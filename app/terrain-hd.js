@@ -378,6 +378,7 @@
  * ================================================================== */
 (() => {
   'use strict';
+  const ASSETS = window.tablefolkPacks?.base || './assets/';
   const HD = window.TablefolkHD;
   const V3 = (x,y,z) => new BABYLON.Vector3(x,y,z);
   const C3 = (r,g,b) => new BABYLON.Color3(r,g,b);

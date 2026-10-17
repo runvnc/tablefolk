@@ -467,6 +467,16 @@
       occupy(c, ent, o.type !== 'wall');
       register(o.type, ent);
     }
+    // Explicit floor tiles: water/lava block placement, and each material's
+    // patch is a ref ("place lamp beside water"), like painted map lines.
+    const paintByMat = new Map();
+    for (const t of spec.paint || []) {
+      const c = [Math.round(t.x), Math.round(t.z)];
+      if (['water', 'lava'].includes(t.mat)) blocked.add(key(c[0], c[1]));
+      if (!paintByMat.has(t.mat)) paintByMat.set(t.mat, []);
+      paintByMat.get(t.mat).push(c);
+    }
+    for (const [mat, cs] of paintByMat) if (mat !== 'none' && !registry.has(mat)) register(mat, { cells: cs, centre: [cs.reduce((a, c) => a + c[0], 0) / cs.length, cs.reduce((a, c) => a + c[1], 0) / cs.length] });
     for (const a of spec.agents || []) if (Array.isArray(a.at)) {
       const c = [Math.round(a.at[0]), Math.round(a.at[1])];
       const ent = { cells: [c], centre: c }; occupy(c, ent, false); register(a.id, ent);
@@ -596,6 +606,133 @@
   // A turn is one character reply (one brain decision), however many commands it ran.
   window.addEventListener('tablefolk-agent-turn', e => { if (!active) return; active.lastTurn = e.detail; if (!active.ended) active.turns++; });
 
+  // ---------- ASCII grid ----------
+  // "grid": rows of glyphs, top row = north, left = west, one glyph per cell,
+  // centred on the board. Default glyphs follow the characters' own vision
+  // map (app.js); digits 1-9 are the scenario's agents in order; "legend"
+  // adds or overrides glyphs: "<object>", "<material>", "<agent id>",
+  // "player", "<object> on <material>" or 'note "text"'. Two adjacent equal
+  // glyphs of a wide item (table, bench, desk, sofa...) make one item.
+  const GRID_GLYPHS = { '#': 'wall', '~': 'water', ',': 'grass', ':': 'dirt', '^': 'stone', '&': 'lava', '=': 'wood', '_': 'oak',
+    C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
+    o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
+    $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
+    K: 'bookshelf', Y: 'player', '@': 'player' };
+  function parseGlyph(v, agentIds) {
+    const str = String(v).trim();
+    const note = str.match(/^note\s+"([^"]*)"$/i);
+    if (note) return { obj: 'note', text: note[1] };
+    const on = str.match(/^(.+?)\s+on\s+(\S+)$/i);
+    if (on) { const a = parseGlyph(on[1], agentIds), m = matOf(on[2].toLowerCase()); return a && m ? { ...a, mat: m } : null; }
+    if (agentIds.includes(str)) return { agent: str };
+    const w = str.toLowerCase().replace(/\s+/g, '_');
+    if (w === 'player') return { player: true };
+    const mat = matOf(w.replace(/_floor$|^floor_/, ''));
+    if (mat && mat !== 'none') return { mat };
+    const thing = singular(w);
+    return THINGS.includes(thing) ? { obj: thing } : null;
+  }
+  // Grid cell (row r, column c) -> board cell. North = -z, east = -x.
+  function gridOrigin(rows, cols) { return { x0: Math.floor((cols - 1) / 2), z0: Math.floor((rows - 1) / 2) }; }
+  function expandGrid(scn) {
+    if (!scn.grid.length) return { ...scn, gridWarnings: [] };
+    const ids = scn.agents.map(a => a.id), legend = {}, warnings = [];
+    for (const [g, v] of Object.entries(GRID_GLYPHS)) legend[g] = parseGlyph(v, ids);
+    ids.slice(0, 9).forEach((id, i) => { legend[String(i + 1)] = { agent: id }; });
+    for (const [g, v] of Object.entries(scn.legend)) {
+      const e = [...g].length === 1 ? parseGlyph(v, ids) : null;
+      if (e) legend[g] = e; else warnings.push(`legend "${g}": "${v}" is not a known object, material or character`);
+    }
+    const grid = scn.grid.map(r => [...r]), R = grid.length, C = Math.max(...grid.map(r => r.length));
+    const { x0, z0 } = gridOrigin(R, C), used = new Set(), unknown = new Set();
+    const objects = [], paint = [], agentAt = {};
+    let playerAt = null;
+    for (let r = 0; r < R; r++) for (let c = 0; c < grid[r].length; c++) {
+      const g = grid[r][c];
+      if (g === '.' || g === ' ' || used.has(r + ',' + c)) continue;
+      const e = legend[g];
+      if (!e) { unknown.add(g); continue; }
+      const x = x0 - c, z = r - z0;
+      if (e.mat) paint.push({ x, z, mat: e.mat });
+      if (e.agent) agentAt[e.agent] = [x, z];
+      if (e.player) playerAt = [x, z];
+      if (!e.obj) continue;
+      const extra = e.text != null ? { text: e.text } : {};
+      if (WIDE_ITEMS.has(e.obj) && grid[r][c + 1] === g && !used.has(r + ',' + (c + 1))) {
+        used.add(r + ',' + (c + 1)); objects.push({ type: e.obj, x: x - 0.5, z, ...extra });
+      } else if (WIDE_ITEMS.has(e.obj) && grid[r + 1]?.[c] === g) {
+        used.add((r + 1) + ',' + c); objects.push({ type: e.obj, x, z: z + 0.5, ry: Math.PI / 2, ...extra });
+      } else objects.push({ type: e.obj, x, z, ...extra });
+    }
+    if (unknown.size) warnings.push(`grid: unknown glyphs ${[...unknown].map(g => '"' + g + '"').join(' ')} (add them to "legend")`);
+    return { ...scn, gridWarnings: warnings,
+      objects: [...objects, ...scn.objects], paint: [...paint, ...scn.paint],
+      agents: scn.agents.map(a => !Array.isArray(a.at) && agentAt[a.id] ? { ...a, at: agentAt[a.id] } : a),
+      player: playerAt && !Array.isArray(scn.player?.at) ? { ...scn.player, at: playerAt } : scn.player };
+  }
+
+  // Scenario with explicit objects/paint/positions -> the same in grid form,
+  // over the whole board. Whatever a glyph can't say exactly (turned or
+  // off-cell objects, tinted paint, characters 10+) stays in objects/paint/at.
+  function toAscii(input) {
+    const scn = normalizeScenario(input), w = W();
+    const halfW = w?.WORLD?.halfW ?? 6, halfH = w?.WORLD?.halfH ?? 5;
+    const rows = 2 * halfH + 1, cols = 2 * halfW + 1, { x0, z0 } = gridOrigin(rows, cols);
+    const cellOf = (x, z) => [z + z0, x0 - x];
+    // Full board, '.' everywhere: row width sets where the grid is centred.
+    const grid = Array.from({ length: rows }, () => Array(cols).fill('.'));
+    const glyphOf = {}, legend = {}, ids = scn.agents.map(a => a.id);
+    for (const [g, v] of Object.entries(GRID_GLYPHS)) if (!(v in glyphOf)) glyphOf[v] = g;
+    const pool = [...'EGHIJOQRUVXZdefgijkmqrxyz0%+!?*<>'].filter(g => !(g in GRID_GLYPHS));
+    const glyphFor = name => { if (!(name in glyphOf)) { const g = pool.shift(); if (!g) return null; glyphOf[name] = g; legend[g] = name; } return glyphOf[name]; };
+    const inGrid = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
+    const matAt = new Map(), taken = new Set();
+    const leftPaint = [], leftObjects = [];
+    for (const t of scn.paint) {
+      const [r, c] = cellOf(+t.x, +t.z), g = !t.tint && Number.isInteger(+t.x) && Number.isInteger(+t.z) && inGrid(r, c) && glyphFor(t.mat);
+      if (g) { grid[r][c] = g; matAt.set(r + ',' + c, t.mat); } else leftPaint.push(t);
+    }
+    // A thing standing on paint gets a combined glyph ("chest on stone").
+    const place = (cellsRC, name) => {
+      if (!cellsRC.every(([r, c]) => inGrid(r, c) && !taken.has(r + ',' + c))) return false;
+      const mats = new Set(cellsRC.map(([r, c]) => matAt.get(r + ',' + c) || ''));
+      const m = mats.size === 1 ? [...mats][0] : '';
+      const g = glyphFor(m ? `${name} on ${m}` : name); if (!g) return false;
+      for (const [r, c] of cellsRC) { grid[r][c] = g; taken.add(r + ',' + c); }
+      return true;
+    };
+    // Physics leaves things a little off their cell: snap within 0.1.
+    const near = (a, b) => Math.abs(a - b) < 0.1, snap = v => near(v, Math.round(v)) ? Math.round(v) : v;
+    const half = v => near(Math.abs(v % 1), 0.5), turned = ry => near(Math.abs(ry) % Math.PI, Math.PI / 2);
+    for (const o of scn.objects) {
+      const ry = +o.ry || 0, plain = near(ry % (2 * Math.PI), 0) || near(Math.abs(ry % (2 * Math.PI)), 2 * Math.PI);
+      const x = half(+o.x) ? Math.round(+o.x * 2) / 2 : snap(+o.x), z = half(+o.z) ? Math.round(+o.z * 2) / 2 : snap(+o.z);
+      const name = o.type === 'note' && o.text ? `note "${String(o.text).replace(/"/g, "'")}"` : o.type;
+      let cellsRC = null;
+      if (WIDE_ITEMS.has(o.type) && plain && half(x) && Number.isInteger(z)) cellsRC = [cellOf(x + 0.5, z), cellOf(x - 0.5, z)].sort((a, b) => a[1] - b[1]);
+      else if (WIDE_ITEMS.has(o.type) && turned(ry) && half(z) && Number.isInteger(x)) cellsRC = [cellOf(x, z - 0.5), cellOf(x, z + 0.5)];
+      else if (!WIDE_ITEMS.has(o.type) && (plain || o.type === 'wall') && Number.isInteger(x) && Number.isInteger(z)) cellsRC = [cellOf(x, z)];
+      if (!cellsRC || !place(cellsRC, name)) leftObjects.push(o);
+    }
+    const agents = scn.agents.map((a, i) => {
+      if (i >= 9 || !Array.isArray(a.at) || !Number.isInteger(snap(+a.at[0])) || !Number.isInteger(snap(+a.at[1]))) return a;
+      const [r, c] = cellOf(snap(+a.at[0]), snap(+a.at[1]));
+      if (!inGrid(r, c) || taken.has(r + ',' + c)) return a;
+      const m = matAt.get(r + ',' + c);
+      grid[r][c] = m ? glyphFor(`${a.id} on ${m}`) : String(i + 1); taken.add(r + ',' + c);
+      const { at, ...rest } = a; return rest;
+    });
+    let player = scn.player;
+    const pa = scn.player?.at;
+    if (Array.isArray(pa) && Number.isInteger(snap(+pa[0])) && Number.isInteger(snap(+pa[1]))) {
+      const [r, c] = cellOf(snap(+pa[0]), snap(+pa[1]));
+      if (inGrid(r, c) && !taken.has(r + ',' + c)) { grid[r][c] = 'Y'; const { at, ...rest } = scn.player; player = rest; }
+    }
+    // Dropped: normalize-only fields that would just add noise to the JSON.
+    const { gridWarnings, ...out } = { ...scn, grid: grid.map(r => r.join('')), legend, objects: leftObjects, paint: leftPaint, agents, player };
+    return out;
+  }
+
   function normalizeScenario(s) {
     if (!s || typeof s !== 'object') throw new Error('scenario must be a JSON object');
     if (s.v && s.v !== 1) throw new Error('unsupported scenario version ' + s.v);
@@ -608,6 +745,8 @@
       base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'island', walls: ['block', 'modern'].includes(s.walls) ? s.walls : 'tabletop',
       pathfinding: s.pathfinding !== false, campfire: s.campfire !== false,
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,
+      grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
+      legend: s.legend && typeof s.legend === 'object' ? Object.fromEntries(Object.entries(s.legend).map(([k, v]) => [k, String(v)])) : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
@@ -643,12 +782,15 @@
   }
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
-    const scn = normalizeScenario(input);
+    const base = normalizeScenario(input);
     // Extra asset packs first, so their object types exist for the layout.
-    for (const r of await Promise.allSettled(scn.packs.map(u => window.tablefolkPacks.load(u)))) {
+    for (const r of await Promise.allSettled(base.packs.map(u => window.tablefolkPacks.load(u)))) {
       if (r.status === 'rejected') { console.error(r.reason); window.tablefolkToast?.('asset pack failed: ' + r.reason.message, { type: 'error' }); }
     }
     refreshThings();
+    // The grid becomes ordinary objects, paint and positions for the build;
+    // the link and restart keep the compact grid.
+    const scn = expandGrid(base);
     stopChecker();
     w.state.saveKey = SCENARIO_KEY;
     w.setWallStyle?.(scn.walls);
@@ -706,15 +848,16 @@
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
-    const code = opts.code || await encodeScenario(scn);
-    active = { scn, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
+    plan.warnings.unshift(...scn.gridWarnings);
+    const code = opts.code || await encodeScenario(base);
+    active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
     if (!opts.testing && (scn.intro || scn.goal?.text)) showIntro(scn);
     startChecker();
-    return { scenario: scn, plan };
+    return { scenario: base, plan };
   }
 
   async function exitScenario() {
@@ -810,7 +953,8 @@
     const dirName = d => Math.abs(d.z) >= Math.abs(d.x) ? (d.z < 0 ? 'n' : 's') : (d.x < 0 ? 'e' : 'w');
     return {
       v: 1, title: base.title || 'My scenario', intro: base.intro || '', seed: base.seed ?? 1,
-      player: { name: document.getElementById('chatName')?.value || 'Traveller', gold: st.player.gold || 0, items: st.player.items || [] },
+      player: { name: document.getElementById('chatName')?.value || 'Traveller', gold: st.player.gold || 0, items: st.player.items || [],
+        ...(st.playerAvatar ? { at: [Math.round(st.playerAvatar.root.position.x), Math.round(st.playerAvatar.root.position.z)] } : {}) },
       allowed: [...st.allowed],
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
@@ -1144,6 +1288,10 @@ turns: 6`;
       let base = {}; try { base = readJson(); } catch {}
       writeJson(exportCurrentWorld(base)); setStatus('exported the current world (explicit positions); edit the goal, then copy the link');
     });
+    $('scnToAscii')?.addEventListener('click', () => {
+      try { const o = toAscii(syncMapIntoJson()); writeJson(o); setStatus(`ASCII grid ${o.grid.length} rows; ${o.objects.length} object(s) kept as exact positions`); }
+      catch (e) { setStatus(e.message, true); }
+    });
     $('scnCopyLink')?.addEventListener('click', async () => {
       try { const o = normalizeScenario(syncMapIntoJson()); const code = await encodeScenario(o); copy(linkFor(code), 'scenario link'); setStatus(`link is ${linkFor(code).length} characters`); }
       catch (e) { setStatus(e.message, true); }
@@ -1201,5 +1349,5 @@ turns: 6`;
   function onReady() { refreshThings(); initPane(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
 
-  window.tablefolkScenario = { parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, exitScenario, exportCurrentWorld, generateMapLines, EXAMPLES, get active() { return active; } };
+  window.tablefolkScenario = { parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, generateMapLines, EXAMPLES, get active() { return active; } };
 })();

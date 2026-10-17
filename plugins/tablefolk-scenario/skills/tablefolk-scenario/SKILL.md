@@ -141,6 +141,35 @@ spell.fireball`. Allow only what the scene needs: fewer choices make small
 models behave. `say` is almost always wanted; add `walk` for movement, `give`
 / `sell` / `inventory` for trading, `emote` for flavour.
 
+## ASCII grid (exact rooms, easiest to write)
+
+```jsonc
+"grid": [
+  "#########",
+  "#KK...v.#",
+  "#.tt..F.#",
+  "#.1...F.#",
+  "#RRR..2.#",
+  "#x..N.~~#",
+  "#..Y..~~#"
+],
+"legend": { "R": "carpet", "x": "chest on stone", "N": "note \"Quiet please\"" }
+```
+
+One glyph per cell, **top row = north, left = west**, centred on the board
+(max 13 wide x 11 tall). `.` = empty. Defaults: floors `~` water `,` grass `:`
+dirt `^` stone `&` lava `=` wood `_` oak; objects `#` wall `C` crate `B` barrel
+`M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
+stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`
+bag `P` potion `S` scroll `$` coin_pile `D` desk `c` office_chair `A` armchair
+`F` sofa `T` coffee_table `l` floor_lamp `v` plant `K` bookshelf; `1`-`9` = the
+agents in order; `Y` = player. `legend` maps extra glyphs to an object, a
+material, an agent id, `"<thing> on <material>"` or `note "text"`. Wide items
+(`table bench workbench desk sofa`) use two equal glyphs side by side (`tt`) or
+stacked (turned). Things needing rotation go in `objects` with `ry`. Grid,
+`objects` and `map` lines combine (grid first). Prefer the grid for rooms and
+buildings; use map lines for loose, natural scatter.
+
 ## Map lines (layout engine)
 
 ```
