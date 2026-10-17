@@ -1,0 +1,9 @@
+{
+  "id": "test-pack",
+  "name": "Test pack (browser tests)",
+  "version": 1,
+  "license": "Reuses the core CC0 anvil model.",
+  "items": {
+    "big_anvil": {"file": "../../../assets/models/props/Anvil.gltf", "w": 1.4, "h": 0.9, "d": 0.8, "mass": 4, "scale": 1.3, "visualYOffset": 0.45, "flammable": false, "material": "metal", "aliases": ["forge"], "tags": ["test"]}
+  }
+}

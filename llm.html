@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tablefolk.world - WebLLM Command Grammar Lab</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 20px auto; padding: 0 16px; }
+  #app { display: flex; flex-direction: column; gap: 8px; }
+  h3 { margin-bottom: 4px; }
+  label { font-size: 0.9em; }
+  select, input, textarea { font-size: 0.9em; }
+  #status { font-size: 0.85em; color: #555; min-height: 1.2em; }
+  #output { white-space: pre-wrap; border: 1px solid #ccc; min-height: 40px; padding: 4px; margin-top: 8px; font-size: 0.9em; }
+  #debug-output { white-space: pre-wrap; border: 1px solid #ddd; background: #fafafa; min-height: 32px; padding: 4px; margin-top: 8px; font-size: 0.75em; color: #444; }
+  button { padding: 6px 16px; font-size: 1em; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .note { font-size: 0.8em; color: #888; margin-top: 4px; }
+  .sys-msg { border-left: 3px solid #999; padding-left: 8px; margin-bottom: 4px; }
+  .constraint-box { border-left: 3px solid #6a8; padding-left: 8px; margin-bottom: 4px; }
+  .constraint-box textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.85em; }
+  .controls-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .controls-row label { white-space: nowrap; }
+  input[type="range"] { width: 80px; vertical-align: middle; }
+  input[type="number"] { width: 60px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h3>tablefolk.world WebLLM Command Grammar Lab</h3>
+  <p style="font-size:0.85em;color:#666;margin:0 0 4px 0">Sidecar copy of the WebLLM constrained command prototype — runs entirely in your browser</p>
+  <div>
+    <label>Model:</label>
+    <select id="model-select"></select>
+  </div>
+  <div>
+    <label>Grammar:</label>
+    <select id="grammar-select"></select>
+  </div>
+  <div class="constraint-box">
+    <label>Custom constraint (optional):</label>
+    <textarea id="custom-constraint" rows="8" placeholder="Simple command spec example:
+say(text)
+walk(direction: north|south|east|west)
+spell(name: heal|shield|lightning|fireball, target)
+
+Output can be up to four command lines by default:
+say(&quot;hello&quot;)
+walk(north)
+
+Optional limits:
+@one
+@count 2
+@max 4
+
+Or paste EBNF with root ::= ..."></textarea>
+    <div class="note">If filled, this overrides the Grammar dropdown. Simple command specs compile to plain constrained command lines, not JSON. Enable Debug to inspect grammar; enable Dry-run to skip generation.</div>
+  </div>
+  <div class="controls-row">
+    <div>
+      <label>Greedy:</label>
+      <input type="checkbox" id="greedy" checked>
+    </div>
+    <div>
+      <label>Temp:</label>
+      <input type="range" id="temp" min="0" max="2" step="0.1" value="0.7">
+      <span id="temp-val">0.7</span>
+    </div>
+    <div>
+      <label>Freq.Pen:</label>
+      <input type="range" id="freq-penalty" min="0" max="2" step="0.1" value="0">
+      <span id="freq-penalty-val">0</span>
+    </div>
+    <div>
+      <label>Max tokens:</label>
+      <input type="number" id="max-tokens" value="100" min="1" max="500" style="width:60px">
+    </div>
+    <div>
+      <label>Thinking:</label>
+      <input type="checkbox" id="enable-thinking">
+    </div>
+    <div>
+      <label>Debug:</label>
+      <input type="checkbox" id="debug-grammar">
+    </div>
+    <div>
+      <label>Dry-run:</label>
+      <input type="checkbox" id="dry-run">
+    </div>
+  </div>
+  <div id="status">Loading...</div>
+  <div class="sys-msg">
+    <label>System message:</label>
+    <textarea id="system-msg" rows="3" cols="70">You are an RPG command planner. Output only command lines matching the grammar. Use the fewest commands needed. Do not cast spells unless explicitly requested. Do not invent combat. Do not explain.</textarea>
+  </div>
+  <textarea id="input" rows="4" cols="70" placeholder="Enter prompt...">Tell the guard hello, then walk north.</textarea>
+  <br>
+  <button id="generate" disabled>Generate</button>
+  <pre id="output"></pre>
+  <pre id="debug-output" hidden></pre>
+  <div class="note">Requires WebGPU (Chrome/Edge). Auto-detects GPU capabilities and falls back to f32 if shader-f16 is unsupported. Thinking disabled by default.</div>
+</div>
+<script type="module" src="llm_js/main.js"></script>
+</body>
+</html>

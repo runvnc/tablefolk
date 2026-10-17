@@ -1,0 +1,174 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>tile preview</title>
+<style>html,body{margin:0;height:100%;background:#10151c;overflow:hidden}canvas{width:100%;height:100%;display:block}
+#hud{position:fixed;left:8px;top:8px;color:#9fb;font:12px monospace;white-space:pre;z-index:5}</style>
+</head><body>
+<canvas id="c"></canvas><div id="hud"></div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script>
+const qs = new URLSearchParams(location.search);
+const num = (k,d) => { const v = qs.get(k); return v===null ? d : parseFloat(v); };
+const flag = (k,d) => { const v = qs.get(k); return v===null ? d : (v==='1'||v==='true'); };
+const FILE = qs.get('f') || 'grass_tripo_v7_g60.glb';
+const N = parseInt(qs.get('n') || '4');
+const RAD = num('r', 6);
+const BETA = num('b', 0.95);
+const ALPHA = num('a', -0.785);
+const YAW = qs.get('yaw') !== '0';
+const SEED = parseInt(qs.get('seed') || '12345');
+const ENVI = num('envi', 0.3);
+const HEMI = num('hemi', 0.4);
+const DIRI = num('diri', 1.1);
+const UNLIT = flag('unlit', false);
+const EXPOSURE = num('exp', 1.0);
+// --- new material / post params -----------------------------------------
+const SSAO = flag('ssao', true);            // SSAO2 pipeline
+const SSAO_STR = num('ssaostr', 1.1);       // totalStrength
+const SSAO_RAD = num('ssaorad', 0.55);      // world-space radius
+const SSAO_ONLY = flag('ssaoonly', false);  // debug: show raw AO buffer
+const DETAIL = num('detail', 1.0);          // detail normal blend 0..1
+const DSCALE = num('dscale', 6);            // detail map uv tiling
+const ROUGH = num('rough', -1);             // override roughnessFactor
+const SHADOW = flag('shadow', true);
+const TONEMAP = qs.get('tonemap') || 'aces'; // aces | neutral | none
+const CONTRAST = num('contrast', 1.0);
+const GRADE = flag('grade', false);          // teal-shadow / warm-highlight curves
+const BG = qs.get('bg') || '0.05,0.07,0.10';
+window.__ready = false;
+(async () => {
+  const canvas = document.getElementById('c');
+  const engine = new BABYLON.Engine(canvas, true, {preserveDrawingBuffer:true});
+  const scene = new BABYLON.Scene(engine);
+  const bg = BG.split(',').map(Number);
+  scene.clearColor = new BABYLON.Color4(bg[0],bg[1],bg[2],1);
+  scene.environmentTexture = new BABYLON.CubeTexture('https://assets.babylonjs.com/environments/environmentSpecular.env', scene);
+  scene.environmentIntensity = ENVI;
+  const cam = new BABYLON.ArcRotateCamera('cam', ALPHA, BETA, RAD, BABYLON.Vector3.Zero(), scene);
+  cam.attachControl(canvas, true);
+  cam.wheelPrecision = 20;
+  cam.lowerRadiusLimit = 0.5;
+  cam.minZ = 0.1; cam.maxZ = 100;   // tight range: SSAO depth precision depends on this
+  const hemi = new BABYLON.HemisphericLight('h', new BABYLON.Vector3(0.2,1,0.1), scene);
+  hemi.intensity = HEMI; hemi.groundColor = new BABYLON.Color3(0.18,0.20,0.24);
+  const dir = new BABYLON.DirectionalLight('d', new BABYLON.Vector3(-0.5,-1,0.35), scene);
+  dir.intensity = DIRI; dir.position = new BABYLON.Vector3(6,12,-5);
+  let shadowGen = null;
+  if (SHADOW) {
+    shadowGen = new BABYLON.ShadowGenerator(2048, dir);
+    shadowGen.useBlurCloseExponentialShadowMap = true;
+    shadowGen.blurKernel = 24; shadowGen.darkness = 0.30; shadowGen.bias = 0.0012;
+    dir.autoCalcShadowZBounds = false; dir.shadowMinZ = 1; dir.shadowMaxZ = 30;
+    const half = Math.max(3, N);
+    dir.orthoLeft=-half; dir.orthoRight=half; dir.orthoTop=half; dir.orthoBottom=-half;
+  }
+
+  // shared detail normal map (clay tooth) -- Tripo's per-asset normals are blank
+  let detailTex = null;
+  if (DETAIL > 0) {
+    detailTex = new BABYLON.Texture('./assets/textures/detail_clay_n.png', scene, false, false);
+    detailTex.wrapU = detailTex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  }
+  function applyDetail(m) {
+    if (!(m instanceof BABYLON.PBRMaterial)) return;
+    if (ROUGH >= 0) m.roughness = ROUGH;
+    if (!detailTex) return;
+    m.detailMap.texture = detailTex;
+    m.detailMap.texture.uScale = DSCALE;
+    m.detailMap.texture.vScale = DSCALE;
+    m.detailMap.isEnabled = true;
+    m.detailMap.bumpLevel = DETAIL;
+    m.detailMap.diffuseBlendLevel = 0;
+    m.detailMap.roughnessBlendLevel = DETAIL * 0.35;
+  }
+
+  const container = await BABYLON.SceneLoader.LoadAssetContainerAsync('./assets/models/tiles/', FILE, scene);
+  // measure raw bounds from container meshes
+  const tmp = container.instantiateModelsToScene(n=>n, false);
+  const probe = new BABYLON.TransformNode('probe', scene);
+  tmp.rootNodes.forEach(r=>r.parent = probe);
+  probe.computeWorldMatrix(true);
+  let min = new BABYLON.Vector3(1e9,1e9,1e9), max = new BABYLON.Vector3(-1e9,-1e9,-1e9);
+  probe.getChildMeshes().forEach(m=>{ m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox;
+    min = BABYLON.Vector3.Minimize(min, b.minimumWorld); max = BABYLON.Vector3.Maximize(max, b.maximumWorld); });
+  const ext = max.subtract(min);
+  const mat0 = probe.getChildMeshes().map(m=>m.material).find(Boolean);
+  window.__bounds = { min: min.asArray(), max: max.asArray(), ext: ext.asArray(),
+    meshes: probe.getChildMeshes().length, verts: probe.getChildMeshes().reduce((a,m)=>a+m.getTotalVertices(),0),
+    matType: mat0 && mat0.getClassName(),
+    hasAO: !!(mat0 && mat0.ambientTexture),
+    roughness: mat0 && mat0.roughness, metallic: mat0 && mat0.metallic };
+  document.getElementById('hud').textContent = FILE + '\next ' + ext.asArray().map(v=>v.toFixed(3)).join(', ')
+    + '\nverts ' + window.__bounds.verts
+    + '\nAO tex ' + window.__bounds.hasAO + '  rough ' + window.__bounds.roughness + '  metal ' + window.__bounds.metallic
+    + '\nssao ' + SSAO + ' detail ' + DETAIL + ' x' + DSCALE;
+  probe.dispose();
+  tmp.dispose();
+
+  const s = 1/Math.max(ext.x, ext.z);
+  const cx = (min.x+max.x)/2, cz = (min.z+max.z)/2;
+  // deterministic per-cell PRNG so screenshots are reproducible
+  let _seed = SEED >>> 0;
+  const rnd = () => { _seed = (_seed * 1664525 + 1013904223) >>> 0; return _seed / 4294967296; };
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+    const inst = container.instantiateModelsToScene(n=>n+'_'+i+'_'+j, false);
+    // pivot sits at the CENTRE of the grid cell so yaw spins the tile in place
+    const pivot = new BABYLON.TransformNode('p'+i+'_'+j, scene);
+    pivot.position = new BABYLON.Vector3(i-(N-1)/2, 0, j-(N-1)/2);
+    if (YAW) pivot.rotation.y = Math.floor(rnd()*4) * Math.PI/2;
+    const holder = new BABYLON.TransformNode('t'+i+'_'+j, scene);
+    holder.parent = pivot;
+    inst.rootNodes.forEach(r=>r.parent = holder);
+    holder.scaling = new BABYLON.Vector3(s,s,s);
+    holder.position = new BABYLON.Vector3(-cx*s, -max.y*s, -cz*s);
+    inst.rootNodes.forEach(r=>r.getChildMeshes().forEach(m=>{
+      m.receiveShadows = true;
+      if (shadowGen) shadowGen.addShadowCaster(m, true);
+    }));
+  }
+  scene.materials.forEach(applyDetail);
+  if (UNLIT) scene.materials.forEach(m=>{ m.unlit = true; });
+
+  scene.imageProcessingConfiguration.exposure = EXPOSURE;
+  scene.imageProcessingConfiguration.contrast = CONTRAST;
+  if (TONEMAP === 'none') {
+    scene.imageProcessingConfiguration.toneMappingEnabled = false;
+  } else {
+    scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    scene.imageProcessingConfiguration.toneMappingType =
+      TONEMAP === 'neutral' && BABYLON.ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL !== undefined
+        ? BABYLON.ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL
+        : BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+  }
+  if (GRADE) {
+    const cc = new BABYLON.ColorCurves();
+    cc.shadowsHue = 195; cc.shadowsDensity = 28; cc.shadowsSaturation = -6; cc.shadowsExposure = 4;
+    cc.highlightsHue = 40; cc.highlightsDensity = 18; cc.highlightsSaturation = -4;
+    cc.globalSaturation = 6;
+    scene.imageProcessingConfiguration.colorCurves = cc;
+    scene.imageProcessingConfiguration.colorCurvesEnabled = true;
+  }
+
+  if (SSAO) {
+    try {
+      const ssao = new BABYLON.SSAO2RenderingPipeline('ssao', scene,
+        { ssaoRatio: 1.0, blurRatio: 1.0 }, [cam]);
+      ssao.radius = SSAO_RAD;
+      ssao.totalStrength = SSAO_STR;
+      ssao.base = 0;
+      ssao.samples = 16;
+      ssao.maxZ = 40;
+      ssao.minZAspect = 0.2;
+      ssao.expensiveBlur = true;
+      ssao.bypassBlur = false;
+      window.__ssao = { ok: true, supported: BABYLON.SSAO2RenderingPipeline.IsSupported };
+      if (SSAO_ONLY) scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline('ssao', cam);
+      if (SSAO_ONLY) ssao._ssaoCombinePostProcess && (ssao._ssaoCombinePostProcess.onApply = null);
+    } catch(e) { window.__ssao = { ok:false, err:String(e) }; console.error('ssao', e); }
+  }
+
+  engine.runRenderLoop(()=>scene.render());
+  scene.executeWhenReady(()=>{ setTimeout(()=>{ window.__ready = true; }, 1500); });
+})();
+</script>
+</body></html>

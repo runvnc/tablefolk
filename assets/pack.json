@@ -1,0 +1,26 @@
+{
+  "id": "core",
+  "name": "Tablefolk core",
+  "version": 1,
+  "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt.",
+  "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy), optional aliases and tags.",
+  "items": {
+    "chest": {"file": "models/props/Chest_Wood.gltf", "w": 1.05, "h": 0.75, "d": 0.75, "mass": 1.2, "scale": 0.55, "visualYOffset": 0.38, "flammable": true, "tags": ["fantasy"], "aliases": ["trunk", "treasure"]},
+    "table": {"file": "models/props/Table_Large.gltf", "w": 1.35, "h": 0.85, "d": 0.95, "static": true, "scale": 0.72, "visualYOffset": 0.43, "flammable": true, "tags": ["fantasy"]},
+    "bench": {"file": "models/props/Bench.gltf", "w": 1.35, "h": 0.55, "d": 0.55, "static": true, "scale": 0.88, "visualYOffset": 0.28, "flammable": true, "tags": ["fantasy"]},
+    "stool": {"file": "models/props/Stool.gltf", "w": 0.55, "h": 0.55, "d": 0.55, "mass": 0.7, "scale": 0.78, "visualYOffset": 0.28, "flammable": true, "tags": ["fantasy"], "aliases": ["seat"]},
+    "workbench": {"file": "models/props/Workbench.gltf", "w": 1.35, "h": 0.85, "d": 0.75, "static": true, "scale": 0.82, "visualYOffset": 0.43, "flammable": true, "tags": ["fantasy"]},
+    "cauldron": {"file": "models/props/Cauldron.gltf", "w": 0.8, "h": 0.7, "d": 0.8, "mass": 1.4, "scale": 0.68, "visualYOffset": 0.34, "flammable": false, "material": "metal", "tags": ["fantasy"], "aliases": ["pot"]},
+    "anvil": {"file": "models/props/Anvil.gltf", "w": 0.9, "h": 0.55, "d": 0.48, "mass": 2.4, "scale": 0.75, "visualYOffset": 0.28, "flammable": false, "material": "metal", "tags": ["fantasy"]},
+    "weapon_stand": {"file": "models/props/WeaponStand.gltf", "w": 1, "h": 1.25, "d": 0.55, "static": true, "scale": 0.72, "visualYOffset": 0.62, "flammable": true, "tags": ["fantasy"], "aliases": ["rack", "weapons"]},
+    "axe": {"file": "models/props/Axe_Bronze.gltf", "w": 0.25, "h": 0.75, "d": 0.25, "mass": 0.4, "scale": 0.75, "visualYOffset": 0.38, "flammable": false, "material": "metal", "tags": ["fantasy"]},
+    "pickaxe": {"file": "models/props/Pickaxe_Bronze.gltf", "w": 0.25, "h": 0.75, "d": 0.25, "mass": 0.4, "scale": 0.75, "visualYOffset": 0.38, "flammable": false, "material": "metal", "tags": ["fantasy"]},
+    "bucket": {"file": "models/props/Bucket_Wooden_1.gltf", "w": 0.55, "h": 0.62, "d": 0.55, "mass": 0.6, "scale": 0.72, "visualYOffset": 0.31, "flammable": true, "tags": ["fantasy"]},
+    "bag": {"file": "models/props/Bag.gltf", "w": 0.55, "h": 0.62, "d": 0.55, "mass": 0.45, "scale": 0.85, "visualYOffset": 0.31, "flammable": true, "tags": ["fantasy"], "aliases": ["sack"]},
+    "potion": {"file": "models/props/Potion_1.gltf", "w": 0.32, "h": 0.48, "d": 0.32, "mass": 0.28, "scale": 0.72, "visualYOffset": 0.24, "flammable": false, "material": "glass", "tags": ["fantasy"], "aliases": ["bottle"]},
+    "scroll": {"file": "models/props/Scroll_1.gltf", "w": 0.45, "h": 0.25, "d": 0.45, "mass": 0.22, "scale": 0.75, "visualYOffset": 0.13, "flammable": true, "tags": ["fantasy"]},
+    "coin_pile": {"file": "models/props/Coin_Pile.gltf", "w": 0.55, "h": 0.28, "d": 0.55, "mass": 0.35, "scale": 0.75, "visualYOffset": 0.14, "flammable": false, "material": "metal", "tags": ["fantasy"], "aliases": ["coins", "coin", "gold"]},
+    "apple_crate": {"file": "models/props/FarmCrate_Apple.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["apples"]},
+    "carrot_crate": {"file": "models/props/FarmCrate_Carrot.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["carrots"]}
+  }
+}

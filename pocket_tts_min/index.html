@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pocket TTS Minimal Browser Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; line-height: 1.4; }
+    textarea, select, button { font: inherit; }
+    textarea { width: 100%; height: 130px; box-sizing: border-box; padding: 12px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+    button { padding: 8px 14px; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    #status { padding: 10px 12px; background: #f5f5f5; border-radius: 8px; white-space: pre-wrap; }
+    audio { width: 100%; margin-top: 12px; }
+    .small { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Pocket TTS minimal browser demo</h1>
+  <p class="small">Static demo. Inference runs in your browser via ONNX Runtime WASM; model files are fetched from the Hugging Face Space on first load.</p>
+
+  <textarea id="text">Hello, this is Pocket TTS running locally in the browser with ONNX Runtime.</textarea>
+
+  <div class="row">
+    <label>Language
+      <select id="language">
+        <option value="english_2026-04">English</option>
+        <option value="german">German</option>
+        <option value="italian">Italian</option>
+        <option value="portuguese">Portuguese</option>
+        <option value="spanish">Spanish</option>
+      </select>
+    </label>
+
+    <label>Voice
+      <select id="voice"><option>loading...</option></select>
+    </label>
+  </div>
+
+  <div class="row">
+    <button id="generate" disabled>Loading models...</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="download" disabled>Download WAV</button>
+  </div>
+
+  <div class="row small">
+    <label>Playback buffer
+      <input id="bufferMs" type="range" min="0" max="1500" step="50" value="600">
+      <span id="bufferLabel">600 ms</span>
+    </label>
+    <span>Higher = fewer dropouts, lower = lower latency.</span>
+  </div>
+
+  <div id="status">Starting worker...</div>
+  <audio id="audio" controls></audio>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const SAMPLE_RATE_FALLBACK = 24000;
+
+let worker;
+let audioCtx;
+let pcmNode;
+let pcmGain;
+let underruns = 0;
+let bufferedMs = 0;
+let sampleRate = SAMPLE_RATE_FALLBACK;
+let chunks = [];
+let startedAt = 0;
+let firstAudioAt = 0;
+let isReady = false;
+let objectUrl = null;
+
+function setStatus(s) { $('status').textContent = s; }
+function setBusy(busy) {
+  $('generate').disabled = busy || !isReady;
+  $('stop').disabled = !busy;
+  $('language').disabled = busy || !isReady;
+  $('voice').disabled = busy || !isReady;
+}
+
+function playbackBufferSec() {
+  return Number($('bufferMs').value || 0) / 1000;
+}
+
+async function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    await audioCtx.audioWorklet.addModule('./pcm-worklet.js');
+    pcmNode = new AudioWorkletNode(audioCtx, 'pocket-pcm-processor', {
+      processorOptions: {
+        minBufferSamples: Math.floor(audioCtx.sampleRate * playbackBufferSec()),
+        bufferSize: audioCtx.sampleRate * 60,
+      }
+    });
+    pcmGain = audioCtx.createGain();
+    pcmNode.connect(pcmGain).connect(audioCtx.destination);
+    pcmNode.port.onmessage = (e) => {
+      if (e.data?.type === 'stats') {
+        bufferedMs = e.data.bufferedMs || 0;
+        underruns = e.data.underruns || 0;
+      }
+    };
+  }
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+}
+
+function updateMinBuffer() {
+  if (!pcmNode || !audioCtx) return;
+  pcmNode.port.postMessage({ type: 'set-min-buffer', samples: Math.floor(audioCtx.sampleRate * playbackBufferSec()) });
+}
+
+function resetPlayback() {
+  underruns = 0;
+  bufferedMs = 0;
+  if (pcmNode) {
+    updateMinBuffer();
+    pcmNode.port.postMessage({ type: 'reset' });
+  }
+}
+
+function playFloat32(float32) {
+  // The model outputs 24 kHz. AudioWorklet runs at the hardware context rate.
+  // Browsers resample AudioBufferSourceNode automatically, but worklets do not.
+  // So resample here before pushing into the ring buffer.
+  const targetRate = audioCtx?.sampleRate || sampleRate;
+  const data = sampleRate === targetRate ? float32 : resampleLinear(float32, sampleRate, targetRate);
+  pcmNode.port.postMessage({ type: 'audio', data }, [data.buffer]);
+}
+
+function resampleLinear(input, inRate, outRate) {
+  if (inRate === outRate) return input;
+  const ratio = outRate / inRate;
+  const outLen = Math.max(1, Math.round(input.length * ratio));
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const x = i / ratio;
+    const x0 = Math.floor(x);
+    const x1 = Math.min(input.length - 1, x0 + 1);
+    const t = x - x0;
+    out[i] = input[x0] * (1 - t) + input[x1] * t;
+  }
+  return out;
+}
+
+function concatChunks(list) {
+  const total = list.reduce((n, x) => n + x.length, 0);
+  const out = new Float32Array(total);
+  let off = 0;
+  for (const x of list) { out.set(x, off); off += x.length; }
+  return out;
+}
+
+function wavBlob(float32, rate) {
+  const bytesPerSample = 2;
+  const dataSize = float32.length * bytesPerSample;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  const write = (off, str) => [...str].forEach((c, i) => view.setUint8(off + i, c.charCodeAt(0)));
+  write(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); write(8, 'WAVE');
+  write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, rate, true);
+  view.setUint32(28, rate * bytesPerSample, true); view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, dataSize, true);
+  let off = 44;
+  for (const s of float32) {
+    const v = Math.max(-1, Math.min(1, s));
+    view.setInt16(off, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+    off += 2;
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+function updateAudioElement() {
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = URL.createObjectURL(wavBlob(concatChunks(chunks), sampleRate));
+  $('audio').src = objectUrl;
+  $('download').disabled = false;
+}
+
+function fillVoices(voices, defaultVoice) {
+  $('voice').innerHTML = '';
+  for (const name of voices || []) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    opt.selected = name === defaultVoice;
+    $('voice').appendChild(opt);
+  }
+  isReady = true;
+  $('generate').textContent = 'Generate';
+  setBusy(false);
+}
+
+function initWorker() {
+  worker = new Worker('./inference-worker.js', { type: 'module' });
+  worker.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === 'status') setStatus(m.status + (m.metrics?.rtfx ? `\nRTFx: ${m.metrics.rtfx.toFixed(2)}x` : ''));
+    if (m.type === 'model_status') setStatus(m.text || m.status);
+    if (m.type === 'voices_loaded') fillVoices(m.voices, m.defaultVoice);
+    if (m.type === 'bundle_loaded') { sampleRate = m.sampleRate || SAMPLE_RATE_FALLBACK; }
+    if (m.type === 'loaded') {
+      isReady = true;
+      $('generate').textContent = 'Generate';
+      setBusy(false);
+      setStatus('Ready');
+    }
+    if (m.type === 'voice_set') setStatus(`Voice ready: ${m.voiceName}`);
+    if (m.type === 'generation_started') {
+      chunks = [];
+      firstAudioAt = 0;
+      startedAt = performance.now();
+      underruns = 0;
+      resetPlayback();
+      $('download').disabled = true;
+      setBusy(true);
+      setStatus('Generating...');
+    }
+    if (m.type === 'audio_chunk') {
+      const chunk = new Float32Array(m.data);
+      if (!firstAudioAt) firstAudioAt = performance.now();
+      chunks.push(chunk);
+      playFloat32(chunk);
+      const ttfb = Math.round(firstAudioAt - startedAt);
+      setStatus(`Streaming audio...\nTTFB: ${ttfb} ms\nChunks: ${chunks.length}\nAudio underruns: ${underruns}\nPlayback buffer: ${bufferedMs} ms`);
+    }
+    if (m.type === 'stream_ended') {
+      setBusy(false);
+      if (pcmNode) pcmNode.port.postMessage({ type: 'stream-ended' });
+      updateAudioElement();
+      const total = ((performance.now() - startedAt) / 1000).toFixed(2);
+      setStatus(`Done in ${total}s. Audio chunks: ${chunks.length}. Audio underruns: ${underruns}\nPlayback buffer: ${bufferedMs} ms`);
+    }
+    if (m.type === 'error') {
+      setBusy(false);
+      setStatus('Error: ' + m.error);
+      console.error(m.error);
+    }
+  };
+  worker.postMessage({ type: 'load' });
+}
+
+$('generate').onclick = async () => {
+  await ensureAudio();
+  worker.postMessage({ type: 'generate', data: { text: $('text').value, voice: $('voice').value } });
+};
+$('stop').onclick = () => worker.postMessage({ type: 'stop' });
+$('language').onchange = () => {
+  isReady = false;
+  setBusy(true);
+  worker.postMessage({ type: 'set_language', data: { language: $('language').value } });
+  // worker sends bundle_loaded, but only sends loaded on initial load; mark ready when voices arrive
+  const old = worker.onmessage;
+};
+$('voice').onchange = () => worker.postMessage({ type: 'set_voice', data: { voiceName: $('voice').value } });
+$('download').onclick = () => {
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = 'pocket-tts.wav';
+  a.click();
+};
+
+$('bufferMs').oninput = () => { $('bufferLabel').textContent = `${$('bufferMs').value} ms`; updateMinBuffer(); };
+
+initWorker();
+</script>
+</body>
+</html>

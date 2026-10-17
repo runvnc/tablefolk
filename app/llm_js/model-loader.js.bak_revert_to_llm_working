@@ -1,0 +1,220 @@
+// WebLLM model loader with WebGPU capability detection and fallback
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const MODEL_VARIANTS = {
+  'qwen3-0.6b': {
+    label: 'Qwen3-0.6B',
+    f16: { modelId: 'Qwen3-0.6B-q4f16_1-MLC', vram: '1.4GB' },
+    f32: { modelId: 'Qwen3-0.6B-q4f32_1-MLC', vram: '1.9GB' },
+  },
+  'qwen3.5-0.8b': {
+    label: 'Qwen3.5-0.8B',
+    f16: { modelId: 'Qwen3.5-0.8B-q4f16_1-MLC', vram: '1.6GB' },
+    f32: { modelId: 'Qwen3.5-0.8B-q4f32_1-MLC', vram: '1.9GB' },
+  },
+  'smollm2-360m': {
+    label: 'SmolLM2-360M',
+    f16: { modelId: 'SmolLM2-360M-Instruct-q4f16_1-MLC', vram: '376MB' },
+    f32: { modelId: 'SmolLM2-360M-Instruct-q4f32_1-MLC', vram: '580MB' },
+  },
+  'smollm2-1.7b': {
+    label: 'SmolLM2-1.7B',
+    f16: { modelId: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC', vram: '1.7GB' },
+    f32: { modelId: 'SmolLM2-1.7B-Instruct-q4f32_1-MLC', vram: '2.7GB' },
+  },
+  'qwen2.5-0.5b': {
+    label: 'Qwen2.5-0.5B',
+    f16: { modelId: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', vram: '944MB' },
+    f32: { modelId: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', vram: '1.1GB' },
+  },
+  'tinyllama-1.1b': {
+    label: 'TinyLlama-1.1B',
+    f16: { modelId: 'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC', vram: '697MB' },
+    f32: { modelId: 'TinyLlama-1.1B-Chat-v1.0-q4f32_1-MLC', vram: '840MB' },
+  },
+  'llama3.2-1b': {
+    label: 'Llama-3.2-1B',
+    f16: { modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', vram: '879MB' },
+    f32: { modelId: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', vram: '1.1GB' },
+  },
+};
+
+
+let hfProxyChecked = false;
+let hfProxyAvailable = false;
+let fetchProxyInstalled = false;
+const PREFER_F32_SAFE_MODE = (() => {
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    return qs.has('f32') || localStorage.getItem('tablefolk_force_f32') === '1';
+  } catch {
+    return false;
+  }
+})();
+
+function shouldProxyUrl(url) {
+  try {
+    const u = new URL(url, window.location.href);
+    return u.protocol === 'https:' && (
+      u.hostname === 'huggingface.co' ||
+      u.hostname === 'cdn-lfs.huggingface.co' ||
+      u.hostname === 'cas-bridge.xethub.hf.co' ||
+      u.hostname === 'transfer.xethub.hf.co'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function proxyUrl(url) {
+  return `/hf-proxy?url=${encodeURIComponent(url)}`;
+}
+
+async function detectHFProxy(onProgress) {
+  if (hfProxyChecked) return hfProxyAvailable;
+  hfProxyChecked = true;
+  try {
+    const res = await fetch('/hf-proxy-health', { cache: 'no-store' });
+    hfProxyAvailable = !!res.ok;
+  } catch {
+    hfProxyAvailable = false;
+  }
+  if (hfProxyAvailable) onProgress?.('Using local Hugging Face asset proxy');
+  return hfProxyAvailable;
+}
+
+function installHFProxyFetch(onProgress) {
+  if (fetchProxyInstalled || !hfProxyAvailable || typeof window === 'undefined') return;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    try {
+      if (typeof input === 'string' || input instanceof URL) {
+        const url = String(input);
+        if (shouldProxyUrl(url)) return originalFetch(proxyUrl(url), init);
+      } else if (input instanceof Request && shouldProxyUrl(input.url)) {
+        const req = new Request(proxyUrl(input.url), input);
+        return originalFetch(req, init);
+      }
+    } catch (e) {
+      console.warn('HF proxy fetch rewrite failed; falling back to direct fetch', e);
+    }
+    return originalFetch(input, init);
+  };
+  fetchProxyInstalled = true;
+  onProgress?.('Installed same-origin HF fetch proxy');
+}
+
+let engine = null;
+let currentModel = null;
+let loading = false;
+let hasShaderF16 = null;
+
+async function detectShaderF16() {
+  if (hasShaderF16 !== null) return hasShaderF16;
+  if (!navigator.gpu) return (hasShaderF16 = false);
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    hasShaderF16 = !!adapter?.features?.has('shader-f16');
+    return hasShaderF16;
+  } catch {
+    hasShaderF16 = false;
+    return false;
+  }
+}
+
+function getBestVariant(modelKey) {
+  const model = MODEL_VARIANTS[modelKey];
+  if (!model) return null;
+  // Default is f16 when shader-f16 is truly supported because it is much more
+  // efficient. For older/problem GPUs, add ?f32=1 to the URL or run
+  // localStorage.setItem('tablefolk_force_f32','1') in devtools.
+  if (PREFER_F32_SAFE_MODE) return { ...model.f32, variant: 'f32' };
+  return hasShaderF16 === true ? { ...model.f16, variant: 'f16' } : { ...model.f32, variant: 'f32' };
+}
+
+function getFallbackVariant(modelKey) {
+  const model = MODEL_VARIANTS[modelKey];
+  if (!model) return null;
+  if (PREFER_F32_SAFE_MODE) return hasShaderF16 === true ? { ...model.f16, variant: 'f16' } : null;
+  return hasShaderF16 === true ? { ...model.f32, variant: 'f32' } : { ...model.f16, variant: 'f16' };
+}
+
+function makeLocalAppConfig(variant) {
+  if (!hfProxyAvailable || typeof window === 'undefined') return null;
+  const rec = webllm.prebuiltAppConfig?.model_list?.find(x => x.model_id === variant.modelId);
+  if (!rec) return null;
+  return {
+    model_list: [{
+      ...rec,
+      model: `${window.location.origin}/hf-model/mlc-ai/${variant.modelId}`,
+    }],
+    cacheBackend: 'cache',
+  };
+}
+
+export function getAvailableModels() {
+  // tablefolk.world intentionally uses one tiny local brain for now.
+  // Keep the other variant metadata above for future experiments, but do not expose a selector.
+  const val = MODEL_VARIANTS['qwen3.5-0.8b'];
+  return [{ key: 'qwen3.5-0.8b', label: val.label }];
+}
+
+export function getCurrentModel() {
+  return currentModel;
+}
+
+export async function loadModel(modelKey, onProgress) {
+  const model = MODEL_VARIANTS[modelKey];
+  if (!model) throw new Error(`Unknown model: ${modelKey}`);
+  if (engine && currentModel === modelKey) return engine;
+  if (loading) return;
+
+  if (engine) {
+    try { engine.unload(); } catch {}
+    engine = null;
+  }
+  currentModel = null;
+  loading = true;
+  await detectShaderF16();
+  await detectHFProxy(onProgress);
+  installHFProxyFetch(onProgress);
+  let variant = getBestVariant(modelKey);
+  onProgress?.(`Selected ${variant.variant.toUpperCase()} variant (${variant.vram})${PREFER_F32_SAFE_MODE ? ' via f32 safe mode' : ''}`);
+  try {
+    engine = await tryLoadVariant(variant, onProgress);
+    currentModel = modelKey;
+    onProgress?.('Ready');
+    return engine;
+  } catch (e) {
+    const fallback = getFallbackVariant(modelKey);
+    if (fallback && fallback.modelId !== variant.modelId) {
+      onProgress?.(`${variant.variant.toUpperCase()} failed: ${e.message}. Trying ${fallback.variant.toUpperCase()}...`);
+      engine = await tryLoadVariant(fallback, onProgress);
+      currentModel = modelKey;
+      onProgress?.('Ready (fallback)');
+      return engine;
+    }
+    throw e;
+  } finally {
+    loading = false;
+  }
+}
+
+async function tryLoadVariant(variant, onProgress) {
+  const appConfig = makeLocalAppConfig(variant);
+  const config = {
+    initProgressCallback: (progress) => { if (progress.text) onProgress?.(progress.text); },
+  };
+  if (appConfig) {
+    config.appConfig = appConfig;
+    onProgress?.(`Initializing WebLLM (${variant.variant}, local HF proxy model path)...`);
+  } else {
+    onProgress?.(`Initializing WebLLM (${variant.variant})...`);
+  }
+  return await webllm.CreateMLCEngine(variant.modelId, config);
+}
+
+export function isLoaded() { return engine !== null; }
+export function unloadModel() { if (engine) { try { engine.unload(); } catch {} } engine = null; currentModel = null; }
+export function getEngine() { return engine; }
+export async function getCapabilityInfo() { await detectShaderF16(); return { webgpu: !!navigator.gpu, shaderF16: hasShaderF16 }; }

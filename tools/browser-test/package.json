@@ -1,0 +1,7 @@
+{
+  "name": "tablefolk-browser-test",
+  "private": true,
+  "type": "module",
+  "description": "Drive a real Chrome (WebGPU) over the DevTools protocol to test tablefolk.world. See README.md.",
+  "dependencies": { "playwright-core": "1.49.1" }
+}

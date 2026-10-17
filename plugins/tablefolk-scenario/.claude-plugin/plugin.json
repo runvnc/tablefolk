@@ -1,0 +1,9 @@
+{
+  "name": "tablefolk-scenario",
+  "version": "1.1.0",
+  "description": "Create and share tablefolk.world scenarios: JSON worlds with in-browser LLM characters, played from a #s= link.",
+  "author": {
+    "name": "runvnc"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk"
+}

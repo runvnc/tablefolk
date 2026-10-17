@@ -1,0 +1,14 @@
+{
+  "name": "tablefolk",
+  "owner": {
+    "name": "runvnc",
+    "url": "https://github.com/runvnc"
+  },
+  "plugins": [
+    {
+      "name": "tablefolk-scenario",
+      "source": "./plugins/tablefolk-scenario",
+      "description": "Create and share tablefolk.world scenarios: JSON worlds with in-browser LLM characters, played from a #s= link."
+    }
+  ]
+}
