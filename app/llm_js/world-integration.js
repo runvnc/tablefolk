@@ -617,11 +617,22 @@ async function main() {
       }
       console.log('[tablefolk-world] RAW LLM OUTPUT for agent', g.id, 'at', new Date().toISOString(), 'elapsed ms:', Math.round(performance.now() - decideT0), ':', line);
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
-      const planCmds = planLines.map(l => world.parseLLMCommandLine(l)).filter(Boolean);
-      // Bare continuation lines (e.g. poem lines without say()) right after a say are treated as more speech.
-      for (let i = 0; i < planCmds.length; i++) {
-        if (planCmds[i].kind === 'unknown' && planCmds[i].raw && planCmds[i-1]?.kind === 'say') planCmds[i] = { kind: 'say', text: planCmds[i].raw };
-      }
+      // A line that isn't shaped like a command, name(...), is speech: small
+      // models often answer in plain text ("I am tired. State your
+      // business."), which used to fail as an unknown command. (With thinking
+      // on, plain lines are leftover reasoning and are dropped below.)
+      const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
+      const speakPlain = cfg.thinking !== true && world.getAllowedCommands().includes('say');
+      let saidPlain = false;
+      const planCmds = planLines.map(l => {
+        if (speakPlain && !looksLikeCommand(l)) {
+          const text = l.replace(/^["'\u201c]+|["'\u201d]+$/g, '').trim();
+          if (!text) return null;
+          saidPlain = true;
+          return { kind: 'say', text };
+        }
+        return world.parseLLMCommandLine(l);
+      }).filter(Boolean);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
@@ -638,7 +649,10 @@ async function main() {
       // Keep it as the latest conversational event after generation as well.
       if(chatSuffix && cfg.messages?.length>30) cfg.messages=cfg.messages.slice(-30);
       // Add agent's action as assistant message
-      cfg.messages = (cfg.messages || []).concat([{ role: 'assistant', content: line || 'look()' }]);
+      // Its own reply goes into its history as commands: plain text that was
+      // spoken is stored as say("..."), so it learns the format from itself.
+      const histLine = saidPlain ? planLines.map(l => looksLikeCommand(l) ? l : `say(${JSON.stringify(l.replace(/^["'\u201c]+|["'\u201d]+$/g, '').trim())})`).join('\n') : line;
+      cfg.messages = (cfg.messages || []).concat([{ role: 'assistant', content: histLine || 'look()' }]);
       cfg.recent = (cfg.recent || []).concat(`chose ${line || 'nothing'}`).slice(-6);
       world.setBrainConfig(g.id, cfg);
       appendLog(`${g.id} brain -> ${line || 'look()'}`);
@@ -668,6 +682,7 @@ async function main() {
         const how = [allowedNow.includes('give') ? 'give("item")' : '', allowedNow.includes('sell') ? 'sell("item", price)' : ''].filter(Boolean).join(' or ');
         cfg.messages = cfg.messages.concat([{ role: 'user', content: `SYSTEM: You said you would hand something over, but nothing changed hands. Saying it does nothing; use ${how} to actually do it.` }]);
       }
+      if (saidPlain) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
       if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);
       world.setBrainConfig(g.id, cfg);

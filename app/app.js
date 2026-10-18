@@ -2278,6 +2278,11 @@ function pathPoint(tm,k){
   }
   return {p:tm.end.clone(),dir:tm.end.subtract(tm.start)};
 }
+// Someone (a character or the player's avatar) standing on cell x,z, other than g.
+function occupantAt(x,z,g){
+  const bodies=[...state.characters.filter(c=>c!==g),...(state.playerAvatar && state.playerAvatar!==g ? [state.playerAvatar] : [])];
+  return bodies.find(c=>{ const p=c.logicalPos||c.root.position; return Math.abs(p.x-x)<.6 && Math.abs(p.z-z)<.6; })||null;
+}
 function walk(g,destination){
   const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0]};
   const lp=g.logicalPos||new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
@@ -2292,7 +2297,16 @@ function walk(g,destination){
     description=destination.label;
   }
   if(destination?.type==='coord'){
-    const tx=clamp(Math.round(destination.x),-15,15), tz=clamp(Math.round(destination.z),-15,15);
+    let tx=clamp(Math.round(destination.x),-WORLD.halfW-2,WORLD.halfW+2), tz=clamp(Math.round(destination.z),-WORLD.halfH-2,WORLD.halfH+2);
+    // Someone already stands there: stop on the free cell beside them that's
+    // nearest to us, instead of walking into them.
+    const occ=!destination.object && occupantAt(tx,tz,g);
+    if(occ){
+      const free=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].map(([ox,oz])=>[tx+ox,tz+oz])
+        .filter(([x,z])=>(Math.abs(x-lp.x)<.1 && Math.abs(z-lp.z)<.1) || (cellPassable(x,z) && !occupantAt(x,z,g)))
+        .sort((a,b)=>Math.hypot(a[0]-lp.x,a[1]-lp.z)-Math.hypot(b[0]-lp.x,b[1]-lp.z))[0];
+      if(free){ [tx,tz]=free; description=`beside ${occ.isPlayer?'the player':occ.id}`; }
+    }
     const dx=tx-lp.x, dz=tz-lp.z;
     const distance=Math.hypot(dx,dz);
     targetObject=!!destination.object;
@@ -2301,6 +2315,7 @@ function walk(g,destination){
     // name, so fall back to the coordinates rather than leaking that into
     // speech and into the LLM history the model imitates next turn.
     if(!description || description==='[object Object]') description=`${tx},${tz}`;
+    if(occ && description.startsWith('beside')) destination={...destination,label:description};
     if(distance<.1 || (targetObject && distance<=1.05)) return say(g,`arrived at ${description}`);
     d=new BABYLON.Vector3(dx/distance,0,dz/distance);
     // Stop beside a labeled object; coordinates themselves are exact destinations.
