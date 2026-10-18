@@ -12,7 +12,7 @@ cd tools/browser-test && npm install        # playwright-core only, no browser d
 
 ## Run
 
-1. Start the dev server (if it isn't running): `python3 tablefolk_server.py 8000` in the repo root.
+1. Start the dev server (if it isn't running): `bun server/server.js 8000` in the repo root.
 2. Launch the test Chrome (keep it running; it's a normal window on the desktop):
    `./launch-chrome.sh` (opens `http://localhost:8000/app/?norender=1`).
    - It uses its own profile at `~/.cache/tablefolk-test-chrome`, because Chrome 136+

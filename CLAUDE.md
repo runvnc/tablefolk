@@ -2,7 +2,9 @@
 
 - **Commit and push after every set of edits** (untested is fine; the user wants
   everything saved incrementally).
-- Dev server: `python3 tablefolk_server.py 8000` → `http://localhost:8000/app/`.
+- Dev server: `bun server/server.js 8000` → `http://localhost:8000/app/` (Bun;
+  also the LLM proxy and the `/world/<prompt>` scenario generator, see README).
+  The OpenRouter key is in `.env` (`OPENROUTER_API_KEY=`); never print it.
 - Cache busting: modules and assets load with `?v=` strings (see
   `app/preflight.js` and the `import ... ?v=` lines in `app/llm_js/`). Bump the
   version of every changed file, and of every importer up the chain, so all

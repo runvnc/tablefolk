@@ -19,7 +19,7 @@ next to it so it can be edited later).
 ```bash
 git clone --depth 1 https://github.com/runvnc/tablefolk.git
 cd tablefolk
-python3 tablefolk_server.py 8000        # serves http://localhost:8000/app/
+bun server/server.js 8000               # serves http://localhost:8000/app/
 ```
 
 - Needs desktop Chrome or Edge with WebGPU. The first time a character speaks,

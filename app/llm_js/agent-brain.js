@@ -8,6 +8,7 @@ import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from 
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261018a';
+import { OpenAI, collect } from './openai-client.js?v=20261020a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
@@ -20,7 +21,41 @@ const SUPPORTED_MODELS = {
   'minicpm5-1b-gpu': { label: 'MiniCPM5-1B (GPU/WebGPU)', engine: 'transformers.js', size: '~1.4 GB', hidden: true },
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB' },
+  // Any OpenAI-compatible server (settings: Brain options > endpoint). No
+  // download; by default this Tablefolk server's /api/llm proxy.
+  'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },
 };
+
+// The endpoint brain's settings: ?llm=<baseURL>&llmModel=<model> override,
+// else what was saved in this browser, else this server's proxy.
+export function getEndpointConfig() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('tablefolk_llm_endpoint') || '{}') || {}; } catch {}
+  const qs = new URLSearchParams(location.search);
+  const baseURL = qs.get('llm') || saved.baseURL || '/api/llm/v1';
+  return { baseURL: new URL(baseURL, location.href).href.replace(/\/+$/, ''), apiKey: saved.apiKey || '', model: qs.get('llmModel') || saved.model || '' };
+}
+export function setEndpointConfig(cfg) {
+  try { localStorage.setItem('tablefolk_llm_endpoint', JSON.stringify({ baseURL: cfg.baseURL || '', apiKey: cfg.apiKey || '', model: cfg.model || '' })); } catch {}
+}
+
+function createEndpointEngine() {
+  const cfg = getEndpointConfig();
+  const client = new OpenAI({ baseURL: cfg.baseURL, apiKey: cfg.apiKey });
+  return { client, model: cfg.model, unload() {} };
+}
+
+async function generateEndpoint(engine, _prompt, opts = {}) {
+  const fresh = getEndpointConfig();
+  // Settings may change between turns; rebuild the client when they do.
+  if (fresh.baseURL !== engine.client.baseURL || fresh.apiKey !== engine.client.apiKey) Object.assign(engine, createEndpointEngine());
+  const body = { model: fresh.model || undefined, messages: opts.messages || [], max_tokens: opts.maxTokens ?? 256, temperature: opts.temperature ?? 0.7, stream: true };
+  if (opts.dryRun) return '';
+  const started = performance.now();
+  const out = await collect(await engine.client.chat.completions.create(body), opts.onToken ? text => opts.onToken(text, true) : null);
+  opts.debugLog?.('endpoint finished', { ms: Math.round(performance.now() - started), finish: out.finish_reason, usage: out.usage });
+  return out.text;
+}
 const DEFAULT_MODEL = 'gemma4-e2b-litert';
 
 // Default model is Gemma 4 E2B. ?model=<key> picks any model, hidden ones
@@ -73,6 +108,12 @@ export function createAgentBrainManager(config = {}) {
 
   async function load() {
     if (loaded && engine) return engine;
+    if (getEngineType() === 'openai') {
+      engine = createEndpointEngine();
+      loaded = true;
+      onStatus(`endpoint ready: ${engine.client.baseURL}${engine.model ? ' (' + engine.model + ')' : ''}`);
+      return engine;
+    }
     onStatus('checking WebGPU...');
     console.log('[tablefolk-brain] load() starting, model:', currentModelKey, 'engine type:', getEngineType());
     const getCap = getEngineType() === 'transformers.js' ? getCapTJS
@@ -141,7 +182,8 @@ export function createAgentBrainManager(config = {}) {
       constraintInstruction = dyn.instruction;
     }
 
-    const generateFn = getEngineType() === 'transformers.js' ? generateTJS
+    const generateFn = getEngineType() === 'openai' ? generateEndpoint
+      : getEngineType() === 'transformers.js' ? generateTJS
       : getEngineType() === 'litert-lm' ? generateLiteRT
       : getEngineType() === 'wllama' ? generateWllama
       : getEngineType() === 'wllama3' ? generateWllama3
@@ -214,6 +256,6 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, hidden: !!cfg.hidden })),
-    clearConversations: (agentId = null) => clearLiteRTConversations(agentId),
+    clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

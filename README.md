@@ -90,20 +90,27 @@ python3 -m http.server 8080
 - Facing still controls what is visible, but the text UI no longer rotates with the agent
 
 
-## Current dev server
-
-Use the custom character server on port 8000 so WebLLM model assets can be proxied same-origin:
+## Server (Bun)
 
 ```bash
-cd tablefolk
-python3 tablefolk_server.py 8000
+bun server/server.js 8000            # http://localhost:8000/app/
+bun server/server.js 8000 --litert   # also start `litert-lm serve` (native Gemma on this machine)
 ```
 
-Open:
+Besides the static files it serves:
 
-```txt
-http://localhost:8000
-```
+- `/api/llm/v1/...`: an OpenAI-compatible proxy for the characters' "endpoint"
+  brain (pick "OpenAI-compatible endpoint" in the model menu). Settings:
+  `LLM_BASE_URL` (a URL, `openrouter` or `local`), `LLM_API_KEY`, `LLM_MODEL`.
+- `/api/local/v1/...`: the same, to `litert-lm serve` on this machine.
+- `/world/<prompt>`: writes a scenario from the prompt and opens it.
+  Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
+  `openai/gpt-6-luna` on OpenRouter).
+
+Settings come from the environment or `.env` (`OPENROUTER_API_KEY=` is used for
+OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since
+the proxy spends your key. Native local models: `uv tool install litert-lm`,
+then `litert-lm import --from-huggingface-repo litert-community/gemma-4-E4B-it-litert-lm gemma-4-E4B-it-gpu.litertlm gemma4-e4b`.
 
 ## v14.6 (current)
 

@@ -109,6 +109,11 @@ code { color:#ffe0a0; }
 .custom-grid input[type="checkbox"] { width:18px; height:18px; accent-color:#d7ff9a; }
 
 .cache-controls { display:flex; gap:7px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+.llm-endpoint { margin:4px 0 10px; font-size:12px; }
+.llm-endpoint summary { cursor:pointer; margin-bottom:6px; }
+.llm-endpoint label { display:flex; gap:6px; align-items:center; margin:4px 0; }
+.llm-endpoint input { flex:1; min-width:0; }
+.llm-endpoint-note { opacity:.7; margin-top:4px; line-height:1.35; }
 .cache-backend-label { font-size:11px; display:flex; gap:4px; align-items:center; }
 .cache-backend-label select { padding:3px 5px; font-size:11px; }
 #clearCache { padding:5px 8px; font-size:11px; }

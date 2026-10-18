@@ -43,7 +43,7 @@
     ['app.js?v=20261020d'],
     ['scenery.js?v=20261019ze'],
     ['scenario.js?v=20261020d'],
-    ['llm_js/world-integration.js?v=20261020d', 'module'],
+    ['llm_js/world-integration.js?v=20261020e', 'module'],
   ];
 
   function browserSummary() {

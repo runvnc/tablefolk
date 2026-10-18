@@ -1,5 +1,5 @@
-import { createAgentBrainManager } from './agent-brain.js?v=20261019a';
-import { installDevConsole } from './dev-console.js?v=20261019a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261020a';
+import { installDevConsole } from './dev-console.js?v=20261020a';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261019a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
@@ -245,6 +245,7 @@ function getActiveEngine(manager) {
 
 async function clearActiveModelCache(manager) {
   const engine = getActiveEngine(manager);
+  if (engine === 'openai') return;
   if (engine === 'litert-lm') return clearLiteRTCache(manager.getModelKey());
   if (engine === 'wllama') return clearWllamaCache(manager.getModelKey());
   if (engine === 'wllama3') return clearWllama3Cache(manager.getModelKey());
@@ -253,6 +254,7 @@ async function clearActiveModelCache(manager) {
 
 async function hasActiveModelCached(manager) {
   const engine = getActiveEngine(manager);
+  if (engine === 'openai') return true; // nothing to download
   if (engine === 'litert-lm') return hasLiteRTCached(manager.getModelKey());
   if (engine === 'wllama') return hasWllamaCached(manager.getModelKey());
   if (engine === 'wllama3') return hasWllama3Cached(manager.getModelKey());
@@ -429,6 +431,19 @@ async function main() {
       el('brainStatus') && (el('brainStatus').textContent = 'switching to ' + (manager.getSupportedModels().find(m => m.key === newKey)?.label || newKey) + '…');
       el('loadBrains').click();
     });
+  }
+  // Endpoint brain settings (saved in this browser).
+  {
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('tablefolk_llm_endpoint') || '{}') || {}; } catch { return {}; } })();
+    const f = { baseURL: el('llmBaseURL'), apiKey: el('llmApiKey'), model: el('llmModel') };
+    for (const [k, node] of Object.entries(f)) if (node) {
+      node.value = saved[k] || '';
+      node.addEventListener('change', () => {
+        setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model?.value.trim() });
+        appendLog('endpoint settings saved: ' + getEndpointConfig().baseURL);
+      });
+    }
+    if (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.engine === 'openai') el('llmEndpointBox')?.setAttribute('open', '');
   }
   // Initialize cache backend selector
   const backendSelect = el('cacheBackend');
