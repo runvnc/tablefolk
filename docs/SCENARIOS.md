@@ -233,6 +233,22 @@ link keeps the short form, and the same seed gives the same map.
 - `normalizeScenario` keeps `places` (id, kind, centre, bounds, who is there)
   on the result for tools and prompts.
 
+## 2e. Combat
+
+`app/combat.js`. Everyone has hit points: agent `"hp"` (default 10), `"player": {"hp": 12}`.
+`"wield": "iron sword"` on an agent or the player puts a weapon in hand from
+the start (added to the inventory if missing). Commands: `wield(item)` holds a
+weapon from the inventory (`wield(none)` puts it away), `attack(target)` (an
+agent id or `player`) strikes someone next to you: fists 1, dagger/club/staff
+2, sword/axe/mace/spear 3, greatsword/warhammer 4, plus a small roll, 15%
+misses. At 0 a character is defeated: it falls and stops acting. The struck
+character and anyone within earshot hear about it at once. The player fights
+from the chat box: `/attack grub`, `/wield sword`, or F for the nearest foe.
+Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`,
+`{"player_hp": ["<", 5]}`, `{"player_defeated": true}` (a good `lose`).
+Allow `attack` only for characters who should fight, and say in the
+personality when they do ("If insulted twice, attack(player).").
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile

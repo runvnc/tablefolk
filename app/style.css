@@ -363,3 +363,11 @@ code { color:#ffe0a0; }
 .fp-btn[hidden] + .avatar-hint { display:none; }
 #chatDock .avatar-hint { margin:0 2px; }
 .bubble.whisper { font-style:italic; font-size:.85em; opacity:.82; }
+/* combat.js: the player's health and weapon in the chat dock */
+.player-hp { display:flex; align-items:center; gap:8px; font-size:12px; margin:2px 0 4px; }
+.player-hp .hp-label { font-weight:600; }
+.player-hp .hp-bar { flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.12); overflow:hidden; min-width:60px; }
+.player-hp .hp-bar span { display:block; height:100%; background:linear-gradient(90deg,#d84a3a,#e8b04a); transition:width .3s; }
+.player-hp .hp-num { font-variant-numeric:tabular-nums; }
+.player-hp .hp-weapon { opacity:.85; }
+.player-hp.down .hp-bar span { background:#555; }

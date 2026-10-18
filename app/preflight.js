@@ -40,11 +40,12 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261019c'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261020d'],
+    ['app.js?v=20261020j'],
     ['scenery.js?v=20261019ze'],
+    ['combat.js?v=20261020b'],
     ['procgen.js?v=20261020c'],
-    ['scenario.js?v=20261020f'],
-    ['llm_js/world-integration.js?v=20261020i', 'module'],
+    ['scenario.js?v=20261020j'],
+    ['llm_js/world-integration.js?v=20261020j', 'module'],
   ];
 
   function browserSummary() {

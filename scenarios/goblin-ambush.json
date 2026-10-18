@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "title": "Goblin Ambush",
+  "subtitle": "Talk your way out, or fight.",
+  "intro": "Two goblins block the road out of the woods. You have a sword. They have a club and a grudge.",
+  "seed": 2,
+  "lighting": "bright",
+  "size": [15, 11],
+  "floor": "grass",
+  "player": { "name": "Traveller", "gold": 5, "items": [], "hp": 12, "wield": "iron sword", "at": [0, 3] },
+  "allowed": ["say", "walk", "face", "emote", "attack", "wield"],
+  "agents": [
+    { "id": "grub", "style": "big angry goblin", "hp": 8, "wield": "spiked club", "at": [0, 1],
+      "personality": "Grub, a goblin bandit. You want the traveller's gold (at least 5). If they pay, let them pass and say thanks. If they insult you or refuse twice, attack(player) with your club. If you are badly hurt, beg for mercy." },
+    { "id": "snik", "style": "small nervous goblin", "hp": 5, "wield": "rusty dagger", "at": [1, 0],
+      "personality": "Snik, a scared little goblin. You only fight if Grub is attacked, then you attack(player) too. You run away (walk north) if you are hurt." }
+  ],
+  "map": ["place tree x8 scattered at north", "place boulder x2 at west", "dirt path from south to north"],
+  "goal": { "text": "Get past the goblins (talk or fight).", "win": { "any": [{ "agent_defeated": "grub" }, { "said": ["grub", "thanks"] }] }, "lose": { "player_defeated": true }, "maxTurns": 20, "winText": "The road is clear.", "loseText": "You wake up in a ditch, lighter by a purse." }
+}

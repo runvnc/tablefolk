@@ -23,7 +23,7 @@ const SKILL = readFileSync(join(ROOT, 'server/fast-skill.md'), 'utf8');
 const Procgen = globalThis.TablefolkProcgen;
 
 const COMMANDS = new Set(['say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
-  'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball']);
+  'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield']);
 const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius']);
 const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian']);
 const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };

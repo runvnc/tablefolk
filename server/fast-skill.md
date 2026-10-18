@@ -34,9 +34,14 @@ it over."). Every character needs a reason to talk to the player. Give each
 group member its own id (gob1, gob2...) and personality. 2-6 characters.
 
 Commands: say whisper walk face emote give sell inventory look carry drop
-build note spell.spark spell.fireball. Allow only what the scene needs:
+build note attack wield spell.spark spell.fireball. Allow only what the scene needs:
 `say` almost always, `walk` to move, `give`/`sell`/`inventory` for trading
 (give needs the player within 3 cells), `whisper` = only the player hears.
+Combat: agents and the player have "hp" (default 10); "wield": "iron sword"
+puts a weapon in hand. attack(target) strikes someone adjacent; allow it only
+for fighters and say in the personality when they attack. The player can
+always fight (/attack, /wield). Goals: {"agent_defeated": "id"},
+{"player_defeated": true} (use as "lose").
 
 # Map methods (use exactly one)
 

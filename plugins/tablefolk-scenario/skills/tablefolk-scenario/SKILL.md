@@ -221,8 +221,8 @@ the tile (a hole to the sea; walking onto it is a fall).
 ### Commands (`allowed`)
 
 `say walk face look touch push pull carry drop throw dig build repair panic
-emote note give give_quest sell inventory goal whisper spell.push spell.spark
-spell.fireball`. Allow only what the scene needs: fewer choices make small
+emote note give give_quest sell inventory goal whisper attack wield spell.push
+spell.spark spell.fireball`. Allow only what the scene needs: fewer choices make small
 models behave. The top-level `allowed` is every character's default; an agent's
 own `"allowed"` list replaces it for that character (a guard who can only
 `say` and `face`, a mage with `spell.spark`, a merchant with `sell`). `say` is almost always wanted; add `walk` for movement, `give`
@@ -236,6 +236,22 @@ Trading: `give(item)` hands over an item the character has; `sell(item, price)`
 sells it for `price` gold, which the character chooses (haggling is just
 conversation: state the floor price in the personality). Either way the item
 lands in the player's inventory, so `player_has` sees it.
+
+## Combat (`attack`, `wield`, hit points)
+
+Everyone has hit points: agent `"hp"` (default 10), `"player": {"hp": 12}`.
+`"wield": "iron sword"` on an agent or the player puts a weapon in hand from
+the start (added to the inventory if missing). Commands: `wield(item)` holds a
+weapon from the inventory (`wield(none)` puts it away), `attack(target)` (an
+agent id or `player`) strikes someone next to you: fists 1, dagger/club/staff
+2, sword/axe/mace/spear 3, greatsword/warhammer 4, plus a small roll, 15%
+misses. At 0 a character is defeated: it falls and stops acting. The struck
+character and anyone within earshot hear about it at once. The player fights
+from the chat box: `/attack grub`, `/wield sword`, or F for the nearest foe.
+Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`,
+`{"player_hp": ["<", 5]}`, `{"player_defeated": true}` (a good `lose`).
+Allow `attack` only for characters who should fight, and say in the
+personality when they do ("If insulted twice, attack(player).").
 
 ## Generated dungeons and villages (`generate`, fastest)
 
@@ -344,6 +360,9 @@ Predicates are plain JSON (a link can't run code):
 | `prop_state` | `["crate", "burned"]` |
 | `said` | `["mog", "deal"]` (substring; `"any"` = anyone) |
 | `turns_over` | `12` (one character reply = one turn) |
+| `agent_defeated` | `"grub"` |
+| `agent_hp` / `player_hp` | `["grub", "<=", 3]` / `["<", 5]` |
+| `player_defeated` | `true` |
 | combinators | `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` |
 
 Item names match loosely ("potion" matches "healing potion").

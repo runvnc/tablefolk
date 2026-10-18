@@ -225,7 +225,7 @@ function formatActionSummary(historyEntry) {
     if (result.toLowerCase().startsWith(agentId.toLowerCase() + ' ')) return result;
   }
   // Conjugate common verbs: walk->walks, say->says, look->looks, etc.
-  const verbMap = { walk: 'walks', say: 'says', whisper: 'whispers', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory' };
+  const verbMap = { walk: 'walks', say: 'says', whisper: 'whispers', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory', attack: 'attacks', wield: 'wields' };
   const parts = action.split(/\s+/);
   if (parts.length > 0 && verbMap[parts[0]]) parts[0] = verbMap[parts[0]];
   action = parts.join(' ');
@@ -568,7 +568,7 @@ async function main() {
 
   async function runOneAgentTurn(g) {
     const cfg = world.getBrainConfig(g.id);
-    if (cfg.enabled === false) return false;
+    if (cfg.enabled === false || cfg.defeated) return false;
     if (!world.isTurnReady()) { return false; }
     try {
       world.state.nextAgentId = g.id;
@@ -794,6 +794,8 @@ async function main() {
     const name = el('chatName')?.value || 'God';
     let text = input?.value?.trim();
     if (!text) return;
+    // "/attack gob1", "/wield sword": the player's own actions (combat.js).
+    if (text.startsWith('/') && window.tablefolkCombat?.playerCommand(text)) { input.value = ''; return; }
     // "@bram hello" talks to bram (and selects him) whoever is selected.
     const at = text.match(/^@([A-Za-z0-9_-]+)[\s,:]+(.*)$/s);
     if (at) {
@@ -819,6 +821,11 @@ async function main() {
     // running, the loop takes characters with new speech first instead.
     if (!running && manager.isLoaded()) replyNow(g);
   }
+  // Someone attacked a character: it answers now when the brains are idle.
+  window.addEventListener('tablefolk-attacked', e => {
+    const g = world.getAgents().find(a => a.id === e.detail?.agentId);
+    if (g && !running && manager.isLoaded()) setTimeout(() => replyNow(g), 600);
+  });
   let replying = false;
   async function replyNow(g) {
     if (replying) return;

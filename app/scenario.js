@@ -567,6 +567,11 @@
         return ctx.speech.some(s => (who === 'any' || s.agentId.toLowerCase() === who) && s.text.toLowerCase().includes(needle));
       }
       case 'turns_over': return ctx.turns >= +v;
+      // combat (combat.js)
+      case 'agent_defeated': return !!ctx.w.getBrainConfig(String(v))?.defeated;
+      case 'agent_hp': { const cfg = ctx.w.getBrainConfig(v[0]); return cmp(v[1], cfg.hp ?? cfg.maxHp ?? 10, +v[2]); }
+      case 'player_hp': return cmp(v[0], ctx.player.hp ?? ctx.player.maxHp ?? 10, +v[1]);
+      case 'player_defeated': return !!W().getPlayerAvatar?.()?.defeated === (v !== false);
       default: return false;
     }
   }
@@ -897,6 +902,7 @@
     w.setAllowed(scn.allowed);
     w.setLighting?.(scn.lighting);
     w.setPlayer(scn.player);
+    if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 10); window.tablefolkCombat.reset(); }
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
     const holes = [...finalMat.values()].filter(c => c.mat === 'sea');
@@ -935,6 +941,8 @@
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
         ...(a.ttsVoiceId ? { ttsVoiceId: a.ttsVoiceId } : {}), ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
+        // combat.js: hit points, and nothing wielded or defeated from a previous run
+        maxHp: Math.max(1, +a.hp || 10), hp: Math.max(1, +a.hp || 10), wielding: null, defeated: false,
         inventory: { gold: Math.max(0, +(a.inventory?.gold) || 0), items: (a.inventory?.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : { name: String(i.name), qty: i.qty ?? 1 }) },
       });
     }
@@ -945,6 +953,21 @@
       const firstPos = scn.agents[0] && (Array.isArray(scn.agents[0].at) ? { x: +scn.agents[0].at[0], z: +scn.agents[0].at[1] } : plan.agents[scn.agents[0].id]);
       if (!facing && firstPos) { const dx = firstPos.x - pa.x, dz = firstPos.z - pa.z; facing = Math.abs(dz) >= Math.abs(dx) ? (dz < 0 ? 'n' : 's') : (dx < 0 ? 'e' : 'w'); }
       await w.spawnPlayerAvatar(pa.x, pa.z, facing || pa.facing, scn.player?.model);
+    }
+    // Weapons in hand from the start: agent "wield" / player "wield" (added
+    // to the inventory if missing).
+    if (window.tablefolkCombat) {
+      for (const a of scn.agents) if (a.wield) {
+        const g = w.getAgents().find(x => x.id === a.id), cfg = w.getBrainConfig(a.id), inv = cfg.inventory || { gold: 0, items: [] };
+        if (!w.findItem(inv.items, a.wield)) { inv.items.push({ name: String(a.wield), qty: 1 }); w.setBrainConfig(a.id, { inventory: inv }); }
+        if (g) window.tablefolkCombat.wield(g, a.wield);
+      }
+      const av = w.getPlayerAvatar?.();
+      if (scn.player?.wield && av) {
+        if (!w.findItem(w.state.player.items, scn.player.wield)) w.state.player.items.push({ name: String(scn.player.wield), qty: 1 });
+        window.tablefolkCombat.wield(av, scn.player.wield);
+      }
+      window.tablefolkCombat.renderPlayerHp();
     }
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
