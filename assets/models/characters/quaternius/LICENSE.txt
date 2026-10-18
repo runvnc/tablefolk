@@ -1,0 +1,30 @@
+Characters and monsters by Quaternius (https://quaternius.com), downloaded
+from Poly Pizza (https://poly.pizza/u/Quaternius) and compressed with
+tools/compress-glb.sh (meshopt geometry, AVIF textures). Animations are the
+ones that ship in each file.
+
+CC0 1.0 (public domain):
+  adventurer.glb        Adventurer          https://poly.pizza/m/5EGWBMpuXq
+  adventurer_woman.glb  Adventurer          https://poly.pizza/m/ZwF0K7WBmu
+  hooded.glb            Hooded Adventurer   https://poly.pizza/m/y9KWOVG21R
+  king.glb              King                https://poly.pizza/m/I1gTjmuK2m
+  farmer.glb            Farmer              https://poly.pizza/m/7pn3R6hPvE
+  villager.glb          Animated Woman      https://poly.pizza/m/nIItLV9nxS
+  skeleton.glb          Skeleton            https://poly.pizza/m/1XZD9GK6Kj
+  skeleton_warrior.glb  Skeleton            https://poly.pizza/m/yq5ATpujSt
+  zombie.glb            Zombie              https://poly.pizza/m/VlXjG0N8Eg
+  goblin.glb            Goblin              https://poly.pizza/m/OdCOFSmEhl  (also the kobold, recoloured)
+  orc.glb               Orc                 https://poly.pizza/m/5vO2YJsPEf
+  demon.glb             Demon               https://poly.pizza/m/IkB63XOPvr
+  giant.glb             Giant               https://poly.pizza/m/BldaiPtyJa
+  rat.glb               Rat                 https://poly.pizza/m/iltq5bVNaV
+  spider.glb            Spider              https://poly.pizza/m/yRYJiAJyiM
+  wolf.glb              Wolf                https://poly.pizza/m/P1gU3Qkr9r
+  bat.glb               Bat                 https://poly.pizza/m/hNO9XvjlKa
+  dragon.glb            Dragon              https://poly.pizza/m/3rUm1cN3yp
+  ghost.glb             Ghost               https://poly.pizza/m/Iip30bDHmu
+  slime.glb             Slime               https://poly.pizza/m/LyjSUKHKnh
+
+CC-BY 3.0 (credit: Quaternius, via Poly Pizza):
+  witch.glb             Witch               https://poly.pizza/m/QBEOV9ZUT8
+  wizard.glb            Animated Wizard     https://poly.pizza/m/kttbFvCl2C

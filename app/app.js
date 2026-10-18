@@ -964,11 +964,11 @@ function sceneryAnchors(){
   return out;
 }
 const FACING_DIRS={n:[0,0,-1],s:[0,0,1],e:[-1,0,0],w:[1,0,0]};
-// model: a person from AVATAR_MODELS (e.g. 'woman'); default the critter.
+// model: a person from AVATAR_MODELS or FIGURES (e.g. 'woman', 'skeleton'); default the critter.
 async function spawnAgent(id,x,z,facing='s',model){
   const pos=new BABYLON.Vector3(x,.06,z);
   let g;
-  if(model && AVATAR_MODELS[model]){
+  if(isPersonModel(model)){
     try{ g=await createPerson(id,new BABYLON.Vector3(x,state.terrainTopY??0,z),model,model); }
     catch(e){ console.warn('person model failed; using a critter',e); }
   }
@@ -3646,7 +3646,76 @@ function disposeOwnMaterial(m){
 const AVATAR_MODELS={rogue:'Rogue_Hooded.glb',knight:'Knight.glb',mage:'Mage.glb',ranger:'Ranger.glb',barbarian:'Barbarian.glb',woman:'Rogue.glb'};
 const MODEL_LOOKS={woman:{texture:'rogue_modern.png?v=20261018a',hide:/Cape/}};
 const PERSON_H=1.3;
+// Figures: Quaternius characters and monsters (assets/models/characters/
+// quaternius/, CC0/CC-BY, see LICENSE.txt there). Each GLB brings its own
+// clips; FIG_CLIPS maps them onto the KayKit clip names the rest of the code
+// asks for (Idle_A, Walking_A, Melee_1H_Attack_Chop, Hit_A, Death_A, ...).
+// h: standing height in cells; tint: recolour (kobold is a reddish goblin);
+// lift: hover height for fliers.
+const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
+const FIGURES={
+  adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
+  skeleton:{h:1.22}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{h:1.45},
+  demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{h:.85}, bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
+};
+const FIG_CLIPS={
+  Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],
+  Walking_A:['Walk','Fast_Flying','Flying','Run'], Running_A:['Run','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
+  Waving:['Wave','Yes'], Interact:['Interact','PickUp','Yes'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
+  Hit_A:['HitRecieve','HitReact','RecieveHit','Hit','Idle_HitReact_Left'], Hit_B:['HitRecieve_2','RecieveHit_2','Idle_HitReact_Right','HitRecieve','HitReact','Hit'],
+  Death_A:['Death'],
+  Melee_1H_Attack_Chop:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
+  Melee_1H_Attack_Stab:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
+  Melee_2H_Attack_Chop:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Attack2','Headbutt','Punch'],
+  Melee_Unarmed_Attack_Punch_A:['Punch_Right','Punch','Attack','Bite_Front','Headbutt','Sword_Slash'],
+  Melee_Unarmed_Attack_Kick:['Kick_Right','Kick_Left','Punch_Left','Attack2','Attack'],
+  Ranged_Magic_Spellcasting:['Spell1','Spell2','Staff_Attack','Punch'], Ranged_Magic_Shoot:['Spell2','Spell1','Punch'],
+  Throw:['Punch_Right','Punch','Attack'], Sit_Floor_Idle:['Duck','Crawl'],
+};
+const isPersonModel=m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m]));
+// "CharacterArmature|CharacterArmature|Death|CharacterArmature|Dea" -> Death,
+// "BatArmature|Bat_Flying" -> Flying
+function figClipName(n){
+  const seg=String(n).split('|').filter(s=>s && !/Armature/.test(s));
+  return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime)_/,'');
+}
+async function createFigure(id,pos,model,label){
+  const F=FIGURES[model], sc=state.scene;
+  const res=await BABYLON.SceneLoader.ImportMeshAsync('',FIG_ASSET,(F.file||model)+'.glb?v=20261022a',sc);
+  const root=new BABYLON.TransformNode(id,sc); root.position.copyFrom(pos);
+  const importedRoot=res.meshes.find(m=>m.name==='__root__') || res.meshes[0];
+  // like KayKit people: glTF front is +Z; zero yaw must face north (-Z)
+  importedRoot.parent=root; importedRoot.position.set(0,0,0); importedRoot.rotationQuaternion=null; importedRoot.rotation.set(0,0,0);
+  for(const mesh of res.meshes){
+    mesh.receiveShadows=true; mesh.isPickable=true; mesh.metadata={ownerId:id}; addShadow(mesh);
+    const m=mesh.material; if(!m) continue;
+    if(m instanceof BABYLON.PBRMaterial){ m.maxSimultaneousLights=8; m.roughness=Math.max(.55,m.roughness??.7); m.metallic=Math.min(.2,m.metallic??0); }
+    if(F.tint && m.albedoColor && !m._tfTinted){ m._tfTinted=true; m.albedoColor=m.albedoColor.multiply(new BABYLON.Color3(...F.tint)); }
+  }
+  // F.tint changes the shared materials of this file only for this spawn:
+  // ImportMeshAsync gives every spawn its own copies.
+  const clips={};
+  for(const ag of res.animationGroups||[]){ ag.stop(); const n=figClipName(ag.name); if(!clips[n]) clips[n]=ag; }
+  const rigAnims={};
+  for(const [want,from] of Object.entries(FIG_CLIPS)){ const hit=from.map(n=>clips[n]).find(Boolean); if(hit) rigAnims[want]=hit; }
+  // size to its height in cells
+  root.computeWorldMatrix(true);
+  const bb=root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0);
+  const k=F.h/Math.max(.05,bb.max.y-bb.min.y); root.scaling.setAll(k);
+  importedRoot.position.y=(-(bb.min.y-root.position.y)+(F.lift||0)/k);
+  const wide=Math.max(.4,Math.min(1.1,F.h*.55));
+  const collider=BABYLON.MeshBuilder.CreateBox(id+'_collider',{width:wide,height:Math.max(.4,Math.min(1.4,F.h)),depth:wide},sc);
+  collider.position.copyFrom(root.position); collider.position.y+=Math.min(1.4,F.h)/2; collider.isVisible=false; collider.metadata={ownerId:id};
+  const agg=addBody(collider,'dynamic','BOX',1.25,{friction:.92,restitution:.02});
+  agg?.body?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
+  const g={id,root,collider,agg,selected:false,anim:'idle',t:Math.random()*10,dir:new BABYLON.Vector3(0,0,-1),style:label||model,traits:{fireball:40,obedience:50},rigged:true,rigRoot:importedRoot,rigAnims,
+    owned:{meshes:[...res.meshes],skeletons:[...(res.skeletons||[])],groups:[...(res.animationGroups||[])]},rigMode:null,activeRigAnim:null,cosmetic:{},logicalPos:new BABYLON.Vector3(pos.x,0,pos.z),charModel:model,figure:true,height:F.h};
+  playRig(g,'idle',true);
+  state.characters.push(g);
+  return g;
+}
 async function createPerson(id,pos,model,label){
+  if(FIGURES[model]) return createFigure(id,pos,model,label);
   await initKayKitAnimationSources(state.scene);
   const g=await createKayKitCharacter(state.scene,id,pos,AVATAR_MODELS[model],label||model);
   // createKayKitCharacter turns the model half a turn (for an older convention),
@@ -3674,7 +3743,7 @@ async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   model=model||state.avatarModel||'rogue';
   const pos=new BABYLON.Vector3(x,(state.terrainTopY??0),z);
   let g=null;
-  if(AVATAR_MODELS[model]){
+  if(isPersonModel(model)){
     try{ g=await createPerson('player',pos,model,'player'); }
     catch(e){ console.warn('KayKit avatar failed, using a critter body',e); }
   }
@@ -3690,7 +3759,7 @@ async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   // eye height for first person, from the model's real size
   g.root.computeWorldMatrix(true);
   const bb=g.root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0 && !/collider/.test(m.name));
-  g.eyeHeight=(model!=='critter'?PERSON_H:Math.max(.2,bb.max.y-g.root.position.y))*.88;
+  g.eyeHeight=(model!=='critter'?(g.height||PERSON_H):Math.max(.2,bb.max.y-g.root.position.y))*.88;
   const ring=BABYLON.MeshBuilder.CreateTorus('player_ring',{diameter:.95,thickness:.045,tessellation:40},state.scene);
   const rm=new BABYLON.StandardMaterial('player_ring_mat',state.scene); rm.emissiveColor=new BABYLON.Color3(1,.75,.25); rm.disableLighting=true; rm.alpha=.85;
   ring.material=rm; ring.isPickable=false; ring.parent=g.root; ring.position.y=.04/(g.root.scaling.y||1);
@@ -4022,7 +4091,7 @@ async function restoreWorldState(input) {
   for(const g of data.characters){
     const palIdx=styles.indexOf(g.style), palette=palIdx>=0?palettes[palIdx]:palettes[0];
     let character;
-    if(g.model && AVATAR_MODELS[g.model]) try{ character=await createPerson(g.id,new BABYLON.Vector3(g.x,g.y,g.z),g.model,g.model); }catch(e){ console.warn('person restore failed',e); }
+    if(isPersonModel(g.model)) try{ character=await createPerson(g.id,new BABYLON.Vector3(g.x,g.y,g.z),g.model,g.model); }catch(e){ console.warn('person restore failed',e); }
     if(!character) try{ character=await createGeneratedCritter(state.scene,g.id,new BABYLON.Vector3(g.x,g.y,g.z)); }
     catch(e){
       console.warn('generated rigged character restore failed; using procedural fallback',e);
