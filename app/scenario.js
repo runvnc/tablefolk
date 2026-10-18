@@ -41,10 +41,11 @@
   // core pack is assets/pack.json) plus the procedural modern furniture.
   // refreshThings() rebuilds the lists whenever a pack loads.
   const MODERN = ['desk', 'office_chair', 'armchair', 'sofa', 'coffee_table', 'floor_lamp', 'plant', 'bookshelf'];
-  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'note', 'counter'];
+  // Procedural objects (app.js, scenery.js); models come from the packs.
+  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad'];
   let ITEMS = [], THINGS = [], WIDE_ITEMS = new Set();
-  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', lantern: 'lamp', light: 'lamp', torch: 'lamp',
-    sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rock: 'wall',
+  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', torch: 'lantern', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
+    sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rocks: 'boulder',
     shroom: 'mushroom', toadstool: 'mushroom', stall: 'counter', bar: 'counter',
     chair: 'office_chair', couch: 'sofa', settee: 'sofa', floorlamp: 'floor_lamp', houseplant: 'plant', fern: 'plant', shelf: 'bookshelf', bookcase: 'bookshelf', books: 'bookshelf',
     fire: 'campfire', fireplace: 'campfire', home: 'house', cottage: 'house', hut: 'house', building: 'house' };
@@ -55,7 +56,8 @@
   const ARRANGE = { row: 'row', line: 'row', rows: 'row', cluster: 'cluster', group: 'cluster', pile: 'cluster', stack: 'cluster', heap: 'cluster', scattered: 'scattered', scatter: 'scattered', around: 'around', ring: 'around', circle: 'around' };
   const RELWORDS = { beside: 'beside', by: 'beside', next: 'beside', alongside: 'beside', near: 'near', close: 'near', behind: 'behind', front: 'in_front_of', in_front_of: 'in_front_of', around: 'around', surrounding: 'around' };
 
-  const PAINT_MATS = ['stone', 'flagstone', 'dirt', 'wood', 'sand', 'grass', 'water', 'lava', 'oak', 'tile', 'concrete', 'carpet'];
+  // "sea" is a hole in the board (coasts, islands), the rest are floors.
+  const PAINT_MATS = ['stone', 'flagstone', 'dirt', 'wood', 'sand', 'grass', 'water', 'lava', 'oak', 'tile', 'concrete', 'carpet', 'sea'];
   const MAT_ALIASES = { cobble: 'stone', cobblestone: 'stone', cobbles: 'stone', tiles: 'tile', porcelain: 'tile', stones: 'stone', parquet: 'oak', hardwood: 'oak', rug: 'carpet', carpeted: 'carpet', cement: 'concrete', paving: 'flagstone', slabs: 'flagstone',
     planks: 'wood', wooden: 'wood', boards: 'wood', pond: 'water', river: 'water', pool: 'water', mud: 'dirt', gravel: 'dirt', earth: 'dirt', path: 'dirt',
     beach: 'sand', magma: 'lava', erase: 'none', none: 'none', clear: 'none' };
@@ -617,7 +619,8 @@
     C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
     o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
-    K: 'bookshelf', Y: 'player', '@': 'player' };
+    K: 'bookshelf', Y: 'player', '@': 'player',
+    '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern', '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad' };
   function parseGlyph(v, agentIds) {
     const str = String(v).trim();
     const note = str.match(/^note\s+"([^"]*)"$/i);
@@ -633,7 +636,8 @@
     return THINGS.includes(thing) ? { obj: thing } : null;
   }
   // Grid cell (row r, column c) -> board cell. North = -z, east = -x.
-  const EDGE = { x: 5, z: 4 };
+  // Playable cells of the current board: |x| <= x, |z| <= z.
+  const edge = () => { const W0 = W()?.WORLD; return W0 ? { x: W0.halfW - 1, z: W0.halfH - 1 } : { x: 5, z: 4 }; };
   function gridOrigin(rows, cols) { return { x0: Math.floor((cols - 1) / 2), z0: Math.floor((rows - 1) / 2) }; }
   function expandGrid(scn) {
     if (!scn.grid.length) return { ...scn, gridWarnings: [] };
@@ -648,6 +652,7 @@
     const { x0, z0 } = gridOrigin(R, C), used = new Set(), unknown = new Set();
     const objects = [], paint = [], agentAt = {};
     let playerAt = null, edgeCells = 0;
+    const EDGE = edge();
     for (let r = 0; r < R; r++) for (let c = 0; c < grid[r].length; c++) {
       const g = grid[r][c];
       if (g === '.' || g === ' ' || used.has(r + ',' + c)) continue;
@@ -669,7 +674,7 @@
         used.add((r + 1) + ',' + c); objects.push({ type: e.obj, x, z: z + 0.5, ry: Math.PI / 2, ...extra });
       } else objects.push({ type: e.obj, x, z, ...extra });
     }
-    if (edgeCells) warnings.push(`grid: ${C} wide x ${R} tall, but the board fits ${2 * EDGE.x + 1} x ${2 * EDGE.z + 1}; ${edgeCells} cell(s) sit on the cliff edge (characters there were moved inward)`);
+    if (edgeCells) warnings.push(`grid: ${C} wide x ${R} tall, but the board is ${2 * EDGE.x + 1} x ${2 * EDGE.z + 1}; ${edgeCells} cell(s) fall outside it (characters there were moved inward; set "size")`);
     if (unknown.size) warnings.push(`grid: unknown glyphs ${[...unknown].map(g => '"' + g + '"').join(' ')} (add them to "legend")`);
     return { ...scn, gridWarnings: warnings,
       objects: [...objects, ...scn.objects], paint: [...paint, ...scn.paint],
@@ -681,7 +686,7 @@
   // over the whole board. Whatever a glyph can't say exactly (turned or
   // off-cell objects, tinted paint, characters 10+) stays in objects/paint/at.
   function toAscii(input) {
-    const scn = normalizeScenario(input);
+    const scn = normalizeScenario(input), EDGE = edge();
     const rows = 2 * EDGE.z + 1, cols = 2 * EDGE.x + 1, { x0, z0 } = gridOrigin(rows, cols);
     const cellOf = (x, z) => [z + z0, x0 - x];
     // Full board, '.' everywhere: row width sets where the grid is centred.
@@ -721,6 +726,8 @@
       const x = half(+o.x) ? Math.round(+o.x * 2) / 2 : snap(+o.x), z = half(+o.z) ? Math.round(+o.z * 2) / 2 : snap(+o.z);
       const name = o.type === 'note' && o.text ? `note "${String(o.text).replace(/"/g, "'")}"` : o.type;
       let cellsRC = null;
+      // Lights and other objects with options keep them: they stay explicit.
+      if (['color', 'intensity', 'range', 'y'].some(k => o[k] != null)) { leftObjects.push(o); continue; }
       if (WIDE_ITEMS.has(o.type) && plain && half(x) && Number.isInteger(z)) cellsRC = [cellOf(x + 0.5, z), cellOf(x - 0.5, z)].sort((a, b) => a[1] - b[1]);
       else if (WIDE_ITEMS.has(o.type) && turned(ry) && half(z) && Number.isInteger(x)) cellsRC = [cellOf(x, z - 0.5), cellOf(x, z + 0.5)];
       else if (!WIDE_ITEMS.has(o.type) && (plain || o.type === 'wall') && Number.isInteger(x) && Number.isInteger(z)) cellsRC = [cellOf(x, z)];
@@ -741,8 +748,65 @@
       if (inGrid(r, c) && !taken.has(r + ',' + c)) { grid[r][c] = 'Y'; const { at, ...rest } = scn.player; player = rest; }
     }
     // Dropped: normalize-only fields that would just add noise to the JSON.
-    const { gridWarnings, ...out } = { ...scn, ...(floor ? { floor } : {}), grid: grid.map(r => r.join('')), legend, objects: leftObjects, paint: leftPaint, agents, player };
+    // Crop to what is drawn, keeping the grid centred (its size stays in "size").
+    let dr = 0, dc = 0;
+    grid.forEach((row, r) => row.forEach((g, c) => { if (g !== '.') { dr = Math.max(dr, Math.abs(r - z0)); dc = Math.max(dc, Math.abs(c - x0)); } }));
+    const cropped = grid.slice(z0 - dr, z0 + dr + 1).map(row => row.slice(x0 - dc, x0 + dc + 1).join(''));
+    const { gridWarnings, ...out } = { ...scn, size: [cols, rows], ...(floor ? { floor } : {}), grid: cropped, legend, objects: leftObjects, paint: leftPaint, agents, player };
     return out;
+  }
+
+  // ---------- base maps ----------
+  // The board starts empty. "island" and "clearing" are content, not terrain:
+  // land shaped by sea cells, grass, and for the island its trees, house,
+  // boulders, flowers, fence, lantern and campfire. They are ordinary objects
+  // and paint, so a scenario can add to them, and "From current world"
+  // exports them like anything else. ("," is land; the floor is grass.)
+  const ISLAND = { size: [15, 13], grid: [
+      '---------------',
+      '----,,,,,,-----',
+      '--,%,,%,,,,%,--',
+      '-,,,,,,*,,,,,%-',
+      '-%,;,,,,,,;,,,-',
+      '-,,H,,,,,,,r,,-',
+      '-,,,,,,X,,,,,%-',
+      '--,,j,,,,,,,,,-',
+      '-%,,,,,,,*,,,--',
+      '-,,ffff,,,,,%,-',
+      '--,,,;,,r,,,,--',
+      '---%,,,,,,,----',
+      '------q----q---'] };
+  function expandBase(scn) {
+    if (!['island', 'clearing'].includes(scn.base)) {
+      return scn.campfire === true ? { ...scn, objects: [{ type: 'campfire', x: 1, z: 0 }, ...scn.objects] } : scn;
+    }
+    const { x0, z0 } = gridOrigin(ISLAND.grid.length, ISLAND.grid[0].length), land = new Set(), objects = [];
+    ISLAND.grid.forEach((row, r) => [...row].forEach((g, c) => {
+      const x = x0 - c, z = r - z0;
+      if (g !== '-') land.add(x + ',' + z);
+      const type = GRID_GLYPHS[g];
+      if (!type || g === ',' || g === '-') return;
+      if (scn.base === 'clearing' && type !== 'campfire') return;
+      if (type === 'campfire' && scn.campfire === false) return;
+      if (type === 'fence' || THINGS.includes(type)) objects.push({ type, x, z });
+    }));
+    // Everything that is not island is sea, out to the board's edge.
+    const E = edge(), sea = [];
+    for (let z = -E.z; z <= E.z; z++) for (let x = -E.x; x <= E.x; x++) if (!land.has(x + ',' + z)) sea.push({ x, z, mat: 'sea' });
+    return { ...scn, objects: [...objects, ...scn.objects], paint: [...sea, ...scn.paint], map: ['floor grass', ...scn.map] };
+  }
+  // Board size: "size", else the island's, else the grid plus a two-cell
+  // margin (none when the grid is ringed with sea), else the default.
+  function boardSizeFor(scn) {
+    const island = ['island', 'clearing'].includes(scn.base);
+    let [c, r] = scn.size || (island ? ISLAND.size : scn.grid.length ? [0, 0] : [23, 17]);
+    if (scn.grid.length && !scn.size) {
+      const R = scn.grid.length, C = Math.max(...scn.grid.map(row => [...row].length));
+      const ring = [...scn.grid[0], ...scn.grid[R - 1], ...scn.grid.map(row => [...row][0]), ...scn.grid.map(row => [...row].at(-1))];
+      const m = ring.every(g => (scn.legend[g] || GRID_GLYPHS[g]) === 'sea') ? 0 : 4;
+      c = Math.max(c, C + m); r = Math.max(r, R + m);
+    }
+    return [c, r];
   }
 
   function normalizeScenario(s) {
@@ -754,8 +818,9 @@
       objects: Array.isArray(s.objects) ? s.objects.filter(o => o && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [],
       map: Array.isArray(s.map) ? s.map.map(String) : (typeof s.map === 'string' ? s.map.split('\n') : []),
       goal: s.goal && typeof s.goal === 'object' ? s.goal : null,
-      base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'island', walls: ['block', 'modern'].includes(s.walls) ? s.walls : 'tabletop',
-      pathfinding: s.pathfinding !== false, campfire: s.campfire !== false,
+      base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern'].includes(s.walls) ? s.walls : 'tabletop',
+      pathfinding: s.pathfinding !== false, campfire: s.campfire == null ? null : !!s.campfire,
+      size: Array.isArray(s.size) && s.size.length === 2 && s.size.every(n => Number.isFinite(+n)) ? [+s.size[0], +s.size[1]] : null,
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,
       grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
       legend: s.legend && typeof s.legend === 'object' ? Object.fromEntries(Object.entries(s.legend).map(([k, v]) => [k, String(v)])) : {},
@@ -800,9 +865,10 @@
       if (r.status === 'rejected') { console.error(r.reason); window.tablefolkToast?.('asset pack failed: ' + r.reason.message, { type: 'error' }); }
     }
     refreshThings();
-    // The grid becomes ordinary objects, paint and positions for the build;
-    // the link and restart keep the compact grid.
-    const scn = expandGrid(base);
+    w.setWorldSize?.(...boardSizeFor(base));
+    // The base's content and the grid become ordinary objects, paint and
+    // positions for the build; the link and restart keep the compact form.
+    const scn = expandGrid(expandBase(base));
     stopChecker();
     w.state.saveKey = SCENARIO_KEY;
     w.setWallStyle?.(scn.walls);
@@ -814,6 +880,9 @@
     w.setAllowed(scn.allowed);
     w.setLighting?.(scn.lighting === 'night' ? 'night' : 'bright');
     w.setPlayer(scn.player);
+    // Sea cells first: they shape the land the layout engine places onto.
+    const holes = scn.paint.filter(c => c.mat === 'sea');
+    if (holes.length) { w.setPaint?.(holes.map(c => ({ x: +c.x, z: +c.z, mat: 'sea' }))); await Promise.resolve(); }
     // Never start already won: if the layout satisfies the win condition at
     // turn 0 (e.g. "get Pip to the campfire" with Pip placed by the fire),
     // re-roll with the next seeds.
@@ -975,9 +1044,13 @@
           ...(c.showThoughts === false ? { showThoughts: false } : {}), ...(c.ttsVoiceId ? { ttsVoiceId: c.ttsVoiceId } : {}),
           ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}) };
       }),
-      base: st.baseMap || 'island', ...(st.wallStyle && st.wallStyle !== 'tabletop' ? { walls: st.wallStyle } : {}), ...(st.campfire === false ? { campfire: false } : {}),
+      // Island/clearing content is already objects and paint here, so the
+      // export is a plain board of the same size (or the dungeon, whose rim
+      // and floor come back from "base").
+      base: st.baseMap === 'dungeon' ? 'dungeon' : 'plain', size: [w.WORLD.cols, w.WORLD.rows],
+      ...(st.wallStyle && st.wallStyle !== 'tabletop' ? { walls: st.wallStyle } : {}),
       // The dungeon's rim walls and stone floor come back from "base", so leave them out.
-      objects: w.getObjects().filter(o => !o.rim).map(o => ({ type: o.type, x: +o.x.toFixed(2), z: +o.z.toFixed(2), ...(o.ry ? { ry: o.ry } : {}), ...(o.type === 'note' && o.noteText ? { text: o.noteText } : {}) })),
+      objects: w.getObjects().filter(o => !o.rim).map(o => ({ type: o.type, x: +o.x.toFixed(2), z: +o.z.toFixed(2), ...(o.ry ? { ry: o.ry } : {}), ...(o.type === 'note' && o.noteText ? { text: o.noteText } : {}), ...(o.opts || {}) })),
       paint: [...(st.paint || [])].map(([k, v]) => ({ x: +k.split(',')[0], z: +k.split(',')[1], mat: v.mat, ...(v.tint ? { tint: v.tint } : {}) }))
         .filter(c => !(st.baseMap === 'dungeon' && c.mat === 'stone' && !c.tint)),
       map: [],
@@ -1023,7 +1096,7 @@
   // ---------- examples ----------
   const EXAMPLES = {
     shop: {
-      v: 1, title: 'The Stubborn Shopkeeper', seed: 3,
+      v: 1, title: 'The Stubborn Shopkeeper', seed: 3, base: 'island',
       intro: 'Mog runs the only shop on the island and has never knowingly given a discount.',
       player: { name: 'Traveller', gold: 20, items: [] },
       allowed: ['say', 'sell', 'inventory', 'emote'],
@@ -1032,7 +1105,7 @@
       goal: { text: 'Get the magic sword. You only have 20 gold.', win: { player_has: 'magic sword' }, maxTurns: 14, winText: 'Mog grumbles and slides the sword across the counter.', loseText: 'Mog closes the shop for the day.', score: 'player_gold' },
     },
     guard: {
-      v: 1, title: 'You Shall Not Pass (Probably)', seed: 5,
+      v: 1, title: 'You Shall Not Pass (Probably)', seed: 5, base: 'island',
       intro: 'Brik guards the way to the campfire. Nobody gets past Brik.',
       player: { name: 'Traveller', gold: 0, items: [] },
       allowed: ['say', 'emote', 'face'],
@@ -1041,7 +1114,7 @@
       goal: { text: 'Get Brik to say "you may pass".', win: { said: ['brik', 'you may pass'] }, maxTurns: 10, winText: 'Brik steps aside, looking slightly relieved.', loseText: 'Brik is unmoved. Brik is always unmoved.', score: 'turns_left' },
     },
     lure: {
-      v: 1, title: 'Campfire Stories', seed: 2,
+      v: 1, title: 'Campfire Stories', seed: 2, base: 'island',
       intro: 'Pip is shy and stays by the crates. You want company at the campfire.',
       player: { name: 'Traveller', gold: 0, items: [] },
       allowed: ['say', 'walk', 'face', 'emote'],
@@ -1050,7 +1123,7 @@
       goal: { text: 'Talk Pip into walking to the campfire.', win: { agent_near: ['pip', 'campfire', 1.5] }, maxTurns: 12, winText: 'Pip sits down by the fire, warming tiny hands.', score: 'turns_left' },
     },
     barrels: {
-      v: 1, title: 'Barrel Brigade', seed: 4,
+      v: 1, title: 'Barrel Brigade', seed: 4, base: 'island',
       intro: "Bo is in charge of supplies for tonight's campfire party. The barrels are all over the place.",
       player: { name: 'Traveller', gold: 0, items: [] },
       allowed: ['say', 'walk', 'carry', 'drop', 'face'],
@@ -1060,7 +1133,7 @@
         winText: 'Two barrels by the fire. Party saved.', loseText: 'The party starts without supplies.', score: 'turns_left' },
     },
     storm: {
-      v: 1, title: 'Storm Walls', seed: 6,
+      v: 1, title: 'Storm Walls', seed: 6, base: 'island',
       intro: 'A storm is rolling in and the lamp by the camp keeps blowing over.',
       player: { name: 'Traveller', gold: 0, items: [] },
       allowed: ['say', 'walk', 'build', 'face'],
@@ -1070,7 +1143,7 @@
         winText: 'The lamp stays lit. Dobb takes all the credit.', loseText: 'The storm hits and the lamp goes out.', score: 'turns_left' },
     },
     jailer: {
-      v: 1, title: "The Jailer's Key", seed: 2, base: 'dungeon',
+      v: 1, title: "The Jailer's Key", seed: 2, base: 'dungeon', size: [11, 9],
       intro: 'You are locked in a dungeon. Grub the jailer has the only key.',
       player: { name: 'Prisoner', gold: 0, items: [] },
       allowed: ['say', 'give', 'inventory', 'emote'],
@@ -1081,7 +1154,7 @@
         winText: 'The key turns. Freedom smells like damp stone.', loseText: 'Grub falls asleep on the key.', score: 'turns_left' },
     },
     fire: {
-      v: 1, title: 'Fire Drill', seed: 8,
+      v: 1, title: 'Fire Drill', seed: 8, base: 'island',
       intro: 'Zap just learned fireball and is VERY excited about it. The camp is full of wooden crates and barrels.',
       player: { name: 'Traveller', gold: 0, items: [] },
       allowed: ['say', 'walk', 'emote', 'spell.spark', 'spell.fireball'],
@@ -1095,7 +1168,7 @@
     // An open scenario: no goal, it never ends. A CBT-style guide (not a
     // licensed therapist, said only if asked), with a safety line for crises.
     advisor: {
-      v: 1, title: 'The Sounding Board', safety: true, campfire: false, subtitle: 'A quiet place to talk something through. Take your time.', seed: 3, base: 'plain', walls: 'modern', floor: 'oak',
+      v: 1, title: 'The Sounding Board', safety: true, campfire: false, subtitle: 'A quiet place to talk something through. Take your time.', seed: 3, base: 'plain', size: [13, 11], walls: 'modern', floor: 'oak',
       intro: 'Wren is a CBT-style guide. Bring whatever is on your mind, big or small; Wren will listen and help you think it through. (Wren is a small AI running in your browser, not a doctor or therapist.)',
       player: { name: 'You', gold: 0, items: [], at: [1, 1] },
       allowed: ['say', 'emote', 'note'],
@@ -1135,7 +1208,7 @@
     maze: {
       // Straight-line walking: with pathfinding, "walk to the chest" would
       // solve the maze by itself; here your directions are the puzzle.
-      v: 1, title: 'Lost in the Dungeon', seed: 1, base: 'dungeon', pathfinding: false,
+      v: 1, title: 'Lost in the Dungeon', seed: 1, base: 'dungeon', size: [11, 9], pathfinding: false,
       intro: "Pip is lost in a little dungeon maze and can't see the way to the treasure chest. You can.",
       player: { name: 'Guide', gold: 0, items: [] },
       allowed: ['say', 'walk', 'face'],

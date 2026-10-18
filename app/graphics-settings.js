@@ -47,7 +47,11 @@
   // verts, x~120 tiles; .med2 because the first, too aggressive .med made
   // the tiles look puffy and browsers cache model files) and the tree.
   const MED = { 'grass_v7_orm.glb': 'grass_v7_orm.med2.glb', 'tree.glb': 'tree.med.glb' };
-  window.tablefolkAsset = file => settings.quality === 'high' ? file
+  // Props are small on screen: their 1k copies look the same at every quality
+  // and save ~85 MB of GPU memory per texture. Only the shelved island's
+  // terrain (?island=1) keeps 4096px textures on high.
+  const PROPS = new Set(['barrel.glb', 'blade_cluster.glb', 'crate.glb', 'daisy_clump.glb', 'house.glb', 'rock_boulder3.glb', 'tree.glb']);
+  window.tablefolkAsset = file => settings.quality === 'high' ? (PROPS.has(file) ? file.replace(/\.glb$/, '.1k.glb') : file)
     : (settings.quality === 'medium' && MED[file]) ? MED[file]
     : HAS_1K.has(file) ? file.replace(/\.glb$/, '.1k.glb') : file;
 

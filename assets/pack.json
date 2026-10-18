@@ -2,8 +2,8 @@
   "id": "core",
   "name": "Tablefolk core",
   "version": 1,
-  "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt.",
-  "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy), optional aliases and tags.",
+  "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt. Nature and house models in models/props/gen/ were generated for Tablefolk.",
+  "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy, or fit: \"height\"/\"footprint\" to size the model to h or w/d), decor (no collision, not on the characters' map), optional aliases and tags.",
   "items": {
     "chest": {"file": "models/props/Chest_Wood.gltf", "w": 1.05, "h": 0.75, "d": 0.75, "mass": 1.2, "scale": 0.55, "visualYOffset": 0.38, "flammable": true, "tags": ["fantasy"], "aliases": ["trunk", "treasure"]},
     "table": {"file": "models/props/Table_Large.gltf", "w": 1.35, "h": 0.85, "d": 0.95, "static": true, "scale": 0.72, "visualYOffset": 0.43, "flammable": true, "tags": ["fantasy"]},
@@ -21,6 +21,11 @@
     "scroll": {"file": "models/props/Scroll_1.gltf", "w": 0.45, "h": 0.25, "d": 0.45, "mass": 0.22, "scale": 0.75, "visualYOffset": 0.13, "flammable": true, "tags": ["fantasy"]},
     "coin_pile": {"file": "models/props/Coin_Pile.gltf", "w": 0.55, "h": 0.28, "d": 0.55, "mass": 0.35, "scale": 0.75, "visualYOffset": 0.14, "flammable": false, "material": "metal", "tags": ["fantasy"], "aliases": ["coins", "coin", "gold"]},
     "apple_crate": {"file": "models/props/FarmCrate_Apple.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["apples"]},
-    "carrot_crate": {"file": "models/props/FarmCrate_Carrot.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["carrots"]}
+    "carrot_crate": {"file": "models/props/FarmCrate_Carrot.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["carrots"]},
+    "tree": {"file": "models/props/gen/tree.1k.glb", "w": 0.9, "h": 2.4, "d": 0.9, "static": true, "fit": "height", "clay": true, "flammable": true, "tags": ["nature"], "aliases": ["pine"]},
+    "house": {"file": "models/props/gen/house.1k.glb", "w": 2.3, "h": 2.2, "d": 2.3, "static": true, "fit": "footprint", "visualRy": 3.14159, "clay": true, "flammable": true, "tags": ["building"], "aliases": ["cottage", "hut", "cabin"]},
+    "boulder": {"file": "models/props/gen/rock_boulder3.1k.glb", "w": 0.9, "h": 0.7, "d": 0.9, "static": true, "fit": "footprint", "clay": true, "material": "stone", "flammable": false, "tags": ["nature"], "aliases": ["rock"]},
+    "flowers": {"file": "models/props/gen/daisy_clump.1k.glb", "w": 0.6, "h": 0.3, "d": 0.6, "decor": true, "fit": "footprint", "clay": true, "tags": ["nature"], "aliases": ["daisies", "flower"]},
+    "grass_tuft": {"file": "models/props/gen/blade_cluster.1k.glb", "w": 0.6, "h": 0.35, "d": 0.6, "decor": true, "fit": "footprint", "clay": true, "tags": ["nature"], "aliases": ["tuft", "tufts"]}
   }
 }

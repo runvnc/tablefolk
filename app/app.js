@@ -10,7 +10,22 @@ const ANIM_ASSET = ASSET_BASE + 'models/animations/kaykit/';
 const TILE_ASSET = ASSET_BASE + 'models/tiles/';
 const DETAIL_NORMAL = ASSET_BASE + 'textures/detail_clay_n.png';
 const TABLEFOLK_ASSET = ASSET_BASE + 'models/characters/generated/';
-const WORLD = { size: 12, half: 6, w: 12, h: 10, halfW: 6, halfH: 5 };
+// The world is a board of 1x1 tiles standing in the sea. Playable cells are
+// |x| <= halfW-1 and |z| <= halfH-1 (cols = 2*halfW-1); scenarios set the size
+// ("size": [cols, rows]) through setWorldSize(). ?island=1 brings back the old
+// fixed HD island (shelved: 11 x 9 cells, irregular coast).
+const LEGACY_ISLAND = new URLSearchParams(location.search).has('island');
+const WORLD = { size: 12, half: 6, w: 12, h: 10, halfW: 6, halfH: 5, cols: 11, rows: 9 };
+const BOARD_DEFAULT = [23, 17], BOARD_MIN = 5, BOARD_MAX = 63;
+function boardDims(cols, rows){
+  const fit=(n,d)=>{ n=Math.round(Number(n)||d); n=Math.max(BOARD_MIN,Math.min(BOARD_MAX,n)); return n%2 ? n : n+1; };
+  return [fit(cols,BOARD_DEFAULT[0]), fit(rows,BOARD_DEFAULT[1])];
+}
+function applyWorldDims(cols, rows){
+  Object.assign(WORLD,{ cols, rows, halfW:(cols+1)/2, halfH:(rows+1)/2, w:cols+1, h:rows+1 });
+  WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
+}
+if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
 const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory'];
 const state = {
   scene:null, engine:null, camera:null, shadow:null, materials:{}, characters:[], selected:null, target:null,
@@ -449,7 +464,7 @@ function addPersonMouth(g){
   if(!near.length) return;
   const front=near.reduce((a,p)=>BABYLON.Vector3.Dot(p,fwd)>BABYLON.Vector3.Dot(a,fwd)?p:a);
   const pos=new BABYLON.Vector3(ec.x,y,ec.z).addInPlace(fwd.scale(BABYLON.Vector3.Dot(front.subtract(ec),fwd)+.03*sep));
-  if(!state.mouthMat){ const m=new BABYLON.PBRMaterial('person_mouth',sc); m.albedoColor=new BABYLON.Color3(.12,.03,.03); m.roughness=.6; m.metallic=0; m.maxSimultaneousLights=4; state.mouthMat=m; }
+  if(!state.mouthMat){ const m=new BABYLON.PBRMaterial('person_mouth',sc); m.albedoColor=new BABYLON.Color3(.12,.03,.03); m.roughness=.6; m.metallic=0; m.maxSimultaneousLights=8; state.mouthMat=m; }
   const mouth=BABYLON.MeshBuilder.CreateSphere(g.id+'_mouth',{diameter:1,segments:10},sc);
   mouth.material=state.mouthMat; mouth.isPickable=false; mouth.metadata={ownerId:g.id};
   // orientation and size in world terms, converted into the head bone's space
@@ -604,7 +619,7 @@ async function createGeneratedCritter(scene,id,pos){
   // Keep their shader layout conservative too. Four is Babylon's portable
   // WebGPU default; practicals are selected per mesh below.
   for(const material of new Set(idleRes.meshes.map(m=>m.material).filter(Boolean))){
-    if(material instanceof BABYLON.PBRMaterial) material.maxSimultaneousLights=4;
+    if(material instanceof BABYLON.PBRMaterial) material.maxSimultaneousLights=8;
   }
   importedRoot.parent=root; importedRoot.position.set(0,0,0);
   // Meshy exports this character facing local +Z; root yaw zero therefore faces north visually.
@@ -704,7 +719,7 @@ function registerAllShadowMeshes(scene){
   }
 }
 function addBody(mesh,motion,shape='BOX',mass=1,opts={}){ if(!BABYLON.PhysicsBody) return null; const agg=new BABYLON.PhysicsAggregate(mesh,BABYLON.PhysicsShapeType[shape],{mass,friction:opts.friction??.82,restitution:opts.restitution??.08},state.scene); if(motion==='static') agg.body.setMotionType(BABYLON.PhysicsMotionType.STATIC); return agg; }
-function tag(mesh,type,extra={}){ state.meta.set(mesh,{type,state:extra.state||'intact',material:extra.material||type,tileMaterial:extra.tileMaterial||null,health:extra.health??2,interactive:extra.interactive!==false,zone:extra.zone||'world',flammable:!!extra.flammable, soft:!!extra.soft}); mesh.metadata=state.meta.get(mesh); return mesh; }
+function tag(mesh,type,extra={}){ state.meta.set(mesh,{type,state:extra.state||'intact',material:extra.material||type,tileMaterial:extra.tileMaterial||null,health:extra.health??2,interactive:extra.interactive!==false,zone:extra.zone||'world',flammable:!!extra.flammable, soft:!!extra.soft, ...(extra.decor?{decor:true}:{}), ...(extra.foot?{foot:extra.foot}:{}), ...(extra.solid?{solid:true}:{})}); mesh.metadata=state.meta.get(mesh); return mesh; }
 function meta(mesh){ const m=state.meta.get(mesh)||mesh?.metadata; if(m?.proxy) return state.meta.get(m.proxy)||m.proxy.metadata; return m; }
 function logicalTarget(mesh){ const m=state.meta.get(mesh)||mesh?.metadata; return m?.proxy || mesh; }
 function disposeWorldObject(mesh){
@@ -721,7 +736,7 @@ function disposeWorldObject(mesh){
   // Dispose the object's own materials (e.g. per-import GLB ones) but never a
   // shared world material: disposing state.materials.stone with one broken
   // wall used to break every other wall's material.
-  const shared=new Set([...Object.values(state.materials||{}),state.lampPoolMat,state.lampPoolWarmMat,...Object.values(state.wallMats||{}),...Object.values(state.modernMats||{})].filter(Boolean));
+  const shared=new Set([...(state.sharedAssetMats||[]),...Object.values(state.materials||{}),state.lampPoolMat,state.lampPoolWarmMat,...Object.values(state.wallMats||{}),...Object.values(state.modernMats||{})].filter(Boolean));
   const own=new Set();
   for(const m of [mesh,...(mesh.getChildMeshes?.(false)||[])]) if(m.material && !shared.has(m.material)) own.add(m.material);
   try{ mesh.dispose?.(false,false); }catch{}
@@ -819,6 +834,7 @@ function plateauGround(x,z){
   return [[0,0],[.15,0],[-.15,0],[0,.15],[0,-.15]].some(([ox,oz])=>at(x+ox,z+oz));
 }
 function hasGroundAt(x,z){
+  if(state.boardCells) return [[0,0],[.15,0],[-.15,0],[0,.15],[0,-.15]].some(([ox,oz])=>state.boardCells.has(paintKey(x+ox,z+oz)));
   const fast=plateauGround(x,z); if(fast!==null) return fast;
   const key=Math.round(x*4)+','+Math.round(z*4);
   if(groundCache.has(key)) return groundCache.get(key);
@@ -971,6 +987,7 @@ function makeObject(type,x,z,opts={}){
   if(type==='lamp') return makeLamp(sc,x,z);
   if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'));
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
+  if(window.tablefolkScenery?.types.includes(type)) return window.tablefolkScenery.make(type,x,z,opts);
   if(ITEM_CATALOG[type]) return makeCatalogItem(sc,type,x,z,opts);
   return makeCrate(sc,x,z);
 }
@@ -978,7 +995,7 @@ function getObjects(){
   return state.props.concat(state.blocks).filter(m=>m && !m.isDisposed?.()).map(m=>{
     const mm=meta(m)||{}, p=m.getAbsolutePosition?.()||m.position;
     const ry=m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles().y : (m.rotation?.y||0);
-    return {mesh:m,type:mm.type||m.name,x:p.x,z:p.z,ry:Math.abs(ry)>.01?+ry.toFixed(3):0,state:mm.state||'intact',noteHtml:mm.noteHtml,noteText:mm.noteText,rim:!!mm.rim};
+    return {mesh:m,type:mm.type||m.name,x:p.x,z:p.z,ry:Math.abs(ry)>.01?+ry.toFixed(3):0,state:mm.state||'intact',noteHtml:mm.noteHtml,noteText:mm.noteText,rim:!!mm.rim,...(mm.opts&&Object.keys(mm.opts).length?{opts:mm.opts}:{})};
   }).filter(o=>!['tile','hole'].includes(o.type));
 }
 function syncCharacter(g){
@@ -1033,7 +1050,7 @@ function wallMaterials(){
   if(state.wallMats) return state.wallMats;
   const sc=state.scene;
   const tex=f=>{ const t=new BABYLON.Texture(ASSET+f,sc,true,false,BABYLON.Texture.TRILINEAR_SAMPLINGMODE); t.wrapU=t.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel=8; return t; };
-  const mk=(name,file,color,rough=.62)=>{ const m=new BABYLON.PBRMaterial(name,sc); if(file) m.albedoTexture=tex(file); m.albedoColor=color; m.metallic=0; m.roughness=rough; m.environmentIntensity=.6; m.specularIntensity=.6; m.maxSimultaneousLights=4; return m; };
+  const mk=(name,file,color,rough=.62)=>{ const m=new BABYLON.PBRMaterial(name,sc); if(file) m.albedoTexture=tex(file); m.albedoColor=color; m.metallic=0; m.roughness=rough; m.environmentIntensity=.6; m.specularIntensity=.6; m.maxSimultaneousLights=8; return m; };
   // Stones take their colour from vertex colours (white albedo) with a subtle
   // stone grain texture; the relief is real geometry now, not a normal map.
   // Same glossy "plastic miniature" finish as the grass tiles (roughness .24,
@@ -1150,7 +1167,7 @@ function rebuildWallVisuals(){
 function modernWallMaterials(){
   if(state.wallMats?.modernPanel) return state.wallMats;
   const sc=state.scene, mats=wallMaterials();
-  const mk=(name,rough,coat)=>{ const m=new BABYLON.PBRMaterial(name,sc); m.albedoColor=new BABYLON.Color3(1,1,1); m.metallic=0; m.roughness=rough; m.maxSimultaneousLights=4; return plasticFinish(m,{coat,coatRough:.18}); };
+  const mk=(name,rough,coat)=>{ const m=new BABYLON.PBRMaterial(name,sc); m.albedoColor=new BABYLON.Color3(1,1,1); m.metallic=0; m.roughness=rough; m.maxSimultaneousLights=8; return plasticFinish(m,{coat,coatRough:.18}); };
   mats.modernPanel=mk('mw_panel',.55,.25); mats.modernBase=mk('mw_base',.3,.6); mats.modernCap=mk('mw_cap',.3,.5);
   return mats;
 }
@@ -1187,6 +1204,37 @@ function buildModernWalls(cell,top){
     m.material=mat; m.isPickable=false; m.receiveShadows=true; addShadow(m); state.wallVisuals.push(m);
   }
 }
+// One AssetContainer per model file. Every placed copy instantiates from it
+// and shares its geometry, materials and textures: twenty trees cost one set
+// of textures, not twenty. Shared materials are never disposed with an object.
+const modelContainers=new Map();
+function loadModelInstance(scene,dir,name,prepare){
+  const url=dir+name;
+  if(!modelContainers.has(url)){
+    const p=BABYLON.SceneLoader.LoadAssetContainerAsync(dir,name,scene).then(c=>{
+      state.sharedAssetMats ||= new Set();
+      for(const m of c.materials) state.sharedAssetMats.add(m);
+      try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
+      return c;
+    });
+    p.catch(()=>modelContainers.delete(url));
+    modelContainers.set(url,p);
+  }
+  return modelContainers.get(url).then(c=>{
+    const inst=c.instantiateModelsToScene(n=>n,false,{doNotInstantiate:true});
+    const meshes=[];
+    for(const r of inst.rootNodes){ if(r instanceof BABYLON.AbstractMesh) meshes.push(r); meshes.push(...r.getChildMeshes(false)); }
+    return { meshes, rootNodes:inst.rootNodes, animationGroups:inst.animationGroups||[], skeletons:inst.skeletons||[] };
+  });
+}
+// Bounds of loaded meshes in world space.
+function meshBounds(meshes){
+  let min=new BABYLON.Vector3(1e9,1e9,1e9),max=new BABYLON.Vector3(-1e9,-1e9,-1e9);
+  for(const q of meshes){ if(!(q.getTotalVertices?.()>0)) continue; q.computeWorldMatrix(true); const b=q.getBoundingInfo().boundingBox; min=BABYLON.Vector3.Minimize(min,b.minimumWorld); max=BABYLON.Vector3.Maximize(max,b.maximumWorld); }
+  return {min,max};
+}
+const GEN_ASSET=()=>ASSET_BASE+'models/props/gen/';
+const genPrepare=c=>{ applyClayLookToMeshes(c.meshes,c.scene||state.scene,{detail:.11,detailScale:5}); for(const m of c.materials) plasticFinish(m,{coat:.5,coatRough:.14}); };
 function makeCrate(scene,x,z){
   // Keep the simple box as the physics/picking proxy, but make it invisible and
   // attach the same authored GLB used by decorative scenery. This preserves the
@@ -1195,19 +1243,17 @@ function makeCrate(scene,x,z){
   m.position.set(x,(state.terrainTopY??0)+.36,z); m.isVisible=false;
   addToScene(m,state.materials.wood,{shape:'BOX',mass:1.4,restitution:.12});
   tag(m,'crate',{health:2,material:'wood',flammable:true}); state.props.push(m);
-  BABYLON.SceneLoader.ImportMeshAsync('', ASSET_BASE+'models/props/gen/', (window.tablefolkAsset||(f=>f))('crate.glb'), scene).then(result=>{
+  loadModelInstance(scene,GEN_ASSET(),(window.tablefolkAsset||(f=>f))('crate.glb'),genPrepare).then(result=>{
+    if(m.isDisposed()){ for(const q of result.meshes) q.dispose(); return; }
     const root=new BABYLON.TransformNode('crate_visual_root',scene); root.parent=m;
-    const meshes=result.meshes.filter(q=>q.getTotalVertices?.()>0);
-    if(!meshes.length) throw new Error('crate.glb contains no renderable mesh');
-    let min=new BABYLON.Vector3(1e9,1e9,1e9),max=new BABYLON.Vector3(-1e9,-1e9,-1e9);
-    for(const q of meshes){ q.computeWorldMatrix(true); const b=q.getBoundingInfo().boundingBox; min=BABYLON.Vector3.Minimize(min,b.minimumWorld); max=BABYLON.Vector3.Maximize(max,b.maximumWorld); }
+    if(!result.meshes.some(q=>q.getTotalVertices?.()>0)) throw new Error('crate.glb contains no renderable mesh');
+    const {min,max}=meshBounds(result.meshes);
     // crate.glb is modelled centred on its origin: centre it on the proxy box
     // (offsetting by half its height alone sank it halfway into the ground).
     const ext=max.subtract(min), scale=.72/Math.max(ext.x,ext.z,1e-6);
     root.scaling.setAll(scale); root.position.copyFrom(min.add(max).scale(-.5*scale));
-    for(const q of result.meshes){ q.parent=root; q.metadata={proxy:m}; q.isPickable=true; q.receiveShadows=true; addShadow(q); }
-    applyClayLookToMeshes(result.meshes,scene,{detail:.11,detailScale:5});
-    for(const q of result.meshes) if(q.material) plasticFinish(q.material,{coat:.5,coatRough:.14});
+    for(const r of result.rootNodes) r.parent=root;
+    for(const q of result.meshes){ q.metadata={proxy:m}; q.isPickable=true; q.receiveShadows=true; addShadow(q); }
     m.metadata.asset='crate.glb';
   }).catch(err=>{ console.warn('failed to load crate visual',err); m.isVisible=true; });
   return m;
@@ -1217,18 +1263,17 @@ function makeBarrel(scene,x,z){
   b.position.set(x,(state.terrainTopY??0)+.39,z); b.rotation.z=Math.random()*.08; b.isVisible=false;
   addToScene(b,state.materials.wood,{shape:'CYLINDER',mass:1.1,restitution:.22,friction:.55});
   tag(b,'barrel',{health:2,material:'wood',flammable:true}); state.props.push(b);
-  BABYLON.SceneLoader.ImportMeshAsync('', ASSET_BASE+'models/props/gen/', (window.tablefolkAsset||(f=>f))('barrel.glb'), scene).then(result=>{
+  loadModelInstance(scene,GEN_ASSET(),(window.tablefolkAsset||(f=>f))('barrel.glb'),genPrepare).then(result=>{
+    if(b.isDisposed()){ for(const q of result.meshes) q.dispose(); return; }
     const root=new BABYLON.TransformNode('barrel_visual_root',scene); root.parent=b;
-    const meshes=result.meshes.filter(q=>q.getTotalVertices?.()>0);
-    if(!meshes.length) throw new Error('barrel.glb contains no renderable mesh');
-    let min=new BABYLON.Vector3(1e9,1e9,1e9),max=new BABYLON.Vector3(-1e9,-1e9,-1e9);
-    for(const q of meshes){ q.computeWorldMatrix(true); const bb=q.getBoundingInfo().boundingBox; min=BABYLON.Vector3.Minimize(min,bb.minimumWorld); max=BABYLON.Vector3.Maximize(max,bb.maximumWorld); }
+    if(!result.meshes.some(q=>q.getTotalVertices?.()>0)) throw new Error('barrel.glb contains no renderable mesh');
+    const {min,max}=meshBounds(result.meshes);
     // Centred on its origin like crate.glb: centre it on the proxy cylinder.
     const ext=max.subtract(min), scale=.78/Math.max(ext.y,1e-6);
     root.scaling.setAll(scale); root.position.copyFrom(min.add(max).scale(-.5*scale));
-    for(const q of result.meshes){ q.parent=root; q.metadata={proxy:b}; q.isPickable=true; q.receiveShadows=true; addShadow(q); }
-    applyClayLookToMeshes(result.meshes,scene,{detail:.11,detailScale:5}); b.metadata.asset='barrel.glb';
-    for(const q of result.meshes) if(q.material) plasticFinish(q.material,{coat:.5,coatRough:.14});
+    for(const r of result.rootNodes) r.parent=root;
+    for(const q of result.meshes){ q.metadata={proxy:b}; q.isPickable=true; q.receiveShadows=true; addShadow(q); }
+    b.metadata.asset='barrel.glb';
   }).catch(err=>{ console.warn('failed to load barrel visual',err); b.isVisible=true; });
   return b;
 }
@@ -1277,14 +1322,20 @@ function setLighting(mode='night'){
   const key=sc.getLightByName('tree_key_moved'), rim=sc.getLightByName('teal_rim');
   if(!lightingDefaults) lightingDefaults={keyPos:key?.position.clone(), keyI:key?.intensity, rimI:rim?.intensity};
   const d=lightingDefaults;
+  // Bigger boards: move the key and fill out with the board and raise their
+  // intensity by the square of the distance, so the middle stays as lit.
+  const k=LEGACY_ISLAND ? 1 : boardScale(), fill=sc.getLightByName('cool_fill');
+  if(fill){ d.fillPos ||= fill.position.clone(); d.fillI ??= fill.intensity; d.fillR ??= fill.range;
+    fill.position.copyFrom(d.fillPos.scale(k)); fill.intensity=d.fillI*k*k; fill.range=d.fillR*k; }
+  if(key) key.range=46*k;
   if(mode==='bright'){
     // Raised less and only 2.2x (was y14, 4x): enough to light the north
     // half, while keeping the glancing highlights that give the glossy
     // "plastic miniature" look (4x from overhead flattened it).
-    if(key){ key.position.set(-1,9,10.5); key.intensity=d.keyI*2.2; }
+    if(key){ key.position.set(-1,9*k,10.5*k); key.intensity=d.keyI*2.2*k*k; }
     if(rim) rim.intensity=Math.max(d.rimI,.34);
   } else {
-    if(key && d.keyPos){ key.position.copyFrom(d.keyPos); key.intensity=d.keyI; }
+    if(key && d.keyPos){ key.position.copyFrom(d.keyPos.scale(k)); key.intensity=d.keyI*k*k; }
     if(rim) rim.intensity=d.rimI;
   }
   state.lighting=mode;
@@ -1405,6 +1456,9 @@ const PAINT_MATERIALS={
   tile:{proc:'tile',color:[.93,.92,.9],glyph:'_',name:'tiled floor',rough:.22,coat:.6,aligned:true},
   concrete:{file:'stone_soft.png',color:[.78,.78,.77],glyph:'_',name:'concrete floor',rough:.4,coat:.35},
   carpet:{color:[.40,.45,.50],glyph:'_',name:'carpet',rough:.95},
+  // Not a floor: removes the board tile, so the sea shows through (coasts,
+  // islands, channels). Walking onto it is a fall.
+  sea:{color:[0,0,0],glyph:'~',name:'sea',hole:true},
 };
 // Large porcelain tiles: 2x2 per cell, thin grout.
 function tileFloorTexture(sc){
@@ -1463,7 +1517,7 @@ function paintMaterial(mat,tint){
   const m=new BABYLON.PBRMaterial('paint_'+key,sc);
   const tx=def.file ? new BABYLON.Texture(ASSET+def.file,sc,true,false,BABYLON.Texture.TRILINEAR_SAMPLINGMODE) : def.proc==='tile' ? tileFloorTexture(sc) : def.proc==='oak' ? oakFloorTexture(sc) : null;
   if(tx){ tx.wrapU=tx.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; tx.anisotropicFilteringLevel=8; }
-  m.albedoTexture=tx; m.metallic=0; m.roughness=def.rough??(mat==='water'?.25:.85); m.environmentIntensity=.6; m.specularIntensity=mat==='water'||def.coat?1:.4; m.maxSimultaneousLights=4;
+  m.albedoTexture=tx; m.metallic=0; m.roughness=def.rough??(mat==='water'?.25:.85); m.environmentIntensity=.6; m.specularIntensity=mat==='water'||def.coat?1:.4; m.maxSimultaneousLights=8;
   if(def.coat) plasticFinish(m,{coat:def.coat,coatRough:.1});
   let col=new BABYLON.Color3(...def.color);
   if(tint){ try{ col=BABYLON.Color3.FromHexString(tint); }catch{} }
@@ -1476,9 +1530,11 @@ function rebuildPaint(){
   const sc=state.scene; if(!sc) return;
   for(const m of state.paintMeshes||[]) try{ m.dispose(); }catch{}
   state.paintMeshes=[];
+  // Sea cells are holes in the board, not floors: the board rebuilds around them.
+  if(state.boardMeshes) rebuildBoard();
   if(!state.paint?.size) return;
   const top=state.terrainTopY??0, groups=new Map();
-  for(const [k,v] of state.paint){ const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
+  for(const [k,v] of state.paint){ if(PAINT_MATERIALS[v.mat]?.hole) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
   for(const [g,{v,cells}] of groups){
     const aligned=!!PAINT_MATERIALS[v.mat]?.aligned;   // continuous floors: full-size tiles, no turns
     const base=BABYLON.MeshBuilder.CreateBox('paint_'+g,{width:aligned?1:.97,height:.035,depth:aligned?1:.97},sc);
@@ -1492,6 +1548,90 @@ function rebuildPaint(){
     base.thinInstanceSetBuffer('matrix',buf,16,true);
     state.paintMeshes.push(base);
   }
+}
+// ---- the board ----
+// One tile per cell on a stone column that reaches down into the sea (both
+// thin instances, so even a 63 x 63 board is two draw calls). Cells painted
+// "sea" get neither: the sea shows through and walking there is a fall.
+const BOARD_TILE_H=.24, BOARD_COLUMN_H=3.2;
+function boardMaterials(){
+  if(state.boardMats) return state.boardMats;
+  const sc=state.scene;
+  const top=new BABYLON.PBRMaterial('board_tile_mat',sc);
+  top.albedoColor=new BABYLON.Color3(.62,.60,.56); top.metallic=0; top.roughness=.42; top.environmentIntensity=.7; top.maxSimultaneousLights=8;
+  plasticFinish(top,{coat:.4,coatRough:.15}); applyClayLook(top,sc,{detail:.08,detailScale:4});
+  const side=new BABYLON.PBRMaterial('board_column_mat',sc);
+  side.albedoColor=new BABYLON.Color3(.24,.22,.20); side.metallic=0; side.roughness=.85; side.environmentIntensity=.5; side.maxSimultaneousLights=8;
+  applyClayLook(side,sc,{detail:.12,detailScale:3});
+  return state.boardMats={top,side};
+}
+function boardCellList(){
+  const cells=[];
+  for(let z=-(WORLD.halfH-1);z<=WORLD.halfH-1;z++) for(let x=-(WORLD.halfW-1);x<=WORLD.halfW-1;x++){
+    if(!PAINT_MATERIALS[paintAt(x,z)?.mat]?.hole) cells.push([x,z]);
+  }
+  return cells;
+}
+function rebuildBoard(){
+  const sc=state.scene; if(!sc || LEGACY_ISLAND) return;
+  for(const m of state.boardMeshes||[]) try{ m.dispose(); }catch{}
+  const cells=boardCellList(), {top,side}=boardMaterials(), mat=new BABYLON.Matrix();
+  const make=(name,h,y,material)=>{
+    const m=BABYLON.MeshBuilder.CreateBox(name,{width:name==='board_tile'?.965:1,height:h,depth:name==='board_tile'?.965:1},sc);
+    m.material=material; m.isPickable=false; m.receiveShadows=true;
+    if(!cells.length){ m.setEnabled(false); return m; }
+    const buf=new Float32Array(cells.length*16);
+    cells.forEach(([x,z],i)=>{ BABYLON.Matrix.TranslationToRef(x,y,z,mat); mat.copyToArray(buf,i*16); });
+    m.thinInstanceSetBuffer('matrix',buf,16,true);
+    return m;
+  };
+  state.boardMeshes=[ make('board_tile',BOARD_TILE_H,-BOARD_TILE_H/2,top), make('board_column',BOARD_COLUMN_H,-BOARD_TILE_H-BOARD_COLUMN_H/2+.001,side) ];
+  state.boardCells=new Set(cells.map(([x,z])=>x+','+z));
+  state.terrainTopY=0;
+  sceneryCells=null; groundCache.clear();
+  window.TablefolkHD?.setShore?.(boardShoreEdges());
+}
+// Outward edges of the land, for the sea's foam: [{x,z,nx,nz}] at each edge's middle.
+function boardShoreEdges(){
+  const out=[], cells=state.boardCells; if(!cells) return out;
+  for(const k of cells){
+    const [x,z]=k.split(',').map(Number);
+    for(const [nx,nz] of [[1,0],[-1,0],[0,1],[0,-1]]) if(!cells.has((x+nx)+','+(z+nz))) out.push({x:x+nx*.5,z:z+nz*.5,nx,nz});
+  }
+  return out;
+}
+// Invisible physics floor and click plane over the whole board rectangle.
+function rebuildBoardSupport(){
+  const sc=state.scene;
+  for(const m of [state.physicsGround,state.spawnPickPlane]) try{ m?.dispose(); }catch{}
+  const ground=BABYLON.MeshBuilder.CreateGround('physics_ground',{width:WORLD.w,height:WORLD.h},sc);
+  ground.position.y=(state.terrainTopY??0)-.005; ground.isVisible=false; ground.isPickable=false;
+  const body=new BABYLON.PhysicsAggregate(ground,BABYLON.PhysicsShapeType.BOX,{mass:0,friction:.9,restitution:.02},sc);
+  body.body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+  try{ body.shape.filterMembershipMask=GROUND_FILTER; }catch{}
+  state.physicsGround=ground;
+  const pick=BABYLON.MeshBuilder.CreateGround('spawn_pick_plane',{width:WORLD.w,height:WORLD.h,subdivisions:1},sc);
+  pick.position.y=(state.terrainTopY??0)+.025; pick.isPickable=true;
+  state.spawnPickMat ||= Object.assign(new BABYLON.StandardMaterial('spawn_pick_mat',sc),{alpha:0,disableLighting:true});
+  pick.material=state.spawnPickMat;
+  state.spawnPickPlane=pick;
+}
+// How much bigger than the old 11 x 9 island the board is; lights and the
+// camera scale with it.
+function boardScale(){ return Math.max(1, WORLD.halfW/6, WORLD.halfH/5); }
+function setWorldSize(cols, rows){
+  if(LEGACY_ISLAND || !state.scene) return false;
+  [cols,rows]=boardDims(cols,rows);
+  if(WORLD.cols===cols && WORLD.rows===rows && state.boardMeshes) return false;
+  applyWorldDims(cols,rows);
+  rebuildBoard(); rebuildBoardSupport(); fitBoardView();
+  return true;
+}
+// Lights and camera framed for the current board.
+function fitBoardView(){
+  setLighting(state.lighting||'night');
+  const cam=state.camera;
+  if(cam){ cam.upperRadiusLimit=Math.max(60,70*boardScale()); cam.radius=Math.min(cam.upperRadiusLimit,20.5*boardScale()); cam.setTarget(new BABYLON.Vector3(0,.6,0)); }
 }
 // ---- base maps ----
 // 'island': the full diorama. 'clearing': the same island without the house,
@@ -1507,6 +1647,18 @@ const BASE_MAPS=['island','clearing','dungeon','plain'];
 function setBaseMap(name='island',{build=true}={}){
   const sc=state.scene; if(!sc) return;
   if(!BASE_MAPS.includes(name)) name='island';
+  if(!LEGACY_ISLAND){
+    // The board has no built-in scenery; "island"/"clearing" content comes
+    // from the scenario (scenario.js), "dungeon" adds its floor and rim walls.
+    if(build && state.baseMap==='dungeon' && name!=='dungeon'){
+      for(const b of state.blocks.filter(b=>meta(b)?.rim)){ disposeWorldObject(b); }
+      state.blocks=state.blocks.filter(b=>!b.isDisposed?.());
+      setPaint([],{replace:true});
+    }
+    state.baseMap=name;
+    if(name==='dungeon' && build) buildDungeon();
+    return;
+  }
   const hideClearing=name!=='island', hideDungeon=name==='dungeon'||name==='plain', hidePlain=name==='plain' && !state.lite;
   // Leaving the dungeon: take its floor and rim walls away again.
   if(build && state.baseMap==='dungeon' && name!=='dungeon'){
@@ -1533,7 +1685,7 @@ function buildPlainFloor(){
   const slab=BABYLON.MeshBuilder.CreateBox('plain_floor',{width:1.002,height:H,depth:1.002},sc);
   if(!state.plainFloorMat){
     const m=new BABYLON.PBRMaterial('plain_floor_mat',sc);
-    m.albedoColor=new BABYLON.Color3(.58,.57,.55); m.metallic=0; m.roughness=.4; m.maxSimultaneousLights=4;
+    m.albedoColor=new BABYLON.Color3(.58,.57,.55); m.metallic=0; m.roughness=.4; m.maxSimultaneousLights=8;
     state.plainFloorMat=plasticFinish(m,{coat:.4,coatRough:.15});
   }
   slab.material=state.plainFloorMat; slab.receiveShadows=true; slab.isPickable=true;
@@ -1546,6 +1698,14 @@ function buildPlainFloor(){
 // e.g. for an indoor scene. Its cells stop blocking placement too.
 function setCampfire(on=true){
   const sc=state.scene; if(!sc) return;
+  if(!LEGACY_ISLAND){
+    // The board's campfire is an ordinary object; the toggle adds or removes it.
+    const fires=state.props.filter(m=>!m.isDisposed?.() && meta(m)?.type==='campfire');
+    if(!on) for(const f of fires){ disposeWorldObject(f); state.props=state.props.filter(x=>x!==f); }
+    state.campfire=!!on;
+    const cb=document.getElementById('campfireToggle'); if(cb) cb.checked=!!on;
+    return;
+  }
   for(const m of sc.meshes) if(/^(fire_log|fire_ring_stone|campfire_flame)/.test(m.name)) m.setEnabled(!!on);
   sc.getLightByName('campfire_light')?.setEnabled(!!on);
   state.campfire=!!on; sceneryCells=null;
@@ -1601,7 +1761,7 @@ function modernMats(){
   // rounded edges for box upholstery and panels (box faces have 0..1 UVs)
   const bevel=bevelNormalTexture(sc); bevel.coordinatesIndex=0;
   const mk=(name,c,rough,coat,opt={})=>{
-    const m=new BABYLON.PBRMaterial('mod_'+name,sc); m.albedoColor=new BABYLON.Color3(...c); m.metallic=0; m.roughness=rough; m.maxSimultaneousLights=4;
+    const m=new BABYLON.PBRMaterial('mod_'+name,sc); m.albedoColor=new BABYLON.Color3(...c); m.metallic=0; m.roughness=rough; m.maxSimultaneousLights=8;
     if(opt.emissive) m.emissiveColor=new BABYLON.Color3(...opt.emissive);
     if(opt.bevel){ m.bumpTexture=bevel; m.bumpTexture.level=1; }
     return coat ? plasticFinish(m,{coat,coatRough:.12}) : m;
@@ -1697,8 +1857,9 @@ function makePropProxy(scene,type,opts){
   proxy.position.set(opts.x||0,(opts.y??((opts.h||.8)/2)),opts.z||0);
   proxy.rotation.y=opts.ry||0;
   proxy.isVisible=false;
-  addBody(proxy,opts.static?'static':'dynamic',opts.shape||'BOX',opts.mass??1.1,{friction:opts.friction??.72,restitution:opts.restitution??.12});
-  tag(proxy,type,{health:opts.health??2,material:opts.material||'wood',flammable:opts.flammable??true,soft:!!opts.soft,zone:'real-props'});
+  if(!opts.decor) addBody(proxy,opts.static?'static':'dynamic',opts.shape||'BOX',opts.mass??1.1,{friction:opts.friction??.72,restitution:opts.restitution??.12});
+  tag(proxy,type,{health:opts.health??2,material:opts.material||'wood',flammable:opts.flammable??true,soft:!!opts.soft,zone:'real-props',
+    ...(opts.decor?{decor:true,interactive:false}:{}), ...(opts.static?{solid:true}:{}), ...((opts.w||0)>1.3||(opts.d||0)>1.3?{foot:[(opts.w||.8)/2,(opts.d||.8)/2]}:{})});
   state.props.push(proxy);
   return proxy;
 }
@@ -1724,29 +1885,32 @@ async function importPropAsset(scene,file,opts={}){
   try{
     // Pack items carry full URLs; the glTF's textures resolve from its folder.
     const abs=/^[a-z]+:/i.test(file), dir=abs?file.slice(0,file.lastIndexOf('/')+1):PROP_ASSET, name=abs?file.slice(dir.length):file;
-    const result=await BABYLON.SceneLoader.ImportMeshAsync('',dir,name,scene);
+    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ m.backFaceCulling=false; if('roughness' in m) m.roughness=.42; plasticFinish(m,{coat:.55,coatRough:.12}); } if(opts.clay) applyClayLookToMeshes(c.meshes,scene,{detail:.11,detailScale:5}); });
     // Some props (the chest) bring a skeleton and animation clips; free those
     // with the object (disposeWorldObject runs meta.cleanup).
     for(const ag of result.animationGroups||[]) ag.stop();
-    if(proxy.isDisposed?.()){ for(const ag of result.animationGroups||[]) ag.dispose(); for(const sk of result.skeletons||[]) sk.dispose(); for(const m of result.meshes) m.dispose(false,true); return proxy; }
+    if(proxy.isDisposed?.()){ for(const ag of result.animationGroups||[]) ag.dispose(); for(const sk of result.skeletons||[]) sk.dispose(); for(const m of result.meshes) m.dispose(); return proxy; }
     const pm=meta(proxy); if(pm){ const prev=pm.cleanup; pm.cleanup=()=>{ try{ prev?.(); }catch{} for(const ag of result.animationGroups||[]) try{ ag.dispose(); }catch{} for(const sk of result.skeletons||[]) try{ sk.dispose(); }catch{} }; }
     const root=new BABYLON.TransformNode('real_'+type+'_root',scene);
     root.parent=proxy;
     root.position.set(0,-(opts.visualYOffset??0),0);
     root.scaling.setAll(opts.scale||1);
     root.rotation.y=opts.visualRy||0;
-    for(const mesh of result.meshes){
-      if(mesh===result.meshes[0] && mesh.name==='__root__') { mesh.parent=root; continue; }
-      mesh.parent=root;
-      mesh.metadata={proxy};
-      mesh.receiveShadows=true;
-      addShadow(mesh);
-      if(mesh.material){
-        mesh.material.backFaceCulling=false;
-        // Glossy plastic like the rest of the diorama (was forced matte, >= .74).
-        if('roughness' in mesh.material) mesh.material.roughness=.42;
-        plasticFinish(mesh.material,{coat:.55,coatRough:.12});
-      }
+    for(const r of result.rootNodes) r.parent=root;
+    for(const mesh of result.meshes){ mesh.metadata={proxy}; mesh.receiveShadows=true; addShadow(mesh); }
+    // "fit": scale the model to the item's size (footprint w/d, or height h)
+    // and stand it on the proxy's floor, centred. For models of unknown scale.
+    if(opts.fit){
+      // Measured unrotated, so the offsets are in the proxy's own frame.
+      const h=opts.h||.8, ry=proxy.rotation.y; proxy.rotation.y=0;
+      proxy.computeWorldMatrix(true); root.computeWorldMatrix(true);
+      let {min,max}=meshBounds(result.meshes); const ext=max.subtract(min);
+      const k=opts.fit==='height' ? h/Math.max(ext.y,1e-6) : Math.max(opts.w||.8,opts.d||.8)/Math.max(ext.x,ext.z,1e-6);
+      root.scaling.scaleInPlace(k);
+      root.computeWorldMatrix(true); ({min,max}=meshBounds(result.meshes));
+      const c=proxy.getAbsolutePosition();
+      root.position.x+=c.x-(min.x+max.x)/2; root.position.z+=c.z-(min.z+max.z)/2; root.position.y+=(c.y-h/2)-min.y;
+      proxy.rotation.y=ry; proxy.computeWorldMatrix(true);
     }
     proxy.metadata.asset=file;
   }catch(err){
@@ -2021,7 +2185,7 @@ function installDirectControlHandlers(){
 // Solid things nobody walks through (characters and the player alike).
 // Small loose items (tools, potions, scrolls, coins, notes, bags, buckets,
 // mushrooms) can be stepped over; a carried item never blocks its carrier.
-const BLOCKING_TYPES=new Set(['wall','rock','bakery','fence','bridge','crate','barrel','chest','table','bench','stool','workbench','cauldron','anvil','weapon_stand','apple_crate','carrot_crate','lamp','desk','office_chair','armchair','sofa','coffee_table','floor_lamp','plant','bookshelf']);
+const BLOCKING_TYPES=new Set(['wall','rock','boulder','tree','house','campfire','lantern','signpost','bakery','fence','bridge','crate','barrel','chest','table','bench','stool','workbench','cauldron','anvil','weapon_stand','apple_crate','carrot_crate','lamp','desk','office_chair','armchair','sofa','coffee_table','floor_lamp','plant','bookshelf']);
 function isBlocked(x, z) {
   // painted water/lava can't be walked through
   const pt = paintAt(x, z); if (pt && PAINT_MATERIALS[pt.mat]?.blocks) return true;
@@ -2031,8 +2195,10 @@ function isBlocked(x, z) {
     const mm = meta(m);
     if (!mm) continue;
     const p = m.getAbsolutePosition?.() || m.position;
-    if (Math.abs(p.x - x) < 0.7 && Math.abs(p.z - z) < 0.7) {
-      if (BLOCKING_TYPES.has(mm.type) || mm.material === 'stone') return true;
+    const fx = mm.foot ? mm.foot[0] + .2 : .7, fz = mm.foot ? mm.foot[1] + .2 : .7;
+    if (Math.abs(p.x - x) < fx && Math.abs(p.z - z) < fz) {
+      if (mm.decor) continue;
+      if (BLOCKING_TYPES.has(mm.type) || mm.solid || mm.material === 'stone') return true;
     }
   }
   return false;
@@ -2061,13 +2227,13 @@ function findRoute(from,to){
   const key=(x,z)=>x+','+z, open=[[sx,sz,0,0]], came=new Map([[key(sx,sz),null]]), cost=new Map([[key(sx,sz),0]]);
   const N=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
   let found=false, guard=0;
-  while(open.length && guard++<4000){
+  while(open.length && guard++<Math.max(4000,WORLD.w*WORLD.h*4)){
     open.sort((a,b)=>a[3]-b[3]);
     const [x,z]=open.shift();
     if(x===gx && z===gz){ found=true; break; }
     for(const [dx,dz,c] of N){
       const nx=x+dx, nz=z+dz;
-      if(Math.abs(nx)>16 || Math.abs(nz)>16 || !cellPassable(nx,nz)) continue;
+      if(Math.abs(nx)>WORLD.halfW+3 || Math.abs(nz)>WORLD.halfH+3 || !cellPassable(nx,nz)) continue;
       if(dx && dz && (!cellPassable(x+dx,z) || !cellPassable(x,z+dz))) continue;
       const nc=cost.get(key(x,z))+c, k=key(nx,nz);
       if(nc<(cost.get(k)??1e9)){ cost.set(k,nc); came.set(k,key(x,z)); open.push([nx,nz,nc,nc+Math.hypot(gx-nx,gz-nz)]); }
@@ -2409,6 +2575,7 @@ function proceduralTerrainAt(x,z){
 }
 function baseGlyphForTile(x,z){
   const painted=paintAt(x,z); if(painted) return PAINT_MATERIALS[painted.mat]?.glyph || ',';
+  if(!LEGACY_ISLAND) return '.';
   const t=tileAtGrid(x,z); const m=meta(t);
   const mat=m?.tileMaterial || (t?.name||'').replace('tile_','') || proceduralTerrainAt(x,z);
   if(Math.abs(x)>WORLD.halfW || Math.abs(z)>WORLD.halfH) return '?';
@@ -2427,7 +2594,7 @@ function opaqueCells(){
   for(const m of state.blocks.concat(state.props)){
     if(!m || m.isDisposed?.()) continue;
     const mm=meta(m);
-    if(!mm) continue;
+    if(!mm || mm.decor) continue;
     const p=m.getAbsolutePosition?.() || m.position;
     const glyph=typeGlyph(mm.type);
     if(isOpaqueType(mm.type)){
@@ -2486,7 +2653,7 @@ function isWithinFacingVision(g,cx,cz,x,z,radius){
 }
 function typeGlyph(type){
   const map={
-    wall:'#', bridge:'=', rock:'r', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K'
+    wall:'#', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K'
   };
   return map[type] || (type ? type[0].toUpperCase() : '?');
 }
@@ -2520,7 +2687,16 @@ function describeThing(id, type, pos, marks, extra=''){
 const FULL_MAP_VISION=true;
 // Grid bounds of the whole-map view: the island rectangle plus a margin for
 // the HD island's irregular noses/terraces and one row of sea around it.
+// Board: the whole board plus one ring of sea, cropped to a 25 x 19 window
+// around the agent on bigger boards so prompts stay small.
+const VIEW_HALF={x:12,z:9};
+function mapCropped(){ return !LEGACY_ISLAND && (WORLD.halfW>VIEW_HALF.x || WORLD.halfH>VIEW_HALF.z); }
 function fullMapBounds(cx,cz){
+  if(!LEGACY_ISLAND){
+    const span=(c,half,v)=>half<=v ? [-half,half] : (lo=>[lo,lo+2*v])(clamp(Math.round(c)-v,-half,half-2*v));
+    const [x0,x1]=span(cx,WORLD.halfW,VIEW_HALF.x), [z0,z1]=span(cz,WORLD.halfH,VIEW_HALF.z);
+    return {x0,x1,z0,z1};
+  }
   return { x0:Math.min(-WORLD.halfW-3,cx-1), x1:Math.max(WORLD.halfW+3,cx+1),
            z0:Math.min(-WORLD.halfH-2,cz-1), z1:Math.max(WORLD.halfH+2,cz+1) };
 }
@@ -2548,7 +2724,7 @@ function buildVisiblePerception(agentId=null,radius=7){
     const p=m.getAbsolutePosition?.() || m.position; if(!p) continue;
     const x=Math.round(p.x), z=Math.round(p.z);
     if(!cells.has(gridKey(x,z)) || !sees(x,z)) continue;
-    const mm=meta(m); if(!mm || mm.type==='tile') continue;
+    const mm=meta(m); if(!mm || mm.type==='tile' || mm.decor) continue;
     const glyph=typeGlyph(mm.type), marks=stateMarksFor(mm,m);
     put(x,z,glyph,marks,55);
     // Every non-terrain item rendered in the ASCII map gets an absolute
@@ -2601,13 +2777,13 @@ function buildVisiblePerception(agentId=null,radius=7){
   for (const [key, c] of cells) { if (c.visible && c.base && c.base !== ' ') visibleGlyphs.add(c.base); }
   const glyphNames = {
     '@':'self', 'g':'other character', 'Y':'the player', ',':'grass', ':':'dirt/path', '~':'water',
-    '^':'stone', '#':'wall', '_':'floor', '.':'sand', '&':'lava', '=':'bridge', 'C':'crate', 'B':'barrel', 'M':'mushroom',
+    '^':'stone', '#':'wall', '_':'floor', '.':'open floor', '&':'lava', '=':'bridge', 'C':'crate', 'B':'barrel', 'M':'mushroom',
     'L':'lamp', '*':'crystal/magic', 'H':'house', 'r':'rock', 'x':'rubble',
     'f':'fence', 'h':'chest', 'w':'workbench', 't':'table', 'n':'bench',
     's':'stool', 'o':'cauldron', 'a':'anvil', 'W':'weapon stand',
     '/':'axe', 'p':'pickaxe', 'u':'bucket', 'b':'bag', 'P':'potion',
     'S':'scroll', '$':'coins', 'D':'desk', 'c':'chair', 'A':'armchair', 'F':'sofa', 'T':'coffee table', 'l':'floor lamp',
-    'v':'plant', 'K':'bookshelf', '?':'unknown'
+    'v':'plant', 'K':'bookshelf', '%':'tree', 'X':'campfire', 'I':'signpost', '?':'unknown'
   };
   const legendParts = [];
   for (const glyph of visibleGlyphs) {
@@ -2626,7 +2802,7 @@ function buildVisiblePerception(agentId=null,radius=7){
   const showMap = document.getElementById('showAsciiMap')?.checked !== false;
   return [
     `Agent perception for ${g.id}`,
-    `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${FULL_MAP_VISION?'View: whole map':'Radius: '+radius}`,
+    `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${FULL_MAP_VISION?(mapCropped()?'View: the area around you':'View: whole map'):'Radius: '+radius}`,
     `Holding: ${held ? (heldMeta?.type||held.name) : 'none'}  Target: ${target ? (targetMeta?.type||target.name)+' at ('+Math.round(target.position.x)+','+Math.round(target.position.z)+')' : 'none'}`,
     '',
     ...(showMap ? [`North-up ${mapCols}x${mapRows} map (left=W, right=E; N=-Z, E=-X). Each row shows absolute z:`, ...compassRows, ''] : []),
@@ -3139,6 +3315,7 @@ function saveWorldState() {
         const rec={ type: mm?.type || 'crate', x: m.position.x, z: m.position.z, state: mm?.state || 'intact', health: mm?.health ?? 2 };
         const ry=m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles().y : (m.rotation?.y||0); if(Math.abs(ry)>.01) rec.ry=+ry.toFixed(3);
         if(mm?.type==='note'){ rec.noteHtml=mm.noteHtml||''; rec.noteText=mm.noteText||''; }
+        if(mm?.opts && Object.keys(mm.opts).length) rec.opts=mm.opts;
         return rec;
       }),
       blocks: state.blocks.filter(m => m && !m.isDisposed?.()).map(m => {
@@ -3149,7 +3326,7 @@ function saveWorldState() {
       player: state.player,
       playerAvatar: state.playerAvatar ? { model: state.playerAvatar.avatarModel, x: state.playerAvatar.logicalPos?.x ?? state.playerAvatar.root.position.x, z: state.playerAvatar.logicalPos?.z ?? state.playerAvatar.root.position.z, dx: state.playerAvatar.dir.x, dz: state.playerAvatar.dir.z } : null,
       paint: state.paint ? [...state.paint].map(([k,v])=>[...k.split(',').map(Number),v.mat,v.tint||null]) : [],
-      baseMap: state.baseMap||'island', campfire: state.campfire!==false,
+      baseMap: state.baseMap||'island', campfire: state.campfire!==false, worldSize: [WORLD.cols, WORLD.rows],
       wallStyle: state.wallStyle||'tabletop',
       nextSpawnId: state.nextSpawnId,
       globalHistory: state.globalHistory.slice(-50),
@@ -3187,6 +3364,7 @@ async function restoreWorldState(input) {
   // Base map and wall style first (walls built below use the style); the
   // dungeon's floor and rim walls come back as saved paint/walls, not rebuilt.
   state.wallStyle=data.wallStyle||'tabletop';
+  if(!LEGACY_ISLAND) setWorldSize(...(data.worldSize||BOARD_DEFAULT));
   setBaseMap(data.baseMap||'island',{build:false});
   setCampfire(data.campfire!==false);
   setPaint((data.paint||[]).map(([x,z,mat,tint])=>({x,z,mat,tint})),{replace:true});
@@ -3197,6 +3375,7 @@ async function restoreWorldState(input) {
       else if (p.type === 'mushroom') obj = makeMushroom(state.scene, p.x, p.z);
       else if (p.type === 'lamp') obj = makeLamp(state.scene, p.x, p.z);
       else if (p.type === 'note') obj = makeNote(state.scene, p.x, p.z, p.noteHtml||p.noteText||'<p>note</p>');
+      else if (window.tablefolkScenery?.types.includes(p.type)) obj = window.tablefolkScenery.make(p.type, p.x, p.z, {...(p.opts||{}), ry:p.ry||0});
       else if (ITEM_CATALOG[p.type]) obj = makeCatalogItem(state.scene, p.type, p.x, p.z, {ry:p.ry||0});
       else obj = makeCrate(state.scene, p.x, p.z);
     if(obj){ const mm=meta(obj); if(mm){ mm.state=p.state||'intact'; mm.health=p.health??mm.health; } }
@@ -3267,7 +3446,7 @@ function installWorldAPI(){
     getAgentPerception:(agentId=null,radius=7)=>buildVisiblePerception(agentId,radius), buildVisiblePerception,
     parseInventoryItems, formatInventoryItems, getPlayer:()=>state.player,
     // scenario support (scenario.js)
-    WORLD, ITEM_CATALOG, hasGroundAt, sceneryAt, sceneryAnchors, spawnAgent, makeObject, getObjects, selectCharacter, inventoryChanged,
+    WORLD, ITEM_CATALOG, hasGroundAt, setWorldSize, rebuildBoard, sceneryAt, sceneryAnchors, spawnAgent, makeObject, getObjects, selectCharacter, inventoryChanged,
     findItem:(items,name)=>findItem(items||[],name),
     setPlayer:p=>{ state.player={gold:Number(p?.gold)||0,items:Array.isArray(p?.items)?p.items.map(i=>({name:String(i.name),qty:i.qty??1})):[]}; const n=document.getElementById('chatName'); if(n && p?.name) n.value=p.name; renderPlayerInventory(); },
     setAllowed:list=>{ state.allowed=new Set(list||[]); updatePerceptionUI(); },
@@ -3694,7 +3873,7 @@ function makeSea(scene){
     sea.updateVerticesData(BABYLON.VertexBuffer.PositionKind,pos,false,false);
   });
   const padM=colorMat(scene,'lily_pad',new BABYLON.Color3(.13,.30,.17));
-  for(let i=0;i<10;i++){
+  for(let i=0;i<(LEGACY_ISLAND?10:0);i++){
     const ang=Math.random()*Math.PI*2, r=Math.min(WORLD.halfW,WORLD.halfH)+.8+Math.random()*2.4;
     const pad=BABYLON.MeshBuilder.CreateDisc('lily_pad',{radius:.14+Math.random()*.12,tessellation:9},scene);
     pad.rotation.x=Math.PI/2; pad.position.set(Math.cos(ang)*r*1.15,-.40,Math.sin(ang)*r);
@@ -3786,6 +3965,17 @@ function makeSelectionRing(scene){
   });
 }
 async function addTerrainPolish(scene){
+  if(!LEGACY_ISLAND){
+    // The board in the sea. Light mode keeps the simple sea and sky.
+    if(window.TABLEFOLK_GFX?.lite){ makeSkyDome(scene); makeSea(scene); state.lite=true; }
+    else try{
+      await window.TablefolkHD.buildSea(scene,{ WORLD:{ get halfW(){ return WORLD.halfW-.5; }, get halfH(){ return WORLD.halfH-.5; } }, state, hashNoise, smoothNoise, proceduralTerrainAt, addShadow });
+    }catch(err){ console.error('HD sea failed, using the simple one',err); makeSkyDome(scene); makeSea(scene); }
+    state.terrainTopY=0;
+    rebuildBoard(); rebuildBoardSupport(); fitBoardView();
+    makeSelectionRing(scene);
+    return;
+  }
   // Light mode: the original simple voxel island (no imported cliffs, grass
   // GLBs, trees, house or detailed sea) to leave GPU memory for a big model.
   if(window.TABLEFOLK_GFX?.lite){
@@ -3811,7 +4001,7 @@ async function addTerrainPolish(scene){
   try{ groundBody.shape.filterMembershipMask=GROUND_FILTER; }catch{}
 }
 
-async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; addEventListener('pagehide',()=>{ try{ engine.dispose(); }catch{} }); const scene=new BABYLON.Scene(engine); state.scene=scene; scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
+async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; addEventListener('pagehide',()=>{ try{ engine.dispose(); }catch{} }); const scene=new BABYLON.Scene(engine); state.scene=scene; scene.onNewMaterialAddedObservable.add(m=>{ if('maxSimultaneousLights' in m) m.maxSimultaneousLights=8; }); scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
   scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk)); if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
   // Initial three-quarter composition: house high-right, fire/character left of
   // centre, and the near tree/crates framing the lower-right foreground.
@@ -3941,7 +4131,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // lights are explicitly prioritized per mesh.
   for(const material of scene.materials){
     if(material instanceof BABYLON.PBRMaterial){
-      material.maxSimultaneousLights=4;
+      material.maxSimultaneousLights=8;
       material.useRoughnessFromMetallicTextureGreen=false;
       material.useRoughnessFromMetallicTextureAlpha=false;
       material.roughness=.24;
@@ -3960,7 +4150,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // point light with glTF falloff), which over-exposes StandardMaterials, so
   // give the light island PBR materials like the HD diorama's.
   if(state.lite){
-    const pbr=(name,col,rough,alpha=1)=>{ const m=new BABYLON.PBRMaterial(name,scene); m.albedoColor=col; m.metallic=0; m.roughness=rough; m.environmentIntensity=.85; m.specularIntensity=.5; m.maxSimultaneousLights=4; if(alpha<1) m.alpha=alpha; return m; };
+    const pbr=(name,col,rough,alpha=1)=>{ const m=new BABYLON.PBRMaterial(name,scene); m.albedoColor=col; m.metallic=0; m.roughness=rough; m.environmentIntensity=.85; m.specularIntensity=.5; m.maxSimultaneousLights=8; if(alpha<1) m.alpha=alpha; return m; };
     const island=scene.getMeshByName('voxel_island');
     if(island){ island.material=applyClayLook(pbr('voxel_pbr',new BABYLON.Color3(1,1,1),.3),scene,{detail:.1}); }
     const sea=scene.getMeshByName('sea');
@@ -3977,8 +4167,8 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   }
   // The visible continuous terrain is intentionally non-pickable; preserve a
   // simple invisible pick plane now that buildWorld() no longer creates tile meshes.
-  const spawnPickPlane=BABYLON.MeshBuilder.CreateGround('spawn_pick_plane',{width:WORLD.w,height:WORLD.h,subdivisions:1},scene);
-  spawnPickPlane.position.y=.025; spawnPickPlane.isPickable=true; const _spm=new BABYLON.StandardMaterial('spawn_pick_mat',scene); _spm.alpha=0; _spm.disableLighting=true; spawnPickPlane.material=_spm;
+  if(LEGACY_ISLAND){ const spawnPickPlane=BABYLON.MeshBuilder.CreateGround('spawn_pick_plane',{width:WORLD.w,height:WORLD.h,subdivisions:1},scene);
+  spawnPickPlane.position.y=.025; spawnPickPlane.isPickable=true; const _spm=new BABYLON.StandardMaterial('spawn_pick_mat',scene); _spm.alpha=0; _spm.disableLighting=true; spawnPickPlane.material=_spm; }
   scene.onPointerObservable.add(pi=>{ if(pi.type!==BABYLON.PointerEventTypes.POINTERPICK || !pi.pickInfo?.hit) return; const m=pi.pickInfo.pickedMesh; const owner=m?.metadata?.ownerId; const g=state.characters.find(x=>owner===x.id || m.name.startsWith(x.id+'_')); if(g){ state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); return selectCharacter(g); } const mm=meta(m); const target=logicalTarget(m); if(pi.pickInfo.pickedPoint) state.zoomFocus=new BABYLON.Vector3(pi.pickInfo.pickedPoint.x,0.6,pi.pickInfo.pickedPoint.z); if(mm?.interactive){ state.target=target; const tp=target.getAbsolutePosition?.()||pi.pickInfo.pickedPoint; state.zoomFocus=new BABYLON.Vector3(tp.x,0.6,tp.z); log('target: '+(mm.type||target.name)+' / '+(mm.state||'intact')); updatePerceptionUI(); } });
   setupUI(); installWorldAPI();
   const restored=await loadWorldState();

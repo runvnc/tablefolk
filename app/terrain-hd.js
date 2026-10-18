@@ -385,6 +385,7 @@
   const rect = (u0,v0,u1,v1) => new BABYLON.Vector4(u0,v0,u1,v1);
 
   let API = null; // { WORLD, hashNoise, smoothNoise, proceduralTerrainAt, addShadow, state }
+  let BOARD = false; // buildSea(): the board in the sea, no island
 
   function noise(x,z){ return API.hashNoise(x,z); }
   function merge(list,name,material,{shadows=true,pickable=false}={}){
@@ -1255,8 +1256,11 @@
     // Each band is rebuilt every frame (cheap: ~90 verts) with a scalloped
     // radius and a soft alpha gradient across its width.
     // ------------------------------------------------------------------
+    // The old island's coast is one loop: two foam ribbons follow it. The
+    // board's coast is any set of cell edges, so it gets foam dashes only
+    // (setShore below).
     const shorePts=[];
-    {
+    if(!BOARD){
       const groups={'x:-1':[],'x:1':[],'z:-1':[],'z:1':[]};
       for(const c of edgeProfile().cells) groups[c.axis+':'+c.side].push(c);
       const order=[['x:-1',false],['z:1',false],['x:1',true],['z:-1',true]];
@@ -1307,7 +1311,7 @@
     }
     const foamMain=makeRibbon('hd_foam_main',{half:.30,baseY:.075,baseAlpha:.9,extra:.18});
     const foamWide=makeRibbon('hd_foam_wide',{half:.70,baseY:.045,baseAlpha:.40,extra:.85});
-    foamMain.rebuild(0); foamWide.rebuild(0);
+    if(rN){ foamMain.rebuild(0); foamWide.rebuild(0); }
 
     // Broad translucent current bands (kept from the old build - gives the deep
     // water direction and never reads as rings).
@@ -1366,7 +1370,24 @@
     foamM.emissiveColor=C3(.85,.96,1); foamM.diffuseColor=C3(.05,.12,.13);
     foamM.disableLighting=true; foamM.alpha=.5;
     const foam=[];
-    for(const c of edgeProfile().cells){
+    // Board coast: a few dashes along every land edge facing the sea.
+    HD.setShore=edges=>{
+      for(const f of foam) f.mesh.dispose();
+      foam.length=0;
+      let fs=0x2b7e15;
+      const fr=()=>{ fs=(fs*1664525+1013904223)>>>0; return fs/4294967296; };
+      for(const e of edges||[]){
+        for(let k=0;k<2;k++){
+          const out=.22+fr()*.22, along=(k-.5)*.5+(fr()-.5)*.2, len=.10+fr()*.18;
+          const x=e.x+e.nx*out+(e.nz?along:0), z=e.z+e.nz*out+(e.nx?along:0);
+          const dash=BABYLON.MeshBuilder.CreateTube('hd_shore_foam',{path:[V3(x-len,SEA_Y+.085,z),V3(x+len,SEA_Y+.085,z)],radius:.016+fr()*.014,tessellation:4},scene);
+          if(e.nx) dash.rotation.y=Math.PI/2;
+          dash.material=foamM; dash.isPickable=false; dash.alphaIndex=10;
+          foam.push({mesh:dash,x,z,phase:fr()*6.28});
+        }
+      }
+    };
+    if(!BOARD) for(const c of edgeProfile().cells){
       if(c.corner) continue;
       const outHalf=c.axis==='x'?WORLD.halfH:WORLD.halfW;
       const out=outHalf+c.shapeOut+.30+c.rA*.18;
@@ -1386,7 +1407,7 @@
     const lilyStemM=new BABYLON.PBRMaterial('hd_lily_stem_mat',scene);
     lilyStemM.albedoColor=C3(.06,.16,.06); lilyStemM.metallic=0; lilyStemM.roughness=.82; lilyStemM.specularIntensity=.5;
     const lilies=[];
-    for(let i=0;i<18;i++){
+    for(let i=0;i<(BOARD?0:18);i++){
       const a=wrnd()*Math.PI*2, r=WORLD.halfW+1.4+wrnd()*5.4;
       const x=Math.cos(a)*r+1.3, z=Math.sin(a)*r*.82-.4, padR=.16+wrnd()*.22;
       const pad=BABYLON.MeshBuilder.CreateCylinder('hd_lily_pad',{diameter:padR*2,height:.028,tessellation:10},scene);
@@ -1430,7 +1451,7 @@
       // 180-unit sea; a static bump map reads as frozen water.
       bumpTex.uOffset=(t*.05)%1;
       bumpTex.vOffset=(t*.035)%1;
-      if(!gfx || gfx.seaFoamEnabled!==false){
+      if(rN && (!gfx || gfx.seaFoamEnabled!==false)){
         foamMain.mesh.setEnabled(true); foamWide.mesh.setEnabled(true);
         window.TablefolkPerf?.begin('sea.foam');
         foamMain.rebuild(t); foamWide.rebuild(t);
@@ -1514,6 +1535,14 @@
   }
 
   /* ---------- entry -------------------------------------------------- */
+  // The board (app.js) in the sea: sky and sea only, no island. The shore
+  // foam follows whatever coast the board has (HD.setShore).
+  async function buildSea(scene, api){
+    API=api; BOARD=true;
+    API.state.seaLevel=SEA_LEVEL;
+    buildSky(scene);
+    if(!window.TABLEFOLK_NOWATER) buildWater(scene);
+  }
   async function buildIsland(scene, api){
     API=api;
     buildSky(scene);
@@ -1533,6 +1562,7 @@
   }
 
   window.TablefolkHD.buildIsland=buildIsland;
+  window.TablefolkHD.buildSea=buildSea;
   window.TablefolkHD.buildSky=buildSky;
   window.TablefolkHD.buildWater=buildWater;
 })();

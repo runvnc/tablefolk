@@ -23,7 +23,8 @@
     if (!it || typeof it.file !== 'string') throw new Error(`item "${type}" needs a "file"`);
     const out = { url: new URL(it.file, packUrl).href, pack: packId };
     for (const k of NUM) if (it[k] != null) { if (!Number.isFinite(+it[k])) throw new Error(`item "${type}": ${k} must be a number`); out[k] = +it[k]; }
-    for (const k of ['static', 'flammable']) if (it[k] != null) out[k] = !!it[k];
+    for (const k of ['static', 'flammable', 'decor', 'clay']) if (it[k] != null) out[k] = !!it[k];
+    if (it.fit === 'height' || it.fit === 'footprint') out.fit = it.fit;
     if (typeof it.material === 'string') out.material = it.material;
     if (typeof it.shape === 'string') out.shape = it.shape.toUpperCase();
     out.aliases = Array.isArray(it.aliases) ? it.aliases.map(String).filter(a => /^[a-z][a-z0-9_]*$/.test(a)) : [];
