@@ -65,19 +65,33 @@
   });
 })();
 
-/* chat dock: keep the 'talking to' indicator in sync with the selected agent */
+/* chat dock: the "to:" picker lists the characters and follows the selected
+   one; picking a name selects that character (clicking it in the world works
+   too, and so does starting a message with @name). */
 (() => {
   function ready2(fn) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
     else fn();
   }
   ready2(() => {
-    const chatTarget = document.getElementById('chatTarget');
-    if (!chatTarget) return;
+    const pick = document.getElementById('chatTo');
+    if (!pick) return;
+    let shown = '';
     const update = () => {
-      const id = window.tablefolk?.getSelectedAgent?.()?.id;
-      chatTarget.textContent = 'to: ' + (id || 'click a character');
+      const w = window.tablefolk, ids = (w?.getAgents?.() || []).map(g => g.id), sel = w?.getSelectedAgent?.()?.id || '';
+      const key = ids.join(',');
+      if (key !== shown) {
+        shown = key; pick.textContent = '';
+        if (!ids.length) pick.add(new Option('no characters', ''));
+        for (const id of ids) pick.add(new Option(id, id));
+      }
+      if (document.activeElement !== pick && sel && pick.value !== sel) pick.value = sel;
     };
+    pick.addEventListener('change', () => {
+      const w = window.tablefolk, g = w?.getAgents?.().find(a => a.id === pick.value);
+      if (g) w.selectCharacter(g);
+      document.getElementById('chatInput')?.focus();
+    });
     setInterval(update, 700);
     update();
   });

@@ -325,10 +325,10 @@ function buildAgentMessages(world, g, cfg) {
       const m = String(line).match(/^(.+?)\s+says:\s*(.*)$/);
       return m ? `[${m[1].trim()}] ${m[2]}` : line;
     }).join('\n');
-    // This used to say only 'Reply with say("...")', which told the model to
-    // answer with speech alone: characters agreed to hand things over or walk
-    // somewhere but never issued give()/walk(). Ask for the action too.
-    chatSuffix = '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech + '\nAnswer with say("...") in your own words (never include the speaker name). If you agree to do something, also do it with the matching command on the next line.';
+    // No "answer with say()" here: pointing the model at say() made it talk
+    // and forget the rest of its brief (a password it should react to with
+    // give()). The system prompt already lists the commands.
+    chatSuffix = '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech;
     cfg.pendingChat = [];
     world.setBrainConfig(g.id, cfg);
   }
@@ -603,7 +603,8 @@ async function main() {
       if (!planCmds.length) planCmds.push({ kind: 'look' });
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
-        const chatLines = chatSuffix.trim().split('\n').filter(l => l.trim() && !l.startsWith('NEW SPEECH') && !l.startsWith('Respond to its meaning'));
+        // Only the speech itself goes into the history, never instructions.
+        const chatLines = chatSuffix.trim().split('\n').filter(l => /^\[[^\]]+\]\s/.test(l));
         for (const cl of chatLines) {
           cfg.messages = (cfg.messages || []).concat([{ role: 'user', content: cl }]);
         }
@@ -642,16 +643,16 @@ async function main() {
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
       if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);
       world.setBrainConfig(g.id, cfg);
-      // Add this agent's action and result to ALL OTHER agents' message histories
-      const actionMsg = `${g.id} ${formatActionSummary(g.id + ' ' + (line || 'look()'))}`;
-      const resultMsg = summary;
+      // Tell every other character what this one did, once, in readable form
+      // ("hale says ..."); the raw command line ("hale say(...)") used to go
+      // in as well, so each turn showed up twice.
+      // Every entry this turn added (say + give is two), not just the last.
+      const turnEntries = (world.state?.globalHistory || []).slice(-Math.max(1, planCmds.length)).filter(e => new RegExp('^T\\d+\\s+' + g.id + ':').test(e));
+      const resultMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : summary;
       for (const other of world.getAgents()) {
         if (other.id === g.id) continue;
         const ocfg = world.getBrainConfig(other.id);
-        ocfg.messages = (ocfg.messages || []).concat([
-          { role: 'user', content: actionMsg },
-          { role: 'user', content: resultMsg },
-        ]);
+        ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: resultMsg }]);
         if (ocfg.messages.length > 40) ocfg.messages = ocfg.messages.slice(-40);
         world.setBrainConfig(other.id, ocfg);
       }
@@ -721,8 +722,15 @@ async function main() {
   function sendChatToAgent() {
     const input = el('chatInput');
     const name = el('chatName')?.value || 'God';
-    const text = input?.value?.trim();
+    let text = input?.value?.trim();
     if (!text) return;
+    // "@bram hello" talks to bram (and selects him) whoever is selected.
+    const at = text.match(/^@([A-Za-z0-9_-]+)[\s,:]+(.*)$/s);
+    if (at) {
+      const who = world.getAgents().find(a => a.id.toLowerCase() === at[1].toLowerCase());
+      if (!who) { appendLog('no character called ' + at[1]); window.tablefolkToast?.('no character called ' + at[1], { type: 'error' }); return; }
+      world.selectCharacter(who); text = at[2].trim(); if (!text) return;
+    }
     const g = world.getSelectedAgent?.();
     if (!g) { appendLog('no agent selected'); return; }
     // Listeners (scenario safety check) may add a note to this agent's prompt first.

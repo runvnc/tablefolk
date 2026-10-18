@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261019f" />
+  <link rel="stylesheet" href="style.css?v=20261019g" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -332,14 +332,14 @@
   <div id="scenarioBanner" hidden></div>
   <div id="scenarioEnd" class="scn-overlay" hidden></div>
   <div id="chatDock">
-    <div class="chat-target" id="chatTarget">to: click a character</div>
+    <label class="chat-target" id="chatTarget">to: <select id="chatTo" title="who you are talking to (or start a message with @name)"></select></label>
     <label class="chat-name-label">Chat name <input id="chatName" type="text" value="God" placeholder="Your name" /></label>
     <label class="chat-name-label">Your gold <input id="playerGold" type="number" min="0" step="1" value="100" /></label>
     <button id="firstPersonBtn" class="fp-btn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>first person</span></button>
     <small class="pane-note avatar-hint">Move: WASD / arrows or click the ground · V: first person</small>
     <div id="playerItems" class="chat-target"></div>
     <div class="chat-send-row">
-      <input id="chatInput" type="text" placeholder="Message selected agent..." />
+      <input id="chatInput" type="text" placeholder="Message (or @name message)..." />
       <button id="chatSend" type="button">send</button>
     </div>
     <div class="chat-send-row">
@@ -347,6 +347,6 @@
     </div>
   </div>
   <div id="hint">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261019f"></script>
+  <script src="preflight.js?v=20261019g"></script>
 </body>
 </html>
