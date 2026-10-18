@@ -12,3 +12,6 @@ r2.txt
 tools/browser-test/node_modules/
 tools/browser-test/results/
 generated/
+
+# admin password hash and settings (server/admin.js, server/settings.js)
+.admin/

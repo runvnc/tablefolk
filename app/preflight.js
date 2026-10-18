@@ -29,7 +29,7 @@
     ['toast.js?v=20261018a'],
     ['sfx.js?v=20261022b'],
     ['ui-polish.js?v=20261019g'],
-    ['tabs.js?v=20261022c'],
+    ['tabs.js?v=20261022d'],
     ['library.js?v=20261018a'],
     ['packs.js?v=20261022a'],
     ['https://cdn.babylonjs.com/babylon.js'],
@@ -45,12 +45,12 @@
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261022c'],
     ['senses.js?v=20261020d'],
-    ['play.js?v=20261022c'],
+    ['play.js?v=20261022d'],
     ['speech-input.js?v=20261020a'],
     ['workflows.js?v=20261020a'],
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261022b'],
-    ['scenario.js?v=20261022c'],
+    ['scenario.js?v=20261022d'],
     ['llm_js/world-integration.js?v=20261022b', 'module'],
   ];
 

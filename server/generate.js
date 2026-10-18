@@ -17,6 +17,10 @@ import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import { OpenAI, collect } from '../app/llm_js/openai-client.js';
 import { config, ROOT, endpoint } from './config.js';
+import { voicesText } from './settings.js';
+
+// The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
+export const recent = [];
 import '../app/procgen.js';
 
 const SKILL = readFileSync(join(ROOT, 'server/fast-skill.md'), 'utf8');
@@ -120,7 +124,7 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
   const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 240000 });
   const how = MODES[mode] ? `Use map method ${MODES[mode]}.` : 'Choose the map method that fits best.';
   const messages = [
-    { role: 'system', content: SKILL },
+    { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId "builtin:<name>"; match the character): ${voicesText()}.` },
     { role: 'user', content: `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.` },
   ];
   let scenario = null, problems = [], raw = '';
@@ -140,7 +144,8 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
     emit('progress', { stage: 'problems', problems });
     messages.push({ role: 'assistant', content: raw }, { role: 'user', content: `Fix these problems and reply with the whole corrected JSON object only:\n- ${problems.join('\n- ')}` });
   }
-  if (!scenario) throw new Error('the model did not produce a usable scenario: ' + problems.join('; '));
+  if (!scenario) { recent.push({ at: Date.now(), prompt, model: ep.model, ms: Date.now() - t0, ok: false, error: problems.join('; ').slice(0, 300) }); if (recent.length > 50) recent.shift(); throw new Error('the model did not produce a usable scenario: ' + problems.join('; ')); }
+  recent.push({ at: Date.now(), prompt, model: ep.model, ms: Date.now() - t0, ok: true, title: scenario.title || '' }); if (recent.length > 50) recent.shift();
   const code = encodeScenario(scenario);
   const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
   try {
@@ -150,13 +155,17 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
   return { scenario, code, warnings: problems, ms: Date.now() - t0, model: ep.model };
 }
 
+function failed(prompt, ep, e) {
+  if (recent.at(-1)?.prompt === prompt && !recent.at(-1).ok) return;   // already noted
+  recent.push({ at: Date.now(), prompt, model: ep.model, ms: 0, ok: false, error: String(e.message).slice(0, 300) }); if (recent.length > 50) recent.shift();
+}
 export async function handleGenerate(req, url) {
   const prompt = (url.searchParams.get('prompt') || '').trim().slice(0, 2000);
   if (!prompt) return Response.json({ error: 'prompt required' }, { status: 400 });
   const mode = url.searchParams.get('mode') || 'auto', ep = pickEndpoint(url);
   if (url.searchParams.get('stream') !== '1') {
     try { const r = await generateScenario({ prompt, mode, ep }); return Response.json({ ...r, link: '/app/#s=' + r.code }); }
-    catch (e) { return Response.json({ error: e.message }, { status: 502 }); }
+    catch (e) { failed(prompt, ep, e); return Response.json({ error: e.message }, { status: 502 }); }
   }
   const enc = new TextEncoder();
   const stream = new ReadableStream({
@@ -165,7 +174,7 @@ export async function handleGenerate(req, url) {
       try {
         const r = await generateScenario({ prompt, mode, ep, emit: send });
         send('done', { ...r, link: '/app/#s=' + r.code });
-      } catch (e) { send('failed', { error: e.message }); }
+      } catch (e) { failed(prompt, ep, e); send('failed', { error: e.message }); }
       ctl.close();
     },
   });
@@ -178,7 +187,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 // preview of the JSON as it streams) and "loading" (just a progress bar with
 // little made-up chores, for showing to players). The server's default is
 // config.worldView (WORLD_VIEW=loading or --world-loading); ?view= overrides.
-export async function handleWorld(req, url) {
+export async function handleWorld(req, url, { saved = null } = {}) {
   const words = decodeURIComponent(url.pathname.replace(/^\/world\/?/, '').replace(/\+/g, ' ')).replace(/[/_]+/g, ' ').trim();
   const qs = new URLSearchParams(url.search);
   const view = words && (qs.get('view') || config.worldView) === 'loading' ? 'loading' : 'builder';
@@ -186,7 +195,8 @@ export async function handleWorld(req, url) {
 <form id="f"><input name="p" value="${esc(words)}" placeholder="a small dungeon with a sorceress and goblins" required>
 <select name="mode"><option value="auto">any method</option><option value="generate">generated map</option><option value="grid">ASCII map</option><option value="map">layout lines</option></select>
 <button>build</button></form>
-<div class="card" id="card" ${words ? '' : 'hidden'}><div><span id="stage">starting…</span> <span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>`;
+<div class="card" id="card" ${words || saved ? '' : 'hidden'}><div><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span> <span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
+<div id="editor" hidden></div>`;
   const loadingBody = `<div class="load"><h1>Building your world</h1><p class="sub">“${esc(words)}”</p>
 <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div></div>
 <div class="row"><span id="chore">Unrolling the map…</span><span id="clock"></span></div>
@@ -197,7 +207,7 @@ export async function handleWorld(req, url) {
 :root{--bg:#f4efe4;--fg:#2b2620;--muted:#7a7064;--card:#fffaf0;--line:#e2d8c6;--accent:#6b4f2a;--track:#e6dccb}
 @media (prefers-color-scheme:dark){:root{--bg:#1d1a16;--fg:#ece5d8;--muted:#a59a8a;--card:#272320;--line:#3a342d;--accent:#d7b07a;--track:#3a342d}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;display:flex;justify-content:center;padding:6vh 16px}
-main{width:min(680px,100%)}h1{font-size:1.3rem;margin:0 0 .2rem}p.sub{color:var(--muted);margin:0 0 1.2rem}
+main{width:min(980px,100%)}h1{font-size:1.3rem;margin:0 0 .2rem}p.sub{color:var(--muted);margin:0 0 1.2rem}
 form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}input,select,button{font:inherit;padding:.5rem .7rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);border:none;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
@@ -209,15 +219,27 @@ input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);bor
 #fill{height:100%;width:0;background:var(--accent);border-radius:7px}
 .row{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.95rem}
 #chore{transition:opacity .25s}
+#editor{margin-top:1rem;display:grid;gap:12px}#editor fieldset{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px 14px;margin:0}
+#editor legend{font-weight:600;padding:0 6px}#editor .cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 12px}
+#editor label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:2px}#editor label.wide{grid-column:1/-1}
+#editor input,#editor select,#editor textarea{font:inherit;font-size:.92rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:.35rem .5rem;width:100%}
+#editor textarea{resize:vertical}.mono{font:12.5px/1.35 ui-monospace,monospace!important;white-space:pre}.bad{border-color:#b5542e!important}
+#editor fieldset.agent{background:var(--bg);margin-bottom:10px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:.3rem 0}
+button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}button.small{padding:.1rem .5rem;font-size:.8rem}.muted{color:var(--muted);font-size:.85rem}
+#editor details summary{cursor:pointer;color:var(--muted)}#editor details textarea{width:100%;margin-top:6px}
+#mapView{position:fixed;inset:0;background:rgba(10,8,6,.55);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px}#mapView[hidden]{display:none}
+.mapcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main><script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261022b"></script><script src="/app/builder.js?v=20261022a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
+const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 if(f){ f.mode.value=qs.get('mode')||'auto';
   f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
 const appLink=l=>{const a=new URLSearchParams(); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
+if(SAVED && window.tfBuilder) window.tfBuilder.show(SAVED,{appLink});
 if(words){
   const q=new URLSearchParams(qs); q.set('prompt',words); q.set('stream','1'); q.delete('view');
   const t0=Date.now(), $=id=>document.getElementById(id);
@@ -257,9 +279,12 @@ if(words){
     $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)'; $('clock').textContent='';
     // the loading view just goes there: nothing to click
     if(view==='loading'){ $('fill').style.transition='width .25s linear'; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; setTimeout(()=>location.href=appLink(d.link),500); return; }
-    $('result').innerHTML='<p><a href="'+appLink(d.link)+'">open it</a> · <a href="#" id="again">another one</a></p>';
+    // the builder stays: everything generated is below, to change and play
+    $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s with '+d.model+': '+(d.scenario.title||'scenario');
+    $('result').innerHTML='<p><a href="'+appLink(d.link)+'">open it as generated</a> · <a href="#" id="again">another one</a></p>';
     $('again').onclick=ev=>{ev.preventDefault(); location.reload();};
-    if(!qs.has('stay')) setTimeout(()=>location.href=appLink(d.link),700);});
+    window.tfBuilder?.show(d,{appLink});
+    if(qs.has('go')) setTimeout(()=>location.href=appLink(d.link),700);});
   const fail=msg=>{ ended=true; clearInterval(clock); $('stage').textContent=msg;
     if(view==='loading'){ $('chore').textContent=msg; const b=new URLSearchParams(qs); b.set('view','builder'); $('result').innerHTML='<p><a href="?'+b+'">open the world builder</a></p>'; } };
   es.addEventListener('failed',e=>{es.close(); fail('failed: '+JSON.parse(e.data).error);});

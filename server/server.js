@@ -12,16 +12,22 @@
 //                       a plain loading screen; ?view= overrides per link)
 //   /api/generate       the generator itself (JSON or a server-sent-event stream)
 //   /api/status         what is configured (never keys)
+//   /admin              the admin page (password set on first start;
+//                       delete .admin/password.json or pass --reset-admin to reset)
+//   /api/voices         voice genders and descriptions (set on /admin)
 // See server/config.js for the settings.
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate } from './generate.js';
+import { setupAdmin, handleAdmin, savedWorld } from './admin.js';
 
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
 if (args.includes('--litert')) config.startLitert = true;
 if (args.includes('--world-loading')) config.worldView = 'loading';
+config.port = port;
+await setupAdmin({ reset: args.includes('--reset-admin') });
 
 function headersFor(path) {
   const h = {
@@ -41,7 +47,7 @@ const TYPES = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'a
 async function serveStatic(req, url) {
   let rel = decodeURIComponent(url.pathname);
   const file0 = normalize(join(ROOT, rel));
-  if (!file0.startsWith(ROOT) || /(^|\/)\.(env|git)(\/|$)/.test(rel)) return new Response('forbidden', { status: 403 });
+  if (!file0.startsWith(ROOT) || /(^|\/)\.(env|git|admin)(\/|$)/.test(rel)) return new Response('forbidden', { status: 403 });
   let file = file0;
   if (existsSync(file) && statSync(file).isDirectory()) {
     if (!rel.endsWith('/')) return Response.redirect(url.pathname + '/' + url.search, 301);
@@ -128,7 +134,8 @@ const server = Bun.serve({
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
     if (p === '/api/skills') return listSkills();
-    if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url);
+    if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url, { saved: url.searchParams.get('edit') ? savedWorld(req, url.searchParams.get('edit')) : null });
+    if (p === '/admin' || p === '/admin/' || p.startsWith('/api/admin/') || p === '/api/voices') return handleAdmin(req, url);
     if (p === '/api/status') return Response.json({
       characters: { baseURL: config.characters.baseURL, model: config.characters.model, key: !!config.characters.apiKey },
       generator: { baseURL: config.generator.baseURL, model: config.generator.model, key: !!config.generator.apiKey },

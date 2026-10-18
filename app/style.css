@@ -431,3 +431,5 @@ body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
 #hurtFlash.on { animation:hurt .45s ease-out; }
 @keyframes hurt { 0% { opacity:1; } 100% { opacity:0; } }
 #defeatCard[hidden] { display:none; }
+#adminLink { color:#cfe3d6; text-decoration:none; margin-right:8px; }
+#adminLink:hover { color:#9fe8c8; }

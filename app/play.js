@@ -83,6 +83,8 @@
   function pickUp(m) {
     const mm = meta(m), name = mm.opts?.name || PICKUPS[mm.type] || mm.type.replace(/_/g, ' ');
     give([{ name, qty: 1 }]);
+    // bare-handed: take up a weapon at once
+    if (!state.player.wielding && window.tablefolkCombat?.weaponFor(name) && me()) window.tablefolkCombat.wield(me(), name);
     sfx('pickup', posOf(m));
     note(`${playerName()} picks up the ${name}`);
     toast('Picked up: ' + name, 'success');

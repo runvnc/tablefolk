@@ -119,6 +119,26 @@ Besides the static files it serves:
   ~22 s with local E4B on an RTX 2060. Every result is saved in `generated/`.
   `/api/generate?prompt=...` returns the JSON (`&stream=1` for progress events).
 
+**Admin page** (`/admin`): the first start asks for an admin password in
+the terminal (without a terminal it makes one up and writes it to
+`.admin/initial-password.txt`); only a hash is kept, in `.admin/password.json`.
+Delete that file (or start with `--reset-admin`) to set a new one. The page
+has the server status, links (the world for players, the world in dev mode
+`/app/?dev=1`, the world builder), both LLM endpoints with a test button, what
+`/world/` shows players, voice genders and descriptions (used to cast voices
+and by the generator; also `/api/voices`), recent generations and the saved
+worlds in `generated/` (play, play in dev mode, edit in the builder, delete),
+and a password change. Its settings live in `.admin/settings.json` and win
+over the environment. The `.admin` folder is never served and is git-ignored.
+
+**World builder editor**: in the builder view `/world/<prompt>` stays on the
+page when the scenario is ready and shows it as forms (story, goal and rules,
+player, each character with body, voice, hostile, hit points, brief,
+commands and inventory, the map settings, raw JSON); **play** opens the
+edited version, **map view** draws the layout top-down with every character
+labelled (generated maps and grids). `?go` opens the world straight away as
+before; `/world/?edit=<file>` (admin) edits a saved world.
+
 Settings come from the environment or `.env` (`OPENROUTER_API_KEY=` is used for
 OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since
 the proxy spends your key. Native local models: `uv tool install litert-lm`,

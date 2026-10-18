@@ -997,6 +997,11 @@
       if (scn.player?.wield && av) {
         if (!w.findItem(w.state.player.items, scn.player.wield)) w.state.player.items.push({ name: String(scn.player.wield), qty: 1 });
         window.tablefolkCombat.wield(av, scn.player.wield);
+      } else if (av) {
+        // a weapon in the pack is in hand from the start (players kept punching
+        // with an iron sword in their bag)
+        const weapon = w.state.player.items.find(i => window.tablefolkCombat.weaponFor(i.name));
+        if (weapon) window.tablefolkCombat.wield(av, weapon.name);
       }
       window.tablefolkCombat.renderPlayerHp();
     }
