@@ -1,0 +1,63 @@
+{
+  "v": 1,
+  "title": "The Alchemist's Workshop",
+  "intro": "You step into Old Vesna's workshop. Something in the cauldron is bubbling.",
+  "seed": 1,
+  "base": "plain",
+  "lighting": "night",
+  "walls": "tabletop",
+  "floor": "wood",
+  "campfire": false,
+  "player": {
+    "name": "Apprentice",
+    "gold": 15,
+    "items": []
+  },
+  "allowed": [
+    "say",
+    "walk",
+    "emote",
+    "give",
+    "sell",
+    "inventory"
+  ],
+  "agents": [
+    {
+      "id": "vesna",
+      "model": "mage",
+      "style": "eccentric old alchemist",
+      "ttsVoiceId": "builtin:fantine",
+      "facing": "s",
+      "personality": "Vesna, an eccentric old alchemist. You sell a healing potion for 10 gold and a glowing potion for 30 gold that you will not explain. You are distracted by your cauldron and keep checking on it. If the player offers to help weed the herb garden, you give them the healing potion for free. Use sell() to trade and give() to hand things over.",
+      "inventory": {
+        "gold": 40,
+        "items": [
+          {
+            "name": "healing potion",
+            "qty": 2
+          },
+          {
+            "name": "glowing potion",
+            "qty": 1
+          }
+        ]
+      }
+    }
+  ],
+  "grid": [
+    "###########",
+    "#KK.PoP.KK#",
+    "#....1....#",
+    "#ww.....tt#",
+    "#.......s.#",
+    "#,,,..RR..#",
+    "#,~,..RR.h#",
+    "#,M,....L.#",
+    "#####Y#####"
+  ],
+  "legend": {
+    "R": "carpet",
+    "h": "chest on stone"
+  },
+  "goal": null
+}
