@@ -1,0 +1,138 @@
+{
+ "v": 1,
+ "title": "The Lantern Market",
+ "seed": 11,
+ "base": "island",
+ "size": [
+  31,
+  21
+ ],
+ "lighting": "night",
+ "intro": "Night on the archipelago. Lanterns sway over the little market by the campfire, where Marisol the fishmonger shows off a pearl that glows like a small moon.",
+ "player": {
+  "name": "Traveller",
+  "gold": 10,
+  "items": []
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "emote",
+  "give",
+  "sell",
+  "inventory",
+  "whisper"
+ ],
+ "earshot": 6,
+ "agents": [
+  {
+   "id": "marisol",
+   "model": "woman",
+   "style": "sharp-tongued fishmonger with salt-stained sleeves",
+   "ttsVoiceId": "builtin:fantine",
+   "personality": "Marisol, a fishmonger at the night market. You have a glowing pearl and want to sell it for 12 gold. You will not go below 12 for haggling alone. Your secret: the pearl is not a real pearl, it is a glass bead you painted with glowing lamp oil. If the player says they know it is glass or painted with lamp oil, you get scared they will tell everyone and you sell it for 10 gold, or less. You will also sell it for 10 gold if the player promises to tell nobody. Use sell() to sell the glowing pearl. Never admit the secret unless the player already knows it.",
+   "inventory": {
+    "gold": 3,
+    "items": [
+     {
+      "name": "glowing pearl",
+      "qty": 1
+     },
+     {
+      "name": "smoked eel",
+      "qty": 2
+     }
+    ]
+   },
+   "chaos": 10
+  },
+  {
+   "id": "tobin",
+   "model": "rogue",
+   "style": "nervous ferryman who keeps glancing at the water",
+   "ttsVoiceId": "builtin:marius",
+   "personality": "Tobin, the ferryman, waiting on his little islet east of the market. You are nervous and jumpy. You know a secret: Marisol's glowing pearl is fake, just a glass bead painted with glowing lamp oil; you saw her paint it. You are afraid of Marisol, so you only tell the secret quietly with whisper(), and only after the player is kind to you or promises not to say where they heard it.",
+   "inventory": {
+    "gold": 1,
+    "items": [
+     {
+      "name": "oar",
+      "qty": 1
+     }
+    ]
+   },
+   "chaos": 15
+  }
+ ],
+ "packs": [
+  "http://localhost:8000/tools/browser-test/test-pack/pack.json"
+ ],
+ "grid": [
+  "-------------------------------",
+  "--------------,,,--------------",
+  "-------------,%,j,-------------",
+  "--------------,=,--------------",
+  "--------.......=.......--------",
+  "--------.......=.......--------",
+  "--------.......=.......--------",
+  "--------...............--------",
+  "--------...............---,,,--",
+  "--------...............--,,%,,-",
+  "--------............=====,2,,,-",
+  "--------...............--,j,%,-",
+  "--------...............---,,,--",
+  "--------...............--------",
+  "--------...............--------",
+  "---,,---...............--------",
+  "--,%%,--...............--------",
+  "--,r*,-------------------------",
+  "---,,--------------------------",
+  "-------------------------------",
+  "-------------------------------"
+ ],
+ "objects": [
+  {
+   "type": "lily_pad",
+   "x": 8,
+   "z": 3
+  },
+  {
+   "type": "lily_pad",
+   "x": -9,
+   "z": -5
+  },
+  {
+   "type": "lily_pad",
+   "x": 5,
+   "z": -8
+  },
+  {
+   "type": "lily_pad",
+   "x": 9,
+   "z": 8
+  }
+ ],
+ "map": [
+  "place table x3 row near campfire",
+  "place marisol behind table",
+  "place apple_crate beside table",
+  "place barrel x2 cluster near table",
+  "place big_anvil near table",
+  "place lantern x3 scattered near table",
+  "place light x3 scattered near table",
+  "place note \"Fresh fish and lucky pearls\" in_front_of table",
+  "stone path from campfire to table"
+ ],
+ "goal": {
+  "text": "Get the glowing pearl. Marisol wants 12 gold; you have 10.",
+  "win": {
+   "player_has": "glowing pearl"
+  },
+  "lose": {
+   "turns_over": 24
+  },
+  "winText": "The pearl glows in your palm. Whether it is real is another matter.",
+  "loseText": "Marisol packs up her stall and the lanterns go out.",
+  "score": "player_gold"
+ }
+}

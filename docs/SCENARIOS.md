@@ -183,6 +183,16 @@ Characters see the whole board in their map, or on boards bigger than 25 x 19
 the 25 x 19 window around them. Flowers, grass tufts, lily pads and lights are
 decoration: no collision, and not on the characters' map.
 
+**Layers.** Later wins on each cell: the base (its sea, grass and objects),
+then the `grid` (any glyph replaces the base's floor there, so `,` or `=` on
+the island base's sea makes land, jetties or islets; `.` leaves the cell),
+then explicit `objects`/`paint`, then map lines on the free land that is left.
+With `base: "island"` and a bigger `size`, everything outside the 15 x 13
+island is sea (the island's grid is `ISLAND` in `app/scenario.js` and is
+sketched in the skill). Characters with no position are placed near the
+middle. `give` and `sell` need the player within 3 cells, so connect islets
+that hold traders with jetties.
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile

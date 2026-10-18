@@ -112,15 +112,71 @@ when the character should use them ("Use give() to hand something over.").
 The world is a board of 1x1 tiles standing in the sea, `"size": [cols, rows]`
 cells (odd numbers). Cells run from -(cols-1)/2 to (cols-1)/2 in x and
 likewise in z, around the centre (0, 0); with the default 23 x 17, x -11..11
-and z -8..8. `sea` cells are holes: that's how you draw coasts and islands.
+and z -8..8. Grid cell (row r, column c) of a centred grid R rows x C columns
+is x = (C-1)/2 - c, z = r - (R-1)/2. `sea` cells are holes: that's how you
+draw coasts and islands.
 **north = -z, south = +z, east = -x, west = +x.** The player starts at the
 south by default. Wide items (`table bench workbench desk sofa`) take two
 cells, a house about 2x2.
 
-`base: "island"` gives a ready 15 x 13 island (grass, trees, house, boulders,
-fence, lantern, campfire, flowers) as ordinary objects to build on;
+`base: "island"` gives a ready island (grass, trees, house, boulders, fence,
+lantern, campfire, flowers, lily pads) as ordinary objects to build on;
 `"clearing"` the same land with only the campfire; `"dungeon"` a stone floor
 and a ring of walls. The default `"plain"` is the blank board.
+
+The island base is this 15 x 13 grid, centred (`,` grass, `-` sea; `%` tree,
+`H` house about 2x2 at (4,-1), `X` campfire at (0,0), `j` lantern at (3,1),
+`f` fence, `r` boulder, `*` flowers, `;` tuft, `q` lily pad):
+
+```
+---------------    z = -6 (north)
+----,,,,,,-----
+--,%,,%,,,,%,--
+-,,,,,,*,,,,,%-
+-%,;,,,,,,;,,,-
+-,,H,,,,,,,r,,-
+-,,,,,,X,,,,,%-    z = 0
+--,,j,,,,,,,,,-
+-%,,,,,,,*,,,--
+-,,ffff,,,,,%,-
+--,,,;,,r,,,,--
+---%,,,,,,,----
+------q----q---    z = 6 (south); x = 7 (west, left) .. -7 (east, right)
+```
+
+With a bigger `size` the board grows and the island stays in the middle;
+**every cell outside it is already sea**, so you only draw what you add.
+
+### Layers (later wins on each cell)
+
+1. **base**: its sea, grass floor and objects;
+2. **grid**: every glyph you draw replaces the base's floor on that cell (draw
+   `,` grass or `=` wood on base sea to make land, jetties, islets; `-` turns
+   land into sea), and its objects are added; `.` leaves the cell as it was.
+   Nothing removes base objects except a `"plain"` base;
+3. **`objects`** and **`paint`**, explicit;
+4. **map lines**, laid out on what is left (free land cells only).
+
+### Islets and getting around
+
+Draw islets in the grid (land glyphs in the sea, at the right offset from the
+island, see the sketch above). Walking onto sea is a fall, so **connect islets
+with `=` wooden jetties** if the player should walk there. Chat reaches a
+character at any distance, but `give` and `sell` need the player within 3
+cells. Lily pads go on sea: `q` in the grid ("lily_pad on sea"), or
+`{"type": "lily_pad", "x": .., "z": ..}` on a sea cell.
+
+```jsonc
+// 31 x 21 archipelago on the island base: an islet to the east with a jetty
+"base": "island", "size": [31, 21],
+"grid": [ /* 21 rows of 31; only these rows differ from all '.' */ ],
+// row 10 (z = 0): "....................=====,2,,,."
+//   columns 20-24 are a jetty from the island's east coast (x -5..-9),
+//   25-29 an islet with agent 2 on it (x -10..-14); all other rows '.'.
+```
+
+A character with no `at`, grid digit or `place` line is put near the middle.
+Grid digits are the agents in order: reordering `agents` moves them.
 
 ### Objects (`objects[].type` and map-line things)
 
@@ -134,16 +190,23 @@ and a ring of walls. The default `"plain"` is the blank board.
   see them; lily pads float on sea cells), `fence` is one cell along x (`ry`
   1.5708 turns it north-south)
 - `light`: an invisible point light, `{"type": "light", "x": 2, "z": -1,
-  "color": "#ffb060", "intensity": 3, "range": 6, "y": 2}`. Campfires and
-  lanterns light themselves; add lights for lamps, windows, magic.
+  "color": "#ffb060", "intensity": 3, "range": 6, "y": 2}`. Campfires
+  (orange, intensity 8, range 6) and lanterns (warm, 1.35, range 6) light
+  themselves. `place light ...` in a map line gets the defaults (warm white,
+  intensity 3, range 6, 2 up); for colours, put lights in `objects`.
 
-The authoritative list is the core pack, `assets/pack.json` in the repo
-(item types, sizes, aliases); read it when unsure. More types can come from
-extra **asset packs**: a folder with a `pack.json` (glTF/GLB files plus size,
-physics and aliases per item, paths relative to the manifest) on any static
-host with CORS. List them in the scenario's `"packs"` and use their types like
-built-in ones. Format: `docs/SCENARIOS.md` section 4c; minimal example:
-`tools/browser-test/test-pack/pack.json`.
+The list above is complete for the built-in types. Of them, the model-based
+ones (items, tree, house, boulder, flowers, grass_tuft) are defined in the core
+pack, `assets/pack.json` (sizes, aliases). More types come from extra **asset
+packs**: a folder with a `pack.json` (glTF/GLB files plus size, physics and
+aliases per item, paths relative to the manifest) on any static host with
+CORS. List them in `"packs"`; their types (and aliases) then work everywhere a
+built-in type does: `objects`, map lines (`place big_anvil near table`), grid
+`legend` values, goals. Items 1.3 or more wide take two cells (two equal
+glyphs in a grid; `place` handles it). A relative pack URL resolves against the
+app's assets folder; an absolute URL must be reachable wherever the link is
+opened (a `localhost` pack only works locally). Format: `docs/SCENARIOS.md`
+section 4c; minimal example: `tools/browser-test/test-pack/pack.json`.
 
 ### Floor materials (`floor`, `paint`, map `paint`)
 
@@ -162,6 +225,11 @@ models behave. `say` is almost always wanted; add `walk` for movement, `give`
 other within `earshot` cells, and overhear what the player says to someone
 else nearby. `give` needs the player within 3 cells. Together these make
 secrets, hand-overs out of a guard's sight, and "lure him away" plans work.
+
+Trading: `give(item)` hands over an item the character has; `sell(item, price)`
+sells it for `price` gold, which the character chooses (haggling is just
+conversation: state the floor price in the personality). Either way the item
+lands in the player's inventory, so `player_has` sees it.
 
 ## ASCII grid (exact rooms, easiest to write)
 
@@ -263,9 +331,11 @@ Item names match loosely ("potion" matches "healing potion").
 }
 ```
 
-More examples live in the app (`app/scenario.js`, `EXAMPLES`: shop, guard,
-lure, jailer, fire drill, maze, the Sounding Board office) and the full
-reference is `docs/SCENARIOS.md` in the repository.
+More examples: the 🎯 Scenario pane's example picker (shop, guard, lure,
+jailer, fire drill, maze, the Sounding Board office), whose JSON shows in the
+pane, and `scenarios/*.json` in the cloned repository (an ASCII-grid workshop,
+Low Tide with earshot and whispers, an archipelago with islets and a pack).
+The full reference is `docs/SCENARIOS.md` in the repository.
 
 ## Checklist before handing over a link
 
@@ -274,5 +344,9 @@ reference is `docs/SCENARIOS.md` in the repository.
 2. `allowed` contains every command the personality or goal relies on (a goal
    of `player_has` needs `give` or `sell`).
 3. Items a goal refers to exist in some inventory or on the map.
-4. `encode` printed no warnings. Save the JSON (e.g. `scenarios/<slug>.json`)
+4. Islets the player must reach are connected by jetties; anyone who sells
+   or gives can be reached on foot.
+5. `encode` printed no warnings (it checks agent ids in goals, commands,
+   grid digits, sizes and pack URLs, not layout; the app's 🎯 Scenario pane
+   shows layout notes). Save the JSON (e.g. `scenarios/<slug>.json`)
    next to the link so it can be edited and re-encoded.

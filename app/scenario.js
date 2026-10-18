@@ -793,7 +793,9 @@
     // Everything that is not island is sea, out to the board's edge.
     const E = edge(), sea = [];
     for (let z = -E.z; z <= E.z; z++) for (let x = -E.x; x <= E.x; x++) if (!land.has(x + ',' + z)) sea.push({ x, z, mat: 'sea' });
-    return { ...scn, objects: [...objects, ...scn.objects], paint: [...sea, ...scn.paint], map: ['floor grass', ...scn.map] };
+    // basePaint is laid under the grid and explicit paint (playScenarioNow),
+    // so a grid can draw land, jetties or islets into the base's sea.
+    return { ...scn, objects: [...objects, ...scn.objects], basePaint: sea, map: ['floor grass', ...scn.map] };
   }
   // Board size: "size", else the island's, else the grid plus a two-cell
   // margin (none when the grid is ringed with sea), else the default.
@@ -870,6 +872,8 @@
     // The base's content and the grid become ordinary objects, paint and
     // positions for the build; the link and restart keep the compact form.
     const scn = expandGrid(expandBase(base));
+    // Layers, later wins per cell: the base's sea, then the grid, then "paint".
+    scn.paint = [...(scn.basePaint || []), ...scn.paint];
     stopChecker();
     w.state.saveKey = SCENARIO_KEY;
     w.setWallStyle?.(scn.walls);
@@ -883,7 +887,8 @@
     w.setLighting?.(scn.lighting === 'night' ? 'night' : 'bright');
     w.setPlayer(scn.player);
     // Sea cells first: they shape the land the layout engine places onto.
-    const holes = scn.paint.filter(c => c.mat === 'sea');
+    const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
+    const holes = [...finalMat.values()].filter(c => c.mat === 'sea');
     if (holes.length) { w.setPaint?.(holes.map(c => ({ x: +c.x, z: +c.z, mat: 'sea' }))); await Promise.resolve(); }
     // Never start already won: if the layout satisfies the win condition at
     // turn 0 (e.g. "get Pip to the campfire" with Pip placed by the fire),

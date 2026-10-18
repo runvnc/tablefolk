@@ -2542,6 +2542,8 @@ function sell(g,item,price){
   if(!Number.isFinite(price) || price<0) return say(g,`what price for ${item}? sell needs a number of gold`);
   const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item), buyer=playerName();
   if(!stock) return say(g,`sale failed: ${g.id} has no ${item} to sell`);
+  const av=state.playerAvatar?.root?.position;
+  if(av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
   if((state.player.gold||0)<price) return say(g,`sale failed: ${buyer} has only ${state.player.gold||0} gold, ${stock.name} costs ${price}`);
   state.player.gold-=price; inv.gold=(inv.gold||0)+price;
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
