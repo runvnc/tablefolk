@@ -1,0 +1,18 @@
+{
+  "id": "thievery",
+  "name": "Thievery",
+  "version": "1.0.0",
+  "description": "Pick pockets: lift an item or a few coins from someone next to you.",
+  "params": {},
+  "prompt": "You are a thief. steal(name) lifts an item or a few coins from someone standing next to you; if you fumble, they notice.",
+  "commands": {
+    "steal": {
+      "usage": "steal(target)",
+      "example": "steal(player)",
+      "help": "pick the pocket of someone next to you (about half the time it works)",
+      "range": 1.6, "target": "other", "cooldown": 2,
+      "effects": [{ "steal": { "chance": 0.55 } }],
+      "text": "{{me}} reaches for {{target}}'s pocket"
+    }
+  }
+}

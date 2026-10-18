@@ -103,6 +103,17 @@ async function transcribe(req) {
   }
 }
 
+// Built-in skills (skills/<id>/skill.json), for discovery.
+async function listSkills() {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const out = [];
+  for (const d of readdirSync(join(ROOT, 'skills'), { withFileTypes: true })) {
+    if (!d.isDirectory()) continue;
+    try { const m = JSON.parse(readFileSync(join(ROOT, 'skills', d.name, 'skill.json'), 'utf8')); out.push({ ref: d.name, id: m.id, name: m.name, version: m.version, description: m.description, commands: Object.keys(m.commands || {}), code: !!m.module }); } catch {}
+  }
+  return Response.json({ skills: out });
+}
+
 const server = Bun.serve({
   port, hostname: config.host, idleTimeout: 255,
   async fetch(req) {
@@ -113,6 +124,7 @@ const server = Bun.serve({
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' });
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
+    if (p === '/api/skills') return listSkills();
     if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url);
     if (p === '/api/status') return Response.json({
       characters: { baseURL: config.characters.baseURL, model: config.characters.model, key: !!config.characters.apiKey },

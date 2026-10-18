@@ -1,0 +1,27 @@
+{
+  "id": "magic",
+  "name": "Magic",
+  "version": "1.0.0",
+  "description": "Cast spells from a spellbook, paid for with mana that comes back slowly.",
+  "params": { "spells": ["spark", "heal", "light"] },
+  "state": { "mana": 10, "maxMana": 10 },
+  "regen": { "mana": 1 },
+  "prompt": "You know magic. Your spells: {{spells}}. Mana: {{mana}}/{{maxMana}} (1 comes back each turn).",
+  "commands": {
+    "cast": {
+      "usage": "cast(spell, target)",
+      "example": "cast(spark, gob1)",
+      "help": "cast one of your spells at someone or something (target: a name, player, me, or a thing)",
+      "variants": "spellbook",
+      "param": "spells"
+    }
+  },
+  "spellbook": {
+    "spark":    { "cost": { "mana": 1 }, "range": 4, "target": "any", "effects": [{ "vfx": "spark" }, { "damage": 1 }], "text": "{{me}} flicks a crackling spark at {{target}}" },
+    "fireball": { "cost": { "mana": 5 }, "range": 5, "target": "other", "cooldown": 2, "effects": [{ "vfx": "fireball" }, { "damage": 4 }, { "burn": 2 }], "text": "{{me}} hurls a fireball at {{target}}" },
+    "heal":     { "cost": { "mana": 3 }, "range": 2, "target": "any", "default": "me", "effects": [{ "vfx": "glow" }, { "heal": 4 }], "text": "{{me}} lays a healing glow on {{target}}" },
+    "light":    { "cost": { "mana": 1 }, "target": "none", "effects": [{ "vfx": "glow" }, { "light": { "intensity": 3, "range": 6, "seconds": 90 } }], "text": "{{me}} conjures a floating light" },
+    "push":     { "cost": { "mana": 2 }, "range": 3, "target": "any", "effects": [{ "vfx": "ring" }, { "push": 2 }], "text": "{{me}} shoves the air at {{target}}" },
+    "frost":    { "cost": { "mana": 3 }, "range": 4, "target": "other", "effects": [{ "vfx": "spark" }, { "damage": 2 }], "text": "{{me}} shoots a shard of frost at {{target}}" }
+  }
+}

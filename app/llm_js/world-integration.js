@@ -225,7 +225,7 @@ function formatActionSummary(historyEntry) {
     if (result.toLowerCase().startsWith(agentId.toLowerCase() + ' ')) return result;
   }
   // Conjugate common verbs: walk->walks, say->says, look->looks, etc.
-  const verbMap = { walk: 'walks', say: 'says', whisper: 'whispers', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory', attack: 'attacks', wield: 'wields' };
+  const verbMap = { walk: 'walks', say: 'says', whisper: 'whispers', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory', attack: 'attacks', wield: 'wields', cast: 'casts', steal: 'steals', bandage: 'bandages', sing: 'sings', workflow: 'starts routine' };
   const parts = action.split(/\s+/);
   if (parts.length > 0 && verbMap[parts[0]]) parts[0] = verbMap[parts[0]];
   action = parts.join(' ');
@@ -820,7 +820,7 @@ async function main() {
     let text = input?.value?.trim();
     if (!text) return;
     // "/attack gob1", "/wield sword": the player's own actions (combat.js).
-    if (text.startsWith('/') && window.tablefolkCombat?.playerCommand(text)) { input.value = ''; return; }
+    if (text.startsWith('/') && (window.tablefolkCombat?.playerCommand(text) || window.tablefolkSkills?.playerCommand(text))) { input.value = ''; return; }
     // "@bram hello" talks to bram (and selects him) whoever is selected.
     const at = text.match(/^@([A-Za-z0-9_-]+)[\s,:]+(.*)$/s);
     if (at) {

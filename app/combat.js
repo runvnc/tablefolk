@@ -186,6 +186,24 @@
     }, 380);
   }
 
+  // Damage or healing from anything else (spells, skills): `by` is the name
+  // of who did it, `how` a phrase ("a fireball").
+  function hurt(v, dmg, by = 'something', how = '') {
+    if (!v || v.defeated || dmg <= 0) return 0;
+    const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg), whom = nameOf(v);
+    setHp(v, left); floatText(v, '-' + dmg);
+    playClip(v, ['Hit_A', 'Hit_B'], 500);
+    if (!left) { defeat(v, by); tellWitnesses({ root: { position: v.root.position } }, v, `[event] ${by} strikes down ${whom}${how ? ' with ' + how : ''}.`); }
+    else tellVictim(v, `[event] ${by} hits you${how ? ' with ' + how : ''}! You lose ${dmg} health (${left}/${max} left).`);
+    return dmg;
+  }
+  function heal(v, n) {
+    if (!v || v.defeated || n <= 0) return 0;
+    const { hp, max } = hpOf(v), to = Math.min(max, hp + n);
+    setHp(v, to); floatText(v, '+' + (to - hp));
+    return to - hp;
+  }
+
   function playClip(g, names, ms) {
     if (!g?.rigged || !g.rigAnims) return;
     const ag = names.map(n => g.rigAnims[n]).find(Boolean); if (!ag) return;
@@ -266,5 +284,5 @@
     renderPlayerHp();
   }
 
-  window.tablefolkCombat = { attack, wield, hpOf, setHp, defeat, selfLine, statusWord, weaponFor, showWeapon, playerCommand, renderPlayerHp, reset, REACH };
+  window.tablefolkCombat = { attack, wield, hpOf, setHp, defeat, hurt, heal, playClip, nameOf, resolveTarget, selfLine, statusWord, weaponFor, showWeapon, playerCommand, renderPlayerHp, reset, REACH };
 })();

@@ -1,0 +1,23 @@
+{
+  "v": 1,
+  "title": "The Guild Hall",
+  "subtitle": "A mage, a thief and a bard, each with their own skills.",
+  "intro": "Skills come from packages (skills/*/skill.json). Vexa knows magic, Rook picks pockets, Lyra sings. You know a little magic too: try /cast heal me.",
+  "seed": 3,
+  "size": [13, 11],
+  "floor": "oak",
+  "player": { "name": "Traveller", "gold": 20, "items": ["silver ring"], "skills": ["magic"], "skillParams": { "magic": { "spells": ["heal", "light", "spark"], "mana": 6 } }, "at": [0, 2] },
+  "allowed": ["say", "walk", "face", "emote"],
+  "skills": ["magic", "thievery", "bard", "healing"],
+  "agents": [
+    { "id": "vexa", "model": "mage", "style": "proud court mage", "at": [2, 0], "skills": ["magic", "healing"],
+      "skillParams": { "magic": { "spells": ["spark", "fireball", "heal", "light"], "mana": 12 } },
+      "personality": "Vexa, a proud mage. You show off spells when asked, and heal people who are hurt." },
+    { "id": "rook", "model": "rogue", "style": "charming pickpocket", "at": [-1, 1], "skills": ["thievery"],
+      "inventory": { "gold": 3, "items": [] },
+      "personality": "Rook, a charming thief. You chat with travellers and try to steal(player) when they stand next to you." },
+    { "id": "lyra", "model": "woman", "style": "cheerful bard", "at": [-3, -1], "skills": ["bard"],
+      "personality": "Lyra, a bard. When people are hurt or scared you sing(rest) or sing(courage)." }
+  ],
+  "map": ["place table at center", "place bench beside table", "place bookshelf x2 against north_wall"]
+}

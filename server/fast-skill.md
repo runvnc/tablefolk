@@ -43,6 +43,11 @@ for fighters and say in the personality when they attack. The player can
 always fight (/attack, /wield). Goals: {"agent_defeated": "id"},
 {"player_defeated": true} (use as "lose").
 
+Skills: "skills": ["magic"] at the top, then on an agent "skills": ["magic"],
+"skillParams": {"magic": {"spells": ["spark", "fireball", "heal"]}}. Built in:
+magic (cast(spell, target); spells spark fireball heal light push frost),
+healing (bandage(target)), thievery (steal(target)), bard (sing(rest|courage)).
+
 # Map methods (use exactly one)
 
 ## A. "generate": procedural dungeon or village (fastest, best for big places)

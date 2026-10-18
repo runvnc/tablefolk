@@ -1,0 +1,13 @@
+{
+  "id": "bard",
+  "name": "Bard",
+  "version": "1.0.0",
+  "description": "Songs that affect everyone who hears them (an example of a skill with a code module).",
+  "params": { "songs": ["rest", "courage"] },
+  "prompt": "You are a bard. Songs you know: {{songs}}. sing(song) plays it for everyone within earshot.",
+  "commands": {
+    "sing": { "usage": "sing(song)", "example": "sing(rest)", "help": "sing for everyone nearby: rest heals 1 each, courage steadies them", "variants": "songs", "param": "songs" }
+  },
+  "songs": { "rest": { "cooldown": 2 }, "courage": { "cooldown": 2 } },
+  "module": "skill.js"
+}

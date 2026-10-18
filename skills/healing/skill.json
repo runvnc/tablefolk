@@ -1,0 +1,19 @@
+{
+  "id": "healing",
+  "name": "Healing",
+  "version": "1.0.0",
+  "description": "Bind wounds with bandages: a slower, mana-free heal.",
+  "params": { "bandages": 3 },
+  "state": { "bandages": 3 },
+  "prompt": "You are a healer. Bandages left: {{bandages}}.",
+  "commands": {
+    "bandage": {
+      "usage": "bandage(target)",
+      "example": "bandage(player)",
+      "help": "bind someone's wounds next to you (heals 3; uses a bandage)",
+      "cost": { "bandages": 1 }, "range": 1.6, "target": "any", "default": "me", "cooldown": 1,
+      "effects": [{ "heal": 3 }],
+      "text": "{{me}} binds {{target}}'s wounds"
+    }
+  }
+}

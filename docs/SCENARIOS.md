@@ -285,6 +285,25 @@ Steps: `prompt` (+ `parse`: text, line, number, yesno, word; `save`),
 `{{player}}`, `{{input}}`. Tested with Gemma 4 E4B: greets, counters a low
 offer, sells at 42 (`scenarios/haggle-workflow.json`).
 
+## 2g. Skills
+
+Full reference: `docs/SKILLS.md`. `"skills": ["magic", "thievery"]` loads skill packages; give them to
+characters with `"skills": [...]` on an agent (or the player) and tune them
+with `"skillParams"`. Built in: `magic` (`cast(spell, target)`: spark,
+fireball, heal, light, push, frost; mana), `healing` (`bandage(target)`),
+`thievery` (`steal(target)`), `bard` (`sing(rest|courage)`). A skill's
+commands are allowed automatically for whoever has it.
+
+```json
+"skills": ["magic"],
+"agents": [{ "id": "vexa", "skills": ["magic"],
+  "skillParams": { "magic": { "spells": ["spark", "fireball", "heal"], "mana": 12 } }, "personality": "..." }]
+```
+
+More skills come from URLs, `npm:<package>@<version>` or
+`gh:<user>/<repo>@<tag>/<dir>` (a folder with `skill.json`); writing one:
+`docs/SKILLS.md` in the repository.
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile

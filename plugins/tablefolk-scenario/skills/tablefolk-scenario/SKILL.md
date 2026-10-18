@@ -253,6 +253,25 @@ Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`
 Allow `attack` only for characters who should fight, and say in the
 personality when they do ("If insulted twice, attack(player).").
 
+## Skills (installable abilities)
+
+`"skills": ["magic", "thievery"]` loads skill packages; give them to
+characters with `"skills": [...]` on an agent (or the player) and tune them
+with `"skillParams"`. Built in: `magic` (`cast(spell, target)`: spark,
+fireball, heal, light, push, frost; mana), `healing` (`bandage(target)`),
+`thievery` (`steal(target)`), `bard` (`sing(rest|courage)`). A skill's
+commands are allowed automatically for whoever has it.
+
+```json
+"skills": ["magic"],
+"agents": [{ "id": "vexa", "skills": ["magic"],
+  "skillParams": { "magic": { "spells": ["spark", "fireball", "heal"], "mana": 12 } }, "personality": "..." }]
+```
+
+More skills come from URLs, `npm:<package>@<version>` or
+`gh:<user>/<repo>@<tag>/<dir>` (a folder with `skill.json`); writing one:
+`docs/SKILLS.md` in the repository.
+
 ## Workflows (keep small models on track)
 
 A workflow breaks a task into steps; the character's model only answers one

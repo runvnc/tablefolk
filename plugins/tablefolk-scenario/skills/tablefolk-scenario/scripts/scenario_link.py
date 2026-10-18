@@ -15,7 +15,7 @@ BASES = {'island', 'clearing', 'dungeon', 'plain'}
 ROOMS = {'entrance', 'throne', 'lair', 'treasure', 'library', 'shrine', 'barracks', 'storage', 'kitchen', 'prison', 'crypt', 'alchemy', 'room'}
 BUILDINGS = {'tavern', 'smithy', 'shop', 'temple', 'alchemist', 'guardhouse', 'library', 'house', 'stable', 'square', 'pond', 'garden'}
 COMMANDS = {'say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
-            'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow'}
+            'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing'}
 
 
 def encode(obj):
@@ -59,6 +59,12 @@ def check(obj):
         elif isinstance(node, list):
             for v in node: walk_goal(v)
     walk_goal(obj.get('goal'))
+    import os
+    skills_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..', 'skills')
+    for ref in set(obj.get('skills', []) + [r for a in obj.get('agents', []) for r in a.get('skills', [])] + (obj.get('player') or {}).get('skills', [])):
+        r = str(ref)
+        if not (r.startswith(('http://', 'https://', 'npm:', 'gh:')) or os.path.exists(os.path.join(skills_dir, r, 'skill.json')) or r in ('magic', 'healing', 'thievery', 'bard')):
+            problems.append(f'skill {r!r}: not a built-in skill (magic healing thievery bard) or a URL / npm: / gh: reference')
     for u in obj.get('packs', []):
         if not isinstance(u, str) or not u.endswith('.json'):
             problems.append(f'"packs": {u!r} should be the URL of a pack.json')

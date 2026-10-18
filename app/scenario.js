@@ -841,6 +841,7 @@
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,
       grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
       legend: s.legend && typeof s.legend === 'object' ? Object.fromEntries(Object.entries(s.legend).map(([k, v]) => [k, String(v)])) : {},
+      skills: Array.isArray(s.skills) ? s.skills.map(String).slice(0, 16) : [],
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
@@ -932,6 +933,8 @@
     w.setPaint?.([...plan.paint, ...scn.paint.map(c => ({ x: +c.x, z: +c.z, mat: c.mat, tint: c.tint }))]);
     for (const o of scn.objects) w.makeObject(o.type, +o.x, +o.z, o);
     for (const o of plan.objects) w.makeObject(o.type, o.x, o.z, o);
+    // Skills (skills.js): fetch every manifest the scenario names first.
+    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load(scn) : [];
     let first = null;
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
@@ -974,12 +977,16 @@
       }
       window.tablefolkCombat.renderPlayerHp();
     }
+    if (window.tablefolkSkills) {
+      for (const a of scn.agents) { const g = w.getAgents().find(x => x.id === a.id); if (g) window.tablefolkSkills.grant(g, a.skills || [], a.skillParams || {}); }
+      const av = w.getPlayerAvatar?.(); if (av) window.tablefolkSkills.grant(av, scn.player?.skills || [], scn.player?.skillParams || {});
+    }
     // Characters that live in a routine from the start ("workflow": "patrol").
     for (const a of scn.agents) if (a.workflow && window.tablefolkWorkflows) window.tablefolkWorkflows.start(a.id, String(a.workflow), a.workflowInput || '');
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
-    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings);
+    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...skillWarnings);
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}
