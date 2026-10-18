@@ -1013,11 +1013,14 @@ function makeTile(scene,x,z,material='grass'){ const t=BABYLON.MeshBuilder.Creat
 // 'block': the original short cube per cell. The game logic is the same for
 // both: one static wall object per grid cell.
 const WALL_H=1.1;
+// Scenarios can scale wall height ("wallHeight": 2 = twice as tall); 1 = the
+// tuned sandbox look. Builders below derive every course from wallH().
+const wallH=()=>WALL_H*(state.wallHeightScale||1);
 function makeBlock(scene,x,z,cracked=false){
-  const top=state.terrainTopY??0, tabletop=(state.wallStyle||'tabletop')!=='block';   // tabletop or modern
-  const b=tabletop ? BABYLON.MeshBuilder.CreateBox('wall',{width:.96,height:WALL_H,depth:.96},scene)
-                   : BABYLON.MeshBuilder.CreateBox('wall',{width:.96,height:.62,depth:.96},scene);
-  b.position.set(x,top+(tabletop?WALL_H/2:.31),z);
+  const top=state.terrainTopY??0, tabletop=(state.wallStyle||'tabletop')!=='block', s=state.wallHeightScale||1;   // tabletop or modern
+  const b=tabletop ? BABYLON.MeshBuilder.CreateBox('wall',{width:.96,height:wallH(),depth:.96},scene)
+                   : BABYLON.MeshBuilder.CreateBox('wall',{width:.96,height:.62*s,depth:.96},scene);
+  b.position.set(x,top+(tabletop?wallH()/2:.31*s),z);
   addToScene(b,cracked?state.materials.cracked:state.materials.stone,{motion:'static',shape:'BOX',mass:0});
   tag(b,'wall',{health:cracked?1:3,material:'stone',state:cracked?'cracked':'intact'});
   if(tabletop){ b.isVisible=false; meta(b).tabletop=true; scheduleWallRebuild(); }
@@ -1108,7 +1111,7 @@ function rebuildWallVisuals(){
   if(state.wallStyle==='stone') return buildFieldstoneWalls(cell,top);
   const stones=boxBatch(), core=boxBatch(), trim=boxBatch(), cap=boxBatch();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
-  const T=.18, H=WALL_H-.08, Y0=top+.07, ROWS=5, RH=H/ROWS, BL=.3, GAP=.022;
+  const T=.18, H=wallH()-.08, Y0=top+.07, ROWS=Math.max(1,Math.round(5*(state.wallHeightScale||1))), RH=H/ROWS, BL=.3, GAP=.022;
   const shade=(st,r)=>{ // stone colour by wall state
     if(st==='burned') { const v=.18+r*.08; return [v+.02,v,v-.01]; }
     // Mid grey, not near-white: a glossy highlight needs a darker base to read
@@ -1199,7 +1202,7 @@ function fieldstoneRock(sc){
 function buildFieldstoneWalls(cell,top){
   const sc=state.scene, src=fieldstoneRock(sc), core=boxBatch(), mats=wallMaterials();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
-  const T=.22, H=WALL_H-.04, ROWS=5, RH=H/ROWS, rocks=[];
+  const T=.22, H=wallH()-.04, ROWS=Math.max(1,Math.round(5*(state.wallHeightScale||1))), RH=H/ROWS, rocks=[];
   const shade=(st,r,r2)=>{
     if(st==='burned'){ const v=.13+r*.07; return [v+.02,v,v-.01]; }
     const v=.30+r*.2, warm=(r2-.5)*.12; return [v+warm*.6,v+warm*.2,v-warm*.3];
@@ -1268,7 +1271,7 @@ function modernWallMaterials(){
 function buildModernWalls(cell,top){
   const sc=state.scene, mats=modernWallMaterials();
   const panel=boxBatch(), base=boxBatch(), capB=boxBatch();
-  const T=.16, H=WALL_H-.02;
+  const T=.16, H=wallH()-.02;
   const tone=st=>st==='burned'?[.2,.19,.18]:st==='cracked'?[.70,.67,.62]:[.86,.84,.80];
   for(const [k,w] of cell){
     const [x,z]=k.split(',').map(Number), col=tone(meta(w).state);
@@ -1409,18 +1412,23 @@ function addLampPool(scene,root,{warm=false,y=.025}={}){
 // Scene lighting presets. 'night' is the normal diorama look; 'bright' raises
 // and strengthens the key light so its falloff no longer leaves the north half
 // of the island in the dark (the sky-dome light never reaches materials: it is
-// fifth in priority under the four-light cap). Used by scenarios.
+// fifth in priority under the four-light cap). 'dim' is night at half ambient
+// (key, fill, rim, sky dome and environment), so lamps and fires stand out.
+// Used by scenarios.
 let lightingDefaults=null;
 function setLighting(mode='night'){
   const sc=state.scene; if(!sc) return;
   const key=sc.getLightByName('tree_key_moved'), rim=sc.getLightByName('teal_rim');
   if(!lightingDefaults) lightingDefaults={keyPos:key?.position.clone(), keyI:key?.intensity, rimI:rim?.intensity};
-  const d=lightingDefaults;
+  const d=lightingDefaults, amb=mode==='dim' ? .5 : 1;
+  const hemi=sc.getLightByName('sky_dome_light');
+  if(hemi){ d.hemiI ??= hemi.intensity; hemi.intensity=d.hemiI*amb; }
+  if(sc.environmentTexture){ d.envI ??= sc.environmentIntensity; sc.environmentIntensity=d.envI*amb; }
   // Bigger boards: move the key and fill out with the board and raise their
   // intensity by the square of the distance, so the middle stays as lit.
   const k=LEGACY_ISLAND ? 1 : boardScale(), fill=sc.getLightByName('cool_fill');
   if(fill){ d.fillPos ||= fill.position.clone(); d.fillI ??= fill.intensity; d.fillR ??= fill.range;
-    fill.position.copyFrom(d.fillPos.scale(k)); fill.intensity=d.fillI*k*k; fill.range=d.fillR*k; }
+    fill.position.copyFrom(d.fillPos.scale(k)); fill.intensity=d.fillI*k*k*amb; fill.range=d.fillR*k; }
   if(key) key.range=46*k;
   if(mode==='bright'){
     // Raised less and only 2.2x (was y14, 4x): enough to light the north
@@ -1429,8 +1437,8 @@ function setLighting(mode='night'){
     if(key){ key.position.set(-1,9*k,10.5*k); key.intensity=d.keyI*2.2*k*k; }
     if(rim) rim.intensity=Math.max(d.rimI,.34);
   } else {
-    if(key && d.keyPos){ key.position.copyFrom(d.keyPos.scale(k)); key.intensity=d.keyI*k*k; }
-    if(rim) rim.intensity=d.rimI;
+    if(key && d.keyPos){ key.position.copyFrom(d.keyPos.scale(k)); key.intensity=d.keyI*k*k*amb; }
+    if(rim) rim.intensity=d.rimI*amb;
   }
   state.lighting=mode;
 }
@@ -3802,6 +3810,7 @@ function installWorldAPI(){
     setPathfinding:on=>{ state.pathfinding=on!==false; }, findRoute,
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
     spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
+    setWallHeight:v=>{ state.wallHeightScale=Number.isFinite(+v) && +v>0 ? Math.min(4,Math.max(.25,+v)) : 1; },
     setLighting,
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),

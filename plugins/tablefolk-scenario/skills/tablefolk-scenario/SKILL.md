@@ -59,8 +59,9 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "seed": 7,                       // layout randomness; same JSON + seed = same map
   "base": "plain",                 // plain (blank board, default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63 (default 23x17)
-  "lighting": "bright",            // or "night"
+  "lighting": "bright",            // or "night", "dim" (night at half ambient)
   "walls": "tabletop",             // or "stone" (natural rock walls), "modern" (painted panels), "block"
+  "wallHeight": 2,                 // optional wall height multiplier (default 1; 2 = twice as tall)
   "floor": "stone",                // optional: paint the whole floor (materials below)
   "campfire": true,                // island: false drops its campfire; plain: true adds one
   "pathfinding": true,             // false: walks go straight and stop at walls (maze puzzles)

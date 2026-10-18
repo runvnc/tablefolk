@@ -1,0 +1,138 @@
+{
+  "v": 1,
+  "title": "The Sunken Vault",
+  "subtitle": "Egg, key, riddle, crown.",
+  "intro": "Torch smoke and dripping stone. Somewhere far below, the lich Vezhar guards the Sunshard Crown in his vault. Nobody down here gives anything away for free. Start by finding out who knows what — prisoners are famous talkers.",
+  "seed": 13,
+  "base": "plain",
+  "size": [23, 17],
+  "lighting": "dim",
+  "walls": "stone",
+  "wallHeight": 2,
+  "floor": "stone",
+  "earshot": 5,
+  "player": {
+    "name": "Delver",
+    "gold": 10,
+    "items": [],
+    "model": "rogue"
+  },
+  "allowed": [
+    "say",
+    "whisper",
+    "walk",
+    "face",
+    "look",
+    "emote",
+    "give",
+    "sell",
+    "inventory",
+    "spell.spark"
+  ],
+  "agents": [
+    {
+      "id": "gorv",
+      "model": "critter",
+      "style": "bored goblin jailer",
+      "ttsVoiceId": "builtin:marius",
+      "personality": "Gorv, the goblin jailer of the Sunken Vault. You guard the door to Vezhar's vault (north of your post) and you carry the brass key. You are bored, underpaid and always hungry, and you would do almost anything for one of Berta the cook's pickled eggs. Hard rule: give the brass key with give(\"brass key\") ONLY to someone who has brought you a pickled egg (they must have a pickled egg to offer you). Never give the key before that, whatever else they promise, but hint freely that you dream about pickled eggs and that Berta in the east kitchen sells them. You also know Vezhar the lich loves riddles and that Pip the prisoner (west cells) once got past him. You will not leave your post, and you wave people with the brass key through to the vault.",
+      "inventory": {
+        "gold": 2,
+        "items": [{ "name": "brass key", "qty": 1 }]
+      },
+      "chaos": 15
+    },
+    {
+      "id": "pip",
+      "model": "rogue",
+      "style": "cheerful imprisoned thief",
+      "ttsVoiceId": "builtin:eponine",
+      "personality": "Pip, a thief locked in the west cells for trying to rob Vezhar's vault. You are cheerful and talkative and you want to be freed. You know two secrets. Secret one, tell anyone who asks about the key, the vault or getting north: Gorv the jailer will trade his brass key for a pickled egg, and Berta the cook in the east kitchen sells pickled eggs for 3 gold. Secret two, a hard rule: only AFTER the player tells you they have the brass key (or comes back having got it from Gorv) do you reveal it: Vezhar the lich asks every visitor a riddle, 'I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?' and the answer is 'echo'. Never reveal the word 'echo' before the player has the brass key. Beg the player to unlock your cell with the key before they face the lich.",
+      "chaos": 20
+    },
+    {
+      "id": "berta",
+      "model": "woman",
+      "style": "no-nonsense dungeon cook",
+      "ttsVoiceId": "builtin:cosette",
+      "personality": "Berta, cook of the Sunken Vault, in the east kitchen. You sell pickled eggs for exactly 3 gold each: when someone agrees to buy one, sell it with sell(\"pickled egg\", 3). Never give eggs away free and never change the price. You know Gorv the jailer is mad for your pickled eggs and would trade anything he owns for one. You warn everyone that Vezhar the lich in the north vault burned the last thief who guessed his riddle wrong, and that Pip the prisoner in the west cells knows the riddle. You keep answers short and keep stirring your cauldron.",
+      "inventory": {
+        "gold": 6,
+        "items": [{ "name": "pickled egg", "qty": 3 }]
+      },
+      "chaos": 10
+    },
+    {
+      "id": "vezhar",
+      "model": "mage",
+      "style": "ancient lich and vault guardian",
+      "ttsVoiceId": "builtin:javert",
+      "personality": "Vezhar, an ancient lich guarding the Sunshard Crown in the north vault. You are cold, theatrical and bored after three hundred years, so you test visitors instead of killing them outright. Ask every visitor your riddle: 'I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?' Hard rule: give the Sunshard Crown with give(\"Sunshard Crown\") ONLY if the visitor answers 'echo' (or 'an echo') AND says they carry the brass key Gorv gave them. If they answer wrong, mock them, crackle with spell.spark, and tell them to go and learn from the living below. If they answer 'echo' but have no brass key, refuse and tell them Gorv must vouch for them first. Never give the crown any other way, never sell it, and never leave the vault.",
+      "inventory": {
+        "gold": 0,
+        "items": [{ "name": "Sunshard Crown", "qty": 1 }]
+      },
+      "chaos": 5,
+      "fireballTemptation": 0
+    }
+  ],
+  "grid": [
+    "#######################",
+    "#~~..M.#..4..$$#W..a..#",
+    "#~~....#.......#......#",
+    "#..j...#h&....h#..ww..#",
+    "####.######.######.####",
+    "#......#...1...#..o...#",
+    "#..tt..#.......#..3...#",
+    "#......#.L...L.#BB..CC#",
+    "####.####.....####.####",
+    "#..2...#.......#C....B#",
+    "#......#.......#M....M#",
+    "#.nn...#...X...#......#",
+    "#......#.......#..j...#",
+    "####.####.....####.####",
+    "#..........Z..........#",
+    "#.....j....Y....j.....#",
+    "#######################"
+  ],
+  "legend": {
+    "Z": "note \"Below: cells west, kitchen east. Above: death, in a hat.\""
+  },
+  "objects": [
+    {
+      "type": "light",
+      "x": 0,
+      "z": -7,
+      "color": "#b080ff",
+      "intensity": 3,
+      "range": 6,
+      "y": 2
+    },
+    {
+      "type": "light",
+      "x": 8,
+      "z": 2,
+      "color": "#ffb060",
+      "intensity": 1.5,
+      "range": 4,
+      "y": 1.5
+    },
+    {
+      "type": "light",
+      "x": -7,
+      "z": -2,
+      "color": "#ffc27a",
+      "intensity": 2,
+      "range": 5,
+      "y": 1.5
+    }
+  ],
+  "goal": {
+    "text": "Win the Sunshard Crown from Vezhar the lich in the north vault. Talk to everyone: someone down here knows how.",
+    "win": { "player_has": "Sunshard Crown" },
+    "lose": { "turns_over": 35 },
+    "winText": "The crown is warm as sunrise. Behind you, a lich applauds, very slowly, with somebody else's hands.",
+    "loseText": "The torches gutter out. The vault keeps its crown, and the dark keeps you.",
+    "score": "turns_left"
+  }
+}

@@ -814,13 +814,14 @@
   function normalizeScenario(s) {
     if (!s || typeof s !== 'object') throw new Error('scenario must be a JSON object');
     if (s.v && s.v !== 1) throw new Error('unsupported scenario version ' + s.v);
-    const out = { v: 1, title: String(s.title || 'Untitled scenario'), subtitle: s.subtitle ? String(s.subtitle) : '', safety: !!s.safety, lighting: s.lighting === 'night' ? 'night' : 'bright', intro: s.intro ? String(s.intro) : '', seed: Number.isFinite(+s.seed) ? +s.seed : 1,
+    const out = { v: 1, title: String(s.title || 'Untitled scenario'), subtitle: s.subtitle ? String(s.subtitle) : '', safety: !!s.safety, lighting: ['night', 'dim'].includes(s.lighting) ? s.lighting : 'bright', intro: s.intro ? String(s.intro) : '', seed: Number.isFinite(+s.seed) ? +s.seed : 1,
       player: s.player || { name: 'Traveller', gold: 0, items: [] }, allowed: Array.isArray(s.allowed) ? s.allowed : ['say', 'walk', 'face'],
       agents: (Array.isArray(s.agents) ? s.agents : []).filter(a => a && a.id).map(a => ({ ...a, id: String(a.id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || 'critter' })),
       objects: Array.isArray(s.objects) ? s.objects.filter(o => o && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [],
       map: Array.isArray(s.map) ? s.map.map(String) : (typeof s.map === 'string' ? s.map.split('\n') : []),
       goal: s.goal && typeof s.goal === 'object' ? s.goal : null,
       base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern', 'stone'].includes(s.walls) ? s.walls : 'tabletop',
+      wallHeight: Number.isFinite(+s.wallHeight) && +s.wallHeight > 0 ? Math.min(4, Math.max(.25, +s.wallHeight)) : null,
       pathfinding: s.pathfinding !== false, campfire: s.campfire == null ? null : !!s.campfire,
       earshot: Number.isFinite(+s.earshot) && +s.earshot > 0 ? Math.min(99, +s.earshot) : null,
       size: Array.isArray(s.size) && s.size.length === 2 && s.size.every(n => Number.isFinite(+n)) ? [+s.size[0], +s.size[1]] : null,
@@ -877,6 +878,7 @@
     stopChecker();
     w.state.saveKey = SCENARIO_KEY;
     w.setWallStyle?.(scn.walls);
+    w.setWallHeight?.(scn.wallHeight);
     w.clearWorld();
     w.setBaseMap?.(scn.base);
     w.setPathfinding?.(scn.pathfinding);
@@ -884,7 +886,7 @@
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
-    w.setLighting?.(scn.lighting === 'night' ? 'night' : 'bright');
+    w.setLighting?.(scn.lighting);
     w.setPlayer(scn.player);
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
@@ -953,6 +955,7 @@
     stopChecker(); active = null; renderBanner(); hideEnd();
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
+    w.setWallHeight?.(1);
     w.setPathfinding?.(true);
     w.state.earshot = null;
     w.setCampfire?.(true);
@@ -1067,6 +1070,7 @@
       base: st.baseMap === 'dungeon' ? 'dungeon' : 'plain', size: [w.WORLD.cols, w.WORLD.rows],
       ...(st.earshot ? { earshot: st.earshot } : {}),
       ...(st.wallStyle && st.wallStyle !== 'tabletop' ? { walls: st.wallStyle } : {}),
+      ...(st.wallHeightScale && st.wallHeightScale !== 1 ? { wallHeight: st.wallHeightScale } : {}),
       // The dungeon's rim walls and stone floor come back from "base", so leave them out.
       objects: w.getObjects().filter(o => !o.rim).map(o => ({ type: o.type, x: +o.x.toFixed(2), z: +o.z.toFixed(2), ...(o.ry ? { ry: o.ry } : {}), ...(o.type === 'note' && o.noteText ? { text: o.noteText } : {}), ...(o.opts || {}) })),
       paint: [...(st.paint || [])].map(([k, v]) => ({ x: +k.split(',')[0], z: +k.split(',')[1], mat: v.mat, ...(v.tint ? { tint: v.tint } : {}) }))
