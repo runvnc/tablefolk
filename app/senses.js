@@ -179,5 +179,25 @@
   }
   setInterval(watch, 400);
 
-  window.tablefolkSenses = { aroundLines, placeLine, placeTarget, placeAt, look, compass, relative };
+  // The character's own view, as a small JPEG data URL (vision brains). The
+  // main camera is posed at the character's eyes for one frame (a second
+  // camera or a render-target capture comes out blank with this WebGPU setup
+  // and its post-process pipelines), then put back.
+  async function snapshot(g, { width = 448, height = 320 } = {}) {
+    const sc = state.scene, eng = state.engine, cam = sc?.activeCamera;
+    if (!cam || !eng || cam.getClassName() !== 'ArcRotateCamera') return null;
+    const p = pos(g), d = new BABYLON.Vector3(g.dir?.x || 0, 0, g.dir?.z || 1).normalize();
+    const eye = new BABYLON.Vector3(p.x + d.x * .3, (state.terrainTopY ?? 0) + .85, p.z + d.z * .3);
+    const look = eye.add(d.scale(4)).add(new BABYLON.Vector3(0, -.55, 0));
+    const save = { a: cam.alpha, b: cam.beta, r: cam.radius, t: cam.target.clone(), fov: cam.fov, minZ: cam.minZ, lr: cam.lowerRadiusLimit, lb: cam.lowerBetaLimit, ub: cam.upperBetaLimit };
+    cam.lowerRadiusLimit = null; cam.lowerBetaLimit = null; cam.upperBetaLimit = null;
+    cam.setTarget(look); cam.setPosition(eye); cam.fov = 1.15; cam.minZ = .05;
+    try { return await BABYLON.Tools.CreateScreenshotAsync(eng, cam, { width, height }, 'image/jpeg'); }
+    finally {
+      cam.lowerRadiusLimit = save.lr; cam.lowerBetaLimit = save.lb; cam.upperBetaLimit = save.ub;
+      cam.setTarget(save.t); cam.alpha = save.a; cam.beta = save.b; cam.radius = save.r; cam.fov = save.fov; cam.minZ = save.minZ;
+    }
+  }
+
+  window.tablefolkSenses = { snapshot, aroundLines, placeLine, placeTarget, placeAt, look, compass, relative };
 })();

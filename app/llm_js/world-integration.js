@@ -615,6 +615,17 @@ async function main() {
       appendLog(g.id + ' sending ' + messages.length + ' messages to LLM (' + (cfg.messages||[]).length + ' history)' + (chatTestMode ? ' [CHAT TEST]' : ''));
       console.log('[tablefolk-world] ABOUT TO CALL manager.decide for agent', g.id, 'with', messages.length, 'messages', 'at', new Date().toISOString());
       const decideT0 = performance.now();
+      // Vision (Brain options): what the character sees, as an image on its
+      // newest message, for endpoint brains whose model takes images.
+      let sendMessages = messages;
+      if (el('agentVision')?.checked && getActiveEngine(manager) === 'openai') {
+        const img = await window.tablefolkSenses?.snapshot(g).catch(() => null);
+        if (img) {
+          sendMessages = messages.slice();
+          const last = sendMessages[sendMessages.length - 1];
+          sendMessages[sendMessages.length - 1] = { ...last, content: [{ type: 'text', text: String(last.content) + '\n\n(The image is your own view: what you see in front of you right now.)' }, { type: 'image_url', image_url: { url: img } }] };
+        }
+      }
       window.TABLEFOLK_PAUSE_RENDER = true;
       console.log('[tablefolk-world] render paused at', new Date().toISOString());
       let line;
@@ -622,7 +633,7 @@ async function main() {
       try {
         line = await manager.decide({
           agentId: g.id,
-          messages,
+          messages: sendMessages,
           useGrammar: !chatTestMode,
           allowedCommands: world.getAllowedCommands(g.id),
           // Per-character (Character setup). Reasoning needs room before the

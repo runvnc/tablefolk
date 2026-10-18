@@ -43,11 +43,11 @@
     ['app.js?v=20261020l'],
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261020b'],
-    ['senses.js?v=20261020b'],
+    ['senses.js?v=20261020d'],
     ['speech-input.js?v=20261020a'],
     ['procgen.js?v=20261020c'],
     ['scenario.js?v=20261020l'],
-    ['llm_js/world-integration.js?v=20261020l', 'module'],
+    ['llm_js/world-integration.js?v=20261020n', 'module'],
   ];
 
   function browserSummary() {
