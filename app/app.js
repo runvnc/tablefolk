@@ -1299,11 +1299,13 @@ function buildFieldstoneWalls(cell,top){
       const atD=(a,y,len,hgt,thick,col,seed)=>alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
       core.add(alongX?(a0+a1)/2:perp,(yA+top+H)/2,alongX?perp:(a0+a1)/2,alongX?a1-a0:T-.08,top+H-yA,alongX?T-.08:a1-a0,[.12,.11,.10]);
       for(let r=0;r<ROWS;r++){
-        if(top+(r+1)*RH<=yA) continue;
+        // the lowest course is cut off at the top of the frame's head beam
+        const y0=Math.max(top+r*RH,yA+.075), y1=top+(r+1)*RH;
+        if(y1-y0<.04) continue;
         let a=Math.floor(a0/.5)*.5 - hash(perp*3,r,11)*.2;
         while(a<a1){
           const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.28+hash(seed,r,1)*.26, mid=a+len/2;
-          if(mid>a0 && mid<=a1) atD(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.015,len*1.2,RH*(1.14+hash(seed,2,4)*.14),T*(1.08+hash(seed,6,2)*.16),shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+          if(mid>a0 && mid<=a1) atD(mid,(y0+y1)/2+(hash(seed,4,4)-.5)*.015*(y1-y0)/RH,len*1.2,(y1-y0)*(1.14+hash(seed,2,4)*.14),T*(1.08+hash(seed,6,2)*.16),shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
           a+=len;
         }
       }
@@ -1319,9 +1321,12 @@ function buildFieldstoneWalls(cell,top){
       const a0=Math.min(c0+sign*postHalf,c0+sign*.5), a1=Math.max(c0+sign*postHalf,c0+sign*.5);
       // An arm that ends without a neighbour (a doorway or the end of a run)
       // keeps its stones inside the cell: nothing overhangs into the gap.
-      const far=c0+sign*.5, open=!cell.has((x+dx)+','+(z+dz));
+      const far=c0+sign*.5, nbw=cell.get((x+dx)+','+(z+dz)), open=!nbw;
+      // Next to a door, stones below the header stop at the cell edge, where
+      // the door frame's post begins (above it the courses run on unbroken).
+      const doorNb=nbw && meta(nbw).type==='door', headY=top+doorHeight()+.075;
       const at=(a,y,len,hgt,thick,col,seed)=>{
-        if(open){ let s0=a-len/2, s1=a+len/2; if(sign>0) s1=Math.min(s1,far-.015); else s0=Math.max(s0,far+.015); if(s1-s0<.06) return; a=(s0+s1)/2; len=s1-s0; }
+        if(open || (doorNb && y-hgt/2<headY)){ let s0=a-len/2, s1=a+len/2; if(sign>0) s1=Math.min(s1,far-.015); else s0=Math.max(s0,far+.015); if(s1-s0<.06) return; a=(s0+s1)/2; len=s1-s0; }
         return alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
       };
       // the core stops short of an open end, hidden behind the end stones
