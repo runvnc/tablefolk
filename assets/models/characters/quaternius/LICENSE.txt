@@ -10,7 +10,7 @@ CC0 1.0 (public domain):
   king.glb              King                https://poly.pizza/m/I1gTjmuK2m
   farmer.glb            Farmer              https://poly.pizza/m/7pn3R6hPvE
   villager.glb          Animated Woman      https://poly.pizza/m/nIItLV9nxS
-  skeleton.glb          Skeleton            https://poly.pizza/m/1XZD9GK6Kj
+  skeleton.glb          Skeleton            https://poly.pizza/m/wODZYCgX5Z
   skeleton_warrior.glb  Skeleton            https://poly.pizza/m/yq5ATpujSt
   zombie.glb            Zombie              https://poly.pizza/m/VlXjG0N8Eg
   goblin.glb            Goblin              https://poly.pizza/m/OdCOFSmEhl  (also the kobold, recoloured)

@@ -3669,12 +3669,12 @@ const PERSON_H=1.3;
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
   adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
-  skeleton:{h:1.22}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{h:1.45},
+  skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{h:.85}, bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
 };
 const FIG_CLIPS={
   Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],
-  Walking_A:['Walk','Fast_Flying','Flying','Run'], Running_A:['Run','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
+  Walking_A:['Walk','Fast_Flying','Flying','Run','Running'], Running_A:['Run','Running','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
   Waving:['Wave','Yes'], Interact:['Interact','PickUp','Yes'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
   Hit_A:['HitRecieve','HitReact','RecieveHit','Hit','Idle_HitReact_Left'], Hit_B:['HitRecieve_2','RecieveHit_2','Idle_HitReact_Right','HitRecieve','HitReact','Hit'],
   Death_A:['Death'],
@@ -3691,11 +3691,11 @@ const isPersonModel=m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m]));
 // "BatArmature|Bat_Flying" -> Flying
 function figClipName(n){
   const seg=String(n).split('|').filter(s=>s && !/Armature/.test(s));
-  return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime)_/,'');
+  return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime|Skeleton)_/,'');
 }
 async function createFigure(id,pos,model,label){
   const F=FIGURES[model], sc=state.scene;
-  const res=await BABYLON.SceneLoader.ImportMeshAsync('',FIG_ASSET,(F.file||model)+'.glb?v=20261022a',sc);
+  const res=await BABYLON.SceneLoader.ImportMeshAsync('',FIG_ASSET,(F.file||model)+'.glb?v='+(F.v||'20261022a'),sc);
   const root=new BABYLON.TransformNode(id,sc); root.position.copyFrom(pos);
   const importedRoot=res.meshes.find(m=>m.name==='__root__') || res.meshes[0];
   // like KayKit people: glTF front is +Z; zero yaw must face north (-Z)

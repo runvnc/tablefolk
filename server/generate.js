@@ -25,7 +25,11 @@ const Procgen = globalThis.TablefolkProcgen;
 const COMMANDS = new Set(['say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
   'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing']);
 const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius']);
-const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian']);
+// app.js AVATAR_MODELS + FIGURES; MINDLESS as in play.js (hostile by default)
+const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
+const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian',
+  'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
+  'skeleton', 'skeleton_warrior', 'zombie', 'goblin', 'kobold', 'orc', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
 const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };
 
 export function encodeScenario(obj) {
@@ -59,12 +63,15 @@ export function checkScenario(s) {
   for (const a of s.agents || []) {
     if (!a || typeof a !== 'object') { problems.push('every agent must be an object'); continue; }
     if (!/^[A-Za-z0-9_-]{1,24}$/.test(String(a.id || ''))) problems.push(`agent id ${JSON.stringify(a.id)}: use 1-24 letters, digits, _ or -`);
-    if (!a.personality) problems.push(`agent ${a.id}: needs a "personality"`);
     if (a.model && !MODELS.has(a.model)) a.model = 'critter';
+    // monsters that only fight need no brief
+    if (!a.personality && (a.hostile || (a.hostile == null && MINDLESS.has(a.model)))) a.personality = `A hostile ${String(a.model).replace(/_/g, ' ')}.`;
+    if (!a.personality) problems.push(`agent ${a.id}: needs a "personality"`);
     if (a.ttsVoiceId) { const v = String(a.ttsVoiceId).replace(/^builtin:/, '').toLowerCase(); if (VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
     for (const c of a.allowed || []) if (!COMMANDS.has(c)) problems.push(`agent ${a.id} "allowed": unknown command ${c}`);
   }
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
+  if (s.player?.model && !MODELS.has(s.player.model)) delete s.player.model;
   for (const c of s.allowed || []) if (!COMMANDS.has(c)) problems.push(`"allowed": unknown command ${c}`);
   if (!Array.isArray(s.allowed)) s.allowed = ['say', 'walk', 'face', 'emote'];
   // Person-height doors and first person need the tall walls (twice the
