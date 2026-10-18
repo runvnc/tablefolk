@@ -820,7 +820,7 @@
       objects: Array.isArray(s.objects) ? s.objects.filter(o => o && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [],
       map: Array.isArray(s.map) ? s.map.map(String) : (typeof s.map === 'string' ? s.map.split('\n') : []),
       goal: s.goal && typeof s.goal === 'object' ? s.goal : null,
-      base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern'].includes(s.walls) ? s.walls : 'tabletop',
+      base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern', 'stone'].includes(s.walls) ? s.walls : 'tabletop',
       pathfinding: s.pathfinding !== false, campfire: s.campfire == null ? null : !!s.campfire,
       earshot: Number.isFinite(+s.earshot) && +s.earshot > 0 ? Math.min(99, +s.earshot) : null,
       size: Array.isArray(s.size) && s.size.length === 2 && s.size.every(n => Number.isFinite(+n)) ? [+s.size[0], +s.size[1]] : null,

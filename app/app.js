@@ -1105,6 +1105,7 @@ function rebuildWallVisuals(){
   const mats=wallMaterials(), top=state.terrainTopY??0;
   const cell=new Map(walls.map(w=>[Math.round(w.position.x)+','+Math.round(w.position.z),w]));
   if(state.wallStyle==='modern') return buildModernWalls(cell,top);
+  if(state.wallStyle==='stone') return buildFieldstoneWalls(cell,top);
   const stones=boxBatch(), core=boxBatch(), trim=boxBatch(), cap=boxBatch();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
   const T=.18, H=WALL_H-.08, Y0=top+.07, ROWS=5, RH=H/ROWS, BL=.3, GAP=.022;
@@ -1161,6 +1162,89 @@ function rebuildWallVisuals(){
     const m=batch.mesh('tt_walls_'+name,sc); if(!m) continue;
     m.material=mat; m.isPickable=false; m.receiveShadows=true; addShadow(m); state.wallVisuals.push(m);
   }
+}
+// Natural stone ("walls": "stone"): a dry-stone wall of irregular rounded
+// rocks in mixed sizes and shades over a dark mortar core, laid out like the
+// tabletop walls (arms to each neighbour, a post at corners). One lumpy rock
+// geometry drawn per stone (thin instances: size, tilt and colour per copy).
+function fieldstoneRock(sc){
+  if(state.fieldRock && !state.fieldRock.isDisposed()) return state.fieldRock;
+  const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:2,flat:false},sc);
+  const pos=m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  // Lumpy, slightly flattened top and bottom (stones are laid flat side down).
+  for(let i=0;i<pos.length;i+=3){
+    const x=pos[i],y=pos[i+1],z=pos[i+2], n=Math.sin(x*9.1+z*4.3)*.5+Math.sin(y*7.7+x*3.1)*.5+Math.sin(z*8.3-y*5.2)*.5;
+    const k=1+n*.07; pos[i]=x*k; pos[i+1]=Math.max(-.42,Math.min(.42,y*k)); pos[i+2]=z*k;
+  }
+  m.updateVerticesData(BABYLON.VertexBuffer.PositionKind,pos);
+  const nrm=[]; BABYLON.VertexData.ComputeNormals(pos,m.getIndices(),nrm); m.updateVerticesData(BABYLON.VertexBuffer.NormalKind,nrm);
+  m.setEnabled(false);
+  const mat=new BABYLON.PBRMaterial('fieldstone_mat',sc);
+  mat.albedoColor=new BABYLON.Color3(1,1,1); mat.metallic=0; mat.roughness=.42; mat.environmentIntensity=.85; mat.specularIntensity=.6; mat.maxSimultaneousLights=8;
+  plasticFinish(mat,{coat:.5,coatRough:.12}); applyClayLook(mat,sc,{detail:.14,detailScale:3});
+  state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(mat);
+  m.material=mat;
+  return state.fieldRock=m;
+}
+function buildFieldstoneWalls(cell,top){
+  const sc=state.scene, src=fieldstoneRock(sc), core=boxBatch(), mats=wallMaterials();
+  const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
+  const T=.22, H=WALL_H-.04, ROWS=5, RH=H/ROWS, rocks=[];
+  const shade=(st,r,r2)=>{
+    if(st==='burned'){ const v=.13+r*.07; return [v+.02,v,v-.01]; }
+    const v=.30+r*.2, warm=(r2-.5)*.12; return [v+warm*.6,v+warm*.2,v-warm*.3];
+  };
+  const rock=(x,y,z,sx,sy,sz,col,seed)=>rocks.push({x,y,z,sx,sy,sz,col,ry:(hash(seed,3,7)-.5)*.5,rz:(hash(seed,5,1)-.5)*.18});
+  for(const [k,w] of cell){
+    const [x,z]=k.split(',').map(Number), st=meta(w).state;
+    let arms=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
+    if(!arms.length) arms=[[1,0],[-1,0]]; else if(arms.length===1) arms.push([-arms[0][0],-arms[0][1]]);
+    const straight=arms.length===2 && arms[0][0]===-arms[1][0] && arms[0][1]===-arms[1][1];
+    const postHalf=straight?0:T/2;
+    for(const [dx,dz] of arms){
+      const alongX=dx!==0, sign=dx||dz, c0=alongX?x:z, perp=alongX?z:x;
+      const a0=Math.min(c0+sign*postHalf,c0+sign*.5), a1=Math.max(c0+sign*postHalf,c0+sign*.5);
+      const at=(a,y,len,hgt,thick,col,seed)=>alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
+      core.add(alongX?(a0+a1)/2:perp,top+H/2,alongX?perp:(a0+a1)/2,alongX?a1-a0:T-.08,H,alongX?T-.08:a1-a0,[.12,.11,.10]);
+      for(let r=0;r<ROWS;r++){
+        // Stones of mixed length, continuing across cells (world-aligned).
+        let a=Math.floor(a0/.5)*.5 - hash(perp*3,r,11)*.2, i=0;
+        while(a<a1){
+          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.2+hash(seed,r,1)*.22;
+          const mid=a+len/2;
+          if(mid>a0 && mid<=a1 && !(st==='cracked' && hash(seed,9,9)<.18)){
+            const hgt=RH*(1.15+hash(seed,2,4)*.4), thick=T*(1+hash(seed,6,2)*.35);
+            at(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.3,hgt,thick,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+          }
+          a+=len; i++;
+        }
+      }
+      // capstones: flatter, wider
+      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; at(Math.min(a+.125,a1-.02),top+H+.04,.3,.12,T*1.3,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
+    }
+    // A wall that stops (one neighbour, e.g. at a doorway) ends in a column of
+    // stones instead of the bare core.
+    const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
+    if(nb.length===1) for(let r=0;r<=ROWS;r++){
+      const ex=x-nb[0][0]*.4, ez=z-nb[0][1]*.4, seed=x*97+z*53+r*5, sz=T*1.3;
+      rock(ex,top+(r<ROWS?r*RH+RH/2:H+.04),ez,sz,r<ROWS?RH*1.25:.12,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+    }
+    if(postHalf) for(let r=0;r<=ROWS;r++){
+      const seed=x*131+z*71+r, sz=T*1.25;
+      rock(x,top+(r<ROWS?r*RH+RH/2:H+.04),z,sz,r<ROWS?RH*1.1:.12,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+    }
+  }
+  const coreMesh=core.mesh('stone_walls_core',sc); if(coreMesh){ coreMesh.material=mats.core; coreMesh.isPickable=false; coreMesh.receiveShadows=true; state.wallVisuals.push(coreMesh); }
+  if(!rocks.length) return;
+  const m=src.clone('stone_walls_rocks'); m.makeGeometryUnique(); m.setEnabled(true); m.isPickable=false; m.receiveShadows=true;
+  const buf=new Float32Array(rocks.length*16), cols=new Float32Array(rocks.length*4), mx=new BABYLON.Matrix(), q=new BABYLON.Quaternion();
+  rocks.forEach((r,i)=>{
+    BABYLON.Quaternion.RotationYawPitchRollToRef(r.ry,0,r.rz,q);
+    BABYLON.Matrix.ComposeToRef(new BABYLON.Vector3(r.sx,r.sy,r.sz),q,new BABYLON.Vector3(r.x,r.y,r.z),mx); mx.copyToArray(buf,i*16);
+    cols.set([...r.col,1],i*4);
+  });
+  m.thinInstanceSetBuffer('matrix',buf,16,true); m.thinInstanceSetBuffer('color',cols,4,true);
+  addShadow(m); state.wallVisuals.push(m);
 }
 // Modern walls: smooth painted panels (warm white, satin) with a dark
 // baseboard and a slim top trim, joined like the stone walls.
@@ -3653,7 +3737,7 @@ function installWorldAPI(){
     setAllowed:list=>{ state.allowed=new Set(list||[]); updatePerceptionUI(); },
     setPathfinding:on=>{ state.pathfinding=on!==false; }, findRoute,
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
-    spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, setWallStyle:st=>{ state.wallStyle=['block','modern'].includes(st)?st:'tabletop'; },
+    spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
     setLighting,
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),

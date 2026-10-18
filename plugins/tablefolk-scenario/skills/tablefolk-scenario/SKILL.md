@@ -60,7 +60,7 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "base": "plain",                 // plain (blank board, default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63 (default 23x17)
   "lighting": "bright",            // or "night"
-  "walls": "tabletop",             // or "modern" (painted panels) | "block"
+  "walls": "tabletop",             // or "stone" (natural rock walls), "modern" (painted panels), "block"
   "floor": "stone",                // optional: paint the whole floor (materials below)
   "campfire": true,                // island: false drops its campfire; plain: true adds one
   "pathfinding": true,             // false: walks go straight and stop at walls (maze puzzles)

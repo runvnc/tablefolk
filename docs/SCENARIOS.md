@@ -22,7 +22,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "lighting": "bright",                                  // or "night" (sandbox look)
   "base": "plain",                                       // plain (blank board, default) | island | clearing | dungeon
   "size": [23, 17],                                      // board in cells, odd numbers (section 2c)
-  "walls": "tabletop",                                   // or "modern" (smooth painted panels) or "block" (old short cubes)
+  "walls": "tabletop",                                   // or "stone" (natural rock), "modern" (smooth panels), "block" (old cubes)
   "campfire": true,                                      // island/clearing: false drops their campfire; plain/dungeon: true adds one
   "pathfinding": true,                                   // false: walks go in straight lines and stop at walls
   "earshot": 6,                                          // cells within which characters hear and see each other (default 6)
@@ -266,7 +266,8 @@ in the share text.
   island is shelved behind `?island=1`.
 - **Walls** default to tabletop sections: stone-block walls about 1.1 tall that
   join to neighbouring wall cells. `"walls": "modern"` makes them smooth
-  painted panels with a baseboard; `"walls": "block"` keeps the old cubes.
+  painted panels with a baseboard; `"walls": "stone"` natural dry-stone walls
+  of rounded rocks with capstones; `"walls": "block"` keeps the old cubes.
 - **Painted floors**: also a click-to-spawn brush in the World pane.
 - **Earshot.** A character only hears and sees what other characters do
   closer than `earshot` cells to it (default 6). When you talk to one character,

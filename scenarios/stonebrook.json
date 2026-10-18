@@ -1,0 +1,100 @@
+{
+  "v": 1,
+  "title": "Stonebrook",
+  "subtitle": "A night walk through every kind of floor.",
+  "intro": "Stonebrook at night: a pier and beach, a stone cottage, the tavern, a flagstone square, the forge and the pond. Walk around and look at the floors and walls up close (V for first person).",
+  "seed": 1,
+  "base": "plain",
+  "size": [
+    21,
+    15
+  ],
+  "lighting": "night",
+  "walls": "stone",
+  "player": {
+    "name": "Visitor",
+    "gold": 5,
+    "items": [],
+    "model": "ranger"
+  },
+  "allowed": [
+    "say",
+    "walk",
+    "face",
+    "emote"
+  ],
+  "agents": [
+    {
+      "id": "moss",
+      "model": "mage",
+      "style": "cheerful village caretaker",
+      "ttsVoiceId": "builtin:fantine",
+      "personality": "Moss, the caretaker of Stonebrook, proud of every stone in it. You show visitors around: the oak pier and the sand beach to the north, your stone cottage with its blue carpet to the west, the tavern with its plank floor and tiled kitchen to the east, the flagstone square with the campfire, the stone road, the pond with lily pads, and the forge yard with its lava pit to the south. Keep answers short and friendly. If asked to show something, walk there with walk(\"x,z\")."
+    },
+    {
+      "id": "brann",
+      "model": "barbarian",
+      "style": "gruff blacksmith",
+      "ttsVoiceId": "builtin:jean",
+      "personality": "Brann, the blacksmith. You work at the forge by the lava pit on the concrete yard. Gruff but kind; you love talking about the lava pit and hate anyone touching your anvil."
+    }
+  ],
+  "grid": [
+    "----------_----------",
+    "ZZZZZZZZZZ_ZZZZZZZZZZ",
+    ",,,,,,,,,,:,,,,,,,,,,",
+    ",######,,,:,,,######,",
+    ",#RRRR#,j,:,j,#==EE#,",
+    ",#RVRR#,UUUUU,#==EE#,",
+    ",#RRRR::UU1UU::==EE#,",
+    ",#RRKR#,UUXUU,#=JEE#,",
+    ",######,UUUUU,######,",
+    ",,,,,,,,j,:,j,,,,,,,,",
+    "^^^^^^^^^^Y^^^^^^^^^^",
+    ",~~~~,,,QQQQQ,,,%,,%,",
+    ",~y~~,,,Q&&O2,,:::::,",
+    ",~~~,,,,QQQQQ,%,,%,,,",
+    ",,,,,,,,,,,,,,,,,,,,,"
+  ],
+  "legend": {
+    "Z": "sand",
+    "U": "flagstone",
+    "R": "carpet",
+    "E": "tile",
+    "Q": "concrete",
+    "V": "armchair on carpet",
+    "J": "chest on wood",
+    "O": "anvil on concrete",
+    "y": "lily_pad on water"
+  },
+  "objects": [
+    {
+      "type": "light",
+      "x": 6,
+      "z": -1,
+      "color": "#ffc27a",
+      "intensity": 2.5,
+      "range": 5,
+      "y": 1.4
+    },
+    {
+      "type": "light",
+      "x": -6,
+      "z": -1,
+      "color": "#ffd59a",
+      "intensity": 2.5,
+      "range": 5,
+      "y": 1.4
+    },
+    {
+      "type": "light",
+      "x": 1,
+      "z": 5,
+      "color": "#ff7a2a",
+      "intensity": 3,
+      "range": 4,
+      "y": 0.8
+    }
+  ],
+  "goal": null
+}
