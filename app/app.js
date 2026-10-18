@@ -3178,7 +3178,8 @@ function playerStep(dir){
 // Screen-relative cardinal direction: the camera's forward/right snapped to the grid.
 function cameraCardinal(which){
   const cam=state.scene.activeCamera, f=cam.getForwardRay?cam.getForwardRay().direction:cam.getDirection(BABYLON.Axis.Z);
-  let v=new BABYLON.Vector3(f.x,0,f.z); if(which==='right') v=new BABYLON.Vector3(-f.z,0,f.x); if(which==='back') v=v.scale(-1); if(which==='left') v=new BABYLON.Vector3(f.z,0,-f.x);
+  // Babylon is left-handed: screen-right of a forward f is (f.z, 0, -f.x).
+  let v=new BABYLON.Vector3(f.x,0,f.z); if(which==='right') v=new BABYLON.Vector3(f.z,0,-f.x); if(which==='back') v=v.scale(-1); if(which==='left') v=new BABYLON.Vector3(-f.z,0,f.x);
   return Math.abs(v.x)>Math.abs(v.z) ? new BABYLON.Vector3(Math.sign(v.x),0,0) : new BABYLON.Vector3(0,0,Math.sign(v.z));
 }
 // First person: the grid direction you are looking along. Movement keys use
