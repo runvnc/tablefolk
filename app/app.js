@@ -26,7 +26,7 @@ function applyWorldDims(cols, rows){
   WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
 }
 if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
-const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory'];
+const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper'];
 const state = {
   scene:null, engine:null, camera:null, shadow:null, materials:{}, characters:[], selected:null, target:null,
   blocks:[], props:[], tiles:[], bubbles:[], badges:[], meta:new WeakMap(), held:new Map(), allowed:new Set(['walk','face']), zoomFocus:null, animSources:null,
@@ -2090,12 +2090,14 @@ function clearPendingThought(g){
   const b=state.bubbles.find(x=>x.thought && x.node===g?.root);
   if(b && b.div.classList.contains('pending')) b.ttl=0;
 }
-function say(g,text,voiced=false){
+// whisper: speech only the player hears (other characters never get it); a
+// smaller, dimmer bubble.
+function say(g,text,voiced=false,{whisper=false}={}){
   // Dispatch speech before logging, DOM bubbles, animation, or history work. Only explicit say commands are voiced; action confirmations stay text-only.
   if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
   log(g.id+': '+text);
   try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced}})); }catch{}
-  const div=document.createElement('div'); div.className='bubble'; div.textContent=(text||'...').slice(0,86);
+  const div=document.createElement('div'); div.className=whisper?'bubble whisper':'bubble'; div.textContent=(whisper?'(whispers) ':'')+(text||'...').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:2.8});
   const speechRequested=localStorage.getItem('tablefolkTtsEnabled')==='1' && getBrainConfig(g.id).ttsEnabled!==false;
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
@@ -2107,7 +2109,7 @@ window.tablefolkTTS?.addEventListener('speechend',e=>{ const g=e.detail.agent; i
 function nearestTarget(g,range=3.0){ if(state.target && !state.target.isDisposed()) return state.target; let best=null,bd=99; const p=g.root.position; for(const m of state.props.concat(state.blocks)){ if(m.isDisposed()) continue; const d=BABYLON.Vector3.Distance(p,m.position); if(d<bd){ bd=d; best=m; } } return bd<range?best:null; }
 function canRun(kind,spell){ const key=kind==='spell'?'spell.'+spell:kind; return state.allowed.has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
-function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
+function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
   if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
 function parseWalkDestination(arg){
   arg=String(arg||'').trim();
@@ -2148,6 +2150,7 @@ function parseLLMCommandLine(line){
   let arg=m[2].trim();
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1);
   if(name==='say') return {kind:'say',text:arg||'...'};
+  if(name==='whisper') return {kind:'whisper',text:arg||'...'};
   if(name==='walk') return parseWalkDestination(arg);
   if(name==='spell') return {kind:'spell',spell:(arg.split(',')[0]||'spark').trim()||'spark'};
   if(name==='build'){ const ci=arg.indexOf(','); const thing=(ci<0?arg:arg.slice(0,ci)).trim()||'wall'; const at=ci<0?null:parseLocationArg(arg.slice(ci+1)); return {kind:'build',thing,at}; }
@@ -2163,7 +2166,7 @@ function parseLLMCommandLine(line){
   return null;
 }
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd) return; if(!canRun(cmd.kind,cmd.spell)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && state.allowed.has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -2535,6 +2538,7 @@ function sell(g,item,price){
 }
 // Shop test: the character hands an item to the person in the corner chat
 // (their chat name). For now this only announces the hand-over.
+const GIVE_RANGE=3;
 function give(g,item){
   item=String(item||'').trim();
   if(!item) return say(g,'give what, exactly?');
@@ -2542,6 +2546,10 @@ function give(g,item){
   // If the character actually has it, the item changes hands (scenarios like
   // "get the jailer's key" rely on this); otherwise it's just said.
   const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
+  // Handing over needs the player within reach (when they have an avatar).
+  const av=state.playerAvatar?.root?.position;
+  if(stock && av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE)
+    return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
   if(stock){
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
     addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
@@ -2817,6 +2825,7 @@ function buildCommandExamples(){
   const ex=[];
   if(state.allowed.has('walk')) ex.push('walk(destination): use an absolute coordinate pair or visible map label, e.g. walk("3,5") or walk("C1"); repeat on later turns until arrived');
   if(state.allowed.has('say')) ex.push('say(text) e.g. say("hello there")');
+  if(state.allowed.has('whisper')) ex.push('whisper(text) - only the player hears it, e.g. whisper("meet me by the boat")');
   if(state.allowed.has('look')) ex.push('look()');
   if(state.allowed.has('touch')) ex.push('touch(target) e.g. touch(crate)');
   if(state.allowed.has('push')) ex.push('push()');

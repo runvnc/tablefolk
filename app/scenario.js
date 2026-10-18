@@ -820,6 +820,7 @@
       goal: s.goal && typeof s.goal === 'object' ? s.goal : null,
       base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern'].includes(s.walls) ? s.walls : 'tabletop',
       pathfinding: s.pathfinding !== false, campfire: s.campfire == null ? null : !!s.campfire,
+      earshot: Number.isFinite(+s.earshot) && +s.earshot > 0 ? Math.min(99, +s.earshot) : null,
       size: Array.isArray(s.size) && s.size.length === 2 && s.size.every(n => Number.isFinite(+n)) ? [+s.size[0], +s.size[1]] : null,
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,
       grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
@@ -875,6 +876,7 @@
     w.clearWorld();
     w.setBaseMap?.(scn.base);
     w.setPathfinding?.(scn.pathfinding);
+    w.state.earshot = scn.earshot;
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
@@ -947,6 +949,7 @@
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
     w.setPathfinding?.(true);
+    w.state.earshot = null;
     w.setCampfire?.(true);
     try { history.replaceState(null, '', location.pathname + location.search); } catch {}
     const raw = localStorage.getItem(SANDBOX_KEY);
@@ -1057,6 +1060,7 @@
       // export is a plain board of the same size (or the dungeon, whose rim
       // and floor come back from "base").
       base: st.baseMap === 'dungeon' ? 'dungeon' : 'plain', size: [w.WORLD.cols, w.WORLD.rows],
+      ...(st.earshot ? { earshot: st.earshot } : {}),
       ...(st.wallStyle && st.wallStyle !== 'tabletop' ? { walls: st.wallStyle } : {}),
       // The dungeon's rim walls and stone floor come back from "base", so leave them out.
       objects: w.getObjects().filter(o => !o.rim).map(o => ({ type: o.type, x: +o.x.toFixed(2), z: +o.z.toFixed(2), ...(o.ry ? { ry: o.ry } : {}), ...(o.type === 'note' && o.noteText ? { text: o.noteText } : {}), ...(o.opts || {}) })),

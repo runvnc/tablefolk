@@ -64,6 +64,7 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "floor": "stone",                // optional: paint the whole floor (materials below)
   "campfire": true,                // island: false drops its campfire; plain: true adds one
   "pathfinding": true,             // false: walks go straight and stop at walls (maze puzzles)
+  "earshot": 6,                    // characters hear/see each other within this many cells
   "safety": false,                 // true: crisis-line banner if a message mentions self-harm
   "player": { "name": "Traveller", "gold": 20, "items": [], "at": [0, 3] },
                                    // + "avatar": false, "model": rogue|knight|mage|ranger|barbarian|critter
@@ -153,10 +154,14 @@ the tile (a hole to the sea; walking onto it is a fall).
 ### Commands (`allowed`)
 
 `say walk face look touch push pull carry drop throw dig build repair panic
-emote note give give_quest sell inventory goal spell.push spell.spark
+emote note give give_quest sell inventory goal whisper spell.push spell.spark
 spell.fireball`. Allow only what the scene needs: fewer choices make small
 models behave. `say` is almost always wanted; add `walk` for movement, `give`
 / `sell` / `inventory` for trading, `emote` for flavour.
+`whisper` is speech only the player hears; characters only hear and see each
+other within `earshot` cells, and overhear what the player says to someone
+else nearby. `give` needs the player within 3 cells. Together these make
+secrets, hand-overs out of a guard's sight, and "lure him away" plans work.
 
 ## ASCII grid (exact rooms, easiest to write)
 

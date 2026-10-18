@@ -357,3 +357,4 @@ code { color:#ffe0a0; }
 .fp-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .fp-btn[hidden] + .avatar-hint { display:none; }
 #chatDock .avatar-hint { margin:0 2px; }
+.bubble.whisper { font-style:italic; font-size:.85em; opacity:.82; }

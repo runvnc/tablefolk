@@ -192,7 +192,7 @@ function ownActionResults(world, agentId, n) {
     if (body.startsWith(agentId + ' ')) body = body.slice(agentId.length + 1);
     const arrow = body.indexOf(' -> ');
     const action = arrow >= 0 ? body.slice(0, arrow) : body, result = arrow >= 0 ? body.slice(arrow + 4) : '';
-    if (/^say\b/.test(action)) continue;          // speech: nothing to report
+    if (/^(say|whisper)\b/.test(action)) continue;          // speech: nothing to report
     lines.push(result ? `${action} ${FAILURE.test(result) ? 'FAILED' : 'worked'}: ${result}` : `${action} done`);
   }
   return lines.length ? 'RESULT OF YOUR LAST ACTION: ' + lines.join('; ') : '';
@@ -224,7 +224,7 @@ function formatActionSummary(historyEntry) {
     if (result.toLowerCase().startsWith(agentId.toLowerCase() + ' ')) return result;
   }
   // Conjugate common verbs: walk->walks, say->says, look->looks, etc.
-  const verbMap = { walk: 'walks', say: 'says', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory' };
+  const verbMap = { walk: 'walks', say: 'says', whisper: 'whispers', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory' };
   const parts = action.split(/\s+/);
   if (parts.length > 0 && verbMap[parts[0]]) parts[0] = verbMap[parts[0]];
   action = parts.join(' ');
@@ -305,6 +305,23 @@ function saveSelectedBrainUI(world) {
 // Build the full agent prompt messages (system + history + command reminder +
 // pending chat), reusing world.buildAgentPrompt. Extracted from runOneAgentTurn
 // so the demo chat can build the same prompt without duplicating code.
+// Earshot: characters only hear and see what happens closer than this many cells
+// of them (scenario "earshot", default 6). Whispers reach only the player.
+function earshot(world) { const e = +world.state?.earshot; return e > 0 ? e : 6; }
+function within(a, b, r) { return a && b && Math.hypot(a.x - b.x, a.z - b.z) < r; }
+// The player's words to one character are overheard by the others in
+// earshot (of the player's avatar, or of the one spoken to): kept as context,
+// marked as said to someone else, so they don't feel they must answer.
+function overhear(world, g, who, text) {
+  const src = world.getPlayerAvatar?.()?.root?.position || g.root.position, r = earshot(world);
+  for (const other of world.getAgents()) {
+    if (other.id === g.id || !within(other.root.position, src, r)) continue;
+    const ocfg = world.getBrainConfig(other.id);
+    ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: `[${who}] (to ${g.id}) ${text}` }]).slice(-40);
+    world.setBrainConfig(other.id, ocfg);
+  }
+}
+
 function buildAgentMessages(world, g, cfg) {
   const { systemMessage, commandReminder } = world.buildAgentPrompt(g, cfg);
   const messages = [{ role: 'system', content: systemMessage }];
@@ -638,7 +655,7 @@ async function main() {
       const ownResults = ownActionResults(world, g.id, planCmds.length);
       // A speech-only turn reports nothing back: "bram says <what it just
       // said>" right after its own say(...) only repeated it.
-      const ownReport = ownResults || (planCmds.every(c => c.kind === 'say') ? '' : summary);
+      const ownReport = ownResults || (planCmds.every(c => c.kind === 'say' || c.kind === 'whisper') ? '' : summary);
       if (ownReport) cfg.messages = cfg.messages.concat([{ role: 'user', content: ownReport }]);
       // Said it handed something over but issued no give()/sell(): tell it,
       // so the next turn can actually do it (small models often narrate the
@@ -657,11 +674,15 @@ async function main() {
       // Tell every other character what this one did, once, in readable form
       // ("hale says ..."); the raw command line ("hale say(...)") used to go
       // in as well, so each turn showed up twice.
-      // Every entry this turn added (say + give is two), not just the last.
-      const turnEntries = (world.state?.globalHistory || []).slice(-Math.max(1, planCmds.length)).filter(e => new RegExp('^T\\d+\\s+' + g.id + ':').test(e));
-      const resultMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : summary;
+      // Every entry this turn added (say + give is two), not just the last;
+      // whispers are for the player only.
+      const turnEntries = (world.state?.globalHistory || []).slice(-Math.max(1, planCmds.length)).filter(e => new RegExp('^T\\d+\\s+' + g.id + ':').test(e))
+        .filter(e => !new RegExp('^T\\d+\\s+[^:]+:\\s*' + g.id + ' whisper\\b').test(e));
+      const onlyWhispers = planCmds.length && planCmds.every(c => c.kind === 'whisper');
+      const resultMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : (onlyWhispers ? '' : summary);
+      const r = earshot(world);
       for (const other of world.getAgents()) {
-        if (other.id === g.id) continue;
+        if (other.id === g.id || !resultMsg || !within(other.root.position, g.root.position, r)) continue;
         const ocfg = world.getBrainConfig(other.id);
         ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: resultMsg }]);
         if (ocfg.messages.length > 40) ocfg.messages = ocfg.messages.slice(-40);
@@ -753,6 +774,7 @@ async function main() {
     cfg.pendingChat = (cfg.pendingChat || []).concat([`${name} says: ${text}`]);
     if (cfg.pendingChat.length > 5) cfg.pendingChat = cfg.pendingChat.slice(-5);
     world.setBrainConfig(g.id, cfg);
+    overhear(world, g, name, text);
     appendLog(name + ' -> ' + g.id + ': ' + text);
     input.value = '';
     // The character you spoke to answers now. (This used to press "step",
@@ -784,6 +806,7 @@ async function main() {
       const cfg = world.getBrainConfig(g.id);
       cfg.pendingChat = (cfg.pendingChat || []).concat([`${who} says: ${text}`]).slice(-5);
       world.setBrainConfig(g.id, cfg);
+      overhear(world, g, who, text);
       appendLog(who + ' -> ' + g.id + ': ' + text);
     }
     while (!world.isTurnReady()) await sleep(100);

@@ -25,6 +25,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "walls": "tabletop",                                   // or "modern" (smooth painted panels) or "block" (old short cubes)
   "campfire": true,                                      // island/clearing: false drops their campfire; plain/dungeon: true adds one
   "pathfinding": true,                                   // false: walks go in straight lines and stop at walls
+  "earshot": 6,                                          // cells within which characters hear and see each other (default 6)
   "floor": "stone",                                      // optional: paint the whole floor
   "paint": [{ "x": 0, "z": 0, "mat": "water" }],          // optional explicit floor tiles
   "packs": ["https://example.com/my-pack/pack.json"],    // optional extra asset packs (section 4c)
@@ -257,7 +258,12 @@ in the share text.
   join to neighbouring wall cells. `"walls": "modern"` makes them smooth
   painted panels with a baseboard; `"walls": "block"` keeps the old cubes.
 - **Painted floors**: also a click-to-spawn brush in the World pane.
-- `give(item)` hands an item to the player when the character actually has it
+- **Earshot.** A character only hears and sees what other characters do
+  closer than `earshot` cells to it (default 6). When you talk to one character,
+  the others in earshot of you overhear it (as context, marked "(to bram)",
+  without having to answer). `whisper(text)` is speech only the player hears:
+  allow it in `allowed` for characters with secrets.
+- `give(item)` needs the player within 3 cells (when there's an avatar), and hands an item to the player when the character actually has it
   in its inventory (otherwise it's just said).
 - **Walking** finds a way around walls, painted water/lava and solid props
   (A* over the grid, smoothed into straight legs). Walking to a spot off the
