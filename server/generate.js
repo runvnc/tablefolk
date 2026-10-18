@@ -220,7 +220,7 @@ if(words){
   // It fills at a steady pace, LAP seconds per run, and starts again from
   // zero with a new made-up chore as many times as it takes; when the world
   // is ready it finishes and opens it.
-  const LAP=4.8;
+  const LAP=2.4;
   let ended=false, lap=-1;
   const CHORES=['Unrolling the map','Laying flagstones','Stacking stones for the walls','Hanging doors on their hinges','Lighting the lanterns',
     'Waking the innkeeper','Counting the gold','Teaching goblins to haggle','Polishing the sorceress’s staff','Hiding a key somewhere',
