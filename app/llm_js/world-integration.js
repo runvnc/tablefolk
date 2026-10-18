@@ -889,6 +889,14 @@ async function main() {
     return ok;
   };
   world.isBrainLoopRunning = () => running;
+  // play.js's turn round: one character's turn, never two decisions at once.
+  world.brainReady = () => manager.isLoaded();
+  world.runAgentTurn = async g => {
+    while (replying) await sleep(100);
+    replying = true;
+    try { while (!world.isTurnReady()) await sleep(100); return await runOneAgentTurn(g); }
+    finally { replying = false; }
+  };
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };
   el('chatSend')?.addEventListener('click', sendChatToAgent);
   el('chatInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChatToAgent(); });

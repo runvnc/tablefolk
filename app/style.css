@@ -376,3 +376,47 @@ code { color:#ffe0a0; }
 .mic-btn[data-state="rec"] { background:#c0392b; color:#fff; animation:micPulse 1s ease-in-out infinite; }
 .mic-btn[data-state="busy"] { opacity:.6; }
 @keyframes micPulse { 50% { box-shadow:0 0 0 6px rgba(192,57,43,.25); } }
+
+/* ---- user / dev mode (tabs.js): dev-only things hide in user mode ---- */
+body.user-mode .dev-only { display:none !important; }
+body.user-mode #compassHud small, body.user-mode #spatialDebug { display:none !important; }
+
+/* ---- side panel: slides in and out, collapse button, resize edge ---- */
+#sidePanel { display:block; transform:translateX(-14px); opacity:0; visibility:hidden; pointer-events:none;
+  transition:transform .18s ease, opacity .18s ease, visibility 0s linear .18s; }
+#sidePanel.open { transform:none; opacity:1; visibility:visible; pointer-events:auto; transition:transform .18s ease, opacity .18s ease; }
+#sidePanel.resizing { transition:none; user-select:none; }
+#sidePanel .panel-tools { position:sticky; top:-12px; z-index:3; height:0; display:flex; justify-content:flex-end; }
+#panelClose { width:30px; height:30px; padding:0; margin:-4px -4px 0 0; border-radius:10px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#cfe3d6; cursor:pointer; }
+#panelClose:hover { background:rgba(159,232,200,.2); color:#fff; }
+#panelClose svg, #railToggle svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; display:block; margin:auto; }
+#panelResize { position:absolute; top:18px; bottom:18px; right:-4px; width:9px; cursor:ew-resize; z-index:4; border-radius:6px; }
+#panelResize:hover, #sidePanel.resizing #panelResize { background:rgba(159,232,200,.28); }
+#sidePanel .pane-title { padding-right:36px; }
+#rail .rail-toggle { margin-top:8px; opacity:.75; }
+#rail .rail-toggle svg { transition:transform .18s ease; }
+body.panel-open #rail .rail-toggle svg { transform:rotate(180deg); }
+
+/* ---- Adventurer pane (play.js) ---- */
+#advPane .adv-stat { display:flex; align-items:center; gap:10px; margin:6px 0; font-size:13px; color:#dfe9dc; }
+#advPane .adv-stat > span:first-child { width:70px; color:#aebead; font-size:12px; }
+#advPane .adv-stat .hp-bar { flex:1; height:9px; border-radius:6px; background:rgba(255,255,255,.1); overflow:hidden; }
+#advPane .adv-stat .hp-bar > span { display:block; height:100%; background:linear-gradient(90deg,#e0503c,#f2b13c); }
+#advPane .adv-gold { color:#ffd166; }
+#advPane .adv-goal { font-size:12px; line-height:1.45; color:#e8f1e4; margin:4px 2px; }
+#advPane .adv-items { list-style:none; margin:4px 0; padding:0; }
+#advPane .adv-items li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; margin:3px 0; border-radius:10px; background:rgba(255,255,255,.06); font-size:13px; }
+#advPane .adv-items small { color:#aebead; }
+#advPane .adv-acts { display:flex; gap:4px; }
+#advPane .adv-acts button { padding:3px 8px; font-size:11px; border-radius:8px; }
+#advPane .adv-keys { display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; font-size:11px; color:#c7d4c4; }
+#advPane kbd { display:inline-block; min-width:16px; padding:1px 4px; margin-right:2px; border-radius:5px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); font:10px ui-monospace,monospace; text-align:center; color:#fff; }
+
+/* ---- "skeleton's turn" while nearby characters act (play.js) ---- */
+#npcTurnBanner { position:fixed; left:50%; top:70px; transform:translate(-50%,-8px); z-index:80; padding:8px 16px; border-radius:14px; font-size:13px; color:#f4f0e6;
+  background:rgba(16,20,25,.78); border:1px solid rgba(255,214,140,.35); backdrop-filter:blur(10px); opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
+#npcTurnBanner.show { opacity:1; transform:translate(-50%,0); }
+#sidePanel #panelClose { flex:0 0 30px; }
+/* toasts sit beside the panel, not on it */
+#toastStack { transition:left .18s ease; }
+body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }

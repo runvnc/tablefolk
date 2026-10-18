@@ -989,8 +989,16 @@ function makeObject(type,x,z,opts={}){
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
   if(type==='door') return makeDoor(sc,x,z,opts);
   if(window.tablefolkScenery?.types.includes(type)) return window.tablefolkScenery.make(type,x,z,opts);
-  if(ITEM_CATALOG[type]) return makeCatalogItem(sc,type,x,z,opts);
+  if(ITEM_CATALOG[type]) return keepLoot(makeCatalogItem(sc,type,x,z,opts),opts);
   return makeCrate(sc,x,z);
+}
+// What a chest holds, a coin pile's gold, an item's name (play.js): kept in
+// the object's opts, which saves and restores with it.
+function keepLoot(m,opts){
+  const mm=m&&meta(m); if(!mm) return m;
+  const o={}; for(const k of ['gold','items','name','opened']) if(opts?.[k]!=null) o[k]=opts[k];
+  if(Object.keys(o).length) mm.opts={...(mm.opts||{}),...o};
+  return m;
 }
 function getObjects(){
   return state.props.concat(state.blocks).filter(m=>m && !m.isDisposed?.()).map(m=>{
@@ -1507,6 +1515,10 @@ function ensureDoorAnimator(){
       }
       L.angle+=(dir*1.85-L.angle)*Math.min(1,dt*7);
       L.pivot.rotation.y=L.base+L.angle;
+      // creak as it starts to swing open, thud when it swings shut
+      const open=Math.abs(L.angle)>.12;
+      if(dir && !L.sounded){ L.sounded=true; window.tablefolkSfx?.play('doorOpen',{x:L.x,z:L.z}); }
+      else if(!dir && L.sounded && !open){ L.sounded=false; window.tablefolkSfx?.play('doorClose',{x:L.x,z:L.z}); }
     }
   });
 }
@@ -3058,6 +3070,7 @@ function inventoryChanged(){
   renderPlayerInventory(); updatePerceptionUI(); saveWorldState();
 }
 function renderPlayerInventory(){
+  try{ window.tablefolkPlay?.render(); }catch{}
   const gold=document.getElementById('playerGold'); if(gold && document.activeElement!==gold) gold.value=state.player.gold;
   const items=document.getElementById('playerItems');
   if(items){ const list=(state.player.items||[]).filter(i=>(i.qty??1)>0); items.textContent=list.length ? 'you have: '+list.map(i=>i.name+((i.qty??1)>1?' x'+i.qty:'')).join(', ') : ''; }
@@ -3787,13 +3800,14 @@ function removePlayerAvatar(){
 }
 // One cell in a direction, unless blocked or off the edge (no accidental falls).
 function playerStep(dir){
-  const g=state.playerAvatar; if(!g || g.turnMove || g.falling) return false;
+  const g=state.playerAvatar; if(!g || g.turnMove || g.falling || g.defeated || state.npcBusy) return false;
   setCharacterFacing(g,dir);
   const lp=g.logicalPos||g.root.position, nx=Math.round(lp.x+dir.x), nz=Math.round(lp.z+dir.z);
   if(isBlocked(nx,nz) || !hasGroundAt(nx,nz)) { emitBadge(g,'bonk'); return false; }
   startTurnMove(g,dir,Math.hypot(nx-lp.x,nz-lp.z)); g.anim='walk'; playRig(g,'walk',true);
   setTimeout(()=>{ if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+60);
   state.followAvatar=true;
+  window.tablefolkPlay?.acted('move');
   return true;
 }
 // Screen-relative cardinal direction: the camera's forward/right snapped to the grid.
@@ -3829,7 +3843,7 @@ const fpHeld=new Set();
 const FP_KEYS={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back'};
 function fpWalk(g,dt){
   const sign=(fpHeld.has('fwd')?1:0)-(fpHeld.has('back')?1:0);
-  if(!sign || g.turnMove || g.falling || !state.firstPerson){
+  if(!sign || g.turnMove || g.falling || !state.firstPerson || g.defeated || state.npcBusy){
     if(g.fpWalking){ g.fpWalking=false; if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } }
     return;
   }
@@ -3843,6 +3857,9 @@ function fpWalk(g,dt){
     setCharacterLogicalPosition(g,new BABYLON.Vector3(x,0,z));
     if(!g.fpWalking || g.anim!=='walk'){ g.fpWalking=true; g.anim='walk'; playRig(g,'walk',true); }
     state.followAvatar=true;
+    // entering a new cell is a turn (play.js): nearby characters act
+    const cell=Math.round(x)+','+Math.round(z);
+    if(g.fpCell!==cell){ const was=g.fpCell; g.fpCell=cell; if(was) window.tablefolkPlay?.acted('move'); }
   } else if(g.fpWalking){ g.fpWalking=false; g.anim='idle'; playRig(g,'idle',true); }
 }
 function setupPlayerControls(){
@@ -4074,7 +4091,7 @@ async function restoreWorldState(input) {
       else if (p.type === 'lamp') obj = makeLamp(state.scene, p.x, p.z);
       else if (p.type === 'note') obj = makeNote(state.scene, p.x, p.z, p.noteHtml||p.noteText||'<p>note</p>');
       else if (window.tablefolkScenery?.types.includes(p.type)) obj = window.tablefolkScenery.make(p.type, p.x, p.z, {...(p.opts||{}), ry:p.ry||0});
-      else if (ITEM_CATALOG[p.type]) obj = makeCatalogItem(state.scene, p.type, p.x, p.z, {ry:p.ry||0});
+      else if (ITEM_CATALOG[p.type]) obj = keepLoot(makeCatalogItem(state.scene, p.type, p.x, p.z, {ry:p.ry||0}), p.opts);
       else obj = makeCrate(state.scene, p.x, p.z);
     if(obj){ const mm=meta(obj); if(mm){ mm.state=p.state||'intact'; mm.health=p.health??mm.health; } }
   }
@@ -4728,7 +4745,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
           // characters still select them; Alt-click recentres the camera).
           const av=state.playerAvatar, owner=pick.pickedMesh?.metadata?.ownerId;
           if(av && !e.altKey && !owner && !av.turnMove && !av.falling){
-            walk(av,{type:'coord',x:tx,z:tz}); state.followAvatar=true; return;
+            if(state.npcBusy || av.defeated) return;
+            walk(av,{type:'coord',x:tx,z:tz}); state.followAvatar=true;
+            if(av.turnMove) window.tablefolkPlay?.acted('move');
+            return;
           }
           camera.target=new BABYLON.Vector3(tx,0.6,tz); state.zoomFocus=camera.target.clone();
         }

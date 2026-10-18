@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261020b" />
+  <link rel="stylesheet" href="style.css?v=20261022b" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -37,12 +37,12 @@
         <option value="gemma4-e2b-litert">Gemma 4 E2B</option>
       </select>
       <button id="loadBrains" type="button">load Gemma 4 E2B</button>
-      <button id="startBrains" type="button" disabled>start</button>
-      <button id="stepBrains" type="button" disabled>step</button>
-      <button id="stopBrains" type="button" disabled>stop</button>
+      <button id="startBrains" class="dev-only" type="button" disabled>start</button>
+      <button id="stepBrains" class="dev-only" type="button" disabled>step</button>
+      <button id="stopBrains" class="dev-only" type="button" disabled>stop</button>
     </div>
     <span id="brainStatus" class="top-pill">local brain not loaded</span>
-    <div class="topbar-group topbar-turn">
+    <div class="topbar-group topbar-turn dev-only">
       <label class="top-toggle"><input id="turnMode" type="checkbox" checked /> turn</label>
       <span id="turnStatus" class="top-pill">turn 0 · ready</span>
       <button id="settleNow" type="button">settle</button>
@@ -76,16 +76,26 @@
   <div id="spatialDebug" style="position:fixed; right:14px; top:62px; z-index:75; pointer-events:none; font:11px ui-monospace,monospace; color:#9fe8c8; background:rgba(8,14,12,.72); border:1px solid rgba(120,220,170,.25); border-radius:10px; padding:8px 10px; text-shadow:none; display:none;"></div>
 
   <nav id="rail" aria-label="panels">
-    <button class="rail-btn" data-tab="world" type="button" title="World" aria-label="World"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg></button>
-    <button class="rail-btn" data-tab="character" type="button" title="Character" aria-label="Character"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></button>
-    <button class="rail-btn" data-tab="scenario" type="button" title="Scenario" aria-label="Scenario"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg></button>
-    <button class="rail-btn" data-tab="library" type="button" title="Library" aria-label="Library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/></svg></button>
+    <button class="rail-btn" data-tab="adventurer" type="button" title="Adventurer (I)" aria-label="Adventurer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M10 13h4"/></svg></button>
+    <button class="rail-btn dev-only" data-tab="world" type="button" title="World" aria-label="World"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg></button>
+    <button class="rail-btn dev-only" data-tab="character" type="button" title="Character" aria-label="Character"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></button>
+    <button class="rail-btn dev-only" data-tab="scenario" type="button" title="Scenario" aria-label="Scenario"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg></button>
+    <button class="rail-btn dev-only" data-tab="library" type="button" title="Library" aria-label="Library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/></svg></button>
     <button class="rail-btn" data-tab="voice" type="button" title="Voice" aria-label="Voice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.2 5.8a9 9 0 0 1 0 12.4"/></svg></button>
     <button class="rail-btn" data-tab="graphics" type="button" title="Graphics" aria-label="Graphics"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
-    <button class="rail-btn" data-tab="debug" type="button" title="Debug" aria-label="Debug"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="8" height="12" rx="4"/><path d="M12 7V4.5M9.5 4l1.2 2.2M14.5 4l-1.2 2.2M4 13h4M16 13h4M5 8l3 2M19 8l-3 2M5 19l3-2.2M19 19l-3-2.2"/></svg></button>
+    <button class="rail-btn dev-only" data-tab="debug" type="button" title="Debug" aria-label="Debug"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="8" height="12" rx="4"/><path d="M12 7V4.5M9.5 4l1.2 2.2M14.5 4l-1.2 2.2M4 13h4M16 13h4M5 8l3 2M19 8l-3 2M5 19l3-2.2M19 19l-3-2.2"/></svg></button>
+    <button id="railToggle" class="rail-btn rail-toggle" type="button" title="Show / hide the panel (\)" aria-label="Show or hide the panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
   </nav>
 
   <aside id="sidePanel">
+    <div class="panel-tools">
+      <button id="panelClose" type="button" title="Collapse the panel (Esc)" aria-label="Collapse the panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    </div>
+    <div id="panelResize" title="Drag to resize" aria-hidden="true"></div>
+    <section class="pane" id="pane-adventurer">
+      <h2 class="pane-title">Adventurer</h2>
+      <div id="advPane"></div>
+    </section>
     <section class="pane" id="pane-world">
       <h2 class="pane-title">World</h2>
       <div id="apngStateDrop" class="apng-state-drop" tabindex="0" role="button" aria-label="Load initial world state from a character APNG">
@@ -343,19 +353,19 @@
   <div id="chatDock">
     <label class="chat-target" id="chatTarget">to: <select id="chatTo" title="who you are talking to (or start a message with @name)"></select></label>
     <label class="chat-name-label">Chat name <input id="chatName" type="text" value="God" placeholder="Your name" /></label>
-    <label class="chat-name-label">Your gold <input id="playerGold" type="number" min="0" step="1" value="100" /></label>
+    <label class="chat-name-label dev-only">Your gold <input id="playerGold" type="number" min="0" step="1" value="100" /></label>
     <button id="firstPersonBtn" class="fp-btn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>first person</span></button>
-    <small class="pane-note avatar-hint">Move: WASD / arrows or click the ground · V: first person</small>
+    <small class="pane-note avatar-hint">WASD / click: move · E: open, pick up, talk · F: attack · I: inventory · V: first person</small>
     <div id="playerItems" class="chat-target"></div>
     <div class="chat-send-row">
       <input id="chatInput" type="text" placeholder="Message (or @name message)..." />
       <button id="chatSend" type="button">send</button>
     </div>
-    <div class="chat-send-row">
+    <div class="chat-send-row dev-only">
       <input id="cmd" type="text" placeholder="command e.g. note(<p>hi</p>)" />
     </div>
   </div>
-  <div id="hint">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261022d"></script>
+  <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
+  <script src="preflight.js?v=20261022g"></script>
 </body>
 </html>

@@ -168,8 +168,11 @@
     playClip(g, clip, 900);
     const miss = Math.random() < .15, dmg = miss ? 0 : w.dmg + (Math.random() < .35 ? 1 : 0);
     const who = nameOf(g), whom = nameOf(v);
+    // the player's swing is a turn: nearby characters act after it (play.js)
+    if (isPlayer(g)) setTimeout(() => window.tablefolkPlay?.acted('attack'), 450);
     setTimeout(() => {
       if (v.defeated) return;
+      window.tablefolkSfx?.play(miss ? 'miss' : 'hit', v.root.position);
       if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${w.name === 'fists' ? 'bare fists' : 'the ' + w.name} and misses`); tellVictim(v, `[event] ${who} attacks you with ${withA(w.name)} and misses!`); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${withA(w.name)} and misses.`); return; }
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
@@ -263,6 +266,7 @@
     const g = state.playerAvatar;
     if (!g) { window.tablefolkToast?.('you need an avatar to fight', { type: 'error' }); return true; }
     if (g.defeated) { window.tablefolkToast?.('you are defeated', { type: 'error' }); return true; }
+    if (state.npcBusy) { window.tablefolkToast?.('wait for the others to finish their turn'); return true; }
     const m = String(text).match(/^\/(attack|hit|strike|wield|equip|unwield)\b\s*(.*)$/i);
     if (!m) return false;
     const verb = m[1].toLowerCase(), arg = m[2].trim();
@@ -274,7 +278,7 @@
   addEventListener('keydown', e => {
     if (e.key !== 'f' && e.key !== 'F') return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || e.ctrlKey || e.metaKey || e.altKey) return;
-    const g = state.playerAvatar; if (!g || g.defeated) return;
+    const g = state.playerAvatar; if (!g || g.defeated || state.npcBusy) return;
     attack(g, '');
   });
 

@@ -967,6 +967,9 @@
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
         maxHp: Math.max(1, +a.hp || 10), hp: Math.max(1, +a.hp || 10), wielding: null, defeated: false,
+        // play.js: hostile characters fight with a built-in routine, no LLM
+        // (unset: mindless monster models are hostile, everyone else talks)
+        ...(a.hostile != null ? { hostile: !!a.hostile } : { hostile: undefined }),
         // workflows.js: which routines it may start, none running yet
         workflows: Array.isArray(a.workflows) ? a.workflows.map(String) : null, wf: null,
         inventory: { gold: Math.max(0, +(a.inventory?.gold) || 0), items: (a.inventory?.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : { name: String(i.name), qty: i.qty ?? 1 }) },
