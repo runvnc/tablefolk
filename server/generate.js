@@ -217,12 +217,14 @@ if(words){
   // before the first event with text in it.
   const clock=setInterval(()=>{ $('clock').textContent=((Date.now()-t0)/1000).toFixed(1)+'s'; },100);
   // Loading view: the bar never slows down (slowing reads as "this is slow").
-  // It fills at a steady pace, LAP seconds per run, plus a jump for every
-  // batch of tokens the model streams (thinking or writing), and starts again
-  // from zero with a new made-up chore as many times as it takes; when the
-  // world is ready it finishes and opens it.
-  const LAP=2.4, PER_CHAR=.05, PER_THOUGHT=.03;
+  // It creeps at a steady pace (a lap in LAP seconds) and lurches ahead in
+  // random fake bumps every fraction of a second (together about 40%/s), plus
+  // a jump for every batch of tokens the model streams (thinking or
+  // writing); it starts again from zero with a new made-up chore as many
+  // times as it takes; when the world is ready it finishes and opens it.
+  const LAP=6, PER_CHAR=.05, PER_THOUGHT=.03;
   let ended=false, pos=0, tPrev=performance.now(), seenChars=0, seenThought=0;
+  const fakeBump=()=>{ if(ended) return; pos+=3+Math.random()*Math.random()*22; setTimeout(fakeBump,120+Math.random()*480); };
   const CHORES=['Unrolling the map','Laying flagstones','Stacking stones for the walls','Hanging doors on their hinges','Lighting the lanterns',
     'Waking the innkeeper','Counting the gold','Teaching goblins to haggle','Polishing the sorceress’s staff','Hiding a key somewhere',
     'Sweeping the tavern floor','Filling barrels','Writing secret notes','Feeding the ravens','Sharpening swords','Rehearsing villain monologues',
@@ -234,7 +236,7 @@ if(words){
     const tick=now=>{ if(ended) return; pos+=Math.min(.1,(now-tPrev)/1000)/LAP*100; tPrev=now;
       if(pos>=100){ pos%=100; nextChore(); }
       $('fill').style.width=pos.toFixed(1)+'%'; requestAnimationFrame(tick); };
-    requestAnimationFrame(tick); }
+    requestAnimationFrame(tick); setTimeout(fakeBump,200); }
   const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
