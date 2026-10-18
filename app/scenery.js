@@ -56,22 +56,26 @@
     return out;
   }
 
-  // Local lights only light what is near them: props and characters within
-  // range (rechecked every second, things move). The board and floors get a
-  // glow decal instead, so many lights on a big board never compete for the
-  // material light slots.
-  const localLights = new Set();
+  // Local lights only light what is near them: props, characters and floors
+  // within range (rechecked every second, things move). Materials hold 8
+  // lights and the scene has 4 global ones, so each mesh takes only its 4
+  // nearest local lights; a big merged floor near a dozen lanterns used to
+  // get the first ones in scene order and drop the rest (the lava's light).
+  // The board's tiles get glow decals instead.
+  const localLights = new Set(), PER_MESH = 4;
   function refreshLocalLights() {
     if (!localLights.size || !state.scene) return;
+    for (const L of localLights) if (L.isDisposed()) localLights.delete(L);
     const meshes = state.scene.meshes.filter(m => m.isEnabled() && m.isVisible !== false && !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
-    for (const L of localLights) {
-      if (L.isDisposed()) { localLights.delete(L); continue; }
-      const p = L.getAbsolutePosition(), r = L.range + 1;
-      L.includedOnlyMeshes = meshes.filter(m => {
-        const s = m.getBoundingInfo?.().boundingSphere; if (!s) return false;
-        return BABYLON.Vector3.Distance(s.centerWorld, p) < r + s.radiusWorld;
-      });
+    const per = new Map([...localLights].map(L => [L, []])), pos = new Map([...localLights].map(L => [L, L.getAbsolutePosition()]));
+    for (const m of meshes) {
+      const s = m.getBoundingInfo?.().boundingSphere; if (!s) continue;
+      const near = [];
+      for (const L of localLights) { const gap = BABYLON.Vector3.Distance(s.centerWorld, pos.get(L)) - s.radiusWorld; if (gap < L.range + 1) near.push([gap, L]); }
+      near.sort((a, b) => a[0] - b[0]);
+      for (const [, L] of near.slice(0, PER_MESH)) per.get(L).push(m);
     }
+    for (const [L, list] of per) L.includedOnlyMeshes = list;
   }
   setInterval(refreshLocalLights, 1000);
   function pointLight(r, name, { y, color, intensity, range }) {
@@ -168,5 +172,7 @@
       return r;
     },
   };
-  window.tablefolkScenery = { types: Object.keys(makers), make: (type, x, z, opts = {}) => makers[type]?.(state.scene, x, z, opts) ?? null };
+  // Other code's lights (lava) join the same nearby-only lighting.
+  const trackLight = L => { localLights.add(L); queueMicrotask(refreshLocalLights); };
+  window.tablefolkScenery = { trackLight, types: Object.keys(makers), make: (type, x, z, opts = {}) => makers[type]?.(state.scene, x, z, opts) ?? null };
 })();

@@ -85,15 +85,6 @@
       "intensity": 2.5,
       "range": 5,
       "y": 1.4
-    },
-    {
-      "type": "light",
-      "x": 1,
-      "z": 5,
-      "color": "#ff7a2a",
-      "intensity": 3,
-      "range": 4,
-      "y": 0.8
     }
   ],
   "goal": null

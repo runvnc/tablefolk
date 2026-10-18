@@ -1171,17 +1171,27 @@ function fieldstoneRock(sc){
   if(state.fieldRock && !state.fieldRock.isDisposed()) return state.fieldRock;
   const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:2,flat:false},sc);
   const pos=m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-  // Lumpy, slightly flattened top and bottom (stones are laid flat side down).
+  // Lumpy and flat: a slab-like stone with flattened top and bottom faces
+  // (stones are laid flat side down), squared-off ends, uneven surface.
   for(let i=0;i<pos.length;i+=3){
-    const x=pos[i],y=pos[i+1],z=pos[i+2], n=Math.sin(x*9.1+z*4.3)*.5+Math.sin(y*7.7+x*3.1)*.5+Math.sin(z*8.3-y*5.2)*.5;
-    const k=1+n*.07; pos[i]=x*k; pos[i+1]=Math.max(-.42,Math.min(.42,y*k)); pos[i+2]=z*k;
+    const x=pos[i],y=pos[i+1],z=pos[i+2], n=Math.sin(x*9.1+z*4.3)*.5+Math.sin(y*7.7+x*3.1)*.5+Math.sin(z*8.3-y*5.2)*.5+Math.sin(x*21+y*17+z*13)*.25;
+    const k=1+n*.08, sq=1+(.5-Math.abs(y))*.18;
+    pos[i]=x*k*sq; pos[i+1]=Math.max(-.27,Math.min(.27,y*.72*k)); pos[i+2]=z*k*sq;
   }
   m.updateVerticesData(BABYLON.VertexBuffer.PositionKind,pos);
   const nrm=[]; BABYLON.VertexData.ComputeNormals(pos,m.getIndices(),nrm); m.updateVerticesData(BABYLON.VertexBuffer.NormalKind,nrm);
   m.setEnabled(false);
   const mat=new BABYLON.PBRMaterial('fieldstone_mat',sc);
-  mat.albedoColor=new BABYLON.Color3(1,1,1); mat.metallic=0; mat.roughness=.42; mat.environmentIntensity=.85; mat.specularIntensity=.6; mat.maxSimultaneousLights=8;
-  plasticFinish(mat,{coat:.5,coatRough:.12}); applyClayLook(mat,sc,{detail:.14,detailScale:3});
+  mat.albedoColor=new BABYLON.Color3(1,1,1); mat.metallic=0; mat.roughness=.64; mat.environmentIntensity=.7; mat.specularIntensity=.4; mat.maxSimultaneousLights=8;
+  plasticFinish(mat,{coat:.16,coatRough:.3}); mat.environmentIntensity=.7; applyClayLook(mat,sc,{detail:.3,detailScale:5});
+  // Rock grain: pitted, granular relief.
+  const HD=window.TablefolkHD;
+  if(HD) try{
+    const N=256, cv=document.createElement('canvas'); cv.width=cv.height=N; const g=cv.getContext('2d'), img=g.createImageData(N,N);
+    for(let i=0;i<N*N;i++){ const x=i%N, y=(i/N)|0, v=128+Math.sin(x*.21)*18+Math.sin(y*.17+x*.05)*18+(Math.random()-.5)*90; img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v; img.data[i*4+3]=255; }
+    g.putImageData(img,0,0); g.filter='blur(1px)'; g.drawImage(cv,0,0);
+    mat.bumpTexture=HD.dyn(sc,'fieldstone_n',HD.normalFromCanvas(cv,3.5)); mat.bumpTexture.uScale=mat.bumpTexture.vScale=2;
+  }catch(e){ console.warn('rock grain',e); }
   state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(mat);
   m.material=mat;
   return state.fieldRock=m;
@@ -1213,8 +1223,8 @@ function buildFieldstoneWalls(cell,top){
           const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.2+hash(seed,r,1)*.22;
           const mid=a+len/2;
           if(mid>a0 && mid<=a1 && !(st==='cracked' && hash(seed,9,9)<.18)){
-            const hgt=RH*(1.15+hash(seed,2,4)*.4), thick=T*(1+hash(seed,6,2)*.35);
-            at(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.3,hgt,thick,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+            const hgt=RH*(1.6+hash(seed,2,4)*.45), thick=T*(1.1+hash(seed,6,2)*.3);
+            at(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.45,hgt,thick,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
           }
           a+=len; i++;
         }
@@ -1533,8 +1543,10 @@ const PAINT_MATERIALS={
   wood:{file:'wood_planks.png',color:[.95,.9,.85],glyph:'_',name:'wooden floor'},
   sand:{file:'dirt_loam.png',color:[1.25,1.1,.8],glyph:'.',name:'sand'},
   grass:{file:'grass_meadow.png',color:[1,1,1],glyph:',',name:'grass'},
-  water:{file:'water_soft.png',color:[.55,.8,1],glyph:'~',name:'water',emissive:[.02,.06,.09],blocks:true},
-  lava:{file:'dirt_loam.png',color:[1,.35,.1],glyph:'&',name:'lava',emissive:[.9,.25,.03],blocks:true},
+  // Water and lava are laid unturned and edge to edge, so neighbouring cells
+  // join into one surface that flows the same way.
+  water:{file:'water_soft.png',color:[.55,.8,1],glyph:'~',name:'water',emissive:[.02,.06,.09],blocks:true,aligned:true},
+  lava:{proc:'lava',color:[1,1,1],glyph:'&',name:'lava',emissive:[1,1,1],blocks:true,aligned:true},
   // modern floors: glossy (rough + clear coat); 'tile' is drawn, not a file
   oak:{proc:'oak',color:[1,1,1],glyph:'_',name:'wooden floor',rough:.32,coat:.5,aligned:true},
   tile:{proc:'tile',color:[.93,.92,.9],glyph:'_',name:'tiled floor',rough:.22,coat:.6,aligned:true},
@@ -1545,6 +1557,30 @@ const PAINT_MATERIALS={
   sea:{color:[0,0,0],glyph:'~',name:'sea',hole:true},
 };
 // Large porcelain tiles: 2x2 per cell, thin grout.
+// Molten lava, seamless: mostly red-orange melt, bright yellow cracks, a few
+// small islands of black crust. Returns the colour and the glow texture
+// (cracks and melt glow, crust doesn't) plus the canvas for relief.
+function lavaTextures(sc){
+  if(state.lavaTex) return state.lavaTex;
+  const N=256, col=document.createElement('canvas'), glow=document.createElement('canvas'); col.width=col.height=glow.width=glow.height=N;
+  const ci=col.getContext('2d').createImageData(N,N), gi=glow.getContext('2d').createImageData(N,N), T=Math.PI*2/N;
+  // Integer frequencies keep every term periodic over the tile.
+  const waves=[[2,1,.0,1],[1,3,1.3,.8],[3,-2,2.1,.6],[5,4,.7,.35],[-4,6,2.9,.3],[7,-5,1.7,.2],[9,8,.4,.12]];
+  const f=(x,y)=>{ let v=0; for(const [k,l,ph,a] of waves) v+=a*Math.sin(T*(k*x+l*y)+ph); return v/2.3; };
+  const mix=(a,b,t)=>a+(b-a)*Math.max(0,Math.min(1,t));
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    const v=f(x,y), crack=Math.max(0,1-Math.abs(v-.05)/.06), crust=Math.max(0,(v-.62)/.14), i=(y*N+x)*4;
+    let r=mix(.62,.95,.5+v), g=mix(.10,.30,.5+v*.5), b=.03;                      // red to orange melt
+    r=mix(r,1,crack); g=mix(g,.72,crack); b=mix(b,.12,crack);                    // yellow-orange cracks
+    const k=Math.min(1,crust); r=mix(r,.07,k); g=mix(g,.04,k); b=mix(b,.03,k);   // black crust
+    ci.data[i]=r*255; ci.data[i+1]=g*255; ci.data[i+2]=b*255; ci.data[i+3]=255;
+    const gl=(1-k)*(.55+crack*.6);
+    gi.data[i]=Math.min(255,r*gl*255); gi.data[i+1]=Math.min(255,g*gl*255); gi.data[i+2]=Math.min(255,b*gl*255); gi.data[i+3]=255;
+  }
+  col.getContext('2d').putImageData(ci,0,0); glow.getContext('2d').putImageData(gi,0,0);
+  const mk=(name,cv)=>{ const t=new BABYLON.DynamicTexture(name,cv,sc,true); t.update(false); t.wrapU=t.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; return t; };
+  return state.lavaTex={ color:mk('lava_col',col), glow:mk('lava_glow',glow), canvas:col };
+}
 function tileFloorTexture(sc){
   const N=256, cv=document.createElement('canvas'); cv.width=cv.height=N;
   const g=cv.getContext('2d');
@@ -1599,7 +1635,7 @@ function paintMaterial(mat,tint){
   if(state.paintMats.has(key)) return state.paintMats.get(key);
   const def=PAINT_MATERIALS[mat], sc=state.scene;
   const m=new BABYLON.PBRMaterial('paint_'+key,sc);
-  const tx=def.file ? new BABYLON.Texture(ASSET+def.file,sc,true,false,BABYLON.Texture.TRILINEAR_SAMPLINGMODE) : def.proc==='tile' ? tileFloorTexture(sc) : def.proc==='oak' ? oakFloorTexture(sc) : null;
+  const tx=def.file ? new BABYLON.Texture(ASSET+def.file,sc,true,false,BABYLON.Texture.TRILINEAR_SAMPLINGMODE) : def.proc==='tile' ? tileFloorTexture(sc) : def.proc==='oak' ? oakFloorTexture(sc) : def.proc==='lava' ? lavaTextures(sc).color : null;
   if(tx){ tx.wrapU=tx.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; tx.anisotropicFilteringLevel=8; }
   m.albedoTexture=tx; m.metallic=0; m.roughness=def.rough??(mat==='water'?.25:.85); m.environmentIntensity=.6; m.specularIntensity=mat==='water'||def.coat?1:.4; m.maxSimultaneousLights=8;
   if(def.coat) plasticFinish(m,{coat:def.coat,coatRough:.1});
@@ -1611,11 +1647,12 @@ function paintMaterial(mat,tint){
   // floors aren't flat decals beside the sculpted tiles. Water stays smooth.
   const HD=window.TablefolkHD;
   if(mat==='water'){ m.roughness=.06; m.alpha=.86; plasticFinish(m,{coat:.9,coatRough:.04}); }
-  if(mat==='lava'){ m.roughness=.4; plasticFinish(m,{coat:.5,coatRough:.2}); }
+  if(mat==='lava'){ m.roughness=.55; m.emissiveTexture=lavaTextures(sc).glow; m.emissiveColor=new BABYLON.Color3(1.4,1.4,1.4); }
   if(FLOWING[mat]) animateFlow();
   if(HD && tx){
     const bump=cv=>{ const n=HD.dyn(sc,'paint_n_'+key,HD.normalFromCanvas(cv,def.relief??(mat==='water'?3.2:2.4))); n.anisotropicFilteringLevel=8; m.bumpTexture=n; m.bumpTexture.level=mat==='water'?1.3:.9; };
     if(def.file) HD.loadImage(ASSET+def.file).then(img=>{ const cv=HD.canvasOf(img.width,img.height); cv.getContext('2d').drawImage(img,0,0); bump(cv); }).catch(e=>console.warn('floor relief',e));
+    else if(mat==='lava') bump(lavaTextures(sc).canvas);
     else if(tx.getContext) try{ bump(tx.getContext().canvas); }catch(e){ console.warn('floor relief',e); }
   }
   state.paintMats.set(key,m);
@@ -1631,8 +1668,6 @@ const SOLID_FLOORS={
   wood:{color:[.40,.25,.13],layout:'planks',finish:'gloss'}, oak:{color:[.60,.43,.26],layout:'planks',finish:'gloss'},
   tile:{color:[.78,.77,.74],layout:'squares',finish:'glaze'}, concrete:{color:[.50,.50,.49],layout:'slab',finish:'satin'},
   carpet:{color:[.28,.33,.40],layout:'pile',finish:'fabric'},
-  // Lava: dark crust plates over the glowing overlay, which shows in the cracks.
-  lava:{color:[.13,.10,.09],layout:'crust',finish:'rock',overlay:true},
 };
 const FLOOR_FINISH={ gloss:{rough:.34,coat:.6}, glaze:{rough:.16,coat:.85}, satin:{rough:.55,coat:.2}, fabric:{rough:.95,coat:0,fabric:true}, rock:{rough:.7,coat:.15} };
 function fabricNormal(sc){
@@ -1680,12 +1715,15 @@ function buildFloor(type,cells){
   return m;
 }
 // Water and lava ripple: their relief scrolls (one shared observer).
-const FLOWING={ water:{u:.035,v:.022}, lava:{u:.008,v:.005} };
+const FLOWING={ water:{u:.035,v:.022}, lava:{u:.012,v:.007} };
 function animateFlow(){
   if(state.flowObs || window.TABLEFOLK_STILL_MODE) return;
   state.flowObs=state.scene.onBeforeRenderObservable.add(()=>{
     const t=performance.now()*.001;
-    for(const [mat,sp] of Object.entries(FLOWING)) for(const m of state.paintMats?.values()||[]) if(m.name.startsWith('paint_'+mat+'|') && m.bumpTexture){ m.bumpTexture.uOffset=(t*sp.u)%1; m.bumpTexture.vOffset=(t*sp.v)%1; }
+    for(const [mat,sp] of Object.entries(FLOWING)) for(const m of state.paintMats?.values()||[]) if(m.name.startsWith('paint_'+mat+'|')){
+      for(const tx of [m.albedoTexture,m.bumpTexture,m.emissiveTexture]) if(tx){ tx.uOffset=(t*sp.u)%1; tx.vOffset=(t*sp.v)%1; }
+      if(mat==='lava'){ const k=1.3+Math.sin(t*1.7)*.15+Math.sin(t*4.3)*.06; m.emissiveColor.set(k,k,k); }
+    }
   });
 }
 function rebuildPaint(){
@@ -1716,6 +1754,32 @@ function rebuildPaint(){
     state.paintMeshes.push(base);
   }
   for(const [mat,cells] of planks){ const m=buildFloor(mat,cells); if(m) state.paintMeshes.push(m); }
+  rebuildLavaLights();
+}
+// Every connected patch of lava lights its surroundings: a red-orange point
+// light over its middle (props and characters nearby) and a glow on the ground.
+function rebuildLavaLights(){
+  const sc=state.scene;
+  for(const o of state.lavaLights||[]) try{ o.dispose(); }catch{}
+  state.lavaLights=[];
+  const lava=new Set([...(state.paint||[])].filter(([,v])=>v.mat==='lava').map(([k])=>k)), seen=new Set(), top=state.terrainTopY??0;
+  for(const start of lava){
+    if(seen.has(start)) continue;
+    const group=[], todo=[start]; seen.add(start);
+    while(todo.length){ const k=todo.pop(); group.push(k); const [x,z]=k.split(',').map(Number);
+      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){ const n=(x+dx)+','+(z+dz); if(lava.has(n) && !seen.has(n)){ seen.add(n); todo.push(n); } } }
+    const pts=group.map(k=>k.split(',').map(Number)), n=pts.length;
+    const cx=pts.reduce((a,p)=>a+p[0],0)/n, cz=pts.reduce((a,p)=>a+p[1],0)/n;
+    const reach=Math.max(...pts.map(p=>Math.hypot(p[0]-cx,p[1]-cz)))+.5;
+    const L=new BABYLON.PointLight('lava_light',new BABYLON.Vector3(cx,top+.7,cz),sc);
+    L.diffuse=new BABYLON.Color3(1,.32,.06); L.specular=new BABYLON.Color3(1,.4,.1);
+    L.intensity=Math.min(22,5+n*1.5); L.range=Math.min(11,3.5+reach*1.8);
+    window.tablefolkScenery?.trackLight(L);
+    const node=new BABYLON.TransformNode('lava_glow_root',sc); node.position.set(cx,top,cz);
+    const pool=addLampPool(sc,node,{warm:true,y:.08}); const k=(reach+1.2)/1.6; node.scaling.set(k,1,k);
+    if(!window.TABLEFOLK_STILL_MODE){ const ph=cx*1.7+cz; const obs=sc.onBeforeRenderObservable.add(()=>{ const t=performance.now()*.001; L.intensity=Math.min(22,5+n*1.5)*(.88+Math.sin(t*1.7+ph)*.08+Math.sin(t*4.3+ph)*.04); }); L.onDisposeObservable.add(()=>sc.onBeforeRenderObservable.remove(obs)); }
+    state.lavaLights.push(L,node);
+  }
 }
 // ---- the board ----
 // One tile per cell on a stone column that reaches down into the sea (both
