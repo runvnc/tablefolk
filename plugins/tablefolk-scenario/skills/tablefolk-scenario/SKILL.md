@@ -36,6 +36,7 @@ python3 tablefolk_server.py 8000        # serves http://localhost:8000/app/
 python3 scripts/scenario_link.py encode scene.json                 # prints the link
 python3 scripts/scenario_link.py encode scene.json --base https://example.com/app/
 python3 scripts/scenario_link.py decode '<link>'                   # back to JSON
+python3 scripts/scenario_link.py encode scene.json --html scene.html   # + a page that opens it (double-click)
 ```
 
 `encode` prints warnings for obvious mistakes. Layout problems (an unknown word

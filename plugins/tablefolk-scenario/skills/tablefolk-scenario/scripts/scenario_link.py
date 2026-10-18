@@ -7,7 +7,7 @@
 The link format is the app's own: #s=<base64url(deflate-raw(JSON))>, no padding.
 Only the standard library is used.
 """
-import argparse, base64, json, re, sys, zlib
+import argparse, base64, html, json, re, sys, zlib
 
 DEFAULT_BASE = 'http://localhost:8000/app/'
 BASES = {'island', 'clearing', 'dungeon', 'plain'}
@@ -59,13 +59,21 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
     e = sub.add_parser('encode'); e.add_argument('file', help='scenario JSON file, or - for stdin'); e.add_argument('--base', default=DEFAULT_BASE)
+    e.add_argument('--html', metavar='OUT.html', help='also write a page that opens the link (double-click it)')
     d = sub.add_parser('decode'); d.add_argument('link')
     a = ap.parse_args()
     if a.cmd == 'encode':
         obj = json.load(sys.stdin if a.file == '-' else open(a.file))
         for p in check(obj): print('warning:', p, file=sys.stderr)
         base = a.base.split('#')[0]
-        print(f'{base}#s={encode(obj)}')
+        link = f'{base}#s={encode(obj)}'
+        print(link)
+        if a.html:
+            title = html.escape(str(obj.get('title', 'Tablefolk scenario')))
+            with open(a.html, 'w') as f:
+                f.write(f'<!doctype html><meta charset="utf-8"><title>{title}</title>'
+                        f'<meta http-equiv="refresh" content="0;url={html.escape(link)}">'
+                        f'<p>Opening <a href="{html.escape(link)}">{title}</a>...</p>\n')
     else:
         print(json.dumps(decode(a.link), indent=2, ensure_ascii=False))
 
