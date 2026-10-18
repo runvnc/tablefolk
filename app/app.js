@@ -1523,6 +1523,14 @@ function paintMaterial(mat,tint){
   if(tint){ try{ col=BABYLON.Color3.FromHexString(tint); }catch{} }
   m.albedoColor=col;
   if(def.emissive) m.emissiveColor=new BABYLON.Color3(...def.emissive);
+  // Relief from the floor's own texture (brightness as height), so painted
+  // floors aren't flat decals beside the sculpted tiles. Water stays smooth.
+  const HD=window.TablefolkHD;
+  if(HD && tx && mat!=='water'){
+    const bump=cv=>{ const n=HD.dyn(sc,'paint_n_'+key,HD.normalFromCanvas(cv,def.relief??2.4)); n.anisotropicFilteringLevel=8; m.bumpTexture=n; m.bumpTexture.level=.9; };
+    if(def.file) HD.loadImage(ASSET+def.file).then(img=>{ const cv=HD.canvasOf(img.width,img.height); cv.getContext('2d').drawImage(img,0,0); bump(cv); }).catch(e=>console.warn('floor relief',e));
+    else if(tx.getContext) try{ bump(tx.getContext().canvas); }catch(e){ console.warn('floor relief',e); }
+  }
   state.paintMats.set(key,m);
   return m;
 }
@@ -1563,6 +1571,13 @@ function boardMaterials(){
   const side=new BABYLON.PBRMaterial('board_column_mat',sc);
   side.albedoColor=new BABYLON.Color3(.24,.22,.20); side.metallic=0; side.roughness=.85; side.environmentIntensity=.5; side.maxSimultaneousLights=8;
   applyClayLook(side,sc,{detail:.12,detailScale:3});
+  // Stone courses on the sides; a soft stone grain on box tiles.
+  const HD=window.TablefolkHD;
+  if(HD) try{
+    const n=HD.dyn(sc,'board_side_n',HD.normalFromCanvas(HD.stoneFloorHeight(512,11,4,4),2.6));
+    n.vScale=BOARD_COLUMN_H; side.bumpTexture=n;
+    top.bumpTexture=HD.dyn(sc,'board_top_n',HD.normalFromCanvas(HD.macroHeightCanvas(512,7,30,.5),1.4));
+  }catch(e){ console.warn('board relief',e); }
   return state.boardMats={top,side};
 }
 function boardCellList(){
@@ -1594,8 +1609,14 @@ function loadBoardTile(file){
     const grass=src.material; grass.maxSimultaneousLights=8;
     const plain=grass.clone('board_tile_plain'); plain.albedoTexture=null; plain.albedoColor=new BABYLON.Color3(1,1,1);
     state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(grass); state.sharedAssetMats.add(plain);
-    const b=src.getBoundingInfo().boundingBox;
-    boardTileReady.set(file,{src,grass,plain,top:b.maximum.y});
+    // The bounds must be refreshed after baking (they still described the
+    // pre-bake, quantized mesh: top 0.84 instead of 0.42, so the tiles sat
+    // 0.42 low and everything seemed to hover). Stand things on the mean
+    // height of the top surface, not on its highest bump.
+    src.refreshBoundingInfo();
+    const pos=src.getVerticesData(BABYLON.VertexBuffer.PositionKind), maxY=src.getBoundingInfo().boundingBox.maximum.y;
+    let sum=0,n=0; for(let i=1;i<pos.length;i+=3) if(pos[i]>maxY-.12){ sum+=pos[i]; n++; }
+    boardTileReady.set(file,{src,grass,plain,top:n?sum/n:maxY});
   }));
   return boardTileLoads.get(file);
 }
