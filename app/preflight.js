@@ -40,7 +40,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261019c'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261021a'],
+    ['app.js?v=20261021b'],
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261020c'],
     ['senses.js?v=20261020d'],
@@ -49,7 +49,7 @@
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261021a'],
     ['scenario.js?v=20261021a'],
-    ['llm_js/world-integration.js?v=20261020q', 'module'],
+    ['llm_js/world-integration.js?v=20261021a', 'module'],
   ];
 
   function browserSummary() {

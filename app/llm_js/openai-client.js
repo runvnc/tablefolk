@@ -73,14 +73,18 @@ async function* sseChunks(stream) {
 
 // Collect a stream (or a whole response) into { text, finish_reason, usage },
 // calling onToken(fullTextSoFar) as text arrives.
-export async function collect(result, onToken = null) {
+// onReasoning(chars) reports a reasoning model's hidden thinking as it streams
+// (OpenRouter's delta.reasoning), which can come seconds before any content.
+export async function collect(result, onToken = null, onReasoning = null) {
   if (!result?.[Symbol.asyncIterator]) {
     const c = result?.choices?.[0];
     return { text: c?.message?.content || '', finish_reason: c?.finish_reason, usage: result?.usage };
   }
-  let text = '', finish_reason = null, usage = null;
+  let text = '', finish_reason = null, usage = null, thought = 0;
   for await (const chunk of result) {
     const c = chunk.choices?.[0];
+    const r = c?.delta?.reasoning ?? c?.delta?.reasoning_content;
+    if (r) { thought += r.length; onReasoning?.(thought); }
     if (c?.delta?.content) { text += c.delta.content; onToken?.(text); }
     if (c?.finish_reason) finish_reason = c.finish_reason;
     if (chunk.usage) usage = chunk.usage;

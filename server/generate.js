@@ -1,6 +1,6 @@
 // Scenario generator: a prompt in, a playable scenario link out.
 //
-//   GET /world/<prompt words>[?mode=generate|grid|map&model=...&endpoint=local]
+//   GET /world/<prompt words>[?mode=generate|grid|map&model=...&endpoint=local&view=builder|loading]
 //       a page that shows progress and then opens the scenario
 //   GET /api/generate?prompt=...&mode=...&model=...&endpoint=...[&stream=1]
 //       the JSON result ({ scenario, code, link, warnings, ms }), or with
@@ -117,11 +117,13 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
   ];
   let scenario = null, problems = [], raw = '';
   for (let round = 0; round < 2; round++) {
-    emit('progress', { stage: round ? 'repairing' : 'writing', model: ep.model });
-    let chars = 0, last = 0;
+    emit('progress', { stage: round ? 'repairing' : 'waiting', model: ep.model });
+    let chars = 0, last = 0, lastT = -1;
     const out = await collect(await client.chat.completions.create({ model: ep.model, messages, stream: true, temperature: 0.7, max_tokens: 6000 }), text => {
       chars = text.length;
       if (chars - last > 120) { last = chars; emit('progress', { stage: round ? 'repairing' : 'writing', chars, preview: text.slice(-160) }); }
+    }, thought => {
+      if (!chars && (lastT < 0 || thought - lastT > 200)) { lastT = thought; emit('progress', { stage: 'thinking', thought }); }
     });
     raw = out.text;
     try { scenario = parseJSON(raw); problems = checkScenario(scenario); }
@@ -164,48 +166,85 @@ export async function handleGenerate(req, url) {
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Two views of the same run: "builder" (the prompt form, the stage and a
+// preview of the JSON as it streams) and "loading" (just a progress bar with
+// little made-up chores, for showing to players). The server's default is
+// config.worldView (WORLD_VIEW=loading or --world-loading); ?view= overrides.
 export async function handleWorld(req, url) {
   const words = decodeURIComponent(url.pathname.replace(/^\/world\/?/, '').replace(/\+/g, ' ')).replace(/[/_]+/g, ' ').trim();
   const qs = new URLSearchParams(url.search);
+  const view = words && (qs.get('view') || config.worldView) === 'loading' ? 'loading' : 'builder';
+  const builderBody = `<h1>Tablefolk world builder</h1><p class="sub">Describe a scene; a scenario is written and opened for you.</p>
+<form id="f"><input name="p" value="${esc(words)}" placeholder="a small dungeon with a sorceress and goblins" required>
+<select name="mode"><option value="auto">any method</option><option value="generate">generated map</option><option value="grid">ASCII map</option><option value="map">layout lines</option></select>
+<button>build</button></form>
+<div class="card" id="card" ${words ? '' : 'hidden'}><div><span id="stage">starting…</span> <span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>`;
+  const loadingBody = `<div class="load"><h1>Building your world</h1><p class="sub">“${esc(words)}”</p>
+<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div></div>
+<div class="row"><span id="chore">Unrolling the map…</span><span id="clock"></span></div>
+<div id="result"></div><span id="stage" hidden></span><div id="problems" hidden></div><div id="preview" hidden></div></div>`;
   const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tablefolk world builder</title>
+<title>${view === 'loading' ? 'Building your world' : 'Tablefolk world builder'}</title>
 <style>
-:root{--bg:#f4efe4;--fg:#2b2620;--muted:#7a7064;--card:#fffaf0;--line:#e2d8c6;--accent:#6b4f2a}
-@media (prefers-color-scheme:dark){:root{--bg:#1d1a16;--fg:#ece5d8;--muted:#a59a8a;--card:#272320;--line:#3a342d;--accent:#d7b07a}}
+:root{--bg:#f4efe4;--fg:#2b2620;--muted:#7a7064;--card:#fffaf0;--line:#e2d8c6;--accent:#6b4f2a;--track:#e6dccb}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1a16;--fg:#ece5d8;--muted:#a59a8a;--card:#272320;--line:#3a342d;--accent:#d7b07a;--track:#3a342d}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;display:flex;justify-content:center;padding:6vh 16px}
 main{width:min(680px,100%)}h1{font-size:1.3rem;margin:0 0 .2rem}p.sub{color:var(--muted);margin:0 0 1.2rem}
 form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}input,select,button{font:inherit;padding:.5rem .7rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);border:none;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-#stage{font-weight:600}#preview{font:12px/1.4 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-all;max-height:7.5em;overflow:hidden;margin-top:.5rem}
+#stage{font-weight:600}#clock{color:var(--muted);font-variant-numeric:tabular-nums}
+#preview{font:12px/1.4 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-all;max-height:7.5em;overflow:hidden;margin-top:.5rem}
 #problems{color:#b5542e;font-size:.9rem}a{color:var(--accent)}
+.load{margin-top:14vh;text-align:center}.load h1{font-size:1.6rem}
+.bar{height:14px;border-radius:7px;background:var(--track);overflow:hidden;margin:1.4rem 0 .7rem}
+#fill{height:100%;width:0;background:var(--accent);border-radius:7px;transition:width .6s ease}
+.row{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.95rem}
+#chore{transition:opacity .25s}
 </style></head><body><main>
-<h1>Tablefolk world builder</h1><p class="sub">Describe a scene; a scenario is written and opened for you.</p>
-<form id="f"><input name="p" value="${esc(words)}" placeholder="a small dungeon with a sorceress and goblins" required>
-<select name="mode"><option value="auto">any method</option><option value="generate">generated map</option><option value="grid">ASCII map</option><option value="map">layout lines</option></select>
-<button>build</button></form>
-<div class="card" id="card" ${words ? '' : 'hidden'}><div id="stage">starting…</div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
+${view === 'loading' ? loadingBody : builderBody}
 </main><script>
-const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f');
-f.mode.value=qs.get('mode')||'auto';
-f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;};
+const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
+if(f){ f.mode.value=qs.get('mode')||'auto';
+  f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
 const appLink=l=>{const a=new URLSearchParams(); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
 if(words){
-  const q=new URLSearchParams(qs); q.set('prompt',words); q.set('stream','1');
+  const q=new URLSearchParams(qs); q.set('prompt',words); q.set('stream','1'); q.delete('view');
   const t0=Date.now(), $=id=>document.getElementById(id);
+  // The clock runs on its own: a reasoning model can think for seconds
+  // before the first event with text in it.
+  const clock=setInterval(()=>{ $('clock').textContent=((Date.now()-t0)/1000).toFixed(1)+'s'; },100);
+  // Loading view: the bar heads for a target set by the real stages and
+  // creeps on between events, so it always moves; captions are made-up chores.
+  let target=4, shown=0, ended=false;
+  const CHORES=['Unrolling the map','Laying flagstones','Stacking stones for the walls','Hanging doors on their hinges','Lighting the lanterns',
+    'Waking the innkeeper','Counting the gold','Teaching goblins to haggle','Polishing the sorceress’s staff','Hiding a key somewhere',
+    'Sweeping the tavern floor','Filling barrels','Writing secret notes','Feeding the ravens','Sharpening swords','Rehearsing villain monologues',
+    'Arranging bookshelves','Planting mushrooms','Drawing the dungeon on a napkin','Giving everyone a name'];
+  let ci=Math.floor(Math.random()*CHORES.length);
+  const nextChore=()=>{ const el=$('chore'); if(!el||ended) return; ci=(ci+1+Math.floor(Math.random()*3))%CHORES.length; el.style.opacity=0; setTimeout(()=>{ el.textContent=CHORES[ci]+'…'; el.style.opacity=1; },250); };
+  if(view==='loading'){ $('chore').textContent=CHORES[ci]+'…'; setInterval(nextChore,2400);
+    setInterval(()=>{ if(ended) return; target=Math.min(target+.35,94); shown+=(Math.max(target,shown)-shown)*.25; $('fill').style.width=shown.toFixed(1)+'%'; },300); }
+  const bump=t=>{ target=Math.max(target,t); };
+  const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
-    $('stage').textContent=(d.stage==='problems'?'fixing problems':d.stage+'…')+(d.model?' ('+d.model+')':'')+(d.chars?' '+d.chars+' chars':'')+' · '+((Date.now()-t0)/1000).toFixed(1)+'s';
+    $('stage').textContent=(stageText[d.stage]||d.stage)+'…'+(d.model?' ('+d.model+')':'')+(d.chars?' '+d.chars+' chars':'');
+    if(d.stage==='waiting') bump(8); else if(d.stage==='thinking') bump(12+Math.min(25,(d.thought||0)/120));
+    else if(d.stage==='writing') bump(38+Math.min(50,(d.chars||0)/70)); else bump(90);
     if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');});
-  es.addEventListener('done',e=>{es.close(); const d=JSON.parse(e.data);
-    $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)';
+  es.addEventListener('done',e=>{es.close(); ended=true; clearInterval(clock); const d=JSON.parse(e.data);
+    $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)'; $('clock').textContent='';
+    if(view==='loading'){ target=shown=100; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; }
     $('result').innerHTML='<p><a href="'+appLink(d.link)+'">open it</a> · <a href="#" id="again">another one</a></p>';
     $('again').onclick=ev=>{ev.preventDefault(); location.reload();};
     if(!qs.has('stay')) setTimeout(()=>location.href=appLink(d.link),700);});
-  es.addEventListener('failed',e=>{es.close(); $('stage').textContent='failed: '+JSON.parse(e.data).error;});
-  es.onerror=()=>{ es.close(); $('stage').textContent='connection lost (the server may have stopped)'; };
+  const fail=msg=>{ ended=true; clearInterval(clock); $('stage').textContent=msg;
+    if(view==='loading'){ $('chore').textContent=msg; const b=new URLSearchParams(qs); b.set('view','builder'); $('result').innerHTML='<p><a href="?'+b+'">open the world builder</a></p>'; } };
+  es.addEventListener('failed',e=>{es.close(); fail('failed: '+JSON.parse(e.data).error);});
+  es.onerror=()=>{ if(ended) return; es.close(); fail('connection lost (the server may have stopped)'); };
 }
 </script></body></html>`;
   return new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } });

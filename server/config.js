@@ -48,4 +48,7 @@ export const config = {
   generator: endpoint(env('GEN_BASE_URL'), env('GEN_API_KEY'), env('GEN_MODEL'), 'openai/gpt-6-luna'),
   // Start `litert-lm serve` with the server (or pass --litert).
   startLitert: env('START_LITERT') === '1',
+  // What /world/<prompt> shows while it builds: "builder" (the prompt form and
+  // live progress) or "loading" (a plain progress bar for players).
+  worldView: env('WORLD_VIEW', 'builder') === 'loading' ? 'loading' : 'builder',
 };

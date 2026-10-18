@@ -3752,7 +3752,32 @@ function setupFirstPersonLook(){
     const g=state.playerAvatar; if(g && !g.turnMove){ const yx=Math.sin(state.fpYaw), yz=Math.cos(state.fpYaw); setCharacterFacing(g,Math.abs(yx)>Math.abs(yz)?new BABYLON.Vector3(Math.sign(yx),0,0):new BABYLON.Vector3(0,0,Math.sign(yz))); }
   });
 }
+// First person: W/S held down walk smoothly along exactly where you look
+// (the view's yaw, read every frame, so the body can never lag the view and
+// walk you the old way), sliding along walls; A/D still turn a quarter.
+const fpHeld=new Set();
+const FP_KEYS={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back'};
+function fpWalk(g,dt){
+  const sign=(fpHeld.has('fwd')?1:0)-(fpHeld.has('back')?1:0);
+  if(!sign || g.turnMove || g.falling || !state.firstPerson){
+    if(g.fpWalking){ g.fpWalking=false; if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } }
+    return;
+  }
+  const yaw=state.fpYaw??0, step=Math.min(dt,.05)*2.6*sign, lp=g.logicalPos||g.root.position;
+  let x=lp.x, z=lp.z;
+  const ok=(px,pz)=>!isBlocked(px,pz) && hasGroundAt(px,pz);
+  const nx=x+Math.sin(yaw)*step, nz=z+Math.cos(yaw)*step;
+  if(ok(nx,z)) x=nx;
+  if(ok(x,nz)) z=nz;
+  if(x!==lp.x || z!==lp.z){
+    setCharacterLogicalPosition(g,new BABYLON.Vector3(x,0,z));
+    if(!g.fpWalking || g.anim!=='walk'){ g.fpWalking=true; g.anim='walk'; playRig(g,'walk',true); }
+    state.followAvatar=true;
+  } else if(g.fpWalking){ g.fpWalking=false; g.anim='idle'; playRig(g,'idle',true); }
+}
 function setupPlayerControls(){
+  window.addEventListener('keyup',e=>{ const a=FP_KEYS[e.key.toLowerCase()]; if(a) fpHeld.delete(a); });
+  window.addEventListener('blur',()=>fpHeld.clear());
   window.addEventListener('keydown',e=>{
     const g=state.playerAvatar; if(!g) return;
     const tag=(e.target?.tagName||'').toLowerCase();
@@ -3765,8 +3790,7 @@ function setupPlayerControls(){
     if(state.firstPerson){
       if(act==='left') return turnPlayer(1);
       if(act==='right') return turnPlayer(-1);
-      const f=fpForward();
-      return playerStep(act==='fwd'?f:f.scale(-1));
+      fpHeld.add(act); return;   // walked each frame in updateFirstPersonView
     }
     playerStep(cameraCardinal(act==='fwd'?'fwd':act));
   });
@@ -3799,6 +3823,14 @@ function setFirstPerson(on){
     sc.activeCamera=state.camera;
     try{ state.camera.attachControl(canvas,true); }catch{}
     if(g){ g.rigRoot?.setEnabled(true); g.playerRing?.setEnabled(true); }
+    fpHeld.clear();
+    // Free walking leaves you between cells: step onto the nearest one.
+    const lp=g?.logicalPos, cx=lp&&Math.round(lp.x), cz=lp&&Math.round(lp.z);
+    if(lp && !g.turnMove && (Math.abs(lp.x-cx)>.01 || Math.abs(lp.z-cz)>.01)){
+      const keep=g.dir.clone();
+      if(cellPassable(cx,cz)) startTurnMove(g,new BABYLON.Vector3(cx-lp.x,0,cz-lp.z).normalize(),Math.hypot(cx-lp.x,cz-lp.z));
+      setCharacterFacing(g,keep);
+    } else if(g) setCharacterFacing(g,g.dir);
   }
   updateFirstPersonButton();
 }
@@ -3806,8 +3838,10 @@ function updateFirstPersonView(dt){
   const g=state.playerAvatar; if(!state.firstPerson || !g || !fpCam) return;
   const s=g.root.scaling.y||.87, p=g.root.position;
   fpCam.position.set(p.x,p.y+(g.eyeHeight||.92*s/.87),p.z);
-  // Keep the body facing where you look once a step has finished.
-  if(!g.turnMove){ const f=fpForward(); if(f.x!==g.dir.x || f.z!==g.dir.z) setCharacterFacing(g,f); }
+  fpWalk(g,dt);
+  // The body faces where you look (exactly; g.dir keeps the grid direction
+  // the game logic uses).
+  if(!g.turnMove){ const f=fpForward(); if(f.x!==g.dir.x || f.z!==g.dir.z) setCharacterFacing(g,f); g.root.rotation.y=Math.atan2(-Math.sin(state.fpYaw??0),-Math.cos(state.fpYaw??0)); }
   // Look direction is free (mouse drag); the avatar faces its grid-snapped
   // version, so W walks where you look.
   let d=(state.fpYaw??0)-fpCam.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));

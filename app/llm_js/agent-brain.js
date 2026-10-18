@@ -8,7 +8,7 @@ import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from 
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261018a';
-import { OpenAI, collect } from './openai-client.js?v=20261020b';
+import { OpenAI, collect } from './openai-client.js?v=20261021a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired

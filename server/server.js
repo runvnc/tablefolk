@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
 // Tablefolk server (Bun).
 //
-//   bun server/server.js [port] [--litert]
+//   bun server/server.js [port] [--litert] [--world-loading]
 //
 // Serves the project's static files (the app at /app/), and:
 //   /api/llm/v1/...     OpenAI-compatible proxy for the characters' "endpoint"
 //                       brain (LLM_* settings; the key never reaches the page)
 //   /api/local/v1/...   the same, to litert-lm serve on this machine
-//   /world/<prompt>     writes a scenario from a prompt and opens it
+//   /world/<prompt>     writes a scenario from a prompt and opens it (the
+//                       builder page, or with --world-loading / WORLD_VIEW=loading
+//                       a plain loading screen; ?view= overrides per link)
 //   /api/generate       the generator itself (JSON or a server-sent-event stream)
 //   /api/status         what is configured (never keys)
 // See server/config.js for the settings.
@@ -19,6 +21,7 @@ import { handleWorld, handleGenerate } from './generate.js';
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
 if (args.includes('--litert')) config.startLitert = true;
+if (args.includes('--world-loading')) config.worldView = 'loading';
 
 function headersFor(path) {
   const h = {

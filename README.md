@@ -111,7 +111,10 @@ Besides the static files it serves:
   rooms by role), `?mode=grid` (ASCII map), `?mode=map` (layout lines), or
   the default `auto`. `?endpoint=local` uses `litert-lm serve` (Gemma 4 E4B),
   `?model=` any other model; `?art=1` / `?brain=endpoint` are passed on to the
-  app. Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
+  app. The page is the world builder (prompt form, live progress); start the
+  server with `--world-loading` (or `WORLD_VIEW=loading`) to show players a
+  plain loading screen with a progress bar instead (`?view=builder|loading`
+  picks per link). Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
   `openai/gpt-6-luna` on OpenRouter). Timings seen: 6-14 s with gpt-6-luna,
   ~22 s with local E4B on an RTX 2060. Every result is saved in `generated/`.
   `/api/generate?prompt=...` returns the JSON (`&stream=1` for progress events).
