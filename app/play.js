@@ -274,5 +274,49 @@
     else if (k === 'i') { e.preventDefault(); window.tablefolkTabs?.toggle?.('adventurer'); render(); }
   });
 
-  window.tablefolkPlay = { use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, fighterTurn, get busy() { return busy; } };
+  // ---------------------------------------------------------------- messages
+  // Everything the game said (speech, fights, loot), for the Messages pane:
+  // toasts vanish, this keeps the last 300 lines. Engine chatter is left out.
+  const NOISE = /^(turn \d|selected |KayKit|.*rig anims|v8 real prop|world state|layout|loaded |rigged character|.* walks (toward|\d)|.* blocked walking|generated character|agent brains|scenario )/i;
+  const history = [];
+  function remember(text) {
+    const t = String(text || '').trim(); if (!t || NOISE.test(t)) return;
+    const kind = /attack|hits|misses|defeated|strikes|health/i.test(t) ? 'fight' : /picks up|opens|takes|gold|found/i.test(t) ? 'loot' : /^[\w-]+: /.test(t) ? 'talk' : 'info';
+    history.push({ t: Date.now(), text: t, kind }); if (history.length > 300) history.shift();
+    renderMessages();
+  }
+  function renderMessages() {
+    const box = document.getElementById('msgPane'); if (!box || !box.offsetParent) return;
+    const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.innerHTML = history.length ? history.map(m => `<div class="msg m-${m.kind}"><time>${new Date(m.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>${esc(m.text)}</div>`).join('') : '<p class="pane-note">Nothing has happened yet.</p>';
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  }
+
+  // ---------------------------------------------------------------- hurt, defeat
+  function hurtFlash() {
+    let el = document.getElementById('hurtFlash');
+    if (!el) { el = document.createElement('div'); el.id = 'hurtFlash'; document.body.appendChild(el); }
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  }
+  window.addEventListener('tablefolk-defeated', e => {
+    if (e.detail?.id !== 'player') return;
+    remember('You were defeated by ' + e.detail.by + '.');
+    // a scenario with a "player_defeated" lose condition shows its own ending
+    setTimeout(() => {
+      if (!document.getElementById('scenarioEnd')?.hidden) return;
+      let el = document.getElementById('defeatCard');
+      if (!el) { el = document.createElement('div'); el.id = 'defeatCard'; el.className = 'scn-overlay'; document.body.appendChild(el); }
+      el.innerHTML = `<div class="scn-card"><h2>You were defeated</h2><p>${esc(e.detail.by)} struck you down.</p><div class="scn-actions">
+        <button type="button" data-d="restart">try again</button><button type="button" data-d="close">look around</button></div></div>`;
+      el.hidden = false;
+      el.onclick = ev => {
+        const b = ev.target.closest('button'); if (!b) return;
+        el.hidden = true;
+        const a = window.tablefolkScenario?.active;
+        if (b.dataset.d === 'restart' && a) window.tablefolkScenario.playScenario(a.scn, { code: a.code });
+      };
+    }, 700);
+  });
+
+  window.tablefolkPlay = { remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, fighterTurn, get busy() { return busy; } };
 })();

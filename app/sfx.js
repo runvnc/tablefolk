@@ -52,27 +52,44 @@
     o.connect(g); o.start(t); o.stop(t + dur + .05);
     return { o, g };
   }
-  // A hinge creak: a buzzy tone whose pitch wanders, through a resonant filter.
-  function creak(out, t, dur, base) {
-    const o = ctx.createOscillator(); o.type = 'sawtooth';
-    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = base * 4; f.Q.value = 6;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.16, t + .04);
-    let k = t;
-    o.frequency.setValueAtTime(base, t);
-    while (k < t + dur) { k += .03 + Math.random() * .05; o.frequency.linearRampToValueAtTime(base * (.75 + Math.random() * .7), k); g.gain.linearRampToValueAtTime(.06 + Math.random() * .14, k); }
-    g.gain.exponentialRampToValueAtTime(.001, t + dur + .05);
-    o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .1);
+  // A wooden creak: stick-slip friction, a train of tiny clicks whose rate
+  // wanders (rate0 -> rate1 per second), each ringing a resonant body (the
+  // door's wood, around `body` Hz). Rendered sample by sample into a buffer.
+  function creak(out, t, dur, { rate0 = 28, rate1 = 70, body = 950, gain = .35 } = {}) {
+    const sr = ctx.sampleRate, n = Math.floor(dur * sr), buf = ctx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    let next = 0, ring = 0, ph = 0, f = body;
+    for (let i = 0; i < n; i++) {
+      const u = i / n;
+      if (i >= next) {
+        const rate = (rate0 + (rate1 - rate0) * u) * (.75 + Math.random() * .5);
+        next = i + sr / rate; ring = .6 + Math.random() * .4; f = body * (.85 + Math.random() * .3);
+      }
+      ph += 2 * Math.PI * f / sr;
+      const env = Math.min(1, u * 12) * Math.min(1, (1 - u) * 5);
+      d[i] = (Math.sin(ph) * ring + (Math.random() * 2 - 1) * ring * .25) * env;
+      ring *= .9975;
+    }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = body; f1.Q.value = 1.4;
+    const g = ctx.createGain(); g.gain.value = gain;
+    src.connect(f1); f1.connect(g); g.connect(out); src.start(t);
+  }
+  // latch: a sharp little metal tick
+  function latch(out, t, gain = .5) {
+    noise(t, .035, { type: 'highpass', freq: 2500, gain, attack: .001 }).connect(out);
+    tone(t, .05, { wave: 'triangle', f0: 2600, f1: 1800, gain: gain * .5, attack: .001 }).g.connect(out);
   }
 
   const SOUNDS = {
-    doorOpen(out, t) { creak(out, t, .55, 90 + Math.random() * 40); noise(t, .08, { type: 'lowpass', freq: 600, gain: .25 }).connect(out); },
+    doorOpen(out, t) { latch(out, t); creak(out, t + .03, .5, { rate0: 22, rate1: 55, body: 820 + Math.random() * 200 }); },
     doorClose(out, t) {
-      creak(out, t, .18, 120);
-      const th = t + .16;
-      noise(th, .22, { type: 'lowpass', freq: 380, q: .7, gain: .9 }).connect(out);
-      tone(th, .2, { f0: 95, f1: 45, gain: .55 }).g.connect(out);
+      creak(out, t, .14, { rate0: 50, rate1: 70, body: 1000, gain: .2 });
+      const th = t + .12;
+      noise(th, .2, { type: 'lowpass', freq: 320, q: .7, gain: 1, attack: .002 }).connect(out);
+      tone(th, .16, { f0: 110, f1: 55, gain: .5, attack: .002 }).g.connect(out);
+      latch(out, th + .05, .35);
     },
-    chestOpen(out, t) { creak(out, t, .35, 150); noise(t + .3, .12, { type: 'lowpass', freq: 500, gain: .4 }).connect(out); },
+    chestOpen(out, t) { latch(out, t, .4); creak(out, t + .04, .32, { rate0: 35, rate1: 60, body: 1300, gain: .25 }); },
     coins(out, t) {
       for (let i = 0; i < 7; i++) {
         const k = t + i * .045 + Math.random() * .03;

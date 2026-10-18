@@ -3,8 +3,9 @@
  *   wield(item)     hold a weapon from your inventory ("none" puts it away)
  *   attack(target)  strike a character next to you (an id, or "player")
  *
- * Every character has hit points (scenario agent "hp", default 10; the player
- * "player": {"hp": 10}). Damage is the weapon's (fists 1, dagger/club 2,
+ * Every character has hit points (scenario agent "hp", default 10, monsters
+ * less or more by kind; the player "player": {"hp": 20}). Damage is the
+ * weapon's (fists 1, the player's 2, dagger/club 2,
  * sword/axe/mace 3, greatsword/warhammer 4) plus a small roll, with a chance
  * to miss. At 0 a character is defeated: it falls, stops acting, and drops
  * what it wielded. The struck character hears about it at once (and answers,
@@ -29,7 +30,7 @@
   const weaponFor = name => { for (const [re, w] of WEAPONS) if (re.test(name || '')) return { ...w, name }; return null; };
   // Monsters fight with what they are (model, see FIGURES in app.js).
   const NATURAL = {
-    skeleton: { dmg: 2, name: 'rusty blade' }, skeleton_warrior: { dmg: 3, name: 'notched sword' }, zombie: { dmg: 2, name: 'rotting claws' },
+    skeleton: { dmg: 2, name: 'bony claws' }, skeleton_warrior: { dmg: 2, name: 'notched sword' }, zombie: { dmg: 2, name: 'rotting claws' },
     rat: { dmg: 1, name: 'teeth' }, spider: { dmg: 2, name: 'venomous fangs' }, wolf: { dmg: 2, name: 'fangs' }, bat: { dmg: 1, name: 'fangs' },
     slime: { dmg: 1, name: 'acid' }, ghost: { dmg: 2, name: 'chilling touch' }, giant: { dmg: 4, name: 'huge fists' }, demon: { dmg: 3, name: 'claws' },
     dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
@@ -38,11 +39,11 @@
   // ------------------------------------------------------------ hit points
   const isPlayer = g => g && g === state.playerAvatar;
   function hpOf(g) {
-    if (isPlayer(g) || g === 'player') { const p = state.player; p.maxHp ??= 10; p.hp ??= p.maxHp; return { hp: p.hp, max: p.maxHp }; }
+    if (isPlayer(g) || g === 'player') { const p = state.player; p.maxHp ??= 20; p.hp ??= p.maxHp; return { hp: p.hp, max: p.maxHp }; }
     const c = getBrainConfig(g.id); c.maxHp ??= 10; c.hp ??= c.maxHp; return { hp: c.hp, max: c.maxHp };
   }
   function setHp(g, hp) {
-    if (isPlayer(g) || g === 'player') { state.player.hp = Math.max(0, Math.min(state.player.maxHp ?? 10, hp)); renderPlayerHp(); return; }
+    if (isPlayer(g) || g === 'player') { state.player.hp = Math.max(0, Math.min(state.player.maxHp ?? 20, hp)); renderPlayerHp(); return; }
     const c = getBrainConfig(g.id); setBrainConfig(g.id, { hp: Math.max(0, Math.min(c.maxHp ?? 10, hp)) });
   }
   function itemsOf(g) { return isPlayer(g) ? state.player.items : (charInventory(g).items || []); }
@@ -169,7 +170,7 @@
     const d = gap(g, v);
     if (d > REACH) { narrate(g, `attack failed: ${nameOf(v)} is ${d.toFixed(1)} cells away; walk next to them first`); if (isPlayer(g)) window.tablefolkToast?.(`${nameOf(v)} is too far away`, { type: 'error' }); return; }
     const nat = !isPlayer(g) && NATURAL[g.charModel];
-    const wName = wielded(g), w = (wName && weaponFor(wName)) || (wName ? { dmg: 2, kind: 'club', name: wName } : nat ? { ...nat, kind: 'natural' } : { dmg: 1, kind: 'fists', name: 'fists' });
+    const wName = wielded(g), w = (wName && weaponFor(wName)) || (wName ? { dmg: 2, kind: 'club', name: wName } : nat ? { ...nat, kind: 'natural' } : { dmg: isPlayer(g) ? 2 : 1, kind: 'fists', name: 'fists' });
     // face the target and swing
     try { setCharacterFacing(g, new BABYLON.Vector3(v.root.position.x - g.root.position.x, 0, v.root.position.z - g.root.position.z).normalize()); } catch {}
     const clip = w.kind === 'fists' ? ['Melee_Unarmed_Attack_Punch_A', 'Melee_Unarmed_Attack_Kick'] : w.two ? ['Melee_2H_Attack_Chop', 'Melee_2H_Attack_Slice'] : w.kind === 'dagger' || w.kind === 'spear' ? ['Melee_1H_Attack_Stab'] : ['Melee_1H_Attack_Chop', 'Melee_1H_Attack_Slice_Diagonal', 'Melee_1H_Attack_Slice_Horizontal'];
@@ -185,6 +186,7 @@
       if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${wThe} and misses`); tellVictim(v, `[event] ${who} attacks you with ${wA} and misses!`); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} and misses.`); return; }
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
+      if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
       playClip(v, ['Hit_A', 'Hit_B'], 500);
       if (!left) {
         narrate(g, `${who} hits ${whom} with ${wThe} for ${dmg}: ${whom} is defeated`);
@@ -204,6 +206,7 @@
     if (!v || v.defeated || dmg <= 0) return 0;
     const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg), whom = nameOf(v);
     setHp(v, left); floatText(v, '-' + dmg);
+    if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
     playClip(v, ['Hit_A', 'Hit_B'], 500);
     if (!left) { defeat(v, by); tellWitnesses({ root: { position: v.root.position } }, v, `[event] ${by} strikes down ${whom}${how ? ' with ' + how : ''}.`); }
     else tellVictim(v, `[event] ${by} hits you${how ? ' with ' + how : ''}! You lose ${dmg} health (${left}/${max} left).`);
@@ -293,7 +296,7 @@
 
   // A new world (scenario start) resets the player's health and weapon.
   function reset() {
-    state.player.maxHp = +state.player.maxHp || 10; state.player.hp = state.player.maxHp; state.player.wielding = null;
+    state.player.maxHp = +state.player.maxHp || 20; state.player.hp = state.player.maxHp; state.player.wielding = null;
     renderPlayerHp();
   }
 

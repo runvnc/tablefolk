@@ -33,7 +33,7 @@ const state = {
   turn:{index:0, phase:'ready', command:null, resolveMs:200, lastEndedAt:0, mode:true}, globalHistory:[], nextAgentId:null,
   brainConfigs:new Map(), player:{gold:100,items:[]}, saveKey:'tablefolkState', nextSpawnId:1, spawnMode:{enabled:false, type:'critter'}
 };
-function log(s){ const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected '); if(!muted) window.tablefolkToast?.(s,{type:'info'}); }catch{} }
+function log(s){ try{ window.tablefolkPlay?.remember(s); }catch{} const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected '); if(!muted) window.tablefolkToast?.(s,{type:'info'}); }catch{} }
 function pickRandom(a){ return a[Math.floor(Math.random()*a.length)] }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 // Dev escape hatch: ?norender=1 skips the render loop entirely (animate() and
@@ -3660,6 +3660,20 @@ function disposeOwnMaterial(m){
 const AVATAR_MODELS={rogue:'Rogue_Hooded.glb',knight:'Knight.glb',mage:'Mage.glb',ranger:'Ranger.glb',barbarian:'Barbarian.glb',woman:'Rogue.glb'};
 const MODEL_LOOKS={woman:{texture:'rogue_modern.png?v=20261018a',hide:/Cape/}};
 const PERSON_H=1.3;
+// Voices: a character without "ttsVoiceId" gets one that fits its body
+// (female or male), the same one every time for the same id. Genders and
+// descriptions come from the server's /api/voices (set on its admin page),
+// else these defaults.
+const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch']);
+const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
+fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
+function defaultVoiceFor(id,model){
+  const want=FEMALE_MODELS.has(model)?'female':'male';
+  const cat=window.TABLEFOLK_VOICES||Object.entries(VOICE_GENDER).map(([id,gender])=>({id,gender}));
+  const pool=cat.filter(v=>v.gender===want).map(v=>v.id); if(!pool.length) return null;
+  let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0;
+  return 'builtin:'+pool[h%pool.length];
+}
 // Figures: Quaternius characters and monsters (assets/models/characters/
 // quaternius/, CC0/CC-BY, see LICENSE.txt there). Each GLB brings its own
 // clips; FIG_CLIPS maps them onto the KayKit clip names the rest of the code
@@ -4163,7 +4177,7 @@ function installWorldAPI(){
     // scenario support (scenario.js)
     WORLD, ITEM_CATALOG, hasGroundAt, setWorldSize, rebuildBoard, sceneryAt, sceneryAnchors, spawnAgent, makeObject, getObjects, selectCharacter, inventoryChanged,
     findItem:(items,name)=>findItem(items||[],name),
-    setPlayer:p=>{ state.player={gold:Number(p?.gold)||0,items:Array.isArray(p?.items)?p.items.map(i=>({name:String(i.name),qty:i.qty??1})):[]}; const n=document.getElementById('chatName'); if(n && p?.name) n.value=p.name; renderPlayerInventory(); },
+    setPlayer:p=>{ state.player={gold:Number(p?.gold)||0,items:Array.isArray(p?.items)?p.items.filter(i=>i!=null&&(typeof i==='string'||i.name)).map(i=>typeof i==='string'?{name:i,qty:1}:{name:String(i.name),qty:i.qty??1}):[]}; const n=document.getElementById('chatName'); if(n && p?.name) n.value=p.name; renderPlayerInventory(); },
     setAllowed:list=>{ state.allowed=new Set(list||[]); updatePerceptionUI(); },
     setPathfinding:on=>{ state.pathfinding=on!==false; }, findRoute,
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
@@ -4176,6 +4190,7 @@ function installWorldAPI(){
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),
     stepAgentTurn:beginTurnForAgent,
     isTurnReady:()=>state.turn.phase==='ready',
+    defaultVoiceFor,
     spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, restoreWorldState,
   };
 }

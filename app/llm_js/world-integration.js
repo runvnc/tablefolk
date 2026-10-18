@@ -569,6 +569,8 @@ async function main() {
   async function runOneAgentTurn(g) {
     const cfg = world.getBrainConfig(g.id);
     if (cfg.enabled === false || cfg.defeated) return false;
+    // hostile monsters fight with play.js's routine and never talk
+    if (window.tablefolkPlay?.isHostile(g)) return false;
     if (!world.isTurnReady()) { return false; }
     // Inside a workflow (workflows.js), the workflow drives the turn: it asks
     // the model narrow questions and runs the resulting command.
@@ -775,8 +777,10 @@ async function main() {
         // Someone was just spoken to: they answer before the round continues.
         const g = agents.find(a => world.getBrainConfig(a.id).pendingChat?.length) || g0;
         world.state.nextAgentId = g.id;
-        await runOneAgentTurn(g);
+        // a skipped turn (hostile, defeated) returns at once: yield, or the loop spins
+        if (!(await runOneAgentTurn(g))) await sleep(100);
       }
+      await sleep(0);
     }
   });
 

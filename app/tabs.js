@@ -37,6 +37,7 @@
     for (const b of document.querySelectorAll('#rail .rail-btn')) b.classList.toggle('active', b.dataset.tab === name);
     try { localStorage.setItem(KEY, name); localStorage.setItem(LAST, name); } catch {}
     if (name === 'adventurer') try { window.tablefolkPlay?.render(); } catch {}
+    if (name === 'messages') try { window.tablefolkPlay?.renderMessages(); } catch {}
   }
 
   function hide() {

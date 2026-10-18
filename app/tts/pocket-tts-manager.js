@@ -18,7 +18,7 @@
     status(text,state='idle'){ this.dispatchEvent(new CustomEvent('status',{detail:{text,state}})); }
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
-    voices(){ return BUILTINS.map(id=>({id:`builtin:${id}`,name:id})).concat([...this.custom.values()].map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
+    voices(){ const cat=window.TABLEFOLK_VOICES||[]; return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat([...this.custom.values()].map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
     async ensureAudio(){ if(!this.audioCtx){
       // 'interactive' asks Chrome for the smallest possible hardware audio
       // buffer (lowest latency, e.g. for synths/games where every ms

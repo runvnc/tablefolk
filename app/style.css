@@ -420,3 +420,14 @@ body.panel-open #rail .rail-toggle svg { transform:rotate(180deg); }
 /* toasts sit beside the panel, not on it */
 #toastStack { transition:left .18s ease; }
 body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
+/* ---- Messages pane, hurt flash (play.js) ---- */
+#msgPane { font-size:12.5px; line-height:1.45; max-height:calc(100vh - 160px); overflow-y:auto; }
+#msgPane .msg { padding:4px 6px; border-radius:7px; margin:2px 0; color:#e3ece0; }
+#msgPane .msg time { color:#8e9c8b; font:10px ui-monospace,monospace; margin-right:7px; }
+#msgPane .m-fight { background:rgba(224,80,60,.12); }
+#msgPane .m-loot { background:rgba(255,209,102,.10); }
+#msgPane .m-talk { background:rgba(159,232,200,.07); }
+#hurtFlash { position:fixed; inset:0; z-index:90; pointer-events:none; opacity:0; box-shadow:inset 0 0 140px 40px rgba(200,20,10,.75); }
+#hurtFlash.on { animation:hurt .45s ease-out; }
+@keyframes hurt { 0% { opacity:1; } 100% { opacity:0; } }
+#defeatCard[hidden] { display:none; }

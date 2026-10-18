@@ -894,6 +894,8 @@
       if (d) o.ry = Math.atan2(d[0], d[1]);
     }
   }
+  // Hit points for monsters without "hp" (combat.js NATURAL has their damage).
+  const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, orc: 10, demon: 14, giant: 18, dragon: 24 };
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
     const base = normalizeScenario(input);
@@ -923,7 +925,7 @@
     w.setAllowed(scn.allowed);
     w.setLighting?.(scn.lighting);
     w.setPlayer(scn.player);
-    if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 10); window.tablefolkCombat.reset(); }
+    if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 20); window.tablefolkCombat.reset(); }
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
     const holes = [...finalMat.values()].filter(c => c.mat === 'sea');
@@ -963,10 +965,10 @@
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
-        ...(a.ttsVoiceId ? { ttsVoiceId: a.ttsVoiceId } : {}), ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
+        ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
-        maxHp: Math.max(1, +a.hp || 10), hp: Math.max(1, +a.hp || 10), wielding: null, defeated: false,
+        maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), wielding: null, defeated: false,
         // play.js: hostile characters fight with a built-in routine, no LLM
         // (unset: mindless monster models are hostile, everyone else talks)
         ...(a.hostile != null ? { hostile: !!a.hostile } : { hostile: undefined }),
