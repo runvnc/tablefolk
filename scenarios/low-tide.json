@@ -4,11 +4,25 @@
   "intro": "You came in on the night boat. Your contact on the docks is waiting for the words \"low tide\". Get the silk bundle past customs.",
   "seed": 1,
   "base": "plain",
+  "size": [
+    11,
+    9
+  ],
   "lighting": "night",
-  "walls": "tabletop",
   "campfire": false,
-  "player": { "name": "Traveller", "gold": 10, "items": [], "model": "ranger" },
-  "allowed": ["say", "walk", "face", "emote", "give"],
+  "player": {
+    "name": "Traveller",
+    "gold": 10,
+    "items": [],
+    "model": "ranger"
+  },
+  "allowed": [
+    "say",
+    "walk",
+    "face",
+    "emote",
+    "give"
+  ],
   "agents": [
     {
       "id": "hale",
@@ -24,14 +38,22 @@
       "style": "jumpy dockhand and smuggler",
       "ttsVoiceId": "builtin:marius",
       "facing": "n",
-      "personality": "Bram, a dockhand and secretly a smuggler. You are holding a silk bundle for a buyer who will say the password \"low tide\". Only give it to someone who says the password, with give(silk bundle); act like an innocent dockhand with everyone else. You will not carry it past Officer Hale yourself; he watches you. If the buyer asks for help, you can walk to Hale and distract him with a made-up story about a fight on the docks."
-      ,"inventory": { "gold": 3, "items": [{ "name": "silk bundle", "qty": 1 }] }
+      "personality": "Bram, a dockhand and secretly a smuggler. You are holding a silk bundle for a buyer who will say the password \"low tide\". Only give it to someone who says the password, with give(silk bundle); act like an innocent dockhand with everyone else. You will not carry it past Officer Hale yourself; he watches you. If the buyer asks for help, you can walk to Hale and distract him with a made-up story about a fight on the docks.",
+      "inventory": {
+        "gold": 3,
+        "items": [
+          {
+            "name": "silk bundle",
+            "qty": 1
+          }
+        ]
+      }
     }
   ],
   "grid": [
-    "~~~~~~~~~~~",
-    "~~~~~y~~~~~",
-    "~~~~~=~~~~~",
+    "--q-----q--",
+    "-----y-----",
+    "-----=-----",
     ":CC.2=::BB:",
     ":C.......B:",
     "#####1#####",
@@ -39,11 +61,42 @@
     "..L.....L..",
     ".....N....."
   ],
-  "legend": { "y": "player on wood", "N": "note \"Rivermouth - town road\"" },
+  "legend": {
+    "y": "player on wood",
+    "N": "note \"Rivermouth - town road\""
+  },
   "goal": {
     "text": "Get the silk bundle from Bram and carry it to the town road sign, south of the customs gate.",
-    "win": { "all": [ { "player_has": "silk" }, { "agent_near": ["player", [0, 4], 1.5] } ] },
-    "lose": { "any": [ { "said": ["hale", "arrest"] }, { "turns_over": 20 } ] },
+    "win": {
+      "all": [
+        {
+          "player_has": "silk"
+        },
+        {
+          "agent_near": [
+            "player",
+            [
+              0,
+              4
+            ],
+            1.5
+          ]
+        }
+      ]
+    },
+    "lose": {
+      "any": [
+        {
+          "said": [
+            "hale",
+            "arrest"
+          ]
+        },
+        {
+          "turns_over": 20
+        }
+      ]
+    },
     "winText": "The town swallows you up, silk safely under your coat.",
     "loseText": "Hale's hand lands on your shoulder. The silk goes in the harbour ledger.",
     "score": "turns_left"

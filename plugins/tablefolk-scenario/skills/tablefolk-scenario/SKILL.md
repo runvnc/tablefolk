@@ -56,11 +56,12 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "subtitle": "",                  // banner text for open scenarios (no goal)
   "intro": "Mog runs the only shop on the island.",   // shown on load
   "seed": 7,                       // layout randomness; same JSON + seed = same map
-  "base": "island",                // island | clearing | dungeon | plain
+  "base": "plain",                 // plain (blank board, default) | island | clearing | dungeon
+  "size": [23, 17],                // board cells [cols, rows], odd, 5-63 (default 23x17)
   "lighting": "bright",            // or "night"
   "walls": "tabletop",             // or "modern" (painted panels) | "block"
   "floor": "stone",                // optional: paint the whole floor (materials below)
-  "campfire": true,                // false hides the campfire (indoor scenes)
+  "campfire": true,                // island: false drops its campfire; plain: true adds one
   "pathfinding": true,             // false: walks go straight and stop at walls (maze puzzles)
   "safety": false,                 // true: crisis-line banner if a message mentions self-harm
   "player": { "name": "Traveller", "gold": 20, "items": [], "at": [0, 3] },
@@ -104,12 +105,20 @@ write it in plain second-person-friendly sentences, state hard facts (prices,
 secrets, what it will and won't do) explicitly, and mention commands by name
 when the character should use them ("Use give() to hand something over.").
 
-### Coordinates
+### The board and coordinates
 
-Grid cells around the centre (0, 0): x -5..5, z -4..4 (the world is 12 x 10 tiles; x = ±6 or z = ±5 is the cliff edge) (`plain`,
-`clearing` and `dungeon` use the island's flat top). **north = -z, south = +z,
-east = -x, west = +x.** The player starts at the south by default. Wide items
-(`table bench workbench desk sofa`) take two cells.
+The world is a board of 1x1 tiles standing in the sea, `"size": [cols, rows]`
+cells (odd numbers). Cells run from -(cols-1)/2 to (cols-1)/2 in x and
+likewise in z, around the centre (0, 0); with the default 23 x 17, x -11..11
+and z -8..8. `sea` cells are holes: that's how you draw coasts and islands.
+**north = -z, south = +z, east = -x, west = +x.** The player starts at the
+south by default. Wide items (`table bench workbench desk sofa`) take two
+cells, a house about 2x2.
+
+`base: "island"` gives a ready 15 x 13 island (grass, trees, house, boulders,
+fence, lantern, campfire, flowers) as ordinary objects to build on;
+`"clearing"` the same land with only the campfire; `"dungeon"` a stone floor
+and a ring of walls. The default `"plain"` is the blank board.
 
 ### Objects (`objects[].type` and map-line things)
 
@@ -118,7 +127,13 @@ east = -x, west = +x.** The player starts at the south by default. Wide items
   pickaxe bucket bag potion scroll coin_pile apple_crate carrot_crate`
 - modern: `desk office_chair armchair sofa coffee_table floor_lamp plant
   bookshelf` (front faces south; `ry` turns them)
-- scenery refs (exist on `island`, not placeable): `house`, `campfire`
+- outdoors: `tree house boulder campfire lantern fence signpost` (solid),
+  `flowers grass_tuft lily_pad` (decoration: no collision, characters don't
+  see them; lily pads float on sea cells), `fence` is one cell along x (`ry`
+  1.5708 turns it north-south)
+- `light`: an invisible point light, `{"type": "light", "x": 2, "z": -1,
+  "color": "#ffb060", "intensity": 3, "range": 6, "y": 2}`. Campfires and
+  lanterns light themselves; add lights for lamps, windows, magic.
 
 The authoritative list is the core pack, `assets/pack.json` in the repo
 (item types, sizes, aliases); read it when unsure. More types can come from
@@ -131,7 +146,8 @@ built-in ones. Format: `docs/SCENARIOS.md` section 4c; minimal example:
 ### Floor materials (`floor`, `paint`, map `paint`)
 
 `stone flagstone dirt wood sand grass water lava` and modern `oak tile
-concrete carpet`. Water and lava block walking and placement.
+concrete carpet`. Water and lava block walking and placement. `sea` removes
+the tile (a hole to the sea; walking onto it is a fall).
 
 ### Commands (`allowed`)
 
@@ -156,10 +172,13 @@ models behave. `say` is almost always wanted; add `walk` for movement, `give`
 "legend": { "R": "carpet", "x": "chest on stone", "N": "note \"Quiet please\"" }
 ```
 
-One glyph per cell, **top row = north, left = west**, centred on the board
-(**max 11 wide x 9 tall**; anything bigger puts its outer ring on the cliff
-edge, and a player spawned there walks off into the sea; odd sizes centre exactly). `.` = empty. Defaults: floors `~` water `,` grass `:`
-dirt `^` stone `&` lava `=` wood `_` oak; objects `#` wall `C` crate `B` barrel
+One glyph per cell, **top row = north, left = west**, centred on the board;
+odd sizes centre exactly. Without `"size"` the board is the grid plus two cells
+on every side (or exactly the grid if its outer ring is all `-` sea). `.` =
+empty. Defaults: floors `~` water (a pond) `,` grass `:` dirt `^` stone `&`
+lava `=` wood `_` oak, `-` sea (a hole); outdoors `%` tree `H` house `r`
+boulder `X` campfire `f` fence `I` signpost `j` lantern `*` flowers `;`
+grass_tuft `q` lily_pad; objects `#` wall `C` crate `B` barrel
 `M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
 stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`
 bag `P` potion `S` scroll `$` coin_pile `D` desk `c` office_chair `A` armchair

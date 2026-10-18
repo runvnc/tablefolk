@@ -43,8 +43,14 @@ def check(obj):
             problems.append(f'object {o!r} needs "type", numeric "x" and "z"')
     grid = obj.get('grid') or []
     if isinstance(grid, str): grid = grid.split('\n')
-    if len(grid) > 9 or any(len(r) > 11 for r in grid):
-        problems.append(f'"grid" is {max(map(len, grid), default=0)} wide x {len(grid)} tall; the board fits 11 x 9 (larger grids put their outer ring on the cliff edge)')
+    size = obj.get('size')
+    if size is not None and not (isinstance(size, list) and len(size) == 2 and all(isinstance(n, int) and 5 <= n <= 63 for n in size)):
+        problems.append('"size" must be [cols, rows], whole numbers 5-63 (odd numbers centre exactly)')
+    gw, gh = max(map(len, grid), default=0), len(grid)
+    if gw > 63 or gh > 63:
+        problems.append(f'"grid" is {gw} x {gh}; the board is at most 63 x 63')
+    elif grid and isinstance(size, list) and len(size) == 2 and (gw > size[0] or gh > size[1]):
+        problems.append(f'"grid" is {gw} x {gh} but "size" is {size[0]} x {size[1]}; cells outside the board are dropped')
     if not isinstance(obj.get('map', []), list): problems.append('"map" must be a list of lines')
     return problems
 

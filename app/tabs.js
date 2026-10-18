@@ -30,9 +30,8 @@
     for (const b of document.querySelectorAll('#rail .rail-btn')) {
       b.addEventListener('click', () => show(b.dataset.tab));
     }
-    let saved = '';
-    try { saved = localStorage.getItem(KEY) || 'world'; } catch { saved = 'world'; }
-    if (saved) show(saved, { force: true });
+    // The panel starts collapsed so it never covers the world on load; the
+    // rail icons open it.
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
   }
 
@@ -50,7 +49,9 @@
     if (!rail()) return;
     initRail();
     initTtsToggle();
-    window.tablefolkTabs = { show: (n) => show(n, { force: true }), hide };
+    // showIfOpen: switch panes without opening a collapsed panel (selecting a
+    // character shows its pane only if the panel is already open).
+    window.tablefolkTabs = { show: (n) => show(n, { force: true }), showIfOpen: (n) => { if (current) show(n, { force: true }); }, hide };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

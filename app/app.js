@@ -2044,7 +2044,7 @@ function startTurnMove(g,d,distance=null){
   zeroMeshMotion(g.collider);
 }
 
-function selectCharacter(g){ state.characters.forEach(x=>x.selected=false); g.selected=true; state.selected=g; state.nextAgentId=g.id; state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); const sel=document.getElementById('agentSelect'); if(sel) sel.value=g.id; log('selected '+g.id); playRig(g,'idle',true); updatePerceptionUI(); try{ window.tablefolk?.onAgentSelected?.(g); }catch{} try{ window.tablefolkTabs?.show('character'); }catch{} }
+function selectCharacter(g){ state.characters.forEach(x=>x.selected=false); g.selected=true; state.selected=g; state.nextAgentId=g.id; state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); const sel=document.getElementById('agentSelect'); if(sel) sel.value=g.id; log('selected '+g.id); playRig(g,'idle',true); updatePerceptionUI(); try{ window.tablefolk?.onAgentSelected?.(g); }catch{} try{ window.tablefolkTabs?.showIfOpen('character'); }catch{} }
 // Show/update a streaming bubble for an agent during LLM generation.
 function showStreamingBubble(g, text) {
   let b = state.bubbles.find(x => x.streaming && x.node === g.root);

@@ -620,7 +620,7 @@
     o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
     K: 'bookshelf', Y: 'player', '@': 'player',
-    '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern', '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad' };
+    '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern', '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
   function parseGlyph(v, agentIds) {
     const str = String(v).trim();
     const note = str.match(/^note\s+"([^"]*)"$/i);
@@ -783,8 +783,8 @@
     const { x0, z0 } = gridOrigin(ISLAND.grid.length, ISLAND.grid[0].length), land = new Set(), objects = [];
     ISLAND.grid.forEach((row, r) => [...row].forEach((g, c) => {
       const x = x0 - c, z = r - z0;
-      if (g !== '-') land.add(x + ',' + z);
-      const type = GRID_GLYPHS[g];
+      const type = GRID_GLYPHS[g]?.replace(/ on sea$/, '');
+      if (g !== '-' && g !== 'q') land.add(x + ',' + z);
       if (!type || g === ',' || g === '-') return;
       if (scn.base === 'clearing' && type !== 'campfire') return;
       if (type === 'campfire' && scn.campfire === false) return;
@@ -936,7 +936,7 @@
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
-    if (!opts.testing && (scn.intro || scn.goal?.text)) showIntro(scn);
+    if (!opts.testing && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
     startChecker();
     return { scenario: base, plan };
   }
@@ -986,15 +986,20 @@
     el.innerHTML = `<button type="button" class="scn-collapse" data-scn="collapse" title="hide">–</button><div class="scn-title">🎯 ${esc(active.scn.title)}</div>`
       + (g?.text ? `<div class="scn-goal">${esc(g.text)}</div>` : (active.scn.subtitle ? `<div class="scn-goal">${esc(active.scn.subtitle)}</div>` : ''))
       + `<div class="scn-meta">turn ${turns}${max ? ' / ' + max : ''} · you have ${W().getPlayer().gold || 0} gold</div>`
-      + `<div class="scn-actions"><button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
+      + `<div class="scn-actions">${active.scn.intro || g?.text ? '<button type="button" data-scn="intro">intro</button>' : ''}<button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
   }
+  // The intro card doesn't block or blur the world; players can turn it off
+  // (remembered) and bring it back with the banner's "intro" button.
+  const INTRO_KEY = 'tablefolk.hideIntros';
+  const introsHidden = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; } };
   function showIntro(scn) {
     const el = $('scenarioEnd'); if (!el) return;
     el.hidden = false; el.className = 'scn-overlay intro';
     el.innerHTML = `<div class="scn-card"><h2>${esc(scn.title)}</h2>${scn.intro ? `<p>${esc(scn.intro)}</p>` : ''}`
       + (scn.goal?.text ? `<p class="scn-goal-big">${esc(scn.goal.text)}</p>` : '')
       + `<p class="scn-hint">Talk to them in the chat box at the bottom. The brain runs in your browser.</p>`
-      + `<div class="scn-actions"><button type="button" data-scn="close">start</button></div></div>`;
+      + `<div class="scn-actions"><button type="button" data-scn="close">start</button></div>`
+      + `<label class="scn-hint scn-nointro"><input type="checkbox" data-scn-nointro ${introsHidden() ? 'checked' : ''}> don't show intros</label></div>`;
   }
   function shareText(won, ctx) {
     const score = scoreFor(active.scn.goal, ctx, won);
@@ -1016,10 +1021,14 @@
     try { await navigator.clipboard.writeText(text); window.tablefolkToast?.(what + ' copied', { type: 'ok' }); }
     catch { prompt('Copy this:', text); }
   }
+  document.addEventListener('change', e => {
+    if (e.target.matches?.('[data-scn-nointro]')) try { localStorage.setItem(INTRO_KEY, e.target.checked ? '1' : ''); } catch {}
+  });
   document.addEventListener('click', async e => {
     const b = e.target.closest?.('[data-scn]'); if (!b) return;
     const act = b.dataset.scn;
     if (act === 'close') hideEnd();
+    if (act === 'intro' && active) showIntro(active.scn);
     if ((act === 'collapse' || act === 'expand') && active) { active.collapsed = act === 'collapse'; renderBanner(goalContext()); }
     if (act === 'closesafety') { const s = document.getElementById('scenarioSafety'); if (s) s.hidden = true; }
     if (act === 'exit') exitScenario();

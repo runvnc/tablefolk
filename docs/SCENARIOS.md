@@ -20,9 +20,10 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "intro": "Mog runs the only shop on the island.",      // shown on load
   "seed": 7,                                             // layout randomness
   "lighting": "bright",                                  // or "night" (sandbox look)
-  "base": "island",                                      // island | clearing | dungeon | plain
+  "base": "plain",                                       // plain (blank board, default) | island | clearing | dungeon
+  "size": [23, 17],                                      // board in cells, odd numbers (section 2c)
   "walls": "tabletop",                                   // or "modern" (smooth painted panels) or "block" (old short cubes)
-  "campfire": true,                                      // false hides the campfire (indoor scenes)
+  "campfire": true,                                      // island/clearing: false drops their campfire; plain/dungeon: true adds one
   "pathfinding": true,                                   // false: walks go in straight lines and stop at walls
   "floor": "stone",                                      // optional: paint the whole floor
   "paint": [{ "x": 0, "z": 0, "mat": "water" }],          // optional explicit floor tiles
@@ -76,7 +77,8 @@ floor <material>
 ```
 
 - **things**: `crate barrel mushroom lamp wall note "<text>"`, the composite
-  `counter` (a row of three wall sections), the items `chest table bench stool
+  `counter` (a row of three wall sections), outdoor pieces `tree house boulder
+  flowers grass_tuft campfire lantern light fence signpost lily_pad`, the items `chest table bench stool
   workbench cauldron anvil weapon_stand axe pickaxe bucket bag potion scroll
   coin_pile apple_crate carrot_crate`, the modern set `desk office_chair
   armchair sofa coffee_table floor_lamp plant bookshelf` (front faces south;
@@ -85,21 +87,23 @@ floor <material>
   (`stone flagstone dirt wood sand grass water lava`, modern `oak tile concrete
   carpet`; water and lava block
   walking and placement), e.g. `paint water x6 cluster at east` for a pond.
-  `floor <material>` paints the whole island. Painted patches can be refs
+  `sea` is not a floor: it removes the board tile there, so the sea shows
+  through (coasts, islands, channels; walking onto it is a fall).
+  `floor <material>` paints the whole board. Painted patches can be refs
   (`place lamp beside water`).
 - **placements**:
   - `at <area>`, where area is `center`, `north`, `south`, `east`, `west`,
     `northeast`, `northwest`, `southeast`, `southwest` or `random`
-  - `against <edge>_wall`: along that edge of the island
+  - `against <edge>_wall`: along that edge of the land
   - `beside X`, `near X`, `behind X`, `in_front_of X`, `around X`
   - arrangements, which can be combined with the above: `row`, `cluster`,
     `scattered`, e.g. `place barrel x4 row against west_wall`
-- **refs** (X): any thing placed earlier, an agent id, `player` (your avatar),
-  or fixed scenery: `house`, `campfire`. `place player ...` positions your
+- **refs** (X): any thing placed earlier (`house`, `campfire`, `tree`...), an
+  agent id or `player` (your avatar). `place player ...` positions your
   avatar (default: at south).
 - Directions follow the game's convention: north = −Z, south = +Z,
   east = −X, west = +X. "Front" of a thing is the side facing the middle of the
-  island; "behind" is the side away from it.
+  board; "behind" is the side away from it.
 
 Unknown words are ignored and reported, not fatal, because small models
 improvise.
@@ -107,10 +111,10 @@ improvise.
 ## 2b. ASCII grid
 
 `grid` draws the board directly: one glyph per cell, **top row = north, left =
-west**, centred on the board. The board fits **11 wide x 9 tall** (x -5..5, z
--4..4); a bigger grid's outer ring lands on the cliff edge, so characters there
-are moved inward and a warning is shown. Use odd sizes so the grid centres
-exactly. `.` and spaces are empty. The grid is laid down first; `objects` and `map` lines are added on top,
+west**, centred on the board. Without a `size`, the board is the grid plus two
+cells on every side, or exactly the grid when its outer ring is all sea (`-`).
+Cells outside a smaller `size` are skipped with a warning. Use odd sizes so
+the grid centres exactly. `.` and spaces are empty. The grid is laid down first; `objects` and `map` lines are added on top,
 and map lines can refer to what the grid placed (`place lamp beside water`).
 
 ```jsonc
@@ -135,6 +139,8 @@ Default glyphs (the same ones characters see in their vision map):
 | `&` lava | `=` wood | `a` anvil | `W` weapon stand | `/` axe | `p` pickaxe | `u` bucket | `b` bag |
 | `_` oak | | `P` potion | `S` scroll | `$` coins | `D` desk | `c` office chair | `A` armchair |
 | | | `F` sofa | `T` coffee table | `l` floor lamp | `v` plant | `K` bookshelf | |
+| `-` sea | | `%` tree | `H` house | `r` boulder | `X` campfire | `f` fence | `I` signpost |
+| | | `j` lantern | `*` flowers | `;` grass tuft | `q` lily pad | | |
 
 - `1`-`9` are the scenario's agents in order; `Y` (or `@`) is the player.
 - `legend` adds or overrides single-character glyphs. A value is an object
@@ -153,14 +159,35 @@ Default glyphs (the same ones characters see in their vision map):
   Whatever a glyph can't say exactly (turned or off-cell objects, tinted
   paint) stays in `objects` / `paint`, so the conversion loses nothing.
 
+## 2c. The board
+
+The world is a board of 1 x 1 tiles standing in the sea. `"size": [cols, rows]`
+sets it (odd numbers, 5 to 63; default 23 x 17); cells run from
+-(cols-1)/2 to (cols-1)/2 in x, likewise in z. `sea` cells are holes. A
+house takes about 2 x 2 cells; everything else one cell (wide items two).
+
+Light: the scene keeps its key, rim and fill lights (scaled with the board).
+`campfire` and `lantern` bring their own warm light; `light` is an invisible
+point light for anything else:
+
+```jsonc
+{ "type": "light", "x": 2, "z": -1, "color": "#ffb060", "intensity": 3, "range": 6, "y": 2 }
+```
+
+A light only lights props and characters within its range; floors get a glow
+decal instead, so a board can have many. Lights keep their options when
+exported and stay in `objects` in an ASCII export.
+
+Characters see the whole board in their map, or on boards bigger than 25 x 19
+the 25 x 19 window around them. Flowers, grass tufts, lily pads and lights are
+decoration: no collision, and not on the characters' map.
+
 ## 3. Layout engine (deterministic)
 
-1. **Grid.** Integer cells on the island. A cell is *solid* when the island top
-   is under its centre and four probes 0.35 out (no overhanging the cliff);
-   that's a lookup in the plateau tiles the island builder recorded. It is
-   *blocked* when fixed scenery (house, trees, boulders, fence, signpost,
-   campfire, decor crates) covers it between ankle and head height, from one
-   pass over those meshes' triangles. (Per-cell raycasts froze the tab.)
+1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile
+   (it isn't `sea`) under its centre and four probes 0.35 out. (With the
+   shelved `?island=1` terrain, *blocked* also covers that island's fixed
+   scenery, from one pass over its meshes' triangles.)
 2. **Parse** lines into entities `{thing, count, relation, ref, arrangement}`.
 3. **Order.** Explicit objects first, then lines whose refs are resolved, in
    written order. Lines waiting on a ref are deferred and retried, and `path`
@@ -199,7 +226,7 @@ code, so a link can't run script):
 | `player_gold` | `[">=", 10]` |
 | `agent_has` | `["mog", "magic sword"]` |
 | `agent_gold` | `["mog", ">=", 30]` |
-| `agent_near` | `["mog", "campfire", 1.5]` (target: agent, object type, scenery, or `[x, z]`) |
+| `agent_near` | `["mog", "campfire", 1.5]` (target: agent, `player`, object type, or `[x, z]`) |
 | `object_near` | `["barrel", "house", 2]`, or `["barrel", "campfire", 2, 2]` for "at least 2 barrels" |
 | `object_count` | `["barrel", "<", 3]` |
 | `prop_state` | `["crate", "burned"]` (any crate) |
@@ -218,15 +245,14 @@ in the share text.
 
 ## 4b. Base maps, walls and items
 
-- **Base maps**: `island` is the full diorama. `clearing` is the same island
-  without the house, trees, boulders, fence/signpost, lantern and decor crates.
-  `dungeon` is a clearing without grass tufts, plus a stone floor and a closed
-  ring of walls on the rim. The rim walls and floor are ordinary walls and
-  paint, so they can be edited and are saved. `plain` is a clearing with the
-  grass and tufts gone and a flat smooth floor on top (indoor and modern
-  scenes, e.g. *The Sounding Board*). Clearing, dungeon and plain also hide
-  the rocks on the plateau. The World pane has the same picker for the
-  sandbox.
+- **Base maps**: `plain` (the default) is the blank board. `island` is
+  content laid on it: a 15 x 13 board, land shaped by sea cells, a grass floor,
+  and trees, a house, boulders, flowers, grass tufts, a fence, a lantern, lily
+  pads and a campfire, all ordinary objects and paint (a scenario adds to them,
+  and **From current world** exports them as such). `clearing` is the same land
+  with only the campfire. `dungeon` adds a stone floor and a closed ring of
+  walls on the rim; those are ordinary walls and paint too. The old fixed HD
+  island is shelved behind `?island=1`.
 - **Walls** default to tabletop sections: stone-block walls about 1.1 tall that
   join to neighbouring wall cells. `"walls": "modern"` makes them smooth
   painted panels with a baseboard; `"walls": "block"` keeps the old cubes.
@@ -235,7 +261,7 @@ in the share text.
   in its inventory (otherwise it's just said).
 - **Walking** finds a way around walls, painted water/lava and solid props
   (A* over the grid, smoothed into straight legs). Walking to a spot off the
-  island still walks straight off the edge (and falls). `"pathfinding": false`
+  board (or onto sea) still walks straight off the edge (and falls). `"pathfinding": false`
   restores straight-line walking that stops at the first obstacle, which is
   what makes a guide-them-through-the-maze puzzle.
 
@@ -256,6 +282,9 @@ Pages, Hugging Face, R2/S3, a home server) or inside the repo.
       "w": 1.4, "h": 0.9, "d": 0.8,        // physics box in cells (w >= 1.3 takes two cells)
       "scale": 1.3, "visualYOffset": 0.45, // fit the model to the box
       "visualRy": 0,                       // optional model turn (radians)
+      // or "fit": "height" | "footprint": scale the model to h, or to w/d, and
+      // stand it on the box floor (for models of unknown scale)
+      // "decor": true: no collision, not on the characters' map (flowers...)
       "mass": 4, "static": false, "shape": "BOX", "material": "metal", "flammable": false,
       "aliases": ["forge"],                // extra words for map lines
       "tags": ["fantasy"]
@@ -270,6 +299,8 @@ Pages, Hugging Face, R2/S3, a home server) or inside the repo.
 - A scenario's `"packs"` list loads extra packs before the layout; their item
   types then work in `objects`, map lines and goals like built-in ones. The
   first pack to define a type keeps it, so packs can't replace core items.
+- Each model file loads once; every placed copy shares its geometry,
+  materials and textures, so fifty trees cost one tree's textures.
 - Packs are data (JSON and models), never code. `tools/browser-test/test-pack`
   is a minimal example.
 - Prepare models with `tools/compress-glb.sh model.glb` (AVIF textures,

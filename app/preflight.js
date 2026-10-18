@@ -28,7 +28,7 @@
     ['confirm-dialog.js?v=20261018a'],
     ['toast.js?v=20261018a'],
     ['ui-polish.js?v=20261018a'],
-    ['tabs.js?v=20261018a'],
+    ['tabs.js?v=20261019f'],
     ['library.js?v=20261018a'],
     ['packs.js?v=20261019c'],
     ['https://cdn.babylonjs.com/babylon.js'],
@@ -40,9 +40,9 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261019c'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261019c'],
+    ['app.js?v=20261019f'],
     ['scenery.js?v=20261019c'],
-    ['scenario.js?v=20261019d'],
+    ['scenario.js?v=20261019f'],
     ['llm_js/world-integration.js?v=20261019a', 'module'],
   ];
 
