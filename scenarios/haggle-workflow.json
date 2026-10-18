@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "title": "The Haggler",
+  "subtitle": "A shopkeeper who follows a routine.",
+  "intro": "Mog sells one magic sword and haggles by the book: a workflow keeps his small brain on track. Make him an offer.",
+  "seed": 1,
+  "size": [11, 9],
+  "floor": "wood",
+  "player": { "name": "Traveller", "gold": 60, "items": [], "at": [0, 1] },
+  "allowed": ["say", "sell"],
+  "agents": [
+    { "id": "mog", "style": "grumpy shopkeeper", "at": [0, -1],
+      "personality": "Mog, a grumpy shopkeeper who sells one magic sword. He wants 50 gold and never takes less than 40.",
+      "inventory": { "gold": 0, "items": ["magic sword"] },
+      "workflow": "haggle" }
+  ],
+  "workflows": {
+    "haggle": {
+      "description": "sell the magic sword for a fair price",
+      "steps": [
+        { "id": "wait", "await": "speech", "save": "said" },
+        { "prompt": "The customer said: \"{{said}}\". How many gold coins did they offer for the sword? Answer 0 if they did not offer a price.", "parse": "number", "save": "bid" },
+        { "if": "bid == 0", "then": "chat" },
+        { "if": "bid >= 40", "then": "deal", "else": "counter" },
+        { "id": "chat", "prompt": "The customer said: \"{{said}}\". Reply in one short grumpy sentence and ask what they will pay for the magic sword.", "parse": "line", "save": "reply" },
+        { "command": "say(\"{{reply}}\")", "goto": "wait" },
+        { "id": "counter", "prompt": "The customer offered {{bid}} gold for the magic sword. Refuse in one short grumpy sentence and ask for 50 gold.", "parse": "line", "save": "reply" },
+        { "command": "say(\"{{reply}}\")", "goto": "wait", "max": 4, "exit": "giveup" },
+        { "id": "deal", "command": "sell(\"magic sword\", {{bid}})", "end": true },
+        { "id": "giveup", "command": "say(\"Bah. Come back when you have real money.\")", "end": true }
+      ]
+    }
+  },
+  "map": ["place counter against north_wall"],
+  "goal": { "text": "Buy the magic sword.", "win": { "player_has": "magic sword" }, "maxTurns": 12, "score": "player_gold" }
+}

@@ -570,6 +570,20 @@ async function main() {
     const cfg = world.getBrainConfig(g.id);
     if (cfg.enabled === false || cfg.defeated) return false;
     if (!world.isTurnReady()) { return false; }
+    // Inside a workflow (workflows.js), the workflow drives the turn: it asks
+    // the model narrow questions and runs the resulting command.
+    if (window.tablefolkWorkflows?.active(g.id)) {
+      const acted = await window.tablefolkWorkflows.turn(g, {
+        runLine: async (agent, l) => {
+          const cmd = world.parseLLMCommandLine(l);
+          if (!cmd) return;
+          await world.stepAgentTurn(agent.id, cmd, 'workflow');
+          try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: agent.id, line: l } })); } catch {}
+        },
+      });
+      if (acted) { const c2 = world.getBrainConfig(g.id); c2.messages = (c2.messages || []).concat([{ role: 'assistant', content: '(routine) ' + (world.state?.globalHistory?.slice(-1)?.[0] || '') }]).slice(-30); world.setBrainConfig(g.id, c2); }
+      return acted;
+    }
     try {
       world.state.nextAgentId = g.id;
       updatePerceptionUI();

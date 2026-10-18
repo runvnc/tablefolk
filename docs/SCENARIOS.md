@@ -249,6 +249,42 @@ Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`
 Allow `attack` only for characters who should fight, and say in the
 personality when they do ("If insulted twice, attack(player).").
 
+## 2f. Workflows
+
+`app/workflows.js` (full reference in its header comment). A workflow breaks a task into steps; the character's model only answers one
+narrow question at a time, and the steps decide what happens next. Put them
+in `"workflows"` and either start one on an agent (`"workflow": "haggle"`,
+it runs from the start) or allow the `workflow` command so the character can
+start one itself (`workflow(haggle, 30)`; `"workflows": ["haggle"]` on an
+agent limits which).
+
+```json
+"workflows": {
+  "haggle": {
+    "description": "sell the magic sword for a fair price",
+    "steps": [
+      { "id": "wait", "await": "speech", "save": "said" },
+      { "prompt": "The customer said: \"{{said}}\". How many gold coins did they offer? Answer 0 if none.", "parse": "number", "save": "bid" },
+      { "if": "bid >= 40", "then": "deal", "else": "counter" },
+      { "id": "counter", "prompt": "Refuse {{bid}} gold in one short grumpy sentence and ask for 50.", "parse": "line", "save": "reply" },
+      { "command": "say(\"{{reply}}\")", "goto": "wait", "max": 4, "exit": "giveup" },
+      { "id": "deal", "command": "sell(\"magic sword\", {{bid}})", "end": true },
+      { "id": "giveup", "command": "say(\"Bah. Come back with real money.\")", "end": true }
+    ]
+  }
+}
+```
+
+Steps: `prompt` (+ `parse`: text, line, number, yesno, word; `save`),
+`choose` (`{"choose": "Fight or flee?", "options": {"fight": "s1", "flee":
+"s2"}}`), `if` (`==` `!=` `>=` `<=` `>` `<` `contains`, `then`/`else`),
+`command` (any command line; takes the character's turn), `await`
+(`"speech"`: the next words or event addressed to it; `"turns"` with
+`"turns": N`), `set` (`{"set": {"tries": "{{tries}}+1"}}`), and `goto`,
+`end`, `max` + `exit` on any step. Templates: `{{var}}`, `{{me}}`,
+`{{player}}`, `{{input}}`. Tested with Gemma 4 E4B: greets, counters a low
+offer, sells at 42 (`scenarios/haggle-workflow.json`).
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile

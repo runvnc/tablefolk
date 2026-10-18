@@ -841,6 +841,7 @@
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,
       grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
       legend: s.legend && typeof s.legend === 'object' ? Object.fromEntries(Object.entries(s.legend).map(([k, v]) => [k, String(v)])) : {},
+      workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
@@ -897,7 +898,8 @@
     w.setBaseMap?.(scn.base);
     w.setPathfinding?.(scn.pathfinding);
     w.state.earshot = scn.earshot;
-    w.state.places = scn.places || [];   // generated maps' rooms and buildings (senses.js)
+    w.state.places = scn.places || [];
+    w.state.workflows = scn.workflows || {};   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
@@ -944,6 +946,8 @@
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
         maxHp: Math.max(1, +a.hp || 10), hp: Math.max(1, +a.hp || 10), wielding: null, defeated: false,
+        // workflows.js: which routines it may start, none running yet
+        workflows: Array.isArray(a.workflows) ? a.workflows.map(String) : null, wf: null,
         inventory: { gold: Math.max(0, +(a.inventory?.gold) || 0), items: (a.inventory?.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : { name: String(i.name), qty: i.qty ?? 1 }) },
       });
     }
@@ -970,6 +974,8 @@
       }
       window.tablefolkCombat.renderPlayerHp();
     }
+    // Characters that live in a routine from the start ("workflow": "patrol").
+    for (const a of scn.agents) if (a.workflow && window.tablefolkWorkflows) window.tablefolkWorkflows.start(a.id, String(a.workflow), a.workflowInput || '');
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
