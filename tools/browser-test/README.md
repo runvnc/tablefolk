@@ -15,6 +15,11 @@ cd tools/browser-test && npm install        # playwright-core only, no browser d
 1. Start the dev server (if it isn't running): `bun server/server.js 8000` in the repo root.
 2. Launch the test Chrome (keep it running; it's a normal window on the desktop):
    `./launch-chrome.sh` (opens `http://localhost:8000/app/?norender=1`).
+   Under Hyprland the window (class `tablefolk-test`) is floated and sized
+   with `hyprctl`, since tiling ignores `--window-size`: 1280x887 at
+   (620, 40) by default, a 1280x800 page (`TEST_WIN_W`, `TEST_WIN_H`,
+   `TEST_WIN_X`, `TEST_WIN_Y` change it). `?art=1` also skips the scenario
+   intro card, so it doesn't cover screenshots.
    - It uses its own profile at `~/.cache/tablefolk-test-chrome`, because Chrome 136+
      refuses remote debugging on the default profile. Your `chrome://flags`
      (WebGPU/Vulkan) are copied from your normal profile.

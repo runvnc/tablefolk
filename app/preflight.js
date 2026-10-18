@@ -48,7 +48,7 @@
     ['workflows.js?v=20261020a'],
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261021a'],
-    ['scenario.js?v=20261020q'],
+    ['scenario.js?v=20261021a'],
     ['llm_js/world-integration.js?v=20261020q', 'module'],
   ];
 

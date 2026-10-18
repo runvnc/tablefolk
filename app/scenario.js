@@ -993,7 +993,9 @@
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
-    if (!opts.testing && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
+    // Art mode (?art=1) is for looking at the world: no intro card over it
+    // (the banner's intro button still shows it).
+    if (!opts.testing && !window.TABLEFOLK_ART_MODE && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
     startChecker();
     return { scenario: base, plan };
   }
