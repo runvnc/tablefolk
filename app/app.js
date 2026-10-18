@@ -1526,46 +1526,83 @@ function paintMaterial(mat,tint){
   // Relief from the floor's own texture (brightness as height), so painted
   // floors aren't flat decals beside the sculpted tiles. Water stays smooth.
   const HD=window.TablefolkHD;
-  if(HD && tx && mat!=='water'){
-    const bump=cv=>{ const n=HD.dyn(sc,'paint_n_'+key,HD.normalFromCanvas(cv,def.relief??2.4)); n.anisotropicFilteringLevel=8; m.bumpTexture=n; m.bumpTexture.level=.9; };
+  if(mat==='water'){ m.roughness=.06; m.alpha=.86; plasticFinish(m,{coat:.9,coatRough:.04}); }
+  if(mat==='lava'){ m.roughness=.4; plasticFinish(m,{coat:.5,coatRough:.2}); }
+  if(FLOWING[mat]) animateFlow();
+  if(HD && tx){
+    const bump=cv=>{ const n=HD.dyn(sc,'paint_n_'+key,HD.normalFromCanvas(cv,def.relief??(mat==='water'?3.2:2.4))); n.anisotropicFilteringLevel=8; m.bumpTexture=n; m.bumpTexture.level=mat==='water'?1.3:.9; };
     if(def.file) HD.loadImage(ASSET+def.file).then(img=>{ const cv=HD.canvasOf(img.width,img.height); cv.getContext('2d').drawImage(img,0,0); bump(cv); }).catch(e=>console.warn('floor relief',e));
     else if(tx.getContext) try{ bump(tx.getContext().canvas); }catch(e){ console.warn('floor relief',e); }
   }
   state.paintMats.set(key,m);
   return m;
 }
-// Wooden floors are real planks, like the wall stones: rounded edges (bevel
-// normal map), slightly different heights and shades, the glossy miniature
-// finish. A flat textured overlay never caught the light the way the
-// sculpted tiles and props do.
-const PLANK_FLOORS={ wood:[.40,.25,.13], oak:[.60,.43,.26] };
-function plankMaterial(){
-  if(state.plankMat) return state.plankMat;
-  const sc=state.scene, m=new BABYLON.PBRMaterial('plank_floor_mat',sc);
-  m.albedoColor=new BABYLON.Color3(1,1,1); m.metallic=0; m.roughness=.34; m.environmentIntensity=.85; m.specularIntensity=.7; m.maxSimultaneousLights=8;
-  plasticFinish(m,{coat:.6,coatRough:.1}); applyClayLook(m,sc,{detail:.08,detailScale:4});
-  m.bumpTexture=bevelNormalTexture(sc); m.bumpTexture.level=1;
-  state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
-  return state.plankMat=m;
+// Solid floors: real geometry instead of flat textured overlays, which never
+// caught the light the way the sculpted tiles and props do. Every piece of a
+// floor type is merged into one mesh (one draw call; a piece is 12
+// triangles). Wood/oak are planks, tile ceramic squares, concrete slabs,
+// all with rounded edges (the wall stones' bevel normal map) and the glossy
+// miniature finish; carpet is a raised continuous pile with a fabric grain.
+const SOLID_FLOORS={
+  wood:{color:[.40,.25,.13],layout:'planks',finish:'gloss'}, oak:{color:[.60,.43,.26],layout:'planks',finish:'gloss'},
+  tile:{color:[.78,.77,.74],layout:'squares',finish:'glaze'}, concrete:{color:[.50,.50,.49],layout:'slab',finish:'satin'},
+  carpet:{color:[.28,.33,.40],layout:'pile',finish:'fabric'},
+  // Lava: dark crust plates over the glowing overlay, which shows in the cracks.
+  lava:{color:[.13,.10,.09],layout:'crust',finish:'rock',overlay:true},
+};
+const FLOOR_FINISH={ gloss:{rough:.34,coat:.6}, glaze:{rough:.16,coat:.85}, satin:{rough:.55,coat:.2}, fabric:{rough:.95,coat:0,fabric:true}, rock:{rough:.7,coat:.15} };
+function fabricNormal(sc){
+  const N=128, cv=document.createElement('canvas'); cv.width=cv.height=N;
+  const g=cv.getContext('2d'), img=g.createImageData(N,N);
+  for(let i=0;i<N*N;i++){ const v=110+Math.random()*90; img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v; img.data[i*4+3]=255; }
+  g.putImageData(img,0,0);
+  const HD=window.TablefolkHD; if(!HD) return null;
+  const t=HD.dyn(sc,'carpet_n',HD.normalFromCanvas(cv,3)); t.uScale=t.vScale=3; return t;
 }
-function buildPlanks(cells,base){
-  const b=boxBatch(), top=state.terrainTopY??0;
+function floorMaterial(finish){
+  state.floorMats ||= {};
+  if(state.floorMats[finish]) return state.floorMats[finish];
+  const f=FLOOR_FINISH[finish], sc=state.scene, m=new BABYLON.PBRMaterial('floor_'+finish+'_mat',sc);
+  m.albedoColor=new BABYLON.Color3(1,1,1); m.metallic=0; m.roughness=f.rough; m.environmentIntensity=.85; m.specularIntensity=f.fabric?.3:.7; m.maxSimultaneousLights=8;
+  if(f.coat) plasticFinish(m,{coat:f.coat,coatRough:.1});
+  applyClayLook(m,sc,{detail:.08,detailScale:4});
+  if(f.fabric){ m.bumpTexture=fabricNormal(sc); m.sheen.isEnabled=true; m.sheen.intensity=.5; m.sheen.color=new BABYLON.Color3(.8,.85,.95); }
+  else { m.bumpTexture=bevelNormalTexture(sc); m.bumpTexture.level=1; }
+  state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
+  return state.floorMats[finish]=m;
+}
+function buildFloor(type,cells){
+  const def=SOLID_FLOORS[type], b=boxBatch(), top=state.terrainTopY??0;
   const hash=(a,c,k)=>{ let h=Math.imul(a*73856093^c*19349663^k*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
   for(const [x,z,tint] of cells){
-    const col=tint||base;
-    for(let i=0;i<4;i++){
+    const col=tint||def.color, piece=(px,pz,w,d,h,k)=>b.add(px,top+h/2,pz,w,h,d,[col[0]*k,col[1]*k,col[2]*k]);
+    if(def.layout==='planks') for(let i=0;i<4;i++){
       const pz=z-.375+i*.25;
       // Staggered joints: every other row splits mid-cell.
       const pieces=i%2 ? [[x-.25,.485],[x+.25,.485]] : [[x,.985]];
-      pieces.forEach(([px,len],j)=>{
-        const r=hash(x,z,i*3+j), h=.042+r*.012, k=.86+hash(z,x,i*5+j)*.26;
-        b.add(px,top+h/2,pz,len,h,.232,[col[0]*k,col[1]*k,col[2]*k]);
-      });
+      pieces.forEach(([px,len],j)=>piece(px,pz,len,.232,.042+hash(x,z,i*3+j)*.012,.86+hash(z,x,i*5+j)*.26));
     }
+    else if(def.layout==='squares') for(const [a,c] of [[-.25,-.25],[.25,-.25],[-.25,.25],[.25,.25]])
+      piece(x+a,z+c,.468,.468,.032+hash(x+a*4,z+c*4,7)*.004,.95+hash(z+c*4,x+a*4,3)*.08);
+    else if(def.layout==='slab') piece(x,z,.975,.975,.04+hash(x,z,1)*.01,.9+hash(z,x,2)*.14);
+    else if(def.layout==='crust') for(const [a,c] of [[-.24,-.24],[.24,-.24],[-.24,.24],[.24,.24]]){
+      const r=hash(x+a*4,z+c*4,9), w=.3+r*.12, d=.3+hash(z+c*4,x+a*4,5)*.12;
+      piece(x+a+(r-.5)*.06,z+c+(hash(x,z+c*4,2)-.5)*.06,w,d,.05+r*.03,.8+r*.4);
+    }
+    else piece(x,z,1,1,.05,.97+hash(x,z,4)*.03);   // carpet pile: full cells, reads as one continuous carpet
   }
-  const m=b.mesh('plank_floor',state.scene); if(!m) return null;
-  m.material=plankMaterial(); m.isPickable=false; m.receiveShadows=true;
+  const m=b.mesh('floor_'+type,state.scene); if(!m) return null;
+  m.material=floorMaterial(def.finish); m.isPickable=false; m.receiveShadows=true;
   return m;
+}
+// Water and lava ripple: their relief scrolls (one shared observer).
+const FLOWING={ water:{u:.035,v:.022}, lava:{u:.008,v:.005} };
+function animateFlow(){
+  if(state.flowObs || window.TABLEFOLK_STILL_MODE) return;
+  state.flowObs=state.scene.onBeforeRenderObservable.add(()=>{
+    const t=performance.now()*.001;
+    for(const [mat,sp] of Object.entries(FLOWING)) for(const m of state.paintMats?.values()||[]) if(m.name.startsWith('paint_'+mat+'|') && m.bumpTexture){ m.bumpTexture.uOffset=(t*sp.u)%1; m.bumpTexture.vOffset=(t*sp.v)%1; }
+  });
 }
 function rebuildPaint(){
   const sc=state.scene; if(!sc) return;
@@ -1577,8 +1614,9 @@ function rebuildPaint(){
   const top=state.terrainTopY??0, groups=new Map();
   const planks=new Map();
   for(const [k,v] of state.paint){
-    if(PLANK_FLOORS[v.mat]){ let tint=null; if(v.tint) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{}
-      if(!planks.has(v.mat)) planks.set(v.mat,[]); planks.get(v.mat).push([...k.split(',').map(Number),tint]); continue; }
+    if(SOLID_FLOORS[v.mat]){ let tint=null; if(v.tint && !SOLID_FLOORS[v.mat].overlay) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{}
+      if(!planks.has(v.mat)) planks.set(v.mat,[]); planks.get(v.mat).push([...k.split(',').map(Number),tint]);
+      if(!SOLID_FLOORS[v.mat].overlay) continue; }
     if(PAINT_MATERIALS[v.mat]?.hole || (state.boardModel && TILE_FLOORS.has(v.mat))) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
   for(const [g,{v,cells}] of groups){
     const aligned=!!PAINT_MATERIALS[v.mat]?.aligned;   // continuous floors: full-size tiles, no turns
@@ -1593,7 +1631,7 @@ function rebuildPaint(){
     base.thinInstanceSetBuffer('matrix',buf,16,true);
     state.paintMeshes.push(base);
   }
-  for(const [mat,cells] of planks){ const m=buildPlanks(cells,PLANK_FLOORS[mat]); if(m) state.paintMeshes.push(m); }
+  for(const [mat,cells] of planks){ const m=buildFloor(mat,cells); if(m) state.paintMeshes.push(m); }
 }
 // ---- the board ----
 // One tile per cell on a stone column that reaches down into the sea (both
