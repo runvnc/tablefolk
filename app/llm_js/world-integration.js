@@ -215,6 +215,14 @@ function formatActionSummary(historyEntry) {
   if (agentId && action.startsWith(agentId + ' ')) action = action.slice(agentId.length + 1);
   // Also strip the raw command form like 'folk1 walk(n)' -> 'walk(n)'
   if (agentId && action.startsWith(agentId)) action = action.slice(agentId.length).trim();
+  // Results that are already a sentence about the actor ("give silk bundle ->
+  // bram gives Traveller silk bundle") stand on their own; printing both
+  // halves read "bram gives -> bram gives Traveller silk bundle".
+  const arrow = action.indexOf(' -> ');
+  if (agentId && arrow >= 0) {
+    const result = action.slice(arrow + 4).trim();
+    if (result.toLowerCase().startsWith(agentId.toLowerCase() + ' ')) return result;
+  }
   // Conjugate common verbs: walk->walks, say->says, look->looks, etc.
   const verbMap = { walk: 'walks', say: 'says', look: 'looks', touch: 'touches', push: 'pushes', pull: 'pulls', carry: 'carries', drop: 'drops', throw: 'throws', dig: 'digs', build: 'builds', repair: 'repairs', panic: 'panics', spell: 'casts', goal: 'sets goal', give_quest: 'gives quest', give: 'gives', sell: 'sells', inventory: 'checks inventory' };
   const parts = action.split(/\s+/);
