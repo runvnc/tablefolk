@@ -628,7 +628,10 @@ async function main() {
       // sale failed: ..." was in the prompt but the model still claimed the
       // sale worked.) Speech-only turns keep the plain summary.
       const ownResults = ownActionResults(world, g.id, planCmds.length);
-      cfg.messages = cfg.messages.concat([{ role: 'user', content: ownResults || summary }]);
+      // A speech-only turn reports nothing back: "bram says <what it just
+      // said>" right after its own say(...) only repeated it.
+      const ownReport = ownResults || (planCmds.every(c => c.kind === 'say') ? '' : summary);
+      if (ownReport) cfg.messages = cfg.messages.concat([{ role: 'user', content: ownReport }]);
       // Said it handed something over but issued no give()/sell(): tell it,
       // so the next turn can actually do it (small models often narrate the
       // hand-over instead of using the command).
@@ -676,10 +679,12 @@ async function main() {
     appendLog('agent brains started');
     while (running) {
       const agents = world.getAgents();
-      for (const g of agents) {
+      for (const g0 of agents) {
         if (!running) break;
         if (!world.isTurnReady()) { await sleep(150); continue; }
-       world.state.nextAgentId = g.id;
+        // Someone was just spoken to: they answer before the round continues.
+        const g = agents.find(a => world.getBrainConfig(a.id).pendingChat?.length) || g0;
+        world.state.nextAgentId = g.id;
         await runOneAgentTurn(g);
       }
     }
@@ -742,9 +747,20 @@ async function main() {
     world.setBrainConfig(g.id, cfg);
     appendLog(name + ' -> ' + g.id + ': ' + text);
     input.value = '';
-    // Auto-step the agent so it responds immediately
-    const stepBtn = el('stepBrains');
-    if (stepBtn && !stepBtn.disabled) stepBtn.click();
+    // The character you spoke to answers now. (This used to press "step",
+    // which runs characters in turn order: you'd talk to Bram and Hale would
+    // answer, while your words waited for Bram's turn.) With the brains
+    // running, the loop takes characters with new speech first instead.
+    if (!running && manager.isLoaded()) replyNow(g);
+  }
+  let replying = false;
+  async function replyNow(g) {
+    if (replying) return;
+    replying = true;
+    try {
+      while (!world.isTurnReady()) await sleep(100);
+      if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g);
+    } finally { replying = false; }
   }
   // Programmatic chat for the scenario tactic tester (scenario.js): queue a
   // message exactly like the chat box does, run that character's turn, and
