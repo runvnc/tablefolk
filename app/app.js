@@ -1239,20 +1239,22 @@ function rebuildWallVisuals(){
   }
   buildDoors(cell,top);
 }
-// Natural stone ("walls": "stone"): a dry-stone wall of irregular rounded
-// rocks in mixed sizes and shades over a dark mortar core, laid out like the
-// tabletop walls (arms to each neighbour, a post at corners). One lumpy rock
-// geometry drawn per stone (thin instances: size, tilt and colour per copy).
+// Natural stone ("walls": "stone"): a dry-stone wall of flat, slightly
+// uneven slabs in mixed lengths and shades, packed tight over a mortar core,
+// laid out like the tabletop walls (arms to each neighbour, a post at
+// corners). One slab geometry drawn per stone (thin instances: size, tilt and
+// colour per copy).
 function fieldstoneRock(sc){
   if(state.fieldRock && !state.fieldRock.isDisposed()) return state.fieldRock;
-  const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:2,flat:false},sc);
+  const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:3,flat:false},sc);
   const pos=m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-  // Lumpy and flat: a slab-like stone with flattened top and bottom faces
-  // (stones are laid flat side down), squared-off ends, uneven surface.
+  // Flat slabs: a superellipsoid (the sphere pushed out to a box with softly
+  // rounded edges) so faces pack tight and little mortar shows, with gently
+  // uneven faces.
   for(let i=0;i<pos.length;i+=3){
-    const x=pos[i],y=pos[i+1],z=pos[i+2], n=Math.sin(x*9.1+z*4.3)*.5+Math.sin(y*7.7+x*3.1)*.5+Math.sin(z*8.3-y*5.2)*.5+Math.sin(x*21+y*17+z*13)*.25;
-    const k=1+n*.08, sq=1+(.5-Math.abs(y))*.18;
-    pos[i]=x*k*sq; pos[i+1]=Math.max(-.27,Math.min(.27,y*.72*k)); pos[i+2]=z*k*sq;
+    const x=pos[i],y=pos[i+1],z=pos[i+2], P=5, r=Math.pow(Math.abs(x)**P+Math.abs(y)**P+Math.abs(z)**P,1/P)||1;
+    const n=Math.sin(x*7.3+z*5.1+1.7)*Math.sin(z*6.1-y*4.4)*.6+Math.sin(x*13.7-z*11.3+y*9.1)*.3, k=1+n*.035;
+    pos[i]=x/r*.5*k; pos[i+1]=y/r*.5*(1+n*.025); pos[i+2]=z/r*.5*k;
   }
   m.updateVerticesData(BABYLON.VertexBuffer.PositionKind,pos);
   const nrm=[]; BABYLON.VertexData.ComputeNormals(pos,m.getIndices(),nrm); m.updateVerticesData(BABYLON.VertexBuffer.NormalKind,nrm);
@@ -1263,10 +1265,18 @@ function fieldstoneRock(sc){
   // Rock grain: pitted, granular relief.
   const HD=window.TablefolkHD;
   if(HD) try{
+    // Seamless multi-octave value noise plus fine speckle: no direction, no
+    // repeating bands.
     const N=256, cv=document.createElement('canvas'); cv.width=cv.height=N; const g=cv.getContext('2d'), img=g.createImageData(N,N);
-    for(let i=0;i<N*N;i++){ const x=i%N, y=(i/N)|0, v=128+Math.sin(x*.21)*18+Math.sin(y*.17+x*.05)*18+(Math.random()-.5)*90; img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v; img.data[i*4+3]=255; }
-    g.putImageData(img,0,0); g.filter='blur(1px)'; g.drawImage(cv,0,0);
-    mat.bumpTexture=HD.dyn(sc,'fieldstone_n',HD.normalFromCanvas(cv,3.5)); mat.bumpTexture.uScale=mat.bumpTexture.vScale=2;
+    const octave=cells=>{ const r=new Float32Array(cells*cells).map(()=>Math.random()); return (x,y)=>{
+      const fx=x/N*cells, fy=y/N*cells, x0=Math.floor(fx), y0=Math.floor(fy), tx=fx-x0, ty=fy-y0, sx=tx*tx*(3-2*tx), sy=ty*ty*(3-2*ty);
+      const v=(a,b)=>r[((b%cells)+cells)%cells*cells+((a%cells)+cells)%cells];
+      return (v(x0,y0)*(1-sx)+v(x0+1,y0)*sx)*(1-sy)+(v(x0,y0+1)*(1-sx)+v(x0+1,y0+1)*sx)*sy; }; };
+    const oct=[[octave(4),.35],[octave(9),.3],[octave(23),.22],[octave(61),.13]];
+    for(let i=0;i<N*N;i++){ const x=i%N, y=(i/N)|0; let v=0; for(const [f,w] of oct) v+=f(x,y)*w;
+      v=128+(v-.5)*150+(Math.random()-.5)*28+(Math.random()<.015?-60:0); img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v; img.data[i*4+3]=255; }
+    g.putImageData(img,0,0);
+    mat.bumpTexture=HD.dyn(sc,'fieldstone_n',HD.normalFromCanvas(cv,3)); mat.bumpTexture.uScale=mat.bumpTexture.vScale=1.3;
   }catch(e){ console.warn('rock grain',e); }
   state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(mat);
   m.material=mat;
@@ -1275,12 +1285,12 @@ function fieldstoneRock(sc){
 function buildFieldstoneWalls(cell,top){
   const sc=state.scene, src=fieldstoneRock(sc), core=boxBatch(), mats=wallMaterials();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
-  const T=.22, H=wallH()-.04, ROWS=Math.max(1,Math.round(5*(state.wallHeightScale||1))), RH=H/ROWS, rocks=[];
+  const T=.22, H=wallH()-.04, ROWS=Math.max(1,Math.round(6*(state.wallHeightScale||1))), RH=H/ROWS, rocks=[];
   const shade=(st,r,r2)=>{
     if(st==='burned'){ const v=.13+r*.07; return [v+.02,v,v-.01]; }
     const v=.30+r*.2, warm=(r2-.5)*.12; return [v+warm*.6,v+warm*.2,v-warm*.3];
   };
-  const rock=(x,y,z,sx,sy,sz,col,seed)=>rocks.push({x,y,z,sx,sy,sz,col,ry:(hash(seed,3,7)-.5)*.5,rz:(hash(seed,5,1)-.5)*.18});
+  const rock=(x,y,z,sx,sy,sz,col,seed)=>rocks.push({x,y,z,sx,sy,sz,col,ry:(hash(seed,3,7)-.5)*.12,rz:(hash(seed,5,1)-.5)*.06});
   for(const [k,w] of cell){
     const [x,z]=k.split(',').map(Number), st=meta(w).state;
     if(meta(w).type==='door'){
@@ -1292,12 +1302,12 @@ function buildFieldstoneWalls(cell,top){
         if(top+(r+1)*RH<=yA) continue;
         let a=Math.floor(a0/.5)*.5 - hash(perp*3,r,11)*.2;
         while(a<a1){
-          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.2+hash(seed,r,1)*.22, mid=a+len/2;
-          if(mid>a0 && mid<=a1) atD(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.45,RH*(1.6+hash(seed,2,4)*.45),T*(1.1+hash(seed,6,2)*.3),shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.28+hash(seed,r,1)*.26, mid=a+len/2;
+          if(mid>a0 && mid<=a1) atD(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.015,len*1.2,RH*(1.14+hash(seed,2,4)*.14),T*(1.08+hash(seed,6,2)*.16),shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
           a+=len;
         }
       }
-      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; atD(Math.min(a+.125,a1-.02),top+H+.04,.3,.12,T*1.3,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
+      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; atD(Math.min(a+.125,a1-.02),top+H+.035,.29,.09,T*1.25,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
       continue;
     }
     let arms=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
@@ -1307,34 +1317,42 @@ function buildFieldstoneWalls(cell,top){
     for(const [dx,dz] of arms){
       const alongX=dx!==0, sign=dx||dz, c0=alongX?x:z, perp=alongX?z:x;
       const a0=Math.min(c0+sign*postHalf,c0+sign*.5), a1=Math.max(c0+sign*postHalf,c0+sign*.5);
-      const at=(a,y,len,hgt,thick,col,seed)=>alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
-      core.add(alongX?(a0+a1)/2:perp,top+H/2,alongX?perp:(a0+a1)/2,alongX?a1-a0:T-.08,H,alongX?T-.08:a1-a0,[.12,.11,.10]);
+      // An arm that ends without a neighbour (a doorway or the end of a run)
+      // keeps its stones inside the cell: nothing overhangs into the gap.
+      const far=c0+sign*.5, open=!cell.has((x+dx)+','+(z+dz));
+      const at=(a,y,len,hgt,thick,col,seed)=>{
+        if(open){ let s0=a-len/2, s1=a+len/2; if(sign>0) s1=Math.min(s1,far-.015); else s0=Math.max(s0,far+.015); if(s1-s0<.06) return; a=(s0+s1)/2; len=s1-s0; }
+        return alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
+      };
+      // the core stops short of an open end, hidden behind the end stones
+      const c0e=open&&sign<0?a0+.1:a0, c1e=open&&sign>0?a1-.1:a1;
+      core.add(alongX?(c0e+c1e)/2:perp,top+H/2,alongX?perp:(c0e+c1e)/2,alongX?c1e-c0e:T-.06,H,alongX?T-.06:c1e-c0e,[.17,.16,.14]);
       for(let r=0;r<ROWS;r++){
         // Stones of mixed length, continuing across cells (world-aligned).
         let a=Math.floor(a0/.5)*.5 - hash(perp*3,r,11)*.2, i=0;
         while(a<a1){
-          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.2+hash(seed,r,1)*.22;
+          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.28+hash(seed,r,1)*.26;
           const mid=a+len/2;
           if(mid>a0 && mid<=a1 && !(st==='cracked' && hash(seed,9,9)<.18)){
-            const hgt=RH*(1.6+hash(seed,2,4)*.45), thick=T*(1.1+hash(seed,6,2)*.3);
-            at(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.45,hgt,thick,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+            const hgt=RH*(1.14+hash(seed,2,4)*.14), thick=T*(1.08+hash(seed,6,2)*.16);
+            at(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.015,len*1.2,hgt,thick,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
           }
           a+=len; i++;
         }
       }
       // capstones: flatter, wider
-      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; at(Math.min(a+.125,a1-.02),top+H+.04,.3,.12,T*1.3,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
+      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; at(Math.min(a+.125,a1-.02),top+H+.035,.29,.09,T*1.25,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
     }
     // A wall that stops (one neighbour, e.g. at a doorway) ends in a column of
     // stones instead of the bare core.
     const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
     if(nb.length===1) for(let r=0;r<=ROWS;r++){
-      const ex=x-nb[0][0]*.4, ez=z-nb[0][1]*.4, seed=x*97+z*53+r*5, sz=T*1.3;
-      rock(ex,top+(r<ROWS?r*RH+RH/2:H+.04),ez,sz,r<ROWS?RH*1.25:.12,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+      const sz=T*1.3, ex=x-nb[0][0]*(.5-sz/2-.015), ez=z-nb[0][1]*(.5-sz/2-.015), seed=x*97+z*53+r*5;
+      rock(ex,top+(r<ROWS?r*RH+RH/2:H+.04),ez,sz,r<ROWS?RH*1.15:.1,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
     }
     if(postHalf) for(let r=0;r<=ROWS;r++){
       const seed=x*131+z*71+r, sz=T*1.25;
-      rock(x,top+(r<ROWS?r*RH+RH/2:H+.04),z,sz,r<ROWS?RH*1.1:.12,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+      rock(x,top+(r<ROWS?r*RH+RH/2:H+.04),z,sz,r<ROWS?RH*1.12:.1,sz,shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
     }
   }
   const coreMesh=core.mesh('stone_walls_core',sc); if(coreMesh){ coreMesh.material=mats.core; coreMesh.isPickable=false; coreMesh.receiveShadows=true; state.wallVisuals.push(coreMesh); }

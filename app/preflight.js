@@ -40,7 +40,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261019c'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261019zi'],
+    ['app.js?v=20261020c'],
     ['scenery.js?v=20261019ze'],
     ['scenario.js?v=20261019za'],
     ['llm_js/world-integration.js?v=20261019l', 'module'],
