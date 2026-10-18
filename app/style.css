@@ -371,3 +371,8 @@ code { color:#ffe0a0; }
 .player-hp .hp-num { font-variant-numeric:tabular-nums; }
 .player-hp .hp-weapon { opacity:.85; }
 .player-hp.down .hp-bar span { background:#555; }
+/* speech-input.js */
+.mic-btn { min-width:38px; }
+.mic-btn[data-state="rec"] { background:#c0392b; color:#fff; animation:micPulse 1s ease-in-out infinite; }
+.mic-btn[data-state="busy"] { opacity:.6; }
+@keyframes micPulse { 50% { box-shadow:0 0 0 6px rgba(192,57,43,.25); } }

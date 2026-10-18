@@ -2637,7 +2637,7 @@ function parseWalkDestination(arg){
   if(xy) return {kind:'walk',destination:{type:'coord',x:Number(xy[1]),z:Number(xy[2])},destinationText:`(${Number(xy[1])},${Number(xy[2])})`};
   const legacy={north:'n',south:'s',east:'e',west:'w',n:'n',s:'s',e:'e',w:'w'};
   if(legacy[arg.toLowerCase()]) return {kind:'walk',dir:legacy[arg.toLowerCase()],destinationText:arg};
-  if(/^[A-Za-z$/*][A-Za-z0-9_$/*-]*$/.test(arg)) return {kind:'walk',destination:{type:'label',label:arg},destinationText:arg};
+  if(/^[A-Za-z$/*][A-Za-z0-9_$/* -]*$/.test(arg)) return {kind:'walk',destination:{type:'label',label:arg.replace(/\s+/g,' ')},destinationText:arg};
   return null;
 }
 function parseLocationArg(arg){
@@ -2812,9 +2812,14 @@ function walk(g,destination){
   else if(destination?.type==='label'){
     const key=String(destination.label||'').toLowerCase();
     const target=state.perceptionLabels?.get(key);
+    // a place on a generated map (walk(tavern)): its free cell nearest the walker
+    const place=(!target || target.isDisposed?.()) && window.tablefolkSenses?.placeTarget(destination.label,g);
+    if(place) destination={type:'coord',x:place.x,z:place.z,label:place.id};
+    else {
     if(!target || target.isDisposed?.()) return say(g,`can't see map label ${destination.label}`);
     const p=target.getAbsolutePosition?.()||target.position;
     destination={type:'coord',x:Math.round(p.x),z:Math.round(p.z),label:destination.label,object:true};
+    }
     description=destination.label;
   }
   if(destination?.type==='coord'){
@@ -2881,7 +2886,7 @@ function walk(g,destination){
   log(g.id+' walks '+safeTravel.toFixed(1)+' tiles toward '+description+(safeTravel+0.01<requested?' and stops before an obstacle':''));
   setTimeout(()=>{ if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+80);
 }
-function look(g){ const t=nearestTarget(g,6); if(!t) return say(g,pickRandom(['I see many legal surfaces','nothing but vibes and grass','the horizon looks back at me','empty space, legally distinct'])); const m=meta(t); const desc=m?.state==='intact'?'looking normal-ish':m?.state==='cracked'?'definitely cracked':m?.state==='burned'?'crispy':m?.state==='broken'?'gone, actually':'suspicious'; say(g,pickRandom([`that ${m?.type||t.name} is ${desc}`,`the ${m?.type||t.name} seems ${desc}`,`checking: ${m?.type||t.name}, status ${desc}`])); }
+function look(g){ if(window.tablefolkSenses) return window.tablefolkSenses.look(g); const t=nearestTarget(g,6); if(!t) return say(g,pickRandom(['I see many legal surfaces','nothing but vibes and grass','the horizon looks back at me','empty space, legally distinct'])); const m=meta(t); const desc=m?.state==='intact'?'looking normal-ish':m?.state==='cracked'?'definitely cracked':m?.state==='burned'?'crispy':m?.state==='broken'?'gone, actually':'suspicious'; say(g,pickRandom([`that ${m?.type||t.name} is ${desc}`,`the ${m?.type||t.name} seems ${desc}`,`checking: ${m?.type||t.name}, status ${desc}`])); }
 function touch(g,targetId=''){ 
   let t=null;
   if(targetId){
@@ -3352,6 +3357,8 @@ function buildVisiblePerception(agentId=null,radius=7){
     `Agent perception for ${g.id}`,
     `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${FULL_MAP_VISION?(mapCropped()?'View: the area around you':'View: whole map'):'Radius: '+radius}`,
     `Holding: ${held ? (heldMeta?.type||held.name) : 'none'}  Target: ${target ? (targetMeta?.type||target.name)+' at ('+Math.round(target.position.x)+','+Math.round(target.position.z)+')' : 'none'}`,
+    // Relative descriptions (senses.js) read far better for small models than the map.
+    ...(window.tablefolkSenses ? ['', ...window.tablefolkSenses.placeLine(g), ...window.tablefolkSenses.aroundLines(g)] : []),
     '',
     ...(showMap ? [`North-up ${mapCols}x${mapRows} map (left=W, right=E; N=-Z, E=-X). Each row shows absolute z:`, ...compassRows, ''] : []),
     details.length ? 'Nearby visible objects:' : 'Nearby visible objects: none',
@@ -3363,10 +3370,10 @@ function buildVisiblePerception(agentId=null,radius=7){
 }
 function buildCommandExamples(g=null){
   const ex=[], allowed=allowedFor(g);
-  if(allowed.has('walk')) ex.push('walk(destination): use an absolute coordinate pair or visible map label, e.g. walk("3,5") or walk("C1"); repeat on later turns until arrived');
+  if(allowed.has('walk')) ex.push('walk(destination): a coordinate pair, or the name of a person, thing or place, e.g. walk("3,5"), walk(bram), walk(chest)'+((state.places||[]).length?', walk(tavern)':'')+'; repeat on later turns until arrived');
   if(allowed.has('say')) ex.push('say(text) e.g. say("hello there")');
   if(allowed.has('whisper')) ex.push('whisper(text) - only the player hears it, e.g. whisper("meet me by the boat")');
-  if(allowed.has('look')) ex.push('look()');
+  if(allowed.has('look')) ex.push('look() - look around carefully: describes everyone and everything in sight');
   if(allowed.has('touch')) ex.push('touch(target) e.g. touch(crate)');
   if(allowed.has('push')) ex.push('push()');
   if(allowed.has('pull')) ex.push('pull()');

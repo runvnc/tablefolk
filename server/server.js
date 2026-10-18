@@ -13,7 +13,7 @@
 // See server/config.js for the settings.
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
-import { config, ROOT, LITERT_URL } from './config.js';
+import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate } from './generate.js';
 
 const args = process.argv.slice(2);
@@ -73,6 +73,36 @@ async function proxy(req, url, prefix, ep) {
   }
 }
 
+// Speech to text with Gemma 4's own audio input (litert-lm serve and a model
+// with an audio encoder). The page posts 16 kHz mono WAV.
+let speechChecked = null;
+async function speechAvailable() {
+  if (speechChecked && Date.now() - speechChecked.at < 30000) return speechChecked.ok;
+  let ok = false;
+  try { const r = await fetch(LITERT_URL + '/models', { signal: AbortSignal.timeout(1500) }); ok = (await r.json()).data?.some(m => m.id === SPEECH_MODEL.split(',')[0]); } catch {}
+  speechChecked = { ok, at: Date.now() };
+  return ok;
+}
+async function transcribe(req) {
+  const wav = Buffer.from(await req.arrayBuffer());
+  if (wav.length < 1000 || wav.length > 20e6) return Response.json({ error: 'expected a WAV recording up to 20 MB' }, { status: 400 });
+  try {
+    const t0 = Date.now();
+    const r = await fetch(LITERT_URL + '/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: SPEECH_MODEL, max_tokens: 200, temperature: 0, messages: [{ role: 'user', content: [
+        { type: 'text', text: 'Transcribe this speech exactly. Output only the spoken words, nothing else.' },
+        { type: 'input_audio', input_audio: { data: wav.toString('base64'), format: 'wav' } }] }] }),
+    });
+    const d = await r.json();
+    if (!r.ok) return Response.json({ error: d.error?.message || 'transcription failed' }, { status: 502 });
+    const text = String(d.choices?.[0]?.message?.content || '').trim().replace(/^["']|["']$/g, '');
+    return Response.json({ text, ms: Date.now() - t0, model: SPEECH_MODEL });
+  } catch (e) {
+    return Response.json({ error: 'local speech model unreachable (start litert-lm serve): ' + e.message }, { status: 503 });
+  }
+}
+
 const server = Bun.serve({
   port, hostname: config.host, idleTimeout: 255,
   async fetch(req) {
@@ -82,11 +112,13 @@ const server = Bun.serve({
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters);
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' });
     if (p === '/api/generate') return handleGenerate(req, url);
+    if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
     if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url);
     if (p === '/api/status') return Response.json({
       characters: { baseURL: config.characters.baseURL, model: config.characters.model, key: !!config.characters.apiKey },
       generator: { baseURL: config.generator.baseURL, model: config.generator.model, key: !!config.generator.apiKey },
       local: LITERT_URL,
+      speech: await speechAvailable(),
     });
     return serveStatic(req, url);
   },

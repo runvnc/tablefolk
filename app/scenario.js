@@ -897,6 +897,7 @@
     w.setBaseMap?.(scn.base);
     w.setPathfinding?.(scn.pathfinding);
     w.state.earshot = scn.earshot;
+    w.state.places = scn.places || [];   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);

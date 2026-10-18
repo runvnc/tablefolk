@@ -821,6 +821,11 @@ async function main() {
     // running, the loop takes characters with new speech first instead.
     if (!running && manager.isLoaded()) replyNow(g);
   }
+  // Someone walked up to a character (senses.js): it may greet them.
+  window.addEventListener('tablefolk-approached', e => {
+    const g = world.getAgents().find(a => a.id === e.detail?.agentId);
+    if (g && !running && manager.isLoaded()) setTimeout(() => replyNow(g), 300);
+  });
   // Someone attacked a character: it answers now when the brains are idle.
   window.addEventListener('tablefolk-attacked', e => {
     const g = world.getAgents().find(a => a.id === e.detail?.agentId);

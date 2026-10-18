@@ -25,6 +25,9 @@ if (existsSync(envFile)) {
 const env = (k, d = '') => process.env[k] ?? d;
 
 export const LITERT_URL = env('LITERT_URL', 'http://127.0.0.1:9379/v1');
+// Native multimodal model for speech (and image) input: litert-lm import
+// --from-huggingface-repo litert-community/gemma-4-E2B-it-litert-lm gemma-4-E2B-it.litertlm gemma4-e2b-mm
+export const SPEECH_MODEL = env('LITERT_SPEECH_MODEL', 'gemma4-e2b-mm');
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
 
 // Resolve a base URL shorthand and pick a matching default key and model.
