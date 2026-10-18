@@ -1534,7 +1534,7 @@ function rebuildPaint(){
   if(state.boardMeshes) rebuildBoard();
   if(!state.paint?.size) return;
   const top=state.terrainTopY??0, groups=new Map();
-  for(const [k,v] of state.paint){ if(PAINT_MATERIALS[v.mat]?.hole) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
+  for(const [k,v] of state.paint){ if(PAINT_MATERIALS[v.mat]?.hole || (state.boardModel && TILE_FLOORS.has(v.mat))) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
   for(const [g,{v,cells}] of groups){
     const aligned=!!PAINT_MATERIALS[v.mat]?.aligned;   // continuous floors: full-size tiles, no turns
     const base=BABYLON.MeshBuilder.CreateBox('paint_'+g,{width:aligned?1:.97,height:.035,depth:aligned?1:.97},sc);
@@ -1572,23 +1572,82 @@ function boardCellList(){
   }
   return cells;
 }
+// The board's tiles are the sculpted grass tile (relief, normal and AO maps),
+// one model drawn once per cell (thin instances), turned a random quarter
+// per cell like the old island. Grass cells keep its grass texture; stone,
+// flagstone, dirt, sand and unpainted cells get the same relief in a flat
+// colour (a paint tint overrides it). Water, lava and indoor floors stay
+// overlays on top. Big boards use the lighter model; past 2500 cells, boxes.
+const TILE_COLORS={ board:[.46,.44,.41], stone:[.40,.39,.37], flagstone:[.33,.33,.32], dirt:[.27,.17,.09], sand:[.66,.54,.33] };
+const TILE_FLOORS=new Set(['grass','stone','flagstone','dirt','sand']);
+const BOARD_MODEL_H=.84;
+const boardTileReady=new Map(), boardTileLoads=new Map();
+function boardTileFile(n){ return n>2500 ? null : n>900 ? 'grass_v7_orm.med2.glb' : 'grass_v7_orm.1k.glb'; }
+function loadBoardTile(file){
+  if(!boardTileLoads.has(file)) boardTileLoads.set(file, BABYLON.SceneLoader.ImportMeshAsync('',TILE_ASSET,file,state.scene).then(r=>{
+    const src=r.meshes.find(m=>m.getTotalVertices?.()>0);
+    if(!src) throw new Error(file+' has no mesh');
+    src.setParent(null); src.bakeCurrentTransformIntoVertices();
+    for(const m of r.meshes) if(m!==src) m.dispose();
+    src.name='board_tile_src'; src.setEnabled(false); src.isPickable=false;
+    applyClayLookToMeshes([src],state.scene,{detail:.11,detailScale:5});
+    const grass=src.material; grass.maxSimultaneousLights=8;
+    const plain=grass.clone('board_tile_plain'); plain.albedoTexture=null; plain.albedoColor=new BABYLON.Color3(1,1,1);
+    state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(grass); state.sharedAssetMats.add(plain);
+    const b=src.getBoundingInfo().boundingBox;
+    boardTileReady.set(file,{src,grass,plain,top:b.maximum.y});
+  }));
+  return boardTileLoads.get(file);
+}
+function tileColor(cell){
+  const p=paintAt(cell[0],cell[1]);
+  if(p?.tint){ try{ const c=BABYLON.Color3.FromHexString(p.tint); return [c.r,c.g,c.b]; }catch{} }
+  return TILE_COLORS[p?.mat] || TILE_COLORS.board;
+}
 function rebuildBoard(){
   const sc=state.scene; if(!sc || LEGACY_ISLAND) return;
   for(const m of state.boardMeshes||[]) try{ m.dispose(); }catch{}
   const cells=boardCellList(), {top,side}=boardMaterials(), mat=new BABYLON.Matrix();
-  const make=(name,h,y,material)=>{
-    const m=BABYLON.MeshBuilder.CreateBox(name,{width:name==='board_tile'?.965:1,height:h,depth:name==='board_tile'?.965:1},sc);
-    m.material=material; m.isPickable=false; m.receiveShadows=true;
-    if(!cells.length){ m.setEnabled(false); return m; }
-    const buf=new Float32Array(cells.length*16);
-    cells.forEach(([x,z],i)=>{ BABYLON.Matrix.TranslationToRef(x,y,z,mat); mat.copyToArray(buf,i*16); });
+  const file=boardTileFile(cells.length), model=file && boardTileReady.get(file);
+  if(file && !model) loadBoardTile(file).then(()=>rebuildBoard()).catch(e=>console.warn('board tile model unavailable; plain tiles',e));
+  const tileH=model ? BOARD_MODEL_H : BOARD_TILE_H;
+  const place=(m,list,y,{turn=false,colors=null}={})=>{
+    m.isPickable=false; m.receiveShadows=true;
+    if(!list.length){ m.setEnabled(false); return m; }
+    m.setEnabled(true);
+    const buf=new Float32Array(list.length*16), q=new BABYLON.Quaternion(), one=new BABYLON.Vector3(1.006,1,1.006), v=new BABYLON.Vector3();
+    list.forEach(([x,z],i)=>{
+      const k=turn ? (((x*73856093)^(z*19349663))>>>0)%4 : 0;
+      BABYLON.Quaternion.RotationYawPitchRollToRef(k*Math.PI/2,0,0,q); v.set(x,y,z);
+      BABYLON.Matrix.ComposeToRef(turn?one:BABYLON.Vector3.One(),q,v,mat); mat.copyToArray(buf,i*16);
+    });
     m.thinInstanceSetBuffer('matrix',buf,16,true);
+    if(colors) m.thinInstanceSetBuffer('color',colors,4,true);
     return m;
   };
-  state.boardMeshes=[ make('board_tile',BOARD_TILE_H,-BOARD_TILE_H/2,top), make('board_column',BOARD_COLUMN_H,-BOARD_TILE_H-BOARD_COLUMN_H/2+.001,side) ];
+  const meshes=[];
+  if(model){
+    const isGrass=c=>{ const p=paintAt(c[0],c[1]); return p?.mat==='grass' && !p.tint; };
+    const grassCells=cells.filter(isGrass), plainCells=cells.filter(c=>!isGrass(c));
+    const y=-model.top;
+    // Own geometry each: the plain tiles' per-instance colour buffer must not
+    // land on geometry the grass tiles share (wrong-sized buffer, black frame).
+    const g=model.src.clone('board_tile_grass'); g.makeGeometryUnique(); g.material=model.grass; meshes.push(place(g,grassCells,y,{turn:true}));
+    const colors=new Float32Array(plainCells.length*4);
+    plainCells.forEach((c,i)=>{ const [r,gg,b]=tileColor(c); colors.set([r,gg,b,1],i*4); });
+    const p=model.src.clone('board_tile_plain'); p.makeGeometryUnique(); p.material=model.plain; meshes.push(place(p,plainCells,y,{turn:true,colors}));
+  } else {
+    meshes.push(place(BABYLON.MeshBuilder.CreateBox('board_tile',{width:.965,height:BOARD_TILE_H,depth:.965},sc),cells,-BOARD_TILE_H/2));
+    meshes[0].material=top;
+  }
+  const col=BABYLON.MeshBuilder.CreateBox('board_column',{width:1,height:BOARD_COLUMN_H,depth:1},sc); col.material=side;
+  meshes.push(place(col,cells,-tileH-BOARD_COLUMN_H/2+.02));
+  state.boardMeshes=meshes; state.boardModel=!!model;
   state.boardCells=new Set(cells.map(([x,z])=>x+','+z));
   state.terrainTopY=0;
   sceneryCells=null; groundCache.clear();
+  // Floors the tiles now show themselves need no overlay (and vice versa).
+  if(state.paintOverlayModel!==state.boardModel){ state.paintOverlayModel=state.boardModel; schedulePaintRebuild(); }
   window.TablefolkHD?.setShore?.(boardShoreEdges());
 }
 // Outward edges of the land, for the sea's foam: [{x,z,nx,nz}] at each edge's middle.
