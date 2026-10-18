@@ -217,7 +217,7 @@ if(words){
   // before the first event with text in it.
   const clock=setInterval(()=>{ $('clock').textContent=((Date.now()-t0)/1000).toFixed(1)+'s'; },100);
   // Loading view: the bar moves fast from the start (a curve over time:
-  // half way at ~4s, 80% by ~11s) and the real writing progress can only push
+  // half way at ~2s, 90% by ~7s) and the real writing progress can only push
   // it further; captions are made-up chores.
   let target=0, shown=0, ended=false, written=0;
   const CHORES=['Unrolling the map','Laying flagstones','Stacking stones for the walls','Hanging doors on their hinges','Lighting the lanterns',
@@ -226,9 +226,9 @@ if(words){
     'Arranging bookshelves','Planting mushrooms','Drawing the dungeon on a napkin','Giving everyone a name'];
   let ci=Math.floor(Math.random()*CHORES.length);
   const nextChore=()=>{ const el=$('chore'); if(!el||ended) return; ci=(ci+1+Math.floor(Math.random()*3))%CHORES.length; el.style.opacity=0; setTimeout(()=>{ el.textContent=CHORES[ci]+'…'; el.style.opacity=1; },250); };
-  if(view==='loading'){ $('chore').textContent=CHORES[ci]+'…'; setInterval(nextChore,2400);
+  if(view==='loading'){ $('chore').textContent=CHORES[ci]+'…'; setInterval(nextChore,4800);
     setInterval(()=>{ if(ended) return; const t=(Date.now()-t0)/1000;
-      target=Math.max(target,95*(1-Math.exp(-t/6)),written?55+40*Math.min(1,written/3500):0);
+      target=Math.max(target,96*(1-Math.exp(-t/3)),written?55+40*Math.min(1,written/3500):0);
       shown+=(Math.min(target,96)-shown)*.3; $('fill').style.width=shown.toFixed(1)+'%'; },120); }
   const bump=t=>{ target=Math.max(target,t); };
   const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
