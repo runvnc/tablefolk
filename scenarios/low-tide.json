@@ -18,11 +18,9 @@
   },
   "allowed": [
     "say",
-    "whisper",
     "walk",
     "face",
-    "emote",
-    "give"
+    "emote"
   ],
   "agents": [
     {
@@ -31,7 +29,13 @@
       "style": "stern harbour customs officer",
       "ttsVoiceId": "builtin:javert",
       "facing": "n",
-      "personality": "Officer Hale, the harbour customs officer. You stand in the only gate between the docks and the town, and nobody passes until you are satisfied they carry nothing illegal. Silk is contraband this year. You cannot search bags; you judge people by their answers. You are tired and hungry, proud of your sharp eyes, and you distrust Bram the dockhand. Flattery and a good story work on you. If you believe a traveller, step aside with walk(e) to let them through, then walk(w) back. If someone reports a fight or trouble on the docks, you go and look with walk(n). If you see silk handed to anyone, or anyone admits to carrying silk, or you hear talk of silk or secret passwords, or someone tells an obvious lie, say \"You're under arrest\"."
+      "personality": "Officer Hale, the harbour customs officer. You stand in the only gate between the docks and the town, and nobody passes until you are satisfied they carry nothing illegal. Silk is contraband this year. You cannot search bags; you judge people by their answers. You are tired and hungry, proud of your sharp eyes, and you distrust Bram the dockhand. Flattery and a good story work on you. If you believe a traveller, step aside with walk(e) to let them through, then walk(w) back. If someone reports a fight or trouble on the docks, you go and look with walk(n). If you see silk handed to anyone, or anyone admits to carrying silk, or you hear talk of silk or secret passwords, or someone tells an obvious lie, say \"You're under arrest\".",
+      "allowed": [
+        "say",
+        "walk",
+        "face",
+        "emote"
+      ]
     },
     {
       "id": "bram",
@@ -48,7 +52,15 @@
             "qty": 1
           }
         ]
-      }
+      },
+      "allowed": [
+        "say",
+        "whisper",
+        "walk",
+        "face",
+        "emote",
+        "give"
+      ]
     }
   ],
   "grid": [

@@ -40,8 +40,10 @@ def check(obj):
     for i in ids:
         if not i or not re.fullmatch(r'[A-Za-z0-9_-]{1,24}', str(i)): problems.append(f'agent id {i!r}: use 1-24 letters, digits, _ or -')
     if len(set(ids)) != len(ids): problems.append('agent ids must be unique')
-    for c in obj.get('allowed', []):
-        if c not in COMMANDS: problems.append(f'"allowed": unknown command {c!r} (known: {" ".join(sorted(COMMANDS))})')
+    for where, cmds in [('"allowed"', obj.get('allowed', []))] + [(f'agent {a.get("id")!r} "allowed"', a['allowed']) for a in obj.get('agents', []) if 'allowed' in a]:
+        if not isinstance(cmds, list): problems.append(f'{where} must be a list of commands'); continue
+        for c in cmds:
+            if c not in COMMANDS: problems.append(f'{where}: unknown command {c!r} (known: {" ".join(sorted(COMMANDS))})')
     # Goal predicates whose first argument is a character id.
     def walk_goal(node):
         if isinstance(node, dict):

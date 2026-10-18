@@ -2509,7 +2509,7 @@ function updateTurnUI(){
   if(status) status.textContent = `turn ${state.turn.index} · ${state.turn.phase}`;
   document.querySelectorAll('button[data-cmd]').forEach(btn=>{
     const cmd=parseCommand(btn.dataset.cmd);
-    const disabled=!!(cmd&&!canRun(cmd.kind,cmd.spell)) || (isTurnMode() && state.turn.phase==='resolving');
+    const disabled=!!(cmd&&!canRun(cmd.kind,cmd.spell,state.selected)) || (isTurnMode() && state.turn.phase==='resolving');
     btn.disabled=disabled;
   });
 }
@@ -2623,7 +2623,10 @@ function say(g,text,voiced=false,{whisper=false}={}){
 window.tablefolkTTS?.addEventListener('speechstart',e=>{ const g=e.detail.agent; if(g){g.speaking=true;g.anim='talk';playRig(g,'talk',true);} });
 window.tablefolkTTS?.addEventListener('speechend',e=>{ const g=e.detail.agent; if(g){g.speaking=false;g.voiced=false;if(g.anim==='talk'){g.anim='idle';playRig(g,'idle',true);}if(g._headNodes)for(const h of g._headNodes)h.scaling.y=1;} });
 function nearestTarget(g,range=3.0){ if(state.target && !state.target.isDisposed()) return state.target; let best=null,bd=99; const p=g.root.position; for(const m of state.props.concat(state.blocks)){ if(m.isDisposed()) continue; const d=BABYLON.Vector3.Distance(p,m.position); if(d<bd){ bd=d; best=m; } } return bd<range?best:null; }
-function canRun(kind,spell){ const key=kind==='spell'?'spell.'+spell:kind; return state.allowed.has(key); }
+// Commands a character may use: its own list ("allowed" on the scenario
+// agent, kept in its brain config), else the scenario-wide list.
+function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.allowed; return Array.isArray(own)?new Set(own):state.allowed; }
+function canRun(kind,spell,g=null){ const key=kind==='spell'?'spell.'+spell:kind; return allowedFor(g).has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
 function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
   if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
@@ -2681,7 +2684,7 @@ function parseLLMCommandLine(line){
   if(['look','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(name)) return {kind:name};
   return null;
 }
-function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd) return; if(!canRun(cmd.kind,cmd.spell)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && state.allowed.has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
+function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
   switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
@@ -3091,7 +3094,7 @@ function give(g,item){
   }
   return say(g,`${g.id} gives ${recipient} ${item}`);
 }
-function giveQuest(g,text){ if(!state.allowed.has('give_quest')){ return say(g,'I cannot bestow quests'); } const targets=state.characters.filter(x=>x!==g && BABYLON.Vector3.Distance(g.root.position,x.root.position)<=2.0); if(!targets.length){ return say(g,'no one nearby to quest upon'); } const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI(); }
+function giveQuest(g,text){ if(!allowedFor(g).has('give_quest')){ return say(g,'I cannot bestow quests'); } const targets=state.characters.filter(x=>x!==g && BABYLON.Vector3.Distance(g.root.position,x.root.position)<=2.0); if(!targets.length){ return say(g,'no one nearby to quest upon'); } const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI(); }
 function castSpell(g,spell){ g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,'sparkles are a valid plan'); g.anim='idle'; playRig(g,'idle',true); },220); }
   if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,'physics has been consulted'); g.anim='idle'; },220); return; }
   if(spell==='fireball'){ const target=nearestTarget(g,4.5); const hit=target?.getAbsolutePosition?.() || origin.add(g.dir.scale(3)); fireballVfx(origin.add(new BABYLON.Vector3(0,.85,0)),hit); setTimeout(()=>{ for(const m of state.props.concat(state.blocks)){ if(!m.isDisposed() && BABYLON.Vector3.Distance(hit,m.position)<2.25){ impulse(m,hit.add(new BABYLON.Vector3(0,.1,0)),7.2,.55); damage(m,meta(m)?.flammable?2:1,'fire'); } } for(const other of state.characters){ if(other!==g && BABYLON.Vector3.Distance(hit,other.root.position)<2.4){ other.anim='panic'; say(other,pickRandom(['hot weather attack','the sun is local now','why did you invite fire'])); setTimeout(()=>other.anim='idle',1100); } } say(g,pickRandom(['fireball is basically planning','wood is now bridge ingredients','careful fireball is still careful'])); g.anim='idle'; },420); }
@@ -3354,33 +3357,33 @@ function buildVisiblePerception(agentId=null,radius=7){
     ...(showMap ? legend : []),
   ].join('\n');
 }
-function buildCommandExamples(){
-  const ex=[];
-  if(state.allowed.has('walk')) ex.push('walk(destination): use an absolute coordinate pair or visible map label, e.g. walk("3,5") or walk("C1"); repeat on later turns until arrived');
-  if(state.allowed.has('say')) ex.push('say(text) e.g. say("hello there")');
-  if(state.allowed.has('whisper')) ex.push('whisper(text) - only the player hears it, e.g. whisper("meet me by the boat")');
-  if(state.allowed.has('look')) ex.push('look()');
-  if(state.allowed.has('touch')) ex.push('touch(target) e.g. touch(crate)');
-  if(state.allowed.has('push')) ex.push('push()');
-  if(state.allowed.has('pull')) ex.push('pull()');
-  if(state.allowed.has('carry')) ex.push('carry()');
-  if(state.allowed.has('drop')) ex.push('drop()');
-  if(state.allowed.has('throw')) ex.push('throw()');
-  if(state.allowed.has('dig')) ex.push('dig()');
-  if(state.allowed.has('build')) ex.push('build(thing) e.g. build(wall), optionally at a location: build(wall, "3,5") or build(crate, C1); builds in front of you if no location given');
-  if(state.allowed.has('face')) ex.push('face(direction) e.g. face(n) - rotate without moving (n/s/e/w)');
-  if(state.allowed.has('repair')) ex.push('repair()');
-  if(state.allowed.has('panic')) ex.push('panic()');
-  if(state.allowed.has('emote')) ex.push('emote(name) e.g. emote(dance) - dance, laugh, sit, wave, clap, cheer, sleep, bow');
-  if(state.allowed.has('spell.push')) ex.push('spell(push)');
-  if(state.allowed.has('spell.spark')) ex.push('spell(spark)');
-  if(state.allowed.has('spell.fireball')) ex.push('spell(fireball)');
-  if(state.allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe)');
-  if(state.allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
-  if(state.allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
-  if(state.allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
-  if(state.allowed.has('sell')) ex.push('sell(item, price) e.g. sell("magic sword", 30) - sell an item from your inventory to the person you are chatting with for that many gold');
-  if(state.allowed.has('give')) ex.push('give(item) e.g. give(magic sword) - hand an item to the person you are chatting with');
+function buildCommandExamples(g=null){
+  const ex=[], allowed=allowedFor(g);
+  if(allowed.has('walk')) ex.push('walk(destination): use an absolute coordinate pair or visible map label, e.g. walk("3,5") or walk("C1"); repeat on later turns until arrived');
+  if(allowed.has('say')) ex.push('say(text) e.g. say("hello there")');
+  if(allowed.has('whisper')) ex.push('whisper(text) - only the player hears it, e.g. whisper("meet me by the boat")');
+  if(allowed.has('look')) ex.push('look()');
+  if(allowed.has('touch')) ex.push('touch(target) e.g. touch(crate)');
+  if(allowed.has('push')) ex.push('push()');
+  if(allowed.has('pull')) ex.push('pull()');
+  if(allowed.has('carry')) ex.push('carry()');
+  if(allowed.has('drop')) ex.push('drop()');
+  if(allowed.has('throw')) ex.push('throw()');
+  if(allowed.has('dig')) ex.push('dig()');
+  if(allowed.has('build')) ex.push('build(thing) e.g. build(wall), optionally at a location: build(wall, "3,5") or build(crate, C1); builds in front of you if no location given');
+  if(allowed.has('face')) ex.push('face(direction) e.g. face(n) - rotate without moving (n/s/e/w)');
+  if(allowed.has('repair')) ex.push('repair()');
+  if(allowed.has('panic')) ex.push('panic()');
+  if(allowed.has('emote')) ex.push('emote(name) e.g. emote(dance) - dance, laugh, sit, wave, clap, cheer, sleep, bow');
+  if(allowed.has('spell.push')) ex.push('spell(push)');
+  if(allowed.has('spell.spark')) ex.push('spell(spark)');
+  if(allowed.has('spell.fireball')) ex.push('spell(fireball)');
+  if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe)');
+  if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
+  if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
+  if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
+  if(allowed.has('sell')) ex.push('sell(item, price) e.g. sell("magic sword", 30) - sell an item from your inventory to the person you are chatting with for that many gold');
+  if(allowed.has('give')) ex.push('give(item) e.g. give(magic sword) - hand an item to the person you are chatting with');
   return ex.length?ex:['walk("0,0")'];
 }
 function buildAgentPrompt(g, cfg) {
@@ -3391,8 +3394,8 @@ function buildAgentPrompt(g, cfg) {
   const personality = (cfg.personality || '').replace(/\s+/g, ' ').trim();
   const quest = (cfg.quest || '').replace(/\s+/g, ' ').trim();
   const goal = (cfg.goal || '').replace(/\s+/g, ' ').trim();
-  const canGiveQuest = state.allowed.has('give_quest');
-  const cmds = buildCommandExamples();
+  const canGiveQuest = allowedFor(g).has('give_quest');
+  const cmds = buildCommandExamples(g);
   const recentActs = (cfg.recent || []).slice(-4);
   // Anti-echo instructions are optional and OFF by default - small models can
   // confuse negative prompts ('do not copy', 'never put') and end up doing the
@@ -3410,7 +3413,7 @@ function buildAgentPrompt(g, cfg) {
     '',
     ...(canGiveQuest ? ['Use give_quest() to bestow a quest on nearby agents.'] : []),
     // Small models narrate hand-overs ("here it is") instead of doing them.
-    ...((state.allowed.has('give') || state.allowed.has('sell')) ? ['Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use ' + [state.allowed.has('give') ? 'give(item)' : '', state.allowed.has('sell') ? 'sell(item, price)' : ''].filter(Boolean).join(' or ') + ' in the same reply.'] : []),
+    ...((allowedFor(g).has('give') || allowedFor(g).has('sell')) ? ['Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use ' + [allowedFor(g).has('give') ? 'give(item)' : '', allowedFor(g).has('sell') ? 'sell(item, price)' : ''].filter(Boolean).join(' or ') + ' in the same reply.'] : []),
     'Messages in the form "NAME says ..." report speech addressed to you.',
     'Understand and answer the meaning of that speech; do not copy or quote it back.',
     'Do not output anything except the command line.',
@@ -3435,11 +3438,12 @@ function buildAgentPrompt(g, cfg) {
   return { systemMessage, commandReminder };
 }
 function updatePerceptionUI(){
-  // state.allowed may change outside the checkbox handlers (notably when an
+  // The allowed commands (the selected character's own list, else the
+  // shared one) may change outside the checkbox handlers (notably when an
   // APNG/local save is restored), so always synchronize the controls from the
   // authoritative command set before rendering the prompt.
   document.querySelectorAll('#allowedCommands input[data-command]').forEach(chk=>{
-    chk.checked=state.allowed.has(chk.dataset.command);
+    chk.checked=allowedFor(state.selected).has(chk.dataset.command);
   });
   updateTurnUI();
   const out=document.getElementById('promptOut'); if(!out) return;
@@ -4007,7 +4011,7 @@ function installWorldAPI(){
   window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,
     getAgents:()=>state.characters.slice(), getSelectedAgent:()=>state.selected,
     getBrainConfig, setBrainConfig, refreshAgentSelect,
-    getAllowedCommands:()=>Array.from(state.allowed), canRun,
+    getAllowedCommands:(agentId=null)=>Array.from(allowedFor(state.characters.find(x=>x.id===agentId))), allowedFor, canRun,
     getAgentPerception:(agentId=null,radius=7)=>buildVisiblePerception(agentId,radius), buildVisiblePerception,
     parseInventoryItems, formatInventoryItems, getPlayer:()=>state.player,
     // scenario support (scenario.js)
@@ -4042,10 +4046,13 @@ function setupUI(){
       const lab=document.createElement('label'); lab.className='cmdcheck';
       const chk=document.createElement('input'); chk.type='checkbox'; chk.dataset.command=c; chk.checked=state.allowed.has(c);
       chk.onchange=()=>{
-        chk.checked?state.allowed.add(c):state.allowed.delete(c);
+        // A character with its own list edits that list; otherwise the shared one.
+        const g=state.selected, own=g && Array.isArray(state.brainConfigs.get(g.id)?.allowed);
+        if(own){ const set=allowedFor(g); chk.checked?set.add(c):set.delete(c); setBrainConfig(g.id,{allowed:[...set]}); }
+        else chk.checked?state.allowed.add(c):state.allowed.delete(c);
         document.querySelectorAll('button[data-cmd]').forEach(btn=>{
           const cmd=parseCommand(btn.dataset.cmd);
-          btn.disabled=!!(cmd&&!canRun(cmd.kind,cmd.spell));
+          btn.disabled=!!(cmd&&!canRun(cmd.kind,cmd.spell,state.selected));
         });
         updatePerceptionUI();
       };

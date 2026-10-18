@@ -157,7 +157,7 @@ export function initDemoChat() {
       console.log('[demo-chat] prompt:', JSON.stringify(messages, null, 2));
       // Pass the available commands as native tools so the model uses its
       // <|tool_call_start|>[func(args)]<|tool_call_end|> format.
-      const tools = buildTools(world.getAllowedCommands());
+      const tools = buildTools(world.getAllowedCommands(g.id));
       const input = tokenizer.apply_chat_template(messages, {
         tools,
         add_generation_prompt: true,

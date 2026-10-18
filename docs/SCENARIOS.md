@@ -31,9 +31,10 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "paint": [{ "x": 0, "z": 0, "mat": "water" }],          // optional explicit floor tiles
   "packs": ["https://example.com/my-pack/pack.json"],    // optional extra asset packs (section 4c)
   "player": { "name": "Traveller", "gold": 20, "items": [] }, // + "avatar": false, "at": [x, z], "model": rogue|knight|mage|ranger|barbarian|critter
-  "allowed": ["say", "sell", "inventory", "emote"],      // command checkboxes
+  "allowed": ["say", "sell", "inventory", "emote"],      // default commands for every character
   "agents": [{
     "id": "mog",
+    "allowed": ["say", "sell"],       // optional: this character's own commands (replaces the default)
     "personality": "grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
     "quest": "",                      // optional, same as character setup
     "thinking": false, "showThoughts": true, "ttsVoiceId": "builtin:jean",

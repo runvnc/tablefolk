@@ -69,9 +69,10 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "safety": false,                 // true: crisis-line banner if a message mentions self-harm
   "player": { "name": "Traveller", "gold": 20, "items": [], "at": [0, 3] },
                                    // + "avatar": false, "model": rogue|knight|mage|ranger|barbarian|critter
-  "allowed": ["say", "sell", "inventory", "emote"],
+  "allowed": ["say", "sell", "inventory", "emote"],   // default commands for every character
   "agents": [{
     "id": "mog",                   // 1-24 chars [A-Za-z0-9_-]; also the name used in map lines
+    "allowed": ["say", "sell"],    // optional: this character's own commands (replaces the default)
     "personality": "a grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
     "quest": "",                   // optional private aim
     "model": "critter",              // critter (default) | woman | rogue | knight | mage | ranger | barbarian
@@ -222,7 +223,9 @@ the tile (a hole to the sea; walking onto it is a fall).
 `say walk face look touch push pull carry drop throw dig build repair panic
 emote note give give_quest sell inventory goal whisper spell.push spell.spark
 spell.fireball`. Allow only what the scene needs: fewer choices make small
-models behave. `say` is almost always wanted; add `walk` for movement, `give`
+models behave. The top-level `allowed` is every character's default; an agent's
+own `"allowed"` list replaces it for that character (a guard who can only
+`say` and `face`, a mage with `spell.spark`, a merchant with `sell`). `say` is almost always wanted; add `walk` for movement, `give`
 / `sell` / `inventory` for trading, `emote` for flavour.
 `whisper` is speech only the player hears; characters only hear and see each
 other within `earshot` cells, and overhear what the player says to someone

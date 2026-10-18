@@ -921,6 +921,8 @@
       first = first || g;
       w.setBrainConfig(a.id, {
         enabled: true, style: a.style || 'helpful character', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',
+        // Its own commands, else the scenario's "allowed" list.
+        allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
         ...(a.ttsVoiceId ? { ttsVoiceId: a.ttsVoiceId } : {}), ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
@@ -1060,7 +1062,7 @@
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
         return { id: g.id, ...(g.charModel ? { model: g.charModel } : {}), at: [Math.round(g.root.position.x), Math.round(g.root.position.z)], facing: dirName(g.dir),
-          personality: c.personality || '', ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}),
+          personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}),
           ...(c.showThoughts === false ? { showThoughts: false } : {}), ...(c.ttsVoiceId ? { ttsVoiceId: c.ttsVoiceId } : {}),
           ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}) };
       }),

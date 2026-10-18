@@ -603,7 +603,7 @@ async function main() {
           agentId: g.id,
           messages,
           useGrammar: !chatTestMode,
-          allowedCommands: world.getAllowedCommands(),
+          allowedCommands: world.getAllowedCommands(g.id),
           // Per-character (Character setup). Reasoning needs room before the
           // command lines, so raise the token budget too.
           enableThinking: cfg.thinking === true,
@@ -622,7 +622,7 @@ async function main() {
       // business."), which used to fail as an unknown command. (With thinking
       // on, plain lines are leftover reasoning and are dropped below.)
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
-      const speakPlain = cfg.thinking !== true && world.getAllowedCommands().includes('say');
+      const speakPlain = cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
       let saidPlain = false;
       const planCmds = planLines.map(l => {
         if (speakPlain && !looksLikeCommand(l)) {
@@ -674,7 +674,7 @@ async function main() {
       // Said it handed something over but issued no give()/sell(): tell it,
       // so the next turn can actually do it (small models often narrate the
       // hand-over instead of using the command).
-      const allowedNow = world.getAllowedCommands();
+      const allowedNow = world.getAllowedCommands(g.id);
       const saidNow = planCmds.filter(c => c.kind === 'say').map(c => c.text || '').join(' ');
       const handedOver = planCmds.some(c => c.kind === 'give' || c.kind === 'sell');
       if (!handedOver && (allowedNow.includes('give') || allowedNow.includes('sell'))
