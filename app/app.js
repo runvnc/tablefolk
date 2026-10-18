@@ -3811,7 +3811,7 @@ async function addTerrainPolish(scene){
   try{ groundBody.shape.filterMembershipMask=GROUND_FILTER; }catch{}
 }
 
-async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; const scene=new BABYLON.Scene(engine); state.scene=scene; scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
+async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; addEventListener('pagehide',()=>{ try{ engine.dispose(); }catch{} }); const scene=new BABYLON.Scene(engine); state.scene=scene; scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
   scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk)); if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
   // Initial three-quarter composition: house high-right, fire/character left of
   // centre, and the near tree/crates framing the lower-right foreground.

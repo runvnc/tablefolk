@@ -30,7 +30,7 @@ function getWorker() {
     // Classic (not module) worker on purpose - see the comment at the top of
     // litert-worker.js for why a module worker breaks the library's own
     // importScripts()-based WASM glue loader.
-    worker = new Worker('./llm_js/litert-worker.js?v=20261018a');
+    worker = new Worker('./llm_js/litert-worker.js?v=20261019a');
     worker.onmessage = (e) => {
       const { id, type } = e.data;
       const p = pending.get(id);
@@ -48,6 +48,17 @@ function getWorker() {
   }
   return worker;
 }
+
+// Leaving or reloading the page: end the worker now, which frees the model's
+// GPU memory (gigabytes) at once instead of whenever the old page is collected.
+// A page restored from the back/forward cache has lost its worker: reload it.
+addEventListener('pagehide', () => {
+  if (!worker) return;
+  worker.terminate();
+  worker = null; loaded = false; currentModel = null;
+  for (const [id, p] of pending) { p.reject(new Error('page closed')); pending.delete(id); }
+});
+addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
 function call(type, payload = {}, { onProgress, onToken } = {}) {
   const id = nextId++;

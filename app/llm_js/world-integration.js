@@ -1,6 +1,6 @@
-import { createAgentBrainManager } from './agent-brain.js?v=20261018a';
-import { installDevConsole } from './dev-console.js?v=20261018a';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261018a';
+import { createAgentBrainManager } from './agent-brain.js?v=20261019a';
+import { installDevConsole } from './dev-console.js?v=20261019a';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261019a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
@@ -439,6 +439,7 @@ async function main() {
     // are looking at. Buttons stay disabled.
     shouldLoad = false;
     setStatus('local brain disabled (art review mode)');
+    el('modelLoadNotice')?.classList.add('hidden');
     appendLog('art review mode: LLM load skipped');
   } else if (getActiveEngine(manager) === 'transformers.js' || getActiveEngine(manager) === 'wllama3') {
     // GPU/WebGPU engines never auto-load, even if cached and even if this model

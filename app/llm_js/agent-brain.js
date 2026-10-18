@@ -2,8 +2,8 @@ import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from 
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
 import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261018a';
 import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261018a';
-import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261018a';
-import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261018a';
+import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261019a';
+import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261019a';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
