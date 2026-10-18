@@ -3144,11 +3144,22 @@ async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   const rm=new BABYLON.StandardMaterial('player_ring_mat',state.scene); rm.emissiveColor=new BABYLON.Color3(1,.75,.25); rm.disableLighting=true; rm.alpha=.85;
   ring.material=rm; ring.isPickable=false; ring.parent=g.root; ring.position.y=.04/(g.root.scaling.y||1);
   g.playerRing=ring;
+  setCameraArrowKeys(false);
   updateFirstPersonButton(); updatePerceptionUI();
   return g;
 }
+// The overview camera turns on the arrow keys by default. With an avatar the
+// arrows walk it, and the camera swinging at the same time changed what
+// "forward" meant mid-walk (up/down seemed swapped), so they only walk then.
+function setCameraArrowKeys(on){
+  const cam=state.camera; if(!cam) return;
+  cam._tfKeys ||= {up:cam.keysUp.slice(),down:cam.keysDown.slice(),left:cam.keysLeft.slice(),right:cam.keysRight.slice()};
+  cam.keysUp=on?cam._tfKeys.up.slice():[]; cam.keysDown=on?cam._tfKeys.down.slice():[];
+  cam.keysLeft=on?cam._tfKeys.left.slice():[]; cam.keysRight=on?cam._tfKeys.right.slice():[];
+}
 function removePlayerAvatar(){
   const g=state.playerAvatar; if(!g) return;
+  setCameraArrowKeys(true);
   if(state.firstPerson) setFirstPerson(false);
   try{ g.playerRing?.material?.dispose(); g.playerRing?.dispose(); }catch{}
   disposeCharacter(g); state.playerAvatar=null; updateFirstPersonButton();
