@@ -2037,7 +2037,7 @@ function startTurnMove(g,d,distance=null){
   const start=new BABYLON.Vector3(lp.x,0,lp.z);
   const travel=distance==null ? (g.stepDistance||1.0) : Math.max(0,Number(distance)||0);
   const end=start.add(d.scale(travel));
-  end.x=clamp(end.x,-15.5,15.5); end.z=clamp(end.z,-15.5,15.5); end.y=0;
+  end.x=clamp(end.x,-WORLD.halfW-2.5,WORLD.halfW+2.5); end.z=clamp(end.z,-WORLD.halfH-2.5,WORLD.halfH+2.5); end.y=0;
   const actual=BABYLON.Vector3.Distance(start,end);
   g.turnMove={start,end,t:0,dur:Math.max(.48,actual*.32)};
   g.collider?.physicsBody?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
@@ -3170,7 +3170,11 @@ function cameraCardinal(which){
   let v=new BABYLON.Vector3(f.x,0,f.z); if(which==='right') v=new BABYLON.Vector3(-f.z,0,f.x); if(which==='back') v=v.scale(-1); if(which==='left') v=new BABYLON.Vector3(f.z,0,-f.x);
   return Math.abs(v.x)>Math.abs(v.z) ? new BABYLON.Vector3(Math.sign(v.x),0,0) : new BABYLON.Vector3(0,0,Math.sign(v.z));
 }
-function turnPlayer(sign){ const g=state.playerAvatar; if(!g || g.turnMove) return; const d=g.dir; setCharacterFacing(g,new BABYLON.Vector3(-d.z*sign,0,d.x*sign)); if(state.firstPerson) state.fpYaw=Math.atan2(g.dir.x,g.dir.z); }
+// First person: the grid direction you are looking along. Movement keys use
+// this, not the avatar's body (the body could lag the view: look around while
+// a step was under way and W would then walk the way the body still faced).
+function fpForward(){ const yx=Math.sin(state.fpYaw??0), yz=Math.cos(state.fpYaw??0); return Math.abs(yx)>Math.abs(yz) ? new BABYLON.Vector3(Math.sign(yx),0,0) : new BABYLON.Vector3(0,0,Math.sign(yz)); }
+function turnPlayer(sign){ const g=state.playerAvatar; if(!g || g.turnMove) return; const d=state.firstPerson ? fpForward() : g.dir; setCharacterFacing(g,new BABYLON.Vector3(-d.z*sign,0,d.x*sign)); if(state.firstPerson) state.fpYaw=Math.atan2(g.dir.x,g.dir.z); }
 // First-person mouse look: drag to turn/tilt the view; the avatar turns to
 // the nearest grid direction you're looking along.
 function setupFirstPersonLook(){
@@ -3198,7 +3202,8 @@ function setupPlayerControls(){
     if(state.firstPerson){
       if(act==='left') return turnPlayer(1);
       if(act==='right') return turnPlayer(-1);
-      return playerStep(act==='fwd'?g.dir.clone():g.dir.scale(-1));
+      const f=fpForward();
+      return playerStep(act==='fwd'?f:f.scale(-1));
     }
     playerStep(cameraCardinal(act==='fwd'?'fwd':act));
   });
@@ -3238,6 +3243,8 @@ function updateFirstPersonView(dt){
   const g=state.playerAvatar; if(!state.firstPerson || !g || !fpCam) return;
   const s=g.root.scaling.y||.87, p=g.root.position;
   fpCam.position.set(p.x,p.y+(g.eyeHeight||.92*s/.87),p.z);
+  // Keep the body facing where you look once a step has finished.
+  if(!g.turnMove){ const f=fpForward(); if(f.x!==g.dir.x || f.z!==g.dir.z) setCharacterFacing(g,f); }
   // Look direction is free (mouse drag); the avatar faces its grid-snapped
   // version, so W walks where you look.
   let d=(state.fpYaw??0)-fpCam.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
