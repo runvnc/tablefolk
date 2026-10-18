@@ -103,9 +103,18 @@ Besides the static files it serves:
   brain (pick "OpenAI-compatible endpoint" in the model menu). Settings:
   `LLM_BASE_URL` (a URL, `openrouter` or `local`), `LLM_API_KEY`, `LLM_MODEL`.
 - `/api/local/v1/...`: the same, to `litert-lm serve` on this machine.
-- `/world/<prompt>`: writes a scenario from the prompt and opens it.
-  Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
-  `openai/gpt-6-luna` on OpenRouter).
+- `/world/<prompt>`: writes a scenario from the prompt and opens it, e.g.
+  `http://localhost:8000/world/a+small+dungeon+with+a+sorceress+and+goblins`.
+  A built-in agent runs a condensed scenario skill (`server/fast-skill.md`) in
+  one pass (plus one repair round if the checks fail), with any of the three
+  map methods: `?mode=generate` (procedural dungeon/village, characters put in
+  rooms by role), `?mode=grid` (ASCII map), `?mode=map` (layout lines), or
+  the default `auto`. `?endpoint=local` uses `litert-lm serve` (Gemma 4 E4B),
+  `?model=` any other model; `?art=1` / `?brain=endpoint` are passed on to the
+  app. Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
+  `openai/gpt-6-luna` on OpenRouter). Timings seen: 6-14 s with gpt-6-luna,
+  ~22 s with local E4B on an RTX 2060. Every result is saved in `generated/`.
+  `/api/generate?prompt=...` returns the JSON (`&stream=1` for progress events).
 
 Settings come from the environment or `.env` (`OPENROUTER_API_KEY=` is used for
 OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since

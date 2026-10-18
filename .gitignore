@@ -11,3 +11,4 @@ r2.txt
 # browser test tooling
 tools/browser-test/node_modules/
 tools/browser-test/results/
+generated/
