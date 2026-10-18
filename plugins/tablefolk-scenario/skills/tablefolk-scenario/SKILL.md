@@ -68,14 +68,19 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "earshot": 6,                    // characters hear/see each other within this many cells
   "safety": false,                 // true: crisis-line banner if a message mentions self-harm
   "player": { "name": "Traveller", "gold": 20, "items": [], "at": [0, 3] },
-                                   // + "avatar": false, "model": rogue|knight|mage|ranger|barbarian|critter
+                                   // + "avatar": false, "model": any body below (e.g. adventurer)
   "allowed": ["say", "sell", "inventory", "emote"],   // default commands for every character
   "agents": [{
     "id": "mog",                   // 1-24 chars [A-Za-z0-9_-]; also the name used in map lines
     "allowed": ["say", "sell"],    // optional: this character's own commands (replaces the default)
     "personality": "a grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
     "quest": "",                   // optional private aim
-    "model": "critter",              // critter (default) | woman | rogue | knight | mage | ranger | barbarian
+    "model": "villager",             // critter (default); people: adventurer adventurer_woman hooded king farmer
+                                     // villager witch wizard; monsters: skeleton skeleton_warrior zombie goblin
+                                     // kobold orc rat spider wolf bat ghost slime demon giant dragon; older chibi
+                                     // people: woman rogue knight mage ranger barbarian
+    "hostile": false,                // true: fights the player with a built-in routine, no LLM (default true
+                                     // for mindless monsters: skeletons, zombie, rat, spider, wolf, bat, slime...)
     "style": "grumpy old shopkeeper",   // what the character is, for its prompt
     "inventory": { "gold": 0, "items": [{ "name": "magic sword", "qty": 1 }] },
     "at": [0, -3], "facing": "s",  // optional; or place it with a map line
@@ -186,7 +191,14 @@ Grid digits are the agents in order: reordering `agents` moves them.
   fills a wall cell (put `+` in a wall run in the grid): a person-height wooden leaf with the
   wall carried over the top; it swings open as anyone approaches, so doorways stay passable.
 - items: `chest table bench stool workbench cauldron anvil weapon_stand axe
-  pickaxe bucket bag potion scroll coin_pile apple_crate carrot_crate`
+  pickaxe bucket bag potion scroll coin_pile apple_crate carrot_crate`. Loot:
+  `chest` and `iron_chest` take `"gold"` and `"items"` (the player opens them
+  with E and takes it all); `coin_pile` takes `"gold"` and is picked up by
+  walking over it; potions, scrolls and tools are picked up with E.
+- village: `well market_stand market_stalls cart broken_cart tent logs bed
+  double_bed bookcase banner wall_banner target dummy pumpkin statue torch
+  iron_chest fantasy_house stable windmill watch_tower bell_tower`
+  (bookcases and wall banners turn their backs to an adjacent wall)
 - modern: `desk office_chair armchair sofa coffee_table floor_lamp plant
   bookshelf` (front faces south; `ry` turns them)
 - outdoors: `tree house boulder campfire lantern fence signpost` (solid),

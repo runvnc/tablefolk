@@ -13,11 +13,15 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "lighting": "bright",              // or "night"
   "walls": "stone",                  // or "tabletop", "modern"
   "wallHeight": 2,                   // always 2: person-height doors and first person need it
-  "player": { "name": "Traveller", "gold": 10, "items": [] },
+  "player": { "name": "Traveller", "gold": 10, "items": [], "model": "adventurer" },
   "allowed": ["say", "walk", "face", "emote"],   // default commands for every character
   "agents": [ {
     "id": "vexa",                    // 1-24 chars [A-Za-z0-9_-], unique
-    "model": "mage",                 // critter | woman | rogue | knight | mage | ranger | barbarian
+    "model": "wizard",               // people: adventurer adventurer_woman hooded king farmer villager witch wizard
+                                     // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon
+                                     // (older chibi bodies: critter woman rogue knight mage ranger barbarian)
+    "hostile": true,                 // optional: fights the player with a built-in routine, no LLM (default true for mindless monsters)
+    "hp": 6,                         // optional, default 10
     "style": "proud sorceress",      // what the character is, a few words
     "personality": "Vexa, a sorceress who ... (the character's whole brief: who they are, what they want, hard facts, secrets, what they will and won't do, which commands to use when)",
     "allowed": ["say", "walk", "emote"],   // optional, replaces the default list for this character
@@ -38,6 +42,14 @@ Commands: say whisper walk face emote give sell inventory look carry drop
 build note attack wield spell.spark spell.fireball. Allow only what the scene needs:
 `say` almost always, `walk` to move, `give`/`sell`/`inventory` for trading
 (give needs the player within 3 cells), `whisper` = only the player hears.
+Monsters: skeletons, zombies, rats, spiders, wolves, bats, slimes, ghosts are
+hostile by default: when the player is near they close in and attack (no
+LLM, no personality needed). Goblins, kobolds and orcs talk unless "hostile":
+true. Loot: {"type": "chest", "x": 2, "z": -1, "gold": 30, "items": ["silver
+key"]} (or "in": "treasure"); the player opens it with E. Coin piles hold
+"gold". Village props: well market_stand market_stalls cart tent logs bed
+bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
+fantasy_house stable windmill watch_tower bell_tower.
 Combat: agents and the player have "hp" (default 10); "wield": "iron sword"
 puts a weapon in hand. attack(target) strikes someone adjacent; allow it only
 for fighters and say in the personality when they attack. The player can

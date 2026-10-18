@@ -27,6 +27,13 @@
     [/club|cudgel|bat\b|stick|branch|pickaxe|pick\b|staff|cane|rolling pin|frying pan/i, { dmg: 2, kind: 'club' }],
   ];
   const weaponFor = name => { for (const [re, w] of WEAPONS) if (re.test(name || '')) return { ...w, name }; return null; };
+  // Monsters fight with what they are (model, see FIGURES in app.js).
+  const NATURAL = {
+    skeleton: { dmg: 2, name: 'rusty blade' }, skeleton_warrior: { dmg: 3, name: 'notched sword' }, zombie: { dmg: 2, name: 'rotting claws' },
+    rat: { dmg: 1, name: 'teeth' }, spider: { dmg: 2, name: 'venomous fangs' }, wolf: { dmg: 2, name: 'fangs' }, bat: { dmg: 1, name: 'fangs' },
+    slime: { dmg: 1, name: 'acid' }, ghost: { dmg: 2, name: 'chilling touch' }, giant: { dmg: 4, name: 'huge fists' }, demon: { dmg: 3, name: 'claws' },
+    dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
+  };
 
   // ------------------------------------------------------------ hit points
   const isPlayer = g => g && g === state.playerAvatar;
@@ -161,30 +168,32 @@
     if (!v) { narrate(g, `attack failed: no ${target || 'one'} to attack${target ? '' : ' within reach'}`); if (isPlayer(g)) window.tablefolkToast?.(target ? `no ${target} here` : 'nobody within reach', { type: 'error' }); return; }
     const d = gap(g, v);
     if (d > REACH) { narrate(g, `attack failed: ${nameOf(v)} is ${d.toFixed(1)} cells away; walk next to them first`); if (isPlayer(g)) window.tablefolkToast?.(`${nameOf(v)} is too far away`, { type: 'error' }); return; }
-    const wName = wielded(g), w = (wName && weaponFor(wName)) || (wName ? { dmg: 2, kind: 'club', name: wName } : { dmg: 1, kind: 'fists', name: 'fists' });
+    const nat = !isPlayer(g) && NATURAL[g.charModel];
+    const wName = wielded(g), w = (wName && weaponFor(wName)) || (wName ? { dmg: 2, kind: 'club', name: wName } : nat ? { ...nat, kind: 'natural' } : { dmg: 1, kind: 'fists', name: 'fists' });
     // face the target and swing
     try { setCharacterFacing(g, new BABYLON.Vector3(v.root.position.x - g.root.position.x, 0, v.root.position.z - g.root.position.z).normalize()); } catch {}
     const clip = w.kind === 'fists' ? ['Melee_Unarmed_Attack_Punch_A', 'Melee_Unarmed_Attack_Kick'] : w.two ? ['Melee_2H_Attack_Chop', 'Melee_2H_Attack_Slice'] : w.kind === 'dagger' || w.kind === 'spear' ? ['Melee_1H_Attack_Stab'] : ['Melee_1H_Attack_Chop', 'Melee_1H_Attack_Slice_Diagonal', 'Melee_1H_Attack_Slice_Horizontal'];
     playClip(g, clip, 900);
     const miss = Math.random() < .15, dmg = miss ? 0 : w.dmg + (Math.random() < .35 ? 1 : 0);
     const who = nameOf(g), whom = nameOf(v);
+    const wThe = w.kind === 'natural' ? 'its ' + w.name : w.name === 'fists' ? 'bare fists' : 'the ' + w.name, wA = w.kind === 'natural' ? 'its ' + w.name : withA(w.name);
     // the player's swing is a turn: nearby characters act after it (play.js)
     if (isPlayer(g)) setTimeout(() => window.tablefolkPlay?.acted('attack'), 450);
     setTimeout(() => {
       if (v.defeated) return;
       window.tablefolkSfx?.play(miss ? 'miss' : 'hit', v.root.position);
-      if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${w.name === 'fists' ? 'bare fists' : 'the ' + w.name} and misses`); tellVictim(v, `[event] ${who} attacks you with ${withA(w.name)} and misses!`); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${withA(w.name)} and misses.`); return; }
+      if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${wThe} and misses`); tellVictim(v, `[event] ${who} attacks you with ${wA} and misses!`); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} and misses.`); return; }
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
       playClip(v, ['Hit_A', 'Hit_B'], 500);
       if (!left) {
-        narrate(g, `${who} hits ${whom} with ${w.name === 'fists' ? 'bare fists' : 'the ' + w.name} for ${dmg}: ${whom} is defeated`);
+        narrate(g, `${who} hits ${whom} with ${wThe} for ${dmg}: ${whom} is defeated`);
         defeat(v, who);
-        tellWitnesses(g, v, `[event] ${who} strikes down ${whom} with ${withA(w.name)}. ${whom} is defeated.`);
+        tellWitnesses(g, v, `[event] ${who} strikes down ${whom} with ${wA}. ${whom} is defeated.`);
       } else {
-        narrate(g, `${who} hits ${whom} with ${w.name === 'fists' ? 'bare fists' : 'the ' + w.name} for ${dmg} (${whom}: ${left}/${max} health)`);
-        tellVictim(v, `[event] ${who} attacks you with ${withA(w.name)}! You lose ${dmg} health (${left}/${max} left).`);
-        tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${withA(w.name)} (${whom}: ${left}/${max} health).`);
+        narrate(g, `${who} hits ${whom} with ${wThe} for ${dmg} (${whom}: ${left}/${max} health)`);
+        tellVictim(v, `[event] ${who} attacks you with ${wA}! You lose ${dmg} health (${left}/${max} left).`);
+        tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} (${whom}: ${left}/${max} health).`);
       }
     }, 380);
   }

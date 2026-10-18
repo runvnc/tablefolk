@@ -30,7 +30,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "floor": "stone",                                      // optional: paint the whole floor
   "paint": [{ "x": 0, "z": 0, "mat": "water" }],          // optional explicit floor tiles
   "packs": ["https://example.com/my-pack/pack.json"],    // optional extra asset packs (section 4c)
-  "player": { "name": "Traveller", "gold": 20, "items": [] }, // + "avatar": false, "at": [x, z], "model": rogue|knight|mage|ranger|barbarian|critter
+  "player": { "name": "Traveller", "gold": 20, "items": [] }, // + "avatar": false, "at": [x, z], "model": any agent model (default rogue)
   "allowed": ["say", "sell", "inventory", "emote"],      // default commands for every character
   "agents": [{
     "id": "mog",
@@ -38,7 +38,8 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
     "personality": "grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
     "quest": "",                      // optional, same as character setup
     "thinking": false, "showThoughts": true, "ttsVoiceId": "builtin:jean",
-    "model": "woman",                 // optional body: woman | rogue | knight | mage | ranger | barbarian (default: critter)
+    "model": "villager",              // optional body (default: critter), see "Bodies" below
+    "hostile": false,                 // optional: true fights the player with a built-in routine (no LLM)
     "style": "calm, kind woman",      // optional: what the character is, for its prompt
     "inventory": { "gold": 0, "items": [{ "name": "magic sword", "qty": 1 }] },
     "at": [0, -3], "facing": "s"       // optional; or place it in "map"
@@ -61,6 +62,27 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   }
 }
 ```
+
+**Bodies** (`model`, for agents and the player): people `adventurer
+adventurer_woman hooded king farmer villager witch wizard`; monsters
+`skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost
+slime demon giant dragon` (Quaternius models with their own animations,
+`app.js` `FIGURES`); and the older chibi KayKit people `woman rogue knight
+mage ranger barbarian`, or the clay `critter`.
+
+**Hostile characters** (`play.js`): an agent with `"hostile": true` (default
+for the mindless monsters: skeletons, zombie, rat, spider, wolf, bat, slime,
+ghost, giant, demon, dragon) takes no LLM turns. After each player action
+(a step, an attack, using something) every character within earshot acts
+once, nearest first: hostile ones close in two cells and attack with their
+natural weapon (combat.js `NATURAL`), the others take an LLM turn when the
+brain is loaded. The player waits meanwhile ("bones' turn").
+
+**Loot**: chests (`chest`, `iron_chest`) take `"gold"` and `"items"` in
+`objects`; the player opens one with E and takes everything. A chest without
+either holds a little gold and sometimes a healing potion. `coin_pile` takes
+`"gold"` (default 10-30) and is picked up by walking over it; `potion scroll
+axe pickaxe bag bucket` are picked up with E (`"name"` renames the item).
 
 `objects` and `map` can be combined: explicit objects are placed first and the
 layout engine works around them. **From current world** in the Scenario pane
@@ -85,7 +107,11 @@ floor <material>
   `counter` (a row of three wall sections), outdoor pieces `tree house boulder
   flowers grass_tuft campfire lantern light fence signpost lily_pad`, the items `chest table bench stool
   workbench cauldron anvil weapon_stand axe pickaxe bucket bag potion scroll
-  coin_pile apple_crate carrot_crate`, the modern set `desk office_chair
+  coin_pile apple_crate carrot_crate`, the village set `well market_stand
+  market_stalls cart broken_cart tent logs bed double_bed bookcase banner
+  wall_banner target dummy pumpkin statue torch iron_chest fantasy_house
+  stable windmill watch_tower bell_tower` (bookcases and wall banners turn
+  their backs to an adjacent wall), the modern set `desk office_chair
   armchair sofa coffee_table floor_lamp plant bookshelf` (front faces south;
   give `ry` in `objects` to turn them), or an agent id (places that character).
 - **floor tiles**: `paint <material> [xN] <placement>` lays painted tiles
