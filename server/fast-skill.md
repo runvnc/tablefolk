@@ -76,7 +76,7 @@ One glyph per cell, top row = north, rows equal length (odd sizes 7-41).
 Floors: , grass  : dirt  ^ stone  = wood  _ oak  ~ water  & lava  - sea (hole)
 Objects: # wall  + door (in a doorway: a wall cell either side)  C crate  B barrel  h chest  t table (tt = one table)  n bench
 s stool  o cauldron  a anvil  W weapon_stand  / axe  p pickaxe  u bucket  b bag
-P potion  S scroll  $ coin_pile  K bookshelf  A armchair  D desk  v plant
+P potion  S scroll  $ coin_pile  K bookcase  A armchair  D desk  v plant
 l floor_lamp  M mushroom  L lamp  N note  % tree  H house  r boulder
 X campfire  f fence  I signpost  j lantern  * flowers
 Characters: 1-9 = agents in order; Y = player. "." = empty board.

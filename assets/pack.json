@@ -2,30 +2,735 @@
   "id": "core",
   "name": "Tablefolk core",
   "version": 1,
-  "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt. Nature and house models in models/props/gen/ were generated for Tablefolk.",
+  "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt. Nature and house models in models/props/gen/ were generated for Tablefolk. Village props in models/props/village/ and characters in models/characters/quaternius/: Quaternius via Poly Pizza (see the LICENSE.txt files there).",
   "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy, or fit: \"height\"/\"footprint\" to size the model to h or w/d), decor (no collision, not on the characters' map), optional aliases and tags.",
   "items": {
-    "chest": {"file": "models/props/Chest_Wood.gltf", "w": 1.05, "h": 0.75, "d": 0.75, "mass": 1.2, "scale": 0.55, "visualYOffset": 0.38, "flammable": true, "tags": ["fantasy"], "aliases": ["trunk", "treasure"]},
-    "table": {"file": "models/props/Table_Large.gltf", "w": 1.35, "h": 0.85, "d": 0.95, "static": true, "scale": 0.72, "visualYOffset": 0.43, "flammable": true, "tags": ["fantasy"]},
-    "bench": {"file": "models/props/Bench.gltf", "w": 1.35, "h": 0.55, "d": 0.55, "static": true, "scale": 0.88, "visualYOffset": 0.28, "flammable": true, "tags": ["fantasy"]},
-    "stool": {"file": "models/props/Stool.gltf", "w": 0.55, "h": 0.55, "d": 0.55, "mass": 0.7, "scale": 0.78, "visualYOffset": 0.28, "flammable": true, "tags": ["fantasy"], "aliases": ["seat"]},
-    "workbench": {"file": "models/props/Workbench.gltf", "w": 1.35, "h": 0.85, "d": 0.75, "static": true, "scale": 0.82, "visualYOffset": 0.43, "flammable": true, "tags": ["fantasy"]},
-    "cauldron": {"file": "models/props/Cauldron.gltf", "w": 0.8, "h": 0.7, "d": 0.8, "mass": 1.4, "scale": 0.68, "visualYOffset": 0.34, "flammable": false, "material": "metal", "tags": ["fantasy"], "aliases": ["pot"]},
-    "anvil": {"file": "models/props/Anvil.gltf", "w": 0.9, "h": 0.55, "d": 0.48, "mass": 2.4, "scale": 0.75, "visualYOffset": 0.28, "flammable": false, "material": "metal", "tags": ["fantasy"]},
-    "weapon_stand": {"file": "models/props/WeaponStand.gltf", "w": 1, "h": 1.25, "d": 0.55, "static": true, "scale": 0.72, "visualYOffset": 0.62, "flammable": true, "tags": ["fantasy"], "aliases": ["rack", "weapons"]},
-    "axe": {"file": "models/props/Axe_Bronze.gltf", "w": 0.25, "h": 0.75, "d": 0.25, "mass": 0.4, "scale": 0.75, "visualYOffset": 0.38, "flammable": false, "material": "metal", "tags": ["fantasy"]},
-    "pickaxe": {"file": "models/props/Pickaxe_Bronze.gltf", "w": 0.25, "h": 0.75, "d": 0.25, "mass": 0.4, "scale": 0.75, "visualYOffset": 0.38, "flammable": false, "material": "metal", "tags": ["fantasy"]},
-    "bucket": {"file": "models/props/Bucket_Wooden_1.gltf", "w": 0.55, "h": 0.62, "d": 0.55, "mass": 0.6, "scale": 0.72, "visualYOffset": 0.31, "flammable": true, "tags": ["fantasy"]},
-    "bag": {"file": "models/props/Bag.gltf", "w": 0.55, "h": 0.62, "d": 0.55, "mass": 0.45, "scale": 0.85, "visualYOffset": 0.31, "flammable": true, "tags": ["fantasy"], "aliases": ["sack"]},
-    "potion": {"file": "models/props/Potion_1.gltf", "w": 0.32, "h": 0.48, "d": 0.32, "mass": 0.28, "scale": 0.72, "visualYOffset": 0.24, "flammable": false, "material": "glass", "tags": ["fantasy"], "aliases": ["bottle"]},
-    "scroll": {"file": "models/props/Scroll_1.gltf", "w": 0.45, "h": 0.25, "d": 0.45, "mass": 0.22, "scale": 0.75, "visualYOffset": 0.13, "flammable": true, "tags": ["fantasy"]},
-    "coin_pile": {"file": "models/props/Coin_Pile.gltf", "w": 0.55, "h": 0.28, "d": 0.55, "mass": 0.35, "scale": 0.75, "visualYOffset": 0.14, "flammable": false, "material": "metal", "tags": ["fantasy"], "aliases": ["coins", "coin", "gold"]},
-    "apple_crate": {"file": "models/props/FarmCrate_Apple.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["apples"]},
-    "carrot_crate": {"file": "models/props/FarmCrate_Carrot.gltf", "w": 1, "h": 0.75, "d": 0.9, "mass": 1.25, "scale": 0.82, "visualYOffset": 0.37, "flammable": true, "tags": ["fantasy"], "aliases": ["carrots"]},
-    "tree": {"file": "models/props/gen/tree.1k.glb", "w": 0.9, "h": 2.4, "d": 0.9, "static": true, "fit": "height", "clay": true, "flammable": true, "tags": ["nature"], "aliases": ["pine"]},
-    "house": {"file": "models/props/gen/house.1k.glb", "w": 2.3, "h": 2.2, "d": 2.3, "static": true, "fit": "footprint", "visualRy": 3.14159, "clay": true, "flammable": true, "tags": ["building"], "aliases": ["cottage", "hut", "cabin"]},
-    "boulder": {"file": "models/props/gen/rock_boulder3.1k.glb", "w": 0.9, "h": 0.7, "d": 0.9, "static": true, "fit": "footprint", "clay": true, "material": "stone", "flammable": false, "tags": ["nature"], "aliases": ["rock"]},
-    "flowers": {"file": "models/props/gen/daisy_clump.1k.glb", "w": 0.6, "h": 0.3, "d": 0.6, "decor": true, "fit": "footprint", "clay": true, "tags": ["nature"], "aliases": ["daisies", "flower"]},
-    "grass_tuft": {"file": "models/props/gen/blade_cluster.1k.glb", "w": 0.6, "h": 0.35, "d": 0.6, "decor": true, "fit": "footprint", "clay": true, "tags": ["nature"], "aliases": ["tuft", "tufts"]}
+    "chest": {
+      "file": "models/props/Chest_Wood.gltf",
+      "w": 1.05,
+      "h": 0.75,
+      "d": 0.75,
+      "mass": 1.2,
+      "scale": 0.55,
+      "visualYOffset": 0.38,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "trunk",
+        "treasure"
+      ]
+    },
+    "table": {
+      "file": "models/props/Table_Large.gltf",
+      "w": 1.35,
+      "h": 0.85,
+      "d": 0.95,
+      "static": true,
+      "scale": 0.72,
+      "visualYOffset": 0.43,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "bench": {
+      "file": "models/props/Bench.gltf",
+      "w": 1.35,
+      "h": 0.55,
+      "d": 0.55,
+      "static": true,
+      "scale": 0.88,
+      "visualYOffset": 0.28,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "stool": {
+      "file": "models/props/Stool.gltf",
+      "w": 0.55,
+      "h": 0.55,
+      "d": 0.55,
+      "mass": 0.7,
+      "scale": 0.78,
+      "visualYOffset": 0.28,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "seat"
+      ]
+    },
+    "workbench": {
+      "file": "models/props/Workbench.gltf",
+      "w": 1.35,
+      "h": 0.85,
+      "d": 0.75,
+      "static": true,
+      "scale": 0.82,
+      "visualYOffset": 0.43,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "cauldron": {
+      "file": "models/props/Cauldron.gltf",
+      "w": 0.8,
+      "h": 0.7,
+      "d": 0.8,
+      "mass": 1.4,
+      "scale": 0.68,
+      "visualYOffset": 0.34,
+      "flammable": false,
+      "material": "metal",
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "pot"
+      ]
+    },
+    "anvil": {
+      "file": "models/props/Anvil.gltf",
+      "w": 0.9,
+      "h": 0.55,
+      "d": 0.48,
+      "mass": 2.4,
+      "scale": 0.75,
+      "visualYOffset": 0.28,
+      "flammable": false,
+      "material": "metal",
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "weapon_stand": {
+      "file": "models/props/WeaponStand.gltf",
+      "w": 1,
+      "h": 1.25,
+      "d": 0.55,
+      "static": true,
+      "scale": 0.72,
+      "visualYOffset": 0.62,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "rack",
+        "weapons"
+      ]
+    },
+    "axe": {
+      "file": "models/props/Axe_Bronze.gltf",
+      "w": 0.25,
+      "h": 0.75,
+      "d": 0.25,
+      "mass": 0.4,
+      "scale": 0.75,
+      "visualYOffset": 0.38,
+      "flammable": false,
+      "material": "metal",
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "pickaxe": {
+      "file": "models/props/Pickaxe_Bronze.gltf",
+      "w": 0.25,
+      "h": 0.75,
+      "d": 0.25,
+      "mass": 0.4,
+      "scale": 0.75,
+      "visualYOffset": 0.38,
+      "flammable": false,
+      "material": "metal",
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "bucket": {
+      "file": "models/props/Bucket_Wooden_1.gltf",
+      "w": 0.55,
+      "h": 0.62,
+      "d": 0.55,
+      "mass": 0.6,
+      "scale": 0.72,
+      "visualYOffset": 0.31,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "bag": {
+      "file": "models/props/Bag.gltf",
+      "w": 0.55,
+      "h": 0.62,
+      "d": 0.55,
+      "mass": 0.45,
+      "scale": 0.85,
+      "visualYOffset": 0.31,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "sack"
+      ]
+    },
+    "potion": {
+      "file": "models/props/Potion_1.gltf",
+      "w": 0.32,
+      "h": 0.48,
+      "d": 0.32,
+      "mass": 0.28,
+      "scale": 0.72,
+      "visualYOffset": 0.24,
+      "flammable": false,
+      "material": "glass",
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "bottle"
+      ]
+    },
+    "scroll": {
+      "file": "models/props/Scroll_1.gltf",
+      "w": 0.45,
+      "h": 0.25,
+      "d": 0.45,
+      "mass": 0.22,
+      "scale": 0.75,
+      "visualYOffset": 0.13,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "coin_pile": {
+      "file": "models/props/Coin_Pile.gltf",
+      "w": 0.55,
+      "h": 0.28,
+      "d": 0.55,
+      "mass": 0.35,
+      "scale": 0.75,
+      "visualYOffset": 0.14,
+      "flammable": false,
+      "material": "metal",
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "coins",
+        "coin",
+        "gold"
+      ]
+    },
+    "apple_crate": {
+      "file": "models/props/FarmCrate_Apple.gltf",
+      "w": 1,
+      "h": 0.75,
+      "d": 0.9,
+      "mass": 1.25,
+      "scale": 0.82,
+      "visualYOffset": 0.37,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "apples"
+      ]
+    },
+    "carrot_crate": {
+      "file": "models/props/FarmCrate_Carrot.gltf",
+      "w": 1,
+      "h": 0.75,
+      "d": 0.9,
+      "mass": 1.25,
+      "scale": 0.82,
+      "visualYOffset": 0.37,
+      "flammable": true,
+      "tags": [
+        "fantasy"
+      ],
+      "aliases": [
+        "carrots"
+      ]
+    },
+    "tree": {
+      "file": "models/props/gen/tree.1k.glb",
+      "w": 0.9,
+      "h": 2.4,
+      "d": 0.9,
+      "static": true,
+      "fit": "height",
+      "clay": true,
+      "flammable": true,
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "pine"
+      ]
+    },
+    "house": {
+      "file": "models/props/gen/house.1k.glb",
+      "w": 2.3,
+      "h": 2.2,
+      "d": 2.3,
+      "static": true,
+      "fit": "footprint",
+      "visualRy": 3.14159,
+      "clay": true,
+      "flammable": true,
+      "tags": [
+        "building"
+      ],
+      "aliases": [
+        "cottage",
+        "hut",
+        "cabin"
+      ]
+    },
+    "boulder": {
+      "file": "models/props/gen/rock_boulder3.1k.glb",
+      "w": 0.9,
+      "h": 0.7,
+      "d": 0.9,
+      "static": true,
+      "fit": "footprint",
+      "clay": true,
+      "material": "stone",
+      "flammable": false,
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "rock"
+      ]
+    },
+    "flowers": {
+      "file": "models/props/gen/daisy_clump.1k.glb",
+      "w": 0.6,
+      "h": 0.3,
+      "d": 0.6,
+      "decor": true,
+      "fit": "footprint",
+      "clay": true,
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "daisies",
+        "flower"
+      ]
+    },
+    "grass_tuft": {
+      "file": "models/props/gen/blade_cluster.1k.glb",
+      "w": 0.6,
+      "h": 0.35,
+      "d": 0.6,
+      "decor": true,
+      "fit": "footprint",
+      "clay": true,
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "tuft",
+        "tufts"
+      ]
+    },
+    "well": {
+      "file": "models/props/village/well.glb",
+      "w": 1.4,
+      "h": 1.9,
+      "d": 1.4,
+      "static": true,
+      "fit": "footprint",
+      "material": "stone",
+      "flammable": false,
+      "aliases": [
+        "water_well"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "market_stand": {
+      "file": "models/props/village/market_stand.glb",
+      "w": 1.8,
+      "h": 1.9,
+      "d": 1.1,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "market_stall",
+        "booth"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "market_stalls": {
+      "file": "models/props/village/market_stalls.glb",
+      "w": 3.2,
+      "h": 1.6,
+      "d": 2.2,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "market",
+        "bazaar"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "cart": {
+      "file": "models/props/village/cart.glb",
+      "w": 1.9,
+      "h": 1.0,
+      "d": 1.0,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "handcart",
+        "wagon"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "broken_cart": {
+      "file": "models/props/village/broken_cart.glb",
+      "w": 1.9,
+      "h": 0.8,
+      "d": 1.0,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "wreck"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "tent": {
+      "file": "models/props/village/tent.glb",
+      "w": 1.9,
+      "h": 1.5,
+      "d": 1.9,
+      "static": true,
+      "fit": "footprint",
+      "flammable": true,
+      "aliases": [
+        "camp"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "logs": {
+      "file": "models/props/village/logs.glb",
+      "w": 1.3,
+      "h": 0.45,
+      "d": 0.8,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "woodpile",
+        "firewood",
+        "lumber"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "bed": {
+      "file": "models/props/village/bed.glb",
+      "w": 1.0,
+      "h": 0.7,
+      "d": 1.9,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "cot"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "double_bed": {
+      "file": "models/props/village/double_bed.glb",
+      "w": 1.6,
+      "h": 0.8,
+      "d": 2.0,
+      "static": true,
+      "fit": "footprint",
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "bookcase": {
+      "file": "models/props/village/bookcase.glb",
+      "w": 1.0,
+      "h": 1.8,
+      "d": 0.45,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "books",
+        "library_shelf"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "banner": {
+      "file": "models/props/village/banner.glb",
+      "w": 0.6,
+      "h": 2.0,
+      "d": 0.4,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "flag"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "wall_banner": {
+      "file": "models/props/village/wall_banner.glb",
+      "w": 0.7,
+      "h": 1.6,
+      "d": 0.15,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "tapestry",
+        "pennant"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "target": {
+      "file": "models/props/village/target.glb",
+      "w": 0.9,
+      "h": 1.3,
+      "d": 0.5,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "archery_target",
+        "bullseye"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "dummy": {
+      "file": "models/props/village/dummy.glb",
+      "w": 0.6,
+      "h": 1.4,
+      "d": 0.5,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "training_dummy",
+        "practice_dummy"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "pumpkin": {
+      "file": "models/props/village/pumpkin.glb",
+      "w": 0.55,
+      "h": 0.45,
+      "d": 0.55,
+      "mass": 0.8,
+      "fit": "footprint",
+      "aliases": [
+        "pumpkins",
+        "gourd"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "statue": {
+      "file": "models/props/village/statue.glb",
+      "w": 1.0,
+      "h": 2.0,
+      "d": 1.0,
+      "static": true,
+      "fit": "height",
+      "material": "stone",
+      "flammable": false,
+      "aliases": [
+        "monument",
+        "stag_statue"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "torch": {
+      "file": "models/props/village/torch.glb",
+      "w": 0.3,
+      "h": 1.4,
+      "d": 0.3,
+      "static": true,
+      "fit": "height",
+      "flammable": false,
+      "aliases": [
+        "standing_torch",
+        "brazier"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "iron_chest": {
+      "file": "models/props/village/iron_chest.glb",
+      "w": 1.0,
+      "h": 0.75,
+      "d": 0.7,
+      "mass": 1.6,
+      "fit": "footprint",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "strongbox",
+        "coffer"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "fantasy_house": {
+      "file": "models/props/village/fantasy_house.glb",
+      "w": 3.0,
+      "h": 3.4,
+      "d": 3.0,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "timber_house",
+        "townhouse"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "stable": {
+      "file": "models/props/village/stable.glb",
+      "w": 3.4,
+      "h": 2.6,
+      "d": 2.6,
+      "static": true,
+      "fit": "footprint",
+      "aliases": [
+        "barn",
+        "stables"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "windmill": {
+      "file": "models/props/village/windmill.glb",
+      "w": 2.5,
+      "h": 4.5,
+      "d": 2.5,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "mill"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "watch_tower": {
+      "file": "models/props/village/watch_tower.glb",
+      "w": 2.0,
+      "h": 4.6,
+      "d": 2.0,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "watchtower",
+        "tower"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "bell_tower": {
+      "file": "models/props/village/bell_tower.glb",
+      "w": 2.0,
+      "h": 5.0,
+      "d": 2.0,
+      "static": true,
+      "fit": "height",
+      "aliases": [
+        "belltower",
+        "chapel"
+      ],
+      "flammable": true,
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    }
   }
 }

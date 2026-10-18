@@ -2397,6 +2397,7 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   let proxy=null;
   const p=importPropAsset(scene,file,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
+  if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});
   return proxy;
 }
 async function importPropAsset(scene,file,opts={}){
@@ -3212,7 +3213,7 @@ function isWithinFacingVision(g,cx,cz,x,z,radius){
 }
 function typeGlyph(type){
   const map={
-    wall:'#', door:'+', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K'
+    wall:'#', door:'+', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K', bookcase:'K'
   };
   return map[type] || (type ? type[0].toUpperCase() : '?');
 }
@@ -3344,7 +3345,7 @@ function buildVisiblePerception(agentId=null,radius=7){
     's':'stool', 'o':'cauldron', 'a':'anvil', 'W':'weapon stand',
     '/':'axe', 'p':'pickaxe', 'u':'bucket', 'b':'bag', 'P':'potion',
     'S':'scroll', '$':'coins', 'D':'desk', 'c':'chair', 'A':'armchair', 'F':'sofa', 'T':'coffee table', 'l':'floor lamp',
-    'v':'plant', 'K':'bookshelf', '%':'tree', 'X':'campfire', 'I':'signpost', '?':'unknown'
+    'v':'plant', 'K':'bookcase', '%':'tree', 'X':'campfire', 'I':'signpost', '?':'unknown'
   };
   const legendParts = [];
   for (const glyph of visibleGlyphs) {

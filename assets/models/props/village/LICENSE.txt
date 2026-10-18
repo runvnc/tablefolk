@@ -1,0 +1,26 @@
+Village props by Quaternius (https://quaternius.com), CC0 1.0, downloaded
+from Poly Pizza and compressed with tools/compress-glb.sh.
+
+  well.glb           https://poly.pizza/m/QlqncKYxXb
+  market_stand.glb   https://poly.pizza/m/DGIM5HGISb
+  market_stalls.glb  https://poly.pizza/m/4ZAhRv2tLG
+  cart.glb           https://poly.pizza/m/l7bDe7ak6j
+  broken_cart.glb    https://poly.pizza/m/NBDHe8J7f9
+  tent.glb           https://poly.pizza/m/5Q7qIrfDxA
+  logs.glb           https://poly.pizza/m/fei4I7FfrJ
+  bed.glb            https://poly.pizza/m/ianC28eMOF
+  double_bed.glb     https://poly.pizza/m/BuRay4fVFr
+  bookcase.glb       https://poly.pizza/m/tACDGJ4CGW
+  banner.glb         https://poly.pizza/m/Kd94xlw5aj
+  wall_banner.glb    https://poly.pizza/m/dQjx8fBjIl
+  target.glb         https://poly.pizza/m/Ev3BbukDFS
+  dummy.glb          https://poly.pizza/m/1pYOHhwjXP
+  pumpkin.glb        https://poly.pizza/m/bvLvqnU1jX
+  statue.glb         https://poly.pizza/m/cKloIsNcT8
+  torch.glb          https://poly.pizza/m/Gq38E7hFZw
+  iron_chest.glb     https://poly.pizza/m/AngpV0HxD8
+  fantasy_house.glb  https://poly.pizza/m/BH2XHWUNmF
+  stable.glb         https://poly.pizza/m/qhNQSOGGbi
+  windmill.glb       https://poly.pizza/m/jpHoi9xDLG
+  watch_tower.glb    https://poly.pizza/m/cMxuj2gt7D
+  bell_tower.glb     https://poly.pizza/m/ux44tbeQvj

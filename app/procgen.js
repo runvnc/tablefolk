@@ -43,7 +43,7 @@
     throne: { floor: 'R', wall: ['K', 'W', 'j'], center: ['A'], carpet: true },
     lair: { floor: ':', wall: ['r', 'B', 'b'], center: ['X'] },
     treasure: { floor: '^', wall: ['h', '$', '$', 'P'], center: ['h'] },
-    library: { floor: '=', wall: ['K', 'K', 'K', 'S'], center: ['D', 'c'] },
+    library: { floor: '=', wall: ['K', 'K', 'K', 'S'], center: ['t', 's'] },
     shrine: { floor: '^', wall: ['l', 'v', 'S'], center: ['o'] },
     barracks: { floor: '^', wall: ['W', 'n', 'n', '/'], center: ['t'] },
     storage: { floor: ':', wall: ['C', 'B', 'C', 'B', 'u'], center: ['C'] },

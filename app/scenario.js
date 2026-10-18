@@ -44,10 +44,10 @@
   // Procedural objects (app.js, scenery.js); models come from the packs.
   const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad'];
   let ITEMS = [], THINGS = [], WIDE_ITEMS = new Set();
-  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', torch: 'lantern', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
+  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
     sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rocks: 'boulder',
     shroom: 'mushroom', toadstool: 'mushroom', stall: 'counter', bar: 'counter',
-    chair: 'office_chair', couch: 'sofa', settee: 'sofa', floorlamp: 'floor_lamp', houseplant: 'plant', fern: 'plant', shelf: 'bookshelf', bookcase: 'bookshelf', books: 'bookshelf',
+    chair: 'office_chair', couch: 'sofa', settee: 'sofa', floorlamp: 'floor_lamp', houseplant: 'plant', fern: 'plant', shelf: 'bookshelf', bookshelves: 'bookcase',
     fire: 'campfire', fireplace: 'campfire', home: 'house', cottage: 'house', hut: 'house', building: 'house' };
   const AREA_DIRS = { north: [0, -1], south: [0, 1], east: [-1, 0], west: [1, 0],
     northeast: [-1, -1], northwest: [1, -1], southeast: [-1, 1], southwest: [1, 1] };
@@ -624,7 +624,7 @@
     C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
     o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
-    K: 'bookshelf', Y: 'player', '@': 'player',
+    K: 'bookcase', Y: 'player', '@': 'player',
     '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern', '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
   function parseGlyph(v, agentIds) {
     const str = String(v).trim();
@@ -877,6 +877,23 @@
     starting = run;
     return run;
   }
+  // Furniture with a back (front faces +z at ry 0) stands with its back to
+  // an adjacent wall: maps and the generator rarely give the right ry, and
+  // bookcases showed their backs to the room. An ry that already puts the
+  // back against a wall is kept.
+  const WALL_BACKED = new Set(['bookshelf', 'bookcase', 'wall_banner']);
+  function backToWalls(objs, existing = []) {
+    const key = (x, z) => Math.round(+x) + ',' + Math.round(+z);
+    const wall = new Set([...objs, ...existing].filter(o => o.type === 'wall' || o.type === 'door').map(o => key(o.x, o.z)));
+    for (const o of objs) {
+      if (!WALL_BACKED.has(o.type)) continue;
+      const x = Math.round(+o.x), z = Math.round(+o.z), ry = +o.ry || 0;
+      const fx = Math.round(Math.sin(ry)), fz = Math.round(Math.cos(ry));
+      if (wall.has(key(x - fx, z - fz)) && !wall.has(key(x + fx, z + fz))) continue;
+      const d = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dz]) => wall.has(key(x - dx, z - dz)) && !wall.has(key(x + dx, z + dz)));
+      if (d) o.ry = Math.atan2(d[0], d[1]);
+    }
+  }
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
     const base = normalizeScenario(input);
@@ -931,6 +948,7 @@
       if (evalCond(scn.goal.win, planContext(scn, plan))) plan.warnings.unshift('warning: the goal is already met at the start for every layout tried');
     }
     w.setPaint?.([...plan.paint, ...scn.paint.map(c => ({ x: +c.x, z: +c.z, mat: c.mat, tint: c.tint }))]);
+    backToWalls([...scn.objects, ...plan.objects], existing);
     for (const o of scn.objects) w.makeObject(o.type, +o.x, +o.z, o);
     for (const o of plan.objects) w.makeObject(o.type, o.x, o.z, o);
     // Skills (skills.js): fetch every manifest the scenario names first.

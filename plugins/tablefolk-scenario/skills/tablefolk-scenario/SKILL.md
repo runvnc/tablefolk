@@ -373,7 +373,7 @@ grass_tuft `q` lily_pad; objects `#` wall `+` door `C` crate `B` barrel
 `M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
 stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`
 bag `P` potion `S` scroll `$` coin_pile `D` desk `c` office_chair `A` armchair
-`F` sofa `T` coffee_table `l` floor_lamp `v` plant `K` bookshelf; `1`-`9` = the
+`F` sofa `T` coffee_table `l` floor_lamp `v` plant `K` bookcase; `1`-`9` = the
 agents in order; `Y` = player. `legend` maps extra glyphs to an object, a
 material, an agent id, `"<thing> on <material>"` or `note "text"`. Wide items
 (`table bench workbench desk sofa`) use two equal glyphs side by side (`tt`) or

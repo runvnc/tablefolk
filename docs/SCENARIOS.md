@@ -143,7 +143,7 @@ Default glyphs (the same ones characters see in their vision map):
 | `:` dirt | `^` stone | `h` chest | `w` workbench | `t` table | `n` bench | `s` stool | `o` cauldron |
 | `&` lava | `=` wood | `a` anvil | `W` weapon stand | `/` axe | `p` pickaxe | `u` bucket | `b` bag |
 | `_` oak | | `P` potion | `S` scroll | `$` coins | `D` desk | `c` office chair | `A` armchair |
-| | | `F` sofa | `T` coffee table | `l` floor lamp | `v` plant | `K` bookshelf | |
+| | | `F` sofa | `T` coffee table | `l` floor lamp | `v` plant | `K` bookcase | |
 | `-` sea | | `%` tree | `H` house | `r` boulder | `X` campfire | `f` fence | `I` signpost |
 | | | `j` lantern | `*` flowers | `;` grass tuft | `q` lily pad | | |
 
