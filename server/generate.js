@@ -67,8 +67,9 @@ export function checkScenario(s) {
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
   for (const c of s.allowed || []) if (!COMMANDS.has(c)) problems.push(`"allowed": unknown command ${c}`);
   if (!Array.isArray(s.allowed)) s.allowed = ['say', 'walk', 'face', 'emote'];
-  // Person-height doors need the tall walls: twice the tabletop height by default.
-  if (s.wallHeight == null) s.wallHeight = 2;
+  // Person-height doors and first person need the tall walls (twice the
+  // tabletop height); lower ones put the player's head through the lintel.
+  if (!(+s.wallHeight >= 2)) s.wallHeight = 2;
   const methods = ['generate', 'grid', 'map'].filter(k => s[k] && (!Array.isArray(s[k]) || s[k].length));
   if (methods.length > 1 && methods.includes('generate')) problems.push(`use one map method, not ${methods.join(' + ')}`);
   if (s.generate) {

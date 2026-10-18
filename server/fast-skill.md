@@ -12,7 +12,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "seed": 7,
   "lighting": "bright",              // or "night"
   "walls": "stone",                  // or "tabletop", "modern"
-  "wallHeight": 2,                   // walls twice tabletop height (fits the doors); 1 = low
+  "wallHeight": 2,                   // always 2: person-height doors and first person need it
   "player": { "name": "Traveller", "gold": 10, "items": [] },
   "allowed": ["say", "walk", "face", "emote"],   // default commands for every character
   "agents": [ {
