@@ -106,7 +106,7 @@ when the character should use them ("Use give() to hand something over.").
 
 ### Coordinates
 
-Grid cells around the centre (0, 0): x about -5..5, z about -4..4 (the world is 12 x 10; the outer ring is the edge) (`plain`,
+Grid cells around the centre (0, 0): x -5..5, z -4..4 (the world is 12 x 10 tiles; x = ±6 or z = ±5 is the cliff edge) (`plain`,
 `clearing` and `dungeon` use the island's flat top). **north = -z, south = +z,
 east = -x, west = +x.** The player starts at the south by default. Wide items
 (`table bench workbench desk sofa`) take two cells.
@@ -157,7 +157,8 @@ models behave. `say` is almost always wanted; add `walk` for movement, `give`
 ```
 
 One glyph per cell, **top row = north, left = west**, centred on the board
-(max 13 wide x 11 tall). `.` = empty. Defaults: floors `~` water `,` grass `:`
+(**max 11 wide x 9 tall**; anything bigger puts its outer ring on the cliff
+edge, and a player spawned there walks off into the sea; odd sizes centre exactly). `.` = empty. Defaults: floors `~` water `,` grass `:`
 dirt `^` stone `&` lava `=` wood `_` oak; objects `#` wall `C` crate `B` barrel
 `M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
 stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`

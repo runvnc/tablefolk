@@ -107,8 +107,10 @@ improvise.
 ## 2b. ASCII grid
 
 `grid` draws the board directly: one glyph per cell, **top row = north, left =
-west**, centred on the board (the whole board is 13 x 11). `.` and spaces are
-empty. The grid is laid down first; `objects` and `map` lines are added on top,
+west**, centred on the board. The board fits **11 wide x 9 tall** (x -5..5, z
+-4..4); a bigger grid's outer ring lands on the cliff edge, so characters there
+are moved inward and a warning is shown. Use odd sizes so the grid centres
+exactly. `.` and spaces are empty. The grid is laid down first; `objects` and `map` lines are added on top,
 and map lines can refer to what the grid placed (`place lamp beside water`).
 
 ```jsonc

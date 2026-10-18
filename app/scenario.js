@@ -633,6 +633,7 @@
     return THINGS.includes(thing) ? { obj: thing } : null;
   }
   // Grid cell (row r, column c) -> board cell. North = -z, east = -x.
+  const EDGE = { x: 5, z: 4 };
   function gridOrigin(rows, cols) { return { x0: Math.floor((cols - 1) / 2), z0: Math.floor((rows - 1) / 2) }; }
   function expandGrid(scn) {
     if (!scn.grid.length) return { ...scn, gridWarnings: [] };
@@ -646,16 +647,20 @@
     const grid = scn.grid.map(r => [...r]), R = grid.length, C = Math.max(...grid.map(r => r.length));
     const { x0, z0 } = gridOrigin(R, C), used = new Set(), unknown = new Set();
     const objects = [], paint = [], agentAt = {};
-    let playerAt = null;
+    let playerAt = null, edgeCells = 0;
     for (let r = 0; r < R; r++) for (let c = 0; c < grid[r].length; c++) {
       const g = grid[r][c];
       if (g === '.' || g === ' ' || used.has(r + ',' + c)) continue;
       const e = legend[g];
       if (!e) { unknown.add(g); continue; }
       const x = x0 - c, z = r - z0;
+      // Integer cells reach x -5..5, z -4..4; the next ring out is the cliff edge.
+      const offBoard = Math.abs(x) > EDGE.x || Math.abs(z) > EDGE.z;
+      if (offBoard) edgeCells++;
+      const inside = () => [Math.max(-EDGE.x, Math.min(EDGE.x, x)), Math.max(-EDGE.z, Math.min(EDGE.z, z))];
       if (e.mat) paint.push({ x, z, mat: e.mat });
-      if (e.agent) agentAt[e.agent] = [x, z];
-      if (e.player) playerAt = [x, z];
+      if (e.agent) agentAt[e.agent] = offBoard ? inside() : [x, z];
+      if (e.player) playerAt = offBoard ? inside() : [x, z];
       if (!e.obj) continue;
       const extra = e.text != null ? { text: e.text } : {};
       if (WIDE_ITEMS.has(e.obj) && grid[r][c + 1] === g && !used.has(r + ',' + (c + 1))) {
@@ -664,6 +669,7 @@
         used.add((r + 1) + ',' + c); objects.push({ type: e.obj, x, z: z + 0.5, ry: Math.PI / 2, ...extra });
       } else objects.push({ type: e.obj, x, z, ...extra });
     }
+    if (edgeCells) warnings.push(`grid: ${C} wide x ${R} tall, but the board fits ${2 * EDGE.x + 1} x ${2 * EDGE.z + 1}; ${edgeCells} cell(s) sit on the cliff edge (characters there were moved inward)`);
     if (unknown.size) warnings.push(`grid: unknown glyphs ${[...unknown].map(g => '"' + g + '"').join(' ')} (add them to "legend")`);
     return { ...scn, gridWarnings: warnings,
       objects: [...objects, ...scn.objects], paint: [...paint, ...scn.paint],
@@ -675,9 +681,8 @@
   // over the whole board. Whatever a glyph can't say exactly (turned or
   // off-cell objects, tinted paint, characters 10+) stays in objects/paint/at.
   function toAscii(input) {
-    const scn = normalizeScenario(input), w = W();
-    const halfW = w?.WORLD?.halfW ?? 6, halfH = w?.WORLD?.halfH ?? 5;
-    const rows = 2 * halfH + 1, cols = 2 * halfW + 1, { x0, z0 } = gridOrigin(rows, cols);
+    const scn = normalizeScenario(input);
+    const rows = 2 * EDGE.z + 1, cols = 2 * EDGE.x + 1, { x0, z0 } = gridOrigin(rows, cols);
     const cellOf = (x, z) => [z + z0, x0 - x];
     // Full board, '.' everywhere: row width sets where the grid is centred.
     const grid = Array.from({ length: rows }, () => Array(cols).fill('.'));
@@ -688,7 +693,14 @@
     const inGrid = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
     const matAt = new Map(), taken = new Set();
     const leftPaint = [], leftObjects = [];
+    // A material painted over most of the board is the floor: say it once in
+    // "floor" instead of giving every glyph an "on <floor>" variant.
+    const count = {};
+    for (const t of scn.paint) if (!t.tint) count[t.mat] = (count[t.mat] || 0) + 1;
+    const top = Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+    const floor = scn.floor || (count[top] >= rows * cols / 2 ? top : '');
     for (const t of scn.paint) {
+      if (floor && !t.tint && t.mat === floor) continue;
       const [r, c] = cellOf(+t.x, +t.z), g = !t.tint && Number.isInteger(+t.x) && Number.isInteger(+t.z) && inGrid(r, c) && glyphFor(t.mat);
       if (g) { grid[r][c] = g; matAt.set(r + ',' + c, t.mat); } else leftPaint.push(t);
     }
@@ -729,7 +741,7 @@
       if (inGrid(r, c) && !taken.has(r + ',' + c)) { grid[r][c] = 'Y'; const { at, ...rest } = scn.player; player = rest; }
     }
     // Dropped: normalize-only fields that would just add noise to the JSON.
-    const { gridWarnings, ...out } = { ...scn, grid: grid.map(r => r.join('')), legend, objects: leftObjects, paint: leftPaint, agents, player };
+    const { gridWarnings, ...out } = { ...scn, ...(floor ? { floor } : {}), grid: grid.map(r => r.join('')), legend, objects: leftObjects, paint: leftPaint, agents, player };
     return out;
   }
 

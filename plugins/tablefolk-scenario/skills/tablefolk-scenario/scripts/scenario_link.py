@@ -41,6 +41,10 @@ def check(obj):
     for o in obj.get('objects', []):
         if not all(isinstance(o.get(k), (int, float)) for k in ('x', 'z')) or not o.get('type'):
             problems.append(f'object {o!r} needs "type", numeric "x" and "z"')
+    grid = obj.get('grid') or []
+    if isinstance(grid, str): grid = grid.split('\n')
+    if len(grid) > 9 or any(len(r) > 11 for r in grid):
+        problems.append(f'"grid" is {max(map(len, grid), default=0)} wide x {len(grid)} tall; the board fits 11 x 9 (larger grids put their outer ring on the cliff edge)')
     if not isinstance(obj.get('map', []), list): problems.append('"map" must be a list of lines')
     return problems
 
