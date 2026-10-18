@@ -78,7 +78,9 @@ paint <material> [xN] [<placement>]
 floor <material>
 ```
 
-- **things**: `crate barrel mushroom lamp wall note "<text>"`, the composite
+- **things**: `crate barrel mushroom lamp wall door note "<text>"` (a door
+  fills a wall cell: person-height wooden leaf, wall carried over the top,
+  swings open as anyone approaches, so doorways stay passable), the composite
   `counter` (a row of three wall sections), outdoor pieces `tree house boulder
   flowers grass_tuft campfire lantern light fence signpost lily_pad`, the items `chest table bench stool
   workbench cauldron anvil weapon_stand axe pickaxe bucket bag potion scroll
@@ -134,9 +136,9 @@ and map lines can refer to what the grid placed (`place lamp beside water`).
 
 Default glyphs (the same ones characters see in their vision map):
 
-| floor | | objects | | | | | |
-|---|---|---|---|---|---|---|---|
-| `~` water | `,` grass | `#` wall | `C` crate | `B` barrel | `M` mushroom | `L` lamp | `N` note |
+| floor | | objects | | | | | | |
+|---|---|---|---|---|---|---|---|---|
+| `~` water | `,` grass | `#` wall | `+` door | `C` crate | `B` barrel | `M` mushroom | `L` lamp | `N` note |
 | `:` dirt | `^` stone | `h` chest | `w` workbench | `t` table | `n` bench | `s` stool | `o` cauldron |
 | `&` lava | `=` wood | `a` anvil | `W` weapon stand | `/` axe | `p` pickaxe | `u` bucket | `b` bag |
 | `_` oak | | `P` potion | `S` scroll | `$` coins | `D` desk | `c` office chair | `A` armchair |

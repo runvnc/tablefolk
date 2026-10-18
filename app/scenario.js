@@ -42,7 +42,7 @@
   // refreshThings() rebuilds the lists whenever a pack loads.
   const MODERN = ['desk', 'office_chair', 'armchair', 'sofa', 'coffee_table', 'floor_lamp', 'plant', 'bookshelf'];
   // Procedural objects (app.js, scenery.js); models come from the packs.
-  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad'];
+  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad'];
   let ITEMS = [], THINGS = [], WIDE_ITEMS = new Set();
   const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', torch: 'lantern', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
     sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rocks: 'boulder',
@@ -409,7 +409,7 @@
         const placedCells = placeGroup(g, ref, n);
         if (!placedCells.length) { warnings.push(`"${p.raw.trim()}": no free cell, skipped`); continue; }
         const ent = { cells: placedCells, centre: [placedCells.reduce((a, c) => a + c[0], 0) / placedCells.length, placedCells.reduce((a, c) => a + c[1], 0) / placedCells.length] };
-        for (const c of placedCells) occupy(c, ent, !(thing === 'wall' || thing === 'counter') && !p.isAgent);
+        for (const c of placedCells) occupy(c, ent, !(thing === 'wall' || thing === 'door' || thing === 'counter') && !p.isAgent);
         if (p.isAgent) {
           const look = ref ? ref.centre : centre;
           out.agents[thing] = { x: placedCells[0][0], z: placedCells[0][1], facing: facingFrom(placedCells[0], look) };
@@ -461,12 +461,12 @@
     //    objects and fixed-position agents first
     for (const o of (spec.existing || [])) {
       const c = [Math.round(o.x), Math.round(o.z)];
-      if (!occupied.has(key(c[0], c[1]))) { const ent = { cells: [c], centre: c }; occupy(c, ent, o.type !== 'wall'); }
+      if (!occupied.has(key(c[0], c[1]))) { const ent = { cells: [c], centre: c }; occupy(c, ent, o.type !== 'wall' && o.type !== 'door'); }
     }
     for (const o of spec.objects || []) {
       const c = [Math.round(o.x), Math.round(o.z)];
       const ent = { cells: [c], centre: c };
-      occupy(c, ent, o.type !== 'wall');
+      occupy(c, ent, o.type !== 'wall' && o.type !== 'door');
       register(o.type, ent);
     }
     // Explicit floor tiles: water/lava block placement, and each material's
@@ -615,7 +615,7 @@
   // adds or overrides glyphs: "<object>", "<material>", "<agent id>",
   // "player", "<object> on <material>" or 'note "text"'. Two adjacent equal
   // glyphs of a wide item (table, bench, desk, sofa...) make one item.
-  const GRID_GLYPHS = { '#': 'wall', '~': 'water', ',': 'grass', ':': 'dirt', '^': 'stone', '&': 'lava', '=': 'wood', '_': 'oak',
+  const GRID_GLYPHS = { '#': 'wall', '+': 'door', '~': 'water', ',': 'grass', ':': 'dirt', '^': 'stone', '&': 'lava', '=': 'wood', '_': 'oak',
     C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
     o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
@@ -1088,7 +1088,7 @@
       'Line forms:',
       '  place <thing> [xN] <placement>',
       '  path from <thing|area> to <thing|area>',
-      `Things: crate, barrel, mushroom, lamp, wall, counter, note "<short text>", ${ITEMS.join(', ')}${agentIds.length ? ', characters: ' + agentIds.join(', ') : ''}.`,
+      `Things: crate, barrel, mushroom, lamp, wall, door, counter, note "<short text>", ${ITEMS.join(', ')}${agentIds.length ? ', characters: ' + agentIds.join(', ') : ''}.`,
       '  paint <stone|flagstone|dirt|wood|sand|grass|water|lava> [xN] <placement>   (floor tiles; water x6 cluster = a pond)',
       '  floor <material>   (the whole floor)',
       'Placements: at center|north|south|east|west|northeast|northwest|southeast|southwest|random, against north_wall (or south_wall, east_wall, west_wall), beside X, near X, behind X, in_front_of X, around X. Optional: row, cluster, scattered.',

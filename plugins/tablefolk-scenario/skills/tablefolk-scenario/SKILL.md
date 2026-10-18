@@ -181,7 +181,9 @@ Grid digits are the agents in order: reordering `agents` moves them.
 
 ### Objects (`objects[].type` and map-line things)
 
-- props: `crate barrel mushroom lamp wall note`, `counter` (a row of three walls)
+- props: `crate barrel mushroom lamp wall door note`, `counter` (a row of three walls). A door
+  fills a wall cell (put `+` in a wall run in the grid): a person-height wooden leaf with the
+  wall carried over the top; it swings open as anyone approaches, so doorways stay passable.
 - items: `chest table bench stool workbench cauldron anvil weapon_stand axe
   pickaxe bucket bag potion scroll coin_pile apple_crate carrot_crate`
 - modern: `desk office_chair armchair sofa coffee_table floor_lamp plant
@@ -253,7 +255,7 @@ on every side (or exactly the grid if its outer ring is all `-` sea). `.` =
 empty. Defaults: floors `~` water (a pond) `,` grass `:` dirt `^` stone `&`
 lava `=` wood `_` oak, `-` sea (a hole); outdoors `%` tree `H` house `r`
 boulder `X` campfire `f` fence `I` signpost `j` lantern `*` flowers `;`
-grass_tuft `q` lily_pad; objects `#` wall `C` crate `B` barrel
+grass_tuft `q` lily_pad; objects `#` wall `+` door `C` crate `B` barrel
 `M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
 stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`
 bag `P` potion `S` scroll `$` coin_pile `D` desk `c` office_chair `A` armchair

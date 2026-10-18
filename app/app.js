@@ -987,6 +987,7 @@ function makeObject(type,x,z,opts={}){
   if(type==='lamp') return makeLamp(sc,x,z);
   if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'));
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
+  if(type==='door') return makeDoor(sc,x,z,opts);
   if(window.tablefolkScenery?.types.includes(type)) return window.tablefolkScenery.make(type,x,z,opts);
   if(ITEM_CATALOG[type]) return makeCatalogItem(sc,type,x,z,opts);
   return makeCrate(sc,x,z);
@@ -1026,6 +1027,29 @@ function makeBlock(scene,x,z,cracked=false){
   if(tabletop){ b.isVisible=false; meta(b).tabletop=true; scheduleWallRebuild(); }
   state.blocks.push(b); return b;
 }
+// A door fills one wall cell: a person-height wooden leaf (PERSON_H is 1.3)
+// with the wall itself carried over the top as a stone header, so it sits in
+// a wall run like a real doorway. The leaf swings open for anyone nearby, so
+// door cells stay passable. Geometry is real relief (planks, ledges, brace,
+// strap hinges) in the same glossy plastic finish as the walls.
+const DOOR_H=1.45;
+const doorHeight=()=>Math.max(.55,Math.min(DOOR_H,wallH()-.3));
+function makeDoor(scene,x,z,opts={}){
+  const top=state.terrainTopY??0, raised=(state.wallStyle||'tabletop')!=='block';
+  const b=BABYLON.MeshBuilder.CreateBox('door',{width:.96,height:raised?wallH():.62*(state.wallHeightScale||1),depth:.96},scene);
+  b.position.set(x,top+(raised?wallH()/2:.31*(state.wallHeightScale||1)),z);
+  b.isVisible=false; b.isPickable=true;
+  tag(b,'door',{health:4,material:'wood',flammable:true});
+  meta(b).opts={...(opts.ry?{ry:+opts.ry}:{})};
+  if(raised){ meta(b).tabletop=true; scheduleWallRebuild(); }
+  else { // legacy block walls have no merged visuals: build a static leaf here
+    const g=buildDoorLeaf(scene,x,z,!(+opts.ry||0),top,Math.min(doorHeight(),.9*(state.wallHeightScale||1)));
+    g.standalone=true;
+    meta(b).cleanup=()=>{ try{ g.pivot.dispose(false,true); }catch{} };
+    state.doorLeaves=state.doorLeaves||[]; state.doorLeaves.push(g); ensureDoorAnimator();
+  }
+  state.blocks.push(b); return b;
+}
 let wallRebuildQueued=false;
 function scheduleWallRebuild(){ if(wallRebuildQueued) return; wallRebuildQueued=true; queueMicrotask(()=>{ wallRebuildQueued=false; try{ rebuildWallVisuals(); }catch(e){ console.warn('wall rebuild failed',e); } }); }
 // Normal map for one box face (UV2 0..1 per face): flat centre, edges
@@ -1063,8 +1087,14 @@ function wallMaterials(){
   const stones=plastic(mk('tt_wall_stones',null,new BABYLON.Color3(1,1,1),.26));
   // rounded-edge stones: the bevel normal map on UV2 (detail map stays on UV1)
   stones.bumpTexture=bevelNormalTexture(sc); stones.bumpTexture.level=1;
+  // Doors: glossy moulded-plastic wood (never flat/matte) so the plank relief
+  // catches the key light like the stones do; near-black glossy ironwork.
+  const doorWood=plastic(mk('tt_door_wood',null,new BABYLON.Color3(1,1,1),.3));
+  doorWood.bumpTexture=stones.bumpTexture; doorWood.roughness=.34;
+  const doorIron=plastic(mk('tt_door_iron',null,new BABYLON.Color3(1,1,1),.38));
+  doorIron.roughness=.4; doorIron.metallic=.35; doorIron.environmentIntensity=1;
   state.wallMats={ stones, core:mk('tt_wall_core',null,new BABYLON.Color3(1,1,1),.9),
-    trim:plastic(mk('tt_wall_trim',null,new BABYLON.Color3(1,1,1),.26)), cap:plastic(mk('tt_wall_cap',null,new BABYLON.Color3(1,1,1),.26)) };
+    trim:plastic(mk('tt_wall_trim',null,new BABYLON.Color3(1,1,1),.26)), cap:plastic(mk('tt_wall_cap',null,new BABYLON.Color3(1,1,1),.26)), doorWood, doorIron };
   return state.wallMats;
 }
 // Box geometry appended straight into one vertex buffer (thousands of
@@ -1087,6 +1117,29 @@ function boxBatch(){
         I.push(base,base+2,base+1,base,base+3,base+2);
       }
     },
+    // Rotated box (Euler radians, applied X then Y then Z): door braces etc.
+    // Axis-aligned add() above stays the fast path for the thousands of stones.
+    addR(cx,cy,cz,sx,sy,sz,col,rx=0,ry=0,rz=0){
+      const rot=v=>{
+        let [x,y,z]=v;
+        if(rx){ const c=Math.cos(rx), s=Math.sin(rx); [y,z]=[y*c-z*s, y*s+z*c]; }
+        if(ry){ const c=Math.cos(ry), s=Math.sin(ry); [x,z]=[x*c+z*s, -x*s+z*c]; }
+        if(rz){ const c=Math.cos(rz), s=Math.sin(rz); [x,y]=[x*c-y*s, x*s+y*c]; }
+        return [x,y,z];
+      };
+      const size=[sx,sy,sz];
+      for(const [n,u,v] of faces){
+        const base=P.length/3, rn=rot(n), ru=rot(u), rv=rot(v);
+        const hn=(Math.abs(n[0])*size[0]+Math.abs(n[1])*size[1]+Math.abs(n[2])*size[2])/2;
+        const hu=(Math.abs(u[0])*size[0]+Math.abs(u[1])*size[1]+Math.abs(u[2])*size[2])/2;
+        const hv=(Math.abs(v[0])*size[0]+Math.abs(v[1])*size[1]+Math.abs(v[2])*size[2])/2;
+        for(const [a,c] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+          P.push(cx+rn[0]*hn+ru[0]*a*hu+rv[0]*c*hv, cy+rn[1]*hn+ru[1]*a*hu+rv[1]*c*hv, cz+rn[2]*hn+ru[2]*a*hu+rv[2]*c*hv);
+          N.push(rn[0],rn[1],rn[2]); U.push((a+1)/2*hu*3.2,(c+1)/2*hv*3.2); U2.push((a+1)/2,(c+1)/2); C.push(col[0],col[1],col[2],1);
+        }
+        I.push(base,base+2,base+1,base,base+3,base+2);
+      }
+    },
     mesh(name,sc){
       if(!P.length) return null;
       const m=new BABYLON.Mesh(name,sc), vd=new BABYLON.VertexData();
@@ -1103,7 +1156,8 @@ function rebuildWallVisuals(){
   const sc=state.scene; if(!sc) return;
   for(const m of state.wallVisuals||[]) try{ m.dispose(); }catch{}
   state.wallVisuals=[];
-  const walls=state.blocks.filter(b=>b && !b.isDisposed?.() && meta(b)?.type==='wall' && meta(b)?.tabletop);
+  const walls=state.blocks.filter(b=>b && !b.isDisposed?.() && (meta(b)?.type==='wall'||meta(b)?.type==='door') && meta(b)?.tabletop);
+  state.doorLeaves=(state.doorLeaves||[]).filter(l=>l.standalone);
   if(!walls.length) return;
   const mats=wallMaterials(), top=state.terrainTopY??0;
   const cell=new Map(walls.map(w=>[Math.round(w.position.x)+','+Math.round(w.position.z),w]));
@@ -1120,6 +1174,24 @@ function rebuildWallVisuals(){
   };
   for(const [k,w] of cell){
     const [x,z]=k.split(',').map(Number), st=meta(w).state;
+    if(meta(w).type==='door'){
+      // Only the header: the wall comes together again over the doorway.
+      const alongX=doorAxisOf(cell,x,z), DH=doorHeight(), yA=top+DH, yB=Y0+H, a0=(alongX?x:z)-.5, a1=(alongX?x:z)+.5, perp=alongX?z:x;
+      const putD=(b,ac,y,len,hgt,thick,col)=>{ alongX ? b.add(ac,y,perp,len,hgt,thick,col) : b.add(perp,y,ac,thick,hgt,len,col); };
+      putD(core,(a0+a1)/2,(yA+yB)/2,a1-a0,yB-yA,T-.04,[.16,.15,.14]);
+      for(let r=0;r<ROWS;r++){
+        if(Y0+(r+1)*RH<=yA) continue;
+        const off=(r%2)*BL/2+hash(perp*7,r,3)*.06;
+        for(let kb=Math.floor((a0-off)/BL)-1; kb*BL+off<a1; kb++){
+          const b0=kb*BL+off, b1=b0+BL; if(b1<=a0) continue;
+          const l=b0>=a0?b0+GAP/2:a0, rgt=b1<=a1?b1-GAP/2:a1; if(rgt-l<.03) continue;
+          const rnd=hash(kb,r,perp*13+(alongX?1:2));
+          putD(stones,(l+rgt)/2,Y0+r*RH+RH/2,rgt-l,RH-GAP,T+.035+(hash(kb,r,perp+9)-.5)*.02,shade(st,rnd));
+        }
+      }
+      putD(cap,(a0+a1)/2,yB+.025,a1-a0,.05,T+.08,[.40,.38,.36]);
+      continue;
+    }
     const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
     let arms=dirs.slice();
     if(!arms.length) arms=[[1,0],[-1,0]];
@@ -1165,6 +1237,7 @@ function rebuildWallVisuals(){
     const m=batch.mesh('tt_walls_'+name,sc); if(!m) continue;
     m.material=mat; m.isPickable=false; m.receiveShadows=true; addShadow(m); state.wallVisuals.push(m);
   }
+  buildDoors(cell,top);
 }
 // Natural stone ("walls": "stone"): a dry-stone wall of irregular rounded
 // rocks in mixed sizes and shades over a dark mortar core, laid out like the
@@ -1210,6 +1283,23 @@ function buildFieldstoneWalls(cell,top){
   const rock=(x,y,z,sx,sy,sz,col,seed)=>rocks.push({x,y,z,sx,sy,sz,col,ry:(hash(seed,3,7)-.5)*.5,rz:(hash(seed,5,1)-.5)*.18});
   for(const [k,w] of cell){
     const [x,z]=k.split(',').map(Number), st=meta(w).state;
+    if(meta(w).type==='door'){
+      // Header only: fieldstone courses carried over the doorway.
+      const alongX=doorAxisOf(cell,x,z), DH=doorHeight(), yA=top+DH, a0=(alongX?x:z)-.5, a1=(alongX?x:z)+.5, perp=alongX?z:x;
+      const atD=(a,y,len,hgt,thick,col,seed)=>alongX ? rock(a,y,perp,len,hgt,thick,col,seed) : rock(perp,y,a,thick,hgt,len,col,seed);
+      core.add(alongX?(a0+a1)/2:perp,(yA+top+H)/2,alongX?perp:(a0+a1)/2,alongX?a1-a0:T-.08,top+H-yA,alongX?T-.08:a1-a0,[.12,.11,.10]);
+      for(let r=0;r<ROWS;r++){
+        if(top+(r+1)*RH<=yA) continue;
+        let a=Math.floor(a0/.5)*.5 - hash(perp*3,r,11)*.2;
+        while(a<a1){
+          const seed=Math.round(a*100)*31+r*7+Math.round(perp*13), len=.2+hash(seed,r,1)*.22, mid=a+len/2;
+          if(mid>a0 && mid<=a1) atD(mid,top+r*RH+RH/2+(hash(seed,4,4)-.5)*.03,len*1.45,RH*(1.6+hash(seed,2,4)*.45),T*(1.1+hash(seed,6,2)*.3),shade(st,hash(seed,8,8),hash(seed,1,9)),seed);
+          a+=len;
+        }
+      }
+      for(let a=a0;a<a1-.05;a+=.25){ const seed=Math.round(a*100)*17+Math.round(perp*13)+99; atD(Math.min(a+.125,a1-.02),top+H+.04,.3,.12,T*1.3,shade(st,hash(seed,8,3)*.6+.3,hash(seed,2,2)),seed); }
+      continue;
+    }
     let arms=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
     if(!arms.length) arms=[[1,0],[-1,0]]; else if(arms.length===1) arms.push([-arms[0][0],-arms[0][1]]);
     const straight=arms.length===2 && arms[0][0]===-arms[1][0] && arms[0][1]===-arms[1][1];
@@ -1248,7 +1338,7 @@ function buildFieldstoneWalls(cell,top){
     }
   }
   const coreMesh=core.mesh('stone_walls_core',sc); if(coreMesh){ coreMesh.material=mats.core; coreMesh.isPickable=false; coreMesh.receiveShadows=true; state.wallVisuals.push(coreMesh); }
-  if(!rocks.length) return;
+  if(!rocks.length){ buildDoors(cell,top); return; }
   const m=src.clone('stone_walls_rocks'); m.makeGeometryUnique(); m.setEnabled(true); m.isPickable=false; m.receiveShadows=true;
   const buf=new Float32Array(rocks.length*16), cols=new Float32Array(rocks.length*4), mx=new BABYLON.Matrix(), q=new BABYLON.Quaternion();
   rocks.forEach((r,i)=>{
@@ -1258,6 +1348,7 @@ function buildFieldstoneWalls(cell,top){
   });
   m.thinInstanceSetBuffer('matrix',buf,16,true); m.thinInstanceSetBuffer('color',cols,4,true);
   addShadow(m); state.wallVisuals.push(m);
+  buildDoors(cell,top);
 }
 // Modern walls: smooth painted panels (warm white, satin) with a dark
 // baseboard and a slim top trim, joined like the stone walls.
@@ -1275,6 +1366,13 @@ function buildModernWalls(cell,top){
   const tone=st=>st==='burned'?[.2,.19,.18]:st==='cracked'?[.70,.67,.62]:[.86,.84,.80];
   for(const [k,w] of cell){
     const [x,z]=k.split(',').map(Number), col=tone(meta(w).state);
+    if(meta(w).type==='door'){
+      const alongX=doorAxisOf(cell,x,z), DH=doorHeight(), yA=top+DH;
+      const putD=(b,y,hgt,thick,c)=>{ alongX ? b.add(x,y,z,1,hgt,thick,c) : b.add(x,y,z,thick,hgt,1,c); };
+      putD(panel,(yA+top+H)/2,top+H-yA,T,col);
+      putD(capB,top+H+.015,.03,T+.03,[.93,.92,.90]);
+      continue;
+    }
     let arms=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dz])=>cell.has((x+dx)+','+(z+dz)));
     if(!arms.length) arms=[[1,0],[-1,0]];
     else if(arms.length===1) arms.push([-arms[0][0],-arms[0][1]]);
@@ -1300,6 +1398,94 @@ function buildModernWalls(cell,top){
     const m=batch.mesh('mw_walls_'+name,sc); if(!m) continue;
     m.material=mat; m.isPickable=false; m.receiveShadows=true; addShadow(m); state.wallVisuals.push(m);
   }
+  buildDoors(cell,top);
+}
+// Which way a door runs: along the wall it sits in (true = along x).
+function doorAxisOf(cell,x,z){
+  if(cell.has((x+1)+','+z)||cell.has((x-1)+','+z)) return true;
+  if(cell.has(x+','+(z+1))||cell.has(x+','+(z-1))) return false;
+  return true;
+}
+// One door leaf in local space: hinge at the origin, leaf extends +x, faces
+// +/-z. All relief is real geometry in two batches (glossy plastic wood,
+// glossy iron) so it catches highlights and casts shadows like the walls.
+function buildDoorLeaf(sc,x,z,alongX,top,DH){
+  const mats=wallMaterials(), W=.74, leafH=DH-.08, y0=.03;
+  const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
+  const seed=Math.round(x)*131+Math.round(z)*71;
+  const wood=boxBatch(), iron=boxBatch();
+  const brown=(m)=>[.33*m,.205*m,.105*m];
+  wood.add(W/2,y0+leafH/2,0,W,leafH,.04,[.13,.09,.05]);            // dark core behind the plank gaps
+  const pw=(W-.036)/4;
+  for(let i=0;i<4;i++){
+    const cx=pw/2+i*(pw+.012), h=leafH*(i===0||i===3?.94:1), th=.07+hash(seed,i,1)*.016, zo=(hash(seed,i,2)-.5)*.008, m=.88+hash(seed,i,3)*.3;
+    wood.add(cx,y0+h/2,zo,pw,h,th,brown(m));                        // plank
+    for(const gx of [-pw*.24,pw*.2]) for(const s of [1,-1])         // raised grain strips, both faces
+      wood.add(cx+gx,y0+h*.4,zo+s*(th/2+.004),.016,h*.6,.008,brown(m*1.22));
+    if(hash(seed,i,4)<.45) wood.add(cx+(hash(seed,i,5)-.5)*pw*.5,y0+h*(.25+hash(seed,i,6)*.5),zo,.04,.055,th+.012,brown(m*.55)); // knot
+  }
+  for(const fy of [.22,.74]) wood.add(W/2,DH*fy,0,W+.02,.12,.115,brown(.78));   // ledges, proud of the planks
+  const bLen=Math.hypot(W-.16,DH*.5), bAng=Math.atan2(DH*.5,W-.16);
+  wood.addR(W/2,DH*.48,.055,bLen,.1,.028,brown(.86),0,0,bAng);                 // diagonal brace
+  for(const fy of [.22,.74]){
+    iron.add(W*.37,DH*fy,0,W*.74,.058,.128,[.13,.13,.15]);                     // strap hinges
+    for(let s2=0;s2<4;s2++) iron.add(.05+s2*W*.2,DH*fy,0,.034,.034,.14,[.24,.24,.27]); // studs
+  }
+  iron.add(W-.1,DH*.5,0,.075,.17,.125,[.14,.14,.16]);                          // handle backplate
+  const pivot=new BABYLON.TransformNode('door_pivot',sc);
+  const base=alongX?0:-Math.PI/2;
+  pivot.position.set(alongX?x-W/2:x, top, alongX?z:z-W/2); pivot.rotation.y=base;
+  for(const [batch,mat,name] of [[wood,mats.doorWood,'door_leaf_wood'],[iron,mats.doorIron,'door_leaf_iron']]){
+    const m=batch.mesh(name,sc); if(!m) continue;
+    m.material=mat; m.parent=pivot; m.receiveShadows=true; addShadow(m);
+  }
+  for(const s of [1,-1]){                                                       // ring handles
+    const ring=BABYLON.MeshBuilder.CreateTorus('door_ring',{diameter:.125,thickness:.02,tessellation:20},sc);
+    ring.material=mats.doorIron; ring.parent=pivot; ring.position.set(W-.1,DH*.44,s*.095); ring.rotation.x=Math.PI/2+(s>0?.3:-.3)*s; addShadow(ring);
+  }
+  return {pivot,x,z,alongX,base,angle:0};
+}
+// Frames (shared batch) plus a swinging leaf per door cell. Called by every
+// wall-style builder after it has drawn the stone header over each doorway.
+function buildDoors(cell,top){
+  const sc=state.scene, doors=[...cell.entries()].filter(([,w])=>meta(w).type==='door');
+  if(!doors.length) return;
+  const mats=wallMaterials(), frame=boxBatch(), DH=doorHeight();
+  for(const [k,w] of doors){
+    const [x,z]=k.split(',').map(Number), alongX=doorAxisOf(cell,x,z);
+    const putF=(ac,y,len,hgt,thick,col)=>{ alongX ? frame.add(ac,y,z,len,hgt,thick,col) : frame.add(x,y,ac,thick,hgt,len,col); };
+    for(const e of [-0.435,0.435]) putF((alongX?x:z)+e,top+(DH+.05)/2,.13,DH+.05,.21,[.26,.16,.09]);  // jamb posts
+    putF(alongX?x:z,top+DH+.01,1,.13,.21,[.28,.17,.09]);                                                // head beam under the stone header
+    putF(alongX?x:z,top+.018,.88,.036,.26,[.30,.19,.10]);                                               // threshold
+    const g=buildDoorLeaf(sc,x,z,alongX,top,DH);
+    for(const m of g.pivot.getChildMeshes(false)){ m.metadata={proxy:w}; m.isPickable=true; state.wallVisuals.push(m); }
+    state.wallVisuals.push(g.pivot);
+    (state.doorLeaves=state.doorLeaves||[]).push(g);
+  }
+  const fm=frame.mesh('door_frames',sc);
+  if(fm){ fm.material=mats.doorWood; fm.isPickable=false; fm.receiveShadows=true; addShadow(fm); state.wallVisuals.push(fm); }
+  ensureDoorAnimator();
+}
+// Doors swing away from whoever is close, and settle shut when clear. One
+// observer for every door, however often the walls are rebuilt.
+function ensureDoorAnimator(){
+  if(state._doorAnimator||!state.scene) return; state._doorAnimator=true;
+  state.scene.onBeforeRenderObservable.add(()=>{
+    const leaves=state.doorLeaves||[]; if(!leaves.length) return;
+    const dt=Math.min(.05,(state.scene.getEngine().getDeltaTime()||16)/1000);
+    const folk=[...(state.characters||[]),state.playerAvatar].filter(Boolean);
+    for(const L of leaves){
+      if(L.pivot.isDisposed?.()) continue;
+      let dir=0;
+      for(const g of folk){
+        const p=g.logicalPos||g.root?.position; if(!p) continue;
+        const dx=p.x-L.x, dz=p.z-L.z;
+        if(dx*dx+dz*dz<2.9){ dir=L.alongX ? (dz>=0?1:-1) : (dx>=0?-1:1); break; }
+      }
+      L.angle+=(dir*1.85-L.angle)*Math.min(1,dt*7);
+      L.pivot.rotation.y=L.base+L.angle;
+    }
+  });
 }
 // One AssetContainer per model file. Every placed copy instantiates from it
 // and shares its geometry, materials and textures: twenty trees cost one set
@@ -2759,7 +2945,7 @@ function build(g,thing='wall',at=null){
   const lp=g.logicalPos||g.root.position;
   if(Math.hypot(lp.x-x,lp.z-z)<.6){ const p=g.root.position.add(g.dir.scale(1.25)); x=clamp(Math.round(p.x),-15,15); z=clamp(Math.round(p.z),-15,15); }
   setCharacterFacing(g,new BABYLON.Vector3(Math.sign(x-lp.x),0,Math.sign(z-lp.z)));
-  if(thing==='crate') makeCrate(state.scene,x,z); else makeBlock(state.scene,x,z,false);
+  if(thing==='crate') makeCrate(state.scene,x,z); else if(thing==='door') makeDoor(state.scene,x,z,{}); else makeBlock(state.scene,x,z,false);
   say(g,'built '+thing+' at ('+x+','+z+')'); updatePerceptionUI(); saveWorldState();
 }
 function panic(g){ g.anim='panic'; playRig(g,'panic',true); say(g,'I have promoted the floor to manager'); if(!isTurnMode()){ for(let i=0;i<5;i++) setTimeout(()=>{ const v=new BABYLON.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(); g.collider.physicsBody?.applyImpulse(v.scale(1.15),g.collider.position); },i*160); } else emitBadge(g,'panic'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); zeroMeshMotion(g.collider); },1050); }
@@ -2924,7 +3110,7 @@ function baseGlyphForTile(x,z){
 function isOpaqueType(type){
   // Only genuinely large, solid structures occlude map vision. Small props,
   // lamps, barrels, crates and rocks remain visible without casting huge blind wedges.
-  return ['wall','bakery','cracked_shrine_plinth'].includes(type);
+  return ['wall','door','bakery','cracked_shrine_plinth'].includes(type);
 }
 function opaqueCells(){
   const out=new Set();
@@ -2990,7 +3176,7 @@ function isWithinFacingVision(g,cx,cz,x,z,radius){
 }
 function typeGlyph(type){
   const map={
-    wall:'#', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K'
+    wall:'#', door:'+', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K'
   };
   return map[type] || (type ? type[0].toUpperCase() : '?');
 }
@@ -3114,7 +3300,7 @@ function buildVisiblePerception(agentId=null,radius=7){
   for (const [key, c] of cells) { if (c.visible && c.base && c.base !== ' ') visibleGlyphs.add(c.base); }
   const glyphNames = {
     '@':'self', 'g':'other character', 'Y':'the player', ',':'grass', ':':'dirt/path', '~':'water',
-    '^':'stone', '#':'wall', '_':'floor', '.':'open floor', '&':'lava', '=':'bridge', 'C':'crate', 'B':'barrel', 'M':'mushroom',
+    '^':'stone', '#':'wall', '+':'door (opens as you approach)', '_':'floor', '.':'open floor', '&':'lava', '=':'bridge', 'C':'crate', 'B':'barrel', 'M':'mushroom',
     'L':'lamp', '*':'crystal/magic', 'H':'house', 'r':'rock', 'x':'rubble',
     'f':'fence', 'h':'chest', 'w':'workbench', 't':'table', 'n':'bench',
     's':'stool', 'o':'cauldron', 'a':'anvil', 'W':'weapon stand',
@@ -3316,6 +3502,7 @@ function spawnProp(kind='crate'){
   let obj;
   if(kind==='barrel') obj=makeBarrel(state.scene,x,z);
   else if(kind==='wall') obj=makeBlock(state.scene,x,z,false);
+  else if(kind==='door') obj=makeDoor(state.scene,x,z,{});
   else if(kind==='mushroom') obj=makeMushroom(state.scene,x,z);
   else if(kind==='lamp') obj=makeLamp(state.scene,x,z);
   else if(kind==='note') obj=makeNote(state.scene,x,z,'<h2>Note</h2><p>...</p>');
@@ -3358,6 +3545,9 @@ async function spawnAt(type, x, z) {
   } else if (type === 'wall') {
     obj = makeBlock(state.scene, x, z, false);
     log('spawned wall at ' + x + ',' + z);
+  } else if (type === 'door') {
+    obj = makeDoor(state.scene, x, z, {});
+    log('spawned door at ' + x + ',' + z);
   } else if (type === 'mushroom') {
     obj = makeMushroom(state.scene, x, z);
     log('spawned mushroom at ' + x + ',' + z);
@@ -3739,7 +3929,7 @@ async function restoreWorldState(input) {
   }
   for(const b of (data.blocks||[])){
     const cracked=b.state==='cracked';
-    const obj=makeBlock(state.scene,b.x,b.z,cracked);
+    const obj=b.type==='door' ? makeDoor(state.scene,b.x,b.z,{}) : makeBlock(state.scene,b.x,b.z,cracked);
     if(obj){ const mm=meta(obj); if(mm){ mm.state=b.state||'intact'; mm.health=b.health??mm.health; if(b.rim) mm.rim=true; } }
   }
   const palettes=[
@@ -3902,11 +4092,12 @@ function setupUI(){
   const wallSel=document.getElementById('wallStyleSelect');
   if(wallSel){ wallSel.value=state.wallStyle||'tabletop'; wallSel.onchange=()=>{
     state.wallStyle=wallSel.value;
-    // Rebuild every wall in the new style, keeping its state.
-    const old=state.blocks.filter(b=>!b.isDisposed?.() && meta(b)?.type==='wall').map(b=>({x:b.position.x,z:b.position.z,mm:{...meta(b)}}));
-    for(const b of state.blocks.filter(b=>meta(b)?.type==='wall')) disposeWorldObject(b);
+    // Rebuild every wall (and door) in the new style, keeping its state.
+    const isWallish=b=>['wall','door'].includes(meta(b)?.type);
+    const old=state.blocks.filter(b=>!b.isDisposed?.() && isWallish(b)).map(b=>({x:b.position.x,z:b.position.z,mm:{...meta(b)}}));
+    for(const b of state.blocks.filter(isWallish)) disposeWorldObject(b);
     state.blocks=state.blocks.filter(b=>!b.isDisposed?.());
-    for(const o of old){ const b=makeBlock(state.scene,o.x,o.z,o.mm.state==='cracked'); const mm=meta(b); mm.state=o.mm.state; mm.health=o.mm.health; if(o.mm.rim) mm.rim=true; }
+    for(const o of old){ const b=o.mm.type==='door' ? makeDoor(state.scene,o.x,o.z,{}) : makeBlock(state.scene,o.x,o.z,o.mm.state==='cracked'); const mm=meta(b); mm.state=o.mm.state; mm.health=o.mm.health; if(o.mm.rim) mm.rim=true; }
     scheduleWallRebuild(); saveWorldState();
   }; }
   const spawnModeEnabled=document.getElementById('spawnModeEnabled'); if(spawnModeEnabled) spawnModeEnabled.onchange=()=>{

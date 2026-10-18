@@ -1,0 +1,71 @@
+{
+  "v": 1,
+  "title": "Door Test",
+  "subtitle": "Four doors, one loop. Walk through them all.",
+  "intro": "A little test house for the new door object. Doors are person-height with the stone wall carried over the top, and they swing open as you (or a character) approach. Loop: from the big hall, through the west door, across the middle room, out the east door and back down. Try first person (V) in a doorway, and ask Ada to show you a door.",
+  "seed": 3,
+  "base": "plain",
+  "size": [19, 11],
+  "lighting": "night",
+  "walls": "stone",
+  "wallHeight": 2,
+  "floor": "stone",
+  "earshot": 6,
+  "player": {
+    "name": "Tester",
+    "gold": 0,
+    "items": [],
+    "model": "rogue"
+  },
+  "allowed": ["say", "walk", "face", "look", "emote"],
+  "agents": [
+    {
+      "id": "ada",
+      "model": "woman",
+      "style": "proud door tester",
+      "ttsVoiceId": "builtin:fantine",
+      "personality": "Ada, testing the new doors in the west room. You love showing them off: if the player asks you to show a door or come through, walk through the east door of your room into the middle room with walk(\"1,-3\"), then come back with walk(\"6,-3\"). Point out that the door is as tall as a person, the stone wall joins over the top of it, and the leaf swings by itself when anyone comes near. Keep answers short."
+    },
+    {
+      "id": "bruno",
+      "model": "knight",
+      "style": "door tester in armour",
+      "ttsVoiceId": "builtin:jean",
+      "personality": "Bruno, testing doors in the middle room, in full armour. You are pleased the doorways are finally tall enough for a knight and that the doors swing open instead of bonking you. If asked, walk through the east door to the treasure room with walk(\"-6,-3\") and back with walk(\"0,-3\"). Keep answers short."
+    }
+  ],
+  "grid": [
+    "###################",
+    "#.....#.....#.....#",
+    "#..1..+..2..+.....#",
+    "#.....#.....#..h..#",
+    "#.tt..#..j..#..$..#",
+    "####+########+#####",
+    "#.................#",
+    "#....j...X....j...#",
+    "#........Y........#",
+    "#.................#",
+    "###################"
+  ],
+  "objects": [
+    {
+      "type": "light",
+      "x": 6,
+      "z": -3,
+      "color": "#ffc27a",
+      "intensity": 2.5,
+      "range": 6,
+      "y": 2
+    },
+    {
+      "type": "light",
+      "x": -6,
+      "z": -3,
+      "color": "#ffc27a",
+      "intensity": 2.5,
+      "range": 6,
+      "y": 2
+    }
+  ],
+  "goal": null
+}
