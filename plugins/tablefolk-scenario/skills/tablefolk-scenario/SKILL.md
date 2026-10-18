@@ -328,6 +328,8 @@ character belongs in:
 - `"kind": "dungeon"`: rooms joined by corridors, walls only around floors,
   the sea outside (`"outside": "table"` keeps the bare board). Options:
   `"rooms"` (3-16), `"size": [cols, rows]`, `"boss": "throne" | "lair"`.
+  Doorways get `+` doors and walls default to `"wallHeight": 2` (set
+  `"wallHeight": 1` for low tabletop walls).
   Places: `entrance` (the player starts here), `throne`, `lair`, `treasure`,
   `library`, `shrine`, `barracks`, `storage`, `kitchen`, `prison`, `crypt`,
   `alchemy`, `room N`. Night lighting, a light in every room.

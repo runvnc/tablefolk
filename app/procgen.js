@@ -15,6 +15,8 @@
  * the throne room or lair furthest away, treasure in dead ends) and furnished
  * to match. Village: two crossing roads, a square with a campfire, buildings
  * along the roads with doors onto them, trees, flowers, a garden, a pond.
+ * Doorways get real doors ('+'), and generated scenarios default to
+ * "wallHeight": 2 so the person-height doors fit.
  *
  * Plain script, no dependencies: the browser loads it before scenario.js
  * (window.TablefolkProcgen); the server imports it for the same result.
@@ -186,6 +188,16 @@
         if (near) g[r][c] = '#';
       }
     }
+    // Doors ('+') where a corridor passes through a room's wall: a corridor
+    // cell next to the room, with wall on both sides across it.
+    for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) if (g[r][c] === ':') {
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!roomAt(r + dr, c + dc) || roomAt(r, c)) continue;
+        const sides = dr ? [g[r][c - 1], g[r][c + 1]] : [g[r - 1][c], g[r + 1][c]];
+        const nextToDoor = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => g[r + a][c + b] === '+');
+        if (sides.every(x => x === '#') && !nextToDoor) { g[r][c] = '+'; break; }
+      }
+    }
     rooms.forEach((rm, i) => furnish(g, R, rm, ROOM_FURNISH[kind[i]] || ROOM_FURNISH.room, doorsOf[i]));
     const at = toBoard(W, H);
     const count = {};
@@ -240,7 +252,7 @@
         const r1 = r0 + h - 1, c1 = c0 + w - 1;
         if (!free(r0, c0, r1, c1)) continue;
         for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) g[r][c] = (r === r0 || r === r1 || c === c0 || c === c1) ? '#' : spec.floor;
-        g[door[0]][door[1]] = spec.floor;
+        g[door[0]][door[1]] = '+';
         // a path from the door to the road
         const [dr, dc] = side === 'n' ? [1, 0] : side === 's' ? [-1, 0] : side === 'w' ? [0, 1] : [0, -1];
         for (let r = door[0] + dr, c = door[1] + dc; r > 0 && c > 0 && r < H - 1 && c < W - 1 && g[r][c] === ','; r += dr, c += dc) g[r][c] = ':';
@@ -275,7 +287,7 @@
   const HARD = new Set(['#', '.', '~', '&', '-', 'y', '%']);
   function ensureConnected(g, start) {
     const H = g.length, W = g[0].length, key = (r, c) => r * W + c;
-    const walk = (r, c) => FLOOR_GLYPHS.has(g[r][c]);
+    const walk = (r, c) => FLOOR_GLYPHS.has(g[r][c]) || g[r][c] === '+';
     for (let round = 0; round < 60; round++) {
       // 0-1 BFS: floor costs 0, furniture costs 1, walls are impassable.
       const cost = new Map([[key(...start), 0]]), prev = new Map(), dq = [start];
@@ -397,7 +409,7 @@
     }
     return {
       scenario: { ...scn, grid: scn.grid?.length ? scn.grid : gen.grid, legend: { ...gen.legend, ...(scn.legend || {}) }, size: scn.size || gen.size,
-        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, walls: scn.walls ?? 'stone', base: scn.base ?? 'plain' },
+        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, walls: scn.walls ?? 'stone', wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
       places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
       warnings,
     };

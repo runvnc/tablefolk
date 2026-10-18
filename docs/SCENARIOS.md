@@ -209,8 +209,9 @@ the same file) builds a whole map:
 
 It runs inside `normalizeScenario`, before everything else: the result is an
 ordinary `grid` + `legend`, `objects` (one `light` per room or building),
-`size`, `lighting` (night for dungeons), `walls` (`stone`) and a position for
-every character and the player. Anything the scenario sets itself wins. The
+`size`, `lighting` (night for dungeons), `walls` (`stone`), `wallHeight` (2,
+so the person-height doors fit), a `+` door in every doorway, and a position
+for every character and the player. Anything the scenario sets itself wins. The
 link keeps the short form, and the same seed gives the same map.
 
 - Dungeon: BSP rooms, a spanning tree of L-shaped corridors plus a loop or two,

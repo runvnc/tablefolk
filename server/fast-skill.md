@@ -12,6 +12,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "seed": 7,
   "lighting": "bright",              // or "night"
   "walls": "stone",                  // or "tabletop", "modern"
+  "wallHeight": 2,                   // walls twice tabletop height (fits the doors); 1 = low
   "player": { "name": "Traveller", "gold": 10, "items": [] },
   "allowed": ["say", "walk", "face", "emote"],   // default commands for every character
   "agents": [ {
@@ -64,7 +65,7 @@ always built. Agents without "in" are placed by their role (goblin → lair,
 sorceress/king → throne, guard → barracks, priest → shrine/temple, smith →
 smithy, innkeeper → tavern, merchant → shop). Objects:
 "objects": [{ "type": "chest", "in": "treasure" }]. Dungeons are lit at night
-automatically. Don't add "grid" or "map".
+automatically; rooms and buildings get doors. Don't add "grid" or "map".
 
 ## B. "grid": ASCII map (exact small rooms and buildings)
 
@@ -73,13 +74,13 @@ automatically. Don't add "grid" or "map".
 
 One glyph per cell, top row = north, rows equal length (odd sizes 7-41).
 Floors: , grass  : dirt  ^ stone  = wood  _ oak  ~ water  & lava  - sea (hole)
-Objects: # wall  C crate  B barrel  h chest  t table (tt = one table)  n bench
+Objects: # wall  + door (in a doorway: a wall cell either side)  C crate  B barrel  h chest  t table (tt = one table)  n bench
 s stool  o cauldron  a anvil  W weapon_stand  / axe  p pickaxe  u bucket  b bag
 P potion  S scroll  $ coin_pile  K bookshelf  A armchair  D desk  v plant
 l floor_lamp  M mushroom  L lamp  N note  % tree  H house  r boulder
 X campfire  f fence  I signpost  j lantern  * flowers
 Characters: 1-9 = agents in order; Y = player. "." = empty board.
-Leave doorways (gaps) in walls. Use legend for extra glyphs: an object,
+Leave doorways in walls: a + door, or a gap. Use legend for extra glyphs: an object,
 a material (carpet tile concrete flagstone sand), an agent id, or
 "<thing> on <material>".
 
