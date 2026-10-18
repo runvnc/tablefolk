@@ -198,7 +198,7 @@ input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);bor
 #problems{color:#b5542e;font-size:.9rem}a{color:var(--accent)}
 .load{margin-top:14vh;text-align:center}.load h1{font-size:1.6rem}
 .bar{height:14px;border-radius:7px;background:var(--track);overflow:hidden;margin:1.4rem 0 .7rem}
-#fill{height:100%;width:0;background:var(--accent);border-radius:7px;transition:width .6s ease}
+#fill{height:100%;width:0;background:var(--accent);border-radius:7px;transition:width .15s linear}
 .row{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.95rem}
 #chore{transition:opacity .25s}
 </style></head><body><main>
@@ -216,9 +216,10 @@ if(words){
   // The clock runs on its own: a reasoning model can think for seconds
   // before the first event with text in it.
   const clock=setInterval(()=>{ $('clock').textContent=((Date.now()-t0)/1000).toFixed(1)+'s'; },100);
-  // Loading view: the bar heads for a target set by the real stages and
-  // creeps on between events, so it always moves; captions are made-up chores.
-  let target=4, shown=0, ended=false;
+  // Loading view: the bar moves fast from the start (a curve over time:
+  // half way at ~4s, 80% by ~11s) and the real writing progress can only push
+  // it further; captions are made-up chores.
+  let target=0, shown=0, ended=false, written=0;
   const CHORES=['Unrolling the map','Laying flagstones','Stacking stones for the walls','Hanging doors on their hinges','Lighting the lanterns',
     'Waking the innkeeper','Counting the gold','Teaching goblins to haggle','Polishing the sorceress’s staff','Hiding a key somewhere',
     'Sweeping the tavern floor','Filling barrels','Writing secret notes','Feeding the ravens','Sharpening swords','Rehearsing villain monologues',
@@ -226,18 +227,20 @@ if(words){
   let ci=Math.floor(Math.random()*CHORES.length);
   const nextChore=()=>{ const el=$('chore'); if(!el||ended) return; ci=(ci+1+Math.floor(Math.random()*3))%CHORES.length; el.style.opacity=0; setTimeout(()=>{ el.textContent=CHORES[ci]+'…'; el.style.opacity=1; },250); };
   if(view==='loading'){ $('chore').textContent=CHORES[ci]+'…'; setInterval(nextChore,2400);
-    setInterval(()=>{ if(ended) return; target=Math.min(target+.35,94); shown+=(Math.max(target,shown)-shown)*.25; $('fill').style.width=shown.toFixed(1)+'%'; },300); }
+    setInterval(()=>{ if(ended) return; const t=(Date.now()-t0)/1000;
+      target=Math.max(target,95*(1-Math.exp(-t/6)),written?55+40*Math.min(1,written/3500):0);
+      shown+=(Math.min(target,96)-shown)*.3; $('fill').style.width=shown.toFixed(1)+'%'; },120); }
   const bump=t=>{ target=Math.max(target,t); };
   const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
     $('stage').textContent=(stageText[d.stage]||d.stage)+'…'+(d.model?' ('+d.model+')':'')+(d.chars?' '+d.chars+' chars':'');
-    if(d.stage==='waiting') bump(8); else if(d.stage==='thinking') bump(12+Math.min(25,(d.thought||0)/120));
-    else if(d.stage==='writing') bump(38+Math.min(50,(d.chars||0)/70)); else bump(90);
+    if(d.stage==='writing' && d.chars) written=d.chars; else if(d.stage==='repairing'||d.stage==='problems') bump(90);
     if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');});
   es.addEventListener('done',e=>{es.close(); ended=true; clearInterval(clock); const d=JSON.parse(e.data);
     $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)'; $('clock').textContent='';
-    if(view==='loading'){ target=shown=100; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; }
+    // the loading view just goes there: nothing to click
+    if(view==='loading'){ target=shown=100; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; setTimeout(()=>location.href=appLink(d.link),500); return; }
     $('result').innerHTML='<p><a href="'+appLink(d.link)+'">open it</a> · <a href="#" id="again">another one</a></p>';
     $('again').onclick=ev=>{ev.preventDefault(); location.reload();};
     if(!qs.has('stay')) setTimeout(()=>location.href=appLink(d.link),700);});
