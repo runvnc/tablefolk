@@ -1,5 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261020a';
-import { installDevConsole } from './dev-console.js?v=20261020a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261020b';
+import { localClient } from './openai-client.js?v=20261020b';
+import { installDevConsole } from './dev-console.js?v=20261020b';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261019a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
@@ -382,6 +383,11 @@ async function main() {
   // already sitting on the model they want, instead of loading a redundant
   // second copy of the same multi-GB weights.
   installDevConsole(() => manager);
+  // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
+  // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.
+  window.tablefolkLLM = localClient({
+    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, onToken: onToken ? t => onToken(t) : null }),
+  }, { model: 'active-brain' });
   let running = false;
   let stepIndex = 0;
   window.addEventListener('tablefolk:clear-conversations', event => manager.clearConversations(event.detail?.agentId ?? null));

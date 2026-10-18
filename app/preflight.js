@@ -44,7 +44,7 @@
     ['scenery.js?v=20261019ze'],
     ['procgen.js?v=20261020c'],
     ['scenario.js?v=20261020f'],
-    ['llm_js/world-integration.js?v=20261020e', 'module'],
+    ['llm_js/world-integration.js?v=20261020i', 'module'],
   ];
 
   function browserSummary() {
