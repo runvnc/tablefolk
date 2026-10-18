@@ -40,31 +40,32 @@
   // What each kind of room holds. Glyphs are the scenario grid's own.
   const ROOM_FURNISH = {
     entrance: { floor: '^', wall: ['j'], center: [] },
-    throne: { floor: 'R', wall: ['K', 'W', 'j'], center: ['A'], carpet: true },
+    throne: { floor: 'R', wall: ['K', 'W', 'j', 'e'], center: ['A'], carpet: true },
     lair: { floor: ':', wall: ['r', 'B', 'b'], center: ['X'] },
-    treasure: { floor: '^', wall: ['h', '$', '$', 'P'], center: ['h'] },
+    treasure: { floor: '^', wall: ['h', '$', '$', 'P', 'm'], center: ['h'] },
     library: { floor: '=', wall: ['K', 'K', 'K', 'S'], center: ['t', 's'] },
-    shrine: { floor: '^', wall: ['l', 'v', 'S'], center: ['o'] },
-    barracks: { floor: '^', wall: ['W', 'n', 'n', '/'], center: ['t'] },
+    shrine: { floor: '^', wall: ['j', 'e', 'S', 'i'], center: ['o'] },
+    barracks: { floor: '^', wall: ['Z', 'Z', 'W', 'n', '/'], center: ['t'] },
     storage: { floor: ':', wall: ['C', 'B', 'C', 'B', 'u'], center: ['C'] },
     kitchen: { floor: 'E', wall: ['B', 'u', 'w'], center: ['o', 't'] },
     prison: { floor: ':', wall: ['f', 'f', 'u'], center: [] },
-    crypt: { floor: '^', wall: ['r', 'l', 'S'], center: ['h'] },
+    crypt: { floor: '^', wall: ['r', 'j', 'S'], center: ['h'] },
     alchemy: { floor: '^', wall: ['P', 'P', 'K', 'w'], center: ['o'] },
     room: { floor: '^', wall: ['C', 'B'], center: [] },
   };
   const BUILDING_FURNISH = {
-    tavern: { floor: '=', wall: ['B', 'B', 'n', 'j'], center: ['t', 's', 't', 's'], size: [7, 6] },
-    smithy: { floor: 'Q', wall: ['W', '/', 'p'], center: ['a', '&'], size: [6, 5] },
-    shop: { floor: '=', wall: ['C', 'B', 'K', '$'], center: ['t'], size: [5, 5] },
-    temple: { floor: '^', wall: ['l', 'v', 'l'], center: ['n', 'n', 'o'], size: [7, 7] },
+    tavern: { floor: '=', wall: ['B', 'B', 'n', 'j', 'e'], center: ['t', 's', 't', 's'], size: [7, 6] },
+    smithy: { floor: 'Q', wall: ['W', '/', 'p', 'd'], center: ['a', '&'], size: [6, 5] },
+    shop: { floor: '=', wall: ['C', 'B', 'K', '$', 'm'], center: ['t'], size: [5, 5] },
+    temple: { floor: '^', wall: ['i', 'e', 'i', 'S'], center: ['n', 'n', 'o'], size: [7, 7] },
     alchemist: { floor: '_', wall: ['P', 'K', 'P', 'w'], center: ['o'], size: [5, 5] },
-    guardhouse: { floor: '^', wall: ['W', 'n', '/'], center: ['t'], size: [5, 5] },
-    library: { floor: '=', wall: ['K', 'K', 'K'], center: ['D', 'c'], size: [6, 5] },
-    house: { floor: '_', wall: ['A', 'K', 'v', 'l'], center: ['T'], size: [5, 5] },
-    stable: { floor: ':', wall: ['u', 'B', 'f'], center: [], size: [6, 5] },
+    guardhouse: { floor: '^', wall: ['W', 'Z', '/', 'e'], center: ['t'], size: [5, 5] },
+    library: { floor: '=', wall: ['K', 'K', 'K'], center: ['t', 's'], size: [6, 5] },
+    house: { floor: '=', wall: ['Z', 'K', 'B', 'j'], center: ['t', 's'], size: [5, 5] },
+    stable: { floor: ':', wall: ['u', 'B', 'f', 'd'], center: [], size: [6, 5] },
   };
-  const GEN_LEGEND = { R: 'carpet', E: 'tile', Q: 'concrete', U: 'flagstone', y: 'lily_pad on water' };
+  const GEN_LEGEND = { R: 'carpet', E: 'tile', Q: 'concrete', U: 'flagstone', y: 'lily_pad on water',
+    Z: 'bed', G: 'well', O: 'market_stand', V: 'cart', J: 'dummy', k: 'target', g: 'pumpkin', d: 'logs', e: 'wall_banner', i: 'torch', m: 'iron_chest' };
 
   // Furnish a rectangular interior (r0..r1, c0..c1): wall-side things on cells
   // next to the wall but not next to a doorway, centre things near the middle,
@@ -223,7 +224,7 @@
     // The square: flagstone around the crossing, a campfire, a signpost.
     const sq = { r0: midR - 2, c0: midC - 2, r1: midR + 3, c1: midC + 3 };
     for (let r = sq.r0; r <= sq.r1; r++) for (let c = sq.c0; c <= sq.c1; c++) g[r][c] = 'U';
-    g[sq.r0][sq.c0] = 'j'; g[sq.r1][sq.c1] = 'j'; g[sq.r0 + 1][sq.c1 - 1] = 'I';
+    g[sq.r0][sq.c0] = 'j'; g[sq.r1][sq.c1] = 'j'; g[sq.r0 + 1][sq.c1 - 1] = 'I'; g[sq.r1][sq.c0] = 'G'; g[sq.r0][sq.c1] = 'O';
     const taken = makeGrid(W, H, false);
     const mark = (r0, c0, r1, c1) => { for (let r = Math.max(0, r0); r <= Math.min(H - 1, r1); r++) for (let c = Math.max(0, c0); c <= Math.min(W - 1, c1); c++) taken[r][c] = true; };
     mark(midR - 1, 0, midR + 2, W - 1); mark(0, midC - 1, H - 1, midC + 2); mark(sq.r0 - 1, sq.c0 - 1, sq.r1 + 1, sq.c1 + 1);
@@ -266,10 +267,12 @@
     // Pond, garden, trees, flowers in what is left.
     const placeBlob = (h, w, fn) => { for (let tries = 0; tries < 80; tries++) { const r0 = R.int(1, H - 1 - h), c0 = R.int(1, W - 1 - w); if (free(r0, c0, r0 + h - 1, c0 + w - 1)) { fn(r0, c0); mark(r0 - 1, c0 - 1, r0 + h, c0 + w); return [r0, c0]; } } return null; };
     const pond = placeBlob(3, 4, (r0, c0) => { for (let r = r0; r < r0 + 3; r++) for (let c = c0; c < c0 + 4; c++) if (!((r === r0 || r === r0 + 2) && (c === c0 || c === c0 + 3))) g[r][c] = '~'; g[r0 + 1][c0 + 1] = 'y'; });
-    const garden = placeBlob(4, 5, (r0, c0) => { for (let r = r0; r < r0 + 4; r++) for (let c = c0; c < c0 + 5; c++) g[r][c] = (r === r0 || r === r0 + 3) ? 'f' : (c === c0 || c === c0 + 4 ? ',' : '*'); });
+    const garden = placeBlob(4, 5, (r0, c0) => { for (let r = r0; r < r0 + 4; r++) for (let c = c0; c < c0 + 5; c++) g[r][c] = (r === r0 || r === r0 + 3) ? 'f' : (c === c0 || c === c0 + 4 ? ',' : (R.next() < .35 ? 'g' : '*')); });
     // Trees, flowers and boulders on open grass (not against walls or paths).
     const open = (r, c) => g[r][c] === ',' && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].every(([dr, dc]) => [',', '%', '*', 'r'].includes(g[r + dr]?.[c + dc] ?? ','));
     for (let i = 0, n = Math.round(W * H / 30), tries = 0; i < n && tries < 2000; tries++) { const r = R.int(1, H - 2), c = R.int(1, W - 2); if (open(r, c)) { g[r][c] = R.next() < .72 ? '%' : (R.next() < .6 ? '*' : 'r'); i++; } }
+    // Yard things: carts, woodpiles, a training yard by the guardhouse.
+    for (let i = 0, n = Math.max(2, Math.round(W * H / 160)), tries = 0; i < n && tries < 1000; tries++) { const r = R.int(1, H - 2), c = R.int(1, W - 2); if (open(r, c)) { g[r][c] = R.pick(['V', 'd', 'd', 'g', 'k', 'J']); i++; } }
     const at = toBoard(W, H), count = {};
     const named = places.map(p => {
       count[p.kind] = (count[p.kind] || 0) + 1;
