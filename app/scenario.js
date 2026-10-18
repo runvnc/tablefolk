@@ -814,6 +814,14 @@
   function normalizeScenario(s) {
     if (!s || typeof s !== 'object') throw new Error('scenario must be a JSON object');
     if (s.v && s.v !== 1) throw new Error('unsupported scenario version ' + s.v);
+    // "generate": a procedural dungeon or village (procgen.js) becomes the
+    // grid, lights and character positions; the link keeps the short form.
+    let gen = null;
+    if (s.generate && typeof s.generate === 'object' && !s._gen && window.TablefolkProcgen) {
+      const r = window.TablefolkProcgen.applyToScenario(s);
+      gen = { places: r.places, warnings: r.warnings, generate: s.generate };
+      s = r.scenario;
+    }
     const out = { v: 1, title: String(s.title || 'Untitled scenario'), subtitle: s.subtitle ? String(s.subtitle) : '', safety: !!s.safety, lighting: ['night', 'dim'].includes(s.lighting) ? s.lighting : 'bright', intro: s.intro ? String(s.intro) : '', seed: Number.isFinite(+s.seed) ? +s.seed : 1,
       player: s.player || { name: 'Traveller', gold: 0, items: [] }, allowed: Array.isArray(s.allowed) ? s.allowed : ['say', 'walk', 'face'],
       agents: (Array.isArray(s.agents) ? s.agents : []).filter(a => a && a.id).map(a => ({ ...a, id: String(a.id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || 'critter' })),
@@ -831,6 +839,7 @@
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
+    if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
     // Normalising twice (restart) must not wrap the turn limit again.
     if (out.goal?.maxTurns && !JSON.stringify(out.goal.lose || {}).includes('turns_over')) {
       const t = { turns_over: +out.goal.maxTurns };
@@ -940,7 +949,7 @@
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
-    plan.warnings.unshift(...scn.gridWarnings);
+    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings);
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}

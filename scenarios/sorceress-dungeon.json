@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "title": "The Sorceress Below",
+  "intro": "A generated dungeon. The sorceress Vexa rules from the deepest room; her goblins guard the halls.",
+  "seed": 7,
+  "generate": { "kind": "dungeon", "rooms": 9 },
+  "player": { "name": "Adventurer", "gold": 10, "items": [] },
+  "allowed": ["say", "walk", "face", "emote"],
+  "agents": [
+    { "id": "vexa", "model": "mage", "style": "cold, proud sorceress", "personality": "Vexa, a sorceress who rules this dungeon from her throne. She is bored and curious about visitors." },
+    { "id": "grub", "style": "goblin guard", "personality": "Grub, a lazy goblin. Loves shiny things." },
+    { "id": "snik", "style": "goblin", "personality": "Snik, a nervous goblin who talks too much." },
+    { "id": "mog", "style": "goblin cook", "in": "kitchen", "personality": "Mog, the goblins' cook." }
+  ],
+  "objects": [{ "type": "chest", "in": "treasure" }]
+}

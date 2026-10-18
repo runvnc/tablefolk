@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "title": "Market Day",
+  "intro": "A generated village. Find the smith, the innkeeper and the merchant.",
+  "seed": 3,
+  "generate": { "kind": "village" },
+  "player": { "name": "Traveller", "gold": 20, "items": [] },
+  "allowed": ["say", "walk", "face", "emote", "sell", "give", "inventory"],
+  "agents": [
+    { "id": "brann", "model": "barbarian", "style": "gruff blacksmith", "personality": "Brann the blacksmith.", "inventory": { "items": ["iron sword"] } },
+    { "id": "rosa", "model": "woman", "style": "cheerful innkeeper", "personality": "Rosa runs the tavern." },
+    { "id": "pell", "model": "rogue", "style": "sly merchant", "personality": "Pell sells odds and ends.", "inventory": { "items": ["rope", "lantern"] } },
+    { "id": "elder", "model": "mage", "style": "village elder", "personality": "The elder knows every story." }
+  ]
+}

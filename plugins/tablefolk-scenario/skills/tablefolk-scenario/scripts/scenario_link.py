@@ -11,6 +11,9 @@ import argparse, base64, html, json, re, sys, zlib
 
 DEFAULT_BASE = 'http://localhost:8000/app/'
 BASES = {'island', 'clearing', 'dungeon', 'plain'}
+# procgen.js places ("in"): dungeon rooms, village buildings and spots.
+ROOMS = {'entrance', 'throne', 'lair', 'treasure', 'library', 'shrine', 'barracks', 'storage', 'kitchen', 'prison', 'crypt', 'alchemy', 'room'}
+BUILDINGS = {'tavern', 'smithy', 'shop', 'temple', 'alchemist', 'guardhouse', 'library', 'house', 'stable', 'square', 'pond', 'garden'}
 COMMANDS = {'say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
             'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball'}
 
@@ -59,7 +62,17 @@ def check(obj):
     for u in obj.get('packs', []):
         if not isinstance(u, str) or not u.endswith('.json'):
             problems.append(f'"packs": {u!r} should be the URL of a pack.json')
+    gen = obj.get('generate')
+    if gen is not None:
+        kind = str((gen or {}).get('kind', 'dungeon')).lower() if isinstance(gen, dict) else None
+        if kind not in ('dungeon', 'village', 'town'): problems.append('"generate" must be {"kind": "dungeon" | "village", ...}')
+        known = ROOMS if kind == 'dungeon' else BUILDINGS
+        for thing in obj.get('agents', []) + obj.get('objects', []) + [obj.get('player') or {}]:
+            where = thing.get('in')
+            if where is not None and re.sub(r'\s+\d+$', '', str(where).lower()) not in known:
+                problems.append(f'"in": {where!r} is not a {kind} place ({" ".join(sorted(known))})')
     for o in obj.get('objects', []):
+        if gen is not None and o.get('in') is not None and o.get('type'): continue
         if not all(isinstance(o.get(k), (int, float)) for k in ('x', 'z')) or not o.get('type'):
             problems.append(f'object {o!r} needs "type", numeric "x" and "z"')
     grid = obj.get('grid') or []

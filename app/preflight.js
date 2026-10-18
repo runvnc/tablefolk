@@ -42,7 +42,8 @@
     ['terrain-hd.js?v=20261019c'],
     ['app.js?v=20261020d'],
     ['scenery.js?v=20261019ze'],
-    ['scenario.js?v=20261020d'],
+    ['procgen.js?v=20261020c'],
+    ['scenario.js?v=20261020f'],
     ['llm_js/world-integration.js?v=20261020e', 'module'],
   ];
 

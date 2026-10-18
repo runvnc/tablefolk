@@ -237,6 +237,44 @@ sells it for `price` gold, which the character chooses (haggling is just
 conversation: state the floor price in the personality). Either way the item
 lands in the player's inventory, so `player_has` sees it.
 
+## Generated dungeons and villages (`generate`, fastest)
+
+Let the app build the whole map from a seed, and say which place each
+character belongs in:
+
+```json
+{
+  "v": 1, "title": "The Sorceress Below", "seed": 7,
+  "generate": { "kind": "dungeon", "rooms": 9 },
+  "agents": [
+    { "id": "vexa", "model": "mage", "style": "proud sorceress", "in": "throne", "personality": "..." },
+    { "id": "grub", "style": "goblin guard", "personality": "..." }
+  ],
+  "objects": [{ "type": "chest", "in": "treasure" }]
+}
+```
+
+- `"kind": "dungeon"`: rooms joined by corridors, walls only around floors,
+  the sea outside (`"outside": "table"` keeps the bare board). Options:
+  `"rooms"` (3-16), `"size": [cols, rows]`, `"boss": "throne" | "lair"`.
+  Places: `entrance` (the player starts here), `throne`, `lair`, `treasure`,
+  `library`, `shrine`, `barracks`, `storage`, `kitchen`, `prison`, `crypt`,
+  `alchemy`, `room N`. Night lighting, a light in every room.
+- `"kind": "village"`: crossing roads, a flagstone `square` (the player starts
+  here) with a campfire and signpost, buildings with their doors onto the
+  roads. Options: `"buildings"` (3-14), `"size"`. Places: `tavern`, `smithy`,
+  `shop`, `temple`, `alchemist`, `guardhouse`, `library`, `stable`,
+  `house N` (or `house` for any), `square`, `pond`, `garden`.
+- `"in"` on an agent, an object, or the player puts it in that place (any
+  place named in `"in"` is always built). An agent with neither `"at"` nor
+  `"in"` goes where its id/style/personality suggests: goblins and monsters to
+  the lair, rulers and sorcerers to the throne room, guards to barracks,
+  priests to the shrine/temple, smiths to the smithy, innkeepers to the
+  tavern, merchants to the shop...
+- Same seed, same map. Change `"seed"` for another layout. `"walls"` defaults
+  to `"stone"` here; `"lighting"`, `"grid"`, `"legend"`, more `"objects"` and
+  `"goal"` all work as usual (a `"grid"` replaces the generated one).
+
 ## ASCII grid (exact rooms, easiest to write)
 
 ```jsonc

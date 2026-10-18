@@ -197,6 +197,42 @@ sketched in the skill). Characters with no position are placed near the
 middle. `give` and `sell` need the player within 3 cells, so connect islets
 that hold traders with jetties.
 
+## 2d. Generated dungeons and villages (`generate`)
+
+`app/procgen.js` (seeded, no dependencies; the browser and the Bun server load
+the same file) builds a whole map:
+
+```json
+"generate": { "kind": "dungeon", "rooms": 9, "size": [33, 25], "boss": "throne", "outside": "sea" }
+"generate": { "kind": "village", "buildings": 7, "size": [35, 27] }
+```
+
+It runs inside `normalizeScenario`, before everything else: the result is an
+ordinary `grid` + `legend`, `objects` (one `light` per room or building),
+`size`, `lighting` (night for dungeons), `walls` (`stone`) and a position for
+every character and the player. Anything the scenario sets itself wins. The
+link keeps the short form, and the same seed gives the same map.
+
+- Dungeon: BSP rooms, a spanning tree of L-shaped corridors plus a loop or two,
+  one-cell walls around floors only, sea outside. Room purposes come from the
+  room graph: the `entrance` is nearest the south edge (the player starts
+  there), the room furthest from it is the `throne` or `lair`, a dead end is the
+  `treasure` room, the rest `library shrine barracks storage kitchen prison
+  crypt alchemy`. Each kind is furnished from the normal object set; a
+  connectivity pass clears any furniture that would cut a corridor off.
+- Village: two crossing dirt roads, a flagstone `square` (campfire, lanterns,
+  signpost), buildings facing the roads with a door and a path
+  (`tavern smithy shop temple alchemist guardhouse library stable house N`),
+  a `pond`, a fenced flower `garden`, trees, flowers and boulders.
+- `"in": "<place>"` on an agent, object or the player puts it in a free cell of
+  that place (`house` = any house; any kind named in an `in` is always built).
+  Agents with neither `at` nor `in` are matched by role words in their id,
+  style and personality (goblin → lair, sorceress/king → throne, guard →
+  barracks, priest → shrine/temple, smith → smithy, innkeeper → tavern,
+  merchant → shop, ...). Unknown places are reported in the scenario pane.
+- `normalizeScenario` keeps `places` (id, kind, centre, bounds, who is there)
+  on the result for tools and prompts.
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile
