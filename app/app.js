@@ -1534,6 +1534,39 @@ function paintMaterial(mat,tint){
   state.paintMats.set(key,m);
   return m;
 }
+// Wooden floors are real planks, like the wall stones: rounded edges (bevel
+// normal map), slightly different heights and shades, the glossy miniature
+// finish. A flat textured overlay never caught the light the way the
+// sculpted tiles and props do.
+const PLANK_FLOORS={ wood:[.40,.25,.13], oak:[.60,.43,.26] };
+function plankMaterial(){
+  if(state.plankMat) return state.plankMat;
+  const sc=state.scene, m=new BABYLON.PBRMaterial('plank_floor_mat',sc);
+  m.albedoColor=new BABYLON.Color3(1,1,1); m.metallic=0; m.roughness=.34; m.environmentIntensity=.85; m.specularIntensity=.7; m.maxSimultaneousLights=8;
+  plasticFinish(m,{coat:.6,coatRough:.1}); applyClayLook(m,sc,{detail:.08,detailScale:4});
+  m.bumpTexture=bevelNormalTexture(sc); m.bumpTexture.level=1;
+  state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
+  return state.plankMat=m;
+}
+function buildPlanks(cells,base){
+  const b=boxBatch(), top=state.terrainTopY??0;
+  const hash=(a,c,k)=>{ let h=Math.imul(a*73856093^c*19349663^k*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
+  for(const [x,z,tint] of cells){
+    const col=tint||base;
+    for(let i=0;i<4;i++){
+      const pz=z-.375+i*.25;
+      // Staggered joints: every other row splits mid-cell.
+      const pieces=i%2 ? [[x-.25,.485],[x+.25,.485]] : [[x,.985]];
+      pieces.forEach(([px,len],j)=>{
+        const r=hash(x,z,i*3+j), h=.042+r*.012, k=.86+hash(z,x,i*5+j)*.26;
+        b.add(px,top+h/2,pz,len,h,.232,[col[0]*k,col[1]*k,col[2]*k]);
+      });
+    }
+  }
+  const m=b.mesh('plank_floor',state.scene); if(!m) return null;
+  m.material=plankMaterial(); m.isPickable=false; m.receiveShadows=true;
+  return m;
+}
 function rebuildPaint(){
   const sc=state.scene; if(!sc) return;
   for(const m of state.paintMeshes||[]) try{ m.dispose(); }catch{}
@@ -1542,7 +1575,11 @@ function rebuildPaint(){
   if(state.boardMeshes) rebuildBoard();
   if(!state.paint?.size) return;
   const top=state.terrainTopY??0, groups=new Map();
-  for(const [k,v] of state.paint){ if(PAINT_MATERIALS[v.mat]?.hole || (state.boardModel && TILE_FLOORS.has(v.mat))) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
+  const planks=new Map();
+  for(const [k,v] of state.paint){
+    if(PLANK_FLOORS[v.mat]){ let tint=null; if(v.tint) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{}
+      if(!planks.has(v.mat)) planks.set(v.mat,[]); planks.get(v.mat).push([...k.split(',').map(Number),tint]); continue; }
+    if(PAINT_MATERIALS[v.mat]?.hole || (state.boardModel && TILE_FLOORS.has(v.mat))) continue; const g=v.mat+'|'+(v.tint||''); if(!groups.has(g)) groups.set(g,{v,cells:[]}); groups.get(g).cells.push(k.split(',').map(Number)); }
   for(const [g,{v,cells}] of groups){
     const aligned=!!PAINT_MATERIALS[v.mat]?.aligned;   // continuous floors: full-size tiles, no turns
     const base=BABYLON.MeshBuilder.CreateBox('paint_'+g,{width:aligned?1:.97,height:.035,depth:aligned?1:.97},sc);
@@ -1556,6 +1593,7 @@ function rebuildPaint(){
     base.thinInstanceSetBuffer('matrix',buf,16,true);
     state.paintMeshes.push(base);
   }
+  for(const [mat,cells] of planks){ const m=buildPlanks(cells,PLANK_FLOORS[mat]); if(m) state.paintMeshes.push(m); }
 }
 // ---- the board ----
 // One tile per cell on a stone column that reaches down into the sea (both
