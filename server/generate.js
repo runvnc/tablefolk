@@ -5,6 +5,9 @@
 //   GET /api/generate?prompt=...&mode=...&model=...&endpoint=...[&stream=1]
 //       the JSON result ({ scenario, code, link, warnings, ms }), or with
 //       stream=1 server-sent events: progress, then a final "done"
+//   POST /api/revise {scenario, request}
+//       the same events for a change to an existing scenario (the builder's
+//       "ask the AI for changes" box)
 //
 // One fast pass of the "fast skill" (server/fast-skill.md, a condensed
 // tablefolk-scenario skill) on the generator endpoint (GEN_* settings,
@@ -120,25 +123,60 @@ function pickEndpoint(url) {
 
 // Run the generator; `emit(event, data)` reports progress.
 export async function generateScenario({ prompt, mode = 'auto', ep, emit = () => {} }) {
-  const t0 = Date.now();
-  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 240000 });
   const how = MODES[mode] ? `Use map method ${MODES[mode]}.` : 'Choose the map method that fits best.';
+  return runModel({ label: prompt, mode, ep, emit, maxTokens: 6000,
+    user: `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.` });
+}
+
+// Change an existing scenario as asked ("make the goblin a shopkeeper",
+// "add a second treasure room"); the whole updated JSON comes back.
+export async function reviseScenario({ scenario, request, ep, emit = () => {} }) {
+  // A frozen layout (moved in the tabletop view) lists every wall and floor
+  // tile: those stay here, and the model sees the rest plus a way to add or
+  // remove objects by square, instead of rewriting hundreds of lines.
+  const big = (scenario.objects?.length || 0) > 40 || (scenario.paint?.length || 0) > 40;
+  const kept = big ? { objects: scenario.objects || [], paint: scenario.paint || [] } : null;
+  const shown = big ? { ...scenario, objects: undefined, paint: undefined } : scenario;
+  const note = big ? `\n\nThis map has fixed positions: its ${kept.objects.length} objects and ${kept.paint.length} floor tiles are not shown and are kept as they are. `
+    + 'Do not write "objects" or "paint". To change the map, add "add_objects": [{"type": ..., "x": ..., "z": ..., ...}] and/or "remove_objects": [[x, z], ...] (removes the objects on those squares; [x, z, "type"] removes only that type) and/or "add_paint": [{"x", "z", "mat"}]. '
+    + `Characters and the player move with "at": [x, z]. The board is ${scenario.size?.join(' x ') || 'unknown'} squares, x from west to east is decreasing, z grows to the south. Rooms: ${(scenario.places || []).map(p => p.id + (p.center ? ' at ' + JSON.stringify(p.center) : '')).join(', ') || 'none'}.`
+    + `\nObjects by type: ${Object.entries((kept.objects).reduce((m, o) => (m[o.type] = (m[o.type] || 0) + 1, m), {})).map(([t, n]) => t + ' ' + n).join(', ')}.`
+    + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.` : '';
+  const json = JSON.stringify(shown);
+  const maxTokens = Math.min(16000, Math.max(6000, Math.ceil(json.length / 2.5) + 2000));
+  const r = await runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens,
+    user: `Here is a scenario:\n\n${json}${note}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.`,
+    merge: big ? out => mergeKept(out, kept) : null });
+  return r;
+}
+function mergeKept(s, kept) {
+  const rm = Array.isArray(s.remove_objects) ? s.remove_objects.filter(Array.isArray) : [];
+  const gone = o => rm.some(([x, z, t]) => Math.round(o.x) === Math.round(+x) && Math.round(o.z) === Math.round(+z) && (!t || t === o.type));
+  s.objects = [...kept.objects.filter(o => !gone(o)), ...(Array.isArray(s.add_objects) ? s.add_objects.filter(o => o && o.type && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [])];
+  s.paint = [...kept.paint, ...(Array.isArray(s.add_paint) ? s.add_paint.filter(c => c && c.mat && Number.isFinite(+c.x) && Number.isFinite(+c.z)) : [])];
+  delete s.add_objects; delete s.remove_objects; delete s.add_paint;
+  return s;
+}
+
+async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }) {
+  const t0 = Date.now(), prompt = label;
+  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 240000 });
   const messages = [
     { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId "builtin:<name>"; match the character): ${voicesText()}.` },
-    { role: 'user', content: `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.` },
+    { role: 'user', content: user },
   ];
   let scenario = null, problems = [], raw = '';
   for (let round = 0; round < 2; round++) {
     emit('progress', { stage: round ? 'repairing' : 'waiting', model: ep.model });
     let chars = 0, last = 0, lastT = -1;
-    const out = await collect(await client.chat.completions.create({ model: ep.model, messages, stream: true, temperature: 0.7, max_tokens: 6000 }), text => {
+    const out = await collect(await client.chat.completions.create({ model: ep.model, messages, stream: true, temperature: 0.7, max_tokens: maxTokens }), text => {
       chars = text.length;
       if (chars - last > 120) { last = chars; emit('progress', { stage: round ? 'repairing' : 'writing', chars, preview: text.slice(-160) }); }
     }, thought => {
       if (!chars && (lastT < 0 || thought - lastT > 200)) { lastT = thought; emit('progress', { stage: 'thinking', thought }); }
     });
     raw = out.text;
-    try { scenario = parseJSON(raw); problems = checkScenario(scenario); }
+    try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario); }
     catch (e) { scenario = null; problems = [e.message]; }
     if (!problems.length) break;
     emit('progress', { stage: 'problems', problems });
@@ -153,6 +191,26 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
     writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode, model: ep.model, ...scenario }, null, 2) + '\n');
   } catch {}
   return { scenario, code, warnings: problems, ms: Date.now() - t0, model: ep.model };
+}
+
+// POST /api/revise {scenario, request} -> server-sent events like
+// /api/generate?stream=1: progress, then "done" {scenario, code, link, ...}
+export async function handleRevise(req, url) {
+  if (req.method !== 'POST') return Response.json({ error: 'POST {scenario, request}' }, { status: 405 });
+  let body; try { body = await req.json(); } catch { return Response.json({ error: 'bad JSON' }, { status: 400 }); }
+  const request = String(body?.request || '').trim().slice(0, 2000), scenario = body?.scenario;
+  if (!request || !scenario || typeof scenario !== 'object') return Response.json({ error: 'scenario and request required' }, { status: 400 });
+  if (JSON.stringify(scenario).length > 400000) return Response.json({ error: 'scenario too large' }, { status: 413 });
+  const ep = pickEndpoint(url), enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(ctl) {
+      const send = (event, data) => { try { ctl.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)); } catch {} };
+      try { const r = await reviseScenario({ scenario, request, ep, emit: send }); send('done', { ...r, link: '/app/#s=' + r.code }); }
+      catch (e) { failed('change: ' + request, ep, e); send('failed', { error: e.message }); }
+      ctl.close();
+    },
+  });
+  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
 }
 
 function failed(prompt, ep, e) {
@@ -227,11 +285,14 @@ input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);bor
 #editor fieldset.agent{background:var(--bg);margin-bottom:10px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:.3rem 0}
 button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}button.small{padding:.1rem .5rem;font-size:.8rem}.muted{color:var(--muted);font-size:.85rem}
 #editor details summary{cursor:pointer;color:var(--muted)}#editor details textarea{width:100%;margin-top:6px}
+#tableView{position:fixed;inset:0;z-index:11;background:var(--bg);display:flex;flex-direction:column}#tableView[hidden]{display:none}
+#tableView .tvbar{display:flex;gap:10px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line)}#tableView iframe{flex:1;border:0;width:100%}
+#editor fieldset.ask textarea{width:100%}
 #mapView{position:fixed;inset:0;background:rgba(10,8,6,.55);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px}#mapView[hidden]{display:none}
 .mapcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261022b"></script><script src="/app/builder.js?v=20261022a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261022b"></script><script src="/app/builder.js?v=20261023a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 if(f){ f.mode.value=qs.get('mode')||'auto';

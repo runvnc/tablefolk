@@ -4219,7 +4219,7 @@ function installWorldAPI(){
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),
     stepAgentTurn:beginTurnForAgent,
     isTurnReady:()=>state.turn.phase==='ready',
-    canSeeEachOther,
+    canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,
     spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, restoreWorldState,
   };
@@ -4852,9 +4852,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // olive greens relative to the concept art.
   LOOK()?.applyTonemap(scene,{exposure:1.34,contrast:1.12,tonemap:'neutral',grade:true});
   // Diorama polish: soft bloom on emissives, gentle vignette, and a subtle tilt-shift depth of field.
-  if(window.TABLEFOLK_GFX?.lite){
+  if(window.TABLEFOLK_GFX?.lite || window.TABLEFOLK_TABLETOP){
     // Light mode: no post-process pipeline, SSAO or glow layer (each holds
-    // full-screen render targets).
+    // full-screen render targets). The tabletop view skips them too: no
+    // tilt-shift blur or vignette on a printed map.
   } else try{
     const rp=new BABYLON.DefaultRenderingPipeline('drp',true,scene,[camera]);
     rp.fxaaEnabled=true;

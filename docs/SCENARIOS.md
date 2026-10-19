@@ -264,6 +264,14 @@ link keeps the short form, and the same seed gives the same map.
   merchant → shop, ...). Unknown places are reported in the scenario pane.
 - `normalizeScenario` keeps `places` (id, kind, centre, bounds, who is there)
   on the result for tools and prompts.
+- **Fixed layouts**: `tablefolkScenario.freezeLayout()` (the tabletop view's
+  "use this layout") turns the running world back into a scenario with
+  every object, floor tile and character at an exact position: `generate`,
+  `grid` and `map` are dropped, `objects`, `paint`, `size` and `base` hold the
+  board, and `places` keeps the rooms (a scenario with `places` and no
+  `generate` keeps them as they are). The AI change box keeps such big lists
+  on the server and lets the model use `add_objects`, `remove_objects`
+  ([x, z] or [x, z, type]) and `add_paint` instead.
 
 ## 2e. Combat
 

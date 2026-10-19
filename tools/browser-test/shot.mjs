@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 const [out = 'shot.png', js, wait = '1500'] = process.argv.slice(2);
 const W = +(process.env.SHOT_W || 1280), H = +(process.env.SHOT_H || 800);
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
-const page = b.contexts()[0].pages().find(p => p.url().includes('localhost:8000'));
+const page = b.contexts()[0].pages().find(p => p.url().includes(process.env.SHOT_HOST || 'localhost:8000'));
 const cdp = await page.context().newCDPSession(page);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
 await page.evaluate(() => window.dispatchEvent(new Event('resize')));

@@ -11,6 +11,7 @@
 //                       builder page, or with --world-loading / WORLD_VIEW=loading
 //                       a plain loading screen; ?view= overrides per link)
 //   /api/generate       the generator itself (JSON or a server-sent-event stream)
+//   /api/revise         POST {scenario, request}: the generator changes a scenario
 //   /api/status         what is configured (never keys)
 //   /admin              the admin page (password set on first start;
 //                       delete .admin/password.json or pass --reset-admin to reset)
@@ -19,7 +20,7 @@
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
-import { handleWorld, handleGenerate } from './generate.js';
+import { handleWorld, handleGenerate, handleRevise } from './generate.js';
 import { setupAdmin, handleAdmin, savedWorld } from './admin.js';
 
 const args = process.argv.slice(2);
@@ -132,6 +133,7 @@ const server = Bun.serve({
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters);
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' });
     if (p === '/api/generate') return handleGenerate(req, url);
+    if (p === '/api/revise') return handleRevise(req, url);
     if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
     if (p === '/api/skills') return listSkills();
     if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url, { saved: url.searchParams.get('edit') ? savedWorld(req, url.searchParams.get('edit')) : null });

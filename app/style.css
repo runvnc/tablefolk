@@ -437,3 +437,24 @@ body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
 #npcThinking { position:fixed; left:50%; top:70px; transform:translate(-50%,-8px); z-index:79; padding:5px 12px; border-radius:12px; font-size:12px; font-style:italic; color:#dfe6dc;
   background:rgba(16,20,25,.55); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
 #npcThinking.show { opacity:1; transform:translate(-50%,0); }
+/* ---- tabletop view (?tabletop=1, tabletop.js) ---- */
+html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toastStack) { display:none !important; }
+html.tabletop body { background:#1b1d1f; overflow:hidden; }
+html.tabletop #renderCanvas, #ttOverlay { position:fixed; left:0; top:var(--tt-top, 44px); width:100vw; height:calc(100vh - var(--tt-top, 44px)); }
+#ttOverlay { pointer-events:none; z-index:5; }
+html.tt-edit #renderCanvas { cursor:crosshair; }
+#ttBar { position:fixed; left:0; right:0; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:7px 12px; font:13px system-ui, sans-serif; color:#e9ece6;
+  background:#24272b; border-bottom:1px solid #3a3e44; }
+#ttBar label { display:inline-flex; gap:4px; align-items:center; cursor:pointer; white-space:nowrap; }
+#ttBar button, #ttBar select { white-space:nowrap; width:auto; font:inherit; color:#e9ece6; background:#33373d; border:1px solid #4a4f57; border-radius:7px; padding:3px 9px; cursor:pointer; }
+#ttBar button:hover { background:#3d4249; }
+#ttBar button.hot { background:#2f6b3a; border-color:#4fa35f; }
+#ttBar .sep { flex:1; }
+#ttBar #ttStatus { color:#aab3a7; font-size:12px; }
+#ttCharsBox { position:relative; }
+#ttCharsBox summary { cursor:pointer; }
+#ttChars { position:absolute; top:24px; left:0; min-width:180px; max-height:60vh; overflow:auto; padding:8px 10px; background:#24272b; border:1px solid #4a4f57; border-radius:9px; display:flex; flex-direction:column; gap:4px; z-index:12; }
+#ttChars .hostile { color:#ff9a8a; }
+#ttChars .row { display:flex; gap:5px; margin-top:4px; }
+html:fullscreen #ttBar { display:none; }
+#ttBar > * { flex:0 0 auto; }

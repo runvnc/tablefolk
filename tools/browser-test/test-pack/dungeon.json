@@ -1,0 +1,3 @@
+{"title":"Crypt of Bones","generate":{"kind":"dungeon","rooms":5,"seed":4},"lighting":"dim","walls":"stone","wallHeight":2,
+ "player":{"name":"Hero"},
+ "agents":[{"id":"bones","model":"skeleton_warrior","in":"room2"},{"id":"grik","model":"goblin","hostile":false,"personality":"a sly goblin","in":"room1"},{"id":"webby","model":"spider","in":"room3"}]}

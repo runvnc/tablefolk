@@ -5,6 +5,12 @@
  *
  *   window.tfBuilder.show({ scenario, model?, ms? }, { appLink })
  *
+ * Ask the AI for changes: a request goes to POST /api/revise with the
+ * scenario (server/generate.js), the reply replaces it; undo steps back.
+ * Tabletop map: the app's ?tabletop=1 view in a frame (app/tabletop.js), to
+ * print, show on a flat screen, or move things; "use this layout" sends the
+ * scenario back with every position fixed.
+ *
  * Map preview: generated maps run procgen.js here (the same code the app
  * runs), grids are drawn as they are; "map" layout lines are placed by the
  * app itself, so for those only the explicit objects and positions show.
@@ -26,6 +32,8 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let scn = null, meta = {}, voices = [], appLink = l => l;
+  const past = [];   // undo: earlier versions of scn
+  const remember = () => { past.push(JSON.stringify(scn)); if (past.length > 20) past.shift(); };
   fetch('/api/voices').then(r => r.ok ? r.json() : null).then(d => { if (d?.voices) { voices = d.voices; if (scn) render(); } }).catch(() => {});
 
   // ---- paths: "agents.0.style" ----
@@ -70,6 +78,8 @@
     </div></fieldset>`;
   }
   function mapBox() {
+    if (!scn.generate && !scn.grid?.length && (scn.objects?.length || 0) > 40) return `<p class="muted">Fixed layout: ${scn.objects.length} objects and ${scn.paint?.length || 0} floor tiles at exact positions (moved in the tabletop map). Move things there, or ask the AI for changes.${scn.places?.length ? ' Rooms: ' + esc(scn.places.map(p => p.id).join(', ')) + '.' : ''}</p>
+      ${field('board size [columns, rows]', 'size', 'json', { rows: 1 })}`;
     if (scn.generate) return `<div class="cols">${field('kind', 'generate.kind', 'select', { options: ['dungeon', 'village'] })}${field(scn.generate.kind === 'village' ? 'buildings' : 'rooms', scn.generate.kind === 'village' ? 'generate.buildings' : 'generate.rooms', 'num')}${field('seed', 'generate.seed', 'num')}</div>
       ${field('objects (JSON)', 'objects', 'json', { wide: true, rows: 4 })}`;
     if (scn.grid?.length) return `${field('grid (top = north, left = west; digits are the characters in order)', 'grid', 'lines', { wide: true, rows: Math.min(30, scn.grid.length + 1) })}
@@ -79,8 +89,12 @@
   function render() {
     const box = $('editor'); if (!box || !scn) return;
     box.hidden = false;
+    const typed = $('aiReq')?.value || '', said = $('aiMsg')?.textContent || '';
     box.innerHTML = `<div class="toolbar"><button type="button" data-act="play">▶ play</button><button type="button" class="ghost" data-act="dev">play in dev mode</button>
-        <button type="button" class="ghost" data-act="map">map view</button><button type="button" class="ghost" data-act="copy">copy link</button><button type="button" class="ghost" data-act="download">download JSON</button><span id="edmsg" class="muted"></span></div>
+        <button type="button" data-act="table">tabletop map</button><button type="button" class="ghost" data-act="map">quick map</button><button type="button" class="ghost" data-act="copy">copy link</button><button type="button" class="ghost" data-act="download">download JSON</button><span id="edmsg" class="muted"></span></div>
+      <fieldset class="ask"><legend>Ask the AI for changes</legend>
+        <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
+        <div class="toolbar"><button type="button" data-act="ask">ask</button><button type="button" class="ghost" data-act="undo" ${past.length ? '' : 'disabled'}>undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div></fieldset>
       <fieldset><legend>Story</legend><div class="cols">${field('title', 'title')}${field('subtitle', 'subtitle')}
         ${field('lighting', 'lighting', 'select', { options: [['', '(default)'], 'bright', 'night', 'dim'] })}${field('walls', 'walls', 'select', { options: [['', '(default)'], 'stone', 'tabletop', 'block', 'modern'] })}
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
@@ -89,6 +103,7 @@
       <fieldset><legend>Characters</legend>${(scn.agents || []).map(agentBox).join('')}<button type="button" class="ghost" data-act="add">+ add a character</button></fieldset>
       <fieldset><legend>Map${scn.generate ? ' (generated ' + esc(scn.generate.kind || 'dungeon') + ')' : scn.grid?.length ? ' (ASCII grid)' : ' (layout lines)'}</legend>${mapBox()}</fieldset>
       <details><summary>raw JSON</summary><textarea id="rawJson" class="mono" rows="18"></textarea><div class="toolbar"><button type="button" class="ghost" data-act="applyRaw">apply JSON</button></div></details>`;
+    if (typed) $('aiReq').value = typed; if (said) $('aiMsg').textContent = said;
     // the rules box edits goal.win / goal.lose / goal.maxTurns together
     const rules = $('f___rules'); if (rules) { const g = scn.goal || {}; const r = {}; for (const k of ['win', 'lose', 'maxTurns', 'winText', 'loseText', 'score']) if (g[k] != null) r[k] = g[k]; rules.value = Object.keys(r).length ? JSON.stringify(r, null, 1) : ''; }
   }
@@ -117,16 +132,66 @@
   document.addEventListener('change', e => { if (e.target.closest?.('#editor') && e.target.tagName === 'SELECT') onInput(e); });
   document.addEventListener('toggle', e => { if (e.target.tagName === 'DETAILS' && e.target.open && $('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2); }, true);
   document.addEventListener('click', async e => {
-    const b = e.target.closest?.('#editor button, #mapView button'); if (!b) return;
+    const b = e.target.closest?.('#editor button, #mapView button, #tableView button'); if (!b) return;
+    if (b.dataset.act === 'closeTable') { $('tableView').hidden = true; $('tableView').querySelector('iframe').src = 'about:blank'; return; }
     const act = b.dataset.act;
-    if (b.dataset.remove != null) { scn.agents.splice(+b.dataset.remove, 1); render(); return; }
+    if (b.dataset.remove != null) { remember(); scn.agents.splice(+b.dataset.remove, 1); render(); return; }
     if (act === 'play' || act === 'dev') window.open(await link(act === 'dev'), '_blank');
     else if (act === 'copy') { await navigator.clipboard.writeText(location.origin + await link(false)); msg('link copied'); }
     else if (act === 'download') { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(scn, null, 2)], { type: 'application/json' })); a.download = (scn.title || 'scenario').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.json'; a.click(); }
     else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); }
-    else if (act === 'applyRaw') { try { scn = JSON.parse($('rawJson').value); render(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
+    else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'map') showMap();
     else if (act === 'closeMap') $('mapView').hidden = true;
+    else if (act === 'ask') ask();
+    else if (act === 'undo' && past.length) { scn = JSON.parse(past.pop()); render(); msg('undone'); }
+    else if (act === 'table') showTable();
+  });
+
+  // ---- ask the AI for changes ----
+  let asking = false;
+  async function ask() {
+    const req = $('aiReq')?.value.trim(); if (!req || asking) return;
+    const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
+    asking = true; say('asking…');
+    try {
+      const r = await fetch('/api/revise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: scn, request: req }) });
+      if (!r.ok || !r.body) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', done = null;
+      for (;;) {
+        const { value, done: end } = await rd.read(); if (end) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+          const ev = chunk.match(/^event: (.*)$/m)?.[1], data = JSON.parse(chunk.match(/^data: (.*)$/m)?.[1] || '{}');
+          if (ev === 'progress') say(data.stage === 'writing' || data.stage === 'repairing' ? `${data.stage}… ${data.chars} characters` : data.stage === 'problems' ? 'fixing: ' + data.problems.join('; ').slice(0, 160) : data.stage === 'thinking' ? 'thinking…' : `asking ${data.model || ''}…`);
+          else if (ev === 'failed') throw new Error(data.error);
+          else if (ev === 'done') done = data;
+        }
+      }
+      if (!done) throw new Error('no answer');
+      remember(); scn = done.scenario; render();
+      $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
+    } catch (e) { say('failed: ' + e.message); }
+    finally { asking = false; }
+  }
+
+  // ---- tabletop map (the app's ?tabletop=1 view in a frame) ----
+  async function showTable() {
+    let v = $('tableView');
+    if (!v) {
+      v = document.createElement('div'); v.id = 'tableView';
+      v.innerHTML = `<div class="tvbar"><b>tabletop map</b><span id="tvMsg" class="muted">print it, show it on a screen laid flat, or tick "move things" to rearrange and then "use this layout"</span><span style="flex:1"></span><button type="button" data-act="closeTable">close</button></div><iframe title="tabletop map" allow="fullscreen"></iframe>`;
+      document.body.appendChild(v);
+    }
+    v.hidden = false;
+    v.querySelector('iframe').src = '/app/?tabletop=1#s=' + await encode(scn);
+  }
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || e.data?.type !== 'tablefolk-layout' || !e.data.scenario) return;
+    remember(); scn = e.data.scenario; render();
+    const t = 'layout updated: every position is fixed now (the generator\'s rooms and seed no longer apply; undo goes back)';
+    msg(t); const m = $('tvMsg'); if (m) m.textContent = t;
   });
 
   // ---- top-down map ----
@@ -159,7 +224,7 @@
     if (!v) { v = document.createElement('div'); v.id = 'mapView'; document.body.appendChild(v); }
     const L = layoutForMap();
     v.hidden = false;
-    if (!L) { v.innerHTML = `<div class="mapcard"><p>This scenario places everything with layout lines, which the app lays out when it starts: open it to see the map.</p><button type="button" data-act="closeMap">close</button></div>`; return; }
+    if (!L) { v.innerHTML = `<div class="mapcard"><p>This scenario's layout is made by the app when it starts: open the tabletop map to see it.</p><button type="button" data-act="closeMap">close</button></div>`; return; }
     const cell = Math.max(10, Math.min(28, Math.floor(Math.min(innerWidth - 80, 1100) / L.W), Math.floor((innerHeight - 160) / L.H)));
     v.innerHTML = `<div class="mapcard"><div class="toolbar"><b>${esc(scn.title || 'map')}</b><span class="muted">north is up · ${L.W}×${L.H}</span><span style="flex:1"></span><button type="button" data-act="closeMap">close</button></div><canvas width="${L.W * cell}" height="${L.H * cell}"></canvas>
       <div class="muted">${L.unplaced.length ? 'placed by the app at start (not shown): ' + esc(L.unplaced.join(', ')) + ' · ' : ''}<span style="color:#e05a4a">●</span> hostile <span style="color:#4a90e0">●</span> character <span style="color:#f2c94c">●</span> you</div></div>`;

@@ -847,6 +847,8 @@
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
+    // a frozen layout (freezeLayout) keeps the generated map's rooms
+    else if (Array.isArray(s.places)) out.places = s.places;
     // Normalising twice (restart) must not wrap the turn limit again.
     if (out.goal?.maxTurns && !JSON.stringify(out.goal.lose || {}).includes('turns_over')) {
       const t = { turns_over: +out.goal.maxTurns };
@@ -1018,6 +1020,7 @@
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}
+    try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title } })); } catch {}
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
@@ -1156,6 +1159,32 @@
       map: [],
       goal: base.goal || { text: 'Describe the goal here.', win: { player_has: 'something' }, maxTurns: 12, score: 'turns_left' },
     };
+  }
+
+  // The running scenario with its layout as it stands now: every object,
+  // tile and character at an exact position (after moving things in the
+  // tabletop view). Everything else (story, characters, goal) is kept; the
+  // generated map's rooms stay as "places".
+  function freezeLayout(src = active?.scn) {
+    if (!src) throw new Error('no scenario is running');
+    const w = W(), st = w.state, s = JSON.parse(JSON.stringify(src));
+    for (const k of ['generate', 'grid', 'legend', 'map', 'floor', '_gen', 'genWarnings', 'objects', 'paint']) delete s[k];
+    const dirName = d => !d ? 's' : Math.abs(d.z) >= Math.abs(d.x) ? (d.z < 0 ? 'n' : 's') : (d.x < 0 ? 'e' : 'w');
+    const at = g => { const p = g.logicalPos || g.root.position; return [Math.round(p.x), Math.round(p.z)]; };
+    s.agents = (s.agents || []).map(a => {
+      const g = w.getAgents().find(x => x.id === a.id); if (!g) return a;
+      const { in: _in, ...rest } = a; return { ...rest, at: at(g), facing: dirName(g.dir) };
+    });
+    const av = w.getPlayerAvatar?.();
+    if (av) { const { in: _in, ...p } = s.player || {}; s.player = { ...p, at: at(av), facing: dirName(av.dir) }; }
+    s.base = st.baseMap === 'dungeon' ? 'dungeon' : 'plain'; s.size = [w.WORLD.cols, w.WORLD.rows]; s.campfire = false;
+    if (st.wallStyle) s.walls = st.wallStyle;
+    if (st.places?.length) s.places = st.places;
+    s.objects = w.getObjects().filter(o => !o.rim).map(o => ({ type: o.type, x: +o.x.toFixed(2), z: +o.z.toFixed(2), ...(o.ry ? { ry: o.ry } : {}),
+      ...(o.type === 'note' && o.noteText ? { text: o.noteText } : {}), ...(o.opts || {}) }));
+    s.paint = [...(st.paint || [])].map(([k, v]) => ({ x: +k.split(',')[0], z: +k.split(',')[1], mat: v.mat, ...(v.tint ? { tint: v.tint } : {}) }))
+      .filter(c => !(st.baseMap === 'dungeon' && c.mat === 'stone' && !c.tint));
+    return s;
   }
 
   // ---------- model-written maps ----------
@@ -1534,5 +1563,5 @@ turns: 6`;
   function onReady() { refreshThings(); initPane(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
 
-  window.tablefolkScenario = { parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, generateMapLines, EXAMPLES, get active() { return active; } };
+  window.tablefolkScenario = { parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, freezeLayout, generateMapLines, EXAMPLES, get active() { return active; } };
 })();

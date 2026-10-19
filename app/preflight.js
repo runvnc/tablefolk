@@ -10,7 +10,10 @@
   //             the Pocket-TTS worker, so the scene renders in seconds
   // ---------------------------------------------------------------------
   const _q = new URLSearchParams(location.search);
-  window.TABLEFOLK_ART_MODE = _q.has('art');
+  // ?tabletop=1: the board from straight above, for printing or a screen laid
+  // flat (tabletop.js); no model, plain lighting, no post effects.
+  window.TABLEFOLK_TABLETOP = _q.has('tabletop');
+  window.TABLEFOLK_ART_MODE = _q.has('art') || window.TABLEFOLK_TABLETOP;
   window.TABLEFOLK_FORCE_WEBGL = _q.has('webgl');
   // Still mode: no physics stepping, no per-frame CPU vertex animation.
   // Implied by art review mode; ?still=1 enables it on its own.
@@ -39,9 +42,9 @@
     ['tts/tts-ui.js?v=20261018a'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],
-    ['graphics-settings.js?v=20261019c'],
+    ['graphics-settings.js?v=20261023a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261023b'],
+    ['app.js?v=20261023c'],
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261022c'],
     ['senses.js?v=20261020d'],
@@ -50,7 +53,8 @@
     ['workflows.js?v=20261020a'],
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261022b'],
-    ['scenario.js?v=20261022d'],
+    ['scenario.js?v=20261023a'],
+    ['tabletop.js?v=20261023c'],
     ['llm_js/world-integration.js?v=20261022b', 'module'],
   ];
 

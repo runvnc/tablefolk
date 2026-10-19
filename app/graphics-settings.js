@@ -36,6 +36,9 @@
   // maps onto it; settings.lite stays in sync for code that reads it.
   if (!['high', 'medium', 'light'].includes(settings.quality)) settings.quality = settings.lite ? 'light' : 'high';
   settings.lite = settings.quality === 'light';
+  // Tabletop view (?tabletop=1): 1k textures, no shadow maps or moving sea,
+  // for this page only (nothing is saved).
+  if (window.TABLEFOLK_TABLETOP) Object.assign(settings, { quality: 'medium', lite: false, keyShadowEnabled: false, campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
   window.TABLEFOLK_GFX = settings;
   // Generated models ship with four 4096px textures each (~360 MB of GPU
   // memory per model with mipmaps). Medium/light load the .1k.glb copies

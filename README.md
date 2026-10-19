@@ -135,9 +135,17 @@ over the environment. The `.admin` folder is never served and is git-ignored.
 page when the scenario is ready and shows it as forms (story, goal and rules,
 player, each character with body, voice, hostile, hit points, brief,
 commands and inventory, the map settings, raw JSON); **play** opens the
-edited version, **map view** draws the layout top-down with every character
-labelled (generated maps and grids). `?go` opens the world straight away as
-before; `/world/?edit=<file>` (admin) edits a saved world.
+edited version, **quick map** draws the layout top-down with every character
+labelled (generated maps and grids). **Ask the AI for changes** sends the
+scenario and a request to `POST /api/revise` (the generator model) and
+replaces it with the answer; **undo** steps back. **Tabletop map** opens
+`/app/?tabletop=1#s=...` in a frame: the board straight from above with
+names and a grid, characters shown or hidden one by one, save PNG (up to 300
+px per square), print at one inch per square (tiled over letter pages) or on
+one page, full screen for a screen laid flat, and **move things** (drag, R
+turns, Delete removes); **use this layout** sends the scenario back with every
+position fixed. `?go` opens the world straight away as before;
+`/world/?edit=<file>` (admin) edits a saved world.
 
 Settings come from the environment or `.env` (`OPENROUTER_API_KEY=` is used for
 OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since
