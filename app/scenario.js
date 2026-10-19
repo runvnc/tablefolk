@@ -883,7 +883,7 @@
   // an adjacent wall: maps and the generator rarely give the right ry, and
   // bookcases showed their backs to the room. An ry that already puts the
   // back against a wall is kept.
-  const WALL_BACKED = new Set(['bookshelf', 'bookcase', 'wall_banner']);
+  const WALL_BACKED = new Set(['bookshelf', 'bookcase', 'wall_banner', 'cabinet', 'nightstand']);
   function backToWalls(objs, existing = []) {
     const key = (x, z) => Math.round(+x) + ',' + Math.round(+z);
     const wall = new Set([...objs, ...existing].filter(o => o.type === 'wall' || o.type === 'door').map(o => key(o.x, o.z)));

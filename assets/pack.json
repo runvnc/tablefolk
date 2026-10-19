@@ -731,6 +731,272 @@
         "fantasy",
         "village"
       ]
+    },
+    "candelabra": {
+      "file": "models/props/CandleStick_Stand.gltf",
+      "w": 0.55,
+      "h": 0.95,
+      "d": 0.55,
+      "static": true,
+      "fit": "height",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "candlestick",
+        "candle_stand"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "candles": {
+      "file": "models/props/CandleStick_Triple.gltf",
+      "w": 0.35,
+      "h": 0.33,
+      "d": 0.15,
+      "decor": true,
+      "fit": "height",
+      "flammable": false,
+      "aliases": [
+        "candle"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "cabinet": {
+      "file": "models/props/Cabinet.gltf",
+      "w": 1.0,
+      "h": 0.75,
+      "d": 0.3,
+      "static": true,
+      "fit": "height",
+      "flammable": true,
+      "aliases": [
+        "cupboard",
+        "dresser"
+      ],
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "lectern": {
+      "file": "models/props/BookStand.gltf",
+      "w": 0.4,
+      "h": 1.05,
+      "d": 0.4,
+      "static": true,
+      "fit": "height",
+      "flammable": true,
+      "aliases": [
+        "bookstand",
+        "book_stand"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "cage": {
+      "file": "models/props/Cage_Small.gltf",
+      "w": 0.62,
+      "h": 0.6,
+      "d": 0.62,
+      "static": true,
+      "fit": "height",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "birdcage"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "chains": {
+      "file": "models/props/Chain_Coil.gltf",
+      "w": 0.75,
+      "h": 0.07,
+      "d": 0.65,
+      "decor": true,
+      "fit": "footprint",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "chain",
+        "shackles"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "wooden_chair": {
+      "file": "models/props/Chair_1.gltf",
+      "w": 0.42,
+      "h": 0.8,
+      "d": 0.42,
+      "mass": 0.5,
+      "fit": "height",
+      "flammable": true,
+      "aliases": [
+        "wood_chair"
+      ],
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "nightstand": {
+      "file": "models/props/Nightstand_Shelf.gltf",
+      "w": 0.5,
+      "h": 0.88,
+      "d": 0.3,
+      "static": true,
+      "fit": "height",
+      "flammable": true,
+      "aliases": [
+        "bedside_table"
+      ],
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "apple_barrel": {
+      "file": "models/props/Barrel_Apples.gltf",
+      "w": 0.5,
+      "h": 0.65,
+      "d": 0.5,
+      "static": true,
+      "fit": "height",
+      "flammable": true,
+      "aliases": [
+        "barrel_of_apples"
+      ],
+      "tags": [
+        "fantasy",
+        "village"
+      ]
+    },
+    "pot": {
+      "file": "models/props/Pot_1_Lid.gltf",
+      "w": 0.38,
+      "h": 0.2,
+      "d": 0.38,
+      "mass": 0.3,
+      "fit": "height",
+      "flammable": false,
+      "aliases": [
+        "cooking_pot"
+      ],
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "vase": {
+      "file": "models/props/Vase_2.gltf",
+      "w": 0.5,
+      "h": 0.38,
+      "d": 0.5,
+      "mass": 0.4,
+      "fit": "height",
+      "flammable": false,
+      "aliases": [
+        "urn",
+        "jar"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "broken_pot": {
+      "file": "models/props/Vase_Rubble_Medium.gltf",
+      "w": 0.58,
+      "h": 0.12,
+      "d": 0.45,
+      "decor": true,
+      "fit": "footprint",
+      "flammable": false,
+      "aliases": [
+        "shards",
+        "pot_shards"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "key": {
+      "file": "models/props/Key_Gold.gltf",
+      "w": 0.25,
+      "h": 0.04,
+      "d": 0.45,
+      "mass": 0.05,
+      "fit": "footprint",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "gold_key",
+        "golden_key"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "chalice": {
+      "file": "models/props/Chalice.gltf",
+      "w": 0.16,
+      "h": 0.3,
+      "d": 0.16,
+      "mass": 0.1,
+      "fit": "height",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "goblet",
+        "cup"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
+    },
+    "rope": {
+      "file": "models/props/Rope_1.gltf",
+      "w": 0.45,
+      "h": 0.08,
+      "d": 0.45,
+      "mass": 0.2,
+      "fit": "footprint",
+      "flammable": true,
+      "aliases": [
+        "coil_of_rope"
+      ],
+      "tags": [
+        "fantasy"
+      ]
+    },
+    "iron_crate": {
+      "file": "models/props/Crate_Metal.gltf",
+      "w": 0.62,
+      "h": 0.62,
+      "d": 0.62,
+      "static": true,
+      "fit": "height",
+      "material": "metal",
+      "flammable": false,
+      "aliases": [
+        "metal_crate",
+        "strongbox"
+      ],
+      "tags": [
+        "fantasy",
+        "dungeon"
+      ]
     }
   }
 }

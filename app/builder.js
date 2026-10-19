@@ -27,6 +27,7 @@
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
     K: 'bookcase', Y: 'player', '@': 'player', '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern',
     '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
+  // procgen.js GEN_LEGEND comes with each generated grid's own legend
   const FLOOR = { wall: '#5d5852', door: '#8a5a2b', water: '#3d7fb8', sea: '#1d3d5c', grass: '#6f9a4c', dirt: '#a48558', stone: '#8d8a84', lava: '#d2541e',
     wood: '#9a6b3c', oak: '#b88a55', carpet: '#9b3a3a', tile: '#d9d6cf', concrete: '#a9a7a2', flagstone: '#9c958a', sand: '#d9c58e', floor: '#c9c2b4' };
   const $ = id => document.getElementById(id);

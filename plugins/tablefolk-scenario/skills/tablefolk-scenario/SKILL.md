@@ -199,6 +199,9 @@ Grid digits are the agents in order: reordering `agents` moves them.
   double_bed bookcase banner wall_banner target dummy pumpkin statue torch
   iron_chest fantasy_house stable windmill watch_tower bell_tower`
   (bookcases and wall banners turn their backs to an adjacent wall)
+- dungeon dressing: `candelabra candles cabinet lectern cage chains
+  wooden_chair nightstand apple_barrel pot vase broken_pot iron_crate`, and
+  `key chalice rope`, which the player picks up with E
 - modern: `desk office_chair armchair sofa coffee_table floor_lamp plant
   bookshelf` (front faces south; `ry` turns them)
 - outdoors: `tree house boulder campfire lantern fence signpost` (solid),

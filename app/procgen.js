@@ -40,32 +40,34 @@
   // What each kind of room holds. Glyphs are the scenario grid's own.
   const ROOM_FURNISH = {
     entrance: { floor: '^', wall: ['j'], center: [] },
-    throne: { floor: 'R', wall: ['K', 'W', 'j', 'e'], center: ['A'], carpet: true },
-    lair: { floor: ':', wall: ['r', 'B', 'b'], center: ['X'] },
-    treasure: { floor: '^', wall: ['h', '$', '$', 'P', 'm'], center: ['h'] },
-    library: { floor: '=', wall: ['K', 'K', 'K', 'S'], center: ['t', 's'] },
-    shrine: { floor: '^', wall: ['j', 'e', 'S', 'i'], center: ['o'] },
-    barracks: { floor: '^', wall: ['Z', 'Z', 'W', 'n', '/'], center: ['t'] },
-    storage: { floor: ':', wall: ['C', 'B', 'C', 'B', 'u'], center: ['C'] },
-    kitchen: { floor: 'E', wall: ['B', 'u', 'w'], center: ['o', 't'] },
-    prison: { floor: ':', wall: ['f', 'f', 'u'], center: [] },
-    crypt: { floor: '^', wall: ['r', 'j', 'S'], center: ['h'] },
-    alchemy: { floor: '^', wall: ['P', 'P', 'K', 'w'], center: ['o'] },
+    throne: { floor: 'R', wall: ['K', 'W', '!', 'e', '!'], center: ['A'], carpet: true },
+    lair: { floor: ':', wall: ['r', 'B', 'b', '<', '{'], center: ['X'] },
+    treasure: { floor: '^', wall: ['h', '$', '$', 'P', 'm', '>', ']', '}'], center: ['h'] },
+    library: { floor: '=', wall: ['K', 'K', 'K', 'S', '(', '!'], center: ['t', 's', '?'] },
+    shrine: { floor: '^', wall: ['!', 'e', 'S', 'i', '}'], center: ['?'] },
+    barracks: { floor: '^', wall: ['Z', ')', 'Z', 'W', 'n', '/'], center: ['t', 'z'] },
+    storage: { floor: ':', wall: ['C', 'B', ']', '|', 'u', '<'], center: ['C'] },
+    kitchen: { floor: 'E', wall: ['|', 'u', 'w', '(', '}'], center: ['o', 't', 'z'] },
+    prison: { floor: ':', wall: ['f', '{', '[', 'u', '{'], center: [] },
+    crypt: { floor: '^', wall: ['r', '!', 'S', '}', '<'], center: ['h'] },
+    alchemy: { floor: '^', wall: ['P', 'P', 'K', 'w', '[', '('], center: ['o'] },
     room: { floor: '^', wall: ['C', 'B'], center: [] },
   };
   const BUILDING_FURNISH = {
-    tavern: { floor: '=', wall: ['B', 'B', 'n', 'j', 'e'], center: ['t', 's', 't', 's'], size: [7, 6] },
+    tavern: { floor: '=', wall: ['B', '|', 'n', 'j', 'e', '('], center: ['t', 'z', 't', 's'], size: [7, 6] },
     smithy: { floor: 'Q', wall: ['W', '/', 'p', 'd'], center: ['a', '&'], size: [6, 5] },
     shop: { floor: '=', wall: ['C', 'B', 'K', '$', 'm'], center: ['t'], size: [5, 5] },
     temple: { floor: '^', wall: ['i', 'e', 'i', 'S'], center: ['n', 'n', 'o'], size: [7, 7] },
     alchemist: { floor: '_', wall: ['P', 'K', 'P', 'w'], center: ['o'], size: [5, 5] },
     guardhouse: { floor: '^', wall: ['W', 'Z', '/', 'e'], center: ['t'], size: [5, 5] },
     library: { floor: '=', wall: ['K', 'K', 'K'], center: ['t', 's'], size: [6, 5] },
-    house: { floor: '=', wall: ['Z', 'K', 'B', 'j'], center: ['t', 's'], size: [5, 5] },
+    house: { floor: '=', wall: ['Z', ')', 'K', '(', 'j'], center: ['t', 'z'], size: [5, 5] },
     stable: { floor: ':', wall: ['u', 'B', 'f', 'd'], center: [], size: [6, 5] },
   };
   const GEN_LEGEND = { R: 'carpet', E: 'tile', Q: 'concrete', U: 'flagstone', y: 'lily_pad on water',
-    Z: 'bed', G: 'well', O: 'market_stand', V: 'cart', J: 'dummy', k: 'target', g: 'pumpkin', d: 'logs', e: 'wall_banner', i: 'torch', m: 'iron_chest' };
+    Z: 'bed', G: 'well', O: 'market_stand', V: 'cart', J: 'dummy', k: 'target', g: 'pumpkin', d: 'logs', e: 'wall_banner', i: 'torch', m: 'iron_chest',
+    '!': 'candelabra', '?': 'lectern', '(': 'cabinet', ')': 'nightstand', '[': 'cage', ']': 'iron_crate', '{': 'chains', '}': 'vase',
+    '<': 'broken_pot', '>': 'chalice', '|': 'apple_barrel', z: 'wooden_chair' };
 
   // Furnish a rectangular interior (r0..r1, c0..c1): wall-side things on cells
   // next to the wall but not next to a doorway, centre things near the middle,

@@ -89,7 +89,8 @@ result tells it so.
 `objects`; the player opens one with E and takes everything. A chest without
 either holds a little gold and sometimes a healing potion. `coin_pile` takes
 `"gold"` (default 10-30) and is picked up by walking over it; `potion scroll
-axe pickaxe bag bucket` are picked up with E (`"name"` renames the item).
+axe pickaxe bag bucket key chalice rope` are picked up with E (`"name"`
+renames the item).
 
 `objects` and `map` can be combined: explicit objects are placed first and the
 layout engine works around them. **From current world** in the Scenario pane
@@ -117,8 +118,12 @@ floor <material>
   coin_pile apple_crate carrot_crate`, the village set `well market_stand
   market_stalls cart broken_cart tent logs bed double_bed bookcase banner
   wall_banner target dummy pumpkin statue torch iron_chest fantasy_house
-  stable windmill watch_tower bell_tower` (bookcases and wall banners turn
-  their backs to an adjacent wall), the modern set `desk office_chair
+  stable windmill watch_tower bell_tower` (bookcases, wall banners, cabinets
+  and nightstands turn their backs to an adjacent wall), dungeon dressing
+  `candelabra candles cabinet lectern cage chains wooden_chair nightstand
+  apple_barrel pot vase broken_pot iron_crate key chalice rope` (Quaternius
+  Fantasy Props MegaKit, CC0; generated dungeons and villages use them), the
+  modern set `desk office_chair
   armchair sofa coffee_table floor_lamp plant bookshelf` (front faces south;
   give `ry` in `objects` to turn them), or an agent id (places that character).
 - **floor tiles**: `paint <material> [xN] <placement>` lays painted tiles

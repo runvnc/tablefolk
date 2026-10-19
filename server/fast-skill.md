@@ -49,7 +49,9 @@ true. Loot: {"type": "chest", "x": 2, "z": -1, "gold": 30, "items": ["silver
 key"]} (or "in": "treasure"); the player opens it with E. Coin piles hold
 "gold". Village props: well market_stand market_stalls cart tent logs bed
 bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
-fantasy_house stable windmill watch_tower bell_tower.
+fantasy_house stable windmill watch_tower bell_tower. Dungeon dressing:
+candelabra candles cabinet lectern cage chains wooden_chair nightstand
+apple_barrel pot vase broken_pot iron_crate; key chalice rope are picked up.
 Combat: agents and the player have "hp" (default 10); "wield": "iron sword"
 puts a weapon in hand. attack(target) strikes someone adjacent; allow it only
 for fighters and say in the personality when they attack. The player can
