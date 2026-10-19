@@ -44,7 +44,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261023a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261023c'],
+    ['app.js?v=20261023d'],
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261022c'],
     ['senses.js?v=20261020d'],

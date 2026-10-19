@@ -17,7 +17,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "allowed": ["say", "walk", "face", "emote"],   // default commands for every character
   "agents": [ {
     "id": "vexa",                    // 1-24 chars [A-Za-z0-9_-], unique
-    "model": "wizard",               // people: adventurer adventurer_woman hooded king farmer villager witch wizard
+    "model": "wizard",               // people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard
                                      // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon
                                      // (older chibi bodies: critter woman rogue knight mage ranger barbarian)
     "hostile": true,                 // optional: fights the player with a built-in routine, no LLM (default true for mindless monsters)

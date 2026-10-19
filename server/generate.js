@@ -35,7 +35,7 @@ const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'jave
 // app.js AVATAR_MODELS + FIGURES; MINDLESS as in play.js (hostile by default)
 const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
 const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian',
-  'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
+  'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
   'skeleton', 'skeleton_warrior', 'zombie', 'goblin', 'kobold', 'orc', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
 const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };
 
@@ -292,7 +292,7 @@ button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}bu
 .mapcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261022b"></script><script src="/app/builder.js?v=20261023a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261022b"></script><script src="/app/builder.js?v=20261023b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 if(f){ f.mode.value=qs.get('mode')||'auto';

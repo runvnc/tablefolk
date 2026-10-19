@@ -3693,7 +3693,7 @@ const PERSON_H=1.3;
 // (female or male), the same one every time for the same id. Genders and
 // descriptions come from the server's /api/voices (set on its admin page),
 // else these defaults.
-const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch']);
+const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch','huntress','peasant_woman']);
 const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
 fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
 function defaultVoiceFor(id,model){
@@ -3711,6 +3711,8 @@ function defaultVoiceFor(id,model){
 // lift: hover height for fliers.
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
+  // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
+  woodsman:{h:1.36}, huntress:{h:1.3}, peasant:{h:1.34}, peasant_woman:{h:1.28},
   adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
   skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{h:.85}, bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
@@ -3718,7 +3720,7 @@ const FIGURES={
 const FIG_CLIPS={
   Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],
   Walking_A:['Walk','Fast_Flying','Flying','Run','Running'], Running_A:['Run','Running','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
-  Waving:['Wave','Yes'], Interact:['Interact','PickUp','Yes'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
+  Waving:['Wave','Yes','Talk'], Interact:['Interact','PickUp','Yes'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
   Hit_A:['HitRecieve','HitReact','RecieveHit','Hit','Idle_HitReact_Left'], Hit_B:['HitRecieve_2','RecieveHit_2','Idle_HitReact_Right','HitRecieve','HitReact','Hit'],
   Death_A:['Death'],
   Melee_1H_Attack_Chop:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
@@ -3727,7 +3729,7 @@ const FIG_CLIPS={
   Melee_Unarmed_Attack_Punch_A:['Punch_Right','Punch','Attack','Bite_Front','Headbutt','Sword_Slash'],
   Melee_Unarmed_Attack_Kick:['Kick_Right','Kick_Left','Punch_Left','Attack2','Attack'],
   Ranged_Magic_Spellcasting:['Spell1','Spell2','Staff_Attack','Punch'], Ranged_Magic_Shoot:['Spell2','Spell1','Punch'],
-  Throw:['Punch_Right','Punch','Attack'], Sit_Floor_Idle:['Duck','Crawl'],
+  Throw:['Punch_Right','Punch','Attack'], Sit_Floor_Idle:['Sit','Duck','Crawl'],
 };
 const isPersonModel=m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m]));
 // "CharacterArmature|CharacterArmature|Death|CharacterArmature|Dea" -> Death,

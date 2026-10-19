@@ -28,3 +28,13 @@ CC0 1.0 (public domain):
 CC-BY 3.0 (credit: Quaternius, via Poly Pizza):
   witch.glb             Witch               https://poly.pizza/m/QBEOV9ZUT8
   wizard.glb            Animated Wizard     https://poly.pizza/m/kttbFvCl2C
+
+Universal rig figures, built with tools/build-figures.sh from Quaternius's
+free (Standard) kits, all CC0 1.0 (public domain):
+  Modular Character Outfits - Fantasy  https://quaternius.com/packs/modularcharacteroutfitsfantasy.html
+  Universal Base Characters (heads, eyes, brows, hair)  https://quaternius.com/packs/universalbasecharacters.html
+  Universal Animation Library  https://quaternius.com/packs/universalanimationlibrary.html
+  woodsman.glb        Male Ranger outfit, beard
+  huntress.glb        Female Ranger outfit
+  peasant.glb         Male Peasant outfit, parted hair
+  peasant_woman.glb   Female Peasant outfit, buns

@@ -64,7 +64,9 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
 ```
 
 **Bodies** (`model`, for agents and the player): people `adventurer
-adventurer_woman hooded king farmer villager witch wizard`; monsters
+adventurer_woman hooded king farmer villager witch wizard`, and the realistic
+`woodsman huntress peasant peasant_woman` (hooded rangers and villagers on
+Quaternius's Universal rig, `tools/build-figures.sh`); monsters
 `skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost
 slime demon giant dragon` (Quaternius models with their own animations,
 `app.js` `FIGURES`); and the older chibi KayKit people `woman rogue knight

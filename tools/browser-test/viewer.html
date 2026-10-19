@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><title>model viewer</title>
+<style>html,body{margin:0;height:100%;background:#9aa3a8}canvas{width:100%;height:100%;display:block}#info{position:fixed;left:6px;top:6px;font:12px monospace;background:#fff8;padding:4px;max-width:60%}</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script><script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script></head>
+<body><canvas id="c"></canvas><div id="info"></div><script>
+// viewer.html?m=url1,url2&anim=Walk&t=0.4&yaw=0.6  -- several models side by side (test helper)
+const q=new URLSearchParams(location.search), urls=(q.get('m')||'').split(',').filter(Boolean);
+const engine=new BABYLON.Engine(document.getElementById('c'),true), scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(.6,.64,.66,1);
+const cam=new BABYLON.ArcRotateCamera('c',-Math.PI/2+(+q.get('yaw')||0),1.25,3.2*Math.max(1,urls.length*.6),new BABYLON.Vector3(0,.9,0),scene);
+new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene).intensity=.8;
+const d=new BABYLON.DirectionalLight('d',new BABYLON.Vector3(-.4,-1,-.6),scene); d.intensity=2.2;
+BABYLON.MeshBuilder.CreateGround('g',{width:20,height:20},scene).material=Object.assign(new BABYLON.StandardMaterial('gm',scene),{diffuseColor:new BABYLON.Color3(.5,.5,.48)});
+const info=[];
+(async()=>{
+  for(let i=0;i<urls.length;i++){
+    const r=await BABYLON.SceneLoader.ImportMeshAsync('',urls[i],'',scene);
+    const root=r.meshes[0]; root.position.x=(i-(urls.length-1)/2)*1.4;
+    const b=root.getHierarchyBoundingVectors(true);
+    info.push(urls[i].split('/').pop()+' h='+(b.max.y-b.min.y).toFixed(2)+' anims='+r.animationGroups.map(a=>a.name).join(','));
+    r.animationGroups.forEach(a=>a.stop());
+    const want=q.get('anim'), g=want?r.animationGroups.find(a=>a.name.toLowerCase().includes(want.toLowerCase())):null;
+    if(g){ g.start(true); if(q.get('t')) { g.goToFrame(g.from+(g.to-g.from)*(+q.get('t'))); g.pause(); } }
+  }
+  document.getElementById('info').textContent=info.join(' | ');
+  window.VIEWER_READY=true;
+})().catch(e=>{document.getElementById('info').textContent='ERR '+e.message; window.VIEWER_READY=true;});
+engine.runRenderLoop(()=>scene.render()); addEventListener('resize',()=>engine.resize());
+</script></body></html>

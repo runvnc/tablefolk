@@ -1,0 +1,2 @@
+{"title":"Folk","size":[11,9],"walls":"stone","player":{"name":"Hero","at":[0,3],"model":"woodsman"},
+ "agents":[{"id":"Wren","model":"huntress","at":[2,0],"personality":"x"},{"id":"Tam","model":"peasant","at":[0,0],"personality":"x"},{"id":"Mira","model":"peasant_woman","at":[-2,0],"personality":"x"},{"id":"Bram","model":"adventurer","at":[-4,0],"personality":"x"}]}

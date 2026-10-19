@@ -75,7 +75,7 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
     "allowed": ["say", "sell"],    // optional: this character's own commands (replaces the default)
     "personality": "a grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
     "quest": "",                   // optional private aim
-    "model": "villager",             // critter (default); people: adventurer adventurer_woman hooded king farmer
+    "model": "villager",             // critter (default); people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer
                                      // villager witch wizard; monsters: skeleton skeleton_warrior zombie goblin
                                      // kobold orc rat spider wolf bat ghost slime demon giant dragon; older chibi
                                      // people: woman rogue knight mage ranger barbarian
