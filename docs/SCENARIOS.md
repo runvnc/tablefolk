@@ -78,7 +78,10 @@ once, nearest first: hostile ones close in two cells and attack with their
 natural weapon (combat.js `NATURAL`), the others take an LLM turn when the
 brain is loaded. The player waits for the hostile ones ("bones' turn");
 LLM characters think and talk in the background ("grik is thinking…") while
-the player keeps moving, one at a time.
+the player keeps moving, one at a time, and only while they can see the
+player (walls block; a door does unless one of them stands by it). A
+character that repeats one of its last 8 spoken lines says nothing; its turn
+result tells it so.
 
 **Loot**: chests (`chest`, `iron_chest`) take `"gold"` and `"items"` in
 `objects`; the player opens one with E and takes everything. A chest without

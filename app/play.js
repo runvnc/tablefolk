@@ -239,7 +239,7 @@
         const w = window.tablefolk;
         const brains = w?.brainReady?.() && !w?.isBrainLoopRunning?.();
         const actors = near.filter(c => getBrainConfig(c.id).enabled !== false);
-        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c)) : [];
+        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c)) : [];
         if (talkers.length && !talking) talk(talkers);
         for (const c of fighters) {
           if (c.defeated || me()?.defeated) break;
@@ -250,12 +250,15 @@
       } while (queued);
     } finally { busy = false; setBusy(false); }
   }
+  // a friendly character only takes a turn while it can see the player
+  const sees = c => window.tablefolk?.canSeeEachOther?.(c, me()) ?? true;
   async function talk(list) {
     talking = true;
     const w = window.tablefolk;
     try {
       for (const c of list) {
         if (c.defeated || me()?.defeated) break;
+        if (!sees(c)) continue;   // the player has left the room meanwhile
         banner('npcThinking', `${c.id} is thinking…`);
         await w.runAgentTurn(c);
       }

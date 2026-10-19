@@ -2627,6 +2627,21 @@ function clearPendingThought(g){
 // whisper: speech only the player hears (other characters never get it); a
 // smaller, dimmer bubble.
 function say(g,text,voiced=false,{whisper=false}={}){
+  // A character repeating one of its recent spoken lines: say nothing at all.
+  if(voiced && g && g!==state.playerAvatar){
+    const key=String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    if(key){
+      g._said=g._said||[];
+      if(g._said.includes(key)){
+        clearStreamingBubble(g); console.info('[say] dropped repeat from',g.id+':',text);
+        // tell the character (its turn result), so it says something new next time
+        const h=state.globalHistory, last=h?.[h.length-1];
+        if(last && last.startsWith('T') && last.includes(g.id+':')) h[h.length-1]=last+' -> (you already said that, so nobody heard it; say something new or do something else)';
+        return;
+      }
+      g._said.push(key); if(g._said.length>8) g._said.shift();
+    }
+  }
   // Dispatch speech before logging, DOM bubbles, animation, or history work. Only explicit say commands are voiced; action confirmations stay text-only.
   if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
   log(g.id+': '+text);
@@ -3196,6 +3211,20 @@ function canSeeCell(cx,cz,x,z,opaque){
   // Ignore the start and allow the target cell itself to be visible if it is the wall/blocker.
   for(let i=1;i<ray.length-1;i++){ if(opaque.has(gridKey(ray[i][0],ray[i][1]))) return false; }
   return true;
+}
+// Can a and b see each other (same room, or through a doorway)? Walls block;
+// a door blocks unless one of them stands by it (it swings open for them).
+function canSeeEachOther(a,b){
+  const pa=a?.logicalPos||a?.root?.position, pb=b?.logicalPos||b?.root?.position; if(!pa||!pb) return false;
+  const opaque=new Set();
+  for(const m of state.blocks.concat(state.props)){
+    if(!m || m.isDisposed?.()) continue;
+    const mm=meta(m); if(!mm || mm.decor || !isOpaqueType(mm.type)) continue;
+    const p=m.getAbsolutePosition?.() || m.position;
+    if(mm.type==='door' && Math.min(Math.hypot(p.x-pa.x,p.z-pa.z),Math.hypot(p.x-pb.x,p.z-pb.z))<1.6) continue;
+    opaque.add(gridKey(Math.round(p.x),Math.round(p.z)));
+  }
+  return canSeeCell(Math.round(pa.x),Math.round(pa.z),Math.round(pb.x),Math.round(pb.z),opaque);
 }
 function facingNameFromDir(dir){
   if(!dir) return 'north';
@@ -4190,6 +4219,7 @@ function installWorldAPI(){
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),
     stepAgentTurn:beginTurnForAgent,
     isTurnReady:()=>state.turn.phase==='ready',
+    canSeeEachOther,
     defaultVoiceFor,
     spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, restoreWorldState,
   };
