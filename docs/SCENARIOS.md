@@ -76,7 +76,9 @@ ghost, giant, demon, dragon) takes no LLM turns. After each player action
 (a step, an attack, using something) every character within earshot acts
 once, nearest first: hostile ones close in two cells and attack with their
 natural weapon (combat.js `NATURAL`), the others take an LLM turn when the
-brain is loaded. The player waits meanwhile ("bones' turn").
+brain is loaded. The player waits for the hostile ones ("bones' turn");
+LLM characters think and talk in the background ("grik is thinking…") while
+the player keeps moving, one at a time.
 
 **Loot**: chests (`chest`, `iron_chest`) take `"gold"` and `"items"` in
 `objects`; the player opens one with E and takes everything. A chest without

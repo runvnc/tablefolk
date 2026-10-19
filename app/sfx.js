@@ -7,7 +7,9 @@
  *   window.tablefolkSfx.enabled           false mutes (saved in localStorage)
  *
  * The audio context starts on the first click or key press (browsers block
- * sound before a user gesture).
+ * sound before a user gesture). Doors play recorded samples (Kenney's RPG
+ * Audio, CC0, assets/sounds/kenney-rpg/), one picked at random; the rest
+ * are synthesized, as are doors until their samples have loaded.
  */
 (function () {
   let ctx = null, master = null, noiseBuf = null;
@@ -23,7 +25,27 @@
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return ctx;
   }
-  const wake = () => { try { audio()?.resume(); } catch {} };
+  const SAMPLES = {
+    doorOpen: ['doorOpen_1', 'doorOpen_2'],
+    doorClose: ['doorClose_1', 'doorClose_2', 'doorClose_3', 'doorClose_4'],
+  };
+  const decoded = {}; let loading = false;
+  function loadSamples() {
+    if (loading || !ctx) return; loading = true;
+    const base = new URL('../assets/sounds/kenney-rpg/', document.baseURI);
+    for (const [name, files] of Object.entries(SAMPLES)) for (const f of files)
+      fetch(new URL(f + '.ogg?v=20261023a', base)).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+        .then(b => ctx.decodeAudioData(b)).then(buf => (decoded[name] ||= []).push(buf))
+        .catch(e => console.warn('sfx sample', f, e));
+  }
+  function sample(name, out, t) {
+    const list = decoded[name]; if (!list?.length) return false;
+    const src = ctx.createBufferSource(); src.buffer = list[Math.floor(Math.random() * list.length)];
+    src.playbackRate.value = .94 + Math.random() * .12;
+    src.connect(out); src.start(t);
+    return true;
+  }
+  const wake = () => { try { audio()?.resume(); loadSamples(); } catch {} };
   addEventListener('pointerdown', wake, { capture: true });
   addEventListener('keydown', wake, { capture: true });
 
@@ -108,8 +130,8 @@
     if (!audio() || ctx.state !== 'running') return;
     const v = volumeAt(pos); if (v < .02) return;
     const out = ctx.createGain(); out.gain.value = v; out.connect(master);
-    try { SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
-    setTimeout(() => { try { out.disconnect(); } catch {} }, 2000);
+    try { sample(name, out, ctx.currentTime) || SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
+    setTimeout(() => { try { out.disconnect(); } catch {} }, 3000);
   }
 
   window.tablefolkSfx = {

@@ -433,3 +433,7 @@ body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
 #defeatCard[hidden] { display:none; }
 #adminLink { color:#cfe3d6; text-decoration:none; margin-right:8px; }
 #adminLink:hover { color:#9fe8c8; }
+/* someone with a brain is thinking; the player can keep moving */
+#npcThinking { position:fixed; left:50%; top:70px; transform:translate(-50%,-8px); z-index:79; padding:5px 12px; border-radius:12px; font-size:12px; font-style:italic; color:#dfe6dc;
+  background:rgba(16,20,25,.55); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
+#npcThinking.show { opacity:1; transform:translate(-50%,0); }

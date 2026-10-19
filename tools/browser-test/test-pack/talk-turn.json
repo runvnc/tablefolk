@@ -1,0 +1,3 @@
+{"title":"Talk turn test","size":[11,9],"walls":"stone",
+ "player":{"name":"Hero","at":[-2,0]},
+ "agents":[{"id":"grik","model":"goblin","hostile":false,"personality":"a chatty goblin","at":[1,0]}]}

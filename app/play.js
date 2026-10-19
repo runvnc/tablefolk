@@ -204,18 +204,24 @@
 
   // ---------------------------------------------------------------- the turn round
   // A player action: the characters close by each act once, nearest first.
-  let busy = false, queued = false;
+  // Fighters take their turn before the player moves again (combat is quick).
+  // Characters with a brain think and talk in the background: the player
+  // keeps moving meanwhile, and a small note says who is thinking.
+  let busy = false, queued = false, talking = false;
   function acted(kind) {
     if (!me()) return;
     try { window.dispatchEvent(new CustomEvent('tablefolk-player-turn', { detail: { kind } })); } catch {}
     if (busy) { queued = true; return; }
     round().catch(e => console.error('[play] turn round', e));
   }
+  function banner(id, text) {
+    let el = document.getElementById(id);
+    if (!el) { el = document.createElement('div'); el.id = id; document.body.appendChild(el); }
+    if (text) el.textContent = text; el.classList.toggle('show', !!text);
+  }
   function setBusy(on, text = '') {
     state.npcBusy = on;
-    let el = document.getElementById('npcTurnBanner');
-    if (!el) { el = document.createElement('div'); el.id = 'npcTurnBanner'; document.body.appendChild(el); }
-    el.textContent = text; el.classList.toggle('show', !!(on && text));
+    banner('npcTurnBanner', on ? text : '');
     if (on) { try { fpHeld?.clear?.(); } catch {} }
   }
   const until = async (fn, ms = 20000) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(60); };
@@ -226,23 +232,38 @@
         queued = false;
         const p0 = myPos(); if (!p0) return;
         // let the player's own move finish first
-        await until(() => !me()?.turnMove && (window.tablefolk?.isTurnReady?.() ?? true), 8000);
+        await until(() => !me()?.turnMove, 8000);
         const p = myPos(), R = +state.npcRadius > 0 ? +state.npcRadius : (+state.earshot > 0 ? +state.earshot : 6);
         const near = state.characters.filter(c => !c.defeated && !getBrainConfig(c.id).defeated && Math.hypot(posOf(c.root).x - p.x, posOf(c.root).z - p.z) <= R)
           .sort((a, b) => Math.hypot(a.root.position.x - p.x, a.root.position.z - p.z) - Math.hypot(b.root.position.x - p.x, b.root.position.z - p.z));
         const w = window.tablefolk;
         const brains = w?.brainReady?.() && !w?.isBrainLoopRunning?.();
-        const actors = near.filter(c => { const cfg = getBrainConfig(c.id); return cfg.enabled !== false && (isHostile(c) || brains); });
-        if (!actors.length) break;
-        for (const c of actors) {
+        const actors = near.filter(c => getBrainConfig(c.id).enabled !== false);
+        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c)) : [];
+        if (talkers.length && !talking) talk(talkers);
+        for (const c of fighters) {
           if (c.defeated || me()?.defeated) break;
-          if (isHostile(c)) { setBusy(true, `${c.id}${/s$/.test(c.id) ? "'" : "'s"} turn`); await fighterTurn(c); }
-          else { setBusy(true, `${c.id} is thinking…`); await w.runAgentTurn(c); }
-          await until(() => !c.turnMove && (w?.isTurnReady?.() ?? true), 15000);
+          setBusy(true, `${c.id}${/s$/.test(c.id) ? "'" : "'s"} turn`);
+          await fighterTurn(c);
+          await until(() => !c.turnMove, 15000);
         }
       } while (queued);
     } finally { busy = false; setBusy(false); }
   }
+  async function talk(list) {
+    talking = true;
+    const w = window.tablefolk;
+    try {
+      for (const c of list) {
+        if (c.defeated || me()?.defeated) break;
+        banner('npcThinking', `${c.id} is thinking…`);
+        await w.runAgentTurn(c);
+      }
+    } catch (e) { console.error('[play] talk turn', e); }
+    finally { talking = false; banner('npcThinking', ''); }
+  }
+  // the note goes away once the character has decided what to do
+  addEventListener('tablefolk-agent-turn', () => banner('npcThinking', ''));
   function isHostile(c) { const cfg = getBrainConfig(c.id); return cfg.hostile ?? MINDLESS.has(c.charModel); }
 
   // A plain fighter: attack when next to the player, else close in (two
