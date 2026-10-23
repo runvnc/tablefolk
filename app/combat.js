@@ -33,7 +33,7 @@
     skeleton: { dmg: 2, name: 'bony claws' }, skeleton_warrior: { dmg: 2, name: 'notched sword' }, zombie: { dmg: 2, name: 'rotting claws' },
     rat: { dmg: 1, name: 'teeth' }, spider: { dmg: 2, name: 'venomous fangs' }, wolf: { dmg: 2, name: 'fangs' }, bat: { dmg: 1, name: 'fangs' },
     slime: { dmg: 1, name: 'acid' }, ghost: { dmg: 2, name: 'chilling touch' }, giant: { dmg: 4, name: 'huge fists' }, demon: { dmg: 3, name: 'claws' },
-    dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
+    dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, orc_classic: { dmg: 3, name: 'cleaver' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
   };
 
   // ------------------------------------------------------------ hit points

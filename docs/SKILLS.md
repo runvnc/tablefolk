@@ -78,7 +78,9 @@ Example: `scenarios/skills-demo.json`.
 
 - `allow`: the game's own commands the skill unlocks (`"allow": ["sell",
   "inventory"]` for trade).
-- `card`: state-card lines, by name, rebuilt every turn: providers from the
+- `card`: state-card lines, by name, rebuilt every turn (a line starting
+  with `!` is urgent: it goes at the very end of the prompt, after the words
+  it answers, e.g. trade's "Ana offers 45 gold: enough, sell it now"): providers from the
   game (`wares`, `offer` from `app/trade.js`) or the skill's module
   (`cards: { name(g, data) { return 'a line' } }`).
 - `behaviours`: code-run routines by name (see Roles below), e.g. `follow`.
@@ -89,7 +91,10 @@ Example: `scenarios/skills-demo.json`.
 - `commands`: `usage`, `example`, `help` for the prompt. With `variants`, the
   first argument picks an entry of that table (and `param` limits it to the
   character's own list); otherwise the command itself is the entry.
-- Entry: `cost` (resources), `needs` (items), `range` (cells), `target`
+- Entry: `limit` (don't make more of what its `give` effect makes while
+  the character already has that many: a smith forged a second dagger it
+  didn't need), `cost` (resources), `needs` (items; a seller's materials
+  stay off its wares list unless priced), `range` (cells), `target`
   (`other`, `self`, `any`, `none`; `default` when none is named), `cooldown`
   (own turns), `effects`, `text` (`{{me}}`, `{{target}}`).
 - Effects: `vfx` (spark, fireball, glow, ring), `damage`, `heal`, `burn` (fire

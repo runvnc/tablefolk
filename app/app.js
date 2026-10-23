@@ -3033,8 +3033,12 @@ function build(g,thing='wall',at=null){
 function panic(g){ g.anim='panic'; playRig(g,'panic',true); say(g,'I have promoted the floor to manager'); if(!isTurnMode()){ for(let i=0;i<5;i++) setTimeout(()=>{ const v=new BABYLON.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(); g.collider.physicsBody?.applyImpulse(v.scale(1.15),g.collider.position); },i*160); } else emitBadge(g,'panic'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); zeroMeshMotion(g.collider); },1050); }
 function emote(g,name){
   const valid=['dance','laugh','sit','wave','clap','cheer','sleep','bow'];
-  name=(name||'dance').toLowerCase();
-  if(!valid.includes(name)) name='dance';
+  name=String(name||'dance').toLowerCase().replace(/^["']|["']$/g,'').trim();
+  // Models invent emotes (frown, smile, nod, gossip): the nearest real one,
+  // else just the word over its head (unknown ones used to make it dance).
+  const NEAR={smile:'laugh',grin:'laugh',giggle:'laugh',chuckle:'laugh',happy:'cheer',celebrate:'cheer',nod:'bow',greet:'wave',hello:'wave',bye:'wave',applaud:'clap',rest:'sit',yawn:'sleep',tired:'sleep',curtsy:'bow'};
+  if(!valid.includes(name)) name=NEAR[name]||name;
+  if(!valid.includes(name)){ emitBadge(g,name); log(g.id+' looks '+name); return say(g,`(${g.id} looks ${name})`,false); }
   log(g.id+' emotes: '+name);
   emitBadge(g,name);
   if(g._emoteTimeout) clearTimeout(g._emoteTimeout);
@@ -3124,7 +3128,7 @@ function sell(g,item,price){
   const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item), buyer=playerName();
   if(!stock) return say(g,`sale failed: ${g.id} has no ${item} to sell`);
   const av=state.playerAvatar?.root?.position;
-  if(av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
+  if(!comeOver(g)) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
   // trade.js: the lowest price, and the buyer has to agree to the price
   const low=window.tablefolkTrade?.floor(g,stock.name);
   if(low!=null && price<low) return say(g,`sale refused: you never sell ${stock.name} for less than ${low} gold`,false);
@@ -3143,6 +3147,17 @@ function sell(g,item,price){
 // Shop test: the character hands an item to the person in the corner chat
 // (their chat name). For now this only announces the hand-over.
 const GIVE_RANGE=3;
+// Handing something to the player: within reach, or within earshot, in which
+// case it walks over first (it was talking with them across the room; a 2B
+// model rarely thinks to walk, and the sale failed).
+function comeOver(g){
+  const av=state.playerAvatar?.root?.position; if(!av) return true;
+  const d=Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z);
+  if(d<=GIVE_RANGE) return true;
+  if(d>(state.earshot||6)) return false;
+  try{ walk(g,{type:'coord',x:Math.round(av.x),z:Math.round(av.z)}); }catch(e){ console.warn('comeOver',e); }
+  return true;
+}
 function give(g,item){
   item=String(item||'').trim();
   if(!item) return say(g,'give what, exactly?');
@@ -3152,7 +3167,7 @@ function give(g,item){
   const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
   // Handing over needs the player within reach (when they have an avatar).
   const av=state.playerAvatar?.root?.position;
-  if(stock && av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE)
+  if(stock && av && !comeOver(g))
     return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
   if(stock){
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
@@ -3163,7 +3178,27 @@ function give(g,item){
   }
   return say(g,`${g.id} gives ${recipient} ${item}`);
 }
-function giveQuest(g,text){ if(!allowedFor(g).has('give_quest')){ return say(g,'I cannot bestow quests'); } const targets=state.characters.filter(x=>x!==g && BABYLON.Vector3.Distance(g.root.position,x.root.position)<=2.0); if(!targets.length){ return say(g,'no one nearby to quest upon'); } const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI(); }
+// give_quest(text): to the player when they are in earshot (their quest
+// list, the Adventurer pane), else to a character beside it. A giver gives the
+// player one quest; asking again just reminds it which.
+function giveQuest(g,text){
+  if(!commandsFor(g).has('give_quest')) return say(g,'I cannot bestow quests');
+  text=String(text||'').replace(/^["']|["']$/g,'').trim();
+  const av=state.playerAvatar?.root?.position, who=playerName();
+  if(av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)<=(state.earshot||6)){
+    const qs=(state.player.quests||=[]), mine=qs.find(q=>q.from===g.id);
+    if(mine) return say(g,`${who} already has your quest: ${mine.text}. Talk with them about it; no need to give it again.`,false);
+    if(!text) return say(g,'give_quest needs the task, e.g. give_quest(find my lost sheep)',false);
+    qs.push({from:g.id,text,turn:state.turn?.index??0});
+    window.tablefolkMind?.addMemory(g,`I asked ${who} to: ${text}.`,1.2);
+    window.tablefolkToast?.(`New quest from ${g.id}: ${text}`,{type:'success'});
+    try{ emitBadge(g,'quest!'); window.tablefolkPlay?.render(); }catch{}
+    return say(g,`${g.id} gives ${who} a quest: ${text}`,false);
+  }
+  const targets=state.characters.filter(x=>x!==g && BABYLON.Vector3.Distance(g.root.position,x.root.position)<=2.0);
+  if(!targets.length){ return say(g,'no one nearby to quest upon'); }
+  const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI();
+}
 function castSpell(g,spell){ g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,'sparkles are a valid plan'); g.anim='idle'; playRig(g,'idle',true); },220); }
   if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,'physics has been consulted'); g.anim='idle'; },220); return; }
   if(spell==='fireball'){ const target=nearestTarget(g,4.5); const hit=target?.getAbsolutePosition?.() || origin.add(g.dir.scale(3)); fireballVfx(origin.add(new BABYLON.Vector3(0,.85,0)),hit); setTimeout(()=>{ for(const m of state.props.concat(state.blocks)){ if(!m.isDisposed() && BABYLON.Vector3.Distance(hit,m.position)<2.25){ impulse(m,hit.add(new BABYLON.Vector3(0,.1,0)),7.2,.55); damage(m,meta(m)?.flammable?2:1,'fire'); } } for(const other of state.characters){ if(other!==g && BABYLON.Vector3.Distance(hit,other.root.position)<2.4){ other.anim='panic'; say(other,pickRandom(['hot weather attack','the sun is local now','why did you invite fire'])); setTimeout(()=>other.anim='idle',1100); } } say(g,pickRandom(['fireball is basically planning','wood is now bridge ingredients','careful fireball is still careful'])); g.anim='idle'; },420); }
@@ -3509,7 +3544,7 @@ function buildAgentPrompt(g, cfg) {
   const personality = (cfg.personality || '').replace(/\s+/g, ' ').trim();
   const quest = (cfg.quest || '').replace(/\s+/g, ' ').trim();
   const goal = (cfg.goal || '').replace(/\s+/g, ' ').trim();
-  const canGiveQuest = allowedFor(g).has('give_quest');
+  const canGiveQuest = commandsFor(g).has('give_quest');
   const cmds = buildCommandExamples(g);
   // short: whole sentences here invite the model to say them again
   const recentActs = (cfg.recent || []).slice(-3).map(a => String(a).replace(/^chose\s+/, '').slice(0, 70) + (String(a).length > 76 ? '…' : ''));
@@ -3527,12 +3562,15 @@ function buildAgentPrompt(g, cfg) {
     'Available commands (examples only, use appropriate arguments):',
     ...cmds,
     '',
-    ...(canGiveQuest ? ['Use give_quest() to bestow a quest on nearby agents.'] : []),
+    ...(canGiveQuest ? ['When someone offers to help, give them the task once with give_quest(task); then talk about it.'] : []),
     // Small models narrate hand-overs ("here it is") instead of doing them.
-    ...((allowedFor(g).has('give') || allowedFor(g).has('sell')) ? ['Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use ' + [allowedFor(g).has('give') ? 'give(item)' : '', allowedFor(g).has('sell') ? 'sell(item, price)' : ''].filter(Boolean).join(' or ') + ' in the same reply.'] : []),
+    // (commandsFor: roles and skills grant give/sell too)
+    ...((commandsFor(g).has('give') || commandsFor(g).has('sell')) ? ['Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use ' + [commandsFor(g).has('give') ? 'give(item)' : '', commandsFor(g).has('sell') ? 'sell(item, price)' : ''].filter(Boolean).join(' or ') + ' in the same reply.'] : []),
     'Messages in the form "NAME says ..." report speech addressed to you.',
     'Understand and answer the meaning of that speech; do not copy or quote it back.',
-    'Do not output anything except the command line.',
+    // One command per line: an action alone left customers unanswered (a smith
+    // forged a dagger without a word to the person who asked for it).
+    'Reply with commands only, one per line. When someone speaks to you, always answer with say(...); if you also act, put the action on the next line.',
     '',
     `Character: ${g.id}`,
     ...(style ? [`Style: ${style}`] : []),
@@ -3769,7 +3807,7 @@ const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
   woodsman:{h:1.36}, huntress:{h:1.3}, peasant:{h:1.34}, peasant_woman:{h:1.28},
   adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
-  skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{h:1.45},
+  skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{dir:'generated',file:'orc_warrior',h:1.5,v:'20261024a'}, orc_classic:{file:'orc',h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{h:.85}, bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
 };
 const FIG_CLIPS={
@@ -3795,7 +3833,8 @@ function figClipName(n){
 }
 async function createFigure(id,pos,model,label){
   const F=FIGURES[model], sc=state.scene;
-  const res=await BABYLON.SceneLoader.ImportMeshAsync('',FIG_ASSET,(F.file||model)+'.glb?v='+(F.v||'20261022a'),sc);
+  // dir: another folder under characters/ (generated: made with Meshy via fal.ai, tools/fal-monster.py)
+  const res=await BABYLON.SceneLoader.ImportMeshAsync('',F.dir?ASSET_BASE+'models/characters/'+F.dir+'/':FIG_ASSET,(F.file||model)+'.glb?v='+(F.v||'20261022a'),sc);
   const root=new BABYLON.TransformNode(id,sc); root.position.copyFrom(pos);
   const importedRoot=res.meshes.find(m=>m.name==='__root__') || res.meshes[0];
   // like KayKit people: glTF front is +Z; zero yaw must face north (-Z)

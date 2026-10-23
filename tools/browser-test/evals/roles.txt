@@ -1,0 +1,27 @@
+## innkeeper: food and gossip
+to: greta
+Hello there! I'm hungry and tired.
+What's the news around here?
+I'll have a bowl of stew please. Here are 3 gold.
+win: {"player_has":"bowl of stew"}
+
+## guard: stranger questioned
+to: hector
+Hi. I'm new in town.
+I'm just a traveller looking for work.
+I heard there is some trouble with wolves. Is that true?
+win: {"any":[{"said":["hector","wol"]},{"said":["hector","sheep"]}]}
+
+## quest giver: asks for help
+to: old_tom
+Good morning, old man. You look worried.
+What happened to your sheep?
+I can help. Where should I look?
+win: {"any":[{"said":["old_tom","hollow"]},{"said":["old_tom","den"]}]}
+
+## villager: small talk
+to: pip
+Hey kid, what are you up to?
+Do you know anything exciting about this village?
+Want to come on an adventure with me?
+win: {"turns_over":3}

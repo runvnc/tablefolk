@@ -142,11 +142,19 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
   turns" shortened; no more default "Style: helpful character" for scenario
   characters; `backstory` and the role's duty in the stable prompt prefix.
 - Tests: headless Chrome, `agenttest.mjs`, `evals/`.
-- Not yet: roles starting workflows on cue, EmbeddingGemma retrieval
-  (EmbeddingGemma 2 exists: `onnx-community/embeddinggemma-2-ONNX`, the
-  text model is about 174 MB at q4 plus a 32 MB tokenizer, for
-  Transformers.js; `litert-community/embeddinggemma-2-text-270m-litert-lm`
-  165 MB for LiteRT), schedules, relationships between characters.
+- Smart memory (`app/embed.js`, `app/embed-worker.js`): EmbeddingGemma 2
+  (`onnx-community/embeddinggemma-2-ONNX`, text model q4, 174 MB once,
+  Transformers.js 4.3.1, WebGPU else WASM, vectors cut to 256). Before each
+  turn `tablefolkMind.prepare(g)` scores every memory, `knows` fact and lore
+  line against what was just said (+ goal, quest); raw cosines bunch at
+  0.6-0.8, so each is scored as standard deviations above the others (z),
+  added to the keyword score. Measured: "Is there any trouble around here?"
+  -> "Three sheep went missing" z 2.2; "where could I find the key?" -> "the
+  key is in the well" z 2.5. A character's own `knows` are always on the
+  card; a short lore list (3 or fewer) whole, best first. Off in the
+  Graphics pane ("smart memory"); keyword-only until it has loaded.
+- Not yet: roles starting workflows on cue, schedules, relationships
+  between characters.
 
 ## Order of work
 

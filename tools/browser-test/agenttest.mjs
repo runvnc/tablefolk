@@ -47,6 +47,10 @@ for (;;) {
   await new Promise(r => setTimeout(r, 2000));
 }
 console.log('model:', (await status()).brain, `(${Math.round((Date.now() - t0) / 1000)} s)`);
+// embed.js (smart memory): load it before playing, so every turn uses it
+// (NO_EMBED=1 runs keyword-only).
+if (process.env.NO_EMBED === '1') await page.evaluate(() => window.tablefolkEmbed?.setEnabled(false));
+else console.log('memory model:', await page.evaluate(() => Promise.race([window.tablefolkEmbed?.start().then(() => window.tablefolkEmbed.state + ' ' + window.tablefolkEmbed.device), new Promise(r => setTimeout(() => r('timed out'), 180000))])));
 
 await page.evaluate(({ scenario, tacticsText, runs, withPrompts }) => {
   const S = window.tablefolkScenario, tactics = S.parseTactics(tacticsText);

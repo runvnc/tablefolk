@@ -16,3 +16,4 @@ generated/
 # admin password hash and settings (server/admin.js, server/settings.js)
 .admin/
 tools/browser-test/work/
+/work/

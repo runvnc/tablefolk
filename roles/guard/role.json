@@ -3,7 +3,7 @@
   "name": "Guard",
   "version": "1.0.0",
   "description": "Keeps watch, questions strangers, stands up to trouble.",
-  "duty": "You are a guard. Keep watch, question strangers, keep the peace, and stand up to anyone who causes trouble.",
+  "duty": "You are a guard. Keep watch, question strangers, keep the peace, warn travellers about dangers you know of, and stand up to anyone who causes trouble.",
   "commands": [
     "say",
     "attack"

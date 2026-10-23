@@ -180,6 +180,7 @@
       <div class="adv-stat adv-drag" draggable="${state.player?.gold > 0}" data-give="gold" title="drag onto a character to give gold"><span>Gold</span><b class="adv-gold">${state.player?.gold || 0}</b></div>
       <div class="adv-stat"><span>Wielding</span><b>${w ? esc(w) : 'bare hands'}</b></div>
       ${goal ? `<div class="section-subtitle">Goal</div><p class="adv-goal">${esc(goal)}</p>` : ''}
+      ${(state.player?.quests || []).length ? `<div class="section-subtitle">Quests</div>${state.player.quests.map(q => `<p class="adv-goal">${esc(q.text)} <small>(${esc(q.from)})</small></p>`).join('')}` : ''}
       <div class="section-subtitle">Carrying</div>
       ${items.length ? `<ul class="adv-items">${items.map(i => {
         const n = esc(i.name), weapon = C?.weaponFor(i.name), held = w && w.toLowerCase() === i.name.toLowerCase();

@@ -1,0 +1,13 @@
+{"v":1,"title":"Eval: village roles","base":"plain","size":[13,11],"lighting":"bright",
+ "lore":["The village is called Brackenford.","Wolves have been taking sheep from the north pasture.","The old mill burned down last winter."],
+ "player":{"name":"Ana","gold":30,"items":[],"at":[0,2]},
+ "allowed":["say","emote"],
+ "agents":[
+  {"id":"greta","model":"peasant_woman","at":[-3,0],"facing":"s","role":"innkeeper","personality":"warm, talkative, loves gossip.",
+   "prices":{"bowl of stew":3,"ale":2,"room for the night":5},"inventory":{"gold":10,"items":[{"name":"bowl of stew","qty":4},{"name":"ale","qty":6},{"name":"room for the night","qty":2}]}},
+  {"id":"hector","model":"adventurer","at":[3,0],"facing":"s","role":"guard","personality":"stern, dutiful, suspicious of strangers but fair.","wield":"iron sword"},
+  {"id":"old_tom","model":"farmer","at":[0,-2],"facing":"s","role":"quest_giver","personality":"a worried old shepherd.",
+   "backstory":"Tom has kept sheep in Brackenford for forty years.","knows":["Three sheep went missing this week.","The wolf den is in the hollow past the north pasture."],
+   "inventory":{"gold":20,"items":["shepherd's crook"]}},
+  {"id":"pip","model":"villager","at":[0,4],"facing":"n","role":"villager","personality":"a cheeky twelve-year-old who wants adventure."}],
+ "goal":{"text":"Talk to the villagers.","maxTurns":10}}

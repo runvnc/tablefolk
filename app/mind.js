@@ -88,16 +88,52 @@
     const m = mindOf(g), cfg = getBrainConfig(g.id);
     return new Set(words([m.heard || '', cfg.goal || '', cfg.quest || ''].join(' ')));
   }
-  function score(e, ctx, now) { return e.w * .5 + overlap(e.text, ctx) * 2 + 1.5 / (1 + (now - e.turn) / 6); }
+  // Meaning (embed.js, EmbeddingGemma): how close each memory or fact is to
+  // what was just said, worked out in prepare() before the turn. Raw
+  // cosines bunch together (0.6-0.8 for everything), so each is scored
+  // against the others: standard deviations above the mean (z). Measured:
+  // "Is there any trouble around here?" -> "Three sheep went missing" z 2.2;
+  // "How do you feel about me?" -> "Ana attacked you" 1.3, "gave you 10 gold" 1.6.
+  const simOf = (m, t) => { const z = m.sim?.map.get(t); return z == null ? 0 : Math.max(0, z - .5) * 2.5; };
+  const query = (g, m) => { const cfg = getBrainConfig(g.id); return [m.heard || '', cfg.goal || '', cfg.quest || ''].join(' ').trim(); };
+  const ownFacts = g => { const cfg = getBrainConfig(g.id); return (Array.isArray(cfg.knows) ? cfg.knows : []).map(String); };
+  const loreFacts = () => (Array.isArray(state.lore) ? state.lore : []).map(String);
+  async function prepare(g) {
+    const E = window.tablefolkEmbed; if (!E || E.state === 'off') return;
+    if (E.state !== 'ready') { E.start(); return; }
+    const m = mindOf(g), q = query(g, m);
+    if (!q) { m.sim = null; return; }
+    if (m.sim?.q === q && m.sim.n === m.mem.length) return;
+    const texts = [...new Set([...m.mem.map(e => e.text), ...ownFacts(g), ...loreFacts()])];
+    try {
+      const cos = await E.similar(q, texts); if (!cos) { m.sim = null; return; }
+      const v = [...cos.values()], mu = v.reduce((a, b) => a + b, 0) / v.length;
+      const sd = Math.max(.02, Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / v.length));
+      const map = new Map(); for (const [t, c] of cos) map.set(t, v.length < 3 ? (c - .62) / .05 : (c - mu) / sd);
+      m.sim = { q, n: m.mem.length, map };
+    } catch (e) { console.warn('[mind] embed', e); }
+  }
+  function score(e, ctx, now, m) { return e.w * .5 + overlap(e.text, ctx) * 2 + simOf(m, e.text) + 1.5 / (1 + (now - e.turn) / 6); }
   function recall(g, n = 3) {
     const m = mindOf(g), ctx = context(g);
-    return m.mem.map(e => ({ e, s: score(e, ctx, m.turn) })).sort((a, b) => b.s - a.s).slice(0, n).map(x => x.e)
+    return m.mem.map(e => ({ e, s: score(e, ctx, m.turn, m) })).sort((a, b) => b.s - a.s).slice(0, n).map(x => x.e)
       .sort((a, b) => a.turn - b.turn).map(e => e.text);
   }
-  function facts(g, n = 2) {
-    const cfg = getBrainConfig(g.id), ctx = context(g);
-    const all = [...(Array.isArray(cfg.knows) ? cfg.knows : []), ...(Array.isArray(state.lore) ? state.lore : [])].map(String);
-    return all.map(t => ({ t, s: overlap(t, ctx) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, n).map(x => x.t);
+  // What it knows: its own facts ("knows") always, the most relevant first;
+  // then world lore that fits what was said, or, when none does, one piece
+  // in turn so it has something true to talk about (an innkeeper asked for
+  // news made up gossip while the village lore went unused).
+  function facts(g, n = 4) {
+    const m = mindOf(g), ctx = context(g), rel = t => overlap(t, ctx) * 2 + simOf(m, t);
+    const own = ownFacts(g).map(t => ({ t, s: rel(t) })).sort((a, b) => b.s - a.s).slice(0, 3).map(x => x.t);
+    const lore = loreFacts().filter(t => !own.includes(t)), room = Math.max(1, n - own.length);
+    // a short lore list is shown whole, best first (for a vague "any trouble
+    // around here?" the vectors barely tell three facts apart)
+    const raw = t => overlap(t, ctx) * 2 + (m.sim?.map.get(t) ?? 0);
+    if (lore.length <= 3) return [...own, ...lore.slice().sort((a, b) => raw(b) - raw(a))];
+    const fit = lore.map(t => ({ t, s: rel(t) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, room).map(x => x.t);
+    if (!fit.length) fit.push(m.sim ? lore.slice().sort((a, b) => raw(b) - raw(a))[0] : lore[(m.turn || 0) % lore.length]);
+    return [...own, ...fit];
   }
 
   // ---- mood ----
@@ -263,5 +299,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { prepare, event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

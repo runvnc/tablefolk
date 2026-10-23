@@ -366,6 +366,13 @@ function buildAgentMessages(world, g, cfg) {
     // and forget the rest of its brief (a password it should react to with
     // give()). The system prompt already lists the commands.
     chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.map(e => '- ' + e).join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
+    // skills' urgent cues (trade: what this offer means) right after the words
+    const urgent = window.tablefolkSkills?.urgentLines?.(g) || [];
+    if (urgent.length) chatSuffix += '\n\n' + urgent.map(l => '-> ' + l).join('\n');
+    // The player is right there: a 2B model sometimes talked about "Ana over
+    // there" to Ana.
+    const pn = world.playerName?.() || document.getElementById('chatName')?.value.trim();
+    if (pn && speech.includes(`[${pn}]`)) chatSuffix += `\n(${pn} is standing with you and talking to you: answer ${pn} directly, as "you".)`;
     cfg.pendingChat = [];
     world.setBrainConfig(g.id, cfg);
   }
@@ -628,6 +635,9 @@ async function main() {
           messages.push({ role: 'user', content: 'respond' });
         }
       } else {
+        // mind.js + embed.js: score memories and facts by meaning against what
+        // was just said (at most 2.5 s; keyword-only if the model isn't ready)
+        await Promise.race([window.tablefolkMind?.prepare?.(g), new Promise(r => setTimeout(r, 2500))]).catch(() => {});
         const built = buildAgentMessages(world, g, cfg);
         messages = built.messages;
         chatSuffix = built.chatSuffix;
@@ -713,6 +723,8 @@ async function main() {
         const p = world.parseLLMCommandLine(l);
         // say(Ana, "hello"): the name is who it is talking to, not speech
         if (p?.kind === 'say') { const m = String(p.text).match(/^[A-Za-z][\w ]{0,20},\s*["\u201c](.+?)["\u201d]?$/); if (m) p.text = m[1]; }
+        // say(give_quest(find the sheep)): a command wrapped in say() is run, not spoken
+        if (p?.kind === 'say') { const m = String(p.text).trim().match(/^(\w+)\((.*)\)$/s); if (m && m[1] !== 'say' && others.includes(m[1])) { const q = world.parseLLMCommandLine(m[0]); if (q) { histParts[histParts.length - 1] = m[0]; return [q]; } } }
         return p ? [p] : [];
       });
       // Echo guard: a say() that only repeats what was just said to it is

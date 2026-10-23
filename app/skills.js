@@ -111,7 +111,12 @@
   // State-card lines a skill names ("card": ["wares", "offer"]): providers
   // from the game (trade.js adds wares and offer) or the skill's own module.
   const cards = {};
-  function cardLines(g) {
+  // Lines starting with "!" are urgent ("Ana offers 45 gold: enough, sell it
+  // now"): urgentLines() gives them for the very end of the prompt, after
+  // the words they answer, where a 2B model pays most attention.
+  const cardLines = g => allCardLines(g).filter(l => !l.startsWith('!'));
+  const urgentLines = g => allCardLines(g).filter(l => l.startsWith('!')).map(l => l.slice(1).trim());
+  function allCardLines(g) {
     const out = [], data = store(g);
     for (const m of skillsOf(g)) for (const name of m.card || []) {
       const fn = m.api?.cards?.[name] || cards[name];
@@ -227,6 +232,13 @@
     if ((d.cooldown[key] || 0) > 0) return fail(g, `${name} ${key} isn't ready yet (${d.cooldown[key]} more turns)`);
     for (const [res, n] of Object.entries(entry.cost || {})) if ((d.state[res] ?? 0) < n) return fail(g, `${name} failed: not enough ${res} (${d.state[res] ?? 0}/${n})`);
     for (const it of [].concat(entry.needs || [])) { const inv = isPlayer(g) ? state.player.items : getBrainConfig(g.id).inventory?.items; if (!findItem(inv || [], it)) return fail(g, `${name} failed: needs ${it}`); }
+    // "limit": don't make more of what it gives while it already has that many
+    // (a smith forged a second dagger it didn't need, using up its iron)
+    if (entry.limit) {
+      const inv = isPlayer(g) ? state.player.items : getBrainConfig(g.id).inventory?.items;
+      for (const e of entry.effects || []) if (e.give && (findItem(inv || [], String(e.give))?.qty ?? 0) >= entry.limit)
+        return fail(g, `${name} ${key}: ${nameOf(g)} already has ${e.give} ready; sell or give that one instead`);
+    }
     for (const [res, n] of Object.entries(entry.cost || {})) d.state[res] -= n;
     if (entry.cooldown) d.cooldown[key] = +entry.cooldown;
     if (tgt.who && tgt.who !== g) { try { setCharacterFacing(g, V3(posOf(tgt.who).x - me.x, 0, posOf(tgt.who).z - me.z).normalize()); } catch {} }
@@ -264,5 +276,5 @@
   }
 
   function api() { return { state, narrate, findTarget, combat: window.tablefolkCombat, say, log, getBrainConfig, setBrainConfig, effects: EFFECTS }; }
-  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
+  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, urgentLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
 })();

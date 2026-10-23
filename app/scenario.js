@@ -904,7 +904,7 @@
     }
   }
   // Hit points for monsters without "hp" (combat.js NATURAL has their damage).
-  const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, orc: 10, demon: 14, giant: 18, dragon: 24 };
+  const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24 };
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
     const base = normalizeScenario(input);
@@ -940,6 +940,7 @@
     w.setLighting?.(scn.dark ? 'dim' : scn.lighting);
     const hasTorch = (scn.player?.items || []).some(i => /torch/i.test(i?.name || i));
     w.setPlayer(scn.dark && !hasTorch ? { ...scn.player, items: [...(scn.player?.items || []), 'torch'] } : scn.player);
+    w.state.player.quests = [];   // give_quest (app.js)
     if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 20); window.tablefolkCombat.reset(); }
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));

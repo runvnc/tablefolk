@@ -29,7 +29,17 @@
   }
   // The lowest price sell() accepts (null: no rule).
   function floor(g, item) { return priceOf(g, item)?.low ?? null; }
-  const wares = g => (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0);
+  // What it sells: what it carries, except the materials its own skills use
+  // up (a smith's iron bars), unless they have a price.
+  function materials(g) {
+    const out = new Set();
+    for (const m of window.tablefolkSkills?.skillsOf(g) || []) for (const c of Object.values(m.commands || {})) {
+      const table = c.variants ? m[c.variants] || {} : { x: c };
+      for (const e of Object.values(table)) for (const n of [].concat(e.needs || [])) out.add(String(n).toLowerCase());
+    }
+    return out;
+  }
+  const wares = g => { const mat = materials(g); return (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0 && (!mat.has(i.name.toLowerCase()) || priceOf(g, i.name))); };
   function waresLine(g) {
     const list = wares(g); if (!list.length) return 'You have nothing left to sell.';
     return 'You sell: ' + list.map(i => {
@@ -67,9 +77,9 @@
     // "yes" to the price it named itself
     if (amt == null && YES.test(heard) && st.quoted?.item === item) amt = st.quoted.price;
     if (amt == null) return p ? `They are asking about the ${item}: it is ${p.ask} gold.` : `They are asking about the ${item}.`;
-    if (!p) return `${who} offers ${amt} gold for the ${item}. If that is fair, sell it now: sell(${item}, ${amt}).`;
-    if (amt >= p.low) return `${who} offers ${amt} gold for the ${item}: that is enough. Sell it now: sell(${item}, ${amt}).`;
-    return `${who} offers ${amt} gold for the ${item}: too little (you never go under ${p.low}). Refuse, or ask for more.`;
+    if (!p) return `!${who} offers ${amt} gold for the ${item}. If that is fair, answer with say(...) and sell it on the next line: sell(${item}, ${amt}).`;
+    if (amt >= p.low) return `!${who} offers ${amt} gold for the ${item}: that is enough. Answer with say(...) and sell it on the next line: sell(${item}, ${amt}).`;
+    return `!${who} offers ${amt} gold for the ${item}: too little (you never go under ${p.low}). Refuse, or ask for more.`;
   }
   // Remember the price a seller named, so a plain "yes" can be read as accepting it.
   window.addEventListener('tablefolk-say', e => {

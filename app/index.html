@@ -316,6 +316,11 @@
         <label class="spawn-mode-toggle"><input id="gfxSeaFoamEnabled" type="checkbox" checked /> shoreline foam ribbons</label>
       </div>
       <small class="pane-note">Both rebuild geometry on the CPU every frame. Foam is the cheaper/less-noticeable of the two if you just want to shave a little cost.</small>
+      <div class="section-subtitle">Characters' memory</div>
+      <div class="custom-grid">
+        <label class="spawn-mode-toggle"><input id="embedEnabled" type="checkbox" checked /> smart memory (EmbeddingGemma 2, 175 MB once)</label>
+      </div>
+      <small class="pane-note" id="embedStatus">Characters recall what they know by meaning, not only by matching words ("where should I look?" finds "the wolf den is in the hollow"). Runs in the browser; off: keyword matching only.</small>
       <button id="gfxResetDefaults" type="button" class="danger-btn">reset graphics settings to defaults</button>
     </section>
 
@@ -380,6 +385,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261024b"></script>
+  <script src="preflight.js?v=20261024j"></script>
 </body>
 </html>
