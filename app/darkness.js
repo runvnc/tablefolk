@@ -16,6 +16,7 @@
  *   window.tablefolkDark.start(on)   scenario.js, at each scenario start
  *   window.tablefolkDark.setFog(on)  turn the fog off and on (?nofog=1: off)
  *   window.tablefolkDark.visible(x, z)
+ *   window.tablefolkDark.sightFor(g)  squares character g sees (its prompt)
  * Loaded after app.js and uses its helpers (state, meta, canSeeCell,
  * gridKey, charInventory, addLampPool); off in tabletop mode.
  */
@@ -71,19 +72,31 @@
     }
     return out;
   }
-  function compute() {
-    const me = state.playerAvatar, vis = new Set(); if (!me) return vis;
-    const p = posOf(me), [px, pz] = cellOf(p), opaque = opaqueAround(p.x, p.z), lights = lightSources(), b = board();
+  // The squares g sees: in line of sight within VIEW (all round, not only
+  // ahead), and in a dark scenario also lit (or right next to g).
+  function sight(g, needLight) {
+    const vis = new Set(); if (!g?.root && !g?.logicalPos) return vis;
+    const p = posOf(g), [px, pz] = cellOf(p), opaque = opaqueAround(p.x, p.z), lights = needLight ? lightSources() : null, b = board();
     for (let i = 0; i < b.cols; i++) for (let j = 0; j < b.rows; j++) {
       const x = Math.round(b.x0 + i), z = Math.round(b.z0 + j), d = Math.hypot(x - px, z - pz);
       if (d > VIEW) continue;
       if (d > NEAR) {
         if (!canSeeCell(px, pz, x, z, opaque)) continue;
-        if (!lights.some(L => Math.hypot(L.x - x, L.z - z) <= L.r && canSeeCell(Math.round(L.x), Math.round(L.z), x, z, opaque))) continue;
+        if (lights && !lights.some(L => Math.hypot(L.x - x, L.z - z) <= L.r && canSeeCell(Math.round(L.x), Math.round(L.z), x, z, opaque))) continue;
       }
       vis.add(x + ',' + z);
     }
     return vis;
+  }
+  const compute = () => sight(state.playerAvatar, true);
+  // What a character sees, for its prompt (senses.js, app.js perception);
+  // kept until the current task ends, so one prompt build computes it once.
+  let sightCache = null;
+  function sightFor(g) {
+    if (!g || !(g.logicalPos || g.root)) return null;
+    if (!sightCache) { sightCache = new Map(); setTimeout(() => { sightCache = null; }, 0); }
+    if (!sightCache.has(g)) sightCache.set(g, sight(g, dark));
+    return sightCache.get(g);
   }
 
   // ---- the fog: black boxes over unexplored squares, dim ones over the rest ----
@@ -204,5 +217,5 @@
   }
   function setFog(on) { fogOn = !!on; if (fogOn) update(true); else clearFog(); }
   window.addEventListener('tablefolk-inventory', () => setTimeout(tick, 0));
-  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), get on() { return dark && fogOn; }, carriesTorch };
+  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), get on() { return dark && fogOn; }, carriesTorch, sightFor };
 })();

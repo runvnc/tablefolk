@@ -263,7 +263,14 @@ campfire, standing `torch` or candles, or of a carried torch (3.6 squares), or
 right next to the player. Squares seen before stay, dimmed, and characters on
 them are hidden until seen again. Anyone with a `torch` in their inventory
 carries it lit in the left hand; the player starts with one. `?nofog=1` turns
-the fog off (testing); the tabletop map never has it. Anything the scenario sets itself wins. The
+the fog off (testing); the tabletop map never has it.
+
+**What characters see** (their prompt): the same rule from where they stand,
+all round (not only the way they face), up to 13 squares: line of sight
+always (so nobody sees into or out of a building through its walls), and in a
+`dark` scenario only lit squares (or right next to them). Their object list
+leaves out walls and keeps at most three of each kind of thing (four doors),
+sixteen in all, nearest first. Anything the scenario sets itself wins. The
 link keeps the short form, and the same seed gives the same map.
 
 - Dungeon: BSP rooms, a spanning tree of L-shaped corridors plus a loop or two,

@@ -3267,7 +3267,8 @@ function stateMarksFor(metaObj, mesh){
   let out='';
   const st=metaObj.state||'intact';
   if(st==='burned' || st==='fire') out+='!';
-  if(st==='cracked' || (metaObj.health!==undefined && metaObj.health<=1 && st!=='broken')) out+='#';
+  // damage() sets 'cracked'; health alone isn't a sign (fences start at 1)
+  if(st==='cracked') out+='#';
   if(st==='broken') out+='x';
   if(metaObj.soft || st==='glowing') out+='*';
   try{
@@ -3305,6 +3306,17 @@ function fullMapBounds(cx,cz){
   return { x0:Math.min(-WORLD.halfW-3,cx-1), x1:Math.max(WORLD.halfW+3,cx+1),
            z0:Math.min(-WORLD.halfH-2,cz-1), z1:Math.max(WORLD.halfH+2,cz+1) };
 }
+// The object list, nearest first and short: everyone in sight, then at most
+// three of each kind of thing (four doors), sixteen things in all.
+function shortList(details){
+  const per=new Map(), out=[]; let n=0;
+  for(const e of details.sort((p,q)=>p.d-q.d)){
+    if(!e.type){ out.push(e); continue; }
+    const c=per.get(e.type)||0; if(c>=(e.type==='door'?4:3) || n>=16) continue;
+    per.set(e.type,c+1); n++; out.push(e);
+  }
+  return out;
+}
 function buildVisiblePerception(agentId=null,radius=7){
   const g=agentId ? state.characters.find(x=>x.id===agentId) : (state.selected||state.characters[0]);
   if(!g) return 'No agent selected.';
@@ -3313,7 +3325,11 @@ function buildVisiblePerception(agentId=null,radius=7){
   const opaque=FULL_MAP_VISION ? null : opaqueCells();
   const facingName=facingNameFromDir(g.dir);
   const B=FULL_MAP_VISION ? fullMapBounds(cx,cz) : {x0:cx-radius,x1:cx+radius,z0:cz-radius,z1:cz+radius};
-  const sees=(x,z)=>FULL_MAP_VISION ||
+  // What it sees (darkness.js): line of sight all round, and light in dark
+  // scenarios. Not the way it faces: small models lose track of things just
+  // to their side.
+  const sight=window.tablefolkDark?.sightFor?.(g);
+  const sees=(x,z)=>sight ? sight.has(x+','+z) : FULL_MAP_VISION ||
     (Math.abs(x-cx)<=radius && Math.abs(z-cz)<=radius && isWithinFacingVision(g,cx,cz,x,z,radius) && canSeeCell(cx,cz,x,z,opaque));
   state.perceptionLabels=new Map();
   const cells=new Map(); const details=[];
@@ -3332,12 +3348,15 @@ function buildVisiblePerception(agentId=null,radius=7){
     const mm=meta(m); if(!mm || mm.type==='tile' || mm.decor) continue;
     const glyph=typeGlyph(mm.type), marks=stateMarksFor(mm,m);
     put(x,z,glyph,marks,55);
+    // Walls are on the map and in "Around you"; listing each one only buries
+    // the things worth noticing.
+    if(mm.type==='wall') continue;
     // Every non-terrain item rendered in the ASCII map gets an absolute
     // coordinate entry. Interactive items also expose the same ID as a target.
     const id=(glyph.replace(/[^A-Za-z$/*]/g,'O')||'O')+objectNumber++;
     // Walking accepts every label shown on the map, not only touchable items.
     state.perceptionLabels.set(id.toLowerCase(),m); state.perceptionLabels.set(id,m);
-    details.push({d:Math.hypot(x-cx,z-cz), text:describeThing(id,mm.type,p,marks, mm.state&&mm.state!=='intact'?`, state=${mm.state}`:'')});
+    details.push({d:Math.hypot(x-cx,z-cz), type:mm.type, text:describeThing(id,mm.type,p,marks, mm.state&&mm.state!=='intact'?`, state=${mm.state}`:'')});
   }
   for(const other of state.characters){
     const p=other.root.position; const x=Math.round(p.x), z=Math.round(p.z);
@@ -3409,7 +3428,7 @@ function buildVisiblePerception(agentId=null,radius=7){
   const showMap = document.getElementById('showAsciiMap')?.checked !== false;
   return [
     `Agent perception for ${g.id}`,
-    `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${FULL_MAP_VISION?(mapCropped()?'View: the area around you':'View: whole map'):'Radius: '+radius}`,
+    `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${sight?'View: what you can see from here':FULL_MAP_VISION?(mapCropped()?'View: the area around you':'View: whole map'):'Radius: '+radius}`,
     `Holding: ${held ? (heldMeta?.type||held.name) : 'none'}  Target: ${target ? (targetMeta?.type||target.name)+' at ('+Math.round(target.position.x)+','+Math.round(target.position.z)+')' : 'none'}`,
     // Relative descriptions (senses.js) read far better for small models than the map.
     ...(window.tablefolkSenses ? ['', ...window.tablefolkSenses.placeLine(g), ...window.tablefolkSenses.aroundLines(g)] : []),
@@ -3417,7 +3436,7 @@ function buildVisiblePerception(agentId=null,radius=7){
     ...(showMap ? [`North-up ${mapCols}x${mapRows} map (left=W, right=E; N=-Z, E=-X). Each row shows absolute z:`, ...compassRows, ''] : []),
     details.length ? 'Nearby visible objects:' : 'Nearby visible objects: none',
     // Nearest first, so the cap only drops far-away things.
-    ...details.sort((p,q)=>p.d-q.d).slice(0,FULL_MAP_VISION?48:24).map(e=>e.text),
+    ...shortList(details).map(e=>e.text),
     '',
     ...(showMap ? legend : []),
   ].join('\n');

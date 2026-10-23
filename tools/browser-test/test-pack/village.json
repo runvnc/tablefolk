@@ -1,0 +1,3 @@
+{"title":"Mill Hollow","generate":{"kind":"village","buildings":6,"seed":3},
+ "player":{"name":"Hero"},
+ "agents":[{"id":"mara","model":"peasant_woman","personality":"a kind innkeeper","in":"tavern"},{"id":"tobin","model":"woodsman","personality":"a gruff smith","in":"smithy"},{"id":"pip","model":"peasant","personality":"a curious boy","in":"square"}]}
