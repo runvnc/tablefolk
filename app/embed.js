@@ -6,7 +6,8 @@
  * look?" finds "The wolf den is in the hollow past the north pasture" though
  * they share no words.
  *
- * Loads the first time a character takes a turn (not in ?art=1), unless the
+ * Runs on WebGPU (?embed=wasm: on the CPU, a 314 MB int8 file). Loads the first time a
+ * character takes a turn (not in ?art=1), unless the
  * Graphics pane's "smart memory" box is off (localStorage tablefolkEmbed=off).
  * Until it is ready, recall is keyword-only.
  *
@@ -28,7 +29,7 @@
     if (off()) { api.state = 'off'; return Promise.resolve(false); }
     api.state = 'loading';
     ready = new Promise(resolve => {
-      worker = new Worker(new URL('embed-worker.js?v=20261024a', location.href), { type: 'module' });
+      worker = new Worker(new URL('embed-worker.js?v=20261024c', location.href), { type: 'module' });
       let toasted = false;
       worker.onmessage = e => {
         const d = e.data;
@@ -38,7 +39,7 @@
         const w = waiting.get(d.id); if (w) { waiting.delete(d.id); d.error ? w.reject(new Error(d.error)) : w.resolve(d.vectors); }
       };
       worker.onerror = e => { api.state = 'error'; console.warn('[embed] worker failed', e.message); resolve(false); };
-      worker.postMessage({ type: 'load' });
+      worker.postMessage({ type: 'load', device: new URLSearchParams(location.search).get('embed') });
     });
     return ready;
   }

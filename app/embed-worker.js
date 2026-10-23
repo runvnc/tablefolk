@@ -7,11 +7,13 @@ import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers
 const MODEL = 'onnx-community/embeddinggemma-2-ONNX', DIM = 256;
 let extractor = null;
 
-async function load() {
+async function load(want) {
   const progress = p => { if (p.status === 'progress' && p.file?.endsWith('.onnx_data')) postMessage({ type: 'progress', loaded: p.loaded, total: p.total }); };
-  for (const device of (self.navigator?.gpu ? ['webgpu', 'wasm'] : ['wasm'])) {
+  // WebGPU (q4, 174 MB) unless ?embed=wasm; the CPU needs the int8 file
+  // (314 MB: WASM has no GatherBlockQuantized for q4).
+  for (const device of (want !== 'wasm' && self.navigator?.gpu ? ['webgpu', 'wasm'] : ['wasm'])) {
     try {
-      extractor = await pipeline('feature-extraction', MODEL, { device, dtype: 'q4', progress_callback: progress });
+      extractor = await pipeline('feature-extraction', MODEL, { device, dtype: device === 'wasm' ? 'quantized' : 'q4', progress_callback: progress });
       await extractor(['title: none | text: warm up'], { pooling: 'mean', normalize: true });
       postMessage({ type: 'ready', device });
       return;
@@ -31,7 +33,7 @@ function shrink(row) {
 
 self.onmessage = async e => {
   const d = e.data;
-  if (d.type === 'load') return load();
+  if (d.type === 'load') return load(d.device);
   if (!extractor) return postMessage({ id: d.id, error: 'not loaded' });
   try {
     const out = await extractor(d.texts, { pooling: 'mean', normalize: true });

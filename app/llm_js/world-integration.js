@@ -723,6 +723,13 @@ async function main() {
         const p = world.parseLLMCommandLine(l);
         // say(Ana, "hello"): the name is who it is talking to, not speech
         if (p?.kind === 'say') { const m = String(p.text).match(/^[A-Za-z][\w ]{0,20},\s*["\u201c](.+?)["\u201d]?$/); if (m) p.text = m[1]; }
+        // Long speeches (four sentences of gossip) are cut to the first three
+        // sentences, at most about 260 characters: slow to read and to hear.
+        if (p?.kind === 'say' && String(p.text).length > 260) {
+          const parts = String(p.text).match(/[^.!?]+[.!?]+["')\]]*\s*/g) || [String(p.text)];
+          let t = ''; for (const x of parts) { if (t && (t + x).length > 260) break; t += x; if (t.split(/[.!?]+/).length > 3) break; }
+          p.text = (t || String(p.text).slice(0, 260)).trim();
+        }
         // say(give_quest(find the sheep)): a command wrapped in say() is run, not spoken
         if (p?.kind === 'say') { const m = String(p.text).trim().match(/^(\w+)\((.*)\)$/s); if (m && m[1] !== 'say' && others.includes(m[1])) { const q = world.parseLLMCommandLine(m[0]); if (q) { histParts[histParts.length - 1] = m[0]; return [q]; } } }
         return p ? [p] : [];
