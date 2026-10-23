@@ -243,6 +243,7 @@
     const cfg = getBrainConfig(c.id);
     cfg.inventory = inv;
     cfg.pendingChat = (cfg.pendingChat || []).concat([`(${who} gives you ${given}.)`]).slice(-5);
+    window.tablefolkMind?.event(c, 'given', { who, what: given });
     setBrainConfig(c.id, cfg);
     emitBadge(c, '+' + given.replace(/^the /, ''));
     note(`${who} gives ${c.id} ${given}`);
@@ -431,5 +432,5 @@
     }, 700);
   });
 
-  window.tablefolkPlay = { remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, fighterTurn, get busy() { return busy; } };
+  window.tablefolkPlay = { giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, fighterTurn, get busy() { return busy; } };
 })();

@@ -325,6 +325,7 @@ function overhear(world, g, who, text) {
   }
 }
 
+const HISTORY_KEEP = 12;
 function buildAgentMessages(world, g, cfg) {
   const { systemMessage, commandReminder } = world.buildAgentPrompt(g, cfg);
   const messages = [{ role: 'system', content: systemMessage }];
@@ -337,7 +338,10 @@ function buildAgentMessages(world, g, cfg) {
     messages.push({ role: 'user', content: 'God says: Are you ready my son?' });
     messages.push({ role: 'assistant', content: 'say("Yes I am ready")' });
   }
-  for (const m of hist) {
+  // Only the recent exchange: what matters for longer (feelings, memories,
+  // goal) is in the state card (mind.js), so a small model isn't asked to
+  // dig it out of a long history.
+  for (const m of hist.slice(-HISTORY_KEEP)) {
     const last = messages[messages.length - 1];
     if (last && last.role === m.role) {
       last.content += '\n' + m.content;
@@ -347,16 +351,21 @@ function buildAgentMessages(world, g, cfg) {
   }
   let chatSuffix = '';
   if (cfg.pendingChat && cfg.pendingChat.length > 0) {
+    // Things that happened ("[event] Ana attacks you", "(Ana gives you 5
+    // gold.)") are told apart from what was said: under one "speech"
+    // heading a punch read like a greeting.
+    const isEvent = line => /^\s*(\[event\]|\()/.test(String(line));
+    const events = cfg.pendingChat.filter(isEvent).map(l => String(l).replace(/^\s*\[event\]\s*/, '').replace(/^\((.*)\)$/, '$1'));
     // Convert 'God says: <text>' -> '[God] <text>' so the model has no 'says'
     // pattern to echo back (small models echo the prompt format).
-    const speech = cfg.pendingChat.map(line => {
+    const speech = cfg.pendingChat.filter(l => !isEvent(l)).map(line => {
       const m = String(line).match(/^(.+?)\s+says:\s*(.*)$/);
       return m ? `[${m[1].trim()}] ${m[2]}` : line;
     }).join('\n');
     // No "answer with say()" here: pointing the model at say() made it talk
     // and forget the rest of its brief (a password it should react to with
     // give()). The system prompt already lists the commands.
-    chatSuffix = '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech;
+    chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
     cfg.pendingChat = [];
     world.setBrainConfig(g.id, cfg);
   }

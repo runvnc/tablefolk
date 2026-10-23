@@ -420,7 +420,7 @@ code, so a link can't run script):
 | `object_near` | `["barrel", "house", 2]`, or `["barrel", "campfire", 2, 2]` for "at least 2 barrels" |
 | `object_count` | `["barrel", "<", 3]` |
 | `prop_state` | `["crate", "burned"]` (any crate) |
-| `said` | `["mog", "deal"]` (case-insensitive substring; `"any"` for anyone) |
+| `said` | `["mog", "deal"]` (spoken words, case-insensitive substring; `"any"` for anyone) |
 | `turns_over` | `12` (a turn is one character reply, however many commands it runs) |
 | combinators | `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` |
 

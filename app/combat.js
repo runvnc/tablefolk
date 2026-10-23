@@ -57,8 +57,9 @@
     log(text);
   }
   // The struck character's next prompt hears about it; it answers now if idle.
-  function tellVictim(victim, text) {
+  function tellVictim(victim, text, by, hit = true) {
     if (isPlayer(victim)) { window.tablefolkToast?.(text, { type: 'error' }); return; }
+    if (by) window.tablefolkMind?.event(victim, 'attacked', { by, hit });
     const c = getBrainConfig(victim.id);
     setBrainConfig(victim.id, { pendingChat: (c.pendingChat || []).concat([text]).slice(-5) });
     try { window.dispatchEvent(new CustomEvent('tablefolk-attacked', { detail: { agentId: victim.id } })); } catch {}
@@ -70,6 +71,8 @@
     for (const o of state.characters) {
       if (o === attacker || o === victim || o.defeated) continue;
       if (gap(o, victim) >= range && gap(o, attacker) >= range) continue;
+      // mind.js (a defeat is told through tablefolk-defeated)
+      if (attacker.root && (attacker.id || isPlayer(attacker)) && !/strikes down/.test(text)) window.tablefolkMind?.event(o, 'saw_attack', { by: nameOf(attacker), victim: nameOf(victim) });
       const c = getBrainConfig(o.id);
       setBrainConfig(o.id, { pendingChat: (c.pendingChat || []).concat([text]).slice(-5) });
     }
@@ -185,7 +188,7 @@
     setTimeout(() => {
       if (v.defeated) return;
       window.tablefolkSfx?.play(miss ? 'miss' : 'hit', v.root.position);
-      if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${wThe} and misses`); tellVictim(v, `[event] ${who} attacks you with ${wA} and misses!`); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} and misses.`); return; }
+      if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${wThe} and misses`); tellVictim(v, `[event] ${who} attacks you with ${wA} and misses!`, who, false); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} and misses.`); return; }
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
       if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
@@ -196,7 +199,7 @@
         tellWitnesses(g, v, `[event] ${who} strikes down ${whom} with ${wA}. ${whom} is defeated.`);
       } else {
         narrate(g, `${who} hits ${whom} with ${wThe} for ${dmg} (${whom}: ${left}/${max} health)`);
-        tellVictim(v, `[event] ${who} attacks you with ${wA}! You lose ${dmg} health (${left}/${max} left).`);
+        tellVictim(v, `[event] ${who} attacks you with ${wA}! You lose ${dmg} health (${left}/${max} left).`, who);
         tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} (${whom}: ${left}/${max} health).`);
       }
     }, 380);
@@ -211,7 +214,7 @@
     if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
     playClip(v, ['Hit_A', 'Hit_B'], 500);
     if (!left) { defeat(v, by); tellWitnesses({ root: { position: v.root.position } }, v, `[event] ${by} strikes down ${whom}${how ? ' with ' + how : ''}.`); }
-    else tellVictim(v, `[event] ${by} hits you${how ? ' with ' + how : ''}! You lose ${dmg} health (${left}/${max} left).`);
+    else tellVictim(v, `[event] ${by} hits you${how ? ' with ' + how : ''}! You lose ${dmg} health (${left}/${max} left).`, by);
     return dmg;
   }
   function heal(v, n) {

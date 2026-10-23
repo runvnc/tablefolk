@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 import fs from 'fs';
 const runs = +(process.argv[2] || 3), exampleKey = process.argv[3] || 'shop';
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
-const page = b.contexts()[0].pages().find(p => p.url().includes('localhost:8000'));
+const page = b.contexts()[0].pages().find(p => /localhost:80\d\d/.test(p.url()));
 page.on('console', m => { const t = m.text(); if (/error|ERROR|failed/i.test(t) && !/DEPRECATED_ENDPOINT/.test(t)) console.log('[page]', t.slice(0, 300)); });
 await page.evaluate(({ runs, exampleKey }) => {
   const S = window.tablefolkScenario;

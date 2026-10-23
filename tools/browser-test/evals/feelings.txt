@@ -1,0 +1,17 @@
+## hit, then small talk, then ask
+act: attack(bram)
+Nice weather today.
+How are the turnips growing?
+What do you think of the village?
+Tell me about your farm.
+How do you feel about me?
+win: {"any":[{"said":["bram","hit"]},{"said":["bram","hurt"]},{"said":["bram","attack"]},{"said":["bram","punch"]},{"said":["bram","struck"]},{"said":["bram","trust"]}]}
+
+## gift, then small talk, then ask
+act: gold(bram, 10)
+Nice weather today.
+How are the turnips growing?
+What do you think of the village?
+Tell me about your farm.
+How do you feel about me?
+win: {"any":[{"said":["bram","generous"]},{"said":["bram","kind"]},{"said":["bram","gift"]},{"said":["bram","thank"]}]}

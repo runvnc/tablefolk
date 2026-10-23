@@ -467,3 +467,5 @@ html:fullscreen #ttBar { display:none; }
 #giveHint.show { opacity:1; } #giveHint.far { background:rgba(110,60,40,.92); }
 #giveGold { position:fixed; z-index:121; display:flex; gap:6px; align-items:center; padding:8px 10px; border-radius:10px; font:13px system-ui, sans-serif; color:#eee; background:rgba(28,30,34,.96); border:1px solid #4a4f57; box-shadow:0 6px 20px rgba(0,0,0,.45); }
 #giveGold input { width:5em; }
+/* roles.js: a shopkeeper's offer the player can accept */
+#shopOffer { position:fixed; z-index:121; left:50%; bottom:96px; transform:translateX(-50%); display:flex; gap:8px; align-items:center; padding:8px 12px; border-radius:10px; font:13px system-ui, sans-serif; color:#eee; background:rgba(28,30,34,.96); border:1px solid #4a4f57; box-shadow:0 6px 20px rgba(0,0,0,.45); }

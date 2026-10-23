@@ -2,7 +2,7 @@
 // (where the exact prompt sent to the model is logged). Usage: node workerlog.mjs "<js>"
 import { chromium } from 'playwright-core';
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
-const page = b.contexts()[0].pages().find(p => p.url().includes('localhost:8000'));
+const page = b.contexts()[0].pages().find(p => /localhost:80\d\d/.test(p.url()));
 const lines = [];
 const hook = w => w.on('console', m => { const t = m.text(); if (/SENDING PROMPT/.test(t)) lines.push(m); });
 page.workers().forEach(hook); page.on('worker', hook);

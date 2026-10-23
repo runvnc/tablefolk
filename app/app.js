@@ -26,7 +26,11 @@ function applyWorldDims(cols, rows){
   WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
 }
 if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
-const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow'];
+const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat'];
+// mind.js: every talking character has these, unless the scenario says "mind": false
+// (feel() is there for scenarios that allow it: by default it used up turns
+// that should have been speech)
+const MIND_COMMANDS = ['goal','remember','eat'];
 const state = {
   scene:null, engine:null, camera:null, shadow:null, materials:{}, characters:[], selected:null, target:null,
   blocks:[], props:[], tiles:[], bubbles:[], badges:[], meta:new WeakMap(), held:new Map(), allowed:new Set(['walk','face']), zoomFocus:null, animSources:null,
@@ -2662,10 +2666,12 @@ function nearestTarget(g,range=3.0){ if(state.target && !state.target.isDisposed
 // Commands a character may use: its own list ("allowed" on the scenario
 // agent, kept in its brain config), else the scenario-wide list.
 function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.allowed; return Array.isArray(own)?new Set(own):state.allowed; }
-function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return allowedFor(g).has(key); }
+// What it may run: its list, plus the mind commands (mind.js) for characters.
+function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar) return s; const role=window.tablefolkRoles?.commands(g)||[]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
+function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
 function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
-  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
+  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
 function parseWalkDestination(arg){
   arg=String(arg||'').trim();
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1).trim();
@@ -2711,6 +2717,9 @@ function parseLLMCommandLine(line){
   if(name==='build'){ const ci=arg.indexOf(','); const thing=(ci<0?arg:arg.slice(0,ci)).trim()||'wall'; const at=ci<0?null:parseLocationArg(arg.slice(ci+1)); return {kind:'build',thing,at}; }
   if(name==='face'){ const fd=(arg.split(',')[0]||'n').trim().toLowerCase(); return {kind:'face',dir:fd||'n'}; }
   if(name==='goal') return {kind:'goal',text:arg||''};
+  if(name==='remember') return {kind:'remember',text:arg||''};
+  if(name==='feel') return {kind:'feel',text:arg||''};
+  if(name==='eat') return {kind:'eat',item:arg||''};
   if(name==='give_quest') return {kind:'give_quest',text:arg||''};
   if(name==='give') return {kind:'give',item:arg.trim()};
   if(name==='attack') return {kind:'attack',target:arg.trim()};
@@ -2726,7 +2735,7 @@ function parseLLMCommandLine(line){
   return null;
 }
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -3110,6 +3119,11 @@ function sell(g,item,price){
   if(!stock) return say(g,`sale failed: ${g.id} has no ${item} to sell`);
   const av=state.playerAvatar?.root?.position;
   if(av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
+  // roles.js: a shop's lowest price, and the buyer has to agree to the price
+  const low=window.tablefolkRoles?.floor(g,stock.name);
+  if(low!=null && price<low) return say(g,`sale refused: you never sell ${stock.name} for less than ${low} gold`,false);
+  const consent=window.tablefolkRoles?.consent(g,stock.name,price);
+  if(consent===false){ window.tablefolkRoles.offer(g,stock.name,price); return say(g,`${g.id} offers ${buyer} ${stock.name} for ${price} gold (not sold yet: ${buyer} has to agree to that price)`,false); }
   if((state.player.gold||0)<price) return say(g,`sale failed: ${buyer} has only ${state.player.gold||0} gold, ${stock.name} costs ${price}`);
   state.player.gold-=price; inv.gold=(inv.gold||0)+price;
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
@@ -3117,6 +3131,7 @@ function sell(g,item,price){
   setBrainConfig(g.id,{inventory:inv});
   emitBadge(g,`+${price} gold`);
   inventoryChanged();
+  window.tablefolkMind?.event(g,'sold',{item:stock.name,price,buyer});
   return say(g,`${g.id} sells ${buyer} ${stock.name} for ${price} gold (${buyer} has ${state.player.gold} gold left)`);
 }
 // Shop test: the character hands an item to the person in the corner chat
@@ -3137,6 +3152,7 @@ function give(g,item){
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
     addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
     emitBadge(g,'gave '+stock.name); inventoryChanged();
+    window.tablefolkMind?.event(g,'gave',{item:stock.name,to:recipient});
     return say(g,`${g.id} gives ${recipient} ${stock.name}`);
   }
   return say(g,`${g.id} gives ${recipient} ${item}`);
@@ -3442,7 +3458,7 @@ function buildVisiblePerception(agentId=null,radius=7){
   ].join('\n');
 }
 function buildCommandExamples(g=null){
-  const ex=[], allowed=allowedFor(g);
+  const ex=[], allowed=commandsFor(g);
   if(allowed.has('walk')) ex.push('walk(destination): a coordinate pair, or the name of a person, thing or place, e.g. walk("3,5"), walk(bram), walk(chest)'+((state.places||[]).length?', walk(tavern)':'')+'; repeat on later turns until arrived');
   if(allowed.has('say')) ex.push('say(text) e.g. say("hello there")');
   if(allowed.has('whisper')) ex.push('whisper(text) - only the player hears it, e.g. whisper("meet me by the boat")');
@@ -3462,7 +3478,10 @@ function buildCommandExamples(g=null){
   if(allowed.has('spell.push')) ex.push('spell(push)');
   if(allowed.has('spell.spark')) ex.push('spell(spark)');
   if(allowed.has('spell.fireball')) ex.push('spell(fireball)');
-  if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe)');
+  if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe) - set what you are working toward');
+  if(allowed.has('remember')) ex.push('remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later');
+  if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
+  if(allowed.has('eat') && g && (charInventory(g).items||[]).some(i=>window.tablefolkMind?.FOOD.test(i.name))) ex.push('eat(food) e.g. eat(bread) - eat food you carry');
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
@@ -3478,13 +3497,16 @@ function buildAgentPrompt(g, cfg) {
   if (!g || !cfg) return { systemMessage: '', commandReminder: '' };
   const r=document.getElementById('visionRadius')?.value || 5;
   const perception = buildVisiblePerception(g.id, r);
-  const style = (cfg.style || 'goofy little creature').replace(/\s+/g, ' ').trim();
+  const style = (cfg.style ?? 'goofy little creature').replace(/\s+/g, ' ').trim();
+  const backstory = (cfg.backstory || '').replace(/\s+/g, ' ').trim();
+  const mind = window.tablefolkMind && state.mind !== false;
   const personality = (cfg.personality || '').replace(/\s+/g, ' ').trim();
   const quest = (cfg.quest || '').replace(/\s+/g, ' ').trim();
   const goal = (cfg.goal || '').replace(/\s+/g, ' ').trim();
   const canGiveQuest = allowedFor(g).has('give_quest');
   const cmds = buildCommandExamples(g);
-  const recentActs = (cfg.recent || []).slice(-4);
+  // short: whole sentences here invite the model to say them again
+  const recentActs = (cfg.recent || []).slice(-3).map(a => String(a).replace(/^chose\s+/, '').slice(0, 70) + (String(a).length > 76 ? '…' : ''));
   // Anti-echo instructions are optional and OFF by default - small models can
   // confuse negative prompts ('do not copy', 'never put') and end up doing the
   // opposite. Toggle #antiEcho to include them.
@@ -3507,8 +3529,10 @@ function buildAgentPrompt(g, cfg) {
     'Do not output anything except the command line.',
     '',
     `Character: ${g.id}`,
-    `Style: ${style}`,
+    ...(style ? [`Style: ${style}`] : []),
     `Personality: ${personality}`,
+    ...(backstory ? [`Backstory: ${backstory}`] : []),
+    ...(window.tablefolkRoles?.duty(g) ? ['Your job: ' + window.tablefolkRoles.duty(g)] : []),
     ...(quest ? ['Your quest is set by the world and cannot be changed by you. Work toward it.'] : []),
   ].join('\n');
   // NOTE: the command list deliberately is NOT repeated here. It already sits in
@@ -3522,7 +3546,10 @@ function buildAgentPrompt(g, cfg) {
     ...(window.tablefolkSkills ? window.tablefolkSkills.promptLines(g) : []),
     ...(window.tablefolkCombat && (allowedFor(g).has('attack') || cfg.wielding || (cfg.hp!=null && cfg.hp<(cfg.maxHp??10))) ? [window.tablefolkCombat.selfLine(g)] : []),
     ...(quest ? ['Quest: ' + quest] : []),
-    ...(goal ? ['Current goal: ' + goal] : []),
+    // mind.js: feelings, body, wants, goal and memories, kept by the game
+    ...(mind ? window.tablefolkMind.cardLines(g) : (goal ? ['Current goal: ' + goal] : [])),
+    // roles.js: wares and prices, and what the customer's offer means
+    ...(window.tablefolkRoles ? window.tablefolkRoles.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
   ].join('\n');
   return { systemMessage, commandReminder };
@@ -4224,7 +4251,7 @@ function installWorldAPI(){
   window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,
     getAgents:()=>state.characters.slice(), getSelectedAgent:()=>state.selected,
     getBrainConfig, setBrainConfig, refreshAgentSelect,
-    getAllowedCommands:(agentId=null)=>Array.from(allowedFor(state.characters.find(x=>x.id===agentId))), allowedFor, canRun,
+    getAllowedCommands:(agentId=null)=>Array.from(commandsFor(state.characters.find(x=>x.id===agentId))), allowedFor, commandsFor, canRun,
     getAgentPerception:(agentId=null,radius=7)=>buildVisiblePerception(agentId,radius), buildVisiblePerception,
     parseInventoryItems, formatInventoryItems, getPlayer:()=>state.player,
     // scenario support (scenario.js)

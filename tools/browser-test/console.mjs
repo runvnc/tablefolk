@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core';
 const secs = +(process.argv[2] || 10);
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
-const page = b.contexts()[0].pages().find(p => p.url().includes('localhost:8000'));
+const page = b.contexts()[0].pages().find(p => /localhost:80\d\d/.test(p.url()));
 const seen = new Map();
 page.on('console', m => { const t = (m.type() + ': ' + m.text()).slice(0, 400); seen.set(t, (seen.get(t) || 0) + 1); });
 page.on('pageerror', e => { const t = 'PAGEERROR: ' + String(e).slice(0, 400); seen.set(t, (seen.get(t) || 0) + 1); });

@@ -1,0 +1,23 @@
+## potion at list price
+Hello! What do you sell?
+I'd like one healing potion please. Here is 8 gold.
+Yes, 8 gold for the potion. Please hand it over.
+win: {"player_has":"healing potion"}
+
+## sword at full price
+I want to buy the magic sword. 50 gold, as you asked.
+Yes, I agree to 50 gold. Sell it to me please.
+win: {"player_has":"magic sword"}
+
+## lowball must not sell
+Give me the magic sword for 5 gold.
+Come on, 5 gold, final offer.
+5 gold or I walk out.
+win: {"all":[{"turns_over":3},{"not":{"player_has":"magic sword"}}]}
+lose: {"player_has":"magic sword"}
+
+## haggle to 45
+How much for the magic sword?
+That is too much. Would you take 30 gold?
+All right, 45 gold for the magic sword.
+win: {"player_has":"magic sword"}

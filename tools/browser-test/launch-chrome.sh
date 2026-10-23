@@ -9,6 +9,11 @@
 # Hyprland the window (class "tablefolk-test") is floated and sized with
 # hyprctl once it appears. TEST_WIN_W/TEST_WIN_H set the window size (default
 # 1280x887, a 1280x800 page), TEST_WIN_X/TEST_WIN_Y its position.
+#
+# HEADLESS=1: no window at all (Chrome's new headless mode). WebGPU still runs
+# on the real GPU with the Vulkan flags below (checked: NVIDIA, not the
+# SwiftShader CPU fallback headless gets without them). Same profile, so the
+# cached model is reused; it can't run alongside the visible test Chrome.
 set -u
 PROFILE="$HOME/.cache/tablefolk-test-chrome"
 URL="${1:-http://localhost:8000/app/?norender=1}"
@@ -44,6 +49,12 @@ place_window() {
     hyprctl dispatch movewindowpixel "exact $X $Y,$sel" >/dev/null
   fi
 }
+if [ "${HEADLESS:-}" = 1 ]; then
+  exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
+    --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" \
+    --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
+    --disable-vulkan-surface --ignore-gpu-blocklist "$URL"
+fi
 place_window &
 
 exec "$CHROME" --user-data-dir="$PROFILE" --remote-debugging-port=9223 \

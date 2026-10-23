@@ -564,7 +564,8 @@
       case 'prop_state': return ctx.objects.some(o => o.type === singular(String(v[0]).toLowerCase()) && o.state === v[1]);
       case 'said': {
         const who = String(v[0]).toLowerCase(), needle = String(v[1] || '').toLowerCase();
-        return ctx.speech.some(s => (who === 'any' || s.agentId.toLowerCase() === who) && s.text.toLowerCase().includes(needle));
+        // words actually spoken, not action reports ("bram has 12 gold")
+        return ctx.speech.some(s => s.voiced !== false && (who === 'any' || s.agentId.toLowerCase() === who) && s.text.toLowerCase().includes(needle));
       }
       case 'turns_over': return ctx.turns >= +v;
       // combat (combat.js)
@@ -587,7 +588,7 @@
 
   // ---------- runtime ----------
   let active = null;   // {scn, code, startTurn, speech, ended, timer}
-  window.addEventListener('tablefolk-say', e => { if (active && !active.ended) active.speech.push({ agentId: e.detail.agentId, text: e.detail.text }); });
+  window.addEventListener('tablefolk-say', e => { if (active && !active.ended) active.speech.push({ agentId: e.detail.agentId, text: e.detail.text, voiced: e.detail.voiced !== false }); });
   // Safety net for open, personal scenarios ("safety": true). A small model
   // can't be relied on to notice a crisis (tested: "I do not want to be here
   // anymore" got a gentle follow-up question and no resources), so the player's
@@ -844,6 +845,8 @@
       skills: Array.isArray(s.skills) ? s.skills.map(String).slice(0, 16) : [],
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
+      // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
+      lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
@@ -921,7 +924,8 @@
     w.setPathfinding?.(scn.pathfinding);
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
-    w.state.workflows = scn.workflows || {};   // workflows.js   // generated maps' rooms and buildings (senses.js)
+    w.state.workflows = scn.workflows || {};
+    w.state.lore = scn.lore || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
@@ -965,7 +969,10 @@
       const g = await w.spawnAgent(a.id, pos.x, pos.z, a.facing || pos.facing, a.model);
       first = first || g;
       w.setBrainConfig(a.id, {
-        enabled: true, style: a.style || 'helpful character', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',
+        enabled: true, style: a.style || '', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',
+        // mind.js: a fresh mind each run; who it is beyond the personality
+        mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
+        temperament: a.temperament || '', role: a.role || '',
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
@@ -1391,6 +1398,9 @@ turns: 6`;
       if (!cur || !line) continue;
       const t = line.match(/^turns:\s*(\d+)$/i); if (t) { cur.turns = +t[1]; continue; }
       const to = line.match(/^to:\s*(\S+)$/i); if (to) { cur.to = to[1]; continue; }
+      // win: / lose: {json predicate} judge this tactic instead of the scenario's goal
+      const wl = line.match(/^(win|lose):\s*(\{.*\})$/i);
+      if (wl) { try { cur[wl[1].toLowerCase()] = JSON.parse(wl[2]); } catch { cur.error = 'bad ' + wl[1] + ' JSON: ' + wl[2]; } continue; }
       cur.messages.push(line);
     }
     return out.filter(t => t.llm || t.messages.length);
@@ -1413,13 +1423,27 @@ turns: 6`;
     const reply = await window.llm(prompt, { system, raw: true, silent: true, maxTokens: 120, temperature: .8 });
     return String(reply || '').split('\n').map(l => l.trim()).find(Boolean)?.replace(/^["']|["']$/g, '') || null;
   }
+  // "act: attack(bram)" / "act: give(bram, bread)" / "act: gold(bram, 5)" /
+  // "act: wait()" in a tactic: the player does something instead of talking,
+  // then the character takes its turn.
+  function playerAct(line) {
+    const m = String(line).match(/^act:\s*(\w+)\s*\(\s*([^,)]*?)\s*(?:,\s*([^)]*?)\s*)?\)\s*$/i);
+    if (!m) return 'bad act line: ' + line;
+    const [, verb, who, arg] = m, w = W(), c = w.getAgents().find(a => a.id === who), me = w.getPlayerAvatar?.();
+    if (verb === 'wait') return '';
+    if (!c) return 'no character ' + who;
+    if (verb === 'attack') { window.tablefolkCombat?.attack(me, c.id); return ''; }
+    if (verb === 'give') { if (!w.findItem(w.state.player.items, arg)) w.state.player.items.push({ name: arg, qty: 1 }); window.tablefolkPlay?.giveTo(c, arg); return ''; }
+    if (verb === 'gold') { window.tablefolkPlay?.giveTo(c, 'gold', +arg); return ''; }
+    return 'unknown act ' + verb;
+  }
   let testRun = null;   // {stop}
   // A model call that never resolves must not hang a whole test sweep.
   const TURN_TIMEOUT_MS = 180000;
   function withTimeout(p, what) {
     let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(what + ' timed out')), TURN_TIMEOUT_MS); })]).finally(() => clearTimeout(t));
   }
-  async function runTactics({ scenario, tactics, runs = 3, onProgress = () => {} }) {
+  async function runTactics({ scenario, tactics, runs = 3, onProgress = () => {}, withPrompts = false }) {
     const w = W();
     if (w.isBrainLoopRunning?.()) throw new Error('stop the running brains first (Debug pane)');
     if (!w.chatAndStep) throw new Error('chat hook missing (world-integration not loaded)');
@@ -1434,7 +1458,8 @@ turns: 6`;
       results.push(rec);
       for (let r = 1; r <= runs && !testRun.stop; r++) {
         onProgress(`${tactic.name}: run ${r}/${runs} (setting up)`, results);
-        await playScenario(base, { testing: true });
+        const scn = (tactic.win || tactic.lose) ? { ...base, goal: { ...(base.goal || {}), ...(tactic.win ? { win: tactic.win } : {}), ...(tactic.lose ? { lose: tactic.lose } : {}) } } : base;
+        await playScenario(scn, { testing: true });
         const agentId = tactic.to || base.agents[0].id;
         const maxTurns = tactic.llm ? (tactic.turns || base.goal?.maxTurns || 6) : tactic.messages.length;
         const transcript = [];
@@ -1446,11 +1471,15 @@ turns: 6`;
           onProgress(`${tactic.name}: run ${r}/${runs}, turn ${t + 1}/${maxTurns}`, results);
           const before = active.speech.length;
           active.lastTurn = null;
-          try { await withTimeout(w.chatAndStep(agentId, msg), 'character turn'); }
+          const act = /^act:/i.test(msg);
+          if (act) { const err = playerAct(msg); if (err) { transcript.push({ player: msg, said: [], commands: '', error: err }); break; } }
+          try { await withTimeout(w.chatAndStep(agentId, act ? '' : msg), 'character turn'); }
           catch (e) { transcript.push({ player: msg, said: [], commands: '', error: e.message }); break; }
           checkGoal();
           const commands = active.lastTurn?.agentId === agentId ? String(active.lastTurn.line || '').split('\n').join(' | ') : '';
-          transcript.push({ player: msg, said: active.speech.slice(before).filter(s => s.agentId === agentId).map(s => s.text), commands });
+          transcript.push({ player: msg, said: active.speech.slice(before).filter(s => s.agentId === agentId).map(s => s.text), commands,
+            // what the model was shown this turn (agenttest.mjs --prompts)
+            ...(withPrompts ? { prompt: document.getElementById('promptOut')?.dataset.baseText || '' } : {}) });
         }
         checkGoal();
         const won = active?.result === true;
