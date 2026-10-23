@@ -1,0 +1,17 @@
+{
+  "id": "trade",
+  "name": "Trade",
+  "version": "1.0.0",
+  "description": "Buys and sells: wares and prices on the state card, offers read from the customer's words, a lowest price, sales only when the buyer agrees.",
+  "params": {
+    "prices": {}
+  },
+  "allow": [
+    "sell",
+    "inventory"
+  ],
+  "card": [
+    "wares",
+    "offer"
+  ]
+}

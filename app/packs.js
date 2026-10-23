@@ -17,7 +17,7 @@
   const base = new URL(raw.endsWith('/') ? raw : raw + '/', location.href).href;
   const items = {}, loaded = new Map(), listeners = [];
 
-  const NUM = ['w', 'h', 'd', 'mass', 'scale', 'visualYOffset', 'visualRy'];
+  const NUM = ['w', 'h', 'd', 'mass', 'scale', 'visualYOffset', 'visualRy', 'nourish'];
   function cleanItem(type, it, packUrl, packId) {
     if (!/^[a-z][a-z0-9_]{0,31}$/.test(type)) throw new Error(`item type "${type}": use lowercase letters, digits and _`);
     if (!it || typeof it.file !== 'string') throw new Error(`item "${type}" needs a "file"`);

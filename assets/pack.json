@@ -592,8 +592,10 @@
       "flammable": true,
       "tags": [
         "fantasy",
-        "village"
-      ]
+        "village",
+        "food"
+      ],
+      "nourish": 0.5
     },
     "statue": {
       "file": "models/props/village/statue.glb",

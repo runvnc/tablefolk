@@ -36,29 +36,24 @@
  */
 (function () {
   const reg = new Map();          // id -> manifest (+ .api from a module)
-  const BASE = new URL('../skills/', location.href).href;
-  const trusted = () => new URLSearchParams(location.search).has('trustSkills');
-
-  function urlFor(ref) {
-    const r = String(ref).trim();
-    if (/^https?:\/\//.test(r)) return r.endsWith('.json') ? r : r.replace(/\/?$/, '/skill.json');
-    if (r.startsWith('npm:')) return `https://cdn.jsdelivr.net/npm/${r.slice(4).replace(/\/$/, '')}/skill.json`;
-    if (r.startsWith('gh:')) { const m = r.slice(3).match(/^([^/]+\/[^@/]+)(?:@([^/]+))?(\/.*)?$/); if (m) return `https://cdn.jsdelivr.net/gh/${m[1]}@${m[2] || 'main'}${m[3] || ''}/skill.json`; }
-    return BASE + encodeURIComponent(r.replace(/[^A-Za-z0-9_-]/g, '')) + '/skill.json';
-  }
+  const urlFor = ref => window.tablefolkPackages.refUrl(ref, 'skill');
   async function loadOne(ref) {
     const url = urlFor(ref);
     for (const m of reg.values()) if (m._url === url) return m;
     const r = await fetch(url);
     if (!r.ok) throw new Error(`skill ${ref}: ${r.status} at ${url}`);
-    const m = await r.json();
-    if (!m.id) throw new Error(`skill ${ref}: manifest has no "id"`);
+    return register(await r.json(), url, ref);
+  }
+  // Add a skill manifest (fetched, or inline in a package).
+  async function register(m, url = '', ref = m?.id) {
+    if (!m || !m.id) throw new Error(`skill ${ref}: manifest has no "id"`);
     m._url = url; m._ref = String(ref);
     if (m.module) {
-      const mod = new URL(m.module, url);
-      if (mod.origin === location.origin || trusted()) {
+      const mod = new URL(m.module, url || location.href);
+      if (window.tablefolkPackages.trusted(mod.href)) {
         try { const x = await import(mod.href); m.api = (x.default || x.register)?.(api()) || {}; }
         catch (e) { console.warn('skill module failed', m.id, e); }
+        for (const [name, b] of Object.entries(m.api?.behaviours || {})) window.tablefolkRoles?.addBehaviour(name, b);
       } else console.warn(`skill ${m.id}: code module from ${mod.origin} not loaded (open with ?trustSkills=1 to allow)`);
     }
     reg.set(m.id, m);
@@ -112,6 +107,21 @@
     }
     return out;
   }
+  // State-card lines a skill names ("card": ["wares", "offer"]): providers
+  // from the game (trade.js adds wares and offer) or the skill's own module.
+  const cards = {};
+  function cardLines(g) {
+    const out = [], data = store(g);
+    for (const m of skillsOf(g)) for (const name of m.card || []) {
+      const fn = m.api?.cards?.[name] || cards[name];
+      if (!fn) continue;
+      try { const r = fn(g, data[m.id] || {}); for (const l of [].concat(r || [])) if (l) out.push(String(l)); } catch (e) { console.warn('skill card', m.id, name, e); }
+    }
+    return out;
+  }
+  // The game's own commands a skill unlocks ("allow": ["sell", "inventory"]).
+  const allowedBy = g => skillsOf(g).flatMap(m => m.allow || []);
+  const has = (g, id) => skillsOf(g).some(m => m.id === id);
   function commandFor(g, name) {
     for (const m of skillsOf(g)) if (m.commands?.[name]) return { m, c: m.commands[name] };
     return null;
@@ -253,5 +263,5 @@
   }
 
   function api() { return { state, narrate, findTarget, combat: window.tablefolkCombat, say, log, getBrainConfig, setBrainConfig, effects: EFFECTS }; }
-  window.tablefolkSkills = { load, loadOne, grant, skillsOf, promptLines, commandLines, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
+  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, allowedBy, cards, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
 })();

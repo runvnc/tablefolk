@@ -847,6 +847,8 @@
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
+      // extra things characters can eat (names, or { name, nourish })
+      food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
@@ -925,7 +927,7 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
-    w.state.lore = scn.lore || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
+    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
@@ -961,8 +963,12 @@
     backToWalls([...scn.objects, ...plan.objects], existing);
     for (const o of scn.objects) w.makeObject(o.type, +o.x, +o.z, o);
     for (const o of plan.objects) w.makeObject(o.type, o.x, o.z, o);
-    // Skills (skills.js): fetch every manifest the scenario names first.
-    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load(scn) : [];
+    // Roles (roles.js) and skills (skills.js): fetch every manifest the
+    // scenario names first. A role brings its skills, so agents are read
+    // with their role's skills added.
+    const roleWarnings = window.tablefolkRoles ? await window.tablefolkRoles.load(scn) : [];
+    const withRole = a => window.tablefolkRoles ? window.tablefolkRoles.withRole(a) : a;
+    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: scn.agents.map(withRole) }) : [];
     let first = null;
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
@@ -972,7 +978,7 @@
         enabled: true, style: a.style || '', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',
         // mind.js: a fresh mind each run; who it is beyond the personality
         mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
-        temperament: a.temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
+        temperament: withRole(a).temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
@@ -1017,7 +1023,7 @@
       window.tablefolkCombat.renderPlayerHp();
     }
     if (window.tablefolkSkills) {
-      for (const a of scn.agents) { const g = w.getAgents().find(x => x.id === a.id); if (g) window.tablefolkSkills.grant(g, a.skills || [], a.skillParams || {}); }
+      for (const a0 of scn.agents) { const a = withRole(a0), g = w.getAgents().find(x => x.id === a.id); if (g) window.tablefolkSkills.grant(g, a.skills || [], a.skillParams || {}); }
       const av = w.getPlayerAvatar?.(); if (av) window.tablefolkSkills.grant(av, scn.player?.skills || [], scn.player?.skillParams || {});
     }
     // Characters that live in a routine from the start ("workflow": "patrol").
@@ -1025,7 +1031,7 @@
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
-    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...skillWarnings);
+    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...roleWarnings, ...skillWarnings);
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}

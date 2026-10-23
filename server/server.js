@@ -124,6 +124,16 @@ async function listSkills() {
   return Response.json({ skills: out });
 }
 
+async function listRoles() {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const out = [];
+  for (const d of readdirSync(join(ROOT, 'roles'), { withFileTypes: true })) {
+    if (!d.isDirectory()) continue;
+    try { const m = JSON.parse(readFileSync(join(ROOT, 'roles', d.name, 'role.json'), 'utf8')); out.push({ ref: d.name, id: m.id, name: m.name, version: m.version, description: m.description, skills: m.skills || [], commands: m.commands || [] }); } catch {}
+  }
+  return Response.json({ roles: out });
+}
+
 const server = Bun.serve({
   port, hostname: config.host, idleTimeout: 255,
   async fetch(req) {
@@ -136,6 +146,7 @@ const server = Bun.serve({
     if (p === '/api/revise') return handleRevise(req, url);
     if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
     if (p === '/api/skills') return listSkills();
+    if (p === '/api/roles') return listRoles();
     if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url, { saved: url.searchParams.get('edit') ? savedWorld(req, url.searchParams.get('edit')) : null });
     if (p === '/admin' || p === '/admin/' || p.startsWith('/api/admin/') || p === '/api/voices') return handleAdmin(req, url);
     if (p === '/api/status') return Response.json({

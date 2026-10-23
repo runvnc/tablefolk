@@ -1,0 +1,15 @@
+{
+  "id": "innkeeper",
+  "name": "Innkeeper",
+  "version": "1.0.0",
+  "description": "Keeps the inn: sells food, drink and beds, and passes on gossip.",
+  "duty": "You keep the inn. Welcome guests, sell food, drink and beds with sell(item, price), and pass on the local gossip.",
+  "commands": [
+    "say",
+    "give",
+    "inventory"
+  ],
+  "skills": [
+    "trade"
+  ]
+}

@@ -2670,7 +2670,7 @@ function nearestTarget(g,range=3.0){ if(state.target && !state.target.isDisposed
 // agent, kept in its brain config), else the scenario-wide list.
 function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.allowed; return Array.isArray(own)?new Set(own):state.allowed; }
 // What it may run: its list, plus the mind commands (mind.js) for characters.
-function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar) return s; const role=window.tablefolkRoles?.commands(g)||[]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
+function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
 function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
@@ -3122,11 +3122,11 @@ function sell(g,item,price){
   if(!stock) return say(g,`sale failed: ${g.id} has no ${item} to sell`);
   const av=state.playerAvatar?.root?.position;
   if(av && Math.hypot(av.x-g.root.position.x,av.z-g.root.position.z)>GIVE_RANGE) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
-  // roles.js: a shop's lowest price, and the buyer has to agree to the price
-  const low=window.tablefolkRoles?.floor(g,stock.name);
+  // trade.js: the lowest price, and the buyer has to agree to the price
+  const low=window.tablefolkTrade?.floor(g,stock.name);
   if(low!=null && price<low) return say(g,`sale refused: you never sell ${stock.name} for less than ${low} gold`,false);
-  const consent=window.tablefolkRoles?.consent(g,stock.name,price);
-  if(consent===false){ window.tablefolkRoles.offer(g,stock.name,price); return say(g,`${g.id} offers ${buyer} ${stock.name} for ${price} gold (not sold yet: ${buyer} has to agree to that price)`,false); }
+  const consent=window.tablefolkTrade?.consent(g,stock.name,price);
+  if(consent===false){ window.tablefolkTrade.offer(g,stock.name,price); return say(g,`${g.id} offers ${buyer} ${stock.name} for ${price} gold (not sold yet: ${buyer} has to agree to that price)`,false); }
   if((state.player.gold||0)<price) return say(g,`sale failed: ${buyer} has only ${state.player.gold||0} gold, ${stock.name} costs ${price}`);
   state.player.gold-=price; inv.gold=(inv.gold||0)+price;
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
@@ -3484,7 +3484,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe) - set what you are working toward');
   if(allowed.has('remember')) ex.push('remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later');
   if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
-  if(allowed.has('eat') && g && (charInventory(g).items||[]).some(i=>window.tablefolkMind?.FOOD.test(i.name))) ex.push('eat(food) e.g. eat(bread) - eat food you carry');
+  if(allowed.has('eat') && g && (charInventory(g).items||[]).some(i=>window.tablefolkMind?.isFood(i.name))) ex.push('eat(food) e.g. eat(bread) - eat food you carry');
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
@@ -3551,8 +3551,8 @@ function buildAgentPrompt(g, cfg) {
     ...(quest ? ['Quest: ' + quest] : []),
     // mind.js: feelings, body, wants, goal and memories, kept by the game
     ...(mind ? window.tablefolkMind.cardLines(g) : (goal ? ['Current goal: ' + goal] : [])),
-    // roles.js: wares and prices, and what the customer's offer means
-    ...(window.tablefolkRoles ? window.tablefolkRoles.cardLines(g) : []),
+    // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
+    ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
   ].join('\n');
   return { systemMessage, commandReminder };

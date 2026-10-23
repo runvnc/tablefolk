@@ -33,6 +33,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "packs": ["https://example.com/my-pack/pack.json"],    // optional extra asset packs (section 4c)
   "lore": ["The mill burned down last winter."],         // world facts characters may bring up (docs/MINDS.md)
   "needs": true,                                         // hunger and tiredness (false: off); "mind": false turns the whole mind off
+  "food": ["mushroom stew", { "name": "elf bread", "nourish": 0.9 }],   // more things characters can eat (besides everyday food and pack items tagged "food")
   "player": { "name": "Traveller", "gold": 20, "items": [] }, // + "avatar": false, "at": [x, z], "model": any agent model (default rogue)
   "allowed": ["say", "sell", "inventory", "emote"],      // default commands for every character
   "agents": [{
@@ -45,8 +46,8 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
     "hostile": false,                 // optional: true fights the player with a built-in routine (no LLM)
     "style": "calm, kind woman",      // optional: what the character is, for its prompt
     "inventory": { "gold": 0, "items": [{ "name": "magic sword", "qty": 1 }] },
-    "role": "shopkeeper",             // optional job (docs/MINDS.md): shopkeeper innkeeper guard quest_giver companion villager
-    "prices": { "magic sword": [50, 40], "healing potion": 8 },   // a seller's asking price, or [asking, lowest]
+    "role": "shopkeeper",             // optional job: a role.json package (docs/SKILLS.md "Roles"); built in: shopkeeper innkeeper guard quest_giver companion villager
+    "prices": { "magic sword": [50, 40], "healing potion": 8 },   // a seller's asking price, or [asking, lowest] (the trade skill)
     "backstory": "Mog lost a leg to a troll and never forgave adventurers.",  // optional, always in its prompt
     "knows": ["The old well is dry.", "Bram owes Mog 3 gold."],              // facts it brings up when relevant
     "temperament": "brave",           // optional: brave | timid | calm (how it takes being attacked); else guessed

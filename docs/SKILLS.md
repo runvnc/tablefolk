@@ -49,7 +49,9 @@ unless the page is opened with `?trustSkills=1`.
 - The Bun server lists the built-in skills at `/api/skills`.
 
 Built in: `magic` (cast: spark, fireball, heal, light, push, frost; mana),
-`healing` (bandage; bandages), `thievery` (steal), `bard` (sing; code module).
+`healing` (bandage; bandages), `thievery` (steal), `bard` (sing; code module),
+`trade` (selling: wares and prices on the state card, offers read from the
+customer's words, a lowest price, sales only when the buyer agrees).
 Example: `scenarios/skills-demo.json`.
 
 ## Writing a skill
@@ -74,6 +76,12 @@ Example: `scenarios/skills-demo.json`.
 }
 ```
 
+- `allow`: the game's own commands the skill unlocks (`"allow": ["sell",
+  "inventory"]` for trade).
+- `card`: state-card lines, by name, rebuilt every turn: providers from the
+  game (`wares`, `offer` from `app/trade.js`) or the skill's module
+  (`cards: { name(g, data) { return 'a line' } }`).
+- `behaviours`: code-run routines by name (see Roles below), e.g. `follow`.
 - `params`: per-character settings (a scenario overrides them with
   `skillParams`; a number param with the same name as a state value sets it,
   and its max).
@@ -107,6 +115,42 @@ export default function (api) {   // api: state, narrate, findTarget, combat, sa
 
 A command handler replaces the declarative run for that command; an effect
 can be used in any entry's `effects`. See `skills/bard/`.
+
+## Roles
+
+A role is a job template: a `role.json` package named the same ways
+(`roles/<name>/role.json` on this site, a URL, `npm:`, `gh:`). It gives a
+character a duty line ("Your job: ..."), commands, skills and code-run
+behaviours, so an author writes `"role": "shopkeeper"` and nothing else.
+The server lists the built-in ones at `/api/roles`.
+
+```json
+{
+  "id": "shopkeeper", "name": "Shopkeeper", "version": "1.0.0",
+  "description": "Runs a shop: sells its wares at its prices.",
+  "duty": "You run a shop. Greet customers, say what you sell ...",
+  "commands": ["say", "inventory"],
+  "skills": ["trade"],
+  "skillParams": { "trade": { "prices": { "bread": 2 } } },
+  "temperament": "gruff",
+  "behaviours": []
+}
+```
+
+- `duty`: `{player}` becomes the player's name.
+- `skills` / `skillParams`: skills it brings, with defaults; the agent's own
+  `skills` are added and its `skillParams` win.
+- `temperament`: used when the agent names none (mind.js).
+- `behaviours`: routines run by code with no model call. Built in: `follow`
+  (keeps up with the player after each move; the `companion` role). A skill
+  module adds more with `behaviours: { name: { on: 'tablefolk-player-turn',
+  run(g) {} } }`.
+
+Built in: `shopkeeper` and `innkeeper` (trade), `guard`, `quest_giver`,
+`companion` (follow), `villager`.
+
+Roles, skills and asset packs are the three kinds of shareable package:
+what a character's job is, what it can do, and what things look like.
 
 ## Publishing
 

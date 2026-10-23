@@ -1,0 +1,15 @@
+{
+  "id": "companion",
+  "name": "Companion",
+  "version": "1.0.0",
+  "description": "Travels with the player: keeps up (run by code), helps, talks about what it sees.",
+  "duty": "You travel with {player}. Stay close, help when you can, and talk about what you see.",
+  "commands": [
+    "say",
+    "walk",
+    "attack"
+  ],
+  "behaviours": [
+    "follow"
+  ]
+}

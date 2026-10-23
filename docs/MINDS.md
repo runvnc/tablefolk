@@ -127,10 +127,16 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
   turn only when spoken to, when something happened to them, when a want is
   pressing, every other round on a goal, else every fifth round;
   `state.idleTurnEvery` changes that).
-- `app/roles.js`: the six roles, wares and prices on the card, offers read
+- `app/roles.js` (now `roles/*/role.json` and `app/trade.js`): the six roles, wares and prices on the card, offers read
   from the player's words, a lowest price in `sell()`, and sales that need
   the buyer's agreement (for every seller, role or not): otherwise
   `sell()` makes an offer, and the player gets a buy / no thanks card.
+- Roles are packages now (`roles/<name>/role.json`, loadable by URL, npm or
+  GitHub like skills, docs/SKILLS.md), and selling is the `trade` skill
+  (`skills/trade/skill.json`, rules in `app/trade.js`): any character with
+  it shows its wares and reads offers, not only a shopkeeper. Food comes
+  from asset packs too (items tagged `food`, with `nourish`) and a
+  scenario's `food` list.
 - Prompts: events ("Ana attacks you") are told under WHAT JUST HAPPENED,
   apart from speech; history trimmed to the last 12 messages; "Your last few
   turns" shortened; no more default "Style: helpful character" for scenario

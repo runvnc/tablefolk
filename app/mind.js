@@ -31,6 +31,18 @@
   const MOODS = ['joy', 'fear', 'anger', 'sadness'];
   const UNDEAD = /skeleton|zombie|ghost|slime/i;
   const FOOD = /\b(bread|apple|turnip|cheese|meat|stew|pie|fish|carrot|potato|soup|meal|berr(y|ies)|egg|cake|ham|sausage|onion|cabbage|pear|plum|grapes?|nuts?|jerky|ration|biscuit|porridge|mushroom|roll|pastry|honey)s?\b/i;
+  // Food: anything tagged "food" in a loaded asset pack (its "nourish", 0..1,
+  // says how much hunger it takes away), a scenario's "food" list, or the
+  // everyday words above. Returns how much it nourishes (0: not food).
+  function isFood(name) {
+    const n = String(name || '').toLowerCase().trim(), type = n.replace(/\s+/g, '_');
+    const items = window.tablefolkPacks?.items || {};
+    const it = items[type] || Object.values(items).find(i => i.aliases?.includes(type));
+    if (it?.tags?.includes('food')) return it.nourish ?? .6;
+    const own = (state.food || []).find(f => n === String(f.name ?? f).toLowerCase() || n.includes(String(f.name ?? f).toLowerCase()));
+    if (own) return +(own.nourish ?? .6);
+    return FOOD.test(n) ? .6 : 0;
+  }
   const STOP = new Set('the and you your for are was were with that this have has had not but what who how why where when can will would could should about there their them they then than its it\'s i\'m me my mine our out all any some just very much more most into from over under also only does did doing been being here like want wants know think tell said says say yes okay please thanks'.split(' '));
   const playerName = () => document.getElementById('chatName')?.value.trim() || 'the player';
   const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -158,7 +170,7 @@
     return parts.length ? 'You feel: ' + [...new Set(parts)].join(', ') + '.' : '';
   }
   function hpFrac(g) { const h = window.tablefolkCombat?.hpOf(g); return h && h.max ? h.hp / h.max : 1; }
-  function food(g) { return (charInventory(g).items || []).find(i => FOOD.test(i.name) && (i.qty ?? 1) > 0)?.name || null; }
+  function food(g) { return (charInventory(g).items || []).find(i => isFood(i.name) && (i.qty ?? 1) > 0)?.name || null; }
   function bodyLine(g) {
     const m = mindOf(g), bits = [], hp = hpFrac(g);
     if (hp <= .35) bits.push('badly hurt'); else if (hp < .75) bits.push('hurt');
@@ -231,12 +243,13 @@
   function eat(g, item) {
     item = String(item || '').replace(/^["']|["']$/g, '').trim();
     const inv = charInventory(g), items = (inv.items || []).filter(i => (i.qty ?? 1) > 0);
-    const it = item ? findItem(items, item) : items.find(i => FOOD.test(i.name));
+    const it = item ? findItem(items, item) : items.find(i => isFood(i.name));
     if (!it) return say(g, item ? `eat failed: ${g.id} has no ${item}` : 'eat failed: nothing to eat', false);
-    if (!FOOD.test(it.name)) return say(g, `eat failed: ${it.name} is not food`, false);
+    const nourish = isFood(it.name);
+    if (!nourish) return say(g, `eat failed: ${it.name} is not food`, false);
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
     setBrainConfig(g.id, { inventory: inv });
-    const m = mindOf(g); m.hunger = Math.max(0, m.hunger - .6); push(g, 'joy', .1);
+    const m = mindOf(g); m.hunger = Math.max(0, m.hunger - nourish); push(g, 'joy', .1);
     try { emitBadge(g, 'eats ' + it.name); inventoryChanged(); } catch {}
     return say(g, `${g.id} eats ${/^[aeiou]/i.test(it.name) ? 'an' : 'a'} ${it.name}`, false);
   }
@@ -250,5 +263,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD };
+  window.tablefolkMind = { event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();
