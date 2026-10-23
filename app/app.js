@@ -2432,6 +2432,9 @@ async function importPropAsset(scene,file,opts={}){
     for(const ag of result.animationGroups||[]) ag.stop();
     if(proxy.isDisposed?.()){ for(const ag of result.animationGroups||[]) ag.dispose(); for(const sk of result.skeletons||[]) sk.dispose(); for(const m of result.meshes) m.dispose(); return proxy; }
     const pm=meta(proxy); if(pm){ const prev=pm.cleanup; pm.cleanup=()=>{ try{ prev?.(); }catch{} for(const ag of result.animationGroups||[]) try{ ag.dispose(); }catch{} for(const sk of result.skeletons||[]) try{ sk.dispose(); }catch{} }; }
+    // Its clips stay on the object (packages.js plays them on use); a pack
+    // item's "loop" plays one from the start (a windmill's sails).
+    if(pm){ pm.anims=result.animationGroups||[]; const loop=opts.loop===true?pm.anims[0]:opts.loop?pm.anims.find(a=>a.name.toLowerCase()===String(opts.loop).toLowerCase()):null; loop?.start(true); }
     const root=new BABYLON.TransformNode('real_'+type+'_root',scene);
     root.parent=proxy;
     root.position.set(0,-(opts.visualYOffset??0),0);

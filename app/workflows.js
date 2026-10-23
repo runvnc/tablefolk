@@ -45,7 +45,8 @@
  * it is), with a short prompt: who the character is plus the one question.
  */
 (function () {
-  const defs = () => state.workflows || {};
+  // packages.js: workflows from loaded packages, the scenario's own win
+  const defs = () => ({ ...(window.tablefolkPackages?.workflows || {}), ...(state.workflows || {}) });
   const cfgOf = id => getBrainConfig(id);
   const agentOf = id => state.characters.find(c => c.id === id);
   const playerName = () => document.getElementById('chatName')?.value.trim() || 'the player';

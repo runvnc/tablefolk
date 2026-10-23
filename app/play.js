@@ -123,7 +123,8 @@
     for (const m of state.props) {
       if (!alive(m)) continue;
       const t = meta(m)?.type;
-      if (t === 'chest' || t === 'iron_chest') consider('chest', m, posOf(m));
+      if (window.tablefolkPacks?.items[t]?.use) consider('use', m, posOf(m));   // packages.js
+      else if (t === 'chest' || t === 'iron_chest') consider('chest', m, posOf(m));
       else if (PICKUPS[t]) consider('item', m, posOf(m));
       else if (t === 'coin_pile') consider('gold', m, posOf(m));
       else if (t === 'note') consider('note', m, posOf(m));
@@ -142,6 +143,7 @@
       toast('Say something to ' + u.thing.id);
       return;   // talking is not a turn: the one spoken to answers
     }
+    if (u.kind === 'use') { Promise.resolve(window.tablefolkPackages?.useThing(u.thing, g)).then(done => { if (done) acted('use'); }); return; }
     if (u.kind === 'note') { const mm = meta(u.thing); toast('The note says: ' + ((mm.noteText || noteTextFromHtml(mm.noteHtml || '')) || '(blank)')); return; }
     const p = u.kind === 'chest' ? posOf(u.thing) : null;
     if (p) setCharacterFacing(g, new BABYLON.Vector3(p.x - myPos().x, 0, p.z - myPos().z));

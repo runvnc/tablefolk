@@ -845,6 +845,8 @@
       skills: Array.isArray(s.skills) ? s.skills.map(String).slice(0, 16) : [],
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
+      // packages.js: tablefolk.json packages (items, skills, roles, workflows, code)
+      packages: Array.isArray(s.packages) ? s.packages.filter(u => typeof u === 'string' && u).slice(0, 16) : [],
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // extra things characters can eat (names, or { name, nourish })
@@ -910,6 +912,9 @@
     for (const r of await Promise.allSettled(base.packs.map(u => window.tablefolkPacks.load(u)))) {
       if (r.status === 'rejected') { console.error(r.reason); window.tablefolkToast?.('asset pack failed: ' + r.reason.message, { type: 'error' }); }
     }
+    // Packages (packages.js): their items, skills, roles and workflows.
+    const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages) : [];
+    for (const m of packageWarnings) console.warn('[packages]', m);
     refreshThings();
     w.setWorldSize?.(...boardSizeFor(base));
     // The base's content and the grid become ordinary objects, paint and
@@ -1031,7 +1036,7 @@
     if (first) w.selectCharacter(first);
     w.inventoryChanged();
     w.saveWorldState();
-    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...roleWarnings, ...skillWarnings);
+    plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...packageWarnings, ...roleWarnings, ...skillWarnings);
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}

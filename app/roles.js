@@ -30,6 +30,7 @@
   const key = ref => String(ref || '').trim().toLowerCase();
 
   async function loadOne(ref) {
+    if (get(ref)) return get(ref);   // already here (built in earlier, or from a package)
     const url = window.tablefolkPackages.refUrl(ref, 'role');
     for (const m of reg.values()) if (m._url === url) return m;
     const r = await fetch(url);

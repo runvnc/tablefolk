@@ -38,6 +38,7 @@
   const reg = new Map();          // id -> manifest (+ .api from a module)
   const urlFor = ref => window.tablefolkPackages.refUrl(ref, 'skill');
   async function loadOne(ref) {
+    const known = idOf(ref); if (known) return reg.get(known);   // already here (or from a package)
     const url = urlFor(ref);
     for (const m of reg.values()) if (m._url === url) return m;
     const r = await fetch(url);
@@ -263,5 +264,5 @@
   }
 
   function api() { return { state, narrate, findTarget, combat: window.tablefolkCombat, say, log, getBrainConfig, setBrainConfig, effects: EFFECTS }; }
-  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, allowedBy, cards, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
+  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
 })();

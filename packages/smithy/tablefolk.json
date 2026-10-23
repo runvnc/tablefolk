@@ -1,0 +1,51 @@
+{
+  "id": "smithy",
+  "name": "Smithy",
+  "version": "1.0.0",
+  "description": "An example package with one of everything: a blacksmith role, a smithing skill, an anvil you can strike, and a little code (the smith hammers between customers; the bellows).",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "blacksmith", "crafting"],
+  "items": {
+    "smith_anvil": {
+      "file": "../../assets/models/props/Anvil.gltf",
+      "w": 0.9, "h": 0.55, "d": 0.48, "mass": 2.4, "scale": 0.75, "visualYOffset": 0.28, "static": true, "material": "metal",
+      "aliases": ["forge"], "tags": ["crafting"],
+      "use": { "text": "{{player}} strikes the anvil. Clang!", "sound": "hit" }
+    },
+    "bellows": {
+      "file": "../../assets/models/props/Workbench.gltf",
+      "w": 1.35, "h": 0.85, "d": 0.75, "static": true, "scale": 0.82, "visualYOffset": 0.43,
+      "tags": ["crafting"],
+      "use": "pump_bellows"
+    }
+  },
+  "skills": {
+    "smithing": {
+      "name": "Smithing", "version": "1.0.0",
+      "description": "Forge iron bars into useful things at an anvil.",
+      "params": { "recipes": ["nails", "horseshoe", "dagger"] },
+      "prompt": "You are a smith: you can forge {{recipes}} from an iron bar.",
+      "commands": {
+        "forge": { "usage": "forge(thing)", "example": "forge(nails)", "help": "make something from an iron bar", "variants": "recipes", "param": "recipes" }
+      },
+      "recipes": {
+        "nails": { "target": "none", "needs": "iron bar", "effects": [{ "take": "iron bar" }, { "give": "iron nails" }], "text": "{{me}} hammers an iron bar into nails" },
+        "horseshoe": { "target": "none", "needs": "iron bar", "effects": [{ "take": "iron bar" }, { "give": "horseshoe" }], "text": "{{me}} bends a glowing bar into a horseshoe" },
+        "dagger": { "target": "none", "needs": "iron bar", "effects": [{ "take": "iron bar" }, { "give": "dagger" }], "text": "{{me}} forges a dagger" }
+      },
+      "behaviours": ["hammer"]
+    }
+  },
+  "roles": {
+    "blacksmith": {
+      "name": "Blacksmith", "version": "1.0.0",
+      "description": "Works the forge: makes and sells iron goods.",
+      "duty": "You are the village smith. Sell your iron goods with sell(item, price), and forge more with forge(thing) when you run low or a customer asks for something.",
+      "commands": ["say", "inventory"],
+      "skills": ["smithing", "trade"],
+      "temperament": "gruff"
+    }
+  },
+  "modules": ["smithy.js"]
+}
