@@ -1,0 +1,71 @@
+{
+ "v": 1,
+ "title": "Eval: shopkeeper by role (chaos 50)",
+ "base": "plain",
+ "size": [
+  11,
+  9
+ ],
+ "lighting": "bright",
+ "player": {
+  "name": "Ana",
+  "gold": 60,
+  "items": [],
+  "at": [
+   0,
+   1
+  ]
+ },
+ "allowed": [
+  "say",
+  "emote"
+ ],
+ "agents": [
+  {
+   "id": "mog",
+   "model": "villager",
+   "at": [
+    0,
+    -1
+   ],
+   "facing": "s",
+   "personality": "grumpy and proud, but fair.",
+   "role": "shopkeeper",
+   "prices": {
+    "magic sword": [
+     50,
+     40
+    ],
+    "healing potion": 8
+   },
+   "inventory": {
+    "gold": 5,
+    "items": [
+     {
+      "name": "magic sword",
+      "qty": 1
+     },
+     {
+      "name": "healing potion",
+      "qty": 3
+     }
+    ]
+   },
+   "chaos": 50
+  }
+ ],
+ "objects": [
+  {
+   "type": "counter",
+   "x": 0,
+   "z": -2
+  }
+ ],
+ "goal": {
+  "text": "Shop.",
+  "win": {
+   "player_has": "magic sword"
+  },
+  "maxTurns": 8
+ }
+}

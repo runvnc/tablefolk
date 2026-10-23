@@ -972,7 +972,7 @@
         enabled: true, style: a.style || '', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',
         // mind.js: a fresh mind each run; who it is beyond the personality
         mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
-        temperament: a.temperament || '', role: a.role || '',
+        temperament: a.temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
@@ -1472,7 +1472,7 @@ turns: 6`;
           const before = active.speech.length;
           active.lastTurn = null;
           const act = /^act:/i.test(msg);
-          if (act) { const err = playerAct(msg); if (err) { transcript.push({ player: msg, said: [], commands: '', error: err }); break; } }
+          if (act) { const err = playerAct(msg); if (err) { transcript.push({ player: msg, said: [], commands: '', error: err }); break; } await new Promise(r => setTimeout(r, 700)); }   // a blow lands ~0.4 s after the swing
           try { await withTimeout(w.chatAndStep(agentId, act ? '' : msg), 'character turn'); }
           catch (e) { transcript.push({ player: msg, said: [], commands: '', error: e.message }); break; }
           checkGoal();

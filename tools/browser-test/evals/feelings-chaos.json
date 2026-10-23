@@ -1,0 +1,58 @@
+{
+ "v": 1,
+ "title": "Eval: feelings and memory (chaos 50)",
+ "base": "plain",
+ "size": [
+  11,
+  9
+ ],
+ "lighting": "bright",
+ "player": {
+  "name": "Ana",
+  "gold": 20,
+  "items": [],
+  "at": [
+   0,
+   1
+  ]
+ },
+ "allowed": [
+  "say",
+  "emote",
+  "goal",
+  "give",
+  "inventory"
+ ],
+ "agents": [
+  {
+   "id": "bram",
+   "model": "peasant",
+   "at": [
+    0,
+    0
+   ],
+   "facing": "s",
+   "personality": "a gentle farmer who grows turnips. Friendly but no pushover.",
+   "inventory": {
+    "gold": 2,
+    "items": [
+     {
+      "name": "turnip",
+      "qty": 4
+     }
+    ]
+   },
+   "chaos": 50
+  }
+ ],
+ "goal": {
+  "text": "Talk.",
+  "win": {
+   "said": [
+    "bram",
+    "zzzz"
+   ]
+  },
+  "maxTurns": 10
+ }
+}

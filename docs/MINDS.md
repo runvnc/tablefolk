@@ -117,6 +117,31 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
   sell, a guard who should hold, characters who should react to being hurt
   or given things.
 
+## Built (October 2026)
+
+- `app/mind.js`: mood, needs, memory, the state card, `remember()`,
+  `eat()` (and `feel()` for scenarios that allow it: on by default it used
+  up turns that should have been speech), goal() for every character, goal
+  turns ("6 turns on it: what is the next step?"), and the director
+  (`wantsTurn`: after each player action, nearby characters take a model
+  turn only when spoken to, when something happened to them, when a want is
+  pressing, every other round on a goal, else every fifth round;
+  `state.idleTurnEvery` changes that).
+- `app/roles.js`: the six roles, wares and prices on the card, offers read
+  from the player's words, a lowest price in `sell()`, and sales that need
+  the buyer's agreement (for every seller, role or not): otherwise
+  `sell()` makes an offer, and the player gets a buy / no thanks card.
+- Prompts: events ("Ana attacks you") are told under WHAT JUST HAPPENED,
+  apart from speech; history trimmed to the last 12 messages; "Your last few
+  turns" shortened; no more default "Style: helpful character" for scenario
+  characters; `backstory` and the role's duty in the stable prompt prefix.
+- Tests: headless Chrome, `agenttest.mjs`, `evals/`.
+- Not yet: roles starting workflows on cue, EmbeddingGemma retrieval
+  (EmbeddingGemma 2 exists: `onnx-community/embeddinggemma-2-ONNX`, the
+  text model is about 174 MB at q4 plus a 32 MB tokenizer, for
+  Transformers.js; `litert-community/embeddinggemma-2-text-270m-litert-lm`
+  165 MB for LiteRT), schedules, relationships between characters.
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

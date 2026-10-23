@@ -1,0 +1,67 @@
+{
+ "v": 1,
+ "title": "Eval: shopkeeper (chaos 50)",
+ "base": "plain",
+ "size": [
+  11,
+  9
+ ],
+ "lighting": "bright",
+ "player": {
+  "name": "Ana",
+  "gold": 60,
+  "items": [],
+  "at": [
+   0,
+   1
+  ]
+ },
+ "allowed": [
+  "say",
+  "sell",
+  "give",
+  "inventory",
+  "emote",
+  "goal"
+ ],
+ "agents": [
+  {
+   "id": "mog",
+   "model": "villager",
+   "at": [
+    0,
+    -1
+   ],
+   "facing": "s",
+   "personality": "a grumpy, proud shopkeeper. You sell a magic sword for 50 gold and a healing potion for 8 gold. You may haggle a little but you never go below 40 for the sword. When a price is agreed, use sell() to complete the sale.",
+   "inventory": {
+    "gold": 5,
+    "items": [
+     {
+      "name": "magic sword",
+      "qty": 1
+     },
+     {
+      "name": "healing potion",
+      "qty": 3
+     }
+    ]
+   },
+   "chaos": 50
+  }
+ ],
+ "objects": [
+  {
+   "type": "counter",
+   "x": 0,
+   "z": -2
+  }
+ ],
+ "goal": {
+  "text": "Shop.",
+  "win": {
+   "player_has": "magic sword"
+  },
+  "maxTurns": 8
+ }
+}

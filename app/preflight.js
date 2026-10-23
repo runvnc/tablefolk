@@ -49,16 +49,16 @@
     ['combat.js?v=20261023t'],
     ['darkness.js?v=20261023q'],
     ['senses.js?v=20261023p'],
-    ['mind.js?v=20261023v'],
+    ['mind.js?v=20261023w'],
     ['roles.js?v=20261023v'],
-    ['play.js?v=20261023t'],
+    ['play.js?v=20261023w'],
     ['speech-input.js?v=20261020a'],
     ['workflows.js?v=20261020a'],
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261023n'],
-    ['scenario.js?v=20261023u'],
+    ['scenario.js?v=20261023w'],
     ['tabletop.js?v=20261023j'],
-    ['llm_js/world-integration.js?v=20261023t', 'module'],
+    ['llm_js/world-integration.js?v=20261023x', 'module'],
   ];
 
   function browserSummary() {

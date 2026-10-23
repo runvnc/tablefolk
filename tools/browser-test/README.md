@@ -35,6 +35,30 @@ cd tools/browser-test && npm install        # playwright-core only, no browser d
    exist), printing progress and saving `results/results-<timestamp>.json`
    (wins, turns, transcripts with what was said and the commands issued).
 
+## Headless (nothing on screen)
+
+`HEADLESS=1 ./launch-chrome.sh "http://localhost:8000/app/?norender=1"` runs
+the same test Chrome with no window, still on the real GPU (Vulkan flags;
+without them headless falls back to the SwiftShader CPU renderer). It shares
+the profile, so it can't run alongside the visible one. The model is cached
+per origin: use the port it was downloaded on (8000).
+
+## Agent evals (`agenttest.mjs`)
+
+```bash
+node agenttest.mjs evals/shop-role.json evals/shop-role.txt 3 --base=http://localhost:8000 [--prompts]
+```
+
+Loads `<base>/app/?norender=1` fresh, waits for the cached model (never
+approves a download), plays the scenario file with the tactics file (the
+Scenario pane's format, plus `act:` lines and per-tactic `win:`/`lose:`, see
+docs/SCENARIOS.md section 7) and prints every turn: what the player said,
+what the character said and the commands it ran. `--prompts` keeps the full
+prompt of each turn in the saved JSON (`results/agent-<name>-<ts>.json`).
+Evals live in `evals/`: `shop` (prices in the personality), `shop-role` (the
+shopkeeper role), `feelings` (does a character remember being hit or given
+gold, five turns later).
+
 ## Poking at the page
 
 `node eval.mjs` prints a status summary; `node eval.mjs "<js expression>"`

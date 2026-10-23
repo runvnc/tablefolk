@@ -327,7 +327,8 @@
         const w = window.tablefolk;
         const brains = w?.brainReady?.() && !w?.isBrainLoopRunning?.();
         const actors = near.filter(c => getBrainConfig(c.id).enabled !== false);
-        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c)) : [];
+        // mind.js decides who has something to say or do this round
+        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c) && (window.tablefolkMind?.wantsTurn(c) ?? true)) : [];
         if (talkers.length && !talking) talk(talkers);
         for (const c of fighters) {
           if (c.defeated || me()?.defeated) break;

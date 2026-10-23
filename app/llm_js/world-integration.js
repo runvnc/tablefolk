@@ -365,7 +365,7 @@ function buildAgentMessages(world, g, cfg) {
     // No "answer with say()" here: pointing the model at say() made it talk
     // and forget the rest of its brief (a password it should react to with
     // give()). The system prompt already lists the commands.
-    chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
+    chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.map(e => '- ' + e).join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
     cfg.pendingChat = [];
     world.setBrainConfig(g.id, cfg);
   }
@@ -691,15 +691,41 @@ async function main() {
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
       const speakPlain = !quiet && cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
       let saidPlain = false;
-      const planCmds = planLines.map(l => {
+      // Prose with commands in it ('I take the gold. "Fine," I say.
+      // sell(healing potion, 8)'): the commands are pulled out and run, and
+      // only the quoted words are spoken when there are quotes (the rest is
+      // narration). The history keeps the cleaned lines.
+      const others = world.getAllowedCommands(g.id).filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
+      const embedded = others.length ? new RegExp('\\b(' + others.join('|') + ')\\(([^()]*)\\)', 'gi') : null;
+      const histParts = [];
+      const planCmds = planLines.flatMap(l => {
         if (speakPlain && !looksLikeCommand(l)) {
-          const text = l.replace(/^["'\u201c]+|["'\u201d]+$/g, '').trim();
-          if (!text) return null;
-          saidPlain = true;
-          return { kind: 'say', text };
+          const cmds = [];
+          let text = embedded ? l.replace(embedded, m => { cmds.push(m); return ' '; }) : l;
+          const quoted = [...text.matchAll(/["\u201c]([^"\u201c\u201d]{2,})["\u201d]/g)].map(m => m[1].trim());
+          text = (quoted.length ? quoted.join(' ') : text).replace(/^["'\u201c]+|["'\u201d]+$/g, '').replace(/\s+/g, ' ').trim();
+          const out = [];
+          if (text) { saidPlain = true; out.push({ kind: 'say', text }); histParts.push(`say(${JSON.stringify(text)})`); }
+          for (const c of cmds) { const p = world.parseLLMCommandLine(c); if (p) { out.push(p); histParts.push(c); } }
+          return out;
         }
-        return world.parseLLMCommandLine(l);
-      }).filter(Boolean);
+        histParts.push(l);
+        const p = world.parseLLMCommandLine(l);
+        // say(Ana, "hello"): the name is who it is talking to, not speech
+        if (p?.kind === 'say') { const m = String(p.text).match(/^[A-Za-z][\w ]{0,20},\s*["\u201c](.+?)["\u201d]?$/); if (m) p.text = m[1]; }
+        return p ? [p] : [];
+      });
+      // Echo guard: a say() that only repeats what was just said to it is
+      // dropped, and it's told so (a 2B model at higher temperature sometimes
+      // parrots every line back).
+      const heardNow = (window.tablefolkMind?.mindOf(g).heard || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      let echoed = false;
+      if (spokenTo && heardNow.length > 6) for (let i = planCmds.length - 1; i >= 0; i--) {
+        const c = planCmds[i]; if (c.kind !== 'say') continue;
+        const t = String(c.text).toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        if (t === heardNow || (t.includes(heardNow) && t.length < heardNow.length + 12)) { planCmds.splice(i, 1); echoed = true; }
+      }
+      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(You only repeated what was said to you, so nobody heard it. Answer it in your own words.)']).slice(-5);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
@@ -718,7 +744,7 @@ async function main() {
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
         // Only the speech itself goes into the history, never instructions.
-        const chatLines = chatSuffix.trim().split('\n').filter(l => /^\[[^\]]+\]\s/.test(l));
+        const chatLines = chatSuffix.trim().split('\n').filter(l => /^\[[^\]]+\]\s/.test(l) || /^- /.test(l)).map(l => l.replace(/^- /, '[happened] '));
         for (const cl of chatLines) {
           cfg.messages = (cfg.messages || []).concat([{ role: 'user', content: cl }]);
         }
@@ -729,7 +755,7 @@ async function main() {
       // Add agent's action as assistant message
       // Its own reply goes into its history as commands: plain text that was
       // spoken is stored as say("..."), so it learns the format from itself.
-      const histLine = saidPlain ? planLines.map(l => looksLikeCommand(l) ? l : `say(${JSON.stringify(l.replace(/^["'\u201c]+|["'\u201d]+$/g, '').trim())})`).join('\n') : line;
+      const histLine = saidPlain ? histParts.join('\n') : line;
       cfg.messages = (cfg.messages || []).concat([{ role: 'assistant', content: histLine || 'look()' }]);
       cfg.recent = (cfg.recent || []).concat(`chose ${line || 'nothing'}`).slice(-6);
       world.setBrainConfig(g.id, cfg);

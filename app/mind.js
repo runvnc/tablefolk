@@ -134,7 +134,7 @@
   function tick(g, line = '') {
     const cfg = getBrainConfig(g.id); if (cfg.defeated) return;
     const m = mindOf(g), b = baseline(cfg);
-    m.turn++;
+    m.turn++; m.lastRound = round;
     // feelings fade over a few turns (a punch is still felt five turns on), trust over many
     for (const k of MOODS) m.mood[k] += (b[k] - m.mood[k]) * .07;
     m.mood.trust += (b.trust - m.mood.trust) * .015;
@@ -193,6 +193,24 @@
     return out;
   }
 
+  // ---- the director: who takes a turn ----
+  // play.js asks after each player action. A character near the player takes
+  // a model turn when there is something for it to do: it was spoken to or
+  // something happened to it, it has a pressing want, or it is working on a
+  // goal (every other round); otherwise only now and then (idle chatter), so
+  // a walk past the bakery isn't a speech from the baker at every step.
+  let round = 0;
+  window.addEventListener('tablefolk-player-turn', () => { round++; });
+  function wantsTurn(g) {
+    const cfg = getBrainConfig(g.id), m = mindOf(g), since = round - (m.lastRound ?? -99);
+    if (cfg.pendingChat?.length) return true;
+    if (window.tablefolkWorkflows?.active(g.id)) return true;
+    const w = want(g);
+    if (/^(stay safe|get away|tell .* attacked|let .* stand for)/.test(w)) return true;
+    if ((cfg.goal || w) && since >= 2) return true;
+    return since >= (+state.idleTurnEvery > 0 ? +state.idleTurnEvery : 5);
+  }
+
   // ---- commands ----
   function remember(g, text) {
     text = String(text || '').replace(/^["']|["']$/g, '').trim();
@@ -232,5 +250,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { event, tick, cardLines, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD };
+  window.tablefolkMind = { event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD };
 })();
