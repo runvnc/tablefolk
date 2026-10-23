@@ -590,6 +590,12 @@ async function main() {
       world.state.nextAgentId = g.id;
       updatePerceptionUI();
       const chatTestMode = el('chatTestMode')?.checked;
+      // Talk budget, against rambling: a character that spoke on two turns in a
+      // row without being spoken to keeps quiet for the next few turns (no
+      // say/whisper in its command list) unless someone speaks to it.
+      const spokenTo = !!cfg.pendingChat?.length;
+      if (spokenTo) cfg.quietTurns = 0;
+      const quiet = !spokenTo && cfg.quietTurns > 0;
       let messages;
      let chatSuffix = '';
       if (chatTestMode) {
@@ -616,6 +622,10 @@ async function main() {
         const built = buildAgentMessages(world, g, cfg);
         messages = built.messages;
         chatSuffix = built.chatSuffix;
+      }
+      if (quiet) {
+        const last = messages[messages.length - 1];
+        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' }]);
       }
       // Show in prompt panel
       let displayText = `[AGENT: ${g.id}]
@@ -651,7 +661,7 @@ async function main() {
           agentId: g.id,
           messages: sendMessages,
           useGrammar: !chatTestMode,
-          allowedCommands: world.getAllowedCommands(g.id),
+          allowedCommands: world.getAllowedCommands(g.id).filter(c => !quiet || (c !== 'say' && c !== 'whisper')),
           // Per-character (Character setup). Reasoning needs room before the
           // command lines, so raise the token budget too.
           enableThinking: cfg.thinking === true,
@@ -670,7 +680,7 @@ async function main() {
       // business."), which used to fail as an unknown command. (With thinking
       // on, plain lines are leftover reasoning and are dropped below.)
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
-      const speakPlain = cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
+      const speakPlain = !quiet && cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
       let saidPlain = false;
       const planCmds = planLines.map(l => {
         if (speakPlain && !looksLikeCommand(l)) {
@@ -684,6 +694,17 @@ async function main() {
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
+      // Speech this turn: none while quiet, at most two lines otherwise.
+      let lines = 0, droppedSpeech = false;
+      for (let i = 0; i < planCmds.length; i++) {
+        if (planCmds[i].kind !== 'say' && planCmds[i].kind !== 'whisper') continue;
+        if (quiet || ++lines > 2) { planCmds.splice(i--, 1); droppedSpeech = true; }
+      }
+      const spoke = planCmds.some(c => c.kind === 'say' || c.kind === 'whisper');
+      if (quiet) cfg.quietTurns--;
+      else if (spokenTo) cfg.talkRun = spoke ? 1 : 0;
+      else if (!spoke) cfg.talkRun = 0;
+      else if ((cfg.talkRun = (cfg.talkRun || 0) + 1) >= 2) { cfg.talkRun = 0; cfg.quietTurns = 3; }
       if (!planCmds.length) planCmds.push({ kind: 'look' });
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
@@ -730,6 +751,7 @@ async function main() {
         const how = [allowedNow.includes('give') ? 'give("item")' : '', allowedNow.includes('sell') ? 'sell("item", price)' : ''].filter(Boolean).join(' or ');
         cfg.messages = cfg.messages.concat([{ role: 'user', content: `SYSTEM: You said you would hand something over, but nothing changed hands. Saying it does nothing; use ${how} to actually do it.` }]);
       }
+      if (droppedSpeech) cfg.messages = cfg.messages.concat([{ role: 'user', content: quiet ? 'SYSTEM: You kept quiet this turn; nobody heard that.' : 'SYSTEM: Only your first two lines were spoken. Say less.' }]);
       if (saidPlain) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
       if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);

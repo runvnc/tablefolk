@@ -10,7 +10,7 @@
 
   const DB='tablefolk-pocket-tts', STORE='voices';
   const CACHE_MARKER='tablefolkTtsModelCached';
-  const settings=()=>({enabled:localStorage.getItem('tablefolkTtsEnabled')==='1',language:localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04',volume:Number(localStorage.getItem('tablefolkTtsVolume')||.85),bufferMs:clamp(Number(localStorage.getItem('tablefolkTtsBufferMs')||350),150,1500)});
+  const settings=()=>({enabled:localStorage.getItem('tablefolkTtsEnabled')!=='0',language:localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04',volume:Number(localStorage.getItem('tablefolkTtsVolume')||.85),bufferMs:clamp(Number(localStorage.getItem('tablefolkTtsBufferMs')||350),150,1500)});
   class PocketTTSManager extends EventTarget {
     constructor(){ super(); this.worker=null; this.ready=false; this.loading=false; this.queue=[]; this.running=false; this.audioCtx=null; this.gain=null; this.pcmNode=null; this.directPort=false; this.sampleRate=24000; this.receivedSamples=0; this.pendingAudio=[]; this.pendingStreamEnd=false; this.custom=new Map(); this.pending=new Map(); this.spatial=true; this.panner=null; this.stereoPanner=null; this.spatialAgent=null; this.spatialRAF=null; this.spatialDebug=null; this.showPanDebug=false; this.telemetry={backend:'WASM CPU',isolated:false,threads:1,hardwareConcurrency:navigator.hardwareConcurrency||0,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null}; this.loadCustomIndex(); }
     // RMS of the speech currently playing (0 when silent); drives mouth animation.
@@ -169,6 +169,8 @@
     }    stop(){this.queue=[];try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}
     unload(){this.stopSpatialTicker();this.stop();try{this.worker?.terminate();}catch{}this.worker=null;this.ready=false;this.loading=false;this.pendingLoad=null;this.pendingAudio=[];this.pending.clear();try{this.pcmNode?.disconnect();}catch{}this.analyser=null;try{this.gain?.disconnect();}catch{}try{this.audioCtx?.close();}catch{}this.pcmNode=null;this.gain=null;this.audioCtx=null;this.directPort=false;}
     async setLanguage(language){localStorage.setItem('tablefolkTtsLanguage',language);if(!this.worker)return;this.ready=false;this.status('Loading language…','loading');this.worker.postMessage({type:'set_language',data:{language}});}
+    // Drop one character's queued lines and cut it off if it is speaking (it died).
+    silence(agent){this.queue=this.queue.filter(i=>i.agent!==agent);if(this.current?.agent===agent){try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}}
     setEnabled(v){localStorage.setItem('tablefolkTtsEnabled',v?'1':'0');if(!v)this.stop();}
     setVolume(v){localStorage.setItem('tablefolkTtsVolume',String(v));if(this.gain)this.gain.gain.value=Number(v);}
     setBufferMs(v){localStorage.setItem('tablefolkTtsBufferMs',String(v));}

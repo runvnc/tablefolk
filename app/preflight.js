@@ -38,15 +38,15 @@
     ['https://cdn.babylonjs.com/babylon.js'],
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
-    ['tts/pocket-tts-manager.js?v=20261022a'],
-    ['tts/tts-ui.js?v=20261018a'],
+    ['tts/pocket-tts-manager.js?v=20261023i'],
+    ['tts/tts-ui.js?v=20261023i'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261023a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261023d'],
+    ['app.js?v=20261023i'],
     ['scenery.js?v=20261019ze'],
-    ['combat.js?v=20261022c'],
+    ['combat.js?v=20261023i'],
     ['senses.js?v=20261020d'],
     ['play.js?v=20261023c'],
     ['speech-input.js?v=20261020a'],
@@ -55,7 +55,7 @@
     ['procgen.js?v=20261023a'],
     ['scenario.js?v=20261023b'],
     ['tabletop.js?v=20261023c'],
-    ['llm_js/world-integration.js?v=20261022b', 'module'],
+    ['llm_js/world-integration.js?v=20261023i', 'module'],
   ];
 
   function browserSummary() {

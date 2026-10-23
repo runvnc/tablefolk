@@ -2581,6 +2581,7 @@ function startTurnMove(g,d,distance=null){
 function selectCharacter(g){ state.characters.forEach(x=>x.selected=false); g.selected=true; state.selected=g; state.nextAgentId=g.id; state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); const sel=document.getElementById('agentSelect'); if(sel) sel.value=g.id; log('selected '+g.id); playRig(g,'idle',true); updatePerceptionUI(); try{ window.tablefolk?.onAgentSelected?.(g); }catch{} try{ window.tablefolkTabs?.showIfOpen('character'); }catch{} }
 // Show/update a streaming bubble for an agent during LLM generation.
 function showStreamingBubble(g, text) {
+  if (g?.defeated) return;
   let b = state.bubbles.find(x => x.streaming && x.node === g.root);
   if (!b) {
     const div = document.createElement('div');
@@ -2627,6 +2628,8 @@ function clearPendingThought(g){
 // whisper: speech only the player hears (other characters never get it); a
 // smaller, dimmer bubble.
 function say(g,text,voiced=false,{whisper=false}={}){
+  // The dead say nothing (a turn that was thinking when it died ends here).
+  if(g?.defeated){ clearStreamingBubble(g); return; }
   // A character repeating one of its recent spoken lines: say nothing at all.
   if(voiced && g && g!==state.playerAvatar){
     const key=String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -2648,7 +2651,7 @@ function say(g,text,voiced=false,{whisper=false}={}){
   try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced}})); }catch{}
   const div=document.createElement('div'); div.className=whisper?'bubble whisper':'bubble'; div.textContent=(whisper?'(whispers) ':'')+(text||'...').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:2.8});
-  const speechRequested=localStorage.getItem('tablefolkTtsEnabled')==='1' && getBrainConfig(g.id).ttsEnabled!==false;
+  const speechRequested=localStorage.getItem('tablefolkTtsEnabled')!=='0' && getBrainConfig(g.id).ttsEnabled!==false;
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
   setTimeout(()=>{ if(g.anim==='talk' && (!speechRequested || window.tablefolkTTS?.current?.agent!==g)){ g.anim='idle'; playRig(g,'idle',true); g.speaking=false; if(g._headNodes)for(const h of g._headNodes)h.scaling.y=1; } },speechRequested?2000:900);
   if(state.globalHistory?.length){ const last=state.globalHistory[state.globalHistory.length-1]; if(last && last.startsWith('T') && last.includes(g.id+':')) state.globalHistory[state.globalHistory.length-1]=last+' -> '+text; }

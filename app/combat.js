@@ -229,6 +229,8 @@
 
   function defeat(v, by) {
     v.defeated = true;
+    try { window.tablefolkTTS?.silence?.(v); } catch {}
+    try { clearStreamingBubble(v); } catch {}
     if (v._weaponMesh) showWeapon(v, null);
     const dead = ['Death_A', 'Death_B'].map(n => v.rigAnims?.[n]).find(Boolean);
     clearTimeout(v._clipTimer);

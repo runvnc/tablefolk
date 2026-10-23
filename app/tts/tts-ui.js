@@ -3,7 +3,7 @@
   if(!tts)return;
   let recorder=null, recorded=[], stream=null;
   function refreshVoices(){const sel=$('agentTtsVoice');if(!sel)return;const chosen=window.tablefolk?.getBrainConfig?.(window.tablefolk?.getSelectedAgent?.()?.id)?.ttsVoiceId||sel.value||'builtin:alba';sel.textContent='';for(const v of tts.voices()){const o=document.createElement('option');o.value=v.id;o.textContent=v.name;sel.appendChild(o);}sel.value=[...sel.options].some(o=>o.value===chosen)?chosen:'builtin:alba';}
-  function sync(){const enabled=localStorage.getItem('tablefolkTtsEnabled')==='1';$('ttsEnabled').checked=enabled;$('ttsLanguage').value=localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04';$('ttsVolume').value=localStorage.getItem('tablefolkTtsVolume')||'.85';$('ttsBufferMs').value=localStorage.getItem('tablefolkTtsBufferMs')||'350';refreshVoices();}
+  function sync(){const enabled=localStorage.getItem('tablefolkTtsEnabled')!=='0';$('ttsEnabled').checked=enabled;$('ttsLanguage').value=localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04';$('ttsVolume').value=localStorage.getItem('tablefolkTtsVolume')||'.85';$('ttsBufferMs').value=localStorage.getItem('tablefolkTtsBufferMs')||'350';refreshVoices();}
   tts.addEventListener('status',e=>{if($('ttsStatus'))$('ttsStatus').textContent=e.detail.text;});
   tts.addEventListener('telemetry',e=>{
     const m=e.detail||{}, node=$('ttsTelemetry'); if(!node)return;
@@ -23,7 +23,7 @@
     // resume an AudioContext, so autoplay policy remains separate.
     if(window.TABLEFOLK_ART_MODE){
       $('ttsStatus').textContent='Pocket-TTS disabled (art review mode)';
-    } else if(tts.wasLoaded() || localStorage.getItem('tablefolkTtsEnabled')==='1'){
+    } else if(tts.wasLoaded() || localStorage.getItem('tablefolkTtsEnabled')!=='0'){
       $('ttsStatus').textContent='Auto-loading cached Pocket-TTS…';
       tts.load().catch(err=>{
         $('ttsStatus').textContent='Pocket-TTS auto-load failed: '+err.message;
