@@ -209,9 +209,24 @@
       const [cr, cc] = ctr(rm);
       return { id: count[k] > 1 || k === 'room' ? `${k} ${count[k]}` : k, kind: k, r0: rm.r0, c0: rm.c0, r1: rm.r1, c1: rm.c1, center: at(cr, cc), depth: depth[i] };
     });
-    // A light in every room (night-lit dungeon), warmer for fires.
-    const objects = places.map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.6, intensity: p.kind === 'lair' ? 1.5 : 2.2, range: 5.5, color: p.kind === 'shrine' || p.kind === 'alchemy' ? '#b9a6ff' : '#ffc98a' }));
-    return finish({ kind: 'dungeon', W, H, g, places, objects, start: places.find(p => p.kind === 'entrance'), lighting: 'night' });
+    // A light in every room (night-lit dungeon), warmer for fires; in a dark
+    // dungeon (darkness.js) crypts, prisons, storerooms, lairs and plain rooms
+    // are unlit (a torch shows them), and a standing torch waits at the entrance.
+    const UNLIT = new Set(['crypt', 'prison', 'storage', 'lair', 'room']);
+    const lit = opts.dark ? places.filter(p => !UNLIT.has(p.kind)) : places;
+    const objects = lit.map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.6, intensity: p.kind === 'lair' ? 1.5 : 2.2, range: 5.5, color: p.kind === 'shrine' || p.kind === 'alchemy' ? '#b9a6ff' : '#ffc98a' }));
+    const ent = places.find(p => p.kind === 'entrance');
+    if (opts.dark && ent) {
+      // on the floor farthest from the middle (the player starts there), clear of the doors
+      const i = kind.indexOf('entrance'), rm = rooms[i], [cr, cc] = ctr(rm);
+      let spot = null, best = -1;
+      for (let r = rm.r0; r <= rm.r1; r++) for (let c = rm.c0; c <= rm.c1; c++) {
+        if (g[r][c] !== ROOM_FURNISH.entrance.floor || doorsOf[i].some(([dr, dc]) => Math.abs(dr - r) + Math.abs(dc - c) <= 1)) continue;
+        const d = Math.abs(r - cr) + Math.abs(c - cc); if (d > best) { best = d; spot = [r, c]; }
+      }
+      if (spot) { const [tx, tz] = at(...spot); objects.push({ type: 'torch', x: tx, z: tz }); }
+    }
+    return finish({ kind: 'dungeon', W, H, g, places, objects, start: ent, lighting: 'night', dark: !!opts.dark });
   }
 
   // ---------------------------------------------------------------- village
@@ -316,7 +331,7 @@
     }
   }
 
-  function finish({ kind, W, H, g, places, objects, start, lighting }) {
+  function finish({ kind, W, H, g, places, objects, start, lighting, dark = false }) {
     const at = toBoard(W, H);
     const sp = places.find(p => p.id === start?.id) || places[0];
     if (sp) { let s0 = null; for (let r = sp.r0; r <= sp.r1 && !s0; r++) for (let c = sp.c0; c <= sp.c1; c++) if (FLOOR_GLYPHS.has(g[r][c])) { s0 = [r, c]; break; } if (s0) ensureConnected(g, s0); }
@@ -325,7 +340,7 @@
       const [xa, za] = at(p.r0, p.c0), [xb, zb] = at(p.r1, p.c1);
       Object.assign(p, { x0: Math.min(xa, xb), x1: Math.max(xa, xb), z0: Math.min(za, zb), z1: Math.max(za, zb) });
     }
-    return { kind, size: [W, H], grid: g.map(row => row.join('')), legend: { ...GEN_LEGEND }, objects, places, start: start?.id || null, lighting };
+    return { kind, size: [W, H], grid: g.map(row => row.join('')), legend: { ...GEN_LEGEND }, objects, places, start: start?.id || null, lighting, dark };
   }
 
   // Which place suits a character: words in its id/style/personality.
@@ -384,7 +399,8 @@
     const opts = scn.generate || {};
     const kindName = String(opts.kind || opts.type || 'dungeon').toLowerCase();
     const want = [...(scn.agents || []), ...(scn.objects || []), scn.player || {}].map(a => a.in).filter(v => v != null).map(v => String(v).toLowerCase().replace(/\s+\d+$/, ''));
-    const gen = (kindName === 'village' || kindName === 'town' ? village : dungeon)({ ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size });
+    // dungeons are dark (fog of war, unlit rooms) unless the scenario says "dark": false
+    const gen = (kindName === 'village' || kindName === 'town' ? village : dungeon)({ ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? true });
     const warnings = [], used = new Set(), occupied = new Set(), placed = {};
     const agents = (scn.agents || []).map(a => {
       if (Array.isArray(a.at)) { occupied.add(a.at[0] + ',' + a.at[1]); return a; }
@@ -414,7 +430,7 @@
     }
     return {
       scenario: { ...scn, grid: scn.grid?.length ? scn.grid : gen.grid, legend: { ...gen.legend, ...(scn.legend || {}) }, size: scn.size || gen.size,
-        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, walls: scn.walls ?? 'stone', wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
+        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, dark: scn.dark ?? gen.dark, walls: scn.walls ?? 'stone', wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
       places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
       warnings,
     };

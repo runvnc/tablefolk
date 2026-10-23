@@ -20,6 +20,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "intro": "Mog runs the only shop on the island.",      // shown on load
   "seed": 7,                                             // layout randomness
   "lighting": "bright",                                  // or "night" (sandbox look), "dim" (night at half ambient)
+  "dark": true,                                          // fog of war: only what the player has seen shows (lit and in sight); the player brings a torch. Default: true for generated dungeons, else false
   "base": "plain",                                       // plain (blank board, default) | island | clearing | dungeon
   "size": [23, 17],                                      // board in cells, odd numbers (section 2c)
   "walls": "tabletop",                                   // or "stone" (natural rock), "modern" (smooth panels), "block" (old cubes)
@@ -249,7 +250,20 @@ It runs inside `normalizeScenario`, before everything else: the result is an
 ordinary `grid` + `legend`, `objects` (one `light` per room or building),
 `size`, `lighting` (night for dungeons), `walls` (`stone`), `wallHeight` (2,
 so the person-height doors fit), a `+` door in every doorway, and a position
-for every character and the player. Anything the scenario sets itself wins. The
+for every character and the player. Dungeons are `dark` unless the scenario
+says `"dark": false`: crypts, prisons, storerooms, lairs and plain rooms get
+no light (the player's torch shows them), and a standing torch (one more to
+pick up) waits in the entrance.
+
+**Darkness** (`"dark": true`, `app/darkness.js`): unexplored squares are black,
+so the overview camera shows only what the player has found. A square shows
+while it is in the player's line of sight (walls block, doors only while the
+player is next to them) and lit: within range of a room `light`, lantern,
+campfire, standing `torch` or candles, or of a carried torch (3.6 squares), or
+right next to the player. Squares seen before stay, dimmed, and characters on
+them are hidden until seen again. Anyone with a `torch` in their inventory
+carries it lit in the left hand; the player starts with one. `?nofog=1` turns
+the fog off (testing); the tabletop map never has it. Anything the scenario sets itself wins. The
 link keeps the short form, and the same seed gives the same map.
 
 - Dungeon: BSP rooms, a spanning tree of L-shaped corridors plus a loop or two,

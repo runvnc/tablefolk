@@ -827,7 +827,7 @@
       gen = { places: r.places, warnings: r.warnings, generate: s.generate };
       s = r.scenario;
     }
-    const out = { v: 1, title: String(s.title || 'Untitled scenario'), subtitle: s.subtitle ? String(s.subtitle) : '', safety: !!s.safety, lighting: ['night', 'dim'].includes(s.lighting) ? s.lighting : 'bright', intro: s.intro ? String(s.intro) : '', seed: Number.isFinite(+s.seed) ? +s.seed : 1,
+    const out = { v: 1, title: String(s.title || 'Untitled scenario'), subtitle: s.subtitle ? String(s.subtitle) : '', safety: !!s.safety, dark: !!s.dark, lighting: ['night', 'dim'].includes(s.lighting) ? s.lighting : 'bright', intro: s.intro ? String(s.intro) : '', seed: Number.isFinite(+s.seed) ? +s.seed : 1,
       player: s.player || { name: 'Traveller', gold: 0, items: [] }, allowed: Array.isArray(s.allowed) ? s.allowed : ['say', 'walk', 'face'],
       agents: (Array.isArray(s.agents) ? s.agents : []).filter(a => a && a.id).map(a => ({ ...a, id: String(a.id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || 'critter' })),
       objects: Array.isArray(s.objects) ? s.objects.filter(o => o && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [],
@@ -925,8 +925,10 @@
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
-    w.setLighting?.(scn.lighting);
-    w.setPlayer(scn.player);
+    // dark (darkness.js): fog of war, dim light, and the player brings a torch
+    w.setLighting?.(scn.dark ? 'dim' : scn.lighting);
+    const hasTorch = (scn.player?.items || []).some(i => /torch/i.test(i?.name || i));
+    w.setPlayer(scn.dark && !hasTorch ? { ...scn.player, items: [...(scn.player?.items || []), 'torch'] } : scn.player);
     if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 20); window.tablefolkCombat.reset(); }
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
@@ -1020,6 +1022,7 @@
     const code = opts.code || await encodeScenario(base);
     active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
     try { history.replaceState(null, '', '#s=' + code); } catch {}
+    window.tablefolkDark?.start(scn.dark);
     try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title } })); } catch {}
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));

@@ -27,7 +27,7 @@
 (function () {
   const REACH = 1.7;
   const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
-  const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope' };
+  const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const toast = (t, type = 'info') => window.tablefolkToast?.(t, { type });
   const sfx = (n, p) => window.tablefolkSfx?.play(n, p);

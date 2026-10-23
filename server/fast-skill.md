@@ -11,6 +11,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "intro": "2-3 sentences shown to the player at the start.",
   "seed": 7,
   "lighting": "bright",              // or "night"
+  "dark": false,                     // true: fog of war + torches (generated dungeons default to true)
   "walls": "stone",                  // or "tabletop", "modern"
   "wallHeight": 2,                   // always 2: person-height doors and first person need it
   "player": { "name": "Traveller", "gold": 10, "items": [], "model": "adventurer" },

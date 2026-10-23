@@ -60,6 +60,7 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
   "base": "plain",                 // plain (blank board, default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63 (default 23x17)
   "lighting": "bright",            // or "night", "dim" (night at half ambient)
+  "dark": true,                    // fog of war + carried torches (generated dungeons: default true)
   "walls": "tabletop",             // or "stone" (natural rock walls), "modern" (painted panels), "block"
   "wallHeight": 2,                 // optional wall height multiplier (default 1; 2 = twice as tall)
   "floor": "stone",                // optional: paint the whole floor (materials below)
@@ -347,7 +348,9 @@ character belongs in:
   `"wallHeight": 1` for low tabletop walls).
   Places: `entrance` (the player starts here), `throne`, `lair`, `treasure`,
   `library`, `shrine`, `barracks`, `storage`, `kitchen`, `prison`, `crypt`,
-  `alchemy`, `room N`. Night lighting, a light in every room.
+  `alchemy`, `room N`. Night lighting; dark (fog of war) unless `"dark": false`, with crypts,
+  prisons, storerooms, lairs and plain rooms unlit (the player's torch shows
+  them) and a light in every other room.
 - `"kind": "village"`: crossing roads, a flagstone `square` (the player starts
   here) with a campfire and signpost, buildings with their doors onto the
   roads. Options: `"buildings"` (3-14), `"size"`. Places: `tavern`, `smithy`,
