@@ -59,6 +59,7 @@
     ['trade.js?v=20261023z'],
     ['procgen.js?v=20261023n'],
     ['scenario.js?v=20261024a'],
+    ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261023j'],
     ['llm_js/world-integration.js?v=20261023x', 'module'],
   ];

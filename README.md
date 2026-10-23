@@ -21,6 +21,16 @@ scenarios and turn them into links (`scripts/scenario_link.py`). In Claude Code:
 Then ask, e.g., "make a tablefolk.world scenario: a night market with a fortune
 teller and a pickpocket, and give me the link".
 
+## Packages
+
+Worlds are built from things anyone can publish: asset packs (models),
+skills (what characters can do), roles (their jobs) and packages
+(`tablefolk.json`: any mix of those, plus workflows and code), loaded in the
+browser from this site, any URL, npm or GitHub. The Library pane finds them
+(the official list in `registry/index.json`, plus npm and GitHub tagged
+`tablefolk`). See [docs/PACKAGES.md](docs/PACKAGES.md) and
+[docs/SKILLS.md](docs/SKILLS.md).
+
 ## New in v14
 
 - Turn-based command loop for LLM control.

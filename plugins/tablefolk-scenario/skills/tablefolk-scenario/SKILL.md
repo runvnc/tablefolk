@@ -275,7 +275,8 @@ personality when they do ("If insulted twice, attack(player).").
 characters with `"skills": [...]` on an agent (or the player) and tune them
 with `"skillParams"`. Built in: `magic` (`cast(spell, target)`: spark,
 fireball, heal, light, push, frost; mana), `healing` (`bandage(target)`),
-`thievery` (`steal(target)`), `bard` (`sing(rest|courage)`). A skill's
+`thievery` (`steal(target)`), `bard` (`sing(rest|courage)`), `trade`
+(selling with prices, a lowest price and the buyer's agreement). A skill's
 commands are allowed automatically for whoever has it.
 
 ```json
@@ -287,6 +288,34 @@ commands are allowed automatically for whoever has it.
 More skills come from URLs, `npm:<package>@<version>` or
 `gh:<user>/<repo>@<tag>/<dir>` (a folder with `skill.json`); writing one:
 `docs/SKILLS.md` in the repository.
+
+## Roles (jobs, no code)
+
+`"role"` on an agent gives it a job: a duty line, the commands and skills
+it needs. Built in: `shopkeeper` and `innkeeper` (the trade skill: wares
+and prices are put in front of the model each turn, and `sell()` needs the
+buyer's agreement), `guard`, `quest_giver`, `companion` (follows the
+player by itself), `villager`. Sellers take `"prices"`: asking price, or
+`[asking, lowest]`.
+
+```json
+"agents": [{ "id": "mog", "role": "shopkeeper", "personality": "gruff orc trader",
+  "inventory": { "items": ["magic sword", { "name": "healing potion", "qty": 3 }] },
+  "prices": { "magic sword": [50, 40], "healing potion": 8 } }]
+```
+
+Characters also keep their own feelings, hunger, memories and goals (the
+game tracks them; `"needs": false` turns hunger off, `"lore"` lists world
+facts they may know, an agent's `"backstory"` and `"knows"` its own).
+
+## Packages (shared content)
+
+`"packages": ["smithy", "npm:tablefolk-smithy@1"]` loads a package
+(`tablefolk.json`): object types, skills, roles, workflows and code in one.
+After that its roles and skills are used by id (`"role": "blacksmith"`) and
+its items by type in the map. Built-in example: `smithy` (a `blacksmith`
+role, `smithing` skill with `forge(thing)`, `smith_anvil` and `bellows`
+objects). Format and publishing: `docs/PACKAGES.md` in the repository.
 
 ## Workflows (keep small models on track)
 

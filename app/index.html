@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261023g" />
+  <link rel="stylesheet" href="style.css?v=20261024a" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -260,6 +260,14 @@
         <button id="saveCharacterPreset" type="button" title="Save the selected character's body + mind + voice">save selected</button><button id="spawnCharacterPreset" type="button">spawn</button><button id="applyCharacterPreset" type="button" title="Apply this saved character's mind to the selected character">apply to selected</button><button id="deleteCharacterPreset" type="button" class="danger-btn">delete</button>
       </div>
       <small class="pane-note">saving a character snapshots the currently selected character's body, personality, voice and settings.</small>
+      <div class="section-subtitle">Packages, skills, roles, asset packs</div>
+      <small class="pane-note">The official list (registry/index.json), plus npm packages and GitHub repos tagged <code>tablefolk</code>. Community ones are not reviewed; ones marked "code" ask before their code runs.</small>
+      <div class="lib-row"><input id="pkgSearch" type="text" placeholder="search (empty: everything)" /><select id="pkgKind"><option value="">all kinds</option><option value="package">packages</option><option value="skill">skills</option><option value="role">roles</option><option value="pack">asset packs</option></select></div>
+      <div class="row"><button id="pkgSearchGo" type="button">search</button><label title="GitHub allows 10 searches a minute without a login"><input id="pkgGithub" type="checkbox" /> GitHub too</label></div>
+      <div id="pkgStatus" class="pane-note"></div>
+      <div id="pkgResults"></div>
+      <div class="section-subtitle">Code allowed in this browser</div>
+      <div id="pkgTrust"></div>
     </section>
 
     <section class="pane" id="pane-voice">
@@ -372,6 +380,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261024a"></script>
+  <script src="preflight.js?v=20261024b"></script>
 </body>
 </html>

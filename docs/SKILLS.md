@@ -160,12 +160,14 @@ what a character's job is, what it can do, and what things look like.
   Suggested name prefix: `tablefolk-skill-`.
 - **GitHub**: tag a release; reference `gh:user/repo@tag/path`.
 
+Skills and roles can also travel inside a package (`tablefolk.json`)
+with models, workflows and code: docs/PACKAGES.md, which also covers how
+they are found (the official list, npm, GitHub) and the trust rules for code.
+
 ## Ideas next
 
-- A skill browser pane listing `/api/skills` and searching npm for
-  `tablefolk-skill-*` (the npm registry search API allows CORS).
-- Skills that bring their own workflows (a "merchant" skill with a haggle
-  routine) and their own asset packs (a wand model for magic).
+- Skills that start their package's workflows on cue (a "merchant" skill
+  with a haggle routine).
 - Passive skills: modifiers instead of commands (armour that reduces damage,
   "keen eyes" that widens the senses' radius).
 - Learning: a `teach(skill)` command so characters pass skills on, with

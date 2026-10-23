@@ -1,0 +1,109 @@
+{
+  "about": "The official list of Tablefolk packages. Built-in entries are rebuilt by tools/registry.mjs; add yours to \"community\" in a pull request. Also found in the app: npm packages and GitHub repos with the keyword/topic \"tablefolk\".",
+  "version": 1,
+  "builtin": [
+    {
+      "kind": "skill",
+      "ref": "bard",
+      "name": "Bard",
+      "description": "Songs that affect everyone who hears them (an example of a skill with a code module).",
+      "version": "1.0.0",
+      "code": true
+    },
+    {
+      "kind": "skill",
+      "ref": "healing",
+      "name": "Healing",
+      "description": "Bind wounds with bandages: a slower, mana-free heal.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "skill",
+      "ref": "magic",
+      "name": "Magic",
+      "description": "Cast spells from a spellbook, paid for with mana that comes back slowly.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "skill",
+      "ref": "thievery",
+      "name": "Thievery",
+      "description": "Pick pockets: lift an item or a few coins from someone next to you.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "skill",
+      "ref": "trade",
+      "name": "Trade",
+      "description": "Buys and sells: wares and prices on the state card, offers read from the customer's words, a lowest price, sales only when the buyer agrees.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "companion",
+      "name": "Companion",
+      "description": "Travels with the player: keeps up (run by code), helps, talks about what it sees.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "guard",
+      "name": "Guard",
+      "description": "Keeps watch, questions strangers, stands up to trouble.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "innkeeper",
+      "name": "Innkeeper",
+      "description": "Keeps the inn: sells food, drink and beds, and passes on gossip.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "quest_giver",
+      "name": "Quest giver",
+      "description": "Needs help with something: gives a quest and a reward.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "shopkeeper",
+      "name": "Shopkeeper",
+      "description": "Runs a shop: sells its wares at its prices, haggles a little, never under its lowest price.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "role",
+      "ref": "villager",
+      "name": "Villager",
+      "description": "Lives here: chats and shares what it knows about the place.",
+      "version": "1.0.0",
+      "code": false
+    },
+    {
+      "kind": "package",
+      "ref": "smithy",
+      "name": "Smithy",
+      "description": "An example package with one of everything: a blacksmith role, a smithing skill, an anvil you can strike, and a little code (the smith hammers between customers; the bellows).",
+      "version": "1.0.0",
+      "code": true,
+      "has": [
+        "items",
+        "skills",
+        "roles",
+        "modules"
+      ]
+    }
+  ],
+  "community": []
+}

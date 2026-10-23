@@ -469,3 +469,14 @@ html:fullscreen #ttBar { display:none; }
 #giveGold input { width:5em; }
 /* roles.js: a shopkeeper's offer the player can accept */
 #shopOffer { position:fixed; z-index:121; left:50%; bottom:96px; transform:translateX(-50%); display:flex; gap:8px; align-items:center; padding:8px 12px; border-radius:10px; font:13px system-ui, sans-serif; color:#eee; background:rgba(28,30,34,.96); border:1px solid #4a4f57; box-shadow:0 6px 20px rgba(0,0,0,.45); }
+
+/* registry.js: the Library pane's package list */
+#pkgResults { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.pkg-row { border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 8px; background: rgba(255,255,255,.03); }
+.pkg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pkg-tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.1); }
+.pkg-src-builtin, .pkg-src-official { background: rgba(120,200,140,.22); }
+.pkg-code { background: rgba(230,170,80,.25); }
+.pkg-desc { font-size: 12px; opacity: .85; margin: 4px 0; }
+.pkg-ref { font-size: 11px; opacity: .75; overflow-wrap: anywhere; margin-bottom: 4px; }
+.pkg-trust-row { display: flex; gap: 6px; align-items: center; font-size: 11px; overflow-wrap: anywhere; }

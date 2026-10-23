@@ -31,6 +31,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "floor": "stone",                                      // optional: paint the whole floor
   "paint": [{ "x": 0, "z": 0, "mat": "water" }],          // optional explicit floor tiles
   "packs": ["https://example.com/my-pack/pack.json"],    // optional extra asset packs (section 4c)
+  "packages": ["smithy", "npm:tablefolk-smithy@1"],     // optional packages: items, skills, roles, workflows, code (docs/PACKAGES.md)
   "lore": ["The mill burned down last winter."],         // world facts characters may bring up (docs/MINDS.md)
   "needs": true,                                         // hunger and tiredness (false: off); "mind": false turns the whole mind off
   "food": ["mushroom stew", { "name": "elf bread", "nourish": 0.9 }],   // more things characters can eat (besides everyday food and pack items tagged "food")
