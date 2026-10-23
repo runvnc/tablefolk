@@ -290,10 +290,11 @@ button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}bu
 #tableView .tvbar{display:flex;gap:10px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line)}#tableView iframe{flex:1;border:0;width:100%}
 #editor fieldset.ask textarea{width:100%}
 #mapView{position:fixed;inset:0;background:rgba(10,8,6,.55);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px}#mapView[hidden]{display:none}
-.mapcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
+.maptip{position:absolute;pointer-events:none;z-index:5;max-width:280px;background:rgba(20,18,16,.94);color:#f4eee4;border:1px solid #6b5b45;border-radius:8px;padding:6px 9px;font-size:12.5px;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.4)}.maptip hr{border:0;border-top:1px solid #5a4c3a;margin:5px 0}.maptip .muted{color:#b9ab95}
+.mapcard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261023a"></script><script src="/app/builder.js?v=20261023c"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261023a"></script><script src="/app/builder.js?v=20261023d"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 if(f){ f.mode.value=qs.get('mode')||'auto';

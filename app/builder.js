@@ -206,13 +206,13 @@
     const legend = { ...GLYPHS }; for (const [k, v] of Object.entries(s.legend || {})) legend[k] = String(v);
     const who = [];
     const agents = s.agents || [];
-    agents.forEach((a, i) => { if (Array.isArray(a.at)) who.push({ name: a.id, rc: rc(a.at[0], a.at[1]), hostile: a.hostile ?? MINDLESS.has(a.model) }); });
+    agents.forEach((a, i) => { if (Array.isArray(a.at)) who.push({ name: a.id, rc: rc(a.at[0], a.at[1]), hostile: a.hostile ?? MINDLESS.has(a.model), a }); });
     grid.forEach((row, r) => [...row].forEach((ch, c) => {
-      if (/[1-9]/.test(ch) && agents[+ch - 1] && !who.some(w => w.name === agents[+ch - 1].id)) { const a = agents[+ch - 1]; who.push({ name: a.id, rc: [r, c], hostile: a.hostile ?? MINDLESS.has(a.model) }); }
-      if ((ch === 'Y' || ch === '@') && !s.player?.at) who.push({ name: 'you', rc: [r, c], player: true });
+      if (/[1-9]/.test(ch) && agents[+ch - 1] && !who.some(w => w.name === agents[+ch - 1].id)) { const a = agents[+ch - 1]; who.push({ name: a.id, rc: [r, c], hostile: a.hostile ?? MINDLESS.has(a.model), a }); }
+      if ((ch === 'Y' || ch === '@') && !s.player?.at) who.push({ name: 'you', rc: [r, c], player: true, a: s.player });
     }));
-    if (Array.isArray(s.player?.at)) who.push({ name: 'you', rc: rc(s.player.at[0], s.player.at[1]), player: true });
-    const things = (s.objects || []).filter(o => Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.type !== 'light').map(o => ({ type: o.type, rc: rc(+o.x, +o.z) }));
+    if (Array.isArray(s.player?.at)) who.push({ name: 'you', rc: rc(s.player.at[0], s.player.at[1]), player: true, a: s.player });
+    const things = (s.objects || []).filter(o => Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.type !== 'light').map(o => ({ type: o.type, rc: rc(+o.x, +o.z), o }));
     return { grid, H, W, legend, who, things, places: places.map(p => ({ id: p.id, rc: p.center ? rc(p.center[0], p.center[1]) : null })).filter(p => p.rc), unplaced: agents.filter(a => !who.some(w => w.name === a.id)).map(a => a.id) };
   }
   function floorOf(v) {
@@ -246,6 +246,34 @@
       ctx.font = `700 ${Math.max(11, Math.round(cell * .55))}px system-ui`; const tw = ctx.measureText(w.name).width + 8;
       ctx.fillStyle = 'rgba(20,18,16,.8)'; ctx.fillRect(x - tw / 2, y + cell * .45, tw, Math.max(14, cell * .7)); ctx.fillStyle = '#fff'; ctx.fillText(w.name, x, y + cell * .45 + Math.max(14, cell * .7) / 2);
     }
+    // Tooltips: who and what is under the pointer.
+    const cv = v.querySelector('canvas'), tip = document.createElement('div'); tip.className = 'maptip'; tip.hidden = true; v.querySelector('.mapcard').appendChild(tip);
+    cv.addEventListener('mouseleave', () => { tip.hidden = true; });
+    cv.addEventListener('mousemove', e => {
+      const b = cv.getBoundingClientRect(), c = Math.floor((e.clientX - b.left) / b.width * L.W), r = Math.floor((e.clientY - b.top) / b.height * L.H);
+      const html = mapTip(L, r, c);
+      tip.hidden = !html; if (!html) return;
+      tip.innerHTML = html;
+      const card = v.querySelector('.mapcard').getBoundingClientRect();
+      tip.style.left = Math.min(e.clientX - card.left + 14, card.width - tip.offsetWidth - 6) + 'px';
+      tip.style.top = (e.clientY - card.top + 16) + 'px';
+    });
+  }
+  function mapTip(L, r, c) {
+    const near = p => p.rc[0] === r && p.rc[1] === c, out = [];
+    for (const w of L.who.filter(near)) {
+      const a = w.a || {}, bits = [a.model || (w.player ? '' : 'critter'), w.player ? 'the player' : w.hostile ? 'hostile' : 'talks'].filter(Boolean);
+      const more = [a.personality, a.goal || a.goals, a.items?.length ? 'carries: ' + [].concat(a.items).map(i => i?.name || i).join(', ') : '', a.gold ? a.gold + ' gold' : ''].filter(Boolean).map(t => esc(String(t).slice(0, 140)));
+      out.push(`<b>${esc(w.name)}</b> <span class="muted">${esc(bits.join(' · '))}</span>${more.length ? '<br>' + more.join('<br>') : ''}`);
+    }
+    for (const t of L.things.filter(near)) {
+      const o = t.o, extra = [o.name || o.label, o.text || o.note, o.items ? 'holds: ' + [].concat(o.items).map(i => i?.name || i).join(', ') : '', o.gold ? o.gold + ' gold' : '', o.locked ? 'locked' : ''].filter(Boolean).map(x => esc(String(x).slice(0, 140)));
+      out.push(`<b>${esc(t.type.replace(/_/g, ' '))}</b>${extra.length ? '<br>' + extra.join('<br>') : ''}`);
+    }
+    const ch = [...(L.grid[r] || '')][c];
+    if (ch && ch !== ' ' && ch !== '.') { const val = L.legend[ch]; if (val && val !== 'player' && !/[1-9Y@]/.test(ch)) out.push(`<span class="muted">${esc(ch)}</span> ${esc(String(val).replace(/_/g, ' '))}`); }
+    const pl = L.places.find(near); if (pl) out.push(`<span class="muted">place:</span> ${esc(pl.id)}`);
+    return out.join('<hr>');
   }
 
   window.tfBuilder = {
