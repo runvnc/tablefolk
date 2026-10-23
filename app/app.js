@@ -3807,7 +3807,8 @@ const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
   woodsman:{h:1.36}, huntress:{h:1.3}, peasant:{h:1.34}, peasant_woman:{h:1.28},
   adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
-  skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{h:1.26}, zombie:{h:1.28}, goblin:{h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,ry:Math.PI,v:'20261024a'}, orc_classic:{file:'orc',h:1.45},
+  skeleton:{h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,ry:Math.PI,v:'20261024a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,ry:Math.PI,v:'20261024a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
+  troll:{dir:'meshy',h:2.15,ry:Math.PI,v:'20261024a'}, skeleton_farmer:{dir:'meshy',h:1.32,ry:Math.PI,v:'20261024a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,ry:Math.PI,v:'20261024a'}, orc_classic:{file:'orc',h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{h:.85}, bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
 };
 const FIG_CLIPS={

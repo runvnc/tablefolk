@@ -1,0 +1,15 @@
+## remembers through small talk
+I keep thinking about my brother. I hope we find Tomas soon.
+Nice weather today, isn't it?
+What do you think of this place?
+Do you ever miss your home?
+Tell me a joke, Finn.
+What's your favourite food?
+Should we rest a while?
+Who are we looking for again? Remind me.
+win: {"said":["finn","tomas"]}
+
+## knows the road
+Which way should we go from here?
+Is it safe up north?
+win: {"any":[{"said":["finn","bandit"]},{"said":["finn","varrow"]},{"said":["finn","keep"]}]}

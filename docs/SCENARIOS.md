@@ -79,7 +79,8 @@ adventurer_woman hooded king farmer villager witch wizard`, and the realistic
 Quaternius's Universal rig, `tools/build-figures.sh`); monsters
 `skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost
 slime demon giant dragon` (Quaternius models with their own animations,
-`app.js` `FIGURES`); and the older chibi KayKit people `woman rogue knight
+`app.js` `FIGURES`; `orc` is a grittier one made with Meshy, the old one is
+`orc_classic`, see `assets/models/characters/meshy/`); and the older chibi KayKit people `woman rogue knight
 mage ranger barbarian`, or the clay `critter`.
 
 **Hostile characters** (`play.js`): an agent with `"hostile": true` (default

@@ -1,0 +1,8 @@
+{"v":1,"title":"Eval: companion and memory","base":"plain","size":[11,9],"lighting":"bright",
+ "player":{"name":"Ana","gold":10,"items":[],"at":[0,2]},
+ "allowed":["say","emote"],
+ "lore":["The road north leads to the ruined keep of Varrow.","Bandits have been seen on the north road."],
+ "agents":[{"id":"finn","model":"woodsman","at":[1,2],"facing":"w","role":"companion",
+   "personality":"a loyal, good-humoured ranger who has travelled with Ana for a year. Dry wit, brave, protective.",
+   "knows":["Ana is looking for her lost brother Tomas.","Finn owes Ana his life since the bridge collapse."]}],
+ "goal":{"text":"Travel with Finn.","maxTurns":14}}

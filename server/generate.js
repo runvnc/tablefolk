@@ -37,7 +37,7 @@ const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'jave
 const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
 const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian',
   'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
-  'skeleton', 'skeleton_warrior', 'zombie', 'goblin', 'kobold', 'orc', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
+  'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'troll', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
 const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };
 
 export function encodeScenario(obj) {

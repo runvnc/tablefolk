@@ -74,6 +74,20 @@ Status 2026-10-23: built (mind.js, roles.js, director, headless evals); open: Em
    and GitHub topic `tablefolk`, Library pane; `docs/PACKAGES.md`.
    Not yet: the Library pane is dev-only; no in-game browser for players.
 
+## Refinement hour (2026-10-23, from 16:25)
+
+Goal from the user: something people are genuinely impressed by, not
+frustrated by; most things fine on E2B. Test thoroughly; keep improving the
+3D models (fal.ai budget: about $10).
+
+- Smart memory with EmbeddingGemma 2 in the browser (approved download).
+- Fixes found by evals (see commit log): silent actions, sales across the
+  room, trade cues at the end, give_quest to the player, nested commands,
+  third-person talk about the player, unknown emotes dancing, materials
+  for sale, recipe limits, lore always available.
+- Monsters from Meshy via fal.ai: orc (done), goblin, skeleton warrior,
+  zombie, troll (in progress).
+
 ## Earlier, still open
 
 - **Better monsters:** fal.ai (`FAL_API_KEY` in `.env`) generate + Meshy rig
