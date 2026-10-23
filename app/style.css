@@ -442,7 +442,9 @@ html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toast
 html.tabletop body { background:#1b1d1f; overflow:hidden; }
 html.tabletop #renderCanvas, #ttOverlay { position:fixed; left:0; top:var(--tt-top, 44px); width:100vw; height:calc(100vh - var(--tt-top, 44px)); }
 #ttOverlay { pointer-events:none; z-index:5; }
-html.tt-edit #renderCanvas { cursor:crosshair; }
+html.tabletop #renderCanvas { cursor:grab; touch-action:none; }
+html.tabletop.tt-edit #renderCanvas { cursor:crosshair; }
+html.tabletop.tt-panning #renderCanvas { cursor:grabbing; }
 #ttBar { position:fixed; left:0; right:0; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:7px 12px; font:13px system-ui, sans-serif; color:#e9ece6;
   background:#24272b; border-bottom:1px solid #3a3e44; }
 #ttBar label { display:inline-flex; gap:4px; align-items:center; cursor:pointer; white-space:nowrap; }

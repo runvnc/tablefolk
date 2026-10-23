@@ -15,6 +15,9 @@
  *   every position fixed (tablefolkScenario.freezeLayout) to the world
  *   builder that opened this page in a frame (postMessage
  *   {type:'tablefolk-layout', scenario}); opened on its own it downloads it.
+ * - Zoom and pan: the mouse wheel zooms about the pointer, dragging empty
+ *   space pans (any square with the middle or right button), double-click or
+ *   0 fits the board, + / - zoom, arrows pan; two fingers pinch and pan.
  * Game input is off: nobody walks, fights or takes turns here.
  */
 (function () {
@@ -30,6 +33,9 @@
   try { const h = JSON.parse(localStorage.getItem('tablefolk.tabletop') || '{}'); for (const k of ['grid', 'labels', 'bright']) if (typeof h[k] === 'boolean') opt[k] = h[k]; if (h.outside) opt.outside = h.outside; } catch {}
   const saveOpts = () => { try { localStorage.setItem('tablefolk.tabletop', JSON.stringify({ grid: opt.grid, labels: opt.labels, bright: opt.bright, outside: opt.outside })); } catch {} };
   let cam = null, view = null, overlay = null, sel = null, drag = null, edited = false, flat = null, origLight = null;
+  // zoom: 1 = the whole board fits; (cx, cz) the board point at the middle
+  let zoom = 1, cx = 0, cz = 0, pan = null;
+  const touches = new Map();
   document.documentElement.classList.add('tabletop');
 
   // ---- the camera: straight down, north up (board +z is south, +x west) ----
@@ -49,6 +55,30 @@
   const toPx = (v, x, z) => [(v.hw - (x - v.cx)) / (2 * v.hw) * v.cw, (v.hh + (z - v.cz)) / (2 * v.hh) * v.ch];
   const toWorld = (v, px, py) => [v.cx + v.hw - px / v.cw * 2 * v.hw, v.cz + py / v.ch * 2 * v.hh - v.hh];
 
+  // ---- zoom and pan ----
+  function applyView(cw = view.cw, ch = view.ch) {
+    const f = fit(cw, ch), b = bounds();
+    zoom = Math.max(1, Math.min(zoom, Math.max(b.cols, b.rows) / 3));
+    const hw = f.hw / zoom, hh = f.hh / zoom;
+    // keep some of the board on screen
+    const mx = Math.max(0, f.hw - hw), mz = Math.max(0, f.hh - hh);
+    cx = Math.max(-mx, Math.min(mx, cx)); cz = Math.max(-mz, Math.min(mz, cz));
+    setCam({ ...f, hw, hh, cx, cz }); draw();
+    document.documentElement.classList.toggle('tt-zoomed', zoom > 1.001);
+  }
+  // put board point (wx, wz) under pixel (px, py) at the current zoom
+  function pinTo(wx, wz, px, py) {
+    const f = fit(view.cw, view.ch), hw = f.hw / zoom, hh = f.hh / zoom;
+    cx = wx - hw + px / view.cw * 2 * hw; cz = wz - py / view.ch * 2 * hh + hh;
+  }
+  function zoomAt(factor, px = view.cw / 2, py = view.ch / 2) {
+    const [wx, wz] = toWorld(view, px, py);
+    zoom *= factor; const f = fit(view.cw, view.ch), b = bounds(); zoom = Math.max(1, Math.min(zoom, Math.max(b.cols, b.rows) / 3));
+    pinTo(wx, wz, px, py); applyView();
+  }
+  function fitAll() { zoom = 1; cx = cz = 0; applyView(); }
+  const local = e => { const r = overlay.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
   function setup() {
     const w = W(), st = w.state, scene = st.scene, engine = scene.getEngine();
     try { st.camera.detachControl(); } catch {}
@@ -62,7 +92,7 @@
     const resize = () => {
       const top = document.fullscreenElement ? 0 : $('ttBar').offsetHeight;
       document.documentElement.style.setProperty('--tt-top', top + 'px');
-      engine.resize(); const c = engine.getRenderingCanvas(); setCam(fit(c.clientWidth, c.clientHeight)); draw();
+      engine.resize(); const c = engine.getRenderingCanvas(); if (!view) setCam(fit(c.clientWidth, c.clientHeight)); applyView(c.clientWidth, c.clientHeight);
     };
     addEventListener('resize', () => setTimeout(resize, 30));
     document.addEventListener('fullscreenchange', () => setTimeout(resize, 60));
@@ -219,18 +249,44 @@
   }
   function changed() { edited = true; const b = $('ttUse'); if (b) b.classList.add('hot'); setTimeout(draw, 60); }
   function onDown(e) {
-    if (!opt.edit || e.button !== 0) return;
-    const [x, z] = cellAt(e), t = thingAt(x, z);
-    sel = t; drag = t ? { t, to: null } : null;
-    status(t ? `${t.kind === 'char' ? nameOf(t.g) : t.o.type}: drag to move · R turn · Delete remove` : '');
-    draw(); e.preventDefault();
+    if (!view || !overlay) return;
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, local(e));
+      if (touches.size === 2) { drag = null; pan = { pinch: pinchOf() }; return; }
+    }
+    if (opt.edit && e.button === 0) {
+      const [x, z] = cellAt(e), t = thingAt(x, z);
+      sel = t;
+      if (t) { drag = { t, to: null }; status(`${t.kind === 'char' ? nameOf(t.g) : t.o.type}: drag to move · R turn · Delete remove`); draw(); e.preventDefault(); return; }
+      status(''); draw();
+    }
+    // empty space (or the middle / right button): pan
+    if (e.button <= 2) { const [px, py] = local(e); pan = { w: toWorld(view, px, py), moved: 0, x: e.clientX, y: e.clientY }; document.documentElement.classList.add('tt-panning'); e.preventDefault(); }
   }
-  function onMove(e) { if (!drag) return; const [x, z] = cellAt(e); drag.to = x === drag.t.x && z === drag.t.z ? null : [x, z]; draw(); }
-  function onUp() {
+  function pinchOf() { const [a, b] = [...touches.values()]; return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], w: toWorld(view, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2), zoom }; }
+  function onMove(e) {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) touches.set(e.pointerId, local(e));
+    if (pan?.pinch && touches.size === 2) {
+      const now = pinchOf(), p = pan.pinch;
+      zoom = p.zoom * now.d / p.d; applyView(); pinTo(p.w[0], p.w[1], now.m[0], now.m[1]); applyView(); return;
+    }
+    if (pan) { const [px, py] = local(e); pan.moved = Math.max(pan.moved, Math.hypot(e.clientX - pan.x, e.clientY - pan.y)); pinTo(pan.w[0], pan.w[1], px, py); applyView(); return; }
+    if (!drag) return; const [x, z] = cellAt(e); drag.to = x === drag.t.x && z === drag.t.z ? null : [x, z]; draw();
+  }
+  function onUp(e) {
+    if (e?.pointerType === 'touch') { touches.delete(e.pointerId); if (pan?.pinch) { pan = null; return; } }
+    if (pan) { pan = null; document.documentElement.classList.remove('tt-panning'); return; }
     if (!drag) return;
     const d = drag; drag = null;
     if (d.to) { moveTo(d.t, d.to[0], d.to[1]); sel = thingAt(d.to[0], d.to[1]); }
     draw();
+  }
+  function onWheel(e) {
+    if (!view || !overlay) return;
+    e.preventDefault();
+    // trackpads send small deltas (and pinch as ctrl+wheel); mice send ~100 a notch
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY, [px, py] = local(e);
+    zoomAt(Math.exp(-dy * (e.ctrlKey ? .01 : .0018)), px, py);
   }
   function useLayout() {
     let s; try { s = window.tablefolkScenario.freezeLayout(); } catch (e) { status(e.message); return; }
@@ -260,6 +316,7 @@
       <button type="button" data-tt="png">save PNG</button>
       <button type="button" data-tt="print">print 1" squares</button>
       <button type="button" data-tt="printFit">print on one page</button>
+      <button type="button" data-tt="fit" title="the whole board (double-click, or 0)">fit</button>
       <button type="button" data-tt="full">full screen</button>
       <button type="button" id="ttUse" data-tt="use">${embedded ? 'use this layout in the builder' : 'download scenario with this layout'}</button>
       <span id="ttStatus"></span>`;
@@ -281,6 +338,7 @@
       else if (a === 'print' || a === 'printFit') print(a === 'printFit').catch(err => status('print failed: ' + err.message));
       else if (a === 'full') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); }
       else if (a === 'use') useLayout();
+      else if (a === 'fit') fitAll();
       else if (a === 'allOn') { opt.hidden.clear(); look(); buildList(); }
       else if (a === 'allOff') { for (const g of chars()) opt.hidden.add(g.id); look(); buildList(); }
       else if (a === 'monstersOff') { for (const g of chars()) if (isHostile(g)) opt.hidden.add(g.id); look(); buildList(); }
@@ -294,13 +352,20 @@
     if (opt.edit && sel && (e.key === 'r' || e.key === 'R')) { const s = sel; turn(s); sel = thingAt(s.x, s.z); draw(); }
     else if (opt.edit && sel && (e.key === 'Delete' || e.key === 'Backspace')) { remove(sel); sel = null; draw(); }
     else if (e.key === 'Escape') { sel = null; draw(); }
+    else if (view && (e.key === '+' || e.key === '=')) zoomAt(1.25);
+    else if (view && (e.key === '-' || e.key === '_')) zoomAt(1 / 1.25);
+    else if (view && e.key === '0') fitAll();
+    else if (view && e.key.startsWith('Arrow')) { const step = view.cw * .12, [wx, wz] = toWorld(view, view.cw / 2, view.ch / 2), d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]; pinTo(wx, wz, view.cw / 2 - d[0], view.ch / 2 - d[1]); applyView(); }
     e.stopImmediatePropagation(); if (!e.ctrlKey && !e.metaKey && e.key !== 'F11' && e.key !== 'F5') e.preventDefault();
   }, true);
   addEventListener('keyup', e => { if (!mine(e)) e.stopImmediatePropagation(); }, true);
-  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'click', 'dblclick', 'wheel', 'contextmenu']) {
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'click', 'dblclick', 'wheel', 'contextmenu']) {
     addEventListener(type, e => {
       if (mine(e)) return;
-      if (type === 'pointerdown') onDown(e); else if (type === 'pointermove') onMove(e); else if (type === 'pointerup') onUp(e);
+      if (type === 'pointerdown') onDown(e); else if (type === 'pointermove') onMove(e); else if (type === 'pointerup' || type === 'pointercancel') onUp(e);
+      else if (type === 'wheel') onWheel(e);
+      else if (type === 'dblclick' && !opt.edit) fitAll();
+      else if (type === 'contextmenu') e.preventDefault();
       e.stopImmediatePropagation();
     }, { capture: true, passive: false });
   }
@@ -309,10 +374,10 @@
   // The scenario builds after the scene; set up once both are there (and
   // again when a new scenario starts).
   let ready = false;
-  const start = () => { if (!ready) { ready = true; setup(); } else { opt.hidden.clear(); look(); buildList(); setCam(fit(view.cw, view.ch)); } };
+  const start = () => { if (!ready) { ready = true; setup(); } else { opt.hidden.clear(); look(); buildList(); fitAll(); } };
   addEventListener('tablefolk-scenario-started', () => setTimeout(start, 300));
   // no scenario in the link: show the board as it is
   const fallback = () => setTimeout(() => { if (!ready && !/[#&]s(cenario)?=/.test(location.hash) && !new URLSearchParams(location.search).get('scenario')) start(); }, 1500);
   if (window.TABLEFOLK_SCENE_READY) fallback(); else addEventListener('tablefolk-scene-ready', fallback, { once: true });
-  window.tablefolkTabletop = { render, freeze: () => window.tablefolkScenario.freezeLayout(), toPx: (x, z) => toPx(view, x, z), get options() { return opt; } };
+  window.tablefolkTabletop = { render, freeze: () => window.tablefolkScenario.freezeLayout(), toPx: (x, z) => toPx(view, x, z), zoomAt, fitAll, get view() { return view; }, get options() { return opt; } };
 })();

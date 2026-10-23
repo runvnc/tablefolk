@@ -54,7 +54,7 @@
     ['skills.js?v=20261020a'],
     ['procgen.js?v=20261023a'],
     ['scenario.js?v=20261023b'],
-    ['tabletop.js?v=20261023c'],
+    ['tabletop.js?v=20261023j'],
     ['llm_js/world-integration.js?v=20261023i', 'module'],
   ];
 
