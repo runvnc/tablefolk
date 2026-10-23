@@ -20,12 +20,12 @@
  * gridKey, charInventory, addLampPool); off in tabletop mode.
  */
 (function () {
-  const FOG_H = 2.7, VIEW = 13, NEAR = 1.5, TORCH_R = 3.6;
+  const FLAT_H = 2.5, FOG_H = 2.7, VIEW = 13, NEAR = 1.5, TORCH_R = 3.6;
   // light radius (cells) of objects that light a room, by type
   const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8 };
   const OPAQUE = new Set(['wall', 'door']);
   let dark = false, fogOn = !new URLSearchParams(location.search).has('nofog');
-  let explored = new Set(), seen = new Set(), sig = '', black = null, dim = null, timer = setInterval(() => tick(), 250);
+  let explored = new Set(), seen = new Set(), sig = '', black = null, dim = null, flat = null, timer = setInterval(() => tick(), 250);
 
   // ---- which squares the player sees ----
   const cellOf = p => [Math.round(p.x), Math.round(p.z)];
@@ -62,6 +62,15 @@
     }
     return out;
   }
+  function wallCells() {
+    const out = new Set();
+    for (const m of state.blocks.concat(state.props)) {
+      if (!m || m.isDisposed?.()) continue;
+      const mm = meta(m); if (!mm || mm.decor || !OPAQUE.has(mm.type)) continue;
+      const p = m.getAbsolutePosition?.() || m.position; out.add(gridKey(p.x, p.z));
+    }
+    return out;
+  }
   function compute() {
     const me = state.playerAvatar, vis = new Set(); if (!me) return vis;
     const p = posOf(me), [px, pz] = cellOf(p), opaque = opaqueAround(p.x, p.z), lights = lightSources(), b = board();
@@ -78,29 +87,33 @@
   }
 
   // ---- the fog: black boxes over unexplored squares, dim ones over the rest ----
-  function fogMesh(name, alpha) {
-    const sc = state.scene, m = BABYLON.MeshBuilder.CreateBox(name, { width: 1.003, depth: 1.003, height: FOG_H }, sc);
+  function fogMesh(name, alpha, h = FOG_H) {
+    const sc = state.scene, m = BABYLON.MeshBuilder.CreateBox(name, { width: 1.003, depth: 1.003, height: h }, sc);
     const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
     mat.diffuseColor = mat.specularColor = mat.emissiveColor = BABYLON.Color3.Black(); mat.disableLighting = true;
     if (alpha < 1) { mat.alpha = alpha; mat.disableDepthWrite = true; }
     m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.doNotSyncBoundingInfo = true;
     return m;
   }
-  function place(mesh, keys) {
+  function place(mesh, keys, y = (state.terrainTopY ?? 0) - .3 + FOG_H / 2) {
     if (!keys.length) { mesh.thinInstanceCount = 0; mesh.isVisible = false; return; }
-    const y = (state.terrainTopY ?? 0) - .3 + FOG_H / 2, buf = new Float32Array(keys.length * 16);
+    const buf = new Float32Array(keys.length * 16);
     keys.forEach((k, n) => { const [x, z] = k.split(',').map(Number); BABYLON.Matrix.Translation(x, y, z).copyToArray(buf, n * 16); });
     mesh.thinInstanceSetBuffer('matrix', buf, 16, false); mesh.isVisible = true;
   }
   function paint() {
-    const b = board(), unknown = [], remembered = [];
+    const b = board(), unknown = [], outside = [], remembered = [], walls = wallCells(), w = window.tablefolk;
     for (let i = 0; i < b.cols; i++) for (let j = 0; j < b.rows; j++) {
-      const k = Math.round(b.x0 + i) + ',' + Math.round(b.z0 + j);
-      if (!explored.has(k)) unknown.push(k); else if (!seen.has(k)) remembered.push(k);
+      const x = Math.round(b.x0 + i), z = Math.round(b.z0 + j), k = x + ',' + z;
+      // nothing stands where there is neither floor nor wall (the sea round a
+      // dungeon): a flat lid at floor level, so the outsides of the walls of
+      // the rooms you see stay in view
+      if (!explored.has(k)) (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k);
+      else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
-    black ||= fogMesh('board_fog_black', 1); dim ||= fogMesh('board_fog_dim', .62);
-    place(black, unknown); place(dim, remembered);
+    black ||= fogMesh('board_fog_black', 1); dim ||= fogMesh('board_fog_dim', .62); flat ||= fogMesh('board_fog_flat', 1, FLAT_H);
+    place(black, unknown); place(dim, remembered); place(flat, outside, (state.terrainTopY ?? 0) - .02 - FLAT_H / 2);
   }
   function showCharacters(all) {
     for (const g of state.characters) {
@@ -118,8 +131,8 @@
     showCharacters(false);
   }
   function clearFog() {
-    for (const m of [black, dim]) if (m) { m.dispose(false, true); }
-    black = dim = null; sig = '';
+    for (const m of [black, dim, flat]) if (m) { m.dispose(false, true); }
+    black = dim = flat = null; sig = '';
     showCharacters(true);
   }
 

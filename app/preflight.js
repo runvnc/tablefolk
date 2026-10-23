@@ -47,7 +47,7 @@
     ['app.js?v=20261023i'],
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261023l'],
-    ['darkness.js?v=20261023m'],
+    ['darkness.js?v=20261023o'],
     ['senses.js?v=20261020d'],
     ['play.js?v=20261023m'],
     ['speech-input.js?v=20261020a'],
