@@ -44,6 +44,9 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 // scene.render() both no-op) so only the UI widgets stay live. Used to isolate
 // whether heavy 3D draw work is contributing to perceived LLM response latency.
 const TABLEFOLK_FORCE_NO_RENDER = new URLSearchParams(location.search).has('norender');
+// ?fps=N caps the frame rate for this page (headless tests that render the
+// scene but should leave the GPU to the model).
+const TABLEFOLK_FPS_CAP = Math.max(0, +new URLSearchParams(location.search).get('fps') || 0);
 // Dev escape hatch: ?webgl=1 forces the WebGL2 engine. Needed because headless
 // swiftshader advertises WebGPU but then loses the device, which makes the real
 // app impossible to screenshot for art review. Not a supported user path.
@@ -5008,6 +5011,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   scene.onBeforeRenderObservable.add(()=>{ if(TABLEFOLK_FORCE_NO_RENDER) return; const now=performance.now(), dt=Math.min(.1,(now-lastAnimAt)/1000); lastAnimAt=now; window.TablefolkPerf?.begin('animate.characters'); animate(dt); window.TablefolkPerf?.end('animate.characters'); }); engine.runRenderLoop(()=>{
     if(TABLEFOLK_FORCE_NO_RENDER) return;
     if(window.TABLEFOLK_PAUSE_RENDER){ const fps=thinkFps(); if(fps<=0) return; if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
+    if(TABLEFOLK_FPS_CAP && performance.now()-lastFrameAt<1000/TABLEFOLK_FPS_CAP) return;
     lastFrameAt=performance.now();
     scene.render();
     const recorder=window.tablefolkFrameRecorder;

@@ -55,6 +55,15 @@ Scenario pane's format, plus `act:` lines and per-tactic `win:`/`lose:`, see
 docs/SCENARIOS.md section 7) and prints every turn: what the player said,
 what the character said and the commands it ran. `--prompts` keeps the full
 prompt of each turn in the saved JSON (`results/agent-<name>-<ts>.json`).
+`--render` plays it with the 3D scene drawing too, cheaply: light quality
+(`?gfx=light`: voxel look, no shadow maps or moving sea), 10 fps
+(`?fps=10`), a 640x360 page (`--render=medium`, `--fps=N`, `--size=WxH`
+change them), and saves an image of the scene after each turn to
+`results/shots-<name>-<ts>/`. Use it for anything that needs everything
+working together (walking, combat, darkness, objects); about 2.1 GB of GPU
+memory with the model. Headless Chrome leaves the WebGPU canvas black in
+page screenshots, so the images are read from the canvas (no UI in them);
+`SHOT_CANVAS=1 node shot.mjs out.jpg` does the same by hand.
 Evals live in `evals/`: `shop` (prices in the personality), `shop-role` (the
 shopkeeper role), `feelings` (does a character remember being hit or given
 gold, five turns later).

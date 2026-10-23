@@ -24,7 +24,7 @@
     try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
     catch { return { ...DEFAULTS }; }
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {} }
+  function save() { if (window.TABLEFOLK_GFX_NOSAVE) return; try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {} }
   function clampEvery(v) { v = parseInt(v, 10); if (!Number.isFinite(v) || v < 1) v = 1; return Math.min(10, v); }
 
   // Read synchronously at script-load time (this file loads before
@@ -39,6 +39,15 @@
   // Tabletop view (?tabletop=1): 1k textures, no shadow maps or moving sea,
   // for this page only (nothing is saved).
   if (window.TABLEFOLK_TABLETOP) Object.assign(settings, { quality: 'medium', lite: false, keyShadowEnabled: false, campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
+  // ?gfx=light|medium|high sets the quality for this page only (nothing is
+  // saved), with shadow maps and the moving sea off below high: for headless
+  // tests that need the whole game running at low cost.
+  const gfxParam = new URLSearchParams(location.search).get('gfx');
+  if (['high', 'medium', 'light'].includes(gfxParam)) {
+    Object.assign(settings, { quality: gfxParam, lite: gfxParam === 'light' });
+    if (gfxParam !== 'high') Object.assign(settings, { keyShadowEnabled: false, campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
+    window.TABLEFOLK_GFX_NOSAVE = true;
+  }
   window.TABLEFOLK_GFX = settings;
   // Generated models ship with four 4096px textures each (~360 MB of GPU
   // memory per model with mipmaps). Medium/light load the .1k.glb copies
