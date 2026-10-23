@@ -5,6 +5,8 @@
  *              go to you), pick up an item (potion, scroll, axe...), read a
  *              note, or talk to the character there (selects it, focuses chat)
  *   walk over  gold (coin piles) is picked up on its own
+ *   give       drag an item (or the gold) from the Adventurer pane onto a
+ *              character close by, or press its "give" button (the nearest)
  *   I          the Adventurer pane: health, gold, what you carry (drink a
  *              potion, wield or put away a weapon, drop)
  *
@@ -173,13 +175,14 @@
     const goal = window.tablefolkScenario?.active?.scn?.goal?.text;
     box.innerHTML = `
       ${g ? `<div class="adv-stat"><span>Health</span><span class="hp-bar"><span style="width:${Math.round(100 * hp.hp / hp.max)}%"></span></span><b>${hp.hp}/${hp.max}</b></div>` : '<p class="pane-note">No avatar in this world.</p>'}
-      <div class="adv-stat"><span>Gold</span><b class="adv-gold">${state.player?.gold || 0}</b></div>
+      <div class="adv-stat adv-drag" draggable="${state.player?.gold > 0}" data-give="gold" title="drag onto a character to give gold"><span>Gold</span><b class="adv-gold">${state.player?.gold || 0}</b></div>
       <div class="adv-stat"><span>Wielding</span><b>${w ? esc(w) : 'bare hands'}</b></div>
       ${goal ? `<div class="section-subtitle">Goal</div><p class="adv-goal">${esc(goal)}</p>` : ''}
       <div class="section-subtitle">Carrying</div>
       ${items.length ? `<ul class="adv-items">${items.map(i => {
         const n = esc(i.name), weapon = C?.weaponFor(i.name), held = w && w.toLowerCase() === i.name.toLowerCase();
-        return `<li><span>${n}${(i.qty ?? 1) > 1 ? ` <small>x${i.qty}</small>` : ''}</span><span class="adv-acts">
+        return `<li class="adv-drag" draggable="true" data-give="${n}" title="drag onto a character to give it"><span>${n}${(i.qty ?? 1) > 1 ? ` <small>x${i.qty}</small>` : ''}</span><span class="adv-acts">
+          <button data-act="give" data-item="${n}" title="give to the nearest character (or drag the item onto one)">give</button>
           ${POTION.test(i.name) ? `<button data-act="drink" data-item="${n}">drink</button>` : ''}
           ${weapon ? `<button data-act="${held ? 'unwield' : 'wield'}" data-item="${n}">${held ? 'put away' : 'wield'}</button>` : ''}
           <button data-act="drop" data-item="${n}" title="drop">✕</button></span></li>`;
@@ -199,6 +202,90 @@
     else if (act === 'drop') drop(name);
     else if (act === 'wield' && g) { window.tablefolkCombat?.wield(g, name); render(); }
     else if (act === 'unwield' && g) { window.tablefolkCombat?.wield(g, 'none'); render(); }
+    else if (act === 'give') { const c = nearestTaker(); if (c) giveTo(c, name); else toast('nobody close enough to give it to', 'warn'); }
+  });
+
+  // ---------------------------------------------------------------- giving
+  // Drag an item or the gold from the Adventurer pane onto a character (or
+  // "give" hands it to the nearest one). The character gets it in its
+  // inventory, and hears about it as something said to it, so it reacts.
+  const GIVE_REACH = 3.2;
+  const takers = () => state.characters.filter(c => c.root && !c.defeated && !getBrainConfig(c.id).defeated && c !== me());
+  const distTo = c => { const p = myPos(), q = c.logicalPos || c.root.position; return p ? Math.hypot(p.x - q.x, p.z - q.z) : Infinity; };
+  function nearestTaker() { let best = null; for (const c of takers()) if (distTo(c) <= GIVE_REACH && (!best || distTo(c) < distTo(best))) best = c; return best; }
+  // the character drawn nearest a screen point (its middle, within 80 px)
+  function characterAt(x, y) {
+    const scene = state.scene, cam = scene?.activeCamera; if (!cam) return null;
+    const r = scene.getEngine().getRenderingCanvas().getBoundingClientRect(), vp = cam.viewport.toGlobal(r.width, r.height);
+    let best = null, bd = 80;
+    for (const c of takers()) {
+      const q = c.root.getAbsolutePosition(), s = BABYLON.Vector3.Project(new BABYLON.Vector3(q.x, q.y + .7, q.z), BABYLON.Matrix.Identity(), scene.getTransformMatrix(), vp);
+      if (s.z < 0 || s.z > 1) continue;
+      const d = Math.hypot(s.x + r.left - x, s.y + r.top - y); if (d < bd) { bd = d; best = c; }
+    }
+    return best;
+  }
+  function giveTo(c, what, amount) {
+    if (!me() || me().defeated) return;
+    if (distTo(c) > GIVE_REACH) { toast(`walk closer to ${c.id} first`, 'warn'); return; }
+    const inv = charInventory(c), who = playerName();
+    let given;
+    if (what === 'gold') {
+      const n = Math.min(state.player.gold || 0, Math.max(0, Math.round(+amount || 0))); if (!n) return;
+      state.player.gold -= n; inv.gold = (inv.gold || 0) + n; given = n + ' gold';
+      sfx('coins', posOf(c.root));
+    } else {
+      const it = findItem(state.player.items, what); if (!it || !(it.qty ?? 1)) return;
+      if (state.player.wielding && state.player.wielding.toLowerCase() === it.name.toLowerCase()) window.tablefolkCombat?.wield(me(), 'none');
+      it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) state.player.items.splice(state.player.items.indexOf(it), 1);
+      addItem(inv.items, it.name); given = 'the ' + it.name;
+    }
+    const cfg = getBrainConfig(c.id);
+    cfg.inventory = inv;
+    cfg.pendingChat = (cfg.pendingChat || []).concat([`(${who} gives you ${given}.)`]).slice(-5);
+    setBrainConfig(c.id, cfg);
+    emitBadge(c, '+' + given.replace(/^the /, ''));
+    note(`${who} gives ${c.id} ${given}`);
+    inventoryChanged(); render(); acted('give');
+  }
+  // how much gold: a small box where it was dropped
+  function askGold(c, x, y) {
+    document.getElementById('giveGold')?.remove();
+    const have = state.player.gold || 0; if (!have) return;
+    const box = document.createElement('form'); box.id = 'giveGold';
+    box.innerHTML = `<span>Give ${esc(c.id)}</span><input type="number" min="1" max="${have}" value="${Math.min(10, have)}"> <span>gold</span><button>give</button><button type="button" data-x>✕</button>`;
+    box.style.left = Math.min(x, innerWidth - 260) + 'px'; box.style.top = Math.max(8, y - 50) + 'px';
+    document.body.appendChild(box);
+    const inp = box.querySelector('input'); inp.focus(); inp.select();
+    box.addEventListener('submit', e => { e.preventDefault(); box.remove(); giveTo(c, 'gold', inp.value); });
+    box.querySelector('[data-x]').onclick = () => box.remove();
+    box.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') box.remove(); });
+  }
+  let dragging = null;
+  const hint = () => { let h = document.getElementById('giveHint'); if (!h) { h = document.createElement('div'); h.id = 'giveHint'; document.body.appendChild(h); } return h; };
+  document.addEventListener('dragstart', e => {
+    const d = e.target.closest?.('#advPane [data-give]'); if (!d) return;
+    dragging = d.dataset.give;
+    e.dataTransfer.setData('text/plain', dragging); e.dataTransfer.effectAllowed = 'move';
+  });
+  document.addEventListener('dragend', () => { dragging = null; hint().classList.remove('show'); });
+  const overCanvas = e => e.target?.id === 'renderCanvas';
+  document.addEventListener('dragover', e => {
+    if (!dragging || !overCanvas(e)) { if (dragging) hint().classList.remove('show'); return; }
+    e.preventDefault();
+    const c = characterAt(e.clientX, e.clientY), h = hint();
+    e.dataTransfer.dropEffect = c ? 'move' : 'none';
+    h.textContent = c ? (distTo(c) > GIVE_REACH ? `${c.id} is too far away` : `give to ${c.id}`) : 'drop on a character';
+    h.classList.toggle('far', !c || distTo(c) > GIVE_REACH);
+    h.style.left = e.clientX + 14 + 'px'; h.style.top = e.clientY + 12 + 'px'; h.classList.add('show');
+  });
+  document.addEventListener('drop', e => {
+    if (!dragging || !overCanvas(e)) return;
+    e.preventDefault(); hint().classList.remove('show');
+    const what = dragging, c = characterAt(e.clientX, e.clientY); dragging = null;
+    if (!c) return;
+    if (what === 'gold') { if (distTo(c) > GIVE_REACH) toast(`walk closer to ${c.id} first`, 'warn'); else askGold(c, e.clientX, e.clientY); }
+    else giveTo(c, what);
   });
   window.addEventListener('tablefolk-inventory', render);
 

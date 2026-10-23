@@ -48,7 +48,7 @@
     ['scenery.js?v=20261019ze'],
     ['combat.js?v=20261023i'],
     ['senses.js?v=20261020d'],
-    ['play.js?v=20261023c'],
+    ['play.js?v=20261023k'],
     ['speech-input.js?v=20261020a'],
     ['workflows.js?v=20261020a'],
     ['skills.js?v=20261020a'],

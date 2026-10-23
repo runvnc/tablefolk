@@ -460,3 +460,10 @@ html.tabletop.tt-panning #renderCanvas { cursor:grabbing; }
 #ttChars .row { display:flex; gap:5px; margin-top:4px; }
 html:fullscreen #ttBar { display:none; }
 #ttBar > * { flex:0 0 auto; }
+/* giving (play.js): drag from the Adventurer pane onto a character */
+#advPane .adv-drag[draggable="true"] { cursor:grab; }
+#advPane .adv-drag[draggable="true"]:hover { background:rgba(255,255,255,.05); }
+#giveHint { position:fixed; z-index:120; pointer-events:none; padding:4px 9px; border-radius:8px; font:600 12px system-ui, sans-serif; color:#fff; background:rgba(40,110,60,.92); opacity:0; transition:opacity .1s; }
+#giveHint.show { opacity:1; } #giveHint.far { background:rgba(110,60,40,.92); }
+#giveGold { position:fixed; z-index:121; display:flex; gap:6px; align-items:center; padding:8px 10px; border-radius:10px; font:13px system-ui, sans-serif; color:#eee; background:rgba(28,30,34,.96); border:1px solid #4a4f57; box-shadow:0 6px 20px rgba(0,0,0,.45); }
+#giveGold input { width:5em; }
