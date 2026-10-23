@@ -3,6 +3,27 @@
 The user's requests, recorded as given, with status. Newest batch first.
 Nothing here is cancelled by a later batch; a later batch only changes priority.
 
+## Batch of 2026-10-23, evening: characters that behave (high priority)
+
+Recorded from one long message; the plan is in `docs/MINDS.md`.
+
+1. JRPG-style, dialog-driven adventure, with the LLM characters. The models are
+   tiny, so don't rely on their conversation history to know what matters or
+   what to do.
+2. No hand-coded logic per character, but don't rely on the LLM where it isn't
+   needed: harness features around it.
+3. How do workflows fit in? Goal: appropriate behavior from the agents.
+4. Test scenarios without the visible browser (headless, or text-only), so the
+   user can keep working; art off or graphics very low when not needed.
+5. Ideas from the user: goal() on by default; a remember() command for
+   important state changes; external triggers that prompt characters now and
+   then (without programming each one); a setstate() command; EmbeddingGemma
+   (2) retrieval for backstories and remembered events outside the history.
+6. Characters should be interesting, make sense, do their basic jobs (such as
+   selling) most of the time, with the tiny models.
+7. What makes them interesting: emotional states, awareness of their health,
+   survival needs like hunger, more active pursuit of goals.
+
 ## Batch of 2026-10-23 (high priority)
 
 1. **TTS voice on by default** (done 2026-10-23) unless the player has turned it off (remember the
