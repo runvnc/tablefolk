@@ -6,6 +6,7 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 ## Batch of 2026-10-23, evening: characters that behave (high priority)
 
 Recorded from one long message; the plan is in `docs/MINDS.md`.
+Status 2026-10-23: built (mind.js, roles.js, director, headless evals); open: EmbeddingGemma retrieval (needs approval for a ~200 MB download), roles starting workflows on cue, schedules, relationships.
 
 1. JRPG-style, dialog-driven adventure, with the LLM characters. The models are
    tiny, so don't rely on their conversation history to know what matters or
