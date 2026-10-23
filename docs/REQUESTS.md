@@ -55,6 +55,25 @@ Status 2026-10-23: built (mind.js, roles.js, director, headless evals); open: Em
    mouse UX.
 10. **Quick map tooltips** (done 2026-10-23) for objects and characters.
 
+## Platform batch (2026-10-23)
+
+1. **Headless tests with the scene drawing:** (done) `?gfx=light|medium|high`,
+   `?fps=N`; `agenttest.mjs --render` (light, 10 fps, 640x360) saves an
+   image of the scene per turn (read from the canvas: headless page
+   screenshots leave WebGPU black). About 2.1 GB of GPU memory with the model.
+2. **Roles as packages, selling as a skill:** (done) `roles/<name>/role.json`,
+   the `trade` skill (`app/trade.js`), skills gain `allow`, `card`,
+   `behaviours`; food from pack tags. Evals unchanged (role shop 8/8 at
+   chaos, plain shop, feelings).
+3. **One package format:** (done) `tablefolk.json` with items, skills,
+   roles, workflows, modules and requires (`app/packages.js`); item `use`
+   and `loop`; per-package trust for code; example `packages/smithy`
+   (blacksmith eval 4/4; the smith sometimes forges a second dagger it
+   doesn't need, and forges without saying anything).
+4. **Finding packages:** (done) `registry/index.json` (PRs), npm keyword
+   and GitHub topic `tablefolk`, Library pane; `docs/PACKAGES.md`.
+   Not yet: the Library pane is dev-only; no in-game browser for players.
+
 ## Earlier, still open
 
 - **Better monsters:** fal.ai (`FAL_API_KEY` in `.env`) generate + Meshy rig

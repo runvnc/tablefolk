@@ -1,0 +1,10 @@
+## buy a horseshoe
+Hello smith. What do you have for sale?
+I'll take one horseshoe. Here are 6 gold.
+win: {"player_has":"horseshoe"}
+
+## commission a dagger
+Good day. Can you make me a dagger?
+Please forge one now. I will pay 15 gold for it.
+Here are the 15 gold. Sell me the dagger.
+win: {"player_has":"dagger"}

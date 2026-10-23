@@ -1,0 +1,10 @@
+{"v":1,"title":"Eval: blacksmith from a package","base":"plain","size":[11,9],"lighting":"bright",
+ "packages":["smithy"],
+ "player":{"name":"Ana","gold":40,"items":[],"at":[0,1]},
+ "allowed":["say","emote"],
+ "agents":[{"id":"bram","model":"villager","at":[0,-1],"facing":"s",
+   "personality":"a broad-shouldered smith, blunt but honest.", "role":"blacksmith",
+   "prices":{"horseshoe":[6,4],"dagger":[15,12],"iron nails":3},
+   "inventory":{"gold":5,"items":[{"name":"horseshoe","qty":2},{"name":"iron bar","qty":2}]}}],
+ "objects":[{"type":"smith_anvil","x":1,"z":-2},{"type":"bellows","x":-1,"z":-2}],
+ "goal":{"text":"Get a dagger made.","win":{"player_has":"dagger"},"maxTurns":8}}
