@@ -78,7 +78,7 @@ map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
     "quest": "",                   // optional private aim
     "model": "villager",             // critter (default); people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer
                                      // villager witch wizard; monsters: skeleton skeleton_warrior zombie goblin
-                                     // kobold orc rat spider wolf bat ghost slime demon giant dragon; older chibi
+                                     // kobold orc troll skeleton_farmer rat spider wolf bat ghost slime demon giant dragon; older chibi
                                      // people: woman rogue knight mage ranger barbarian
     "hostile": false,                // true: fights the player with a built-in routine, no LLM (default true
                                      // for mindless monsters: skeletons, zombie, rat, spider, wolf, bat, slime...)
