@@ -7,8 +7,9 @@
 //   generator   GEN_BASE_URL, GEN_API_KEY, GEN_MODEL
 //               what /world/<prompt> uses to write scenarios
 //
-// A base URL may be the shorthand "openrouter" or "local" (litert-lm serve on
-// this machine, LITERT_URL). Keys default to OPENROUTER_API_KEY for OpenRouter.
+// A base URL may be the shorthand "openrouter", "openai" (api.openai.com) or
+// "local" (litert-lm serve on this machine, LITERT_URL). Keys default to
+// OPENROUTER_API_KEY for OpenRouter and OPENAI_API_KEY for OpenAI.
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,23 +30,33 @@ export const LITERT_URL = env('LITERT_URL', 'http://127.0.0.1:9379/v1');
 // --from-huggingface-repo litert-community/gemma-4-E2B-it-litert-lm gemma-4-E2B-it.litertlm gemma4-e2b-mm
 export const SPEECH_MODEL = env('LITERT_SPEECH_MODEL', 'gemma4-e2b-mm');
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
+export const OPENAI_URL = 'https://api.openai.com/v1';
+
+// Default models by provider (fallbackModel may be one of these objects).
+export const DEFAULT_MODELS = {
+  characters: { openrouter: 'google/gemma-4-26b-a4b-it', openai: 'gpt-6-luna' },
+  generator: { openrouter: 'deepseek/deepseek-v4.1-flash-1017', openai: 'gpt-6-luna' },
+};
 
 // Resolve a base URL shorthand and pick a matching default key and model.
-export function endpoint(baseURL, apiKey, model, fallbackModel) {
+// keys: { openrouter, openai } saved on the admin page, before the environment.
+export function endpoint(baseURL, apiKey, model, fallbackModel, keys = {}) {
   const short = String(baseURL || 'openrouter').toLowerCase();
-  if (short === 'local' || short === 'litert') return { baseURL: LITERT_URL, apiKey: apiKey || '', model: model || env('LITERT_MODEL', 'gemma4-e4b,gpu'), local: true };
-  const url = short === 'openrouter' ? OPENROUTER_URL : baseURL;
-  const isOR = url.includes('openrouter.ai');
-  return { baseURL: url, apiKey: apiKey || (isOR ? env('OPENROUTER_API_KEY') : ''), model: model || fallbackModel, local: false,
-    headers: isOR ? { 'HTTP-Referer': 'https://tablefolk.world', 'X-Title': 'Tablefolk' } : {} };
+  if (short === 'local' || short === 'litert') return { baseURL: LITERT_URL, apiKey: apiKey || '', model: model || env('LITERT_MODEL', 'gemma4-e4b,gpu'), local: true, provider: 'local' };
+  const url = short === 'openrouter' ? OPENROUTER_URL : short === 'openai' ? OPENAI_URL : baseURL;
+  const provider = url.includes('openrouter.ai') ? 'openrouter' : url.includes('api.openai.com') ? 'openai' : 'custom';
+  const key = apiKey || (provider === 'openrouter' ? keys.openrouter || env('OPENROUTER_API_KEY') : provider === 'openai' ? keys.openai || env('OPENAI_API_KEY') : '');
+  const fb = typeof fallbackModel === 'object' ? fallbackModel[provider] || fallbackModel.openrouter : fallbackModel;
+  return { baseURL: url, apiKey: key, model: model || fb, local: false, provider,
+    headers: provider === 'openrouter' ? { 'HTTP-Referer': 'https://tablefolk.world', 'X-Title': 'Tablefolk' } : {} };
 }
 
 export const config = {
   port: +env('PORT', '8000'),
   // The proxy spends your API key: only this machine by default.
   host: env('HOST', '127.0.0.1'),
-  characters: endpoint(env('LLM_BASE_URL'), env('LLM_API_KEY'), env('LLM_MODEL'), 'google/gemma-4-26b-a4b-it'),
-  generator: endpoint(env('GEN_BASE_URL'), env('GEN_API_KEY'), env('GEN_MODEL'), 'openai/gpt-6-luna'),
+  characters: endpoint(env('LLM_BASE_URL'), env('LLM_API_KEY'), env('LLM_MODEL'), DEFAULT_MODELS.characters),
+  generator: endpoint(env('GEN_BASE_URL'), env('GEN_API_KEY'), env('GEN_MODEL'), DEFAULT_MODELS.generator),
   // Start `litert-lm serve` with the server (or pass --litert).
   startLitert: env('START_LITERT') === '1',
   // What /world/<prompt> shows while it builds: "builder" (the prompt form and

@@ -167,8 +167,10 @@ table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{text-align:left
 <main>
 <section><h2>Server</h2><div id="status" class="muted"></div>
 <div class="links" style="margin-top:.6rem"><a href="/app/">the world, as players see it</a><a href="/app/?dev=1">the world in admin/dev mode</a><a href="/world/">world builder</a><a href="/world/a+haunted+mill+with+a+ghost?view=loading">players' loading screen</a></div></section>
-<section><h2>Language models</h2><p class="muted">Base URL: <code>openrouter</code>, <code>local</code> (litert-lm serve here) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys are stored on the server and never sent to pages.</p>
-<div class="grid2" id="eps"></div></section>
+<section><h2>Language models</h2><p class="muted">Each endpoint uses OpenRouter, OpenAI (directly), the local model server (litert-lm serve here) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys are stored on the server and never sent to pages.</p>
+<div class="grid2" id="eps"></div>
+<h3 style="margin:1rem 0 .2rem;font-size:.95rem">Provider API keys</h3><p class="muted" style="margin:0">Used by both endpoints when they use that provider (an endpoint's own key wins).</p>
+<div class="grid2" id="keys"></div></section>
 <section><h2>World page</h2><label>What /world/&lt;prompt&gt; shows players</label>
 <select id="worldView"><option value="builder">the world builder (prompt, progress, model)</option><option value="loading">a plain loading screen with a progress bar</option></select>
 <div class="row"><button id="saveView">save</button><span id="viewMsg" class="muted"></span></div></section>
@@ -189,10 +191,13 @@ async function load(){
   const r=await fetch('/api/admin/state'); if(r.status===401){ $('login').hidden=false; $('app').hidden=true; return; }
   S=await r.json(); $('login').hidden=true; $('app').hidden=false; render();
 }
-function epBox(k,title){ const e=S.settings[k];
+const PROVIDERS=[['','(environment)'],['openrouter','OpenRouter'],['openai','OpenAI'],['local','local model server'],['custom','other URL']];
+function provOf(u){ u=String(u||'').toLowerCase(); return !u?'':['openrouter','openai','local','litert'].includes(u)?(u==='litert'?'local':u):'custom'; }
+function epBox(k,title){ const e=S.settings[k], pv=provOf(e.baseURL), def=S.settings.defaults?.[k]||{};
   return '<div><h3 style="margin:.2rem 0;font-size:.95rem">'+title+'</h3><div class="muted">now: '+esc(e.effective.baseURL)+' · '+esc(e.effective.model)+' · key '+(e.effective.key?'<span class=ok>set</span>':'<span class=bad>none</span>')+'</div>'
-  +'<label>Base URL</label><input data-k="'+k+'" data-f="baseURL" value="'+esc(e.baseURL)+'" placeholder="(environment)">'
-  +'<label>Model</label><input data-k="'+k+'" data-f="model" value="'+esc(e.model)+'" placeholder="(environment)">'
+  +'<label>Provider</label><select data-prov="'+k+'">'+PROVIDERS.map(([v,t])=>'<option value="'+v+'"'+(v===pv?' selected':'')+'>'+t+'</option>').join('')+'</select>'
+  +'<div data-urlbox="'+k+'"'+(pv==='custom'?'':' hidden')+'><label>Base URL</label><input data-k="'+k+'" data-f="url" value="'+esc(pv==='custom'?e.baseURL:'')+'" placeholder="https://.../v1"></div>'
+  +'<label>Model</label><input data-k="'+k+'" data-f="model" value="'+esc(e.model)+'" placeholder="'+esc(pv==='openai'?def.openai||'':pv==='local'?'(local default)':def.openrouter||'(environment)')+'">'
   +'<label>API key '+(e.keySaved?'(one is saved; leave empty to keep it)':'')+'</label><input type="password" data-k="'+k+'" data-f="apiKey" placeholder="(environment)" autocomplete="off">'
   +'<div class="row"><button data-save="'+k+'">save</button><button class="ghost" data-test="'+k+'">test</button>'+(e.keySaved?'<button class="ghost" data-clear="'+k+'">forget saved key</button>':'')+'<span class="muted" id="msg_'+k+'"></span></div></div>'; }
 function render(){
@@ -200,14 +205,23 @@ function render(){
   $('status').innerHTML='listening on '+esc(st.host)+':'+st.port+' · up '+ago(st.uptime)+' · Bun '+esc(st.bun)+' · local model server ('+esc(st.local.url)+'): '+(st.local.up?'<span class=ok>running</span>':'not running')
     +(st.initialPassword?'<br><span class=bad>The password was made up at startup (.admin/initial-password.txt): change it below.</span>':'');
   $('eps').innerHTML=epBox('characters',"Characters' endpoint brain")+epBox('generator','Scenario generator (/world)');
+  const kb=(p,t)=>{ const x=S.settings.keys?.[p]||{}; return '<div><label>'+t+' key '+(x.saved?'(<span class=ok>saved</span>; leave empty to keep it)':x.env?'(from .env)':'(<span class=bad>none</span>)')+'</label><input type="password" data-key="'+p+'" autocomplete="off" placeholder="'+(p==='openai'?'sk-...':'sk-or-...')+'">'
+    +'<div class="row"><button data-savekey="'+p+'">save</button>'+(x.saved?'<button class="ghost" data-clearkey="'+p+'">forget saved key</button>':'')+'<span class="muted" id="kmsg_'+p+'"></span></div></div>'; };
+  $('keys').innerHTML=kb('openrouter','OpenRouter')+kb('openai','OpenAI');
   $('worldView').value=S.settings.worldView;
   $('voices').innerHTML=S.settings.voices.map(v=>'<tr data-v="'+v.id+'"><td>'+v.id+'</td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
   $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td>'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td>'+esc(g.model)+'</td><td>'+(g.ok?'<span class=ok>'+(g.ms/1000).toFixed(1)+'s</span> '+esc(g.title||''):'<span class=bad>'+esc(g.error||'failed')+'</span>')+'</td></tr>').join(''):'<tr><td class=muted>none since the server started</td></tr>';
   $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td>'+new Date(g.at).toLocaleString()+'</td><td><b>'+esc(g.title)+'</b><br><span class=muted>'+esc(g.prompt)+' · '+esc(g.model)+'</span></td><td style="white-space:nowrap">'+(g.link?'<a href="'+g.link+'">play</a> · <a href="'+g.link.replace('/app/#','/app/?dev=1#')+'">dev</a> · <a href="'+g.builder+'">edit</a> · ':'')+'<a href="#" data-del="'+esc(g.file)+'">delete</a></td></tr>').join(''):'<tr><td class=muted>none</td></tr>';
 }
+document.addEventListener('change',e=>{ const k=e.target.dataset.prov; if(!k) return; document.querySelector('[data-urlbox="'+k+'"]').hidden=e.target.value!=='custom';
+  const def=S.settings.defaults?.[k]||{}, m=document.querySelector('input[data-k="'+k+'"][data-f="model"]'); m.placeholder=e.target.value==='openai'?def.openai||'':e.target.value==='local'?'(local default)':def.openrouter||''; });
 document.addEventListener('click',async e=>{
   const t=e.target, save=t.dataset.save, test=t.dataset.test, clear=t.dataset.clear, del=t.dataset.del;
+  const sk=t.dataset.savekey||t.dataset.clearkey;
+  if(sk){ const keys={}; if(t.dataset.clearkey) keys['clear_'+sk]=true; else keys[sk]=document.querySelector('input[data-key="'+sk+'"]').value;
+    const r=await post('/api/admin/settings',{keys}); if(r.ok){ S.settings=r.settings; render(); } $('kmsg_'+sk).textContent=r.ok?'saved':'failed: '+(r.error||r.status); }
   if(save||clear){ const k=save||clear, patch={}; patch[k]={}; for(const i of document.querySelectorAll('input[data-k="'+k+'"]')) patch[k][i.dataset.f]=i.value; if(clear) patch[k].clearKey=true;
+    const pv=document.querySelector('select[data-prov="'+k+'"]').value; patch[k].baseURL=pv==='custom'?patch[k].url:pv; delete patch[k].url;
     const r=await post('/api/admin/settings',patch); $('msg_'+k).textContent=r.ok?'saved':'failed: '+(r.error||r.status); if(r.ok){ S.settings=r.settings; render(); $('msg_'+k).textContent='saved'; } }
   if(test){ $('msg_'+test).textContent='testing…'; const r=await post('/api/admin/test',{which:test}); $('msg_'+test).innerHTML=r.ok?'<span class=ok>ok in '+(r.ms/1000).toFixed(1)+'s: '+esc(r.text)+'</span>':'<span class=bad>'+esc(r.error)+'</span>'; }
   if(del){ e.preventDefault(); if(!confirm('Delete '+del+'?')) return; const r=await post('/api/admin/generated',{remove:del}); if(r.ok) load(); }

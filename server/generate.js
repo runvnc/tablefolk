@@ -11,7 +11,8 @@
 //
 // One fast pass of the "fast skill" (server/fast-skill.md, a condensed
 // tablefolk-scenario skill) on the generator endpoint (GEN_* settings,
-// default openai/gpt-6-luna on OpenRouter; endpoint=local uses litert-lm
+// default deepseek/deepseek-v4.1-flash-1017 on OpenRouter (or OpenAI directly,
+// set on the admin page); endpoint=local uses litert-lm
 // serve), checked here (the procedural generator runs too, so a bad "in" is
 // caught), with one repair round if it has problems. Results are saved under
 // generated/.

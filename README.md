@@ -114,8 +114,11 @@ Besides the static files it serves:
   app. The page is the world builder (prompt form, live progress); start the
   server with `--world-loading` (or `WORLD_VIEW=loading`) to show players a
   plain loading screen with a progress bar instead (`?view=builder|loading`
-  picks per link). Settings: `GEN_BASE_URL`, `GEN_API_KEY`, `GEN_MODEL` (default
-  `openai/gpt-6-luna` on OpenRouter). Timings seen: 6-14 s with gpt-6-luna,
+  picks per link). Settings: `GEN_BASE_URL` (`openrouter`, `openai` for
+  api.openai.com, `local` or a URL), `GEN_API_KEY`, `GEN_MODEL` (default
+  `deepseek/deepseek-v4.1-flash-1017` on OpenRouter, `gpt-6-luna` on OpenAI);
+  `OPENAI_API_KEY` is the OpenAI key, and the admin page can set the provider
+  and both keys. Timings seen: 6-14 s with gpt-6-luna,
   ~22 s with local E4B on an RTX 2060. Every result is saved in `generated/`.
   `/api/generate?prompt=...` returns the JSON (`&stream=1` for progress events).
 

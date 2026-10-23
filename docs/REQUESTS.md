@@ -16,7 +16,7 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 5. **Less rambling and repeating:** characters still ramble and repeat. Ideas
    from the user: no more talking after two `say` commands, or not until a few
    turns later.
-6. **World generator backends:** two options in the backend, OpenAI (direct) or
+6. **World generator backends:** (done 2026-10-23) two options in the backend, OpenAI (direct) or
    OpenRouter, each with a place for its API key.
    - Default generator model: OpenRouter `deepseek/deepseek-v4.1-flash-1017`
      instead of `openai/gpt-6-luna`. (The user first said "use OpenAI directly
