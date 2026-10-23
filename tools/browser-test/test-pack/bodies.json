@@ -1,0 +1,3 @@
+{"title":"Bodies","size":[13,9],"walls":"stone",
+ "player":{"name":"Hero","model":"woodsman","at":[-4,0],"items":["sword"]},
+ "agents":[{"id":"kn","model":"knight","hostile":false,"at":[-2,2]},{"id":"wd","model":"woodsman","hostile":false,"at":[0,2]},{"id":"gb","model":"goblin","hostile":false,"at":[2,2]},{"id":"hu","model":"huntress","hostile":false,"at":[4,2]},{"id":"sk","model":"skeleton","hostile":false,"at":[-2,-2]},{"id":"vi","model":"villager","hostile":false,"at":[2,-2]}]}

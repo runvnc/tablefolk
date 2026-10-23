@@ -118,7 +118,9 @@
   function handNode(g) {
     const sk = g.root.getChildMeshes().find(m => m.skeleton)?.skeleton;
     const bones = sk?.bones || [];
-    const b = bones.find(b => b.name === 'handslot.r') || bones.find(b => /hand.*(\.r|_r|right)|right.*hand|r.*hand$/i.test(b.name));
+    // else a wrist, or the end of a simple arm (Quaternius creatures: Arm.R_end)
+    const b = bones.find(b => b.name === 'handslot.r') || bones.find(b => /hand.*(\.r|_r|right)|right.*hand|r.*hand$/i.test(b.name))
+      || bones.find(b => /^wrist[._]?r$/i.test(b.name)) || bones.find(b => /^arm[._]r_end$/i.test(b.name)) || bones.find(b => /^(lower|fore)arm[._]?r$/i.test(b.name));
     return b?.getTransformNode?.() || null;
   }
   function showWeapon(g, w) {

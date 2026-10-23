@@ -46,7 +46,7 @@
     ['terrain-hd.js?v=20261019c'],
     ['app.js?v=20261023i'],
     ['scenery.js?v=20261019ze'],
-    ['combat.js?v=20261023i'],
+    ['combat.js?v=20261023l'],
     ['senses.js?v=20261020d'],
     ['play.js?v=20261023k'],
     ['speech-input.js?v=20261020a'],
