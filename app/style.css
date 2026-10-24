@@ -438,7 +438,9 @@ body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
   background:rgba(16,20,25,.55); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
 #npcThinking.show { opacity:1; transform:translate(-50%,0); }
 /* ---- tabletop view (?tabletop=1, tabletop.js) ---- */
-html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toastStack) { display:none !important; }
+html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toastStack):not(#ttTip) { display:none !important; }
+#ttTip { position:fixed; z-index:20; pointer-events:none; max-width:300px; background:rgba(20,18,16,.94); color:#f4eee4; border:1px solid #6b5b45; border-radius:8px; padding:6px 9px; font:12.5px/1.35 system-ui, sans-serif; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+#ttTip[hidden] { display:none; } #ttTip hr { border:0; border-top:1px solid #5a4c3a; margin:5px 0; } #ttTip .muted { color:#b9ab95; }
 html.tabletop body { background:#1b1d1f; overflow:hidden; }
 html.tabletop #renderCanvas, #ttOverlay { position:fixed; left:0; top:var(--tt-top, 44px); width:100vw; height:calc(100vh - var(--tt-top, 44px)); }
 #ttOverlay { pointer-events:none; z-index:5; }
@@ -480,3 +482,10 @@ html:fullscreen #ttBar { display:none; }
 .pkg-desc { font-size: 12px; opacity: .85; margin: 4px 0; }
 .pkg-ref { font-size: 11px; opacity: .75; overflow-wrap: anywhere; margin-bottom: 4px; }
 .pkg-trust-row { display: flex; gap: 6px; align-items: center; font-size: 11px; overflow-wrap: anywhere; }
+
+/* app.js tablefolkHoldRender: a note while the picture is held */
+#renderHold { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:40; display:flex; gap:10px; align-items:center; padding:10px 16px; border-radius:12px;
+  background:rgba(18,16,14,.82); color:#f2ebde; font:600 15px system-ui, sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .25s; }
+#renderHold.show { opacity:1; }
+#renderHold .spin { width:16px; height:16px; border-radius:50%; border:2px solid rgba(242,235,222,.3); border-top-color:#f2c26b; animation:renderHoldSpin .9s linear infinite; }
+@keyframes renderHoldSpin { to { transform:rotate(360deg); } }

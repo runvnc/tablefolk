@@ -849,6 +849,8 @@
       packages: Array.isArray(s.packages) ? s.packages.filter(u => typeof u === 'string' && u).slice(0, 16) : [],
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
+      // locks.js: locked doors and their keys
+      locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
       food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
@@ -1008,6 +1010,8 @@
       if (!facing && firstPos) { const dx = firstPos.x - pa.x, dz = firstPos.z - pa.z; facing = Math.abs(dz) >= Math.abs(dx) ? (dz < 0 ? 'n' : 's') : (dx < 0 ? 'e' : 'w'); }
       await w.spawnPlayerAvatar(pa.x, pa.z, facing || pa.facing, scn.player?.model);
     }
+    // locked doors (locks.js): "locked": [{"in": "treasure", "key": "silver key"}]
+    try { window.tablefolkLocks?.apply(scn, w.state.places); } catch (e) { console.warn('[locks]', e); }
     // Weapons in hand from the start: agent "wield" / player "wield" (added
     // to the inventory if missing).
     if (window.tablefolkCombat) {

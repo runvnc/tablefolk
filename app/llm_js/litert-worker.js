@@ -525,6 +525,18 @@ async function handle(e, post, tag) {
         // seed it ourselves, matching the CDN version pinned above.
         self.Module = { locateFile: (path) => 'https://cdn.jsdelivr.net/npm/@litert-lm/core@0.14.0/wasm/' + path };
         engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: 8192 } });
+        // Warm up before saying "ready": the first generation sets up the
+        // GPU kernels, and that work held up the game's own GPU calls (the
+        // page froze for seconds just after "ready"). Here it happens while
+        // the page still shows the model loading.
+        onProgress({ phase: 'initialize', percent: 100, text: 'Warming up the local brain...' });
+        try {
+          const t0 = performance.now();
+          const conv = await engine.createConversation({ preface: { messages: [{ role: 'system', content: 'Answer in one word.' }] } });
+          const r = await conv.sendMessage('Say ok.');
+          console.log('[litert-worker] warm-up in', Math.round(performance.now() - t0), 'ms:', messageText(r));
+          await disposeConversation(conv);
+        } catch (err) { console.warn('[litert-worker] warm-up failed:', err?.message || err); }
         currentModel = modelKey;
         onProgress(`${cfg.label} ready`);
         reply({ type: 'result', data: { loaded: true, modelKey } });

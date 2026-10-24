@@ -128,7 +128,8 @@
     let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
-  async function link(dev) { const l = appLink('/app/#s=' + await encode(scn)); return dev ? (l.includes('/app/?') ? l.replace('/app/?', '/app/?dev=1&') : l.replace('/app/#', '/app/?dev=1#')) : l; }
+  // play: the player's view even in a browser that remembers dev mode
+  async function link(dev) { const l = appLink('/app/#s=' + await encode(scn)), q = dev ? 'dev=1' : 'play=1'; return l.includes('/app/?') ? l.replace('/app/?', '/app/?' + q + '&') : l.replace('/app/#', '/app/?' + q + '#'); }
 
   document.addEventListener('input', e => { if (e.target.closest?.('#editor')) onInput(e); });
   document.addEventListener('change', e => { if (e.target.closest?.('#editor') && e.target.tagName === 'SELECT') onInput(e); });

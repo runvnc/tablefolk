@@ -1,7 +1,7 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261024c';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261024d';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261024c';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261024b';
+import { installDevConsole } from './dev-console.js?v=20261024d';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261024c';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
@@ -88,6 +88,11 @@ function setStatus(status, noticeState = null) {
   const text = progress.text;
   const node = el('brainStatus');
   if (node) node.textContent = text;
+  // The model's warm-up keeps the GPU busy for a few seconds, and the
+  // game's own GPU calls then stalled the page: hold rendering meanwhile
+  // (app.js), under a small note, so the page stays responsive.
+  if (/warming up/i.test(text)) window.tablefolkHoldRender?.(true, 'Waking the characters…');
+  else if (/ready|fail|error|unavailable/i.test(text)) window.tablefolkHoldRender?.(false);
   if (noticeState) updateModelNotice(status, noticeState);
   else if (/ready/i.test(text)) updateModelNotice(status, 'ready');
   else if (/fail|error|unavailable/i.test(text)) updateModelNotice(status, 'error');
@@ -585,8 +590,13 @@ async function main() {
   async function runOneAgentTurn(g) {
     const cfg = world.getBrainConfig(g.id);
     if (cfg.enabled === false || cfg.defeated) return false;
-    // hostile monsters fight with play.js's routine and never talk
-    if (window.tablefolkPlay?.isHostile(g)) return false;
+    // hostile characters fight with play.js's routine; mindless ones never
+    // talk, an enemy with a mind (a necromancer, a bandit chief) talks when
+    // spoken to or when the fight starts, with words only (say/whisper/emote:
+    // its blows come from the routine, one a round)
+    const enemy = !!window.tablefolkPlay?.isHostile(g);
+    if (enemy && !(window.tablefolkPlay?.talksToo?.(g) && cfg.pendingChat?.length)) return false;
+    const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => !enemy || c === 'say' || c === 'whisper' || c === 'emote');
     if (!world.isTurnReady()) { return false; }
     // Inside a workflow (workflows.js), the workflow drives the turn: it asks
     // the model narrow questions and runs the resulting command.
@@ -680,7 +690,7 @@ async function main() {
           agentId: g.id,
           messages: sendMessages,
           useGrammar: !chatTestMode,
-          allowedCommands: world.getAllowedCommands(g.id).filter(c => !quiet || (c !== 'say' && c !== 'whisper')),
+          allowedCommands: allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper')),
           // Per-character (Character setup). Reasoning needs room before the
           // command lines, so raise the token budget too.
           enableThinking: cfg.thinking === true,
@@ -705,7 +715,7 @@ async function main() {
       // sell(healing potion, 8)'): the commands are pulled out and run, and
       // only the quoted words are spoken when there are quotes (the rest is
       // narration). The history keeps the cleaned lines.
-      const others = world.getAllowedCommands(g.id).filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
+      const others = allowedCmds().filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
       const embedded = others.length ? new RegExp('\\b(' + others.join('|') + ')\\(([^()]*)\\)', 'gi') : null;
       const histParts = [];
       const planCmds = planLines.flatMap(l => {

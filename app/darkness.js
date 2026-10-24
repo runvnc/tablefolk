@@ -25,7 +25,7 @@
  * gridKey, charInventory, addLampPool); off in tabletop mode.
  */
 (function () {
-  const FLAT_H = 2.5, FOG_H = 2.7, VIEW = 13, NEAR = 1.5, TORCH_R = 3.6;
+  const FLAT_H = 2.5, FOG_H = 2.7, DIM_H = .04, VIEW = 13, NEAR = 1.5, TORCH_R = 5;
   // light radius (cells) of objects that light a room, by type
   const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8 };
   const OPAQUE = new Set(['wall', 'door']);
@@ -129,8 +129,10 @@
       else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
-    black ||= fogMesh('board_fog_black', 1); dim ||= fogMesh('board_fog_dim', .62); flat ||= fogMesh('board_fog_flat', 1, FLAT_H);
-    place(black, unknown); place(dim, remembered); place(flat, outside, (state.terrainTopY ?? 0) - .02 - FLAT_H / 2);
+    // Remembered squares get a dark film on the floor: as tall see-through
+    // boxes they stood in the view like dark glass under an angled camera.
+    black ||= fogMesh('board_fog_black', 1); dim ||= fogMesh('board_fog_dim', .62, DIM_H); flat ||= fogMesh('board_fog_flat', 1, FLAT_H);
+    place(black, unknown); place(dim, remembered, (state.terrainTopY ?? 0) + DIM_H / 2 + .01); place(flat, outside, (state.terrainTopY ?? 0) - .02 - FLAT_H / 2);
     for (const m of [black, dim, flat]) m.setEnabled(!fpFog);
   }
   function showCharacters(all) {
@@ -182,9 +184,35 @@
     })();
     const stick = BABYLON.MeshBuilder.CreateCylinder('torch_stick', { diameterTop: .045, diameterBottom: .035, height: .42, tessellation: 7 }, sc); stick.position.y = .1; stick.material = torchMats.wood;
     const head = BABYLON.MeshBuilder.CreateCylinder('torch_head', { diameter: .075, height: .1, tessellation: 7 }, sc); head.position.y = .33; head.material = torchMats.wrap;
-    const flame = BABYLON.MeshBuilder.CreateCylinder('torch_flame', { diameterTop: 0, diameterBottom: .1, height: .2, tessellation: 7 }, sc); flame.position.y = .47; flame.material = torchMats.fire;
+    // a small glowing core; the flame itself is particles rising from it
+    const flame = BABYLON.MeshBuilder.CreateSphere('torch_flame', { diameter: .075, segments: 6 }, sc); flame.position.y = .41; flame.scaling.y = 1.4; flame.material = torchMats.fire;
     for (const m of [stick, head, flame]) { m.parent = root; m.isPickable = false; }
-    return { root, flame };
+    const ps = flameParticles(sc, flame);
+    root.onDisposeObservable.add(() => ps.dispose());
+    return { root, flame, ps };
+  }
+  // Flame particles: soft additive blobs that rise, shrink and redden.
+  let flameTex = null;
+  function flameParticles(sc, emitter) {
+    if (!flameTex || flameTex.isDisposed?.()) {
+      const size = 64; flameTex = new BABYLON.DynamicTexture('torch_flame_tex', { width: size, height: size }, sc, false);
+      const ctx = flameTex.getContext(), g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, size, size); flameTex.update(); flameTex.hasAlpha = true;
+    }
+    const ps = new BABYLON.ParticleSystem('torch_flame_ps', 70, sc);
+    ps.particleTexture = flameTex; ps.emitter = emitter; ps.isLocal = false;
+    ps.createSphereEmitter(.025, 0);
+    // dim on their own: additive blobs stack up, and bloom blew the old ones into a ball of light
+    ps.color1 = new BABYLON.Color4(.55, .36, .12, .5); ps.color2 = new BABYLON.Color4(.5, .22, .05, .45); ps.colorDead = new BABYLON.Color4(.25, .05, 0, 0);
+    ps.minSize = .035; ps.maxSize = .08; ps.minLifeTime = .15; ps.maxLifeTime = .32;
+    ps.addSizeGradient(0, 1); ps.addSizeGradient(1, .25);
+    ps.emitRate = 70; ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+    ps.gravity = new BABYLON.Vector3(0, 1.4, 0); ps.direction1 = new BABYLON.Vector3(-.08, .5, -.08); ps.direction2 = new BABYLON.Vector3(.08, .9, .08);
+    ps.minEmitPower = .25; ps.maxEmitPower = .5; ps.updateSpeed = .016;
+    ps.renderingGroupId = emitter.renderingGroupId || 0;
+    ps.start();
+    return ps;
   }
   // left hand: the rig's slot or bone, else beside the body
   function leftHand(g) {
@@ -202,8 +230,12 @@
     // the light and the floor glow follow the character, unscaled
     t.holder = new BABYLON.TransformNode('torch_holder', sc);
     t.light = new BABYLON.PointLight('carried_torch_light', new BABYLON.Vector3(0, 1.25, 0), sc);
-    t.light.parent = t.holder; t.light.diffuse = C3(1, .62, .28); t.light.intensity = 1.6; t.light.range = 5;
-    window.tablefolkScenery?.trackLight(t.light);
+    // Linear falloff over a wide range, so it lights the room around you.
+    // Not one of scenery.js's local lights: those reach only the meshes they
+    // are nearest to (by bounding sphere, once a second), and the big floor
+    // mesh always counted the room's own lights as nearer.
+    t.light.parent = t.holder; t.light.diffuse = C3(1, .64, .3); t.light.intensity = 1.7; t.light.range = 7.5;
+    t.light.falloffType = BABYLON.Light.FALLOFF_STANDARD;
     try { addLampPool(sc, t.holder, { warm: true }); } catch {}
     t.obs = sc.onBeforeRenderObservable.add(() => {
       const p = g.root.position; t.holder.position.set(p.x, state.terrainTopY ?? 0, p.z);
@@ -216,8 +248,8 @@
         t.mesh.root.rotation.set(.22, g.root.rotation.y + Math.PI, 0);
       }
       const f = performance.now() * .006;
-      t.light.intensity = 1.6 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
-      t.mesh.flame.scaling.set(1, 1 + Math.sin(f * 1.7) * .15, 1);
+      t.light.intensity = 1.7 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
+      t.mesh.flame.scaling.set(1, 1.4 * (1 + Math.sin(f * 1.7) * .15), 1);
     });
     g._torch = t;
   }

@@ -21,7 +21,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
     "model": "wizard",               // people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard
                                      // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon
                                      // (older chibi bodies: critter woman rogue knight mage ranger barbarian)
-    "hostile": true,                 // optional: fights the player with a built-in routine, no LLM (default true for mindless monsters)
+    "hostile": true,                 // optional: fights the player with a built-in routine (default true for mindless monsters); with a real personality it still talks when spoken to and as the fight starts. Set it on the story's enemies (a necromancer, a bandit chief), or they only talk
     "hp": 6,                         // optional, default 10
     "style": "proud sorceress",      // what the character is, a few words
     "personality": "Vexa, a sorceress who ... (the character's whole brief: who they are, what they want, hard facts, secrets, what they will and won't do, which commands to use when)",
@@ -53,6 +53,11 @@ bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
 fantasy_house stable windmill watch_tower bell_tower. Dungeon dressing:
 candelabra candles cabinet lectern cage chains wooden_chair nightstand
 apple_barrel pot vase broken_pot iron_crate; key chalice rope are picked up.
+Locked doors: "locked": [{"in": "treasure", "key": "silver key"}] (top level)
+locks every door into that place (generated maps); {"at": [x, z], "key": ...}
+one door. The key must be somewhere the player can get it (a chest, a
+character who gives or sells it, or a "key" object lying about, which picks
+up as "key"). Lock rooms only behind a key the story points to.
 Combat: agents and the player have "hp" (default 10); "wield": "iron sword"
 puts a weapon in hand. attack(target) strikes someone adjacent; allow it only
 for fighters and say in the personality when they attack. The player can

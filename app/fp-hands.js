@@ -74,7 +74,7 @@
     const torch = !!(g && window.tablefolkDark?.carriesTorch(g));
     if (torch && !rig.torch && window.tablefolkDark?.torchMesh) {
       const t = window.tablefolkDark.torchMesh(); t.root.parent = rig.l; t.root.position.set(0, -.04, .02); t.root.rotation.set(.18, 0, -.12); t.root.scaling.setAll(.72);
-      prep(t.root); rig.torch = t;
+      prep(t.root); if (t.ps) t.ps.renderingGroupId = 1; rig.torch = t;
     } else if (!torch && rig.torch) { rig.torch.root.dispose(false, false); rig.torch = null; }
     return { w, torch };
   }
@@ -111,7 +111,7 @@
       node.rotation.set(rx, ry, rz);
       node.setEnabled(holds || swinging);
     }
-    if (rig.torch) rig.torch.flame.scaling.set(1, 1 + Math.sin(now * .0102) * .15, 1);
+    if (rig.torch) rig.torch.flame.scaling.set(1, 1.4 * (1 + Math.sin(now * .0102) * .15), 1);
   }
 
   function swingNow(w) {

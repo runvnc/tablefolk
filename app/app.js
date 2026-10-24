@@ -37,7 +37,10 @@ const state = {
   turn:{index:0, phase:'ready', command:null, resolveMs:200, lastEndedAt:0, mode:true}, globalHistory:[], nextAgentId:null,
   brainConfigs:new Map(), player:{gold:100,items:[]}, saveKey:'tablefolkState', nextSpawnId:1, spawnMode:{enabled:false, type:'critter'}
 };
-function log(s){ try{ window.tablefolkPlay?.remember(s); }catch{} const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected '); if(!muted) window.tablefolkToast?.(s,{type:'info'}); }catch{} }
+// Engine chatter (the model's turns, prompts, errors) is toasted only in dev
+// mode; players see what happens in the world.
+const ENGINE_LINE=/\b(LLM|brain|prompt|history|sending \d+ messages|grammar|decide|raw output|engine|workflow step|turn \d+|tokens?)\b/i;
+function log(s){ try{ window.tablefolkPlay?.remember(s); }catch{} const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected ')||(!window.TABLEFOLK_DEV && ENGINE_LINE.test(s)); if(!muted) window.tablefolkToast?.(s,{type:'info'}); }catch{} }
 function pickRandom(a){ return a[Math.floor(Math.random()*a.length)] }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 // Dev escape hatch: ?norender=1 skips the render loop entirely (animate() and
@@ -93,6 +96,15 @@ function setOrthoZoom(camera,halfWidth){
   camera.orthoLeft=-halfWidth; camera.orthoRight=halfWidth; camera.orthoTop=halfWidth/aspect; camera.orthoBottom=-halfWidth/aspect;
   camera.metadata ||= {}; camera.metadata.orthoHalfWidth=halfWidth;
 }
+// Hold rendering for a while (at most 25 s), with a note over the picture:
+// world-integration.js does it while the local model warms up.
+let renderHeldUntil=0;
+window.tablefolkHoldRender=(on,text='')=>{
+  renderHeldUntil=on?performance.now()+25000:0;
+  let el=document.getElementById('renderHold');
+  if(!el && on){ el=document.createElement('div'); el.id='renderHold'; el.innerHTML='<span class="spin"></span><span class="t"></span>'; document.body.appendChild(el); }
+  if(el){ el.querySelector('.t').textContent=text; el.classList.toggle('show',!!on); }
+};
 function setupMouseWheelZoom(camera){
   // This handler owns wheel zoom; Babylon's own wheel input would zoom a
   // second time on every notch.
@@ -107,14 +119,14 @@ function setupMouseWheelZoom(camera){
     const factor=Math.exp(clamp(px,-150,150)*.001);
     const zoomIn=px<0;
     const focus=state.zoomFocus || state.target?.getAbsolutePosition?.() || state.selected?.root?.position;
-    // setTarget keeps the camera position and recomputes the radius, which
-    // silently zoomed in a lot whenever the focus was nearer the camera;
-    // keep the radius and only change it through the zoom factor below.
+    // setTarget on its own keeps the camera where it is and recomputes the
+    // angles and radius from there: the view turned (and zoomed) with every
+    // notch. Keep them (the last flag) and move the camera with the target.
     const radius=camera.radius;
     if(focus){
       const f=focus.clone ? focus.clone() : new BABYLON.Vector3(focus.x||0,focus.y||0,focus.z||0);
       f.y=0.6;
-      camera.setTarget(BABYLON.Vector3.Lerp(camera.target,f,(zoomIn?.42:.18)*Math.min(1,Math.abs(px)/100)));
+      if(state.cameraMode!=='follow') camera.setTarget(BABYLON.Vector3.Lerp(camera.target,f,(zoomIn?.42:.18)*Math.min(1,Math.abs(px)/100)),false,false,true);
     }
     camera.radius=clamp(radius*factor,3.5,60);
   },{passive:false});
@@ -1059,7 +1071,7 @@ function makeDoor(scene,x,z,opts={}){
   if(raised){ meta(b).tabletop=true; scheduleWallRebuild(); }
   else { // legacy block walls have no merged visuals: build a static leaf here
     const g=buildDoorLeaf(scene,x,z,!(+opts.ry||0),top,Math.min(doorHeight(),.9*(state.wallHeightScale||1)));
-    g.standalone=true;
+    g.standalone=true; g.door=b;
     meta(b).cleanup=()=>{ try{ g.pivot.dispose(false,true); }catch{} };
     state.doorLeaves=state.doorLeaves||[]; state.doorLeaves.push(g); ensureDoorAnimator();
   }
@@ -1495,7 +1507,7 @@ function buildDoors(cell,top){
     for(const e of [-0.435,0.435]) putF((alongX?x:z)+e,top+(DH+.05)/2,.13,DH+.05,.21,[.26,.16,.09]);  // jamb posts
     putF(alongX?x:z,top+DH+.01,1,.13,.21,[.28,.17,.09]);                                                // head beam under the stone header
     putF(alongX?x:z,top+.018,.88,.036,.26,[.30,.19,.10]);                                               // threshold
-    const g=buildDoorLeaf(sc,x,z,alongX,top,DH);
+    const g=buildDoorLeaf(sc,x,z,alongX,top,DH); g.door=w;
     for(const m of g.pivot.getChildMeshes(false)){ m.metadata={proxy:w}; m.isPickable=true; state.wallVisuals.push(m); }
     state.wallVisuals.push(g.pivot);
     (state.doorLeaves=state.doorLeaves||[]).push(g);
@@ -1515,7 +1527,8 @@ function ensureDoorAnimator(){
     for(const L of leaves){
       if(L.pivot.isDisposed?.()) continue;
       let dir=0;
-      for(const g of folk){
+      // a locked door stays shut (locks.js)
+      if(!(L.door && meta(L.door)?.locked)) for(const g of folk){
         const p=g.logicalPos||g.root?.position; if(!p) continue;
         const dx=p.x-L.x, dz=p.z-L.z;
         if(dx*dx+dz*dz<2.9){ dir=L.alongX ? (dz>=0?1:-1) : (dx>=0?-1:1); break; }
@@ -2775,6 +2788,7 @@ function isBlocked(x, z) {
     const p = m.getAbsolutePosition?.() || m.position;
     const fx = mm.foot ? mm.foot[0] + .2 : .7, fz = mm.foot ? mm.foot[1] + .2 : .7;
     if (Math.abs(p.x - x) < fx && Math.abs(p.z - z) < fz) {
+      if (mm.type === 'door' && mm.locked) return true;   // locks.js
       if (mm.decor) continue;
       if (BLOCKING_TYPES.has(mm.type) || mm.solid || mm.material === 'stone') return true;
     }
@@ -3938,13 +3952,15 @@ function removePlayerAvatar(){
   setCameraArrowKeys(true);
   if(state.firstPerson) setFirstPerson(false);
   try{ g.playerRing?.material?.dispose(); g.playerRing?.dispose(); }catch{}
-  disposeCharacter(g); state.playerAvatar=null; state.cameraMode='overview'; updateFirstPersonButton();
+  disposeCharacter(g); state.playerAvatar=null; state.cameraMode='overview'; if(state.camera) lockCamera(state.camera,false); window.tablefolkCutaway?.clear(); updateFirstPersonButton();
 }
 // One cell in a direction, unless blocked or off the edge (no accidental falls).
 function playerStep(dir){
   const g=state.playerAvatar; if(!g || g.turnMove || g.falling || g.defeated || state.npcBusy) return false;
   setCharacterFacing(g,dir);
   const lp=g.logicalPos||g.root.position, nx=Math.round(lp.x+dir.x), nz=Math.round(lp.z+dir.z);
+  // a locked door opens if you carry its key (locks.js)
+  const lock=window.tablefolkLocks?.lockedAt(nx,nz); if(lock && !window.tablefolkLocks.tryOpen(lock)) { emitBadge(g,'locked'); return false; }
   if(isBlocked(nx,nz) || !hasGroundAt(nx,nz)) { emitBadge(g,'bonk'); return false; }
   startTurnMove(g,dir,Math.hypot(nx-lp.x,nz-lp.z)); g.anim='walk'; playRig(g,'walk',true);
   setTimeout(()=>{ if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+60);
@@ -3963,7 +3979,14 @@ function cameraCardinal(which){
 // this, not the avatar's body (the body could lag the view: look around while
 // a step was under way and W would then walk the way the body still faced).
 function fpForward(){ const yx=Math.sin(state.fpYaw??0), yz=Math.cos(state.fpYaw??0); return Math.abs(yx)>Math.abs(yz) ? new BABYLON.Vector3(Math.sign(yx),0,0) : new BABYLON.Vector3(0,0,Math.sign(yz)); }
-function turnPlayer(sign){ const g=state.playerAvatar; if(!g || g.turnMove) return; const d=state.firstPerson ? fpForward() : g.dir; setCharacterFacing(g,new BABYLON.Vector3(-d.z*sign,0,d.x*sign)); if(state.firstPerson) state.fpYaw=Math.atan2(g.dir.x,g.dir.z); }
+// First person: a quarter turn from where you are looking (it used to snap
+// the view to the grid first, so a turn from a sideways look swung 40-130
+// degrees); the body faces the grid direction nearest the new view.
+function turnPlayer(sign){
+  const g=state.playerAvatar; if(!g || g.turnMove) return;
+  if(state.firstPerson){ state.fpYaw=(state.fpYaw??0)-sign*Math.PI/2; setCharacterFacing(g,fpForward()); return; }
+  const d=g.dir; setCharacterFacing(g,new BABYLON.Vector3(-d.z*sign,0,d.x*sign));
+}
 // First-person mouse look: drag to turn/tilt the view; the avatar turns to
 // the nearest grid direction you're looking along.
 function setupFirstPersonLook(){
@@ -3995,6 +4018,7 @@ function fpWalk(g,dt){
   const nx=x+Math.sin(yaw)*step, nz=z+Math.cos(yaw)*step;
   if(ok(nx,z)) x=nx;
   if(ok(x,nz)) z=nz;
+  if(x===lp.x && z===lp.z){ const lock=window.tablefolkLocks?.lockedAt(Math.round(lp.x+Math.sin(yaw)*.9*sign),Math.round(lp.z+Math.cos(yaw)*.9*sign)); if(lock) window.tablefolkLocks.tryOpen(lock); }
   if(x!==lp.x || z!==lp.z){
     setCharacterLogicalPosition(g,new BABYLON.Vector3(x,0,z));
     if(!g.fpWalking || g.anim!=='walk'){ g.fpWalking=true; g.anim='walk'; playRig(g,'walk',true); }
@@ -4032,6 +4056,7 @@ function setFirstPerson(on){
   if(on && !g) return;
   state.firstPerson=!!on;
   if(on){
+    window.tablefolkCutaway?.clear();
     if(!fpCam){
       fpCam=new BABYLON.UniversalCamera('fp_cam',new BABYLON.Vector3(0,1,0),sc);
       fpCam.minZ=.05; fpCam.maxZ=600; fpCam.fov=1.0; fpCam.inputs.clear();
@@ -4090,43 +4115,47 @@ window.addEventListener('tablefolk-player-chat',e=>{
   const div=document.createElement('div'); div.className='bubble player-bubble'; div.textContent=String(e.detail?.text||'').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:3.2});
 });
-// Third person. 'follow' (the default with an avatar): the camera stays
-// close, on the avatar, and swings round behind it while it walks away from
-// the camera (not when it steps sideways or back, so A/D don't spin the
-// view); you can still orbit and zoom with the mouse. 'overview' (C toggles):
-// the whole board, the camera easing after the avatar only when it moves.
-// it looks at a point a little ahead of the avatar, so more of what is in
-// front is in view and the avatar sits in the lower part of the screen
-const FOLLOW={radius:7.5,beta:1.1,height:.9,ahead:1};
-const followPoint=g=>{ const p=g.root.position, d=state.firstPerson?null:g.dir; return new BABYLON.Vector3(p.x+(d?.x||0)*FOLLOW.ahead,FOLLOW.height,p.z+(d?.z||0)*FOLLOW.ahead); };
-const behindAlpha=d=>Math.atan2(-(d.z||0),-(d.x||0));
+// Two cameras with an avatar (C switches; V is first person):
+// 'follow' (the default), Diablo-like: high and fixed, looking north from
+// the south at a steep angle, always centred on the avatar; it never turns,
+// so the keys always mean the same screen directions, and walls between it
+// and the avatar drop to a low stub (cutaway.js). The wheel zooms (7-24).
+// 'overview': the old free camera over the board (drag to orbit), easing
+// after the avatar when it moves.
+const FOLLOW={alpha:Math.PI/2,beta:.78,radius:12,min:7,max:24,height:.6};
+const FREE={lowerBetaLimit:.22,upperBetaLimit:1.42,panningSensibility:60};
+function lockCamera(cam,on){
+  if(on){ cam.lowerAlphaLimit=cam.upperAlphaLimit=FOLLOW.alpha; cam.lowerBetaLimit=cam.upperBetaLimit=FOLLOW.beta; cam.panningSensibility=0; }
+  else { cam.lowerAlphaLimit=cam.upperAlphaLimit=null; Object.assign(cam,FREE); }
+}
 function followCameraStart(){
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam) return;
   state.cameraMode='follow';
-  cam.setTarget(followPoint(g));
-  cam.alpha=behindAlpha(g.dir); cam.beta=FOLLOW.beta; cam.radius=FOLLOW.radius;
+  const p=g.root.position;
+  lockCamera(cam,true); cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z),false,false,true); cam.alpha=FOLLOW.alpha; cam.beta=FOLLOW.beta; cam.radius=state.followRadius||FOLLOW.radius;
 }
 function toggleCameraMode(){
   if(state.firstPerson) setFirstPerson(false);
-  if(state.cameraMode==='follow'){ state.cameraMode='overview'; const cam=state.camera; cam.radius=Math.min(cam.upperRadiusLimit,20.5*boardScale()); cam.beta=1.0; }
+  if(state.cameraMode==='follow'){
+    state.cameraMode='overview'; const cam=state.camera; lockCamera(cam,false); window.tablefolkCutaway?.clear();
+    // a good part of the board, not all of a big one
+    cam.radius=Math.min(cam.upperRadiusLimit,15); cam.beta=.95;
+  }
   else followCameraStart();
-  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the overview)':'camera: overview (C to follow)');
+  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
 }
 function followAvatarCamera(dt){
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam || state.firstPerson) return;
   const p=g.root.position;
   if(state.cameraMode==='follow'){
-    cam.target=BABYLON.Vector3.Lerp(cam.target,followPoint(g),Math.min(1,dt*4));
-    if(g.turnMove || g.fpWalking){
-      // walking away from the camera (its view and the walk agree)
-      const fx=-Math.cos(cam.alpha), fz=-Math.sin(cam.alpha);
-      if(fx*g.dir.x+fz*g.dir.z>.2){ let d=behindAlpha(g.dir)-cam.alpha; d=Math.atan2(Math.sin(d),Math.cos(d)); cam.alpha+=d*Math.min(1,dt*2.2); }
-    }
+    cam.setTarget(BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*7)),false,false,true);
+    cam.radius=clamp(cam.radius,FOLLOW.min,FOLLOW.max); state.followRadius=cam.radius;
+    const lp=g.logicalPos||p; window.tablefolkCutaway?.update(lp.x,lp.z);
     return;
   }
   if(!state.followAvatar) return;
   const want=new BABYLON.Vector3(p.x,.6,p.z);
-  cam.target=BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*3));
+  cam.setTarget(BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*3)),false,false,true);
   if(BABYLON.Vector3.Distance(cam.target,want)<.02 && !g.turnMove) state.followAvatar=false;
 }
 // Free a character and everything it imported (meshes, their own materials
@@ -4927,7 +4956,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
             if(av.turnMove) window.tablefolkPlay?.acted('move');
             return;
           }
-          camera.target=new BABYLON.Vector3(tx,0.6,tz); state.zoomFocus=camera.target.clone();
+          if(state.cameraMode!=="follow") camera.setTarget(new BABYLON.Vector3(tx,0.6,tz),false,false,true); state.zoomFocus=new BABYLON.Vector3(tx,0.6,tz);
         }
       }
     }
@@ -5088,6 +5117,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   const thinkFps=()=>{ const v=Number(localStorage.getItem('tablefolkThinkFps')); return Number.isFinite(v)&&localStorage.getItem('tablefolkThinkFps')!==null ? v : 60; };
   scene.onBeforeRenderObservable.add(()=>{ if(TABLEFOLK_FORCE_NO_RENDER) return; const now=performance.now(), dt=Math.min(.1,(now-lastAnimAt)/1000); lastAnimAt=now; window.TablefolkPerf?.begin('animate.characters'); animate(dt); window.TablefolkPerf?.end('animate.characters'); }); engine.runRenderLoop(()=>{
     if(TABLEFOLK_FORCE_NO_RENDER) return;
+    if(renderHeldUntil && performance.now()<renderHeldUntil) return;
     if(window.TABLEFOLK_PAUSE_RENDER){ const fps=thinkFps(); if(fps<=0) return; if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     if(TABLEFOLK_FPS_CAP && performance.now()-lastFrameAt<1000/TABLEFOLK_FPS_CAP) return;
     lastFrameAt=performance.now();

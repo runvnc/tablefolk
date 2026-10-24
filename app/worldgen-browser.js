@@ -21,7 +21,7 @@
  *       {scenario, code, link, ms, model} or 'failed' {error}
  */
 (function () {
-  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261024b';
+  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261024c';
   const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard'.split(' ');
   const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon'.split(' ');
   const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon'.split(' '));
@@ -29,6 +29,8 @@
   const VILLAGE = 'square tavern smithy shop temple alchemist guardhouse library stable house pond garden'.split(' ');
   const THINGS = 'chest coin_pile note potion scroll key chalice rope torch barrel crate candles candelabra cage chains statue bookcase lectern cabinet well market_stand cart tent logs campfire banner'.split(' ');
   const OUTDOOR_THINGS = 'campfire tree boulder tent cart logs crate barrel chest well fence signpost flowers lantern bench table mushroom coin_pile note'.split(' ');
+  const ENEMY = /\b(villain|necromancer|evil|cultist|cult leader|bandit|brigand|captor|kidnapp\w*|warlord|tyrant|dark lord|lich|enemy|boss|raider|marauder|assassin|monster|warlock)\b/i;
+  const HOSTILE_INTENT = /\b(attacks? (anyone|intruders|strangers|the player|on sight)|kills? (anyone|intruders|strangers|the player)|despises (the living|intruders|strangers)|wants (the player|intruders|them) dead)\b/i;
   const COMMANDS = 'say whisper walk face emote give sell inventory look carry drop attack wield'.split(' ');
 
   // ---- the model ----
@@ -165,8 +167,13 @@
       const ag = { id: aid, model };
       // a monster body given a real part (a ghost who guards and talks) talks
       const talks = MINDLESS.has(model) && a.hostile !== true && String(a.personality || '').length > 80 && (!a.allowed || a.allowed.includes('say'));
-      const hostile = !talks && (a.hostile === true || (a.hostile == null && MINDLESS.has(model)));
-      if (talks) ag.hostile = false; else if (a.hostile === true || a.hostile === false) ag.hostile = a.hostile;
+      // the story's enemies fight (and, with a personality, still talk)
+      // (a monster body allowed to attack is an enemy with a mind)
+      // (words about others in a personality mislead: "an escapee from the bandits"; intent doesn't)
+      const villain = a.hostile !== false && (ENEMY.test([a.style, a.id, plan.chars[i]?.role].join(' ')) || HOSTILE_INTENT.test(String(a.personality || ''))
+        || (MINDLESS.has(model) || ['goblin', 'kobold', 'orc', 'troll'].includes(model)) && (a.allowed || []).includes('attack'));
+      const hostile = villain || (!talks && (a.hostile === true || (a.hostile == null && MINDLESS.has(model))));
+      if (villain) ag.hostile = true; else if (talks) ag.hostile = false; else if (a.hostile === true || a.hostile === false) ag.hostile = a.hostile;
       if (a.hp) ag.hp = Math.max(1, Math.min(30, Math.round(+a.hp) || 10));
       ag.style = String(a.style || plan.chars[i]?.role || model).slice(0, 60);
       ag.personality = String(a.personality || '').slice(0, 900) || (hostile ? `A hostile ${model.replace(/_/g, ' ')}.` : `${aid}, ${ag.style}. ${plan.chars[i]?.want || ''} ${plan.chars[i]?.know || ''}`.trim());
@@ -203,6 +210,24 @@
       const p = agents.find(a => !MINDLESS.has(a.model)); if (p) p.allowed = [...new Set([...(p.allowed || []), 'give'])]; else scn.goal = null;
     }
     return scn;
+  }
+
+  // A key in the story opens something: lock a room it is not in (locks.js).
+  function autoLock(scn, built) {
+    if (!scn.generate) return;
+    const ids = built.places.map(p => p.id.replace(/\s+\d+$/, ''));
+    const keys = [
+      ...(scn.objects || []).filter(o => o.type === 'key').map(o => ({ name: 'key', in: o.in })),
+      ...(scn.objects || []).flatMap(o => (o.items || []).filter(i => /\bkey\b/i.test(i)).map(i => ({ name: i, in: o.in }))),
+      ...(scn.agents || []).flatMap(a => (a.inventory?.items || []).filter(i => /\bkey\b/i.test(i)).map(i => ({ name: i, in: a.in, holder: a }))),
+    ];
+    const k = keys[0]; if (!k) return;
+    const room = ['treasure', 'prison', 'throne', 'crypt', 'library', 'shrine', 'storage', 'smithy', 'shop', 'temple'].find(r => ids.includes(r) && r !== k.in);
+    if (!room) return;
+    scn.locked = [{ in: room, key: k.name }];
+    // whoever carries it can hand it over
+    if (k.holder && !MINDLESS.has(k.holder.model)) k.holder.allowed = [...new Set([...(k.holder.allowed || []), 'give'])];
+    if (scn.intro && !/locked/i.test(scn.intro)) scn.intro += ` The ${room} is locked.`;
   }
 
   async function finish(scn, prompt, t0) {
@@ -242,10 +267,11 @@
       const scn = built.scn;
       // 4. characters
       const where = plan.kind === 'outdoor' ? `"near": one of ${OUTDOOR_THINGS.join(', ')}` : `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
-      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
+      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
       const chars = json(await ask(emit, 'characters', 'step 4/4: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
       buildAgents(plan, chars, built, scn);
       if (!scn.agents.length) throw new Error('the model wrote no characters');
+      autoLock(scn, built);
       // 5. the server's checks, and fixes
       let r = await finish(scn, prompt, t0);
       for (let round = 1; r.problems?.length && round <= 2; round++) {

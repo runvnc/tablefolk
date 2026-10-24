@@ -166,7 +166,7 @@ table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{text-align:left
 <header><h1>Tablefolk admin</h1><a href="/app/?dev=1">world (dev mode)</a><button class="ghost" id="logout">log out</button></header>
 <main>
 <section><h2>Server</h2><div id="status" class="muted"></div>
-<div class="links" style="margin-top:.6rem"><a href="/app/">the world, as players see it</a><a href="/app/?dev=1">the world in admin/dev mode</a><a href="/world/">world builder</a><a href="/world/a+haunted+mill+with+a+ghost?view=loading">players' loading screen</a></div></section>
+<div class="links" style="margin-top:.6rem"><a href="/app/?play=1">the world, as players see it</a><a href="/app/?dev=1">the world in admin/dev mode</a><a href="/world/">world builder</a><a href="/world/a+haunted+mill+with+a+ghost?view=loading">players' loading screen</a></div></section>
 <section><h2>Language models</h2><p class="muted">Each endpoint uses OpenRouter, OpenAI (directly), the local model server (litert-lm serve here) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys are stored on the server and never sent to pages.</p>
 <div class="grid2" id="eps"></div>
 <h3 style="margin:1rem 0 .2rem;font-size:.95rem">Provider API keys</h3><p class="muted" style="margin:0">Used by both endpoints when they use that provider (an endpoint's own key wins).</p>

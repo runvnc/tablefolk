@@ -165,6 +165,7 @@
       else if (t === 'coin_pile') consider('gold', m, posOf(m));
       else if (t === 'note') consider('note', m, posOf(m));
     }
+    for (const d of state.blocks) if (meta(d)?.type === 'door' && meta(d).locked) consider('door', d, posOf(d));
     for (const c of state.characters) consider(c.defeated ? (getBrainConfig(c.id).looted ? null : 'body') : 'person', c, c.logicalPos || c.root.position);
     return best?.kind ? best : null;
   }
@@ -180,6 +181,7 @@
       return;   // talking is not a turn: the one spoken to answers
     }
     if (u.kind === 'use') { Promise.resolve(window.tablefolkPackages?.useThing(u.thing, g)).then(done => { if (done) acted('use'); }); return; }
+    if (u.kind === 'door') { if (window.tablefolkLocks?.tryOpen(u.thing)) acted('use'); return; }
     if (u.kind === 'body') { if (searchBody(u.thing)) acted('use'); return; }
     if (u.kind === 'note') { const mm = meta(u.thing); toast('The note says: ' + ((mm.noteText || noteTextFromHtml(mm.noteHtml || '')) || '(blank)')); return; }
     const p = u.kind === 'chest' ? posOf(u.thing) : null;
@@ -231,7 +233,7 @@
       <div class="adv-keys">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span>click the ground: walk there</span>
         <span><kbd>E</kbd> open / pick up / talk</span><span><kbd>F</kbd> attack</span>
-        <span><kbd>V</kbd> first person</span><span><kbd>C</kbd> follow / overview camera</span><span><kbd>I</kbd> this panel</span>
+        <span><kbd>V</kbd> first person</span><span><kbd>C</kbd> follow / free camera</span><span><kbd>I</kbd> this panel</span>
         <span><kbd>Enter</kbd> chat</span><span><kbd>Esc</kbd> close panel</span>
       </div>`;
   }
@@ -399,6 +401,8 @@
   // the note goes away once the character has decided what to do
   addEventListener('tablefolk-agent-turn', () => banner('npcThinking', ''));
   function isHostile(c) { const cfg = getBrainConfig(c.id); return cfg.hostile ?? MINDLESS.has(c.charModel); }
+  // an enemy with a mind: a real personality, not just "A hostile skeleton."
+  function talksToo(c) { const p = String(getBrainConfig(c.id).personality || ''); return isHostile(c) && p.length > 60 && !/^A hostile /.test(p); }
 
   // A plain fighter: attack when next to the player, else close in (two
   // cells a turn) when it can see the player within 8 cells.
@@ -406,8 +410,16 @@
     const pl = me(); if (!pl || pl.defeated) return;
     const a = c.logicalPos || c.root.position, b = pl.logicalPos || pl.root.position, d = Math.hypot(b.x - a.x, b.z - a.z);
     const C = window.tablefolkCombat;
-    if (d <= (C?.REACH ?? 1.6)) { C?.attack(c, 'player'); await sleep(900); return; }
     if (d > 8) return;
+    // an enemy with a mind says something as the fight starts (its LLM turn
+    // runs alongside; the blows don't wait for it)
+    if (!c._taunted && talksToo(c) && sees(c)) {
+      c._taunted = true;
+      const cfg = getBrainConfig(c.id);
+      setBrainConfig(c.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${playerName()} has come within reach. You are going to fight them: say one short line to them first.`]).slice(-5) });
+      window.tablefolk?.runAgentTurn?.(c)?.catch?.(() => {});
+    }
+    if (d <= (C?.REACH ?? 1.6)) { C?.attack(c, 'player'); await sleep(900); return; }
     const route = findRoute(new BABYLON.Vector3(a.x, 0, a.z), new BABYLON.Vector3(b.x, 0, b.z)); if (!route?.length) return;
     // walk two cells along the route, stopping short of the player
     const pts = [new BABYLON.Vector3(a.x, 0, a.z), ...route]; let left = Math.min(2, d - 1.2), end = pts[0];
@@ -475,5 +487,5 @@
     }, 700);
   });
 
-  window.tablefolkPlay = { giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, fighterTurn, get busy() { return busy; } };
+  window.tablefolkPlay = { giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, get busy() { return busy; } };
 })();

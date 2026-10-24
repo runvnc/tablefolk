@@ -34,7 +34,7 @@
   const saveOpts = () => { try { localStorage.setItem('tablefolk.tabletop', JSON.stringify({ grid: opt.grid, labels: opt.labels, bright: opt.bright, outside: opt.outside })); } catch {} };
   let cam = null, view = null, overlay = null, sel = null, drag = null, edited = false, flat = null, origLight = null;
   // zoom: 1 = the whole board fits; (cx, cz) the board point at the middle
-  let zoom = 1, cx = 0, cz = 0, pan = null;
+  let zoom = 1, cx = 0, cz = 0, pan = null, needDraw = false;
   const touches = new Map();
   document.documentElement.classList.add('tabletop');
 
@@ -63,7 +63,9 @@
     // keep some of the board on screen
     const mx = Math.max(0, f.hw - hw), mz = Math.max(0, f.hh - hh);
     cx = Math.max(-mx, Math.min(mx, cx)); cz = Math.max(-mz, Math.min(mz, cz));
-    setCam({ ...f, hw, hh, cx, cz }); draw();
+    // the overlay is drawn after the next 3D frame, so both move together
+    // (drawn at once it ran ahead of the 3D while panning on a slow frame)
+    setCam({ ...f, hw, hh, cx, cz }); needDraw = true;
     document.documentElement.classList.toggle('tt-zoomed', zoom > 1.001);
   }
   // put board point (wx, wz) under pixel (px, py) at the current zoom
@@ -100,6 +102,7 @@
     look();
     // characters' idle animations keep the labels where they are: redraw a few times a second
     setInterval(draw, 500);
+    scene.onAfterRenderObservable.add(() => { if (needDraw) { needDraw = false; draw(); } });
   }
   function look() {
     const w = W(), scene = w.state.scene;
@@ -270,8 +273,40 @@
       const now = pinchOf(), p = pan.pinch;
       zoom = p.zoom * now.d / p.d; applyView(); pinTo(p.w[0], p.w[1], now.m[0], now.m[1]); applyView(); return;
     }
-    if (pan) { const [px, py] = local(e); pan.moved = Math.max(pan.moved, Math.hypot(e.clientX - pan.x, e.clientY - pan.y)); pinTo(pan.w[0], pan.w[1], px, py); applyView(); return; }
-    if (!drag) return; const [x, z] = cellAt(e); drag.to = x === drag.t.x && z === drag.t.z ? null : [x, z]; draw();
+    if (pan) { tip(null); const [px, py] = local(e); pan.moved = Math.max(pan.moved, Math.hypot(e.clientX - pan.x, e.clientY - pan.y)); pinTo(pan.w[0], pan.w[1], px, py); applyView(); return; }
+    if (!drag) { if (e.pointerType !== 'touch') tooltip(e); return; }
+    tip(null); const [x, z] = cellAt(e); drag.to = x === drag.t.x && z === drag.t.z ? null : [x, z]; draw();
+  }
+  // ---- hover: what is on the square ----
+  function tip(html, e) {
+    let el = $('ttTip'); if (!html) { if (el) el.hidden = true; return; }
+    if (!el) { el = document.createElement('div'); el.id = 'ttTip'; document.body.appendChild(el); }
+    el.innerHTML = html; el.hidden = false;
+    const x = Math.min(innerWidth - el.offsetWidth - 8, e.clientX + 14), y = Math.min(innerHeight - el.offsetHeight - 8, e.clientY + 14);
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  }
+  function tooltip(e) {
+    if (!view) return;
+    const [x, z] = cellAt(e), w = W(), out = [];
+    for (const g of chars()) {
+      const p = posOf(g); if (Math.round(p.x) !== x || Math.round(p.z) !== z || opt.hidden.has(g.id)) continue;
+      const cfg = g === w.getPlayerAvatar?.() ? null : w.getBrainConfig(g.id), hp = window.tablefolkCombat?.hpOf(g === w.getPlayerAvatar?.() ? 'player' : g);
+      const inv = cfg?.inventory?.items?.map(i => i.name + ((i.qty ?? 1) > 1 ? ' x' + i.qty : '')).join(', ');
+      out.push(`<b>${esc(nameOf(g))}</b> <span class="muted">${esc([String(g.charModel || '').replace(/_/g, ' '), isHostile(g) ? 'hostile' : '', hp ? hp.hp + '/' + hp.max + ' health' : ''].filter(Boolean).join(' · '))}</span>`
+        + (cfg?.style ? `<br>${esc(cfg.style)}` : '') + (inv ? `<br><span class="muted">carries</span> ${esc(inv)}` : '') + (cfg?.inventory?.gold ? ` <span class="muted">· ${cfg.inventory.gold} gold</span>` : ''));
+    }
+    for (const o of w.getObjects().filter(o => !o.rim && Math.round(o.x) === x && Math.round(o.z) === z && o.type !== 'light')) {
+      const opts = o.opts || {}, mm = o.mesh && window.meta?.(o.mesh), bits = [];
+      if (opts.gold) bits.push(opts.gold + ' gold');
+      if (Array.isArray(opts.items) && opts.items.length) bits.push(opts.items.map(i => i.name || i).join(', '));
+      if (opts.opened) bits.push('opened');
+      if (o.type === 'note' && (o.noteText || mm?.noteText)) bits.push('“' + String(o.noteText || mm.noteText).slice(0, 120) + '”');
+      if (o.type === 'door' && mm?.locked) bits.push('locked: needs the ' + mm.locked);
+      out.push(`<b>${esc(o.type.replace(/_/g, ' '))}</b>${bits.length ? ' <span class="muted">' + esc(bits.join(' · ')) + '</span>' : ''}`);
+    }
+    const pl = (w.state.places || []).find(p => p.x0 != null && x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1);
+    if (pl) out.push(`<span class="muted">place:</span> ${esc(pl.id)}`);
+    tip(out.length ? out.join('<hr>') : null, e);
   }
   function onUp(e) {
     if (e?.pointerType === 'touch') { touches.delete(e.pointerId); if (pan?.pinch) { pan = null; return; } }

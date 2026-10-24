@@ -4,7 +4,8 @@
  * (health, gold, what you carry, controls), Voice and Graphics. Dev mode
  * adds World, Character, Scenario, Library and Debug, the brain loop
  * buttons, the turn controls and the command box. ?dev=1 turns dev mode on
- * (remembered in this browser), ?dev=0 turns it off. Elements with class
+ * (remembered in this browser), ?dev=0 turns it off, ?play=1 shows user mode
+ * for that page only. Elements with class
  * "dev-only" exist in both modes and are hidden in user mode.
  *
  * The panel: a rail icon opens its pane (clicking the open one, the « button,
@@ -23,6 +24,10 @@
   try { if (devParam === '1' || devParam === 'true') localStorage.setItem(DEV, '1'); else if (devParam === '0' || devParam === 'false') localStorage.removeItem(DEV); } catch {}
   let dev = false;
   try { dev = localStorage.getItem(DEV) === '1'; } catch {}
+  // ?play=1: the player's view for this page, whatever is remembered (the
+  // world builder's play links); ?dev=1 still wins
+  if (new URLSearchParams(location.search).has('play') && devParam !== '1') dev = false;
+  window.TABLEFOLK_DEV = dev;
   const allowed = name => { const b = document.querySelector(`#rail .rail-btn[data-tab="${name}"]`); return !!b && (dev || !b.classList.contains('dev-only')); };
 
   function show(name, opts = {}) {

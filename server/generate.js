@@ -93,6 +93,7 @@ export function checkScenario(s) {
     try {
       const r = Procgen.applyToScenario(JSON.parse(JSON.stringify(s)));
       problems.push(...r.warnings);
+      for (const l of Array.isArray(s.locked) ? s.locked : []) if (l?.in && !r.places.some(p => p.id.replace(/\s+\d+$/, '') === String(l.in).toLowerCase().replace(/\s+\d+$/, ''))) problems.push(`"locked": no place "${l.in}" (places: ${r.places.map(p => p.id).join(', ')})`);
     } catch (e) { problems.push('"generate": ' + e.message); }
   }
   if (s.grid) {
@@ -113,6 +114,12 @@ export function checkScenario(s) {
     }
   };
   walk(s.goal);
+  // a locked door's key must be somewhere: carried, in a chest, or lying about
+  const keyNames = [...new Set([...(s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]), ...(s.agents || []).flatMap(a => (a?.inventory?.items || []).map(i => i?.name || i)), ...(s.player?.items || []).map(i => i?.name || i)].filter(Boolean).map(i => String(i).toLowerCase()))];
+  for (const l of Array.isArray(s.locked) ? s.locked : []) {
+    const k = String(l?.key || 'key').toLowerCase();
+    if (!keyNames.some(n => n === k || (/key/.test(n) && (n.includes(k) || k.includes(n))))) problems.push(`"locked": nobody has the "${k}" and it lies nowhere: put it in a chest or give it to a character`);
+  }
   // the player gets things from characters (give/sell), chests, or the floor
   const lying = new Set((s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]).filter(Boolean).map(i => String(i).toLowerCase()));
   const want = String(s.goal?.win?.player_has || '').toLowerCase();
@@ -319,7 +326,7 @@ button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}bu
 .mapcard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261024a"></script><script src="/app/builder.js?v=20261024i"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261024b"></script><script src="/app/builder.js?v=20261024j"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 if(f){ f.mode.value=qs.get('mode')||'auto'; f.how.value=qs.get('how')==='browser'?'browser':'server';
@@ -328,7 +335,7 @@ if(f){ f.mode.value=qs.get('mode')||'auto'; f.how.value=qs.get('how')==='browser
   f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); if(f.how.value==='browser') q.set('how','browser'); else q.delete('how'); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
-const appLink=l=>{const a=new URLSearchParams(); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
+const appLink=l=>{const a=new URLSearchParams(); a.set('play','1'); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
 if(SAVED && window.tfBuilder) window.tfBuilder.show(SAVED,{appLink});
 if(words){
   const q=new URLSearchParams(qs); q.set('prompt',words); q.set('stream','1'); q.delete('view');
@@ -385,7 +392,7 @@ if(words){
   if(qs.get('how')==='browser'){
     // step by step with the local model (app/worldgen-browser.js)
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261024a').then(()=>load('/app/worldgen-browser.js?v=20261024b')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261024b').then(()=>load('/app/worldgen-browser.js?v=20261024d')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));

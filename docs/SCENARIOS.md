@@ -324,6 +324,16 @@ agent id or `player`) strikes someone next to you: fists 1, dagger/club/staff
 misses. At 0 a character is defeated: it falls and stops acting. The struck
 character and anyone within earshot hear about it at once. The player fights
 from the chat box: `/attack grub`, `/wield sword`, or F for the nearest foe.
+Locked doors: `"locked": [{"in": "treasure", "key": "silver key"}]` (top level)
+locks every door into a generated map's place; `{"at": [x, z], "key": ...}`
+one door (`app/locks.js`). A locked door blocks everyone and stays shut; the
+player opens it by walking into it (or E) carrying the key (any item with
+"key" in its name that matches; a picked-up "key" object is called "key"),
+and it stays open. The generators check the key exists somewhere.
+Enemies with a mind: `"hostile": true` on a character with a real
+personality (a necromancer, a bandit chief) fights with the built-in routine
+like a monster and still talks: when spoken to, and one line as the fight
+starts (words only on those turns: say, whisper, emote).
 Blows go turn about: after the player attacks, the next swing waits until
 everyone in the fight has had a turn, characters with a mind included (so a
 caster gets its spell in). E on a fallen character searches it: what it
