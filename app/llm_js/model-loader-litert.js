@@ -16,8 +16,17 @@ const MODEL_CONFIG = {
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM)' },
 };
 
-let worker = null;
+let worker = null, shared = false;
 let nextId = 1;
+// One URL for every page (the game and the world builder), so they share it.
+const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261024a';
+// A model this browser has loaded before (so it is in OPFS): the engine runs
+// in a shared worker, which survives a reload or the step from the world
+// builder into the game (Chrome keeps it 30 s after the last page goes). The
+// first download stays in a dedicated worker: only there can it write OPFS
+// with a sync access handle (a shared worker's async writes cap near 34 MB/s).
+const CACHED = 'tablefolkLitertCached';
+const wasCached = () => { try { return !!localStorage.getItem(CACHED); } catch { return false; } };
 const pending = new Map(); // id -> {resolve, reject, onProgress, onToken}
 
 // Mirrors the worker's own load/unload state so getCurrentModel()/isLoaded()
@@ -25,26 +34,32 @@ const pending = new Map(); // id -> {resolve, reject, onProgress, onToken}
 let currentModel = null;
 let loaded = false;
 
-function getWorker() {
+function onReply(e) {
+  const { id, type } = e.data;
+  const p = pending.get(id);
+  if (!p) return;
+  if (type === 'progress') { p.onProgress?.(e.data.data); return; }
+  if (type === 'token') { p.onToken?.(e.data.text); return; }
+  pending.delete(id);
+  if (type === 'result') p.resolve(e.data.data);
+  else if (type === 'error') p.reject(new Error(e.data.message));
+}
+function failAll(e) {
+  console.error('[model-loader-litert] worker error', e);
+  for (const [id, p] of pending) { p.reject(new Error(e.message || 'LiteRT worker error')); pending.delete(id); }
+}
+function getWorker(noShared = false) {
   if (!worker) {
-    // Classic (not module) worker on purpose - see the comment at the top of
+    // Classic (not module) workers on purpose - see the comment at the top of
     // litert-worker.js for why a module worker breaks the library's own
     // importScripts()-based WASM glue loader.
-    worker = new Worker('./llm_js/litert-worker.js?v=20261019a');
-    worker.onmessage = (e) => {
-      const { id, type } = e.data;
-      const p = pending.get(id);
-      if (!p) return;
-      if (type === 'progress') { p.onProgress?.(e.data.data); return; }
-      if (type === 'token') { p.onToken?.(e.data.text); return; }
-      pending.delete(id);
-      if (type === 'result') p.resolve(e.data.data);
-      else if (type === 'error') p.reject(new Error(e.data.message));
-    };
-    worker.onerror = (e) => {
-      console.error('[model-loader-litert] worker error', e);
-      for (const [id, p] of pending) { p.reject(new Error(e.message || 'LiteRT worker error')); pending.delete(id); }
-    };
+    if (!noShared && wasCached() && typeof SharedWorker === 'function') {
+      try {
+        const sw = new SharedWorker(WORKER_URL, { name: 'tablefolk-litert', extendedLifetime: true });
+        sw.onerror = failAll; worker = sw.port; worker.onmessage = onReply; worker.start(); shared = true;
+      } catch (e) { console.warn('[model-loader-litert] no shared worker:', e); worker = null; }
+    }
+    if (!worker) { worker = new Worker(WORKER_URL); worker.onmessage = onReply; worker.onerror = failAll; shared = false; }
   }
   return worker;
 }
@@ -52,9 +67,10 @@ function getWorker() {
 // Leaving or reloading the page: end the worker now, which frees the model's
 // GPU memory (gigabytes) at once instead of whenever the old page is collected.
 // A page restored from the back/forward cache has lost its worker: reload it.
+// (A shared worker is only let go: Chrome ends it 30 s after the last page.)
 addEventListener('pagehide', () => {
   if (!worker) return;
-  worker.terminate();
+  if (shared) worker.close(); else worker.terminate();
   worker = null; loaded = false; currentModel = null;
   for (const [id, p] of pending) { p.reject(new Error('page closed')); pending.delete(id); }
 });
@@ -97,9 +113,18 @@ export async function loadModel(modelKey, onProgress) {
     onProgress?.(p);
   };
   try {
-    await call('load', { modelKey }, { onProgress: wrappedProgress });
+    try { await call('load', { modelKey }, { onProgress: wrappedProgress }); }
+    catch (e) {
+      // a shared worker that cannot run it (no WebGPU there, say): once more, dedicated
+      if (!shared) throw e;
+      console.warn('[model-loader-litert] shared worker failed, using a dedicated one:', e.message);
+      try { worker.close(); } catch {}
+      worker = null; getWorker(true);
+      await call('load', { modelKey }, { onProgress: wrappedProgress });
+    }
     currentModel = modelKey;
     loaded = true;
+    try { localStorage.setItem(CACHED, modelKey); } catch {}
   } catch (e) {
     throw new Error(`Failed to load LiteRT-LM model: ${e.message}`);
   }
@@ -116,6 +141,7 @@ export function unloadModel() {
 }
 
 export async function clearModelCache(modelKey) {
+  try { localStorage.removeItem(CACHED); } catch {}
   return call('clearCache', { modelKey: modelKey || 'gemma4-e2b-litert' });
 }
 

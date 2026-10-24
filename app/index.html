@@ -275,7 +275,8 @@
       <label class="spawn-mode-toggle"><input id="ttsEnabled" type="checkbox" /> speak <code>say()</code> text aloud</label>
       <div class="row"><button id="loadTts" type="button">load speech model</button><button id="stopTts" type="button">stop speech</button></div>
       <div class="custom-grid">
-        <label>Language <select id="ttsLanguage"><option value="english_2026-04">English</option><option value="german">German</option><option value="italian">Italian</option><option value="portuguese">Portuguese</option><option value="spanish">Spanish</option></select></label>
+        <label>Engine <select id="ttsEngine" title="which speech model runs (the server's admin page sets the default)"><option value="">server default</option></select></label>
+        <label id="ttsLanguageBox">Language <select id="ttsLanguage"><option value="english_2026-04">English</option><option value="german">German</option><option value="italian">Italian</option><option value="portuguese">Portuguese</option><option value="spanish">Spanish</option></select></label>
         <label>Volume <input id="ttsVolume" type="range" min="0" max="1" step=".05" value=".85" /></label>
         <label>Buffering <input id="ttsBufferMs" type="range" min="150" max="1500" step="50" value="350" title="Lower = speech starts sooner but stutters more easily under load. Higher = more delay before speech starts, but far more resistant to glitches." /></label>
       </div>
@@ -385,6 +386,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261024r"></script>
+  <script src="preflight.js?v=20261024s"></script>
 </body>
 </html>

@@ -184,6 +184,11 @@
       if (isPlayer(g)) { if (target) window.tablefolkToast?.(`no ${target} here`, { type: 'error' }); else { swingAnim(g); window.tablefolkSfx?.play('swing'); } }
       return;
     }
+    // One blow a round: the player's next swing waits until everyone in the
+    // fight has had their turn (play.js clears the lock when the round ends).
+    if (isPlayer(g)) {
+      if (state.playerAttackLock && performance.now() - state.playerAttackLock < 30000) { window.tablefolkToast?.('wait for your turn'); return; }
+    }
     const d = gap(g, v);
     if (d > REACH) { narrate(g, `attack failed: ${nameOf(v)} is ${d.toFixed(1)} cells away; walk next to them first`); if (isPlayer(g)) window.tablefolkToast?.(`${nameOf(v)} is too far away`, { type: 'error' }); return; }
     const nat = !isPlayer(g) && NATURAL[g.charModel];
@@ -198,7 +203,7 @@
     const who = nameOf(g), whom = nameOf(v);
     const wThe = w.kind === 'natural' ? 'its ' + w.name : w.name === 'fists' ? 'bare fists' : 'the ' + w.name, wA = w.kind === 'natural' ? 'its ' + w.name : withA(w.name);
     // the player's swing is a turn: nearby characters act after it (play.js)
-    if (isPlayer(g)) setTimeout(() => window.tablefolkPlay?.acted('attack'), 450);
+    if (isPlayer(g)) { state.playerAttackLock = performance.now(); setTimeout(() => window.tablefolkPlay?.acted('attack'), 450); }
     setTimeout(() => {
       if (v.defeated) return;
       window.tablefolkSfx?.play(miss ? 'miss' : HIT_SOUND[w.kind] || 'hitBlunt', v.root.position);

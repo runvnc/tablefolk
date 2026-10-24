@@ -3,7 +3,9 @@
  *
  *   E          use what is in front of you: open a chest (its gold and items
  *              go to you), pick up an item (potion, scroll, axe...), read a
- *              note, or talk to the character there (selects it, focuses chat)
+ *              note, search a body (what it carried; a monster with nothing
+ *              has a little by kind, BODY_LOOT), or talk to the character
+ *              there (selects it, focuses chat)
  *   walk over  gold (coin piles) is picked up on its own
  *   give       drag an item (or the gold) from the Adventurer pane onto a
  *              character close by, or press its "give" button (the nearest)
@@ -52,6 +54,40 @@
   }
   function give(items) { for (const i of items) { const have = state.player.items.find(x => x.name.toLowerCase() === i.name.toLowerCase()); if (have) have.qty = (have.qty ?? 1) + (i.qty ?? 1); else state.player.items.push({ name: i.name, qty: i.qty ?? 1 }); } }
   function describe(gold, items) { return [gold ? gold + ' gold' : '', ...items.map(i => i.name + ((i.qty ?? 1) > 1 ? ' x' + i.qty : ''))].filter(Boolean).join(', '); }
+
+  // ---------------------------------------------------------------- bodies
+  // What a monster that carried nothing has on it, by body: gold [min, max]
+  // and items with a chance each. Seeded by its name, so a reload finds the same.
+  const BODY_LOOT = {
+    goblin: { gold: [2, 9], items: [['rusty dagger', .3]] }, goblin_classic: { gold: [2, 9], items: [['rusty dagger', .3]] }, kobold: { gold: [1, 6], items: [] },
+    orc: { gold: [5, 15], items: [['healing potion', .25]] }, orc_classic: { gold: [5, 15], items: [['healing potion', .25]] },
+    troll: { gold: [10, 30], items: [['healing potion', .5]] },
+    skeleton: { gold: [0, 5], items: [['old bone', .4]] }, skeleton_classic: { gold: [0, 5], items: [['old bone', .4]] }, skeleton_farmer: { gold: [0, 4], items: [['rusty sickle', .3]] },
+    skeleton_warrior: { gold: [3, 12], items: [['rusty sword', .35]] }, skeleton_warrior_classic: { gold: [3, 12], items: [['rusty sword', .35]] },
+    zombie: { gold: [0, 6], items: [] }, giant: { gold: [15, 40], items: [] }, demon: { gold: [10, 30], items: [['scroll', .3]] }, dragon: { gold: [60, 150], items: [['gold chalice', .6]] },
+  };
+  function seeded(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h >>>= 0) % 10000) / 10000; }; }
+  function searchBody(c) {
+    const cfg = getBrainConfig(c.id); if (cfg.looted) return false;
+    const inv = charInventory(c);
+    let gold = Math.max(0, +inv.gold || 0), items = (inv.items || []).filter(i => (i.qty ?? 1) > 0).map(i => ({ name: i.name, qty: i.qty ?? 1 }));
+    const table = BODY_LOOT[c.charModel];
+    if (!gold && !items.length && table) {
+      const r = seeded(c.id + (window.tablefolkScenario?.active?.scn?.title || ''));
+      gold = table.gold[0] + Math.floor(r() * (table.gold[1] - table.gold[0] + 1));
+      items = table.items.filter(([, p]) => r() < p).map(([name]) => ({ name, qty: 1 }));
+    }
+    setBrainConfig(c.id, { looted: true, wielding: null, inventory: { gold: 0, items: [] } });
+    const p = posOf(c.root); setCharacterFacing(me(), new BABYLON.Vector3(p.x - myPos().x, 0, p.z - myPos().z));
+    if (!gold && !items.length) { toast(`You search ${c.id}: nothing of value`); note(`${playerName()} searches ${c.id} and finds nothing`); return true; }
+    state.player.gold = (state.player.gold || 0) + gold; give(items);
+    sfx(gold ? 'coins' : 'pickup', p);
+    const what = describe(gold, items);
+    toast(`You search ${c.id}: ${what}`, 'success'); note(`${playerName()} searches ${c.id} and takes ${what}`);
+    try { emitBadge(c, 'searched'); } catch {}
+    inventoryChanged(); render();
+    return true;
+  }
 
   function openChest(m) {
     const mm = meta(m); mm.opts ||= {};
@@ -119,7 +155,7 @@
     const f = state.firstPerson ? { x: Math.sin(state.fpYaw ?? 0), z: Math.cos(state.fpYaw ?? 0) } : { x: g.dir?.x || 0, z: g.dir?.z || 0 };
     const score = q => { const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz); return d > REACH ? null : d - .6 * ((dx * f.x + dz * f.z) / (d || 1)); };
     let best = null;
-    const consider = (kind, thing, q) => { const s = score(q); if (s != null && (!best || s < best.s)) best = { kind, thing, s }; };
+    const consider = (kind, thing, q) => { if (!kind) return; const s = score(q); if (s != null && (!best || s < best.s)) best = { kind, thing, s }; };
     for (const m of state.props) {
       if (!alive(m)) continue;
       const t = meta(m)?.type;
@@ -129,8 +165,8 @@
       else if (t === 'coin_pile') consider('gold', m, posOf(m));
       else if (t === 'note') consider('note', m, posOf(m));
     }
-    for (const c of state.characters) if (!c.defeated) consider('person', c, c.logicalPos || c.root.position);
-    return best;
+    for (const c of state.characters) consider(c.defeated ? (getBrainConfig(c.id).looted ? null : 'body') : 'person', c, c.logicalPos || c.root.position);
+    return best?.kind ? best : null;
   }
   function use() {
     const g = me(); if (!g || g.defeated || state.npcBusy) return;
@@ -144,6 +180,7 @@
       return;   // talking is not a turn: the one spoken to answers
     }
     if (u.kind === 'use') { Promise.resolve(window.tablefolkPackages?.useThing(u.thing, g)).then(done => { if (done) acted('use'); }); return; }
+    if (u.kind === 'body') { if (searchBody(u.thing)) acted('use'); return; }
     if (u.kind === 'note') { const mm = meta(u.thing); toast('The note says: ' + ((mm.noteText || noteTextFromHtml(mm.noteHtml || '')) || '(blank)')); return; }
     const p = u.kind === 'chest' ? posOf(u.thing) : null;
     if (p) setCharacterFacing(g, new BABYLON.Vector3(p.x - myPos().x, 0, p.z - myPos().z));
@@ -194,7 +231,7 @@
       <div class="adv-keys">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span>click the ground: walk there</span>
         <span><kbd>E</kbd> open / pick up / talk</span><span><kbd>F</kbd> attack</span>
-        <span><kbd>V</kbd> first person</span><span><kbd>I</kbd> this panel</span>
+        <span><kbd>V</kbd> first person</span><span><kbd>C</kbd> follow / overview camera</span><span><kbd>I</kbd> this panel</span>
         <span><kbd>Enter</kbd> chat</span><span><kbd>Esc</kbd> close panel</span>
       </div>`;
   }
@@ -298,7 +335,7 @@
   // Fighters take their turn before the player moves again (combat is quick).
   // Characters with a brain think and talk in the background: the player
   // keeps moving meanwhile, and a small note says who is thinking.
-  let busy = false, queued = false, talking = false;
+  let busy = false, queued = false, talking = null;
   function acted(kind) {
     if (!me()) return;
     try { window.dispatchEvent(new CustomEvent('tablefolk-player-turn', { detail: { kind } })); } catch {}
@@ -332,7 +369,10 @@
         const actors = near.filter(c => getBrainConfig(c.id).enabled !== false);
         // mind.js decides who has something to say or do this round
         const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c) && (window.tablefolkMind?.wantsTurn(c) ?? true)) : [];
-        if (talkers.length && !talking) talk(talkers);
+        if (talkers.length && !talking) { const t = talking = talk(talkers); t.finally(() => { if (talking === t) talking = null; }); }
+        // after an attack the player waits for the characters with a mind
+        // too (they may strike back, or cast), so blows go turn about
+        if (state.playerAttackLock && talking) { setBusy(true, 'the others are deciding…'); await talking; }
         for (const c of fighters) {
           if (c.defeated || me()?.defeated) break;
           setBusy(true, `${c.id}${/s$/.test(c.id) ? "'" : "'s"} turn`);
@@ -340,12 +380,11 @@
           await until(() => !c.turnMove, 15000);
         }
       } while (queued);
-    } finally { busy = false; setBusy(false); }
+    } finally { busy = false; setBusy(false); state.playerAttackLock = 0; }
   }
   // a friendly character only takes a turn while it can see the player
   const sees = c => window.tablefolk?.canSeeEachOther?.(c, me()) ?? true;
   async function talk(list) {
-    talking = true;
     const w = window.tablefolk;
     try {
       for (const c of list) {
@@ -355,7 +394,7 @@
         await w.runAgentTurn(c);
       }
     } catch (e) { console.error('[play] talk turn', e); }
-    finally { talking = false; banner('npcThinking', ''); }
+    finally { banner('npcThinking', ''); }
   }
   // the note goes away once the character has decided what to do
   addEventListener('tablefolk-agent-turn', () => banner('npcThinking', ''));

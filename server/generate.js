@@ -240,6 +240,23 @@ export async function handleGenerate(req, url) {
   return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' } });
 }
 
+// POST /api/finish {scenario, prompt, model, ms}: a scenario made elsewhere
+// (the world builder's step-by-step run with the model in the browser,
+// app/worldgen-browser.js) checked like a generated one; problems come back
+// for the model to fix, else it is saved and its link returned.
+export async function handleFinish(req) {
+  if (req.method !== 'POST') return Response.json({ error: 'POST {scenario, prompt}' }, { status: 405 });
+  const { scenario, prompt = '', model = 'browser', ms = 0 } = await req.json().catch(() => ({}));
+  let problems;
+  try { problems = checkScenario(scenario); } catch (e) { problems = [e.message]; }
+  if (problems.length) return Response.json({ problems });
+  const code = encodeScenario(scenario);
+  recent.push({ at: Date.now(), prompt: String(prompt).slice(0, 300), model, ms, ok: true, title: scenario.title || '' }); if (recent.length > 50) recent.shift();
+  const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
+  try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: 'browser', model, ...scenario }, null, 2) + '\n'); } catch {}
+  return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [] });
+}
+
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Two views of the same run: "builder" (the prompt form, the stage and a
@@ -253,6 +270,7 @@ export async function handleWorld(req, url, { saved = null } = {}) {
   const builderBody = `<h1>Tablefolk world builder</h1><p class="sub">Describe a scene; a scenario is written and opened for you.</p>
 <form id="f"><input name="p" value="${esc(words)}" placeholder="a small dungeon with a sorceress and goblins" required>
 <select name="mode"><option value="auto">any method</option><option value="generate">generated map</option><option value="grid">ASCII map</option><option value="map">layout lines</option></select>
+<select name="how" title="who writes it"><option value="server">in one go: ${esc(config.generator.model)}</option><option value="browser">step by step: Gemma in this browser</option></select>
 <button>build</button></form>
 <div class="card" id="card" ${words || saved ? '' : 'hidden'}><div><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span> <span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
 <div id="editor" hidden></div>`;
@@ -295,11 +313,13 @@ button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}bu
 .mapcard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;max-width:100%;max-height:100%;overflow:auto}.mapcard canvas{display:block;margin:8px 0;border-radius:6px}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261023n"></script><script src="/app/builder.js?v=20261024i"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261024a"></script><script src="/app/builder.js?v=20261024i"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
-if(f){ f.mode.value=qs.get('mode')||'auto';
-  f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
+if(f){ f.mode.value=qs.get('mode')||'auto'; f.how.value=qs.get('how')==='browser'?'browser':'server';
+  // step by step in the browser picks its own map method
+  const sync=()=>{ f.mode.disabled=f.how.value==='browser'; }; f.how.onchange=sync; sync();
+  f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); const q=new URLSearchParams(qs); q.set('mode',f.mode.value); if(f.how.value==='browser') q.set('how','browser'); else q.delete('how'); location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
 const appLink=l=>{const a=new URLSearchParams(); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
@@ -332,8 +352,8 @@ if(words){
       $('fill').style.width=pos.toFixed(1)+'%'; requestAnimationFrame(tick); };
     requestAnimationFrame(tick); setTimeout(fakeBump,200); }
   const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
-  const es=new EventSource('/api/generate?'+q);
-  es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
+  // the same events from the server's stream or from the browser's own run
+  const onProgress=d=>{
     // about 4 characters a token
     const tok=n=>' ~'+Math.round(n/4).toLocaleString()+' tokens';
     $('stage').textContent=(stageText[d.stage]||d.stage)+'…'+(d.model?' ('+d.model+')':'')+(d.chars?tok(d.chars):d.thought?tok(d.thought)+' of thought':'');
@@ -342,8 +362,9 @@ if(words){
     if(d.chars>seenChars){ pos+=(d.chars-seenChars)*PER_CHAR; seenChars=d.chars; }
     if(d.thought>seenThought){ pos+=(d.thought-seenThought)*PER_THOUGHT; seenThought=d.thought; }
     if(d.stage==='repairing' && !d.chars) seenChars=0;
-    if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');});
-  es.addEventListener('done',e=>{es.close(); ended=true; clearInterval(clock); const d=JSON.parse(e.data);
+    if(d.label) $('stage').textContent=d.label+(d.chars?tok(d.chars):'');
+    if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');};
+  const onDone=d=>{ ended=true; clearInterval(clock);
     $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)'; $('clock').textContent='';
     // the loading view just goes there: nothing to click
     if(view==='loading'){ $('fill').style.transition='width .25s linear'; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; setTimeout(()=>location.href=appLink(d.link),500); return; }
@@ -352,11 +373,20 @@ if(words){
     $('result').innerHTML='<p><a href="'+appLink(d.link)+'">open it as generated</a> · <a href="#" id="again">another one</a></p>';
     $('again').onclick=ev=>{ev.preventDefault(); location.reload();};
     window.tfBuilder?.show(d,{appLink});
-    if(qs.has('go')) setTimeout(()=>location.href=appLink(d.link),700);});
+    if(qs.has('go')) setTimeout(()=>location.href=appLink(d.link),700);};
   const fail=msg=>{ ended=true; clearInterval(clock); $('stage').textContent=msg;
     if(view==='loading'){ $('chore').textContent=msg; const b=new URLSearchParams(qs); b.set('view','builder'); $('result').innerHTML='<p><a href="?'+b+'">open the world builder</a></p>'; } };
+  if(qs.get('how')==='browser'){
+    // step by step with the local model (app/worldgen-browser.js)
+    const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
+    load('/app/procgen.js?v=20261024a').then(()=>load('/app/worldgen-browser.js?v=20261024a')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+  } else {
+  const es=new EventSource('/api/generate?'+q);
+  es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));
+  es.addEventListener('done',e=>{es.close(); onDone(JSON.parse(e.data));});
   es.addEventListener('failed',e=>{es.close(); fail('failed: '+JSON.parse(e.data).error);});
   es.onerror=()=>{ if(ended) return; es.close(); fail('connection lost (the server may have stopped)'); };
+  }
 }
 </script></body></html>`;
   return new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } });

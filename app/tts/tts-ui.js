@@ -34,6 +34,15 @@
     $('loadTts').onclick=async()=>{tts.setEnabled(true);$('ttsEnabled').checked=true;try{await tts.load();const lang=$('ttsLanguage').value;if(lang!=='english_2026-04')await tts.setLanguage(lang);}catch(e){console.error(e);}};
     $('stopTts').onclick=()=>tts.stop();
     $('ttsLanguage').onchange=e=>tts.setLanguage(e.target.value);
+    // engine: "server default" clears this browser's pick
+    const eng=$('ttsEngine');
+    if(eng){
+      for(const e of tts.engines()){const o=document.createElement('option');o.value=e.id;o.textContent=e.label;eng.appendChild(o);}
+      eng.value=localStorage.getItem('tablefolkTtsEngine')||'';
+      const langs=()=>{const id=eng.value||tts.engine;$('ttsLanguageBox').hidden=!tts.engines().find(e=>e.id===id)?.languages;};
+      tts.addEventListener('status',langs); langs();
+      eng.onchange=async()=>{ if(!eng.value){localStorage.removeItem('tablefolkTtsEngine');} tts.setEnabled(true);$('ttsEnabled').checked=true; await tts.setEngine(eng.value||await (await fetch('/api/voices')).json().then(d=>d.ttsEngine).catch(()=>'pocket-18m')); if(!eng.value)localStorage.removeItem('tablefolkTtsEngine'); langs(); };
+    }
     $('ttsVolume').oninput=e=>tts.setVolume(e.target.value);
     $('ttsBufferMs').oninput=e=>tts.setBufferMs(e.target.value);
     $('testAgentVoice').onclick=()=>{const g=window.tablefolk?.getSelectedAgent?.();if(g){tts.setEnabled(true);$('ttsEnabled').checked=true;tts.speak(g,'Hello! This is my selected Pocket TTS voice.',$('agentTtsVoice').value);}};

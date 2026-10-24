@@ -444,9 +444,27 @@ async function sendTurn(conversation, promptText, opts, onToken) {
 // Out: {id, type:'progress'|'token', ...}  (0+ times)
 //      {id, type:'result', data}            (exactly once, success)
 //      {id, type:'error', message}          (exactly once, failure)
-self.onmessage = async (e) => {
+//
+// Runs as a dedicated worker or as a shared one (model-loader-litert.js):
+// shared, every page of the site talks to one engine, and Chrome keeps it
+// 30 s after the last page goes (extendedLifetime), so a reload or the step
+// from the world builder into the game finds the model still loaded. Each
+// page's conversations are kept apart by a tag on their agent ids.
+let pages = 0;
+self.onconnect = (ev) => {
+  const port = ev.ports[0], tag = 'p' + (++pages) + ':';
+  port.onmessage = (e) => handle({ data: tagged(e.data, tag) }, (msg) => port.postMessage(msg), tag);
+  port.start?.();
+};
+function tagged(d, tag) {
+  if (d?.type === 'generate') return { ...d, opts: { ...(d.opts || {}), agentId: tag + String(d.opts?.agentId || 'default') } };
+  if (d?.type === 'clearConversations' && d.agentId != null) return { ...d, agentId: tag + d.agentId };
+  return d;
+}
+self.onmessage = (e) => handle(e, (msg) => self.postMessage(msg), '');
+async function handle(e, post, tag) {
   const { id, type } = e.data;
-  const reply = (msg) => self.postMessage({ id, ...msg });
+  const reply = (msg) => post({ id, ...msg });
   try {
     await engineLibReady;
     if (type === 'load') {
@@ -539,7 +557,9 @@ self.onmessage = async (e) => {
     } else if (type === 'debugLastPrompt') {
       reply({ type: 'result', data: lastSent });
     } else if (type === 'clearConversations') {
-      clearConversations(e.data.agentId ?? null);
+      // a shared page clears only its own
+      if (tag && e.data.agentId == null) { for (const h of [...histories.values()]) if (h.agentId.startsWith(tag)) clearConversations(h.agentId); }
+      else clearConversations(e.data.agentId ?? null);
       reply({ type: 'result', data: {} });
     } else if (type === 'currentModel') {
       reply({ type: 'result', data: currentModel });
@@ -551,4 +571,4 @@ self.onmessage = async (e) => {
   } catch (err) {
     reply({ type: 'error', message: err?.message || String(err) });
   }
-};
+}

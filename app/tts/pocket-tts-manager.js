@@ -8,6 +8,16 @@
   const CUSTOM_FRAME = 1920;                      // MIMI samples per frame
   const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 
+  // Speech engines, swappable: the same messages, another worker. The
+  // choice: this browser's (the voice pane, localStorage tablefolkTtsEngine),
+  // else the server's default (admin page, /api/voices), else the first.
+  const ENGINES={
+    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261024a',languages:false},
+    'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261018a',languages:true},
+  };
+  let serverEngine=null;
+  const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
+  async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
   const DB='tablefolk-pocket-tts', STORE='voices';
   const CACHE_MARKER='tablefolkTtsModelCached';
   const settings=()=>({enabled:localStorage.getItem('tablefolkTtsEnabled')!=='0',language:localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04',volume:Number(localStorage.getItem('tablefolkTtsVolume')||.85),bufferMs:clamp(Number(localStorage.getItem('tablefolkTtsBufferMs')||350),150,1500)});
@@ -62,8 +72,11 @@
       };
       this.audioCtx.onstatechange=()=>{if(this.audioCtx.state==='suspended')this.status('Click anywhere once to enable speech','error');};
     } if(this.audioCtx.state==='suspended') await this.audioCtx.resume(); this.gain.gain.value=settings().volume; }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; this.status(this.wasLoaded()?'Auto-loading cached Pocket-TTS…':'Downloading Pocket-TTS model…','loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker('./tts/inference-worker.js?v=20261018a',{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language}}); }); return this.pendingLoad; }
-    async onMessage(m,resolve,reject){ if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');this.status('Pocket-TTS ready (WASM CPU)','ready');resolve?.(); await this.restoreCustomVoices();} }
+    engines(){return Object.entries(ENGINES).map(([id,e])=>({id,label:e.label,languages:e.languages}));}
+    // Switch engines: the running one is dropped and the new one loads now.
+    async setEngine(id){ if(!ENGINES[id])return; localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const engine=this.engine=await chosenEngine(), E=ENGINES[engine]; this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language}}); }); return this.pendingLoad; }
+    async onMessage(m,resolve,reject){ if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready (CPU)`,'ready');resolve?.(); await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry
       if(m.type==='audio_chunk_meta'){this.receivedSamples++;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(m.metrics?.chunkRtfx)||0;if(!this.telemetry.audioArrivalMs&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;}
@@ -168,7 +181,7 @@
         '</div>';
     }    stop(){this.queue=[];try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}
     unload(){this.stopSpatialTicker();this.stop();try{this.worker?.terminate();}catch{}this.worker=null;this.ready=false;this.loading=false;this.pendingLoad=null;this.pendingAudio=[];this.pending.clear();try{this.pcmNode?.disconnect();}catch{}this.analyser=null;try{this.gain?.disconnect();}catch{}try{this.audioCtx?.close();}catch{}this.pcmNode=null;this.gain=null;this.audioCtx=null;this.directPort=false;}
-    async setLanguage(language){localStorage.setItem('tablefolkTtsLanguage',language);if(!this.worker)return;this.ready=false;this.status('Loading language…','loading');this.worker.postMessage({type:'set_language',data:{language}});}
+    async setLanguage(language){localStorage.setItem('tablefolkTtsLanguage',language);if(!this.worker||!ENGINES[this.engine]?.languages)return;this.ready=false;this.status('Loading language…','loading');this.worker.postMessage({type:'set_language',data:{language}});}
     // Drop one character's queued lines and cut it off if it is speaking (it died).
     silence(agent){this.queue=this.queue.filter(i=>i.agent!==agent);if(this.current?.agent===agent){try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}}
     setEnabled(v){localStorage.setItem('tablefolkTtsEnabled',v?'1':'0');if(!v)this.stop();}

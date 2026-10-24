@@ -3921,6 +3921,7 @@ async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   g.playerRing=ring;
   setCameraArrowKeys(false);
   updateFirstPersonButton(); updatePerceptionUI();
+  if(!window.TABLEFOLK_TABLETOP && !state.firstPerson) followCameraStart();
   return g;
 }
 // The overview camera turns on the arrow keys by default. With an avatar the
@@ -3937,7 +3938,7 @@ function removePlayerAvatar(){
   setCameraArrowKeys(true);
   if(state.firstPerson) setFirstPerson(false);
   try{ g.playerRing?.material?.dispose(); g.playerRing?.dispose(); }catch{}
-  disposeCharacter(g); state.playerAvatar=null; updateFirstPersonButton();
+  disposeCharacter(g); state.playerAvatar=null; state.cameraMode='overview'; updateFirstPersonButton();
 }
 // One cell in a direction, unless blocked or off the edge (no accidental falls).
 function playerStep(dir){
@@ -4012,6 +4013,7 @@ function setupPlayerControls(){
     if(tag==='input'||tag==='textarea'||tag==='select'||e.target?.isContentEditable||e.ctrlKey||e.metaKey||e.altKey) return;
     const k=e.key.toLowerCase();
     if(k==='v'){ setFirstPerson(!state.firstPerson); e.preventDefault(); return; }
+    if(k==='c'){ toggleCameraMode(); e.preventDefault(); return; }
     const map={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
     const act=map[k]; if(!act) return;
     e.preventDefault();
@@ -4088,10 +4090,39 @@ window.addEventListener('tablefolk-player-chat',e=>{
   const div=document.createElement('div'); div.className='bubble player-bubble'; div.textContent=String(e.detail?.text||'').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:3.2});
 });
-// After the player moves with the keys, ease the overview camera after the avatar.
+// Third person. 'follow' (the default with an avatar): the camera stays
+// close, on the avatar, and swings round behind it while it walks away from
+// the camera (not when it steps sideways or back, so A/D don't spin the
+// view); you can still orbit and zoom with the mouse. 'overview' (C toggles):
+// the whole board, the camera easing after the avatar only when it moves.
+const FOLLOW={radius:6.5,beta:1.08,height:.8};
+const behindAlpha=d=>Math.atan2(-(d.z||0),-(d.x||0));
+function followCameraStart(){
+  const g=state.playerAvatar, cam=state.camera; if(!g || !cam) return;
+  state.cameraMode='follow';
+  const p=g.root.position; cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z));
+  cam.alpha=behindAlpha(g.dir); cam.beta=FOLLOW.beta; cam.radius=FOLLOW.radius;
+}
+function toggleCameraMode(){
+  if(state.firstPerson) setFirstPerson(false);
+  if(state.cameraMode==='follow'){ state.cameraMode='overview'; const cam=state.camera; cam.radius=Math.min(cam.upperRadiusLimit,20.5*boardScale()); cam.beta=1.0; }
+  else followCameraStart();
+  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the overview)':'camera: overview (C to follow)');
+}
 function followAvatarCamera(dt){
-  const g=state.playerAvatar, cam=state.camera; if(!g || !cam || state.firstPerson || !state.followAvatar) return;
-  const want=new BABYLON.Vector3(g.root.position.x,.6,g.root.position.z);
+  const g=state.playerAvatar, cam=state.camera; if(!g || !cam || state.firstPerson) return;
+  const p=g.root.position;
+  if(state.cameraMode==='follow'){
+    cam.target=BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*6));
+    if(g.turnMove || g.fpWalking){
+      // walking away from the camera (its view and the walk agree)
+      const fx=-Math.cos(cam.alpha), fz=-Math.sin(cam.alpha);
+      if(fx*g.dir.x+fz*g.dir.z>.2){ let d=behindAlpha(g.dir)-cam.alpha; d=Math.atan2(Math.sin(d),Math.cos(d)); cam.alpha+=d*Math.min(1,dt*2.2); }
+    }
+    return;
+  }
+  if(!state.followAvatar) return;
+  const want=new BABYLON.Vector3(p.x,.6,p.z);
   cam.target=BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*3));
   if(BABYLON.Vector3.Distance(cam.target,want)<.02 && !g.turnMove) state.followAvatar=false;
 }

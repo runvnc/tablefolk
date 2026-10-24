@@ -398,7 +398,8 @@
   function applyToScenario(scn) {
     const opts = scn.generate || {};
     const kindName = String(opts.kind || opts.type || 'dungeon').toLowerCase();
-    const want = [...(scn.agents || []), ...(scn.objects || []), scn.player || {}].map(a => a.in).filter(v => v != null).map(v => String(v).toLowerCase().replace(/\s+\d+$/, ''));
+    // places asked for: "generate": {"places": [...]}, and every "in"
+    const want = [...(Array.isArray(opts.places) ? opts.places.map(p => ({ in: p })) : []), ...(scn.agents || []), ...(scn.objects || []), scn.player || {}].map(a => a.in).filter(v => v != null).map(v => String(v).toLowerCase().replace(/\s+\d+$/, ''));
     // dungeons are dark (fog of war, unlit rooms) unless the scenario says "dark": false
     const gen = (kindName === 'village' || kindName === 'town' ? village : dungeon)({ ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? true });
     const warnings = [], used = new Set(), occupied = new Set(), placed = {};

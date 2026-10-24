@@ -7,6 +7,7 @@
 //                            baseURL "openrouter" | "openai" | "local" | a URL)
 //   keys                     { openrouter, openai }  provider keys, used by both
 //   worldView                "builder" | "loading"
+//   ttsEngine                the players' default speech engine (TTS_ENGINES)
 //   voices                   { alba: { gender, description }, ... }
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,6 +17,9 @@ export const ADMIN_DIR = join(ROOT, '.admin');
 const FILE = join(ADMIN_DIR, 'settings.json');
 
 // Pocket-TTS built-in voices (app/tts/pocket-tts-manager.js BUILTINS).
+// Speech engines (app/tts/pocket-tts-manager.js ENGINES); players can pick
+// another one in the app's voice pane.
+export const TTS_ENGINES = ['pocket-18m', 'pocket-100m'];
 export const VOICE_IDS = ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'];
 const DEFAULT_GENDER = { alba: 'female', azelma: 'female', cosette: 'female', eponine: 'female', fantine: 'female', javert: 'male', jean: 'male', marius: 'male' };
 
@@ -37,6 +41,7 @@ function apply() {
     config[k] = endpoint(s.baseURL || raw.baseURL, s.apiKey || raw.apiKey, s.model || raw.model, DEFAULT_MODELS[k], keys);
   }
   config.worldView = saved.worldView === 'loading' || saved.worldView === 'builder' ? saved.worldView : ENV.worldView;
+  config.ttsEngine = TTS_ENGINES.includes(saved.ttsEngine) ? saved.ttsEngine : TTS_ENGINES[0];
 }
 apply();
 
@@ -55,7 +60,7 @@ export function publicSettings() {
     effective: { baseURL: config[k].baseURL, model: config[k].model, key: !!config[k].apiKey, provider: config[k].provider } });
   const env = { openrouter: !!process.env.OPENROUTER_API_KEY, openai: !!process.env.OPENAI_API_KEY };
   const keys = Object.fromEntries(['openrouter', 'openai'].map(p => [p, { saved: !!saved.keys?.[p], env: env[p] }]));
-  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, voices: voices() };
+  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices() };
 }
 
 // patch: { characters: {baseURL, model, apiKey, clearKey}, generator: ..., worldView, voices: [{id, gender, description}] }
@@ -78,6 +83,7 @@ export function updateSettings(patch = {}) {
     saved.keys = k;
   }
   if (patch.worldView === 'builder' || patch.worldView === 'loading' || patch.worldView === '') saved.worldView = patch.worldView || undefined;
+  if (TTS_ENGINES.includes(patch.ttsEngine)) saved.ttsEngine = patch.ttsEngine;
   if (Array.isArray(patch.voices)) {
     saved.voices = {};
     for (const v of patch.voices) if (VOICE_IDS.includes(v.id)) saved.voices[v.id] = { gender: v.gender === 'male' ? 'male' : 'female', description: String(v.description || '').slice(0, 200) };

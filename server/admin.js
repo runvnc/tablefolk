@@ -98,7 +98,7 @@ async function localUp() { try { await fetch(LITERT_URL + '/models', { signal: A
 
 export async function handleAdmin(req, url) {
   const p = url.pathname;
-  if (p === '/api/voices') return json({ voices: voices() });
+  if (p === '/api/voices') return json({ voices: voices(), ttsEngine: config.ttsEngine });
   if (p === '/admin' || p === '/admin/') return new Response(PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
   if (req.method === 'POST' && !(req.headers.get('content-type') || '').includes('application/json')) return json({ error: 'JSON only' }, 415);
   if (p === '/api/admin/login' && req.method === 'POST') {
@@ -174,6 +174,9 @@ table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{text-align:left
 <section><h2>World page</h2><label>What /world/&lt;prompt&gt; shows players</label>
 <select id="worldView"><option value="builder">the world builder (prompt, progress, model)</option><option value="loading">a plain loading screen with a progress bar</option></select>
 <div class="row"><button id="saveView">save</button><span id="viewMsg" class="muted"></span></div></section>
+<section><h2>Speech</h2><label>Players' speech engine (each player can pick another in the app's voice pane)</label>
+<select id="ttsEngine"><option value="pocket-18m">Pocket-TTS small (18M parameters, about 40 MB, English)</option><option value="pocket-100m">Pocket-TTS (100M parameters, about 120 MB, 5 languages)</option></select>
+<div class="row"><button id="saveTts">save</button><span id="ttsMsg" class="muted"></span></div></section>
 <section><h2>Voices</h2><p class="muted">Describe each Pocket-TTS voice. Characters without a voice get one of their body's gender; the generator reads the descriptions to cast scenarios; the app's voice menu shows them.</p>
 <table class="voices"><thead><tr><th>voice</th><th>gender</th><th>description</th></tr></thead><tbody id="voices"></tbody></table>
 <div class="row"><button id="saveVoices">save voices</button><span id="voiceMsg" class="muted"></span></div></section>
@@ -208,7 +211,7 @@ function render(){
   const kb=(p,t)=>{ const x=S.settings.keys?.[p]||{}; return '<div><label>'+t+' key '+(x.saved?'(<span class=ok>saved</span>; leave empty to keep it)':x.env?'(from .env)':'(<span class=bad>none</span>)')+'</label><input type="password" data-key="'+p+'" autocomplete="off" placeholder="'+(p==='openai'?'sk-...':'sk-or-...')+'">'
     +'<div class="row"><button data-savekey="'+p+'">save</button>'+(x.saved?'<button class="ghost" data-clearkey="'+p+'">forget saved key</button>':'')+'<span class="muted" id="kmsg_'+p+'"></span></div></div>'; };
   $('keys').innerHTML=kb('openrouter','OpenRouter')+kb('openai','OpenAI');
-  $('worldView').value=S.settings.worldView;
+  $('worldView').value=S.settings.worldView; $('ttsEngine').value=S.settings.ttsEngine;
   $('voices').innerHTML=S.settings.voices.map(v=>'<tr data-v="'+v.id+'"><td>'+v.id+'</td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
   $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td>'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td>'+esc(g.model)+'</td><td>'+(g.ok?'<span class=ok>'+(g.ms/1000).toFixed(1)+'s</span> '+esc(g.title||''):'<span class=bad>'+esc(g.error||'failed')+'</span>')+'</td></tr>').join(''):'<tr><td class=muted>none since the server started</td></tr>';
   $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td>'+new Date(g.at).toLocaleString()+'</td><td><b>'+esc(g.title)+'</b><br><span class=muted>'+esc(g.prompt)+' · '+esc(g.model)+'</span></td><td style="white-space:nowrap">'+(g.link?'<a href="'+g.link+'">play</a> · <a href="'+g.link.replace('/app/#','/app/?dev=1#')+'">dev</a> · <a href="'+g.builder+'">edit</a> · ':'')+'<a href="#" data-del="'+esc(g.file)+'">delete</a></td></tr>').join(''):'<tr><td class=muted>none</td></tr>';
@@ -227,6 +230,7 @@ document.addEventListener('click',async e=>{
   if(del){ e.preventDefault(); if(!confirm('Delete '+del+'?')) return; const r=await post('/api/admin/generated',{remove:del}); if(r.ok) load(); }
 });
 $('saveView').onclick=async()=>{ const r=await post('/api/admin/settings',{worldView:$('worldView').value}); $('viewMsg').textContent=r.ok?'saved':'failed'; };
+$('saveTts').onclick=async()=>{ const r=await post('/api/admin/settings',{ttsEngine:$('ttsEngine').value}); $('ttsMsg').textContent=r.ok?'saved':'failed'; };
 $('saveVoices').onclick=async()=>{ const v=[...document.querySelectorAll('#voices tr')].map(tr=>({id:tr.dataset.v,gender:tr.querySelector('select').value,description:tr.querySelector('input').value}));
   const r=await post('/api/admin/settings',{voices:v}); $('voiceMsg').textContent=r.ok?'saved':'failed'; };
 $('pwSave').onclick=async()=>{ const r=await post('/api/admin/password',{current:$('pwCur').value,next:$('pwNew').value}); $('pwMsg').textContent=r.ok?'changed':(r.error||'failed'); if(r.ok){ $('pwCur').value=$('pwNew').value=''; load(); } };

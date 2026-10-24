@@ -20,7 +20,7 @@
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
-import { handleWorld, handleGenerate, handleRevise } from './generate.js';
+import { handleWorld, handleGenerate, handleRevise, handleFinish } from './generate.js';
 import { setupAdmin, handleAdmin, savedWorld } from './admin.js';
 
 const args = process.argv.slice(2);
@@ -144,6 +144,7 @@ const server = Bun.serve({
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' });
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/revise') return handleRevise(req, url);
+    if (p === '/api/finish') return handleFinish(req);
     if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
     if (p === '/api/skills') return listSkills();
     if (p === '/api/roles') return listRoles();
