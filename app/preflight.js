@@ -57,7 +57,7 @@
     ['mind.js?v=20261024f'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261024l'],
-    ['live.js?v=20261025a'],
+    ['live.js?v=20261025c'],
     ['director.js?v=20261025zb'],
     ['speech-input.js?v=20261020a'],
     ['workflows.js?v=20261024a'],
@@ -67,9 +67,9 @@
     ['scenario.js?v=20261025a'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
-    ['welcome.js?v=20261025a'],
+    ['welcome.js?v=20261025b'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261025za', 'module'],
+    ['llm_js/world-integration.js?v=20261025zd', 'module'],
   ];
 
   function browserSummary() {

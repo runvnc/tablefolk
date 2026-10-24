@@ -47,11 +47,15 @@
   function hide() { if (el) el.hidden = true; document.documentElement.classList.remove('welcome-open'); }
   async function play(w) {
     if (!w) return;
+    // still "busy" until the world (and its intro card) is up: the model
+    // download question waits for that (world-integration.js)
+    document.documentElement.classList.add('world-loading');
     hide();
     try {
       const scn = await (await fetch('/scenarios/' + w.file, { cache: 'no-cache' })).json();
       await window.tablefolkScenario.playScenario(scn);
     } catch (e) { console.error('[welcome]', e); window.tablefolkToast?.('could not open that world: ' + e.message, { type: 'error' }); show(); }
+    finally { setTimeout(() => document.documentElement.classList.remove('world-loading'), 400); }
   }
   function start() {
     // the top bar's "worlds" button

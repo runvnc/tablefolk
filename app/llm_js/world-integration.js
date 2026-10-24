@@ -148,11 +148,23 @@ function waitForDownloadConsent(modelLabel, modelSize) {
     pendingConsentResolve(false);
     pendingConsentResolve = null;
   }
+  // Not over the welcome screen or a world's intro card: the visitor reads
+  // the story and presses start first, then is asked about the download.
+  return askConsent(modelLabel, modelSize);
+}
+// The question ducks while something else has the screen (it may have been
+// asked before the welcome screen came up, and would sit on the intro card).
+const busyScreen = () => !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
+function askConsent(modelLabel, modelSize) {
   showDownloadConsent(modelLabel, modelSize);
+  const notice = el('modelLoadNotice');
+  const duck = setInterval(() => notice?.classList.toggle('ducked', busyScreen()), 250);
+  notice?.classList.toggle('ducked', busyScreen());
   return new Promise(resolve => {
     const approve = el('approveModelDownload');
     const decline = el('declineModelDownload');
     const cleanup = () => {
+      clearInterval(duck); notice?.classList.remove('ducked');
       approve?.removeEventListener('click', onApprove);
       decline?.removeEventListener('click', onDecline);
     };

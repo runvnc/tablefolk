@@ -360,9 +360,9 @@ code { color:#ffe0a0; }
 .fp-btn[hidden] { display:none; }
 .fp-btn.active { background:rgba(255,200,110,.32); }
 .fp-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.view-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.view-btns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 .view-btns[hidden] { display:none; }
-.view-btns > .fp-btn { flex:1; }
+.view-btns > .fp-btn { min-width:0; white-space:nowrap; }
 .view-btns[hidden] + .avatar-hint { display:none; }
 .fp-btn kbd { font:700 10px/1 ui-monospace,monospace; padding:2px 4px; border-radius:4px; border:1px solid rgba(255,214,140,.4); opacity:.75; }
 #chatDock .avatar-hint { margin:0 2px; }
@@ -495,7 +495,7 @@ html:fullscreen #ttBar { display:none; }
 @keyframes renderHoldSpin { to { transform:rotate(360deg); } }
 
 /* live.js: let them live */
-.view-btns > .live-btn { flex-basis:100%; }
+.view-btns > .live-btn { grid-column:1 / -1; order:-1; padding:7px 10px; font-size:13px; background:rgba(120,220,140,.14); border-color:rgba(140,230,160,.45); color:#dfffe4; }
 .live-btn.active { background:rgba(120,220,140,.22); border-color:rgba(140,230,160,.55); color:#d8ffe0; }
 .live-status:empty { display:none; }
 .live-status { color:#cfe9d4; font-style:italic; }
@@ -533,6 +533,9 @@ html:fullscreen #ttBar { display:none; }
 #welcome .wl-build:hover { background:#e7c48e; }
 #welcome .wl-x { position:absolute; top:12px; right:14px; width:34px; height:34px; border-radius:50%; border:0; background:rgba(255,255,255,.06); color:#cbbfa9; font-size:20px; cursor:pointer; }
 #welcome .wl-x:hover { background:rgba(255,255,255,.14); }
-.worlds-btn { margin-left:8px; padding:4px 12px; border-radius:999px; border:1px solid rgba(255,214,140,.4); background:rgba(255,200,110,.1); color:#ffe2ad; font-weight:700; font-size:12px; cursor:pointer; }
+.worlds-btn { flex:none; width:auto; margin-left:8px; padding:4px 12px; border-radius:999px; border:1px solid rgba(255,214,140,.4); background:rgba(255,200,110,.1); color:#ffe2ad; font-weight:700; font-size:12px; cursor:pointer; }
 .worlds-btn:hover { background:rgba(255,200,110,.22); }
 @media (max-width:600px) { #welcome .wl-card { padding:20px 16px; } #welcome header h1 { font-size:24px; } }
+
+/* world-integration.js: the download question waits for the welcome screen and intro card */
+#modelLoadNotice.ducked { display:none !important; }

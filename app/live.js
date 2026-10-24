@@ -56,7 +56,12 @@
   }
   async function run() {
     const w = W();
-    if (!w?.brainReady?.()) { status('waking the characters…'); try { await w.ensureBrainLoaded(); } catch (e) { status('could not load the brains: ' + e.message); stop(); return; } }
+    // The page loads the brain itself (asking first when it must download):
+    // wait for that rather than start a second load, which cancelled the
+    // pending download question
+    while (on && !w?.brainReady?.()) { status('waiting for the characters\u2019 brain to load…'); await sleep(1000); }
+    if (!on) return;
+    status('');
     while (on) {
       round++;
       const list = order();
