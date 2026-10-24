@@ -3151,6 +3151,8 @@ function charInventory(g){
   const cfg=getBrainConfig(g.id);
   if(!cfg.inventory) cfg.inventory={gold:0,items:[]};
   cfg.inventory.items ||= [];
+  // scenarios write items as plain names too ("items": ["answer scroll"])
+  if(cfg.inventory.items.some(i=>typeof i==='string'||!i?.name)) cfg.inventory.items=cfg.inventory.items.filter(i=>i!=null&&(typeof i==='string'||i.name)).map(i=>typeof i==='string'?{name:i,qty:1}:{...i,name:String(i.name)});
   return cfg.inventory;
 }
 function playerName(){ return document.getElementById('chatName')?.value.trim() || 'God'; }
@@ -3166,7 +3168,8 @@ function parseInventoryItems(text){
 function formatInventoryItems(items){ return (items||[]).map(i=>(i.qty??1)===1 ? i.name : `${i.name}, ${i.qty}`).join('\n'); }
 function findItem(items,name){
   const n=String(name||'').trim().toLowerCase(); if(!n) return null;
-  return items.find(i=>i.name.toLowerCase()===n) || items.find(i=>i.name.toLowerCase().includes(n) || n.includes(i.name.toLowerCase())) || null;
+  const nm=i=>String((typeof i==='string'?i:i?.name)||'').toLowerCase();
+  return items.find(i=>nm(i)===n) || items.find(i=>nm(i) && (nm(i).includes(n) || n.includes(nm(i)))) || null;
 }
 function addItem(items,name){
   const have=items.find(i=>i.name.toLowerCase()===name.toLowerCase());
