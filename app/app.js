@@ -2696,7 +2696,7 @@ function parseWalkDestination(arg){
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1).trim();
   const xy=arg.match(/^\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?$/);
   if(xy) return {kind:'walk',destination:{type:'coord',x:Number(xy[1]),z:Number(xy[2])},destinationText:`(${Number(xy[1])},${Number(xy[2])})`};
-  const legacy={north:'n',south:'s',east:'e',west:'w',n:'n',s:'s',e:'e',w:'w'};
+  const legacy={north:'n',south:'s',east:'e',west:'w',n:'n',s:'s',e:'e',w:'w',northeast:'ne',northwest:'nw',southeast:'se',southwest:'sw',ne:'ne',nw:'nw',se:'se',sw:'sw','north-east':'ne','north-west':'nw','south-east':'se','south-west':'sw'};
   if(legacy[arg.toLowerCase()]) return {kind:'walk',dir:legacy[arg.toLowerCase()],destinationText:arg};
   if(/^[A-Za-z$/*][A-Za-z0-9_$/* -]*$/.test(arg)) return {kind:'walk',destination:{type:'label',label:arg.replace(/\s+/g,' ')},destinationText:arg};
   return null;
@@ -2882,7 +2882,7 @@ function whoByName(name,g){
   return state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===n)||null;
 }
 function walk(g,destination){
-  const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0]};
+  const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0],ne:[-1,0,-1],nw:[1,0,-1],se:[-1,0,1],sw:[1,0,1]};
   const lp=g.logicalPos||new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
   let d=null, travel=g.stepDistance||1.0, description=String(destination||''), targetObject=false;
   if(typeof destination==='string') d=new BABYLON.Vector3(...(dirs[destination]||dirs.n));
@@ -3259,6 +3259,21 @@ function give(g,item){
     return say(g,`${g.id} gives ${playerName} ${amt} gold`);
   }
   const stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
+  // what it is carrying (a note, a mushroom): the other one carries it now,
+  // or it is put down at the player's feet
+  const held=state.held?.get(g.id), heldType=held && !held.isDisposed?.() ? String(meta(held)?.type||'').replace(/_/g,' ') : '';
+  if(!stock && heldType && (heldType===item.toLowerCase() || item.toLowerCase().includes(heldType) || heldType.includes(item.toLowerCase()))){
+    if(other){
+      const a=g.logicalPos||g.root.position, b=other.logicalPos||other.root.position;
+      if(Math.hypot(a.x-b.x,a.z-b.z)>(state.earshot||6)) return say(g,`give failed: ${other.id} is too far away; walk over first`);
+      state.held.delete(g.id); if(state.held.get(other.id)) drop(other,false);
+      state.held.set(other.id,held); beginCarry(other,held); playRig(g,'idle',true);
+      emitBadge(g,'gave '+heldType);
+      return say(g,`${g.id} hands ${other.id} the ${heldType}`);
+    }
+    drop(g,false);
+    return say(g,`${g.id} hands ${playerName} the ${heldType} (it is on the floor in front of ${g.id})`);
+  }
   if(!stock) return say(g,`give failed: ${g.id} has no ${item} (it has ${inv.items.filter(i=>(i.qty??1)>0).map(i=>i.name).join(', ')||'nothing'})`);
   if(other){
     const a=g.logicalPos||g.root.position, b=other.logicalPos||other.root.position, d=Math.hypot(a.x-b.x,a.z-b.z);
