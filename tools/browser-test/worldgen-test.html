@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>World builder test</title>
+<pre id="out">running…</pre>
+<script>
+// Runs the world builder's step-by-step browser workflow (app/worldgen-browser.js)
+// with ?prompt=..., logging every step; window.result holds the outcome and
+// window.steps the model's answers. ?finish=http://localhost:8001 sends the
+// final check to another server (one with POST /api/finish).
+const q = new URLSearchParams(location.search), out = document.getElementById('out'), log = [];
+const say = t => { log.push(t); out.textContent = log.join('\n'); };
+if (q.get('finish')) { const f = window.fetch; window.fetch = (u, o) => String(u) === '/api/finish' ? f(q.get('finish') + '/api/finish', { ...o, headers: { 'Content-Type': 'text/plain' } }) : f(u, o); }
+window.steps = [];
+const load = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+load('/app/procgen.js?t=' + Date.now()).then(() => load('/app/worldgen-browser.js?t=' + Date.now())).then(() => {
+  const t0 = Date.now(); let stage = '';
+  window.tfWorldgen.run(q.get('prompt') || 'a haunted crypt where a ghost guards a silver key', (ev, d) => {
+    if (ev === 'progress') { if (d.stage !== stage) { stage = d.stage; say(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${d.label || d.stage}`); } if (d.problems) say('problems: ' + d.problems.join(' | ')); if (d.preview) window.steps[stage] = d.preview; }
+    if (ev === 'done') { window.result = { ok: true, ms: d.ms, title: d.scenario.title, link: d.link, scenario: d.scenario }; say('DONE in ' + (d.ms / 1000).toFixed(0) + 's: ' + d.scenario.title); }
+    if (ev === 'failed') { window.result = { ok: false, error: d.error }; say('FAILED: ' + d.error); }
+  });
+});
+</script>

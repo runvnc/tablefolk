@@ -19,10 +19,11 @@ const MODEL_CONFIG = {
 let worker = null, shared = false;
 let nextId = 1;
 // One URL for every page (the game and the world builder), so they share it.
-const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261024a';
+const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261024b';
 // A model this browser has loaded before (so it is in OPFS): the engine runs
 // in a shared worker, which survives a reload or the step from the world
-// builder into the game (Chrome keeps it 30 s after the last page goes). The
+// builder into the game: it keeps the model 2 minutes after the last page
+// lets go (litert-worker.js), while Chrome keeps the worker running. The
 // first download stays in a dedicated worker: only there can it write OPFS
 // with a sync access handle (a shared worker's async writes cap near 34 MB/s).
 const CACHED = 'tablefolkLitertCached';
@@ -57,6 +58,10 @@ function getWorker(noShared = false) {
       try {
         const sw = new SharedWorker(WORKER_URL, { name: 'tablefolk-litert', extendedLifetime: true });
         sw.onerror = failAll; worker = sw.port; worker.onmessage = onReply; worker.start(); shared = true;
+        // The worker keeps the model while some page holds one of these locks,
+        // and unloads it 2 minutes after the last one is let go (a page that
+        // closes, or leaves, releases it).
+        navigator.locks?.request('tablefolk-litert-page-' + Math.random(), () => new Promise(() => {})).catch(() => {});
       } catch (e) { console.warn('[model-loader-litert] no shared worker:', e); worker = null; }
     }
     if (!worker) { worker = new Worker(WORKER_URL); worker.onmessage = onReply; worker.onerror = failAll; shared = false; }

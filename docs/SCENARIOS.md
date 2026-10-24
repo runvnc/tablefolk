@@ -324,6 +324,12 @@ agent id or `player`) strikes someone next to you: fists 1, dagger/club/staff
 misses. At 0 a character is defeated: it falls and stops acting. The struck
 character and anyone within earshot hear about it at once. The player fights
 from the chat box: `/attack grub`, `/wield sword`, or F for the nearest foe.
+Blows go turn about: after the player attacks, the next swing waits until
+everyone in the fight has had a turn, characters with a mind included (so a
+caster gets its spell in). E on a fallen character searches it: what it
+carried, or for a monster that carried nothing a little loot by kind
+(`BODY_LOOT` in `app/play.js`: a goblin's coins, a skeleton warrior's rusty
+sword); each body once.
 Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`,
 `{"player_hp": ["<", 5]}`, `{"player_defeated": true}` (a good `lose`).
 Allow `attack` only for characters who should fight, and say in the

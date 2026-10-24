@@ -451,6 +451,26 @@ async function sendTurn(conversation, promptText, opts, onToken) {
 // from the world builder into the game finds the model still loaded. Each
 // page's conversations are kept apart by a tag on their agent ids.
 let pages = 0;
+// Shared: pages hold a Web Lock (tablefolk-litert-page-*) while they use the
+// engine. With none held for 2 minutes the model is unloaded and the worker
+// ends, so a closed or frozen tab never keeps GBs of GPU memory for long.
+// (Chrome itself may end the worker sooner, when the last page of the site
+// closes: Chrome 155 did, within seconds.)
+const IDLE_MS = 120000;
+if (typeof SharedWorkerGlobalScope !== 'undefined' && self instanceof SharedWorkerGlobalScope && self.navigator?.locks) {
+  let idleSince = null;
+  setInterval(async () => {
+    const held = ((await navigator.locks.query()).held || []).filter(l => String(l.name).startsWith('tablefolk-litert-page-')).length;
+    if (held) { idleSince = null; return; }
+    idleSince ??= Date.now();
+    if (Date.now() - idleSince < IDLE_MS || loading) return;
+    console.log('[litert-worker] no page for 2 minutes: unloading');
+    clearConversations();
+    if (engine) { try { engine.delete(); } catch {} }
+    engine = null; currentModel = null;
+    self.close();
+  }, 5000);
+}
 self.onconnect = (ev) => {
   const port = ev.ports[0], tag = 'p' + (++pages) + ':';
   port.onmessage = (e) => handle({ data: tagged(e.data, tag) }, (msg) => port.postMessage(msg), tag);

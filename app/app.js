@@ -4095,12 +4095,15 @@ window.addEventListener('tablefolk-player-chat',e=>{
 // the camera (not when it steps sideways or back, so A/D don't spin the
 // view); you can still orbit and zoom with the mouse. 'overview' (C toggles):
 // the whole board, the camera easing after the avatar only when it moves.
-const FOLLOW={radius:6.5,beta:1.08,height:.8};
+// it looks at a point a little ahead of the avatar, so more of what is in
+// front is in view and the avatar sits in the lower part of the screen
+const FOLLOW={radius:7.5,beta:1.1,height:.9,ahead:1};
+const followPoint=g=>{ const p=g.root.position, d=state.firstPerson?null:g.dir; return new BABYLON.Vector3(p.x+(d?.x||0)*FOLLOW.ahead,FOLLOW.height,p.z+(d?.z||0)*FOLLOW.ahead); };
 const behindAlpha=d=>Math.atan2(-(d.z||0),-(d.x||0));
 function followCameraStart(){
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam) return;
   state.cameraMode='follow';
-  const p=g.root.position; cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z));
+  cam.setTarget(followPoint(g));
   cam.alpha=behindAlpha(g.dir); cam.beta=FOLLOW.beta; cam.radius=FOLLOW.radius;
 }
 function toggleCameraMode(){
@@ -4113,7 +4116,7 @@ function followAvatarCamera(dt){
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam || state.firstPerson) return;
   const p=g.root.position;
   if(state.cameraMode==='follow'){
-    cam.target=BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*6));
+    cam.target=BABYLON.Vector3.Lerp(cam.target,followPoint(g),Math.min(1,dt*4));
     if(g.turnMove || g.fpWalking){
       // walking away from the camera (its view and the walk agree)
       const fx=-Math.cos(cam.alpha), fz=-Math.sin(cam.alpha);

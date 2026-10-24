@@ -131,6 +131,16 @@ Besides the static files it serves:
   and both keys. Timings seen: 6-14 s with gpt-6-luna,
   ~22 s with local E4B on an RTX 2060. Every result is saved in `generated/`.
   `/api/generate?prompt=...` returns the JSON (`&stream=1` for progress events).
+  The page shows the model's thoughts and a token count while it works.
+  **Step by step in the browser** (`?how=browser`, the form's second menu):
+  the local Gemma this browser last loaded (LiteRT, it must already be
+  downloaded) writes it in small steps, `app/worldgen-browser.js`: a plan
+  (text), the map (a little JSON; code builds it with procgen.js, or layout
+  lines outdoors), a review of the map that was built (its rooms and contents
+  and the map as text; it may add things), the characters, then the server's
+  checks (`POST /api/finish`, the same as for a generated scenario) with up to
+  two fix rounds. 20-45 s with E2B on an RTX 2060.
+  `tools/browser-test/worldgen-test.html?prompt=...` runs it on its own.
 
 **Admin page** (`/admin`): the first start asks for an admin password in
 the terminal (without a terminal it makes one up and writes it to
@@ -138,7 +148,9 @@ the terminal (without a terminal it makes one up and writes it to
 Delete that file (or start with `--reset-admin`) to set a new one. The page
 has the server status, links (the world for players, the world in dev mode
 `/app/?dev=1`, the world builder), both LLM endpoints with a test button, what
-`/world/` shows players, voice genders and descriptions (used to cast voices
+`/world/` shows players, the players' speech engine (Pocket-TTS small, 18M
+parameters, about 40 MB, English: the default; or the 100M one, about 120 MB,
+five languages; each player can pick another in the app's voice pane), voice genders and descriptions (used to cast voices
 and by the generator; also `/api/voices`), recent generations and the saved
 worlds in `generated/` (play, play in dev mode, edit in the builder, delete),
 and a password change. Its settings live in `.admin/settings.json` and win

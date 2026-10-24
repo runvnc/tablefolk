@@ -38,6 +38,8 @@ const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spid
 const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian',
   'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
   'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'troll', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
+// what picking up an object gives (app/play.js PICKUPS)
+const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
 const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };
 
 export function encodeScenario(obj) {
@@ -111,7 +113,10 @@ export function checkScenario(s) {
     }
   };
   walk(s.goal);
-  if (s.goal?.win?.player_has && !(s.allowed || []).concat(...(s.agents || []).map(a => a.allowed || [])).some(c => c === 'give' || c === 'sell')) problems.push('a player_has goal needs some character allowed "give" or "sell"');
+  // the player gets things from characters (give/sell), chests, or the floor
+  const lying = new Set((s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]).filter(Boolean).map(i => String(i).toLowerCase()));
+  const want = String(s.goal?.win?.player_has || '').toLowerCase();
+  if (want && !lying.has(want) && !(s.allowed || []).concat(...(s.agents || []).map(a => a.allowed || [])).some(c => c === 'give' || c === 'sell')) problems.push('a player_has goal needs some character allowed "give" or "sell" (or the item in a chest)');
   return problems;
 }
 
@@ -249,12 +254,13 @@ export async function handleFinish(req) {
   const { scenario, prompt = '', model = 'browser', ms = 0 } = await req.json().catch(() => ({}));
   let problems;
   try { problems = checkScenario(scenario); } catch (e) { problems = [e.message]; }
-  if (problems.length) return Response.json({ problems });
+  const cors = { 'Access-Control-Allow-Origin': '*' };   // tools/browser-test/worldgen-test.html runs on another port
+  if (problems.length) return Response.json({ problems }, { headers: cors });
   const code = encodeScenario(scenario);
   recent.push({ at: Date.now(), prompt: String(prompt).slice(0, 300), model, ms, ok: true, title: scenario.title || '' }); if (recent.length > 50) recent.shift();
   const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
   try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: 'browser', model, ...scenario }, null, 2) + '\n'); } catch {}
-  return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [] });
+  return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [] }, { headers: cors });
 }
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -379,7 +385,7 @@ if(words){
   if(qs.get('how')==='browser'){
     // step by step with the local model (app/worldgen-browser.js)
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261024a').then(()=>load('/app/worldgen-browser.js?v=20261024a')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261024a').then(()=>load('/app/worldgen-browser.js?v=20261024b')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));

@@ -21,7 +21,7 @@
  *       {scenario, code, link, ms, model} or 'failed' {error}
  */
 (function () {
-  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261024a';
+  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261024b';
   const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard'.split(' ');
   const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon'.split(' ');
   const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon'.split(' '));
@@ -45,7 +45,7 @@
     modelKey = key; L = mod;
     return L;
   }
-  let n = 0;
+  let n = 0; const log = [];
   async function ask(emit, stage, label, system, user) {
     const agentId = 'worldgen-' + stage + '-' + (++n) + '-' + Date.now();
     emit('progress', { stage, label, chars: 0 });
@@ -54,6 +54,7 @@
       if (t.length - last > 24) { last = t.length; emit('progress', { stage, label, chars: t.length, preview: t.slice(-220) }); }
     });
     L.litertClient.clearConversations(agentId).catch(() => {});
+    log.push({ stage, text });   // window.tfWorldgen.log: every answer, for tests
     emit('progress', { stage, label, chars: text.length, preview: text.slice(-220) });
     return text;
   }
@@ -105,7 +106,15 @@
     };
     const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
     const places = plan.kind === 'village' ? VILLAGE : DUNGEON;
-    const objects = (Array.isArray(m.objects) ? m.objects : []).filter(o => o && things.includes(o.type)).slice(0, 16).map(o => {
+    // models like to write the rooms out: [{name, objects: [...]}]
+    for (const k of ['rooms', 'buildings']) if (Array.isArray(m[k])) {
+      const rooms = m[k];
+      m.objects = [...(m.objects || []), ...rooms.flatMap(r => (Array.isArray(r?.objects) ? r.objects : []).map(o => ({ ...o, in: o.in || r.name || r.id })))];
+      plan.places = [...new Set([...plan.places, ...rooms.map(r => pickFrom(places, r?.name || r?.id || r)).filter(Boolean)])];
+      m[k] = rooms.length;
+    }
+    const seen = new Set();
+    const objects = (Array.isArray(m.objects) ? m.objects : []).filter(o => o && things.includes(o.type) && !seen.has(o.type + '|' + o.in + '|' + (o.text || '')) && seen.add(o.type + '|' + o.in + '|' + (o.text || ''))).slice(0, 16).map(o => {
       const out = { type: o.type };
       if (plan.kind !== 'outdoor') out.in = pickFrom(places, o.in) || plan.places[0] || places[1];
       if (o.gold != null && /chest|coin/.test(o.type)) out.gold = Math.max(0, Math.min(500, Math.round(+o.gold) || 0));
@@ -125,7 +134,15 @@
     scn.generate = plan.kind === 'village' ? { kind: 'village', buildings: n, places: plan.places } : { kind: 'dungeon', rooms: n, places: plan.places };
     scn.dark = plan.kind === 'dungeon' ? m.dark !== false : false;
     scn.objects = objects;
-    const built = globalThis.TablefolkProcgen.applyToScenario(JSON.parse(JSON.stringify(scn)));
+    let built = globalThis.TablefolkProcgen.applyToScenario(JSON.parse(JSON.stringify(scn)));
+    // a thing put in a place that was not built goes to a like one that was
+    const ids = built.places.map(p => p.id.replace(/\s+\d+$/, ''));
+    if (scn.objects.some(o => !ids.includes(o.in))) {
+      const alt = { garden: 'square', pond: 'square', square: 'house', crypt: 'shrine', treasure: 'lair', throne: 'lair' };
+      for (const o of scn.objects) if (!ids.includes(o.in)) o.in = ids.includes(alt[o.in]) ? alt[o.in] : ids.find(i => i !== 'entrance' && i !== 'square') || ids[0];
+      scn.generate.places = scn.generate.places.filter(p => ids.includes(p));
+      built = globalThis.TablefolkProcgen.applyToScenario(JSON.parse(JSON.stringify(scn)));
+    }
     return { scn, places: built.places, grid: built.scenario.grid, objects: built.scenario.objects };
   }
   function describeMap(built) {
@@ -146,8 +163,10 @@
       let aid = id(a.id || a.name || plan.chars[i]?.name || 'npc' + i); while (ids.has(aid)) aid += '2'; ids.add(aid);
       const model = PEOPLE.concat(MONSTERS).includes(a.model) ? a.model : pickFrom(PEOPLE.concat(MONSTERS), a.model) || plan.chars[i]?.body || 'villager';
       const ag = { id: aid, model };
-      const hostile = a.hostile === true || (a.hostile == null && MINDLESS.has(model));
-      if (a.hostile === true || a.hostile === false) ag.hostile = a.hostile;
+      // a monster body given a real part (a ghost who guards and talks) talks
+      const talks = MINDLESS.has(model) && a.hostile !== true && String(a.personality || '').length > 80 && (!a.allowed || a.allowed.includes('say'));
+      const hostile = !talks && (a.hostile === true || (a.hostile == null && MINDLESS.has(model)));
+      if (talks) ag.hostile = false; else if (a.hostile === true || a.hostile === false) ag.hostile = a.hostile;
       if (a.hp) ag.hp = Math.max(1, Math.min(30, Math.round(+a.hp) || 10));
       ag.style = String(a.style || plan.chars[i]?.role || model).slice(0, 60);
       ag.personality = String(a.personality || '').slice(0, 900) || (hostile ? `A hostile ${model.replace(/_/g, ' ')}.` : `${aid}, ${ag.style}. ${plan.chars[i]?.want || ''} ${plan.chars[i]?.know || ''}`.trim());
@@ -164,13 +183,19 @@
     if (scn.map) for (const a of agents) scn.map.push(`place ${a.id} near ${a.near || 'player'}`);
     if (scn.map && scn.objectsOutdoor) { delete scn.objectsOutdoor; }
     // a goal the game can check, or none
-    const g = out.goal, holder = item => agents.find(a => a.inventory?.items?.some(i => i.toLowerCase() === String(item).toLowerCase()));
+    const g = out.goal || (out.agents || []).map(a => a?.goal).find(x => x?.player_has || x?.agent_defeated), holder = item => agents.find(a => a.inventory?.items?.some(i => i.toLowerCase() === String(item).toLowerCase()));
+    // a thing picked up from the floor goes by its kind ("key"), so "silver key" is the key
+    const PICK = { key: 'key', chalice: 'gold chalice', potion: 'healing potion', scroll: 'scroll', rope: 'rope', torch: 'torch' };
+    if (g?.player_has && !holder(g.player_has)) {
+      const pick = (scn.objects || []).find(o => PICK[o.type] && new RegExp('\\b' + o.type + '\\b', 'i').test(g.player_has));
+      if (pick) g.player_has = PICK[pick.type];
+    }
     if (g?.player_has && holder(g.player_has)) {
       const h = holder(g.player_has); h.allowed = [...new Set([...(h.allowed || []), 'give'])];
       scn.goal = { text: String(g.text || `Get the ${g.player_has}.`).slice(0, 160), win: { player_has: String(g.player_has) } };
     } else if (g?.agent_defeated && agents.some(a => a.id === id(g.agent_defeated))) {
       scn.goal = { text: String(g.text || `Defeat ${id(g.agent_defeated)}.`).slice(0, 160), win: { agent_defeated: id(g.agent_defeated) }, lose: { player_defeated: true } };
-    } else if (g?.player_has && (scn.objects || []).some(o => o.items?.some(i => i.toLowerCase() === String(g.player_has).toLowerCase()))) {
+    } else if (g?.player_has && (scn.objects || []).some(o => o.items?.some(i => i.toLowerCase() === String(g.player_has).toLowerCase()) || PICK[o.type] === g.player_has)) {
       scn.goal = { text: String(g.text || `Find the ${g.player_has}.`).slice(0, 160), win: { player_has: String(g.player_has) } };
     }
     if (scn.goal?.win?.player_has && !agents.some(a => a.allowed?.includes('give') || a.allowed?.includes('sell'))) {
@@ -191,13 +216,13 @@
       await model(emit);
       // 1. plan
       const planText = await ask(emit, 'plan', 'step 1/4: planning the world', 'You design small adventure scenes for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
-        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(2-5 lines. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
+        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(3-5 lines: at least one person the player can talk to, and monsters if there is danger. Example: - Brann | woodsman | the gravekeeper | wants the crypt sealed | knows the ghost was his sister. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
       const plan = parsePlan(planText, prompt);
       // 2. map
       const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
       const mapAsk = plan.kind === 'outdoor'
         ? `Write the outdoor map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "map": ["place campfire at center", "place tree x6 scattered at north", "paint water x8 cluster at east", "place player at south"], "objects": [{"type": "chest", "gold": 30, "items": ["silver key"]}]}\nMap lines: place <thing> [xN] [scattered|cluster|row] at center|north|south|east|west|random, or near/beside <thing>. Things: ${OUTDOOR_THINGS.join(', ')}. No characters yet.`
-        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2}, "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${(plan.kind === 'village' ? VILLAGE : DUNGEON).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
+        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${(plan.kind === 'village' ? VILLAGE : DUNGEON).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
       let mapOut = {};
       try { mapOut = json(await ask(emit, 'map', 'step 2/4: drawing the map', 'You turn adventure plans into game data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${mapAsk}`)); }
       catch (e) { emit('progress', { stage: 'map', label: 'the map answer was not JSON; using the plan' }); }
@@ -212,12 +237,12 @@
           if (+rev[key] >= 3 && +rev[key] <= 14) mapOut[key] = +rev[key];
           if (typeof rev.intro === 'string' && rev.intro.length > 20) mapOut.intro = rev.intro;
           built = buildMap(plan, mapOut);
-        } catch (e) { console.warn('[worldgen] review skipped:', e.message); }
+        } catch (e) { console.warn('[worldgen] review skipped:', e.message); log.push({ stage: 'review', error: e.message }); }
       }
       const scn = built.scn;
       // 4. characters
       const where = plan.kind === 'outdoor' ? `"near": one of ${OUTDOOR_THINGS.join(', ')}` : `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
-      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
+      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
       const chars = json(await ask(emit, 'characters', 'step 4/4: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
       buildAgents(plan, chars, built, scn);
       if (!scn.agents.length) throw new Error('the model wrote no characters');
@@ -237,5 +262,5 @@
       emit('failed', { error: e.message || String(e) });
     }
   }
-  window.tfWorldgen = { run, parsePlan, json };
+  window.tfWorldgen = { run, parsePlan, json, log };
 })();
