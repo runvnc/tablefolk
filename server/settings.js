@@ -59,6 +59,9 @@ function apply() {
   config.worldView = saved.worldView === 'loading' || saved.worldView === 'builder' ? saved.worldView : ENV.worldView;
   config.ttsEngine = TTS_ENGINES.includes(saved.ttsEngine) ? saved.ttsEngine : TTS_ENGINES[0];
   config.worldgen = cleanWorldgen(saved.worldgen);
+  // the characters' brain through this server, for visitors who are not the
+  // admin: the endpoint (spends the key) and the local model server (its GPU)
+  config.guestBrain = { cloud: saved.guestBrain?.cloud !== false, local: saved.guestBrain?.local === true };
 }
 apply();
 
@@ -77,7 +80,7 @@ export function publicSettings() {
     effective: { baseURL: config[k].baseURL, model: config[k].model, key: !!config[k].apiKey, provider: config[k].provider } });
   const env = { openrouter: !!process.env.OPENROUTER_API_KEY, openai: !!process.env.OPENAI_API_KEY };
   const keys = Object.fromEntries(['openrouter', 'openai'].map(p => [p, { saved: !!saved.keys?.[p], env: env[p] }]));
-  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), worldgen: config.worldgen };
+  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), worldgen: config.worldgen, guestBrain: config.guestBrain };
 }
 
 // patch: { characters: {baseURL, model, apiKey, clearKey}, generator: ..., worldView, voices: [{id, gender, description}] }
@@ -101,6 +104,7 @@ export function updateSettings(patch = {}) {
   }
   if (patch.worldView === 'builder' || patch.worldView === 'loading' || patch.worldView === '') saved.worldView = patch.worldView || undefined;
   if (TTS_ENGINES.includes(patch.ttsEngine)) saved.ttsEngine = patch.ttsEngine;
+  if (patch.guestBrain && typeof patch.guestBrain === 'object') saved.guestBrain = { cloud: patch.guestBrain.cloud !== false, local: patch.guestBrain.local === true };
   if (patch.worldgen && typeof patch.worldgen === 'object') saved.worldgen = cleanWorldgen({ ...config.worldgen, ...patch.worldgen, guest: { ...config.worldgen.guest, ...(patch.worldgen.guest || {}) } });
   if (Array.isArray(patch.voices)) {
     saved.voices = {};

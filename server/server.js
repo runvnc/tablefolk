@@ -21,7 +21,7 @@ import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate, handleRevise, handleFinish, worldgenOptions } from './generate.js';
-import { setupAdmin, handleAdmin, savedWorld } from './admin.js';
+import { setupAdmin, handleAdmin, savedWorld, isAdmin } from './admin.js';
 
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
@@ -61,15 +61,31 @@ async function serveStatic(req, url) {
 
 // Forward an OpenAI-style request, filling in the endpoint's key and default
 // model. Responses (streams included) pass straight through.
-async function proxy(req, url, prefix, ep) {
+// Visitors who are not the admin: only when the admin page allows it
+// (config.guestBrain), always the configured model with a capped reply, and
+// at most RATE requests per client in RATE_MS (one turn is one request; a
+// world living on its own makes about one every 5 s).
+const RATE = 240, RATE_MS = 10 * 60e3, hits = new Map();
+function limited(ip) {
+  const now = Date.now(), h = (hits.get(ip) || []).filter(t => now - t < RATE_MS);
+  h.push(now); hits.set(ip, h);
+  if (hits.size > 5000) for (const [k, v] of hits) if (!v.length || now - v[v.length - 1] > RATE_MS) hits.delete(k);
+  return h.length > RATE;
+}
+async function proxy(req, url, prefix, ep, ip = '', which = 'cloud') {
   const sub = url.pathname.slice(prefix.length);
   if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
   if (!['/models', '/chat/completions'].includes(sub)) return Response.json({ error: { message: 'only /models and /chat/completions are proxied' } }, { status: 404 });
+  // the admin, or anyone on this machine itself (the owner), is not a visitor
+  const guest = !isAdmin(req) && !/^(127\.|::1$|::ffff:127\.)/.test(ip);
+  if (guest && !config.guestBrain?.[which]) return Response.json({ error: { message: which === 'local' ? 'this server\'s local model is not open to visitors' : 'the server\'s AI is not open to visitors: use the brain in your browser' } }, { status: 403 });
+  if (guest && req.method === 'POST' && limited(ip)) return Response.json({ error: { message: 'too many requests: wait a few minutes' } }, { status: 429 });
   let body;
   if (req.method === 'POST') {
     body = await req.json().catch(() => null);
     if (!body) return Response.json({ error: { message: 'JSON body required' } }, { status: 400 });
-    if (!body.model) body.model = ep.model;
+    if (!body.model || guest) body.model = ep.model;
+    if (guest) body.max_tokens = Math.min(+body.max_tokens || 1024, 2048);
   }
   try {
     const up = await fetch(ep.baseURL + sub, {
@@ -136,12 +152,12 @@ async function listRoles() {
 
 const server = Bun.serve({
   port, hostname: config.host, idleTimeout: 255,
-  async fetch(req) {
-    const url = new URL(req.url);
+  async fetch(req, srv) {
+    const url = new URL(req.url), ip = srv?.requestIP?.(req)?.address || '';
     const p = url.pathname;
     if (p === '/') return Response.redirect('/app/', 302);
-    if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters);
-    if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' });
+    if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud');
+    if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local');
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
     if (p === '/api/revise') return handleRevise(req, url);

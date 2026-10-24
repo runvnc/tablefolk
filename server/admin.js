@@ -215,6 +215,10 @@ td .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.voices td
 </div></section>
 <section id="models"><h2>Language models</h2><p class="lead">Each endpoint uses OpenRouter, OpenAI, the local model server (litert-lm serve on this machine) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys stay on the server and are never sent to pages.</p>
 <div class="grid2" id="eps"></div>
+<div class="card2" style="margin-top:18px"><h3>Visitors may use</h3><div class="checks" style="flex-direction:column">
+<label class="check"><input type="checkbox" id="gbCloud"> The characters' endpoint brain <small>for players without a graphics card; spends your key (always the model above, 240 requests per 10 minutes each)</small></label>
+<label class="check"><input type="checkbox" id="gbLocal"> This server's local model <small>uses this machine's GPU</small></label></div>
+<div class="row"><button class="btn primary" id="saveGuestBrain">Save</button></div></div>
 <h3 style="margin-top:20px">Provider API keys</h3><p class="muted" style="margin:0 0 4px">Used by both endpoints with that provider (an endpoint's own key wins).</p>
 <div class="grid2" id="keys"></div></section>
 <section id="builder"><h2>World builder</h2><p class="lead">Which models the builder offers, and what visitors who are not logged in may use. As admin you can use every option, and type in any model.</p>
@@ -283,6 +287,7 @@ function render(){
   $('gModels').innerHTML=all.map(m=>'<label class="check"><input type="checkbox" value="'+esc(m)+'"'+(wg.guest.cloudModels.includes(m)?' checked':'')+'> '+esc(m)+'</label>').join('');
   $('gModelsBox').hidden=!wg.guest.cloud;
   $('ttsEngine').value=se.ttsEngine;
+  $('gbCloud').checked=se.guestBrain?.cloud!==false; $('gbLocal').checked=!!se.guestBrain?.local;
   $('voices').innerHTML=se.voices.map(v=>'<tr data-v="'+v.id+'"><td><b>'+v.id+'</b></td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
   $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td class="muted">'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td class="muted">'+esc(g.model)+'</td><td>'+(g.ok?'<span class="pill ok">'+(g.ms/1000).toFixed(1)+' s</span> '+esc(g.title||''):'<span class="pill bad">failed</span> <span class="muted">'+esc(g.error||'')+'</span>')+'</td></tr>').join(''):'<tr><td colspan="4" class="empty">None since the server started.</td></tr>';
   $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td><b>'+esc(g.title)+'</b><br><span class="muted">'+esc(g.prompt)+(g.model?' · '+esc(g.model):'')+'</span></td><td class="muted" style="white-space:nowrap">'+new Date(g.at).toLocaleDateString()+'</td><td><div class="acts">'+(g.link?'<a class="btn primary" href="'+g.link.replace('/app/#','/app/?play=1#')+'" target="_blank">Play</a><a class="btn" href="'+g.builder+'" target="_blank">Edit</a><a class="btn" href="'+g.link.replace('/app/#','/app/?dev=1#')+'" target="_blank">Dev</a>':'')+'<button class="btn danger" data-del="'+esc(g.file)+'">Delete</button></div></td></tr>').join(''):'<tr><td colspan="3" class="empty">No saved worlds yet.</td></tr>';
@@ -307,6 +312,7 @@ document.addEventListener('click',async e=>{
 $('saveBuilder').onclick=async()=>{ const cloudModels=$('cloudModels').value.split('\\n').map(s=>s.trim()).filter(Boolean);
   const guest={browser:$('gBrowser').checked,server:$('gServer').checked,cloud:$('gCloud').checked,cloudModels:[...$('gModels').querySelectorAll('input:checked')].map(i=>i.value)};
   saved(await post('/api/admin/settings',{worldgen:{cloudModels,guest},worldView:$('worldView').value}),'World builder settings'); };
+$('saveGuestBrain').onclick=async()=>saved(await post('/api/admin/settings',{guestBrain:{cloud:$('gbCloud').checked,local:$('gbLocal').checked}}),'Visitor brain settings');
 $('saveSpeech').onclick=async()=>{ const v=[...document.querySelectorAll('#voices tr')].map(tr=>({id:tr.dataset.v,gender:tr.querySelector('select').value,description:tr.querySelector('input').value}));
   saved(await post('/api/admin/settings',{ttsEngine:$('ttsEngine').value,voices:v}),'Speech settings'); };
 $('pwSave').onclick=async()=>{ const r=await post('/api/admin/password',{current:$('pwCur').value,next:$('pwNew').value}); if(r.ok){ toast('Password changed'); $('pwCur').value=$('pwNew').value=''; load(); } else toast(r.error||'Could not change it',true); };
