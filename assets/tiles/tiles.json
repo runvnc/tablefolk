@@ -1,0 +1,1198 @@
+{
+ "objects": {
+  "crate": {
+   "file": "objects/crate.png",
+   "w": 133,
+   "h": 164,
+   "anchor": [
+    66,
+    107.7
+   ]
+  },
+  "barrel": {
+   "file": "objects/barrel.png",
+   "w": 133,
+   "h": 147,
+   "anchor": [
+    66,
+    85
+   ]
+  },
+  "mushroom": {
+   "file": "objects/mushroom.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "lamp": {
+   "file": "objects/lamp.png",
+   "w": 389,
+   "h": 408,
+   "anchor": [
+    194,
+    244.9
+   ]
+  },
+  "note": {
+   "file": "objects/note.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "campfire": {
+   "file": "objects/campfire.png",
+   "w": 414,
+   "h": 388,
+   "anchor": [
+    206.8,
+    205.7
+   ]
+  },
+  "lantern": {
+   "file": "objects/lantern.png",
+   "w": 414,
+   "h": 440,
+   "anchor": [
+    206.8,
+    264.3
+   ]
+  },
+  "fence": {
+   "file": "objects/fence.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "signpost": {
+   "file": "objects/signpost.png",
+   "w": 161,
+   "h": 140,
+   "anchor": [
+    80,
+    83.7
+   ]
+  },
+  "lily_pad": {
+   "file": "objects/lily_pad.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "chest": {
+   "file": "objects/chest.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "table": {
+   "file": "objects/table.png",
+   "w": 267,
+   "h": 141,
+   "anchor": [
+    133.3,
+    84.7
+   ]
+  },
+  "bench": {
+   "file": "objects/bench.png",
+   "w": 317,
+   "h": 115,
+   "anchor": [
+    158.4,
+    58.7
+   ]
+  },
+  "stool": {
+   "file": "objects/stool.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "workbench": {
+   "file": "objects/workbench.png",
+   "w": 216,
+   "h": 154,
+   "anchor": [
+    108,
+    97.7
+   ]
+  },
+  "cauldron": {
+   "file": "objects/cauldron.png",
+   "w": 133,
+   "h": 136,
+   "anchor": [
+    66,
+    79.7
+   ]
+  },
+  "anvil": {
+   "file": "objects/anvil.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "weapon_stand": {
+   "file": "objects/weapon_stand.png",
+   "w": 133,
+   "h": 152,
+   "anchor": [
+    66,
+    95.7
+   ]
+  },
+  "axe": {
+   "file": "objects/axe.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "pickaxe": {
+   "file": "objects/pickaxe.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "bucket": {
+   "file": "objects/bucket.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "bag": {
+   "file": "objects/bag.png",
+   "w": 133,
+   "h": 142,
+   "anchor": [
+    66,
+    85.7
+   ]
+  },
+  "potion": {
+   "file": "objects/potion.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "scroll": {
+   "file": "objects/scroll.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "coin_pile": {
+   "file": "objects/coin_pile.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "apple_crate": {
+   "file": "objects/apple_crate.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "carrot_crate": {
+   "file": "objects/carrot_crate.png",
+   "w": 133,
+   "h": 114,
+   "anchor": [
+    66,
+    57.7
+   ]
+  },
+  "tree": {
+   "file": "objects/tree.png",
+   "w": 185,
+   "h": 326,
+   "anchor": [
+    92.4,
+    244.7
+   ]
+  },
+  "house": {
+   "file": "objects/house.png",
+   "w": 299,
+   "h": 422,
+   "anchor": [
+    149.2,
+    303.7
+   ]
+  },
+  "boulder": {
+   "file": "objects/boulder.png",
+   "w": 133,
+   "h": 152,
+   "anchor": [
+    66,
+    95.7
+   ]
+  },
+  "flowers": {
+   "file": "objects/flowers.png",
+   "w": 133,
+   "h": 138,
+   "anchor": [
+    66,
+    81.7
+   ]
+  },
+  "grass_tuft": {
+   "file": "objects/grass_tuft.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "well": {
+   "file": "objects/well.png",
+   "w": 133,
+   "h": 275,
+   "anchor": [
+    66,
+    197
+   ]
+  },
+  "market_stand": {
+   "file": "objects/market_stand.png",
+   "w": 189,
+   "h": 308,
+   "anchor": [
+    94.1,
+    208.3
+   ]
+  },
+  "market_stalls": {
+   "file": "objects/market_stalls.png",
+   "w": 414,
+   "h": 295,
+   "anchor": [
+    206.8,
+    181.3
+   ]
+  },
+  "cart": {
+   "file": "objects/cart.png",
+   "w": 133,
+   "h": 321,
+   "anchor": [
+    66,
+    215.9
+   ]
+  },
+  "broken_cart": {
+   "file": "objects/broken_cart.png",
+   "w": 248,
+   "h": 306,
+   "anchor": [
+    123.6,
+    206.9
+   ]
+  },
+  "tent": {
+   "file": "objects/tent.png",
+   "w": 147,
+   "h": 264,
+   "anchor": [
+    73.3,
+    158.9
+   ]
+  },
+  "logs": {
+   "file": "objects/logs.png",
+   "w": 171,
+   "h": 128,
+   "anchor": [
+    85.2,
+    71.7
+   ]
+  },
+  "bed": {
+   "file": "objects/bed.png",
+   "w": 133,
+   "h": 255,
+   "anchor": [
+    66,
+    149.9
+   ]
+  },
+  "double_bed": {
+   "file": "objects/double_bed.png",
+   "w": 174,
+   "h": 271,
+   "anchor": [
+    86.9,
+    160.4
+   ]
+  },
+  "bookcase": {
+   "file": "objects/bookcase.png",
+   "w": 133,
+   "h": 200,
+   "anchor": [
+    66,
+    143.7
+   ]
+  },
+  "banner": {
+   "file": "objects/banner.png",
+   "w": 278,
+   "h": 206,
+   "anchor": [
+    138.7,
+    149.7
+   ]
+  },
+  "wall_banner": {
+   "file": "objects/wall_banner.png",
+   "w": 133,
+   "h": 185,
+   "anchor": [
+    66,
+    128.7
+   ]
+  },
+  "target": {
+   "file": "objects/target.png",
+   "w": 133,
+   "h": 161,
+   "anchor": [
+    66,
+    104.7
+   ]
+  },
+  "dummy": {
+   "file": "objects/dummy.png",
+   "w": 133,
+   "h": 175,
+   "anchor": [
+    66,
+    118.7
+   ]
+  },
+  "pumpkin": {
+   "file": "objects/pumpkin.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "statue": {
+   "file": "objects/statue.png",
+   "w": 133,
+   "h": 224,
+   "anchor": [
+    66,
+    167.7
+   ]
+  },
+  "torch": {
+   "file": "objects/torch.png",
+   "w": 414,
+   "h": 447,
+   "anchor": [
+    206.8,
+    271.3
+   ]
+  },
+  "iron_chest": {
+   "file": "objects/iron_chest.png",
+   "w": 133,
+   "h": 126,
+   "anchor": [
+    66,
+    69.7
+   ]
+  },
+  "fantasy_house": {
+   "file": "objects/fantasy_house.png",
+   "w": 314,
+   "h": 590,
+   "anchor": [
+    156.8,
+    425.2
+   ]
+  },
+  "stable": {
+   "file": "objects/stable.png",
+   "w": 440,
+   "h": 388,
+   "anchor": [
+    219.6,
+    255.4
+   ]
+  },
+  "windmill": {
+   "file": "objects/windmill.png",
+   "w": 410,
+   "h": 478,
+   "anchor": [
+    204.7,
+    391.9
+   ]
+  },
+  "watch_tower": {
+   "file": "objects/watch_tower.png",
+   "w": 334,
+   "h": 623,
+   "anchor": [
+    167,
+    467.5
+   ]
+  },
+  "bell_tower": {
+   "file": "objects/bell_tower.png",
+   "w": 265,
+   "h": 598,
+   "anchor": [
+    132.2,
+    469
+   ]
+  },
+  "candelabra": {
+   "file": "objects/candelabra.png",
+   "w": 133,
+   "h": 152,
+   "anchor": [
+    66,
+    95.7
+   ]
+  },
+  "candles": {
+   "file": "objects/candles.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "cabinet": {
+   "file": "objects/cabinet.png",
+   "w": 136,
+   "h": 124,
+   "anchor": [
+    67.5,
+    67.7
+   ]
+  },
+  "lectern": {
+   "file": "objects/lectern.png",
+   "w": 133,
+   "h": 150,
+   "anchor": [
+    66,
+    93.7
+   ]
+  },
+  "cage": {
+   "file": "objects/cage.png",
+   "w": 133,
+   "h": 135,
+   "anchor": [
+    66,
+    78.7
+   ]
+  },
+  "chains": {
+   "file": "objects/chains.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "wooden_chair": {
+   "file": "objects/wooden_chair.png",
+   "w": 133,
+   "h": 143,
+   "anchor": [
+    66,
+    86.7
+   ]
+  },
+  "nightstand": {
+   "file": "objects/nightstand.png",
+   "w": 133,
+   "h": 134,
+   "anchor": [
+    66,
+    77.7
+   ]
+  },
+  "apple_barrel": {
+   "file": "objects/apple_barrel.png",
+   "w": 133,
+   "h": 130,
+   "anchor": [
+    66,
+    73.7
+   ]
+  },
+  "pot": {
+   "file": "objects/pot.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "vase": {
+   "file": "objects/vase.png",
+   "w": 133,
+   "h": 114,
+   "anchor": [
+    66,
+    57.7
+   ]
+  },
+  "broken_pot": {
+   "file": "objects/broken_pot.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "key": {
+   "file": "objects/key.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "chalice": {
+   "file": "objects/chalice.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "rope": {
+   "file": "objects/rope.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "iron_crate": {
+   "file": "objects/iron_crate.png",
+   "w": 133,
+   "h": 134,
+   "anchor": [
+    66,
+    77.7
+   ]
+  },
+  "desk": {
+   "file": "objects/desk.png",
+   "w": 184,
+   "h": 164,
+   "anchor": [
+    91.6,
+    107.7
+   ]
+  },
+  "office_chair": {
+   "file": "objects/office_chair.png",
+   "w": 133,
+   "h": 160,
+   "anchor": [
+    66,
+    103.7
+   ]
+  },
+  "armchair": {
+   "file": "objects/armchair.png",
+   "w": 133,
+   "h": 157,
+   "anchor": [
+    66,
+    100.7
+   ]
+  },
+  "sofa": {
+   "file": "objects/sofa.png",
+   "w": 235,
+   "h": 157,
+   "anchor": [
+    117.2,
+    100.7
+   ]
+  },
+  "coffee_table": {
+   "file": "objects/coffee_table.png",
+   "w": 133,
+   "h": 142,
+   "anchor": [
+    66,
+    85.7
+   ]
+  },
+  "floor_lamp": {
+   "file": "objects/floor_lamp.png",
+   "w": 414,
+   "h": 459,
+   "anchor": [
+    206.8,
+    283.3
+   ]
+  },
+  "plant": {
+   "file": "objects/plant.png",
+   "w": 133,
+   "h": 161,
+   "anchor": [
+    66,
+    104.7
+   ]
+  },
+  "bookshelf": {
+   "file": "objects/bookshelf.png",
+   "w": 133,
+   "h": 187,
+   "anchor": [
+    66,
+    130.7
+   ]
+  }
+ },
+ "characters": {
+  "woodsman": {
+   "file": "characters/woodsman.png",
+   "w": 283,
+   "h": 344,
+   "anchor": [
+    141.3,
+    223.9
+   ]
+  },
+  "huntress": {
+   "file": "characters/huntress.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "peasant": {
+   "file": "characters/peasant.png",
+   "w": 279,
+   "h": 339,
+   "anchor": [
+    139.2,
+    220.6
+   ]
+  },
+  "peasant_woman": {
+   "file": "characters/peasant_woman.png",
+   "w": 267,
+   "h": 324,
+   "anchor": [
+    133.1,
+    210.8
+   ]
+  },
+  "adventurer": {
+   "file": "characters/adventurer.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "adventurer_woman": {
+   "file": "characters/adventurer_woman.png",
+   "w": 258,
+   "h": 314,
+   "anchor": [
+    129,
+    204.3
+   ]
+  },
+  "hooded": {
+   "file": "characters/hooded.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "king": {
+   "file": "characters/king.png",
+   "w": 275,
+   "h": 334,
+   "anchor": [
+    137.2,
+    217.4
+   ]
+  },
+  "farmer": {
+   "file": "characters/farmer.png",
+   "w": 267,
+   "h": 324,
+   "anchor": [
+    133.1,
+    210.8
+   ]
+  },
+  "villager": {
+   "file": "characters/villager.png",
+   "w": 254,
+   "h": 309,
+   "anchor": [
+    126.9,
+    201.1
+   ]
+  },
+  "witch": {
+   "file": "characters/witch.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "wizard": {
+   "file": "characters/wizard.png",
+   "w": 267,
+   "h": 324,
+   "anchor": [
+    133.1,
+    210.8
+   ]
+  },
+  "skeleton": {
+   "file": "characters/skeleton.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "skeleton_classic": {
+   "file": "characters/skeleton_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "skeleton_warrior": {
+   "file": "characters/skeleton_warrior.png",
+   "w": 287,
+   "h": 349,
+   "anchor": [
+    143.3,
+    227.2
+   ]
+  },
+  "skeleton_warrior_classic": {
+   "file": "characters/skeleton_warrior_classic.png",
+   "w": 263,
+   "h": 319,
+   "anchor": [
+    131,
+    207.6
+   ]
+  },
+  "zombie": {
+   "file": "characters/zombie.png",
+   "w": 267,
+   "h": 324,
+   "anchor": [
+    133.1,
+    210.8
+   ]
+  },
+  "goblin": {
+   "file": "characters/goblin.png",
+   "w": 199,
+   "h": 242,
+   "anchor": [
+    99.3,
+    157.5
+   ]
+  },
+  "goblin_classic": {
+   "file": "characters/goblin_classic.png",
+   "w": 189,
+   "h": 229,
+   "anchor": [
+    94.2,
+    148.8
+   ]
+  },
+  "kobold": {
+   "file": "characters/kobold.png",
+   "w": 164,
+   "h": 199,
+   "anchor": [
+    81.9,
+    129.3
+   ]
+  },
+  "troll": {
+   "file": "characters/troll.png",
+   "w": 445,
+   "h": 541,
+   "anchor": [
+    222.2,
+    352.3
+   ]
+  },
+  "skeleton_farmer": {
+   "file": "characters/skeleton_farmer.png",
+   "w": 275,
+   "h": 334,
+   "anchor": [
+    137.2,
+    217.4
+   ]
+  },
+  "orc": {
+   "file": "characters/orc.png",
+   "w": 312,
+   "h": 379,
+   "anchor": [
+    155.6,
+    246.7
+   ]
+  },
+  "orc_classic": {
+   "file": "characters/orc_classic.png",
+   "w": 301,
+   "h": 366,
+   "anchor": [
+    150.5,
+    238.1
+   ]
+  },
+  "demon": {
+   "file": "characters/demon.png",
+   "w": 322,
+   "h": 391,
+   "anchor": [
+    160.7,
+    254.4
+   ]
+  },
+  "giant": {
+   "file": "characters/giant.png",
+   "w": 435,
+   "h": 529,
+   "anchor": [
+    217,
+    344.6
+   ]
+  },
+  "rat": {
+   "file": "characters/rat.png",
+   "w": 158,
+   "h": 159,
+   "anchor": [
+    78.8,
+    91.9
+   ]
+  },
+  "spider": {
+   "file": "characters/spider.png",
+   "w": 158,
+   "h": 173,
+   "anchor": [
+    78.8,
+    105.9
+   ]
+  },
+  "wolf": {
+   "file": "characters/wolf.png",
+   "w": 179,
+   "h": 217,
+   "anchor": [
+    89,
+    141.2
+   ]
+  },
+  "bat": {
+   "file": "characters/bat.png",
+   "w": 158,
+   "h": 226,
+   "anchor": [
+    78.8,
+    158.9
+   ]
+  },
+  "dragon": {
+   "file": "characters/dragon.png",
+   "w": 271,
+   "h": 356,
+   "anchor": [
+    135.1,
+    241.1
+   ]
+  },
+  "ghost": {
+   "file": "characters/ghost.png",
+   "w": 230,
+   "h": 298,
+   "anchor": [
+    114.6,
+    200.5
+   ]
+  },
+  "slime": {
+   "file": "characters/slime.png",
+   "w": 158,
+   "h": 173,
+   "anchor": [
+    78.8,
+    105.9
+   ]
+  },
+  "rogue": {
+   "file": "characters/rogue.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "knight": {
+   "file": "characters/knight.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "mage": {
+   "file": "characters/mage.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "ranger": {
+   "file": "characters/ranger.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "barbarian": {
+   "file": "characters/barbarian.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "woman": {
+   "file": "characters/woman.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "critter": {
+   "file": "characters/critter.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  }
+ },
+ "floors": {
+  "stone": {
+   "file": "floors/stone.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "flagstone": {
+   "file": "floors/flagstone.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "dirt": {
+   "file": "floors/dirt.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "wood": {
+   "file": "floors/wood.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "sand": {
+   "file": "floors/sand.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "grass": {
+   "file": "floors/grass.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "water": {
+   "file": "floors/water.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "lava": {
+   "file": "floors/lava.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "oak": {
+   "file": "floors/oak.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "tile": {
+   "file": "floors/tile.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "concrete": {
+   "file": "floors/concrete.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "carpet": {
+   "file": "floors/carpet.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  },
+  "sea": {
+   "file": "floors/sea.png",
+   "w": 132,
+   "h": 133,
+   "anchor": [
+    66,
+    66.5
+   ]
+  }
+ },
+ "ppu": 128,
+ "view": "from the south, 58 degrees up (floors: straight down); screen right is -x"
+}

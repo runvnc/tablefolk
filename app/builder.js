@@ -1,9 +1,10 @@
-/* builder.js -- the world builder's editor (server/generate.js, /world/ in
- * the builder view): the generated scenario as forms to change before
- * playing, a raw JSON box, and a top-down map of the layout with every
- * character labelled.
+/* builder.js -- the world builder's workspace (server/generate.js, /world/
+ * in the builder view): the map editor (app/map-editor.js) over the
+ * generated scenario, and below it the story, the player and the characters
+ * as forms, asking the AI for changes, and the raw JSON.
  *
- *   window.tfBuilder.show({ scenario, model?, ms? }, { appLink })
+ *   window.tfBuilder.show({ scenario, model?, ms? }, { appLink, revise })
+ *     revise: { where, model } for POST /api/revise (where the world was built)
  *
  * Ask the AI for changes: a request goes to POST /api/revise with the
  * scenario (server/generate.js), the reply replaces it; undo steps back.
@@ -11,28 +12,19 @@
  * print, show on a flat screen, or move things; "use this layout" sends the
  * scenario back with every position fixed.
  *
- * Map preview: generated maps run procgen.js here (the same code the app
- * runs), grids are drawn as they are; "map" layout lines are placed by the
- * app itself, so for those only the explicit objects and positions show.
+ * The map editor and the forms change the same scenario: an edit in one
+ * redraws the other. A layout written as "map" lines is placed by the app,
+ * so the editor has it laid out once by the tabletop page in a hidden frame
+ * (?tabletop=1&freeze=1) before it can be edited.
  */
 (function () {
   const PEOPLE = ['woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard'];
-  const MONSTERS = ['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'rat', 'spider', 'wolf', 'bat', 'ghost', 'slime', 'demon', 'giant', 'dragon'];
+  const MONSTERS = ['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'rat', 'spider', 'wolf', 'bat', 'ghost', 'slime', 'demon', 'giant', 'dragon', 'troll'];
   const OLDER = ['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian'];
-  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
-  // scenario.js GRID_GLYPHS (materials and things)
-  const GLYPHS = { '#': 'wall', '+': 'door', '~': 'water', ',': 'grass', ':': 'dirt', '^': 'stone', '&': 'lava', '=': 'wood', '_': 'oak',
-    C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
-    o: 'cauldron', a: 'anvil', W: 'weapon_stand', '/': 'axe', p: 'pickaxe', u: 'bucket', b: 'bag', P: 'potion', S: 'scroll',
-    $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
-    K: 'bookcase', Y: 'player', '@': 'player', '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern',
-    '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
-  // procgen.js GEN_LEGEND comes with each generated grid's own legend
-  const FLOOR = { wall: '#5d5852', door: '#8a5a2b', water: '#3d7fb8', sea: '#1d3d5c', grass: '#6f9a4c', dirt: '#a48558', stone: '#8d8a84', lava: '#d2541e',
-    wood: '#9a6b3c', oak: '#b88a55', carpet: '#9b3a3a', tile: '#d9d6cf', concrete: '#a9a7a2', flagstone: '#9c958a', sand: '#d9c58e', floor: '#c9c2b4' };
+  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll']);
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  let scn = null, meta = {}, voices = [], appLink = l => l;
+  let scn = null, meta = {}, voices = [], appLink = l => l, revise = {}, ed = null, tabNow = 'story';
   const past = [];   // undo: earlier versions of scn
   const remember = () => { past.push(JSON.stringify(scn)); if (past.length > 20) past.shift(); };
   fetch('/api/voices').then(r => r.ok ? r.json() : null).then(d => { if (d?.voices) { voices = d.voices; if (scn) render(); } }).catch(() => {});
@@ -89,25 +81,56 @@
   }
   function render() {
     const box = $('editor'); if (!box || !scn) return;
-    box.hidden = false;
-    const typed = $('aiReq')?.value || '', said = $('aiMsg')?.textContent || '';
-    box.innerHTML = `<div class="toolbar"><button type="button" data-act="play">▶ play</button><button type="button" class="ghost" data-act="dev">play in dev mode</button>
-        <button type="button" data-act="table">tabletop map</button><button type="button" class="ghost" data-act="map">quick map</button><button type="button" class="ghost" data-act="copy">copy link</button><button type="button" class="ghost" data-act="download">download JSON</button><span id="edmsg" class="muted"></span></div>
-      <fieldset class="ask"><legend>Ask the AI for changes</legend>
+    box.hidden = false; $('workspace').hidden = false;
+    $('wsTitle').textContent = scn.title || 'Untitled world';
+    $('wsSub').textContent = [scn.subtitle, meta.model ? 'built with ' + meta.model : ''].filter(Boolean).join(' · ');
+    const typed = $('aiReq')?.value || '', said = $('aiMsg')?.textContent || '', canAsk = revise.where !== undefined;
+    const tabs = [['story', 'Story'], ['player', 'Player'], ['characters', `Characters (${(scn.agents || []).length})`], ['layout', 'Layout'], ['raw', 'JSON']];
+    box.innerHTML = `${canAsk ? `<fieldset class="ask"><legend>Ask the AI for changes</legend>
         <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
-        <div class="toolbar"><button type="button" data-act="ask">ask</button><button type="button" class="ghost" data-act="undo" ${past.length ? '' : 'disabled'}>undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div></fieldset>
-      <fieldset><legend>Story</legend><div class="cols">${field('title', 'title')}${field('subtitle', 'subtitle')}
+        <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div></fieldset>` : ''}
+      <div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === tabNow ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
+      <div data-panel="story" ${tabNow === 'story' ? '' : 'hidden'}><fieldset><legend>Story</legend><div class="cols">${field('title', 'title')}${field('subtitle', 'subtitle')}
         ${field('lighting', 'lighting', 'select', { options: [['', '(default)'], 'bright', 'night', 'dim'] })}${field('walls', 'walls', 'select', { options: [['', '(default)'], 'stone', 'tabletop', 'block', 'modern'] })}
         <label><span>dark (fog of war, torches)</span><select data-path="dark" data-type="bool3"><option value=""${scn.dark == null ? ' selected' : ''}>auto (dungeons: yes)</option><option value="true"${scn.dark === true ? ' selected' : ''}>yes</option><option value="false"${scn.dark === false ? ' selected' : ''}>no</option></select></label>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
-        ${field('win / lose rules (JSON: {"win": ..., "lose": ...})', '__rules', 'json', { wide: true, rows: 3 })}</div></fieldset>
-      <fieldset><legend>Player</legend><div class="cols">${field('name', 'player.name')}${field('body', 'player.model', 'select', { options: modelOptions })}${field('gold', 'player.gold', 'num')}${field('hit points', 'player.hp', 'num', { ph: '20' })}${field('items (comma)', 'player.items', 'list')}${field('wields', 'player.wield')}</div></fieldset>
-      <fieldset><legend>Characters</legend>${(scn.agents || []).map(agentBox).join('')}<button type="button" class="ghost" data-act="add">+ add a character</button></fieldset>
-      <fieldset><legend>Map${scn.generate ? ' (generated ' + esc(scn.generate.kind || 'dungeon') + ')' : scn.grid?.length ? ' (ASCII grid)' : ' (layout lines)'}</legend>${mapBox()}</fieldset>
-      <details><summary>raw JSON</summary><textarea id="rawJson" class="mono" rows="18"></textarea><div class="toolbar"><button type="button" class="ghost" data-act="applyRaw">apply JSON</button></div></details>`;
-    if (typed) $('aiReq').value = typed; if (said) $('aiMsg').textContent = said;
+        ${field('win / lose rules (JSON: {"win": ..., "lose": ...})', '__rules', 'json', { wide: true, rows: 3 })}</div></fieldset></div>
+      <div data-panel="player" ${tabNow === 'player' ? '' : 'hidden'}><fieldset><legend>Player</legend><div class="cols">${field('name', 'player.name')}${field('body', 'player.model', 'select', { options: modelOptions })}${field('gold', 'player.gold', 'num')}${field('hit points', 'player.hp', 'num', { ph: '20' })}${field('items (comma)', 'player.items', 'list')}${field('wields', 'player.wield')}</div></fieldset></div>
+      <div data-panel="characters" ${tabNow === 'characters' ? '' : 'hidden'}><fieldset><legend>Characters</legend>${(scn.agents || []).map(agentBox).join('') || '<p class="muted">No characters yet: drag monsters and people onto the map.</p>'}<button type="button" data-act="add">+ add a character</button></fieldset></div>
+      <div data-panel="layout" ${tabNow === 'layout' ? '' : 'hidden'}><fieldset><legend>Map${scn.generate ? ' (generated ' + esc(scn.generate.kind || 'dungeon') + ')' : scn.grid?.length ? ' (drawn grid)' : scn.map?.length ? ' (layout lines)' : ' (fixed positions)'}</legend>${mapBox()}</fieldset></div>
+      <div data-panel="raw" ${tabNow === 'raw' ? '' : 'hidden'}><fieldset><legend>Raw JSON</legend><textarea id="rawJson" class="mono" rows="22"></textarea><div class="toolbar"><button type="button" data-act="applyRaw">Apply JSON</button></div></fieldset></div>`;
+    if (typed && $('aiReq')) $('aiReq').value = typed; if (said && $('aiMsg')) $('aiMsg').textContent = said;
+    if ($('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2);
     // the rules box edits goal.win / goal.lose / goal.maxTurns together
     const rules = $('f___rules'); if (rules) { const g = scn.goal || {}; const r = {}; for (const k of ['win', 'lose', 'maxTurns', 'winText', 'loseText', 'score']) if (g[k] != null) r[k] = g[k]; rules.value = Object.keys(r).length ? JSON.stringify(r, null, 1) : ''; }
+  }
+  // ---- the map editor ----
+  function mapEditor() {
+    if (ed || !window.tfMapEditor || !$('mapEditor')) return ed;
+    ed = window.tfMapEditor.mount($('mapEditor'), {
+      onChange(s) { scn = s; formsSoon(); },
+    });
+    return ed;
+  }
+  let formsTimer = 0, edTimer = 0;
+  // forms follow the map (not while typing in them)
+  function formsSoon() { clearTimeout(formsTimer); formsTimer = setTimeout(() => { if (!$('editor')?.contains(document.activeElement)) render(); else formsSoon(); }, 300); }
+  // the map follows the forms
+  function mapSoon() { clearTimeout(edTimer); edTimer = setTimeout(() => ed?.refresh(scn), 250); }
+  // "map" lines: laid out by the tabletop page once
+  function needsLayout(s) { return !s.generate && !(Array.isArray(s.grid) ? s.grid.length : s.grid) && (s.map?.length || 0) > 0; }
+  async function layOut() {
+    msg('laying the map out…');
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed;left:-3000px;top:0;width:800px;height:600px;border:0;opacity:0;pointer-events:none';
+    fr.src = '/app/?tabletop=1&freeze=1#s=' + await encode(scn);
+    document.body.appendChild(fr); layingOut = fr;
+  }
+  let layingOut = null;
+  function loadMap() {
+    if (!mapEditor()) return;
+    ed.load(scn);
+    if (needsLayout(scn)) layOut();
   }
   function onInput(e) {
     const el = e.target; if (!el.dataset?.path) return;
@@ -118,6 +141,7 @@
       msg('');
     } catch (err) { msg(err.message); }
     if (el.tagName === 'SELECT' && /\.(model|hostile)$|^generate\.kind$/.test(el.dataset.path)) render();
+    mapSoon();
   }
   const msg = t => { const m = $('edmsg'); if (m) m.textContent = t; };
 
@@ -135,19 +159,18 @@
   document.addEventListener('change', e => { if (e.target.closest?.('#editor') && e.target.tagName === 'SELECT') onInput(e); });
   document.addEventListener('toggle', e => { if (e.target.tagName === 'DETAILS' && e.target.open && $('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2); }, true);
   document.addEventListener('click', async e => {
-    const b = e.target.closest?.('#editor button, #mapView button, #tableView button'); if (!b) return;
+    const b = e.target.closest?.('#editor button, #workspace .acts button, #tableView button'); if (!b) return;
     if (b.dataset.act === 'closeTable') { $('tableView').hidden = true; $('tableView').querySelector('iframe').src = 'about:blank'; return; }
+    if (b.dataset.tab) { tabNow = b.dataset.tab; render(); return; }
     const act = b.dataset.act;
-    if (b.dataset.remove != null) { remember(); scn.agents.splice(+b.dataset.remove, 1); render(); return; }
+    if (b.dataset.remove != null) { remember(); scn.agents.splice(+b.dataset.remove, 1); render(); mapSoon(); return; }
     if (act === 'play' || act === 'dev') window.open(await link(act === 'dev'), '_blank');
-    else if (act === 'copy') { await navigator.clipboard.writeText(location.origin + await link(false)); msg('link copied'); }
+    else if (act === 'copy') { await navigator.clipboard.writeText(location.origin + await link(false)); msg('link copied'); setTimeout(() => msg(''), 2500); }
     else if (act === 'download') { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(scn, null, 2)], { type: 'application/json' })); a.download = (scn.title || 'scenario').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.json'; a.click(); }
-    else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); }
-    else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
-    else if (act === 'map') showMap();
-    else if (act === 'closeMap') $('mapView').hidden = true;
+    else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); mapSoon(); }
+    else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); loadMap(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'ask') ask();
-    else if (act === 'undo' && past.length) { scn = JSON.parse(past.pop()); render(); msg('undone'); }
+    else if (act === 'undo' && past.length) { scn = JSON.parse(past.pop()); render(); loadMap(); msg('undone'); }
     else if (act === 'table') showTable();
   });
 
@@ -158,7 +181,8 @@
     const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
     asking = true; say('asking…');
     try {
-      const r = await fetch('/api/revise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: scn, request: req }) });
+      const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
+      const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: scn, request: req }) });
       if (!r.ok || !r.body) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', done = null;
       for (;;) {
@@ -173,7 +197,7 @@
         }
       }
       if (!done) throw new Error('no answer');
-      remember(); scn = done.scenario; render();
+      remember(); scn = done.scenario; render(); loadMap();
       $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
     } catch (e) { say('failed: ' + e.message); }
     finally { asking = false; }
@@ -191,95 +215,16 @@
     v.querySelector('iframe').src = '/app/?tabletop=1#s=' + await encode(scn);
   }
   addEventListener('message', e => {
-    if (e.origin !== location.origin || e.data?.type !== 'tablefolk-layout' || !e.data.scenario) return;
-    remember(); scn = e.data.scenario; render();
+    if (e.origin !== location.origin || e.data?.type !== 'tablefolk-layout') return;
+    if (e.data.auto) { layingOut?.remove(); layingOut = null; if (!e.data.scenario) { msg('could not lay the map out: ' + (e.data.error || 'no answer')); return; } scn = e.data.scenario; render(); ed?.load(scn); msg('laid out: drag things around'); return; }
+    if (!e.data.scenario) return;
+    remember(); scn = e.data.scenario; render(); ed?.load(scn);
     const t = 'layout updated: every position is fixed now (the generator\'s rooms and seed no longer apply; undo goes back)';
     msg(t); const m = $('tvMsg'); if (m) m.textContent = t;
   });
 
-  // ---- top-down map ----
-  function layoutForMap() {
-    let s = JSON.parse(JSON.stringify(scn)), places = [];
-    if (s.generate && window.TablefolkProcgen) { const r = window.TablefolkProcgen.applyToScenario(s); s = r.scenario; places = r.places || []; }
-    const grid = Array.isArray(s.grid) ? s.grid : s.grid ? String(s.grid).split('\n') : [];
-    if (!grid.length) return null;
-    const H = grid.length, W = Math.max(...grid.map(r => [...r].length));
-    const x0 = Math.floor((W - 1) / 2), z0 = Math.floor((H - 1) / 2), rc = (x, z) => [Math.round(z) + z0, x0 - Math.round(x)];
-    const legend = { ...GLYPHS }; for (const [k, v] of Object.entries(s.legend || {})) legend[k] = String(v);
-    const who = [];
-    const agents = s.agents || [];
-    agents.forEach((a, i) => { if (Array.isArray(a.at)) who.push({ name: a.id, rc: rc(a.at[0], a.at[1]), hostile: a.hostile ?? MINDLESS.has(a.model), a }); });
-    grid.forEach((row, r) => [...row].forEach((ch, c) => {
-      if (/[1-9]/.test(ch) && agents[+ch - 1] && !who.some(w => w.name === agents[+ch - 1].id)) { const a = agents[+ch - 1]; who.push({ name: a.id, rc: [r, c], hostile: a.hostile ?? MINDLESS.has(a.model), a }); }
-      if ((ch === 'Y' || ch === '@') && !s.player?.at) who.push({ name: 'you', rc: [r, c], player: true, a: s.player });
-    }));
-    if (Array.isArray(s.player?.at)) who.push({ name: 'you', rc: rc(s.player.at[0], s.player.at[1]), player: true, a: s.player });
-    const things = (s.objects || []).filter(o => Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.type !== 'light').map(o => ({ type: o.type, rc: rc(+o.x, +o.z), o }));
-    return { grid, H, W, legend, who, things, places: places.map(p => ({ id: p.id, rc: p.center ? rc(p.center[0], p.center[1]) : null })).filter(p => p.rc), unplaced: agents.filter(a => !who.some(w => w.name === a.id)).map(a => a.id) };
-  }
-  function floorOf(v) {
-    if (!v) return null;
-    const on = v.match(/\son\s+(\w+)$/); if (on) return on[1];
-    return FLOOR[v] ? v : null;
-  }
-  function showMap() {
-    let v = $('mapView');
-    if (!v) { v = document.createElement('div'); v.id = 'mapView'; document.body.appendChild(v); }
-    const L = layoutForMap();
-    v.hidden = false;
-    if (!L) { v.innerHTML = `<div class="mapcard"><p>This scenario's layout is made by the app when it starts: open the tabletop map to see it.</p><button type="button" data-act="closeMap">close</button></div>`; return; }
-    const cell = Math.max(10, Math.min(28, Math.floor(Math.min(innerWidth - 80, 1100) / L.W), Math.floor((innerHeight - 160) / L.H)));
-    v.innerHTML = `<div class="mapcard"><div class="toolbar"><b>${esc(scn.title || 'map')}</b><span class="muted">north is up · ${L.W}×${L.H}</span><span style="flex:1"></span><button type="button" data-act="closeMap">close</button></div><canvas width="${L.W * cell}" height="${L.H * cell}"></canvas>
-      <div class="muted">${L.unplaced.length ? 'placed by the app at start (not shown): ' + esc(L.unplaced.join(', ')) + ' · ' : ''}<span style="color:#e05a4a">●</span> hostile <span style="color:#4a90e0">●</span> character <span style="color:#f2c94c">●</span> you</div></div>`;
-    const ctx = v.querySelector('canvas').getContext('2d');
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    L.grid.forEach((row, r) => [...row].forEach((ch, c) => {
-      const val = L.legend[ch], fl = floorOf(val) || (ch === '.' || ch === ' ' || /[1-9Y@]/.test(ch) ? 'floor' : null);
-      ctx.fillStyle = FLOOR[fl] || FLOOR.floor; ctx.fillRect(c * cell, r * cell, cell, cell);
-      if (val && !floorOf(val) && val !== 'player') { ctx.fillStyle = '#2b2620'; ctx.font = `bold ${Math.round(cell * .62)}px ui-monospace,monospace`; ctx.fillText(ch, c * cell + cell / 2, r * cell + cell / 2 + 1); }
-    }));
-    ctx.strokeStyle = 'rgba(0,0,0,.08)'; for (let r = 0; r <= L.H; r++) { ctx.beginPath(); ctx.moveTo(0, r * cell); ctx.lineTo(L.W * cell, r * cell); ctx.stroke(); } for (let c = 0; c <= L.W; c++) { ctx.beginPath(); ctx.moveTo(c * cell, 0); ctx.lineTo(c * cell, L.H * cell); ctx.stroke(); }
-    for (const t of L.things) { ctx.fillStyle = '#2b2620'; ctx.font = `${Math.round(cell * .42)}px system-ui`; ctx.fillText(t.type.slice(0, 6), t.rc[1] * cell + cell / 2, t.rc[0] * cell + cell / 2); }
-    ctx.font = `600 ${Math.max(10, Math.round(cell * .5))}px system-ui`;
-    for (const p of L.places) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(p.id, p.rc[1] * cell + cell / 2, p.rc[0] * cell - cell * .9); }
-    for (const w of L.who) {
-      const x = w.rc[1] * cell + cell / 2, y = w.rc[0] * cell + cell / 2;
-      ctx.beginPath(); ctx.arc(x, y, cell * .38, 0, Math.PI * 2); ctx.fillStyle = w.player ? '#f2c94c' : w.hostile ? '#e05a4a' : '#4a90e0'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-      ctx.font = `700 ${Math.max(11, Math.round(cell * .55))}px system-ui`; const tw = ctx.measureText(w.name).width + 8;
-      ctx.fillStyle = 'rgba(20,18,16,.8)'; ctx.fillRect(x - tw / 2, y + cell * .45, tw, Math.max(14, cell * .7)); ctx.fillStyle = '#fff'; ctx.fillText(w.name, x, y + cell * .45 + Math.max(14, cell * .7) / 2);
-    }
-    // Tooltips: who and what is under the pointer.
-    const cv = v.querySelector('canvas'), tip = document.createElement('div'); tip.className = 'maptip'; tip.hidden = true; v.querySelector('.mapcard').appendChild(tip);
-    cv.addEventListener('mouseleave', () => { tip.hidden = true; });
-    cv.addEventListener('mousemove', e => {
-      const b = cv.getBoundingClientRect(), c = Math.floor((e.clientX - b.left) / b.width * L.W), r = Math.floor((e.clientY - b.top) / b.height * L.H);
-      const html = mapTip(L, r, c);
-      tip.hidden = !html; if (!html) return;
-      tip.innerHTML = html;
-      const card = v.querySelector('.mapcard').getBoundingClientRect();
-      tip.style.left = Math.min(e.clientX - card.left + 14, card.width - tip.offsetWidth - 6) + 'px';
-      tip.style.top = (e.clientY - card.top + 16) + 'px';
-    });
-  }
-  function mapTip(L, r, c) {
-    const near = p => p.rc[0] === r && p.rc[1] === c, out = [];
-    for (const w of L.who.filter(near)) {
-      const a = w.a || {}, bits = [a.model || (w.player ? '' : 'critter'), w.player ? 'the player' : w.hostile ? 'hostile' : 'talks'].filter(Boolean);
-      const more = [a.personality, a.goal || a.goals, a.items?.length ? 'carries: ' + [].concat(a.items).map(i => i?.name || i).join(', ') : '', a.gold ? a.gold + ' gold' : ''].filter(Boolean).map(t => esc(String(t).slice(0, 140)));
-      out.push(`<b>${esc(w.name)}</b> <span class="muted">${esc(bits.join(' · '))}</span>${more.length ? '<br>' + more.join('<br>') : ''}`);
-    }
-    for (const t of L.things.filter(near)) {
-      const o = t.o, extra = [o.name || o.label, o.text || o.note, o.items ? 'holds: ' + [].concat(o.items).map(i => i?.name || i).join(', ') : '', o.gold ? o.gold + ' gold' : '', o.locked ? 'locked' : ''].filter(Boolean).map(x => esc(String(x).slice(0, 140)));
-      out.push(`<b>${esc(t.type.replace(/_/g, ' '))}</b>${extra.length ? '<br>' + extra.join('<br>') : ''}`);
-    }
-    const ch = [...(L.grid[r] || '')][c];
-    if (ch && ch !== ' ' && ch !== '.') { const val = L.legend[ch]; if (val && val !== 'player' && !/[1-9Y@]/.test(ch)) out.push(`<span class="muted">${esc(ch)}</span> ${esc(String(val).replace(/_/g, ' '))}`); }
-    const pl = L.places.find(near); if (pl) out.push(`<span class="muted">place:</span> ${esc(pl.id)}`);
-    return out.join('<hr>');
-  }
-
   window.tfBuilder = {
-    show(result, opts = {}) { scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; render(); },
+    show(result, opts = {}) { scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
     get scenario() { return scn; },
   };
 })();

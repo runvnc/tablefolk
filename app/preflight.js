@@ -65,6 +65,7 @@
     ['scenario.js?v=20261024j'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
+    ['tile-render.js?v=20261025d'],
     ['llm_js/world-integration.js?v=20261024n', 'module'],
   ];
 

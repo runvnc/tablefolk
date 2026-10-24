@@ -9,6 +9,9 @@
 //   worldView                "builder" | "loading"
 //   ttsEngine                the players' default speech engine (TTS_ENGINES)
 //   voices                   { alba: { gender, description }, ... }
+//   worldgen                 the world builder's model choices:
+//                            { cloudModels: [...], guest: { browser, server, cloud, cloudModels: [...] } }
+//                            (an admin may use any; guests what "guest" allows)
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, ROOT, endpoint, DEFAULT_MODELS } from './config.js';
@@ -20,6 +23,19 @@ const FILE = join(ADMIN_DIR, 'settings.json');
 // Speech engines (app/tts/pocket-tts-manager.js ENGINES); players can pick
 // another one in the app's voice pane.
 export const TTS_ENGINES = ['pocket-18m', 'pocket-100m'];
+// The world builder's models: where it runs and which. "cloud" is the
+// generator endpoint (OpenRouter by default), "server" the local model
+// server (litert-lm serve), "browser" Gemma in the visitor's own browser.
+export const DEFAULT_WORLDGEN = {
+  cloudModels: ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it'],
+  guest: { browser: true, server: false, cloud: true, cloudModels: ['deepseek/deepseek-v4.1-flash-1017'] },
+};
+function cleanWorldgen(w = {}) {
+  const list = v => Array.isArray(v) ? [...new Set(v.map(m => String(m).trim()).filter(m => /^[\w.:\/@,+-]{1,120}$/.test(m)))].slice(0, 40) : null;
+  const cloudModels = list(w.cloudModels) || DEFAULT_WORLDGEN.cloudModels;
+  const g = { ...DEFAULT_WORLDGEN.guest, ...(w.guest || {}) };
+  return { cloudModels, guest: { browser: !!g.browser, server: !!g.server, cloud: !!g.cloud, cloudModels: (list(g.cloudModels) || []).filter(m => cloudModels.includes(m)) } };
+}
 export const VOICE_IDS = ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'];
 const DEFAULT_GENDER = { alba: 'female', azelma: 'female', cosette: 'female', eponine: 'female', fantine: 'female', javert: 'male', jean: 'male', marius: 'male' };
 
@@ -42,6 +58,7 @@ function apply() {
   }
   config.worldView = saved.worldView === 'loading' || saved.worldView === 'builder' ? saved.worldView : ENV.worldView;
   config.ttsEngine = TTS_ENGINES.includes(saved.ttsEngine) ? saved.ttsEngine : TTS_ENGINES[0];
+  config.worldgen = cleanWorldgen(saved.worldgen);
 }
 apply();
 
@@ -60,7 +77,7 @@ export function publicSettings() {
     effective: { baseURL: config[k].baseURL, model: config[k].model, key: !!config[k].apiKey, provider: config[k].provider } });
   const env = { openrouter: !!process.env.OPENROUTER_API_KEY, openai: !!process.env.OPENAI_API_KEY };
   const keys = Object.fromEntries(['openrouter', 'openai'].map(p => [p, { saved: !!saved.keys?.[p], env: env[p] }]));
-  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices() };
+  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), worldgen: config.worldgen };
 }
 
 // patch: { characters: {baseURL, model, apiKey, clearKey}, generator: ..., worldView, voices: [{id, gender, description}] }
@@ -84,6 +101,7 @@ export function updateSettings(patch = {}) {
   }
   if (patch.worldView === 'builder' || patch.worldView === 'loading' || patch.worldView === '') saved.worldView = patch.worldView || undefined;
   if (TTS_ENGINES.includes(patch.ttsEngine)) saved.ttsEngine = patch.ttsEngine;
+  if (patch.worldgen && typeof patch.worldgen === 'object') saved.worldgen = cleanWorldgen({ ...config.worldgen, ...patch.worldgen, guest: { ...config.worldgen.guest, ...(patch.worldgen.guest || {}) } });
   if (Array.isArray(patch.voices)) {
     saved.voices = {};
     for (const v of patch.voices) if (VOICE_IDS.includes(v.id)) saved.voices[v.id] = { gender: v.gender === 'male' ? 'male' : 'female', description: String(v.description || '').slice(0, 200) };

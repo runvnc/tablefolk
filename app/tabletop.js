@@ -424,5 +424,19 @@
   // no scenario in the link: show the board as it is
   const fallback = () => setTimeout(() => { if (!ready && !/[#&]s(cenario)?=/.test(location.hash) && !new URLSearchParams(location.search).get('scenario')) start(); }, 1500);
   if (window.TABLEFOLK_SCENE_READY) fallback(); else addEventListener('tablefolk-scene-ready', fallback, { once: true });
+  // ?freeze=1 in a frame: once the scenario stands, send its layout with every
+  // position fixed to the page that opened it (the map editor lays out a
+  // "map lines" scenario this way, app/map-editor.js)
+  if (embedded && new URLSearchParams(location.search).has('freeze')) {
+    const t0 = Date.now(), poll = setInterval(() => {
+      const a = window.tablefolkScenario?.active;
+      if (!a && Date.now() - t0 < 60000) return;
+      clearInterval(poll);
+      setTimeout(() => {
+        let s = null, error = null; try { s = window.tablefolkScenario.freezeLayout(); } catch (e) { error = e.message; }
+        window.parent.postMessage({ type: 'tablefolk-layout', scenario: s, error, auto: true }, location.origin);
+      }, 1500);
+    }, 300);
+  }
   window.tablefolkTabletop = { render, freeze: () => window.tablefolkScenario.freezeLayout(), toPx: (x, z) => toPx(view, x, z), zoomAt, fitAll, get view() { return view; }, get options() { return opt; } };
 })();

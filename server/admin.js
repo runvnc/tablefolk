@@ -69,6 +69,7 @@ export async function setupAdmin({ reset = false } = {}) {
 }
 
 function cookies(req) { return Object.fromEntries((req.headers.get('cookie') || '').split(/;\s*/).filter(Boolean).map(c => { const i = c.indexOf('='); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))]; })); }
+export function isAdmin(req) { return authed(req); }
 function authed(req) {
   const t = cookies(req).tf_admin, exp = t && sessions.get(t);
   if (!exp) return false;
@@ -122,6 +123,20 @@ export async function handleAdmin(req, url) {
     if (!(await Bun.password.verify(String(current || ''), rec.hash))) { await Bun.sleep(600); return json({ error: 'the current password is wrong' }, 403); }
     if (String(next || '').length < 6) return json({ error: 'at least 6 characters' }, 400);
     await savePassword(String(next)); try { rmSync(INITIAL_FILE, { force: true }); } catch {}
+    return json({ ok: true });
+  }
+  // a tile rendered in an admin's browser (app/map-editor.js): kept for everyone
+  if (p === '/api/admin/tiles' && req.method === 'POST') {
+    const t = await req.json().catch(() => ({}));
+    const kind = String(t.kind || ''), name = String(t.name || ''), m = String(t.url || '').match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+    if (!['objects', 'characters', 'floors'].includes(kind) || !/^[a-z][a-z0-9_]{0,40}$/.test(name) || !m) return json({ error: 'kind, name and a PNG data URL' }, 400);
+    const png = Buffer.from(m[1], 'base64'); if (png.length > 2e6) return json({ error: 'too large' }, 413);
+    const dir = join(ROOT, 'assets', 'tiles'), mf = join(dir, 'tiles.json');
+    mkdirSync(join(dir, kind), { recursive: true });
+    writeFileSync(join(dir, kind, name + '.png'), png);
+    const man = existsSync(mf) ? JSON.parse(readFileSync(mf, 'utf8')) : {};
+    (man[kind] ||= {})[name] = { file: `${kind}/${name}.png`, w: +t.w || 0, h: +t.h || 0, anchor: Array.isArray(t.anchor) ? t.anchor.map(Number) : [0, 0] };
+    writeFileSync(mf, JSON.stringify(man, null, 1) + '\n');
     return json({ ok: true });
   }
   if (p === '/api/admin/generated' && req.method === 'POST') {
