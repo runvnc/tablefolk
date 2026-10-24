@@ -4119,10 +4119,10 @@ window.addEventListener('tablefolk-player-chat',e=>{
 // 'follow' (the default), Diablo-like: high and fixed, looking north from
 // the south at a steep angle, always centred on the avatar; it never turns,
 // so the keys always mean the same screen directions, and walls between it
-// and the avatar drop to a low stub (cutaway.js). The wheel zooms (7-24).
+// and the avatar drop to a low stub (cutaway.js). The wheel zooms (7-30).
 // 'overview': the old free camera over the board (drag to orbit), easing
 // after the avatar when it moves.
-const FOLLOW={alpha:Math.PI/2,beta:.78,radius:12,min:7,max:24,height:.6};
+const FOLLOW={alpha:Math.PI/2,beta:.78,radius:16,min:7,max:30,height:.6};
 const FREE={lowerBetaLimit:.22,upperBetaLimit:1.42,panningSensibility:60};
 function lockCamera(cam,on){
   if(on){ cam.lowerAlphaLimit=cam.upperAlphaLimit=FOLLOW.alpha; cam.lowerBetaLimit=cam.upperBetaLimit=FOLLOW.beta; cam.panningSensibility=0; }
@@ -4139,7 +4139,7 @@ function toggleCameraMode(){
   if(state.cameraMode==='follow'){
     state.cameraMode='overview'; const cam=state.camera; lockCamera(cam,false); window.tablefolkCutaway?.clear();
     // a good part of the board, not all of a big one
-    cam.radius=Math.min(cam.upperRadiusLimit,15); cam.beta=.95;
+    cam.radius=Math.min(cam.upperRadiusLimit,19); cam.beta=.95;
   }
   else followCameraStart();
   window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
