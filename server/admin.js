@@ -158,52 +158,97 @@ export function savedWorld(req, file) {
 const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tablefolk admin</title>
 <style>
-:root{--bg:#f4efe4;--fg:#2b2620;--muted:#7a7064;--card:#fffaf0;--line:#e2d8c6;--accent:#6b4f2a;--ok:#2f7a45;--bad:#b5542e}
-@media (prefers-color-scheme:dark){:root{--bg:#1d1a16;--fg:#ece5d8;--muted:#a59a8a;--card:#272320;--line:#3a342d;--accent:#d7b07a;--ok:#7bc58f;--bad:#e08a66}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
-header a{color:var(--accent)}header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}header h1{font-size:1.15rem;margin:0;flex:1}
-main{max-width:980px;margin:0 auto;padding:18px 16px 60px;display:grid;gap:16px}
-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}section h2{font-size:1rem;margin:0 0 .6rem}
-label{display:block;font-size:.85rem;color:var(--muted);margin:.4rem 0 .15rem}
-input,select,textarea,button{font:inherit;padding:.45rem .6rem;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
-input,select{width:100%}button{background:var(--accent);color:var(--bg);border:none;cursor:pointer}button.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media (max-width:720px){.grid2{grid-template-columns:1fr}}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:.6rem}.muted{color:var(--muted);font-size:.85rem}
-.links a{display:inline-block;margin:0 14px 6px 0;color:var(--accent)}
-table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{text-align:left;padding:5px 6px;border-top:1px solid var(--line);vertical-align:top}
-.ok{color:var(--ok)}.bad{color:var(--bad)}#login{max-width:360px;margin:12vh auto}
-.voices td input{width:100%}.voices td select{width:7em}
+:root{--bg:#f3eee4;--fg:#2a251f;--muted:#7a6f62;--card:#fffbf3;--line:#e3d9c7;--accent:#7a5426;--accent2:#a8732f;--soft:#efe6d6;--ok:#2f7a45;--okbg:#e3f1e5;--bad:#b5442e;--badbg:#f8e3dc;--shadow:0 1px 2px rgba(60,40,10,.06),0 6px 20px rgba(60,40,10,.07)}
+@media (prefers-color-scheme:dark){:root{--bg:#191612;--fg:#ede6d9;--muted:#a39886;--card:#24201b;--line:#3a332b;--accent:#d9ae6f;--accent2:#e7c48e;--soft:#2d2822;--ok:#7bc58f;--okbg:#1f3325;--bad:#e08a66;--badbg:#3a2219;--shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:76px}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent)}button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:12px 24px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;font-size:1.05rem}.brand svg{width:26px;height:26px}.brand span{color:var(--muted)}
+header nav{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:.42rem .85rem;font-weight:600;font-size:.88rem;cursor:pointer;text-decoration:none;color:var(--fg);white-space:nowrap}
+.btn:hover{border-color:var(--accent)}.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}.btn.primary:hover{background:var(--accent2)}.btn.danger{color:var(--bad)}.btn.danger:hover{border-color:var(--bad)}.btn.quiet{border-color:transparent;background:none}.btn:disabled{opacity:.5;cursor:default}
+.btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 24px 80px;display:grid;grid-template-columns:200px 1fr;gap:28px}
+aside.side{position:sticky;top:84px;align-self:start;display:flex;flex-direction:column;gap:2px}
+aside.side a{padding:.42rem .7rem;border-radius:9px;color:var(--muted);text-decoration:none;font-weight:600;font-size:.92rem}aside.side a:hover{background:var(--soft);color:var(--fg)}aside.side a.on{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+main{display:grid;gap:22px;min-width:0}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
+section>h2{font-size:1.1rem;margin:0 0 4px}section>p.lead{color:var(--muted);margin:0 0 16px;font-size:.9rem}
+h3{font-size:.95rem;margin:0 0 8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.stat .k{font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}.stat .v{font-weight:700;margin-top:2px;overflow-wrap:anywhere}.stat .s{color:var(--muted);font-size:.84rem;overflow-wrap:anywhere}
+.go{display:flex;flex-direction:column;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px;text-decoration:none;color:var(--fg)}.go:hover{border-color:var(--accent);transform:translateY(-1px)}.go b{display:flex;align-items:center;gap:6px}.go span{color:var(--muted);font-size:.85rem}
+.go svg{width:16px;height:16px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:.08rem .55rem;border-radius:999px;font-size:.78rem;font-weight:700}.pill.ok{background:var(--okbg);color:var(--ok)}.pill.bad{background:var(--badbg);color:var(--bad)}.pill.off{background:var(--soft);color:var(--muted)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:.75rem 0 .25rem}
+input,select,textarea{width:100%;padding:.5rem .65rem;border-radius:10px;border:1px solid var(--line);background:var(--bg)}textarea{resize:vertical;line-height:1.4}
+input:focus,select:focus,textarea:focus,.btn:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card2{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}.muted{color:var(--muted);font-size:.86rem}.ok{color:var(--ok)}.bad{color:var(--bad)}
+.checks{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:4px}.check{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--fg);margin:0;font-size:.9rem;cursor:pointer}.check input{width:auto;accent-color:var(--accent)}
+.check small{color:var(--muted);font-weight:500}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{text-align:left;padding:9px 8px;border-top:1px solid var(--line);vertical-align:middle}th{font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-top:0}
+td .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.voices td input{min-width:200px}.voices td select{width:7.5em}
+.empty{color:var(--muted);text-align:center;padding:18px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;transition:.2s;background:var(--fg);color:var(--bg);padding:.6rem 1rem;border-radius:12px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:20;pointer-events:none}#toast.on{opacity:1;transform:translateX(-50%)}#toast.bad{background:var(--bad);color:#fff}
+#login{max-width:400px;margin:14vh auto;padding:0 16px}#login section{padding:28px}
+@media (max-width:860px){.wrap{grid-template-columns:1fr;padding:16px 14px 60px}aside.side{position:static;flex-direction:row;flex-wrap:wrap}.grid2{grid-template-columns:1fr}header{padding:10px 14px}.voices td input{min-width:120px}}
 </style></head><body>
-<div id="login" hidden><section><h2>Tablefolk admin</h2><form id="lf"><label>Password</label><input type="password" name="pw" autofocus>
-<div class="row"><button>log in</button><span id="lerr" class="bad"></span></div></form>
-<p class="muted">Forgot it? Delete <code>.admin/password.json</code> on the server and restart it: it asks for a new one.</p></section></div>
+<div id="login" hidden><section><div class="brand" style="margin-bottom:14px"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 22l12 7 12-7-12-7z" fill="var(--accent)" opacity=".35"/><path d="M4 16l12 7 12-7-12-7z" fill="var(--accent)" opacity=".6"/><path d="M4 10l12 7 12-7L16 3z" fill="var(--accent)"/></svg><b>Tablefolk</b><span>admin</span></div>
+<form id="lf"><label for="pw">Password</label><input type="password" id="pw" name="pw" autofocus autocomplete="current-password">
+<div class="row"><button class="btn primary">Log in</button><span id="lerr" class="bad"></span></div></form>
+<p class="muted" style="margin-top:18px">Forgot it? Delete <code>.admin/password.json</code> on the server and restart it: it asks for a new one.</p></section></div>
 <div id="app" hidden>
-<header><h1>Tablefolk admin</h1><a href="/app/?dev=1">world (dev mode)</a><button class="ghost" id="logout">log out</button></header>
+<header><div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 22l12 7 12-7-12-7z" fill="var(--accent)" opacity=".35"/><path d="M4 16l12 7 12-7-12-7z" fill="var(--accent)" opacity=".6"/><path d="M4 10l12 7 12-7L16 3z" fill="var(--accent)"/></svg><b>Tablefolk</b><span>admin</span></div>
+<nav><a class="btn" href="/world/" target="_blank">World builder ↗</a><a class="btn" href="/app/?play=1" target="_blank">Play ↗</a><button class="btn quiet" id="logout">Log out</button></nav></header>
+<div class="wrap"><aside class="side" aria-label="sections"><a href="#overview">Overview</a><a href="#models">Language models</a><a href="#builder">World builder</a><a href="#speech">Speech &amp; voices</a><a href="#worlds">Worlds</a><a href="#security">Password</a></aside>
 <main>
-<section><h2>Server</h2><div id="status" class="muted"></div>
-<div class="links" style="margin-top:.6rem"><a href="/app/?play=1">the world, as players see it</a><a href="/app/?dev=1">the world in admin/dev mode</a><a href="/world/">world builder</a><a href="/world/a+haunted+mill+with+a+ghost?view=loading">players' loading screen</a></div></section>
-<section><h2>Language models</h2><p class="muted">Each endpoint uses OpenRouter, OpenAI (directly), the local model server (litert-lm serve here) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys are stored on the server and never sent to pages.</p>
+<section id="overview"><h2>Overview</h2><p class="lead" id="status"></p>
+<div class="tiles" id="stats"></div>
+<h3 style="margin-top:18px">Open</h3>
+<div class="tiles">
+<a class="go" href="/app/?play=1" target="_blank"><b><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>The world, as players see it</b><span>No developer panels.</span></a>
+<a class="go" href="/app/?dev=1" target="_blank"><b><svg viewBox="0 0 24 24"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/></svg>The world in dev mode</b><span>Every panel: brains, prompts, tests.</span></a>
+<a class="go" href="/world/" target="_blank"><b><svg viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>World builder</b><span>Write, draw and edit worlds.</span></a>
+<a class="go" href="/world/a+haunted+mill+with+a+ghost?view=loading" target="_blank"><b><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12a8 8 0 0116 0"/></svg>Players' loading screen</b><span>What a /world link shows players.</span></a>
+</div></section>
+<section id="models"><h2>Language models</h2><p class="lead">Each endpoint uses OpenRouter, OpenAI, the local model server (litert-lm serve on this machine) or any OpenAI-compatible URL. Empty fields use the server's environment (.env). Keys stay on the server and are never sent to pages.</p>
 <div class="grid2" id="eps"></div>
-<h3 style="margin:1rem 0 .2rem;font-size:.95rem">Provider API keys</h3><p class="muted" style="margin:0">Used by both endpoints when they use that provider (an endpoint's own key wins).</p>
+<h3 style="margin-top:20px">Provider API keys</h3><p class="muted" style="margin:0 0 4px">Used by both endpoints with that provider (an endpoint's own key wins).</p>
 <div class="grid2" id="keys"></div></section>
-<section><h2>World page</h2><label>What /world/&lt;prompt&gt; shows players</label>
-<select id="worldView"><option value="builder">the world builder (prompt, progress, model)</option><option value="loading">a plain loading screen with a progress bar</option></select>
-<div class="row"><button id="saveView">save</button><span id="viewMsg" class="muted"></span></div></section>
-<section><h2>Speech</h2><label>Players' speech engine (each player can pick another in the app's voice pane)</label>
-<select id="ttsEngine"><option value="pocket-18m">Pocket-TTS small (18M parameters, about 40 MB, English)</option><option value="pocket-100m">Pocket-TTS (100M parameters, about 120 MB, 5 languages)</option></select>
-<div class="row"><button id="saveTts">save</button><span id="ttsMsg" class="muted"></span></div></section>
-<section><h2>Voices</h2><p class="muted">Describe each Pocket-TTS voice. Characters without a voice get one of their body's gender; the generator reads the descriptions to cast scenarios; the app's voice menu shows them.</p>
-<table class="voices"><thead><tr><th>voice</th><th>gender</th><th>description</th></tr></thead><tbody id="voices"></tbody></table>
-<div class="row"><button id="saveVoices">save voices</button><span id="voiceMsg" class="muted"></span></div></section>
-<section><h2>Recent generations</h2><table><tbody id="recent"></tbody></table></section>
-<section><h2>Saved worlds <span class="muted">(generated/)</span></h2><table><tbody id="gen"></tbody></table></section>
-<section><h2>Password</h2><div class="grid2"><div><label>Current</label><input type="password" id="pwCur"></div><div><label>New (6+ characters)</label><input type="password" id="pwNew"></div></div>
-<div class="row"><button id="pwSave">change password</button><span id="pwMsg" class="muted"></span></div></section>
-</main></div>
+<section id="builder"><h2>World builder</h2><p class="lead">Which models the builder offers, and what visitors who are not logged in may use. As admin you can use every option, and type in any model.</p>
+<div class="grid2"><div>
+<label for="cloudModels">Cloud models offered (one per line, as the provider names them)</label><textarea id="cloudModels" rows="5" spellcheck="false" placeholder="deepseek/deepseek-v4.1-flash-1017"></textarea>
+<p class="muted" style="margin:.4rem 0 0">The scenario generator's model (above) is always offered too.</p>
+<label for="worldView">What a /world/&lt;prompt&gt; link shows</label>
+<select id="worldView"><option value="builder">the world builder: prompt, progress, map editor</option><option value="loading">a plain loading screen with a progress bar, then the game</option></select></div>
+<div class="card2"><h3>Guests may use</h3>
+<div class="checks" style="flex-direction:column">
+<label class="check"><input type="checkbox" id="gBrowser"> In their own browser <small>free for you: Gemma runs on their GPU</small></label>
+<label class="check"><input type="checkbox" id="gServer"> This server's local model <small>uses this machine's GPU</small></label>
+<label class="check"><input type="checkbox" id="gCloud"> Cloud models <small>spends your API credit</small></label></div>
+<div id="gModelsBox"><label>Cloud models guests may pick</label><div class="checks" id="gModels"></div></div></div></div>
+<div class="row"><button class="btn primary" id="saveBuilder">Save world builder settings</button></div></section>
+<section id="speech"><h2>Speech &amp; voices</h2><p class="lead">The engine players hear by default (each can pick another in the app's voice pane), and how each voice is described: characters without a voice get one of their body's gender, the generator reads the descriptions when it casts a world, and the voice menu shows them.</p>
+<label for="ttsEngine">Players' speech engine</label>
+<select id="ttsEngine"><option value="pocket-18m">Pocket-TTS small: 18M parameters, about 40 MB, English</option><option value="pocket-100m">Pocket-TTS: 100M parameters, about 120 MB, 5 languages</option></select>
+<table class="voices" style="margin-top:14px"><thead><tr><th>Voice</th><th>Gender</th><th>Description</th></tr></thead><tbody id="voices"></tbody></table>
+<div class="row"><button class="btn primary" id="saveSpeech">Save speech settings</button></div></section>
+<section id="worlds"><h2>Worlds</h2><p class="lead">Every world built here is saved in <code>generated/</code>. Recent runs since the server started are listed first.</p>
+<h3>Recent runs</h3><table><thead><tr><th>When</th><th>Prompt</th><th>Model</th><th>Result</th></tr></thead><tbody id="recent"></tbody></table>
+<h3 style="margin-top:22px">Saved worlds</h3><table><thead><tr><th>World</th><th>Saved</th><th></th></tr></thead><tbody id="gen"></tbody></table></section>
+<section id="security"><h2>Password</h2><p class="lead">For this page. Sessions last a week, or until the server restarts.</p>
+<div class="grid2"><div><label for="pwCur">Current password</label><input type="password" id="pwCur" autocomplete="current-password"></div><div><label for="pwNew">New password (6+ characters)</label><input type="password" id="pwNew" autocomplete="new-password"></div></div>
+<div class="row"><button class="btn primary" id="pwSave">Change password</button></div></section>
+</main></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <script>
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(async r=>({ok:r.ok,status:r.status,...(await r.json().catch(()=>({})))}));
-const ago=ms=>{const s=Math.round(ms/1000);return s<90?s+'s':s<5400?Math.round(s/60)+' min':s<172800?Math.round(s/3600)+' h':Math.round(s/86400)+' days';};
+const ago=ms=>{const s=Math.round(ms/1000);return s<90?s+' s':s<5400?Math.round(s/60)+' min':s<172800?Math.round(s/3600)+' h':Math.round(s/86400)+' days';};
+let toastT=0; const toast=(t,bad)=>{ const el=$('toast'); el.textContent=t; el.className='on'+(bad?' bad':''); clearTimeout(toastT); toastT=setTimeout(()=>el.className='',2600); };
+const saved=(r,what)=>{ if(r.ok){ toast(what+' saved'); if(r.settings){ S.settings=r.settings; render(); } } else toast('Could not save: '+(r.error||r.status),true); };
 let S=null;
 async function load(){
   const r=await fetch('/api/admin/state'); if(r.status===401){ $('login').hidden=false; $('app').hidden=true; return; }
@@ -211,44 +256,60 @@ async function load(){
 }
 const PROVIDERS=[['','(environment)'],['openrouter','OpenRouter'],['openai','OpenAI'],['local','local model server'],['custom','other URL']];
 function provOf(u){ u=String(u||'').toLowerCase(); return !u?'':['openrouter','openai','local','litert'].includes(u)?(u==='litert'?'local':u):'custom'; }
-function epBox(k,title){ const e=S.settings[k], pv=provOf(e.baseURL), def=S.settings.defaults?.[k]||{};
-  return '<div><h3 style="margin:.2rem 0;font-size:.95rem">'+title+'</h3><div class="muted">now: '+esc(e.effective.baseURL)+' · '+esc(e.effective.model)+' · key '+(e.effective.key?'<span class=ok>set</span>':'<span class=bad>none</span>')+'</div>'
+function epBox(k,title,sub){ const e=S.settings[k], pv=provOf(e.baseURL), def=S.settings.defaults?.[k]||{};
+  return '<div class="card2"><h3>'+title+'</h3><p class="muted" style="margin:0">'+sub+'</p><p class="muted" style="margin:.5rem 0 0">Now: <b>'+esc(e.effective.model)+'</b> at '+esc(e.effective.baseURL)+' · key '+(e.effective.key?'<span class="pill ok">set</span>':'<span class="pill bad">none</span>')+'</p>'
   +'<label>Provider</label><select data-prov="'+k+'">'+PROVIDERS.map(([v,t])=>'<option value="'+v+'"'+(v===pv?' selected':'')+'>'+t+'</option>').join('')+'</select>'
   +'<div data-urlbox="'+k+'"'+(pv==='custom'?'':' hidden')+'><label>Base URL</label><input data-k="'+k+'" data-f="url" value="'+esc(pv==='custom'?e.baseURL:'')+'" placeholder="https://.../v1"></div>'
   +'<label>Model</label><input data-k="'+k+'" data-f="model" value="'+esc(e.model)+'" placeholder="'+esc(pv==='openai'?def.openai||'':pv==='local'?'(local default)':def.openrouter||'(environment)')+'">'
-  +'<label>API key '+(e.keySaved?'(one is saved; leave empty to keep it)':'')+'</label><input type="password" data-k="'+k+'" data-f="apiKey" placeholder="(environment)" autocomplete="off">'
-  +'<div class="row"><button data-save="'+k+'">save</button><button class="ghost" data-test="'+k+'">test</button>'+(e.keySaved?'<button class="ghost" data-clear="'+k+'">forget saved key</button>':'')+'<span class="muted" id="msg_'+k+'"></span></div></div>'; }
+  +'<label>API key '+(e.keySaved?'<span class="muted">(one is saved; leave empty to keep it)</span>':'')+'</label><input type="password" data-k="'+k+'" data-f="apiKey" placeholder="(environment)" autocomplete="off">'
+  +'<div class="row"><button class="btn primary" data-save="'+k+'">Save</button><button class="btn" data-test="'+k+'">Test</button>'+(e.keySaved?'<button class="btn danger" data-clear="'+k+'">Forget saved key</button>':'')+'<span class="muted" id="msg_'+k+'"></span></div></div>'; }
 function render(){
-  const st=S.status;
-  $('status').innerHTML='listening on '+esc(st.host)+':'+st.port+' · up '+ago(st.uptime)+' · Bun '+esc(st.bun)+' · local model server ('+esc(st.local.url)+'): '+(st.local.up?'<span class=ok>running</span>':'not running')
-    +(st.initialPassword?'<br><span class=bad>The password was made up at startup (.admin/initial-password.txt): change it below.</span>':'');
-  $('eps').innerHTML=epBox('characters',"Characters' endpoint brain")+epBox('generator','Scenario generator (/world)');
-  const kb=(p,t)=>{ const x=S.settings.keys?.[p]||{}; return '<div><label>'+t+' key '+(x.saved?'(<span class=ok>saved</span>; leave empty to keep it)':x.env?'(from .env)':'(<span class=bad>none</span>)')+'</label><input type="password" data-key="'+p+'" autocomplete="off" placeholder="'+(p==='openai'?'sk-...':'sk-or-...')+'">'
-    +'<div class="row"><button data-savekey="'+p+'">save</button>'+(x.saved?'<button class="ghost" data-clearkey="'+p+'">forget saved key</button>':'')+'<span class="muted" id="kmsg_'+p+'"></span></div></div>'; };
+  const st=S.status, se=S.settings;
+  $('status').textContent='Listening on '+st.host+':'+st.port+', up '+ago(st.uptime)+', Bun '+st.bun+'.';
+  const stat=(k,v,s)=>'<div class="stat"><div class="k">'+k+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
+  $('stats').innerHTML=stat('Characters\\u2019 brain (endpoint)',esc(se.characters.effective.model),esc(se.characters.effective.provider||''))
+    +stat('Scenario generator',esc(se.generator.effective.model),esc(se.generator.effective.provider||''))
+    +stat('Local model server',st.local.up?'<span class="pill ok">running</span>':'<span class="pill off">not running</span>',esc(st.local.url))
+    +stat('Saved worlds',String(S.generated.length),S.recent.length?S.recent.length+' run'+(S.recent.length===1?'':'s')+' since start':'none since start')
+    +(st.initialPassword?stat('Password','<span class="pill bad">made up at startup</span>','<a href="#security">change it</a>'):'');
+  $('eps').innerHTML=epBox('characters',"Characters' endpoint brain",'What characters think with when a player picks the server brain.')+epBox('generator','Scenario generator','What writes worlds in the cloud (/world).');
+  const kb=(p,t)=>{ const x=se.keys?.[p]||{}; return '<div class="card2"><label style="margin-top:0">'+t+' key '+(x.saved?'<span class="pill ok">saved</span>':x.env?'<span class="pill ok">from .env</span>':'<span class="pill bad">none</span>')+'</label><input type="password" data-key="'+p+'" autocomplete="off" placeholder="'+(x.saved?'leave empty to keep the saved key':(p==='openai'?'sk-...':'sk-or-...'))+'">'
+    +'<div class="row"><button class="btn primary" data-savekey="'+p+'">Save</button>'+(x.saved?'<button class="btn danger" data-clearkey="'+p+'">Forget saved key</button>':'')+'</div></div>'; };
   $('keys').innerHTML=kb('openrouter','OpenRouter')+kb('openai','OpenAI');
-  $('worldView').value=S.settings.worldView; $('ttsEngine').value=S.settings.ttsEngine;
-  $('voices').innerHTML=S.settings.voices.map(v=>'<tr data-v="'+v.id+'"><td>'+v.id+'</td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
-  $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td>'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td>'+esc(g.model)+'</td><td>'+(g.ok?'<span class=ok>'+(g.ms/1000).toFixed(1)+'s</span> '+esc(g.title||''):'<span class=bad>'+esc(g.error||'failed')+'</span>')+'</td></tr>').join(''):'<tr><td class=muted>none since the server started</td></tr>';
-  $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td>'+new Date(g.at).toLocaleString()+'</td><td><b>'+esc(g.title)+'</b><br><span class=muted>'+esc(g.prompt)+' · '+esc(g.model)+'</span></td><td style="white-space:nowrap">'+(g.link?'<a href="'+g.link+'">play</a> · <a href="'+g.link.replace('/app/#','/app/?dev=1#')+'">dev</a> · <a href="'+g.builder+'">edit</a> · ':'')+'<a href="#" data-del="'+esc(g.file)+'">delete</a></td></tr>').join(''):'<tr><td class=muted>none</td></tr>';
+  const wg=se.worldgen||{cloudModels:[],guest:{}};
+  $('cloudModels').value=wg.cloudModels.join('\\n'); $('worldView').value=se.worldView;
+  $('gBrowser').checked=!!wg.guest.browser; $('gServer').checked=!!wg.guest.server; $('gCloud').checked=!!wg.guest.cloud;
+  const all=[...new Set([se.generator.effective.model,...wg.cloudModels].filter(Boolean))];
+  $('gModels').innerHTML=all.map(m=>'<label class="check"><input type="checkbox" value="'+esc(m)+'"'+(wg.guest.cloudModels.includes(m)?' checked':'')+'> '+esc(m)+'</label>').join('');
+  $('gModelsBox').hidden=!wg.guest.cloud;
+  $('ttsEngine').value=se.ttsEngine;
+  $('voices').innerHTML=se.voices.map(v=>'<tr data-v="'+v.id+'"><td><b>'+v.id+'</b></td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
+  $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td class="muted">'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td class="muted">'+esc(g.model)+'</td><td>'+(g.ok?'<span class="pill ok">'+(g.ms/1000).toFixed(1)+' s</span> '+esc(g.title||''):'<span class="pill bad">failed</span> <span class="muted">'+esc(g.error||'')+'</span>')+'</td></tr>').join(''):'<tr><td colspan="4" class="empty">None since the server started.</td></tr>';
+  $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td><b>'+esc(g.title)+'</b><br><span class="muted">'+esc(g.prompt)+(g.model?' · '+esc(g.model):'')+'</span></td><td class="muted" style="white-space:nowrap">'+new Date(g.at).toLocaleDateString()+'</td><td><div class="acts">'+(g.link?'<a class="btn primary" href="'+g.link.replace('/app/#','/app/?play=1#')+'" target="_blank">Play</a><a class="btn" href="'+g.builder+'" target="_blank">Edit</a><a class="btn" href="'+g.link.replace('/app/#','/app/?dev=1#')+'" target="_blank">Dev</a>':'')+'<button class="btn danger" data-del="'+esc(g.file)+'">Delete</button></div></td></tr>').join(''):'<tr><td colspan="3" class="empty">No saved worlds yet.</td></tr>';
 }
-document.addEventListener('change',e=>{ const k=e.target.dataset.prov; if(!k) return; document.querySelector('[data-urlbox="'+k+'"]').hidden=e.target.value!=='custom';
+// the side menu follows the scroll
+const io=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ document.querySelectorAll('aside.side a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id)); } },{rootMargin:'-30% 0px -60% 0px'});
+document.querySelectorAll('main section').forEach(s=>io.observe(s));
+document.addEventListener('change',e=>{ if(e.target.id==='gCloud') $('gModelsBox').hidden=!e.target.checked;
+  const k=e.target.dataset.prov; if(!k) return; document.querySelector('[data-urlbox="'+k+'"]').hidden=e.target.value!=='custom';
   const def=S.settings.defaults?.[k]||{}, m=document.querySelector('input[data-k="'+k+'"][data-f="model"]'); m.placeholder=e.target.value==='openai'?def.openai||'':e.target.value==='local'?'(local default)':def.openrouter||''; });
 document.addEventListener('click',async e=>{
-  const t=e.target, save=t.dataset.save, test=t.dataset.test, clear=t.dataset.clear, del=t.dataset.del;
-  const sk=t.dataset.savekey||t.dataset.clearkey;
+  const t=e.target.closest('button'); if(!t) return;
+  const save=t.dataset.save, test=t.dataset.test, clear=t.dataset.clear, del=t.dataset.del, sk=t.dataset.savekey||t.dataset.clearkey;
   if(sk){ const keys={}; if(t.dataset.clearkey) keys['clear_'+sk]=true; else keys[sk]=document.querySelector('input[data-key="'+sk+'"]').value;
-    const r=await post('/api/admin/settings',{keys}); if(r.ok){ S.settings=r.settings; render(); } $('kmsg_'+sk).textContent=r.ok?'saved':'failed: '+(r.error||r.status); }
+    saved(await post('/api/admin/settings',{keys}),'Key'); }
   if(save||clear){ const k=save||clear, patch={}; patch[k]={}; for(const i of document.querySelectorAll('input[data-k="'+k+'"]')) patch[k][i.dataset.f]=i.value; if(clear) patch[k].clearKey=true;
     const pv=document.querySelector('select[data-prov="'+k+'"]').value; patch[k].baseURL=pv==='custom'?patch[k].url:pv; delete patch[k].url;
-    const r=await post('/api/admin/settings',patch); $('msg_'+k).textContent=r.ok?'saved':'failed: '+(r.error||r.status); if(r.ok){ S.settings=r.settings; render(); $('msg_'+k).textContent='saved'; } }
-  if(test){ $('msg_'+test).textContent='testing…'; const r=await post('/api/admin/test',{which:test}); $('msg_'+test).innerHTML=r.ok?'<span class=ok>ok in '+(r.ms/1000).toFixed(1)+'s: '+esc(r.text)+'</span>':'<span class=bad>'+esc(r.error)+'</span>'; }
-  if(del){ e.preventDefault(); if(!confirm('Delete '+del+'?')) return; const r=await post('/api/admin/generated',{remove:del}); if(r.ok) load(); }
+    saved(await post('/api/admin/settings',patch),'Endpoint'); }
+  if(test){ $('msg_'+test).textContent='testing…'; t.disabled=true; const r=await post('/api/admin/test',{which:test}); t.disabled=false; $('msg_'+test).innerHTML=r.ok?'<span class="pill ok">ok in '+(r.ms/1000).toFixed(1)+' s</span> '+esc(r.text):'<span class="pill bad">failed</span> '+esc(r.error); }
+  if(del){ if(!confirm('Delete '+del+'? This cannot be undone.')) return; const r=await post('/api/admin/generated',{remove:del}); if(r.ok){ toast('Deleted'); load(); } else toast('Could not delete',true); }
 });
-$('saveView').onclick=async()=>{ const r=await post('/api/admin/settings',{worldView:$('worldView').value}); $('viewMsg').textContent=r.ok?'saved':'failed'; };
-$('saveTts').onclick=async()=>{ const r=await post('/api/admin/settings',{ttsEngine:$('ttsEngine').value}); $('ttsMsg').textContent=r.ok?'saved':'failed'; };
-$('saveVoices').onclick=async()=>{ const v=[...document.querySelectorAll('#voices tr')].map(tr=>({id:tr.dataset.v,gender:tr.querySelector('select').value,description:tr.querySelector('input').value}));
-  const r=await post('/api/admin/settings',{voices:v}); $('voiceMsg').textContent=r.ok?'saved':'failed'; };
-$('pwSave').onclick=async()=>{ const r=await post('/api/admin/password',{current:$('pwCur').value,next:$('pwNew').value}); $('pwMsg').textContent=r.ok?'changed':(r.error||'failed'); if(r.ok){ $('pwCur').value=$('pwNew').value=''; load(); } };
+$('saveBuilder').onclick=async()=>{ const cloudModels=$('cloudModels').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+  const guest={browser:$('gBrowser').checked,server:$('gServer').checked,cloud:$('gCloud').checked,cloudModels:[...$('gModels').querySelectorAll('input:checked')].map(i=>i.value)};
+  saved(await post('/api/admin/settings',{worldgen:{cloudModels,guest},worldView:$('worldView').value}),'World builder settings'); };
+$('saveSpeech').onclick=async()=>{ const v=[...document.querySelectorAll('#voices tr')].map(tr=>({id:tr.dataset.v,gender:tr.querySelector('select').value,description:tr.querySelector('input').value}));
+  saved(await post('/api/admin/settings',{ttsEngine:$('ttsEngine').value,voices:v}),'Speech settings'); };
+$('pwSave').onclick=async()=>{ const r=await post('/api/admin/password',{current:$('pwCur').value,next:$('pwNew').value}); if(r.ok){ toast('Password changed'); $('pwCur').value=$('pwNew').value=''; load(); } else toast(r.error||'Could not change it',true); };
 $('logout').onclick=async()=>{ await post('/api/admin/logout'); load(); };
 $('lf').onsubmit=async e=>{ e.preventDefault(); const r=await post('/api/admin/login',{password:e.target.pw.value}); if(r.ok) load(); else $('lerr').textContent=r.error||'failed'; };
 load();

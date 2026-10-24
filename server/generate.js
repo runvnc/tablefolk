@@ -140,7 +140,7 @@ export async function worldgenOptions(req) {
   const cloudAll = [...new Set([config.generator.model, ...wg.cloudModels].filter(Boolean))];
   const local = await localModels();
   const where = [];
-  if (admin || g.browser) where.push({ id: 'browser', label: 'In this browser', note: 'free, private; downloads the model once', models: BROWSER_MODELS.map(([id, label]) => ({ id, label })) });
+  if (admin || g.browser) where.push({ id: 'browser', label: 'In this browser', note: 'free and private: Gemma runs on your own GPU (the game downloads it once)', models: BROWSER_MODELS.map(([id, label]) => ({ id, label })) });
   if ((admin || g.server) && (local?.length || admin)) where.push({ id: 'server', label: 'On this server', note: local ? 'the local model server' : 'the local model server is not running', models: (local?.length ? local : [endpoint('local', '', '', '').model]).map(id => ({ id, label: id })), down: !local });
   if (admin || g.cloud) {
     const models = admin ? cloudAll : g.cloudModels.length ? g.cloudModels : [config.generator.model];
