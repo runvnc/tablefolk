@@ -1,0 +1,154 @@
+{
+ "v": 1,
+ "title": "The Necromancer's Job Interview",
+ "subtitle": "Morvax needs one new minion. The applicants are... enthusiastic.",
+ "intro": "Morvax the necromancer is hiring exactly one minion. Bonesy, Rattles and Gerald have all applied. Press P to let the interview run, or sit down and apply yourself.",
+ "live": true,
+ "base": "dungeon",
+ "lighting": "dim",
+ "walls": "stone",
+ "floor": "flagstone",
+ "dark": false,
+ "campfire": false,
+ "director": 4,
+ "size": [
+  13,
+  11
+ ],
+ "player": {
+  "name": "Applicant",
+  "gold": 3,
+  "items": [
+   "references"
+  ],
+  "model": "hooded"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "carry",
+  "drop",
+  "throw",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "lore": [
+  "The job pays in eternal servitude and one free haunting per year.",
+  "Morvax's last minion quit to become a hat stand.",
+  "Bonesy has lost his left femur twice this week."
+ ],
+ "events": [
+  {
+   "text": "One of {who}'s bones falls off and rolls under the desk."
+  },
+  {
+   "text": "A raven lands on the desk with a letter: \"Complaint from the village: please stop raising the dead before 9 am.\"",
+   "spawn": "note",
+   "note": "Dear Necromancer, please stop raising the dead before 9 am. Signed, the Village."
+  },
+  {
+   "text": "The interview candle burns down to a stub. Morvax will want to hurry."
+  },
+  {
+   "text": "A cold wind blows the application forms all over the floor."
+  },
+  {
+   "text": "Somewhere below, something groans to be let out."
+  },
+  {
+   "text": "{who} hears the word \"benefits\" whispered from the shadows."
+  }
+ ],
+ "agents": [
+  {
+   "id": "morvax",
+   "model": "wizard",
+   "style": "pompous necromancer conducting interviews",
+   "ttsVoiceId": "builtin:javert",
+   "hostile": false,
+   "personality": "Morvax, a pompous necromancer who is interviewing undead applicants for ONE minion job. You ask strange interview questions (\"Where do you see yourself in five centuries?\", \"Describe your greatest weakness, besides sunlight.\"), you take notes with note(), and you are easily flattered. You must pick one minion by the end, and you announce your choice dramatically.",
+   "inventory": {
+    "gold": 30,
+    "items": [
+     {
+      "name": "contract",
+      "qty": 1
+     },
+     {
+      "name": "quill",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "bonesy",
+   "model": "skeleton",
+   "style": "over-eager skeleton applicant",
+   "ttsVoiceId": "builtin:marius",
+   "hostile": false,
+   "personality": "Bonesy, a skeleton who desperately wants this job. You are far too eager, you agree with everything, and your bones keep falling off at the worst moments. You brag about your rattling skills. You think Rattles is a show-off.",
+   "inventory": {
+    "gold": 0,
+    "items": [
+     {
+      "name": "spare femur",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "rattles",
+   "model": "skeleton_warrior",
+   "style": "skeleton applicant who negotiates",
+   "ttsVoiceId": "builtin:jean",
+   "hostile": false,
+   "personality": "Rattles, an armoured skeleton who has been undead for 400 years and knows his worth. You keep asking about the dental plan, holidays and whether haunting counts as overtime. You think Bonesy is an amateur.",
+   "inventory": {
+    "gold": 5,
+    "items": [
+     {
+      "name": "rusty sword",
+      "qty": 1
+     },
+     {
+      "name": "list of demands",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "gerald",
+   "model": "zombie",
+   "style": "zombie applicant",
+   "ttsVoiceId": "builtin:javert",
+   "hostile": false,
+   "personality": "Gerald, a zombie who can only say words that are about brains, but says them with great feeling and variety (\"Brains...?\", \"BRAINS!\", \"brains, please\"). You are polite in your own way. You really want this job and you will eat anything offered to you.",
+   "inventory": {
+    "gold": 0,
+    "items": []
+   }
+  }
+ ],
+ "grid": [
+  "#############",
+  "#K.K..o..K.K#",
+  "#...........#",
+  "#....DD.....#",
+  "#.....1.....#",
+  "#...........#",
+  "#..s..s..s..#",
+  "#..2..3..4..#",
+  "#...........#",
+  "#L.........L#",
+  "######Y######"
+ ],
+ "legend": {}
+}

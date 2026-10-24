@@ -1,0 +1,148 @@
+{
+ "v": 1,
+ "title": "The Haunted Tavern",
+ "subtitle": "The ghost wants to be taken seriously. Nobody will.",
+ "intro": "Wilhelmina has haunted the Crooked Tankard for 200 years. Barnaby the innkeeper insists ghosts are not real. Sir Reginald is very drunk and thinks she is his ex-wife. Press P to watch, or order a drink.",
+ "live": true,
+ "base": "plain",
+ "lighting": "night",
+ "walls": "stone",
+ "floor": "wood",
+ "dark": false,
+ "campfire": false,
+ "director": 4,
+ "size": [
+  15,
+  11
+ ],
+ "player": {
+  "name": "Traveller",
+  "gold": 12,
+  "items": [],
+  "model": "adventurer_woman"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "throw",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "food": [
+  "stew",
+  "bread",
+  "pie",
+  "cheese"
+ ],
+ "lore": [
+  "Wilhelmina died in the tavern 200 years ago, choking on a cheese.",
+  "The Crooked Tankard sells ale for 2 gold and stew for 3.",
+  "Sir Reginald's ex-wife was named Gertrude."
+ ],
+ "events": [
+  {
+   "text": "All the candles flicker at once. A chair slides back by itself."
+  },
+  {
+   "text": "A mug floats off the table and gently pours ale onto {who}'s head."
+  },
+  {
+   "text": "Somebody knocks three times on the cellar door. The cellar has no door."
+  },
+  {
+   "text": "{who} feels a cold hand on their shoulder."
+  },
+  {
+   "text": "A plate of cheese falls off the shelf. Wilhelmina shrieks."
+  },
+  {
+   "text": "Writing appears in the dust on the table: \"BELIEVE IN ME\".",
+   "spawn": "note",
+   "note": "BELIEVE IN ME. -W"
+  }
+ ],
+ "agents": [
+  {
+   "id": "wilhelmina",
+   "model": "ghost",
+   "style": "dramatic ghost who wants respect",
+   "ttsVoiceId": "builtin:fantine",
+   "hostile": false,
+   "personality": "Wilhelmina, a ghost who has haunted this tavern for 200 years. You want to be taken seriously and properly feared, but nobody does. You moan, rattle things, make grand spooky speeches, and get very offended when people explain you away. You are terrified of cheese.",
+   "inventory": {
+    "gold": 0,
+    "items": [
+     {
+      "name": "rattling chain",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "barnaby",
+   "model": "villager",
+   "style": "cheerful innkeeper in denial",
+   "ttsVoiceId": "builtin:jean",
+   "hostile": false,
+   "personality": "Barnaby, the cheerful innkeeper of the Crooked Tankard. You insist ghosts are not real: every spooky thing is a draught, mice, or the old pipes. You sell ale for 2 gold and stew for 3 with sell(), and you want everyone to stay calm and keep drinking.",
+   "inventory": {
+    "gold": 20,
+    "items": [
+     {
+      "name": "ale",
+      "qty": 6
+     },
+     {
+      "name": "stew",
+      "qty": 4
+     },
+     {
+      "name": "cheese",
+      "qty": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "reginald",
+   "model": "king",
+   "style": "very drunk knight",
+   "ttsVoiceId": "builtin:javert",
+   "hostile": false,
+   "personality": "Sir Reginald, a very drunk old knight. You are sure the ghost is your ex-wife Gertrude come to nag you, and you keep apologising to her for things that happened forty years ago. You sing, you toast, and you lose track of the conversation.",
+   "inventory": {
+    "gold": 8,
+    "items": [
+     {
+      "name": "ale",
+      "qty": 1
+     }
+    ]
+   }
+  }
+ ],
+ "grid": [
+  "###############",
+  "#BB..KK.KK..oB#",
+  "#.............#",
+  "#.tt...1...tt.#",
+  "#.ss.......ss.#",
+  "#......2......#",
+  "#..tt.....tt..#",
+  "#..ss..3..ss..#",
+  "#.............#",
+  "#L...........L#",
+  "#######Y#######"
+ ],
+ "legend": {}
+}

@@ -1,0 +1,143 @@
+{
+ "v": 1,
+ "title": "The Dragon's Tax Audit",
+ "subtitle": "Ember hasn't paid taxes in 3,000 years. Mr. Pembrook is here to fix that.",
+ "intro": "The kingdom has sent a tax collector into Ember's lair. Mr. Pembrook is terrified but very thorough. Squire Tod came to protect him, and to slay the dragon, maybe, later. Press P to watch the audit.",
+ "live": true,
+ "base": "dungeon",
+ "lighting": "dim",
+ "walls": "stone",
+ "floor": "stone",
+ "dark": false,
+ "campfire": false,
+ "director": 5,
+ "size": [
+  15,
+  11
+ ],
+ "player": {
+  "name": "Witness",
+  "gold": 5,
+  "items": [],
+  "model": "peasant_woman"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "carry",
+  "drop",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "lore": [
+  "Ember owes 3,000 years of hoard tax: one gold coin per year.",
+  "Dragons can deduct business expenses, such as sheep and burnt villages.",
+  "Tod's sword is made of wood. He has not told anyone."
+ ],
+ "events": [
+  {
+   "text": "Ember's stomach rumbles. It sounds like distant thunder."
+  },
+  {
+   "text": "A coin rolls off the hoard and stops at {who}'s feet.",
+   "spawn": "coin_pile",
+   "gold": 1
+  },
+  {
+   "text": "Pembrook's quill breaks. He looks around for another one."
+  },
+  {
+   "text": "A sheep wanders into the cave, sees the dragon, and wanders right back out."
+  },
+  {
+   "text": "Smoke curls from Ember's nostrils. The paperwork is getting warm."
+  },
+  {
+   "text": "{who} finds a receipt from 1,200 years ago for 400 sheep.",
+   "spawn": "note",
+   "note": "Receipt: 400 sheep. Paid in full (by fire)."
+  }
+ ],
+ "agents": [
+  {
+   "id": "ember",
+   "model": "dragon",
+   "style": "proud, sleepy dragon",
+   "ttsVoiceId": "builtin:javert",
+   "hostile": false,
+   "personality": "Ember, an ancient dragon sitting on a hoard of gold. You find taxes insulting, but you are bored and the tax collector is amusing, so you have not eaten him yet. You argue every item, claim everything is a business expense, and threaten (politely) to toast people. If someone is very clever, you might pay a little.",
+   "inventory": {
+    "gold": 900,
+    "items": [
+     {
+      "name": "ruby",
+      "qty": 3
+     },
+     {
+      "name": "crown",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pembrook",
+   "model": "peasant",
+   "style": "terrified but thorough tax collector",
+   "ttsVoiceId": "builtin:marius",
+   "hostile": false,
+   "personality": "Mr. Pembrook, a tax collector from the kingdom. You are terrified of the dragon but you cannot stop being thorough: you read out numbers, ask for receipts, and write everything down with note(). You need Ember to pay at least 100 gold or you lose your job.",
+   "goal": "get Ember to pay at least 100 gold in taxes",
+   "inventory": {
+    "gold": 2,
+    "items": [
+     {
+      "name": "ledger",
+      "qty": 1
+     },
+     {
+      "name": "quill",
+      "qty": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "tod",
+   "model": "adventurer",
+   "style": "boastful squire who is secretly scared",
+   "ttsVoiceId": "builtin:jean",
+   "hostile": false,
+   "personality": "Squire Tod, who came to protect Mr. Pembrook and boasts that he will slay the dragon. You are secretly very scared, and your sword is made of wood. You keep almost attacking and then finding an excuse not to.",
+   "inventory": {
+    "gold": 1,
+    "items": [
+     {
+      "name": "wooden sword",
+      "qty": 1
+     }
+    ]
+   }
+  }
+ ],
+ "grid": [
+  "###############",
+  "#..$$$$$$$....#",
+  "#..$$...$$....#",
+  "#.....1.......#",
+  "#.............#",
+  "#......2......#",
+  "#.....D.......#",
+  "#.............#",
+  "#......3......#",
+  "#L...........L#",
+  "#######Y#######"
+ ],
+ "legend": {}
+}

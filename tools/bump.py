@@ -15,13 +15,14 @@ REFS = ['app/preflight.js', 'app/index.html', 'server/generate.js', 'app/worldge
        ['app/llm_js/' + f for f in os.listdir(os.path.join(ROOT, 'app/llm_js')) if f.endswith('.js')]
 today = datetime.date.today().strftime('%Y%m%d')
 def nextv(cur):
-    if cur.startswith(today) and len(cur) > 8:
+    # never go back: a version already in use (by date) keeps counting up
+    if len(cur) > 8 and cur[:8].isdigit() and cur[:8] >= today:
         suf = cur[8:]
         n = 0
         for ch in suf: n = n * 26 + (ord(ch) - 96)
         n += 1; out = ''
         while n: n, r = divmod(n - 1, 26); out = chr(97 + r) + out
-        return today + out
+        return cur[:8] + out
     return today + 'a'
 changed = set()
 def bump(name):

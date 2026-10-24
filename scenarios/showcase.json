@@ -1,0 +1,72 @@
+[
+ {
+  "file": "goblin-bakery.json",
+  "title": "The Goblin Bakery",
+  "pitch": "Grub's secret pie recipe is gone and everyone is a suspect.",
+  "who": [
+   "goblin",
+   "witch",
+   "peasant"
+  ],
+  "tags": [
+   "lives on its own",
+   "mystery"
+  ]
+ },
+ {
+  "file": "necromancer-interview.json",
+  "title": "The Necromancer's Job Interview",
+  "pitch": "One job, three undead applicants, one very pompous boss.",
+  "who": [
+   "wizard",
+   "skeleton",
+   "zombie"
+  ],
+  "tags": [
+   "lives on its own",
+   "comedy"
+  ]
+ },
+ {
+  "file": "goblin-builders.json",
+  "title": "The Goblin Construction Crew",
+  "pitch": "Wall in the treasure before the knight arrives. They build, they dig, they argue.",
+  "who": [
+   "goblin",
+   "kobold",
+   "orc"
+  ],
+  "tags": [
+   "they build and dig",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "dragon-tax-audit.json",
+  "title": "The Dragon's Tax Audit",
+  "pitch": "A terrified tax collector, a dragon who owes 3,000 years, a squire with a wooden sword.",
+  "who": [
+   "dragon",
+   "peasant",
+   "adventurer"
+  ],
+  "tags": [
+   "haggling",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "haunted-tavern.json",
+  "title": "The Haunted Tavern",
+  "pitch": "The ghost wants respect. The innkeeper blames the pipes. The knight thinks she's his ex-wife.",
+  "who": [
+   "ghost",
+   "villager",
+   "king"
+  ],
+  "tags": [
+   "lives on its own",
+   "comedy"
+  ]
+ }
+]

@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const [url, out, wait = '9000'] = process.argv.slice(2);
+const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = await b.contexts()[0].newPage();
+await page.setViewportSize({ width: 1366, height: 800 });
+await page.goto(url); await page.waitForTimeout(+wait);
+const canvas = await page.evaluate(() => { try { return document.getElementById('renderCanvas').toDataURL('image/jpeg', .8); } catch { return null; } });
+await page.screenshot({ path: out });
+if (canvas) (await import('fs')).writeFileSync(out.replace(/\.png$/, '-3d.jpg'), Buffer.from(canvas.split(',')[1], 'base64'));
+console.log(await page.evaluate(() => [...document.querySelectorAll('.toast, #scenarioBanner, .scn-overlay, #modelConsent')].filter(e => e.offsetParent).map(e => e.id + ': ' + e.textContent.trim().slice(0, 200))));
+await page.close(); await b.close();

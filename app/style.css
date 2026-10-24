@@ -511,3 +511,28 @@ html:fullscreen #ttBar { display:none; }
 #sightCard img { display:block; width:100%; aspect-ratio:448/320; object-fit:cover; }
 #sightCard figcaption { padding:.5rem .7rem; color:#f1e6cf; font-size:13px; line-height:1.4; }
 #sightCard b { color:#ffd98a; }
+/* welcome.js: pick a world */
+#welcome { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(8,10,12,.62); backdrop-filter:blur(6px); }
+#welcome[hidden] { display:none; }
+#welcome .wl-card { position:relative; width:min(980px,100%); max-height:100%; overflow:auto; background:#1b1814; color:#efe6d6; border:1px solid rgba(255,220,160,.18); border-radius:20px; padding:28px 30px 22px; box-shadow:0 24px 70px rgba(0,0,0,.55); }
+#welcome header h1 { margin:0 0 6px; font:700 30px/1.1 Georgia,serif; color:#ffd98a; letter-spacing:.01em; }
+#welcome header p { margin:0 0 20px; color:#cbbfa9; max-width:64ch; line-height:1.5; }
+#welcome kbd { font:700 12px ui-monospace,monospace; padding:1px 6px; border:1px solid #6b5b45; border-radius:5px; }
+#welcome .wl-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; }
+#welcome .wl-world { display:flex; flex-direction:column; gap:6px; text-align:left; padding:14px; border-radius:14px; border:1px solid rgba(255,220,160,.16); background:linear-gradient(180deg,rgba(255,220,160,.07),rgba(255,220,160,.02)); color:inherit; font:inherit; cursor:pointer; transition:transform .12s, border-color .12s, background .12s; }
+#welcome .wl-world:hover, #welcome .wl-world:focus-visible { transform:translateY(-2px); border-color:rgba(255,217,138,.6); background:linear-gradient(180deg,rgba(255,220,160,.13),rgba(255,220,160,.04)); outline:none; }
+#welcome .wl-who { display:flex; gap:0; height:76px; align-items:flex-end; overflow:hidden; margin:-4px -6px 0; }
+#welcome .wl-who img { height:120px; width:auto; margin:0 -22px -16px; filter:drop-shadow(0 3px 4px rgba(0,0,0,.45)); }
+#welcome .wl-who img:first-child { margin-left:-14px; }
+#welcome .wl-world b { font-size:16px; color:#fff3dc; }
+#welcome .wl-pitch { font-size:13.5px; color:#cbbfa9; line-height:1.4; }
+#welcome .wl-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+#welcome .wl-tags i { font-style:normal; font-size:11px; padding:1px 7px; border-radius:999px; background:rgba(255,217,138,.13); color:#ffd98a; }
+#welcome footer { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:20px; color:#9d917d; font-size:12.5px; }
+#welcome .wl-build { padding:.55rem 1rem; border-radius:10px; background:#d9ae6f; color:#1b1814; font-weight:700; text-decoration:none; font-size:14px; }
+#welcome .wl-build:hover { background:#e7c48e; }
+#welcome .wl-x { position:absolute; top:12px; right:14px; width:34px; height:34px; border-radius:50%; border:0; background:rgba(255,255,255,.06); color:#cbbfa9; font-size:20px; cursor:pointer; }
+#welcome .wl-x:hover { background:rgba(255,255,255,.14); }
+.worlds-btn { margin-left:8px; padding:4px 12px; border-radius:999px; border:1px solid rgba(255,214,140,.4); background:rgba(255,200,110,.1); color:#ffe2ad; font-weight:700; font-size:12px; cursor:pointer; }
+.worlds-btn:hover { background:rgba(255,200,110,.22); }
+@media (max-width:600px) { #welcome .wl-card { padding:20px 16px; } #welcome header h1 { font-size:24px; } }

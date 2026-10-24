@@ -1,0 +1,133 @@
+{
+ "v": 1,
+ "title": "The Goblin Construction Crew",
+ "subtitle": "Wall in the treasure before the knight arrives. How hard can it be?",
+ "intro": "The goblin boss has ordered a wall built around the treasure chest before Sir Dudley the knight arrives. Foreman Gizzard has a plan. Nib would rather dig. Brick does exactly what he is told. Press P to watch them work.",
+ "live": true,
+ "base": "plain",
+ "lighting": "bright",
+ "walls": "stone",
+ "floor": "grass",
+ "campfire": false,
+ "director": 4,
+ "size": [
+  15,
+  11
+ ],
+ "player": {
+  "name": "Inspector",
+  "gold": 10,
+  "items": [],
+  "model": "farmer"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "build",
+  "dig",
+  "carry",
+  "drop",
+  "throw",
+  "give",
+  "remember",
+  "feel",
+  "repair"
+ ],
+ "lore": [
+  "The treasure chest holds the boss's lunch, not gold. Only the boss knows.",
+  "Sir Dudley the knight is coming to take the treasure.",
+  "Goblins build a wall with build(wall), and break one with dig()."
+ ],
+ "events": [
+  {
+   "text": "A messenger runs past shouting: \"The knight is coming! He's very shiny!\""
+  },
+  {
+   "text": "A trumpet sounds far away. Sir Dudley is getting closer."
+  },
+  {
+   "text": "{who} steps on a rake. It does not go well."
+  },
+  {
+   "text": "It starts to rain. Mud everywhere."
+  },
+  {
+   "text": "A crow lands on the chest and stares at {who}."
+  },
+  {
+   "text": "The boss shouts from somewhere: \"WHY IS THERE A HOLE?\""
+  },
+  {
+   "text": "A pile of stones tumbles over next to {who}."
+  }
+ ],
+ "agents": [
+  {
+   "id": "gizzard",
+   "model": "goblin",
+   "style": "bossy goblin foreman",
+   "ttsVoiceId": "builtin:jean",
+   "hostile": false,
+   "personality": "Gizzard, a goblin foreman who must wall in the treasure chest before the knight arrives. You give loud orders to Nib and Brick, you take credit for everything, and you panic whenever the knight is mentioned. You build walls yourself with build(wall) when nobody listens.",
+   "goal": "build walls around the treasure chest before the knight arrives"
+  },
+  {
+   "id": "nib",
+   "model": "kobold",
+   "style": "kobold who loves digging",
+   "ttsVoiceId": "builtin:marius",
+   "hostile": false,
+   "personality": "Nib, a small kobold on the building crew who would much rather dig than build. You keep suggesting tunnels, moats and secret holes. You dig with dig() whenever you get the chance and you are very proud of your holes.",
+   "goal": "dig a tunnel to somewhere exciting"
+  },
+  {
+   "id": "brick",
+   "model": "orc",
+   "style": "literal-minded orc labourer",
+   "ttsVoiceId": "builtin:javert",
+   "hostile": false,
+   "personality": "Brick, a huge, gentle orc labourer who takes every order exactly literally. If told to build a wall, you build one right where you stand. If told to carry something, you carry it. You speak slowly and you love lunch.",
+   "inventory": {
+    "gold": 0,
+    "items": [
+     {
+      "name": "sandwich",
+      "qty": 1
+     }
+    ]
+   }
+  }
+ ],
+ "grid": [
+  "...............",
+  ".%.........%...",
+  "...............",
+  ".....r.....C...",
+  "...............",
+  "...............",
+  "...1.......2...",
+  "...............",
+  ".B.....3.....f.",
+  "...............",
+  ".......Y......."
+ ],
+ "legend": {},
+ "objects": [
+  {
+   "type": "chest",
+   "x": 1,
+   "z": 0,
+   "gold": 0,
+   "items": [
+    "the boss's lunch"
+   ]
+  }
+ ],
+ "food": [
+  "sandwich",
+  "the boss's lunch"
+ ]
+}
