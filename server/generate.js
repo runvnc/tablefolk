@@ -137,7 +137,8 @@ function pickEndpoint(url) {
 // Run the generator; `emit(event, data)` reports progress.
 export async function generateScenario({ prompt, mode = 'auto', ep, emit = () => {} }) {
   const how = MODES[mode] ? `Use map method ${MODES[mode]}.` : 'Choose the map method that fits best.';
-  return runModel({ label: prompt, mode, ep, emit, maxTokens: 6000,
+  // reasoning models (deepseek) think at length before the JSON: room for both
+  return runModel({ label: prompt, mode, ep, emit, maxTokens: 17000,
     user: `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.` });
 }
 
@@ -156,7 +157,7 @@ export async function reviseScenario({ scenario, request, ep, emit = () => {} })
     + `\nObjects by type: ${Object.entries((kept.objects).reduce((m, o) => (m[o.type] = (m[o.type] || 0) + 1, m), {})).map(([t, n]) => t + ' ' + n).join(', ')}.`
     + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.` : '';
   const json = JSON.stringify(shown);
-  const maxTokens = Math.min(16000, Math.max(6000, Math.ceil(json.length / 2.5) + 2000));
+  const maxTokens = Math.min(24000, Math.max(17000, Math.ceil(json.length / 2.5) + 8000));
   const r = await runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens,
     user: `Here is a scenario:\n\n${json}${note}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.`,
     merge: big ? out => mergeKept(out, kept) : null });
@@ -173,7 +174,7 @@ function mergeKept(s, kept) {
 
 async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }) {
   const t0 = Date.now(), prompt = label;
-  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 240000 });
+  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 600000 });   // long thinking: up to 10 minutes
   const messages = [
     { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId "builtin:<name>"; match the character): ${voicesText()}.` },
     { role: 'user', content: user },
