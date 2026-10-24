@@ -62,6 +62,11 @@
   },
   {
    "text": "A pile of stones tumbles over next to {who}."
+  },
+  {
+   "text": "Sir Dudley the knight appears at the edge of the clearing, very shiny, and calls out: \"Who is in charge here?\"",
+   "round": 8,
+   "to": "gizzard"
   }
  ],
  "agents": [

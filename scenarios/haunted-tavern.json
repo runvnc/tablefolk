@@ -68,6 +68,11 @@
    "text": "Writing appears in the dust on the table: \"BELIEVE IN ME\".",
    "spawn": "note",
    "note": "BELIEVE IN ME. -W"
+  },
+  {
+   "text": "The clock strikes midnight. All the candles go out at once and Wilhelmina glows brightly: her spooky powers are at their strongest.",
+   "round": 8,
+   "to": "wilhelmina"
   }
  ],
  "agents": [

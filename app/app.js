@@ -2874,6 +2874,13 @@ function occupantAt(x,z,g){
   const bodies=[...state.characters.filter(c=>c!==g),...(state.playerAvatar && state.playerAvatar!==g ? [state.playerAvatar] : [])];
   return bodies.find(c=>{ const p=c.logicalPos||c.root.position; return Math.abs(p.x-x)<.6 && Math.abs(p.z-z)<.6; })||null;
 }
+// a character (or the player) by name, for walk(name)
+function whoByName(name,g){
+  const n=String(name||'').toLowerCase().replace(/^(the|to)\s+/,'').trim(); if(!n) return null;
+  const me=(document.getElementById('chatName')?.value||'').trim().toLowerCase();
+  if(state.playerAvatar && (n==='player'||n==='you'||(me&&n===me))) return state.playerAvatar;
+  return state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===n)||null;
+}
 function walk(g,destination){
   const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0]};
   const lp=g.logicalPos||new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
@@ -2884,7 +2891,10 @@ function walk(g,destination){
     const target=state.perceptionLabels?.get(key);
     // a place on a generated map (walk(tavern)): its free cell nearest the walker
     const place=(!target || target.isDisposed?.()) && window.tablefolkSenses?.placeTarget(destination.label,g);
+    // someone by name (walk(pembrook), walk(player)): beside them
+    const who=!place && (!target || target.isDisposed?.()) && whoByName(destination.label,g);
     if(place) destination={type:'coord',x:place.x,z:place.z,label:place.id};
+    else if(who){ const q=who.logicalPos||who.root.position; destination={type:'coord',x:Math.round(q.x),z:Math.round(q.z),label:who===state.playerAvatar?'the player':who.id}; }
     else {
     if(!target || target.isDisposed?.()) return say(g,`can't see map label ${destination.label}`);
     const p=target.getAbsolutePosition?.()||target.position;
@@ -3004,7 +3014,7 @@ function touch(g,targetId=''){
   if(m?.soft){ impulse(t,g.root.position,1.7,.45); say(g,'boing verified'); } 
   else { damage(t,.35,'touch'); say(g,'texture report: probably real'); } 
 }
-function push(g,sign=1){ const t=nearestTarget(g); if(!t) return say(g,'nothing to shove'); const from=sign>0?g.root.position:t.position.add(g.root.position.subtract(t.position).scale(2)); impulse(t,from,sign>0?4.8:2.2,.18); const m=meta(t); if(m?.type==='barrel') { m.state='rolling'; emitBadge(t,'roll'); } if(m?.type==='mushroom') emitBadge(t,'boing'); damage(t,.25,'push'); g.anim='push'; playRig(g,'push',false); say(g,sign>0?'helpfully pushing the wrong thing':'pulling with moral uncertainty'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); },540); }
+function push(g,sign=1){ const t=nearestTarget(g); if(!t) return say(g,'nothing to push here'); const from=sign>0?g.root.position:t.position.add(g.root.position.subtract(t.position).scale(2)); impulse(t,from,sign>0?4.8:2.2,.18); const m=meta(t); if(m?.type==='barrel') { m.state='rolling'; emitBadge(t,'roll'); } if(m?.type==='mushroom') emitBadge(t,'boing'); damage(t,.25,'push'); g.anim='push'; playRig(g,'push',false); say(g,`${g.id} ${sign>0?'pushes':'pulls'} the ${(m?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); },540); }
 // The nearest thing called `name` ("note", "the barrel", "pie recipe") that g
 // can see within `radius`; null if none.
 function namedThing(g,name,radius=10){
@@ -3036,7 +3046,7 @@ function carry(g,name=''){
   }
   return carryMesh(g,nearestTarget(g,1.8));
 }
-function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,'the note says: '+txt); } else { say(g,'I am responsible for this now'); } }
+function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot
@@ -3062,10 +3072,10 @@ function dropSpot(g,h){
   const stackTop=Math.max(top,...hits(p).map(b=>b.max.y));
   return new BABYLON.Vector3(p.x,stackTop+halfH-centerDy+.03,p.z);
 }
-function drop(g,thrown=false){ const h=state.held.get(g.id); if(!h) return say(g,'nothing in inventory except opinions'); state.held.delete(g.id); const dropAt=thrown ? null : dropSpot(g,h); endCarry(h,thrown ? h.position.clone() : dropAt, !thrown); if(thrown) h.physicsBody?.applyImpulse(g.dir.add(new BABYLON.Vector3(0,.28,0)).scale(4.4),h.position); playRig(g,thrown?'throw':'idle',false); say(g,thrown?'delivery by violence':'object released from custody'); setTimeout(()=>playRig(g,'idle',true),650); }
+function drop(g,thrown=false){ const h=state.held.get(g.id); if(!h) return say(g,`${g.id} is not carrying anything`); state.held.delete(g.id); const dropAt=thrown ? null : dropSpot(g,h); endCarry(h,thrown ? h.position.clone() : dropAt, !thrown); if(thrown) h.physicsBody?.applyImpulse(g.dir.add(new BABYLON.Vector3(0,.28,0)).scale(4.4),h.position); playRig(g,thrown?'throw':'idle',false); say(g,`${g.id} ${thrown?'throws':'puts down'} the ${(meta(h)?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>playRig(g,'idle',true),650); }
 // dig(north) / dig(wall to the east): turn that way first
-function dig(g,where=''){ const w=String(where||'').toLowerCase().match(/\b(north|south|east|west|n|s|e|w)\b/); if(w){ const d=FACING_DIRS[w[1][0]]; if(d) setCharacterFacing(g,new BABYLON.Vector3(...d)); } playRig(g,'dig',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,1.8); if(t && state.blocks.includes(t)){ damage(t,99,'dig'); say(g,'structural snack acquired'); } else { const p=g.root.position.add(g.dir.scale(1.0)); const hole=BABYLON.MeshBuilder.CreateCylinder('tiny_hole',{diameter:.55,height:.035,tessellation:12},state.scene); hole.position.set(Math.round(p.x),(state.terrainTopY??0)+.015,Math.round(p.z)); hole.material=state.materials.hole; tag(hole,'hole',{interactive:false}); state.props.push(hole); say(g,'hole installed'); } }
-function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,2.5); if(!t) return say(g,'repairing vibes'); const m=meta(t); if(!m) return; m.health=Math.max(m.health,2); if(m.state==='cracked'||m.state==='burned'){ m.state='intact'; if(m.material==='wood') t.material=state.materials.wood; else if(m.material==='stone') t.material=state.materials.stone; else t.material=state.materials.canvas; emitBadge(t,'fixed'); say(g,'I reversed entropy slightly'); } else say(g,'already too beautiful'); }
+function dig(g,where=''){ const w=String(where||'').toLowerCase().match(/\b(north|south|east|west|n|s|e|w)\b/); if(w){ const d=FACING_DIRS[w[1][0]]; if(d) setCharacterFacing(g,new BABYLON.Vector3(...d)); } playRig(g,'dig',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,1.8); if(t && state.blocks.includes(t)){ damage(t,99,'dig'); say(g,`${g.id} digs through the ${meta(t)?.type||'wall'}`); } else { const p=g.root.position.add(g.dir.scale(1.0)); const hole=BABYLON.MeshBuilder.CreateCylinder('tiny_hole',{diameter:.55,height:.035,tessellation:12},state.scene); hole.position.set(Math.round(p.x),(state.terrainTopY??0)+.015,Math.round(p.z)); hole.material=state.materials.hole; tag(hole,'hole',{interactive:false}); state.props.push(hole); say(g,`${g.id} digs a hole in the floor`); } }
+function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,2.5); if(!t) return say(g,'nothing to repair here'); const m=meta(t); if(!m) return; m.health=Math.max(m.health,2); if(m.state==='cracked'||m.state==='burned'){ m.state='intact'; if(m.material==='wood') t.material=state.materials.wood; else if(m.material==='stone') t.material=state.materials.stone; else t.material=state.materials.canvas; emitBadge(t,'fixed'); say(g,`${g.id} repairs the ${m.type}`); } else say(g,`the ${m.type} does not need repairing`); }
 
 function note(g,html='<p>empty note</p>'){
   if(!html || !String(html).trim()) html='<p>empty note</p>';
@@ -3094,7 +3104,7 @@ function build(g,thing='wall',at=null){
   if(thing==='crate') makeCrate(state.scene,x,z); else if(thing==='door') makeDoor(state.scene,x,z,{}); else makeBlock(state.scene,x,z,false);
   say(g,'built '+thing+' at ('+x+','+z+')'); updatePerceptionUI(); saveWorldState();
 }
-function panic(g){ g.anim='panic'; playRig(g,'panic',true); say(g,'I have promoted the floor to manager'); if(!isTurnMode()){ for(let i=0;i<5;i++) setTimeout(()=>{ const v=new BABYLON.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(); g.collider.physicsBody?.applyImpulse(v.scale(1.15),g.collider.position); },i*160); } else emitBadge(g,'panic'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); zeroMeshMotion(g.collider); },1050); }
+function panic(g){ g.anim='panic'; playRig(g,'panic',true); say(g,`${g.id} panics and runs in circles`); if(!isTurnMode()){ for(let i=0;i<5;i++) setTimeout(()=>{ const v=new BABYLON.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(); g.collider.physicsBody?.applyImpulse(v.scale(1.15),g.collider.position); },i*160); } else emitBadge(g,'panic'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); zeroMeshMotion(g.collider); },1050); }
 function emote(g,name){
   const valid=['dance','laugh','sit','wave','clap','cheer','sleep','bow'];
   name=String(name||'dance').toLowerCase().replace(/^["']|["']$/g,'').trim();
@@ -3127,7 +3137,9 @@ function emote(g,name){
     console.log('[emote]', g.id, name, '-> procedural bone drive (no rig clip on this character)');
   }
 }
-function setGoal(g,text){ const cfg=getBrainConfig(g.id); cfg.goal=text||''; setBrainConfig(g.id,cfg); say(g,text?`goal set: ${text}`:'goal cleared'); updatePerceptionUI(); }
+// the same goal again (small models re-set it every turn) is a wasted turn:
+// it is told so, and nothing changes
+function setGoal(g,text){ const cfg=getBrainConfig(g.id); text=String(text||'').replace(/^["']|["']$/g,'').trim(); if(text && String(cfg.goal||'').toLowerCase()===text.toLowerCase()) return say(g,`that is already your goal: now do something toward it`,false); cfg.goal=text||''; setBrainConfig(g.id,cfg); say(g,text?`goal set: ${text}`:'goal cleared'); updatePerceptionUI(); }
 // ---- inventories (shop) ----
 // A character's inventory lives in its brain config (so it is saved with the
 // world, in character snapshots and in recordings): {gold, items:[{name,
@@ -3223,25 +3235,54 @@ function comeOver(g){
   try{ walk(g,{type:'coord',x:Math.round(av.x),z:Math.round(av.z)}); }catch(e){ console.warn('comeOver',e); }
   return true;
 }
+// give(item) to the player, or give(item, pip) / give(item to pip) to another
+// character: it changes hands when g has it and the receiver is within reach
+// (g walks over first when they are in earshot). Saying it gives what it does
+// not have now fails, and says so (a pretend hand-over confused the others).
 function give(g,item){
-  item=String(item||'').trim();
+  item=String(item||'').trim().replace(/^["']|["']$/g,'');
   if(!item) return say(g,'give what, exactly?');
-  const recipient=document.getElementById('chatName')?.value.trim() || 'God';
-  // If the character actually has it, the item changes hands (scenarios like
-  // "get the jailer's key" rely on this); otherwise it's just said.
-  const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
+  const playerName=document.getElementById('chatName')?.value.trim() || 'God';
+  let to='', m=item.match(/^(.*?)\s*(?:,|\bto\b)\s*["']?([\w -]+?)["']?$/i);
+  if(m && m[2]){ item=m[1].trim().replace(/^["']|["']$/g,''); to=m[2].trim().toLowerCase(); }
+  const other=to && !['you','player','the player',playerName.toLowerCase()].includes(to) ? state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===to) : null;
+  if(to && !other && !['you','player','the player',playerName.toLowerCase()].includes(to)) return say(g,`give failed: there is nobody called ${to} here`);
+  const inv=charInventory(g);
+  // gold: give(50 gold), give(gold, pip)
+  const gm=item.match(/^(\d+)?\s*(?:gold|coins?|gold coins?)$/i);
+  if(gm){
+    const amt=Math.max(1,+(gm[1]||1)), have=+inv.gold||0;
+    if(have<amt) return say(g,`give failed: ${g.id} has only ${have} gold`);
+    if(other){ const oinv=charInventory(other); inv.gold=have-amt; oinv.gold=(+oinv.gold||0)+amt; setBrainConfig(g.id,{inventory:inv}); setBrainConfig(other.id,{inventory:oinv}); window.tablefolkMind?.event(other,'given',{who:g.id,what:amt+' gold'}); emitBadge(g,'gave '+amt+' gold'); return say(g,`${g.id} gives ${other.id} ${amt} gold`); }
+    if(state.playerAvatar && !comeOver(g)) return say(g,`give failed: ${playerName} is too far away; walk over to them first`);
+    inv.gold=have-amt; setBrainConfig(g.id,{inventory:inv}); state.player.gold=(+state.player.gold||0)+amt; inventoryChanged(); emitBadge(g,'gave '+amt+' gold');
+    return say(g,`${g.id} gives ${playerName} ${amt} gold`);
+  }
+  const stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
+  if(!stock) return say(g,`give failed: ${g.id} has no ${item} (it has ${inv.items.filter(i=>(i.qty??1)>0).map(i=>i.name).join(', ')||'nothing'})`);
+  if(other){
+    const a=g.logicalPos||g.root.position, b=other.logicalPos||other.root.position, d=Math.hypot(a.x-b.x,a.z-b.z);
+    if(d>GIVE_RANGE){
+      if(d>(state.earshot||6)) return say(g,`give failed: ${other.id} is too far away; walk over first`);
+      try{ walk(g,{type:'coord',x:Math.round(b.x),z:Math.round(b.z)}); }catch{}
+    }
+    stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
+    setBrainConfig(g.id,{inventory:inv});
+    const oinv=charInventory(other); addItem(oinv.items,stock.name); setBrainConfig(other.id,{inventory:oinv});
+    emitBadge(g,'gave '+stock.name);
+    window.tablefolkMind?.event(g,'gave',{item:stock.name,to:other.id}); window.tablefolkMind?.event(other,'given',{who:g.id,what:stock.name});
+    return say(g,`${g.id} gives ${other.id} ${stock.name}`);
+  }
+  const recipient=playerName;
   // Handing over needs the player within reach (when they have an avatar).
   const av=state.playerAvatar?.root?.position;
-  if(stock && av && !comeOver(g))
+  if(av && !comeOver(g))
     return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
-  if(stock){
-    stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
-    addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
-    emitBadge(g,'gave '+stock.name); inventoryChanged();
-    window.tablefolkMind?.event(g,'gave',{item:stock.name,to:recipient});
-    return say(g,`${g.id} gives ${recipient} ${stock.name}`);
-  }
-  return say(g,`${g.id} gives ${recipient} ${item}`);
+  stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
+  addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
+  emitBadge(g,'gave '+stock.name); inventoryChanged();
+  window.tablefolkMind?.event(g,'gave',{item:stock.name,to:recipient});
+  return say(g,`${g.id} gives ${recipient} ${stock.name}`);
 }
 // give_quest(text): to the player when they are in earshot (their quest
 // list, the Adventurer pane), else to a character beside it. A giver gives the
@@ -3264,8 +3305,8 @@ function giveQuest(g,text){
   if(!targets.length){ return say(g,'no one nearby to quest upon'); }
   const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI();
 }
-function castSpell(g,spell){ g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,'sparkles are a valid plan'); g.anim='idle'; playRig(g,'idle',true); },220); }
-  if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,'physics has been consulted'); g.anim='idle'; },220); return; }
+function castSpell(g,spell){ g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,`${g.id} casts a spark`); g.anim='idle'; playRig(g,'idle',true); },220); }
+  if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,`${g.id} casts push: everything nearby is shoved away`); g.anim='idle'; },220); return; }
   if(spell==='fireball'){ const target=nearestTarget(g,4.5); const hit=target?.getAbsolutePosition?.() || origin.add(g.dir.scale(3)); fireballVfx(origin.add(new BABYLON.Vector3(0,.85,0)),hit); setTimeout(()=>{ for(const m of state.props.concat(state.blocks)){ if(!m.isDisposed() && BABYLON.Vector3.Distance(hit,m.position)<2.25){ impulse(m,hit.add(new BABYLON.Vector3(0,.1,0)),7.2,.55); damage(m,meta(m)?.flammable?2:1,'fire'); } } for(const other of state.characters){ if(other!==g && BABYLON.Vector3.Distance(hit,other.root.position)<2.4){ other.anim='panic'; say(other,pickRandom(['hot weather attack','the sun is local now','why did you invite fire'])); setTimeout(()=>other.anim='idle',1100); } } say(g,pickRandom(['fireball is basically planning','wood is now bridge ingredients','careful fireball is still careful'])); g.anim='idle'; },420); }
 }
 function makeRing(pos,material){ const ring=BABYLON.MeshBuilder.CreateTorus('spell_ring',{diameter:.2,thickness:.028,tessellation:24},state.scene); ring.position=pos.add(new BABYLON.Vector3(0,.08,0)); ring.material=material; let s=.2; const obs=state.scene.onBeforeRenderObservable.add(()=>{ s+=.075; ring.scaling.set(s,s,s); ring.rotation.x+=.08; if(s>3.4){ ring.dispose(); state.scene.onBeforeRenderObservable.remove(obs); } }); }
@@ -3592,12 +3633,21 @@ function buildCommandExamples(g=null){
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
   if(allowed.has('sell')) ex.push('sell(item, price) e.g. sell("magic sword", 30) - sell an item from your inventory to the person you are chatting with for that many gold');
-  if(allowed.has('give')) ex.push('give(item) e.g. give(magic sword) - hand an item to the person you are chatting with');
+  if(allowed.has('give')) ex.push('give(item) e.g. give(magic sword) - hand an item to the player; give(item, name) to another character, e.g. give(bread, pip); give(10 gold, name) for money');
   if(allowed.has('wield')) ex.push('wield(item) e.g. wield(iron sword) - hold a weapon from your inventory; wield(none) puts it away');
   if(window.tablefolkSkills) ex.push(...window.tablefolkSkills.commandLines(g));
   if(allowed.has('workflow') && window.tablefolkWorkflows?.describe(g).length) ex.push('workflow(name, input) - start a routine that guides you step by step: '+window.tablefolkWorkflows.describe(g).join(', '));
   if(allowed.has('attack')) ex.push('attack(target) e.g. attack(player) or attack(gob1) - strike someone standing next to you (walk there first); only when you really mean to fight');
   return ex.length?ex:['walk("0,0")'];
+}
+// "You are Rattles: skeleton applicant who negotiates. You keep asking about
+// the dental plan, holidays and whether haunting counts as overtime."
+// (one of the personality's sentences about what it does, not its name)
+function inCharacter(id, style, personality){
+  const sents=String(personality).match(/[^.!?]+[.!?]+/g)||[String(personality)];
+  // a different trait each turn, so all of them come up
+  const traits=sents.slice(1).filter(x=>x.trim().length>25), pick=traits.length?traits[Math.floor(Math.random()*traits.length)]:sents[0];
+  return `you are ${id}${style?', '+style:''}. ${pick.trim()}`.slice(0,260);
 }
 function buildAgentPrompt(g, cfg) {
   if (!g || !cfg) return { systemMessage: '', commandReminder: '' };
@@ -3663,6 +3713,11 @@ function buildAgentPrompt(g, cfg) {
     // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
+    // Last, where a small model looks hardest: who it is. Its personality sits
+    // at the top of the system prompt; without this, characters drift into
+    // each other's voice within a few turns (everyone talking like the
+    // necromancer about "the architecture of despair").
+    ...(personality ? ['Stay yourself: ' + inCharacter(g.id, style, personality)] : []),
   ].join('\n');
   return { systemMessage, commandReminder };
 }

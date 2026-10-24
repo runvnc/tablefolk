@@ -62,6 +62,11 @@
    "text": "{who} finds a receipt from 1,200 years ago for 400 sheep.",
    "spawn": "note",
    "note": "Receipt: 400 sheep. Paid in full (by fire)."
+  },
+  {
+   "text": "A royal bell rings outside: the audit deadline is now. Ember must pay, or the royal auditors (all forty of them) will come in.",
+   "round": 8,
+   "to": "ember"
   }
  ],
  "agents": [

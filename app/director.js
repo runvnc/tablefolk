@@ -15,7 +15,9 @@
  * "note", "note": "Meet me at midnight."}], "{who}" being the character it
  * happens to. Then generic ones, by setting (indoors / outdoors / dungeon).
  * "director": false in a scenario turns it off; "director": 3 makes it
- * every 3 turns (default 5).
+ * every 3 turns (default 5). An event with "round": N happens once when the
+ * live rounds reach N, to the character "to" (or the first): turning points
+ * ("The candle is out: Morvax must choose now").
  *
  *   window.tablefolkDirector.tick(c)     live.js, after c's turn
  *   window.tablefolkDirector.now(text?)  make something happen now (tests, dev)
@@ -75,7 +77,7 @@
   }
   function pick() {
     const fresh = l => l.filter(e => !used.has(e.text));
-    const own = fresh(scnEvents);
+    const own = fresh(scnEvents.filter(e => !Number.isFinite(+e.round)));
     if (own.length && Math.random() < .7) return own[Math.floor(Math.random() * own.length)];
     let pool = fresh([...setting(), ...ANY]);
     if (!pool.length) { used = new Set(scnEvents.map(e => e.text)); pool = [...setting(), ...ANY]; }
@@ -132,8 +134,20 @@
   }
   // at most one event in 20 s, however fast turns go (skipped turns are fast)
   let lastAt = 0;
+  // Timed events ("events": [{"text": "...", "round": 8}]): once, when the
+  // live rounds reach it, whatever the clock says; the story's turning points
+  function timed() {
+    const r = window.tablefolkLive?.round || 0;
+    const ev = scnEvents.find(e => Number.isFinite(+e.round) && r >= +e.round && !used.has(e.text));
+    if (!ev) return false;
+    const who = ev.to ? state.characters.find(o => o.id === ev.to && !o.defeated) : null;
+    const target = who || state.characters.find(o => !o.defeated);
+    if (target) { happen(target, ev); lastAt = performance.now(); }
+    return true;
+  }
   function tick(c) {
     if (off || !state.characters?.length) return;
+    if (timed()) return;
     if (++turns % every) return;
     if (performance.now() - lastAt < 20000) { turns--; return; }
     lastAt = performance.now();

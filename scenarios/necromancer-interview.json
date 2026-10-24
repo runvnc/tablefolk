@@ -62,6 +62,11 @@
   },
   {
    "text": "{who} hears the word \"benefits\" whispered from the shadows."
+  },
+  {
+   "text": "The interview candle goes out. Morvax must announce, right now, which applicant gets the job, and why.",
+   "round": 8,
+   "to": "morvax"
   }
  ],
  "agents": [

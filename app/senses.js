@@ -146,7 +146,10 @@
     const inv = (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0).map(i => String(i.name || i));
     if (can.has('eat')) { const food = inv.find(n => window.tablefolkMind?.isFood?.(n)); if (food) out.push(`eat(${food})`); }
     const people = near.filter(t => t.kind !== 'thing' && t.d < 2.5);
-    if (can.has('give') && inv.length && people.length) out.push(`give(${inv[0]}) to ${people[0].name.replace(/ \(the player\)$/, '')}`);
+    // give(bun, pip): the receiver named (give(bun) alone goes to the player)
+    const to = people[0] && (people[0].kind === 'player' ? 'player' : people[0].id);
+    if (can.has('give') && to && inv.length) out.push(`give(${inv[0]}, ${to})`);
+    else if (can.has('give') && to && (+charInventory(g).gold || 0) >= 5) out.push(`give(5 gold, ${to})`);
     if (can.has('dig')) for (const [w, [dx, dz]] of Object.entries(DIRS)) {
       const b = (state.blocks || []).find(b => { const q = b.getAbsolutePosition?.() || b.position; return meta(b)?.type === 'wall' && Math.round(q.x) === px + dx && Math.round(q.z) === pz + dz; });
       if (b) { out.push(`dig(${w}) (breaks the wall ${w} of you)`); break; }

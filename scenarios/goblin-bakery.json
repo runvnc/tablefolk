@@ -65,6 +65,11 @@
   },
   {
    "text": "The bell over the door rings, but nobody comes in."
+  },
+  {
+   "text": "The town crier shouts through the window: \"The pie contest starts in one minute! Whoever has the best recipe wins a golden spoon!\"",
+   "round": 8,
+   "to": "grub"
   }
  ],
  "agents": [
