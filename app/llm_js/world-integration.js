@@ -1,7 +1,7 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261025a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261024a';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261025a';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025a';
+import { installDevConsole } from './dev-console.js?v=20261024a';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025c';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
@@ -603,9 +603,10 @@ async function main() {
     // its blows come from the routine, one a round)
     const enemy = !!window.tablefolkPlay?.isHostile(g);
     if (enemy && !(window.tablefolkPlay?.talksToo?.(g) && cfg.pendingChat?.length)) return false;
-    // look() twice in a row learns nothing new (small models loop on it): not
-    // on offer the turn after a look
-    const lookedLately = (world.getBrainConfig(g.id).recent || []).slice(-1).some(r => /\blook\b/.test(r));
+    // look() again so soon learns nothing new (small models loop on it, and
+    // with sight each look is a picture to describe): not on offer for three
+    // turns after one
+    const lookedLately = (world.getBrainConfig(g.id).recent || []).slice(-3).some(r => /\blook\b/.test(r));
     const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => (!enemy || c === 'say' || c === 'whisper' || c === 'emote') && !(lookedLately && c === 'look'));
     if (!world.isTurnReady()) { return false; }
     // Inside a workflow (workflows.js), the workflow drives the turn: it asks
@@ -767,14 +768,18 @@ async function main() {
       // ... and one that copies what someone else said lately (Pip saying
       // Thistle's line word for word, as its own)
       const words = t => new Set(String(t).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2));
-      const recentOthers = (world.state?.globalHistory || []).slice(-10).map(e => e.match(/^T\d+\s+([^:]+):\s*\S+\s+(?:say|whisper)\s+"(.*?)"(?:\s+->|$)/)).filter(m => m && m[1] !== g.id).map(m => words(m[2]));
+      // (its own lines too: a catchphrase said three times running)
+      const recentOthers = (world.state?.globalHistory || []).slice(-14).map(e => e.match(/^T\d+\s+([^:]+):\s*\S+\s+(?:say|whisper)\s+"(.*?)"(?:\s+->|$)/)).filter(Boolean).map(m => words(m[2]));
       for (let i = planCmds.length - 1; i >= 0; i--) {
         const c = planCmds[i]; if (c.kind !== 'say' || !recentOthers.length) continue;
         const mine = words(c.text); if (mine.size < 4) continue;
-        const copied = recentOthers.some(o => { let n = 0; for (const w of mine) if (o.has(w)) n++; return n / mine.size >= .7; });
+        // or the history's own wording copied as speech: say("grub says Calm? ...")
+        const names = world.getAgents().map(a => a.id.toLowerCase());
+        const quotesHistory = names.some(n => new RegExp('^' + n + ' (says|said|whispers)\\b', 'i').test(String(c.text).trim()));
+        const copied = quotesHistory || recentOthers.some(o => { let n = 0; for (const w of mine) if (o.has(w)) n++; return n / mine.size >= .7; });
         if (copied) { planCmds.splice(i, 1); echoed = true; }
       }
-      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(You only repeated what someone else just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
+      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(That line only repeated what was just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
@@ -790,6 +795,8 @@ async function main() {
       else if (!spoke) cfg.talkRun = 0;
       else if ((cfg.talkRun = (cfg.talkRun || 0) + 1) >= 2) { cfg.talkRun = 0; cfg.quietTurns = 3; }
       // nothing usable: it stands and thinks (a look() here filled turns with looking around)
+      // a look() on a later line, too soon after the last one
+      if (lookedLately) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'look' && planCmds.length > 1) planCmds.splice(i, 1);
       if (!planCmds.length) planCmds.push({ kind: 'emote', emote: 'ponders' });
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
@@ -1033,7 +1040,10 @@ async function main() {
           body: JSON.stringify({ model: ep.model || undefined, max_tokens: 160, temperature: .6, messages: [{ role: 'system', content: system }, { role: 'user', content: [{ type: 'text', text: VISION_PROMPT }, { type: 'image_url', image_url: { url: img } }] }] }) });
         text = (await r.json())?.choices?.[0]?.message?.content || '';
       }
-      text = String(text).replace(/\s+/g, ' ').replace(/^["\u201c]+|["\u201d]+$/g, '').trim().slice(0, 300);
+      // two sentences at most: it is told on the next turn, and shown
+      text = String(text).replace(/\s+/g, ' ').replace(/^["\u201c]+|["\u201d]+$/g, '').trim();
+      const sent = text.match(/[^.!?]+[.!?]+["')\]]*/g) || [text];
+      text = sent.slice(0, 2).join(' ').trim().slice(0, 280);
       if (!text) return null;
       const c2 = world.getBrainConfig(g.id);
       world.setBrainConfig(g.id, { pendingChat: (c2.pendingChat || []).concat([`[you looked] What you see: ${text}`]).slice(-5) });

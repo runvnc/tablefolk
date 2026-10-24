@@ -110,7 +110,7 @@
       const q = posOf(o), d = Math.hypot(q.x - p.x, q.z - p.z);
       if (o !== c && d > 4) continue;
       const cfg = getBrainConfig(o.id);
-      setBrainConfig(o.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${o === c ? text.replace(new RegExp('\\b' + who + '\\b', 'g'), 'you').replace(/^you\b/, 'You') : text}`]).slice(-5) });
+      setBrainConfig(o.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${o === c ? toYou(text, who) : text}`]).slice(-5) });
     }
     try { emitBadge(c, '!'); } catch {}
     state.globalHistory = (state.globalHistory || []).concat([`T${state.turn?.index ?? 0} event: ${text}`]).slice(-20);
@@ -118,15 +118,25 @@
     log('[director] ' + text);
     return text;
   }
+  // "grub's stomach growls" -> "your stomach growls", to the one it happens to
+  function toYou(text, who) {
+    const n = who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp('\\b' + n + '[\u2019\']s\\b', 'gi'), 'your').replace(new RegExp('\\b' + n + '\\b', 'gi'), 'you')
+      .replace(/^your\b/, 'Your').replace(/^you\b/, 'You');
+  }
   function narrate(text) {
     let el = document.getElementById('narration');
     if (!el) { el = document.createElement('div'); el.id = 'narration'; el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
     el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(narrate.t); narrate.t = setTimeout(() => el.classList.remove('show'), 6500);
   }
+  // at most one event in 20 s, however fast turns go (skipped turns are fast)
+  let lastAt = 0;
   function tick(c) {
     if (off || !state.characters?.length) return;
     if (++turns % every) return;
+    if (performance.now() - lastAt < 20000) { turns--; return; }
+    lastAt = performance.now();
     // to someone the player can see, when there is someone
     const seen = state.characters.filter(o => !o.defeated && (window.tablefolkDark?.visible?.(posOf(o).x, posOf(o).z) ?? true));
     const target = seen.length ? seen[Math.floor(Math.random() * seen.length)] : c;

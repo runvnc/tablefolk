@@ -2748,13 +2748,15 @@ function parseLLMCommandLine(line){
   if(name==='note') return {kind:'note',html:arg||''};
   if(name==='touch') return {kind:'touch',target:arg||''};
   if(name==='emote') return {kind:'emote',emote:(arg.split(',')[0]||'dance').trim().toLowerCase()||'dance'};
-  if(['look','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(name)) return {kind:name};
+  // carry(note), dig(north), push(barrel): the thing (or way) named, if any
+  if(['carry','dig','push','pull','repair'].includes(name)) return {kind:name,target:String(arg||'').trim().replace(/^["']|["']$/g,'')};
+  if(['look','drop','throw','panic','inventory'].includes(name)) return {kind:name};
   // a skill's command (skills.js): cast(fireball, gob1)
   if(window.tablefolkSkills?.isCommand(name)) return {kind:'skill',name,args:arg?arg.split(',').map(x=>x.trim().replace(/^["']|["']$/g,'')).filter(Boolean):[]};
   return null;
 }
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -2901,6 +2903,15 @@ function walk(g,destination){
         .sort((a,b)=>Math.hypot(a[0]-lp.x,a[1]-lp.z)-Math.hypot(b[0]-lp.x,b[1]-lp.z))[0];
       if(free){ [tx,tz]=free; description=`beside ${occ.isPlayer?'the player':occ.id}`; }
     }
+    // A thing stands there (walk(-3,-2) to the chest): the free square beside
+    // it nearest to us ("can't walk toward (-3,-2)" before)
+    else if(!destination.object && !cellPassable(tx,tz) && (Math.abs(tx-lp.x)>.1 || Math.abs(tz-lp.z)>.1)){
+      const thing=getObjects().find(o=>Math.round(o.x)===tx&&Math.round(o.z)===tz&&!['tile','light'].includes(o.type));
+      const free=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].map(([ox,oz])=>[tx+ox,tz+oz])
+        .filter(([x,z])=>(Math.abs(x-lp.x)<.1 && Math.abs(z-lp.z)<.1) || (cellPassable(x,z) && !occupantAt(x,z,g)))
+        .sort((a,b)=>Math.hypot(a[0]-lp.x,a[1]-lp.z)-Math.hypot(b[0]-lp.x,b[1]-lp.z))[0];
+      if(free){ [tx,tz]=free; description=`beside the ${thing?thing.type.replace(/_/g,' '):'wall'}`; destination={...destination,label:description}; }
+    }
     const dx=tx-lp.x, dz=tz-lp.z;
     const distance=Math.hypot(dx,dz);
     targetObject=!!destination.object;
@@ -2994,7 +3005,38 @@ function touch(g,targetId=''){
   else { damage(t,.35,'touch'); say(g,'texture report: probably real'); } 
 }
 function push(g,sign=1){ const t=nearestTarget(g); if(!t) return say(g,'nothing to shove'); const from=sign>0?g.root.position:t.position.add(g.root.position.subtract(t.position).scale(2)); impulse(t,from,sign>0?4.8:2.2,.18); const m=meta(t); if(m?.type==='barrel') { m.state='rolling'; emitBadge(t,'roll'); } if(m?.type==='mushroom') emitBadge(t,'boing'); damage(t,.25,'push'); g.anim='push'; playRig(g,'push',false); say(g,sign>0?'helpfully pushing the wrong thing':'pulling with moral uncertainty'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); },540); }
-function carry(g){ const t=nearestTarget(g,1.8); if(!t) return say(g,'arms found no object'); const m=meta(t); if(!m || ['wall','bakery','crystal'].includes(m.type)) return say(g,'too spiritually heavy'); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,'the note says: '+txt); } else { say(g,'I am responsible for this now'); } }
+// The nearest thing called `name` ("note", "the barrel", "pie recipe") that g
+// can see within `radius`; null if none.
+function namedThing(g,name,radius=10){
+  const want=String(name||'').toLowerCase().replace(/^(the|a|an|that|this)\s+/,'').trim().replace(/\s+/g,'_'); if(!want) return null;
+  const p=g.logicalPos||g.root.position, vis=window.tablefolkDark?.sightFor?.(g);
+  let best=null, bd=Infinity;
+  for(const o of getObjects()){
+    if(['tile','light','hole','wall','door'].includes(o.type)) continue;
+    const label=String(o.opts?.name||'').toLowerCase().replace(/\s+/g,'_');
+    if(!(o.type===want || o.type.includes(want) || want.includes(o.type) || (label && (label.includes(want)||want.includes(label))))) continue;
+    if(vis && !vis.has(Math.round(o.x)+','+Math.round(o.z))) continue;
+    const d=Math.hypot(o.x-p.x,o.z-p.z); if(d<=radius && d<bd){ bd=d; best=o; }
+  }
+  return best?{...best,d:bd}:null;
+}
+// carry(note): the one named; when it is a few steps away, walk over and
+// pick it up on arrival (small models name things they can see, not reach)
+function carry(g,name=''){
+  if(name && !/^(it|that|this|something|object|item)$/i.test(name)){
+    const o=namedThing(g,name);
+    if(!o) return say(g,`there is no ${name} in sight to carry`,false);
+    if(o.d>1.8){
+      walk(g,{type:'coord',x:Math.round(o.x),z:Math.round(o.z),label:'the '+o.type.replace(/_/g,' ')});
+      const dur=(g.turnMove?.dur||1)*1000+150;
+      setTimeout(()=>{ const q=g.logicalPos||g.root.position; if(!o.mesh.isDisposed?.() && Math.hypot(o.x-q.x,o.z-q.z)<=1.9) carryMesh(g,o.mesh); },dur);
+      return;
+    }
+    return carryMesh(g,o.mesh);
+  }
+  return carryMesh(g,nearestTarget(g,1.8));
+}
+function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,'the note says: '+txt); } else { say(g,'I am responsible for this now'); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot
@@ -3021,7 +3063,8 @@ function dropSpot(g,h){
   return new BABYLON.Vector3(p.x,stackTop+halfH-centerDy+.03,p.z);
 }
 function drop(g,thrown=false){ const h=state.held.get(g.id); if(!h) return say(g,'nothing in inventory except opinions'); state.held.delete(g.id); const dropAt=thrown ? null : dropSpot(g,h); endCarry(h,thrown ? h.position.clone() : dropAt, !thrown); if(thrown) h.physicsBody?.applyImpulse(g.dir.add(new BABYLON.Vector3(0,.28,0)).scale(4.4),h.position); playRig(g,thrown?'throw':'idle',false); say(g,thrown?'delivery by violence':'object released from custody'); setTimeout(()=>playRig(g,'idle',true),650); }
-function dig(g){ playRig(g,'dig',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,1.8); if(t && state.blocks.includes(t)){ damage(t,99,'dig'); say(g,'structural snack acquired'); } else { const p=g.root.position.add(g.dir.scale(1.0)); const hole=BABYLON.MeshBuilder.CreateCylinder('tiny_hole',{diameter:.55,height:.035,tessellation:12},state.scene); hole.position.set(Math.round(p.x),(state.terrainTopY??0)+.015,Math.round(p.z)); hole.material=state.materials.hole; tag(hole,'hole',{interactive:false}); state.props.push(hole); say(g,'hole installed'); } }
+// dig(north) / dig(wall to the east): turn that way first
+function dig(g,where=''){ const w=String(where||'').toLowerCase().match(/\b(north|south|east|west|n|s|e|w)\b/); if(w){ const d=FACING_DIRS[w[1][0]]; if(d) setCharacterFacing(g,new BABYLON.Vector3(...d)); } playRig(g,'dig',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,1.8); if(t && state.blocks.includes(t)){ damage(t,99,'dig'); say(g,'structural snack acquired'); } else { const p=g.root.position.add(g.dir.scale(1.0)); const hole=BABYLON.MeshBuilder.CreateCylinder('tiny_hole',{diameter:.55,height:.035,tessellation:12},state.scene); hole.position.set(Math.round(p.x),(state.terrainTopY??0)+.015,Math.round(p.z)); hole.material=state.materials.hole; tag(hole,'hole',{interactive:false}); state.props.push(hole); say(g,'hole installed'); } }
 function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,2.5); if(!t) return say(g,'repairing vibes'); const m=meta(t); if(!m) return; m.health=Math.max(m.health,2); if(m.state==='cracked'||m.state==='burned'){ m.state='intact'; if(m.material==='wood') t.material=state.materials.wood; else if(m.material==='stone') t.material=state.materials.stone; else t.material=state.materials.canvas; emitBadge(t,'fixed'); say(g,'I reversed entropy slightly'); } else say(g,'already too beautiful'); }
 
 function note(g,html='<p>empty note</p>'){
@@ -3609,6 +3652,8 @@ function buildAgentPrompt(g, cfg) {
   // real seconds per turn. Re-add if the model starts forgetting the syntax.
   const commandReminder = [
     'SYSTEM: ' + String(perception).slice(0, 2400),
+    // senses.js: a short menu of things it could do right here
+    ...(window.tablefolkSenses?.hereLine ? [window.tablefolkSenses.hereLine(g)].filter(Boolean) : []),
     '',
     ...(window.tablefolkSkills ? window.tablefolkSkills.promptLines(g) : []),
     ...(window.tablefolkCombat && (allowedFor(g).has('attack') || cfg.wielding || (cfg.hp!=null && cfg.hp<(cfg.maxHp??10))) ? [window.tablefolkCombat.selfLine(g)] : []),

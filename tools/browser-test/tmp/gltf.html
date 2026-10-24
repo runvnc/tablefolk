@@ -1,0 +1,4 @@
+<!doctype html><canvas id=c width=200 height=200></canvas>
+<script src="https://cdn.babylonjs.com/babylon.js"></script><script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script>(async()=>{ const e=new BABYLON.Engine(document.getElementById('c')); const s=new BABYLON.Scene(e); new BABYLON.ArcRotateCamera('c',0,1,3,BABYLON.Vector3.Zero(),s);
+await BABYLON.SceneLoader.LoadAssetContainerAsync('/app/assets/models/props/', new URLSearchParams(location.search).get('f')||'Barrel.gltf', s); window.done=1; })();</script>

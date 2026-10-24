@@ -307,24 +307,37 @@ function clearConversations(agentId = null) {
 }
 
 // History as a preface: bounded, and opening with a user turn (Gemma expects it).
-function prefaceMessages(system, messages) {
+// The engine holds 8192 tokens (maxNumTokens). Each turn's prompt is long
+// (what the character sees, its mind, the rules), so a few turns of history
+// filled it ("Input token ids are too long: 8302 >= 8192") and every turn after
+// failed. History is kept to a budget in characters (about 3 to a token),
+// leaving room for the new prompt and the answer.
+const CHAR_BUDGET = 19000;
+const sizeOf = list => list.reduce((n, m) => n + String(m.content || '').length, 0);
+function prefaceMessages(system, messages, reserve = 0) {
   const hist = messages.slice(-MAX_HISTORY_MESSAGES).filter(m => m.role === 'user' || m.role === 'assistant')
     .map(m => ({ role: m.role, content: String(m.content || '') }));
+  while (hist.length && String(system || '').length + sizeOf(hist) + reserve > CHAR_BUDGET) hist.shift();
   while (hist.length && hist[0].role !== 'user') hist.shift();
   return [...(system ? [{ role: 'system', content: system }] : []), ...hist];
 }
 
 // The live conversation for key, rebuilt from history if another one was live.
-async function liveConversation(key, agentId, system, historyOverride = null) {
-  if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride) {
-    live.turns += 1;
+// The vision model's own sampler defaults ran hot (garbled lines: "I't",
+// "you's"): it gets the game's temperature, top-p. The web text models keep
+// the defaults they were tuned and tested with.
+const samplerFor = temperature => engineVision ? { sessionConfig: { samplerParams: { type: 2, p: .95, k: 64, temperature: Number.isFinite(+temperature) ? Math.max(.05, +temperature) : .5 } } } : {};
+async function liveConversation(key, agentId, system, historyOverride = null, temperature, reserve = 0, slim = false) {
+  if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride && !slim && live.chars + reserve < CHAR_BUDGET) {
+    live.turns += 1; live.chars += reserve;
     return live.conv;
   }
   await dropLive();
   let h = histories.get(key);
   if (!h) { h = { agentId: String(agentId || 'default'), system, messages: [] }; histories.set(key, h); }
-  const conv = await engine.createConversation({ preface: { messages: prefaceMessages(system, historyOverride || h.messages) } });
-  live = { key, conv, turns: 1 };
+  const preface = prefaceMessages(system, slim ? [] : (historyOverride || h.messages), reserve);
+  const conv = await engine.createConversation({ preface: { messages: preface }, ...samplerFor(temperature) });
+  live = { key, conv, turns: 1, chars: sizeOf(preface) + reserve };
   return conv;
 }
 
@@ -390,7 +403,8 @@ async function generateText(messages, opts, onToken) {
     // A conversation that errored is unusable; retry once on a rebuilt one.
     console.warn('[litert-worker] generation failed, retrying on a rebuilt conversation', err);
     await dropLive();
-    return await runTurn(systemContent, chatMessages, promptText, opts, onToken, thinking);
+    // too long even so: once more with no history at all
+    return await runTurn(systemContent, chatMessages, promptText, /too long/i.test(err?.message || '') ? { ...opts, _slim: true } : opts, onToken, thinking);
   }
 }
 
@@ -401,7 +415,8 @@ async function generateText(messages, opts, onToken) {
 async function runTurn(systemContent, chatMessages, promptText, opts, onToken, thinking) {
   const agentId = String(opts.agentId || 'default');
   const key = agentId + ':' + (thinking ? 'think:' : '') + hashSystemPrompt(systemContent || '');
-  const conversation = await liveConversation(key, agentId, systemContent, thinking ? chatMessages.slice(0, -1) : null);
+  // room for the prompt and about 1000 characters of answer
+  const conversation = await liveConversation(key, agentId, systemContent, thinking ? chatMessages.slice(0, -1) : null, opts.temperature, promptText.length + 1000, !!opts._slim);
   try {
     const out = await sendTurn(conversation, promptText, opts, onToken);
     if (!thinking) {
@@ -615,7 +630,7 @@ async function handle(e, post, tag) {
       if (!engine || !engineVision) throw new Error('the loaded model cannot see');
       const text = await serialize(async () => {
         await dropLive();
-        const conv = await engine.createConversation({ preface: { messages: e.data.system ? [{ role: 'system', content: e.data.system }] : [] } });
+        const conv = await engine.createConversation({ preface: { messages: e.data.system ? [{ role: 'system', content: e.data.system }] : [] }, ...samplerFor(.6) });
         try {
           const r = await conv.sendMessage({ role: 'user', content: [{ type: 'image', data: e.data.image }, { type: 'text', text: e.data.prompt || 'What do you see?' }] });
           return splitThinking(messageText(r)).text;

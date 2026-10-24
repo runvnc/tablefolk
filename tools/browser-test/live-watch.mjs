@@ -12,7 +12,8 @@ const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close();
 const errors = [];
 page.on('pageerror', e => errors.push(String(e).slice(0, 300)));
-page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
+page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 300)); });
+page.on('response', r => { if (r.status() >= 400) errors.push(r.status() + ' ' + r.url().slice(0, 200)); });
 await page.goto(`${base}/app/?play=1&scenario=${encodeURIComponent(src)}&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
@@ -32,10 +33,11 @@ while (Date.now() - t1 < +secs * 1000) {
   await page.waitForTimeout(2500);
 }
 const turns = await page.evaluate(() => window.tablefolkLive.round);
+if (process.env.PROMPT) console.log('LAST PROMPT:\n' + JSON.stringify(await page.evaluate(() => window.__tablefolkLiteRT?.lastPrompt?.()), null, 1).slice(0, 4000));
 await page.evaluate(() => window.tablefolkLive.stop());
 const name = String(src).split('/').pop().replace(/\.json$/, '');
 mkdirSync(new URL('./results/', import.meta.url), { recursive: true });
 writeFileSync(new URL(`./results/live-${name}-${Date.now()}.json`, import.meta.url), JSON.stringify({ src, secs, rounds: turns, lines, errors }, null, 1));
 console.log(`\n${lines.length} events in ${secs} s, ${turns} rounds; ${errors.length} errors`);
-for (const e of errors.slice(0, 10)) console.log('ERR', e);
+for (const e of [...new Set(errors)].slice(0, 15)) console.log('ERR', e);
 await page.close(); await b.close().catch(() => {});

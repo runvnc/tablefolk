@@ -131,6 +131,31 @@
     return best ? { x: best.x, z: best.z, id: p.id } : { x: p.center[0], z: p.center[1], id: p.id };
   }
 
+  // "You could, right here: carry(note) (2 steps west), dig(north) (breaks the
+  // wall), eat(bun)." A short menu of concrete things this character can do
+  // where it stands, with the commands it is allowed: a small model picks
+  // from a menu far better than it invents an action from nothing.
+  const SMALL = /^(note|potion|scroll|key|bag|bucket|mushroom|pumpkin|chalice|rope|axe|pickaxe|crate|barrel|apple_barrel|vase|pot|candles|torch|coin_pile)$/;
+  const DIRS = { north: [0, -1], south: [0, 1], east: [-1, 0], west: [1, 0] };
+  function hereLine(g) {
+    const can = new Set(commandsFor(g)), out = [];
+    const p0 = pos(g), px = Math.round(p0.x), pz = Math.round(p0.z);
+    const near = things(g, 6);
+    const fmt = t => `${steps(t.d)}${t.d < 1.5 ? '' : ' ' + compass(t.x - px, t.z - pz)}`;
+    if (can.has('carry')) for (const t of near.filter(t => t.kind === 'thing' && SMALL.test(t.id)).slice(0, 2)) out.push(`carry(${t.name}) (${fmt(t)}${t.id === 'note' ? ', and read it' : ''})`);
+    const inv = (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0).map(i => String(i.name || i));
+    if (can.has('eat')) { const food = inv.find(n => window.tablefolkMind?.isFood?.(n)); if (food) out.push(`eat(${food})`); }
+    const people = near.filter(t => t.kind !== 'thing' && t.d < 2.5);
+    if (can.has('give') && inv.length && people.length) out.push(`give(${inv[0]}) to ${people[0].name.replace(/ \(the player\)$/, '')}`);
+    if (can.has('dig')) for (const [w, [dx, dz]] of Object.entries(DIRS)) {
+      const b = (state.blocks || []).find(b => { const q = b.getAbsolutePosition?.() || b.position; return meta(b)?.type === 'wall' && Math.round(q.x) === px + dx && Math.round(q.z) === pz + dz; });
+      if (b) { out.push(`dig(${w}) (breaks the wall ${w} of you)`); break; }
+    }
+    if (can.has('build') && Math.random() < .5) out.push('build(wall) or build(crate) (in front of you)');
+    if ((can.has('throw') || can.has('drop')) && state.held?.get(g.id)) out.push(`${can.has('throw') ? 'throw' : 'drop'}() (what you are carrying)`);
+    return out.length ? 'You could, right here: ' + out.slice(0, 5).join(', ') + '.' : '';
+  }
+
   // look(): the action's result is a fuller description.
   function look(g) {
     const p0 = pos(g), all = things(g, 10);
@@ -231,5 +256,5 @@
     }
   }
 
-  window.tablefolkSenses = { snapshot, aroundLines, placeLine, placeTarget, placeAt, look, compass, relative };
+  window.tablefolkSenses = { hereLine, snapshot, aroundLines, placeLine, placeTarget, placeAt, look, compass, relative };
 })();
