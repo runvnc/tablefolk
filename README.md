@@ -199,6 +199,24 @@ OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since
 the proxy spends your key. Native local models: `uv tool install litert-lm`,
 then `litert-lm import --from-huggingface-repo litert-community/gemma-4-E4B-it-litert-lm gemma-4-E4B-it-gpu.litertlm gemma4-e4b`.
 
+## Living worlds (October 2026)
+
+- **Welcome**: the app opens on a choice of worlds (`scenarios/showcase.json`)
+  and a way to build your own; the "worlds" button brings it back.
+- **Let them live** (P): everyone acts on their own while you watch or join in;
+  a world can start that way (`"live": true`). The **director** makes small
+  things happen now and then (a note under the door, a rat, a knock), plus the
+  world's own events and timed turning points. See docs/SCENARIOS.md 2h.
+- **Sight**: with the "Gemma 4 E2B with sight" brain (the full multimodal
+  model, 2.6 GB, on the LiteRT-LM nightly's vision encoder; a 6 GB graphics
+  card), `look` sends a picture from the character's own eyes, described in
+  its own voice and shown to the player. The endpoint brain does the same
+  when its model takes images (Brain options > vision).
+- Characters give each other things and gold, walk to each other, pick up and
+  read notes, dig through walls and build them; a menu of what they could do
+  right here in every prompt.
+- Plan, brainstorm and progress: docs/LAUNCH-PLAN.md.
+
 ## v14.6 (current)
 
 - Speaking animation now driven by TTS events: `speechstart`/`speechend` from Pocket-TTS set `g.speaking`, play the `talk` rig animation for the real audio duration, and oscillate the head bone Y-scale (~14Hz) as a mouth flapping effect.

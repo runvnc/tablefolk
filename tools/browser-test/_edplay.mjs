@@ -1,0 +1,22 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const ctx = b.contexts()[0]; const page = await ctx.newPage();
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.goto('http://localhost:8001/world/?t=' + Date.now());
+await page.evaluate(async () => { const s = await (await fetch('/scenarios/goblin-bakery.json')).json(); window.tfBuilder.show({ scenario: s, model: 'test', ms: 0 }, { revise: {} }); });
+await page.waitForTimeout(2000);
+await page.evaluate(() => document.getElementById('mapEditor').scrollIntoView({ block: 'start' })); await page.waitForTimeout(300);
+const box = await (await page.$('.tfme-stage canvas')).boundingBox();
+await page.dragAndDrop('.tfme-item[data-name="goblin"]', '.tfme-stage canvas', { targetPosition: { x: box.width / 2 + 40, y: box.height / 2 } });
+await page.keyboard.press('w'); await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2 + 60); await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 60, { steps: 6 }); await page.mouse.up();
+const code = await page.evaluate(async () => {
+  const s = window.tfBuilder.scenario, cs = new CompressionStream('deflate-raw'), w = cs.writable.getWriter(); w.write(new TextEncoder().encode(JSON.stringify(s))); w.close();
+  const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer()); let t = ''; for (const x of buf) t += String.fromCharCode(x);
+  return { code: btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''), agents: s.agents.map(a => a.id), walls: s.objects.filter(o => o.type === 'wall').length };
+});
+console.log('edited:', code.agents, code.walls, 'walls');
+const g = await ctx.newPage();
+const errs = []; g.on('pageerror', e => errs.push(String(e)));
+await g.goto('http://localhost:8001/app/?play=1&art=1#s=' + code.code); await g.waitForTimeout(12000);
+console.log('in game:', JSON.stringify(await g.evaluate(() => ({ title: window.tablefolkScenario.active?.scn?.title, chars: state.characters.map(c => c.id + '@' + Math.round(c.logicalPos?.x ?? c.root.position.x) + ',' + Math.round(c.logicalPos?.z ?? c.root.position.z)), walls: state.blocks.filter(b => meta(b)?.type === 'wall').length }))), errs);
+await g.close(); await page.close(); await b.close();

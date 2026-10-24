@@ -400,6 +400,50 @@ More skills come from URLs, `npm:<package>@<version>` or
 `gh:<user>/<repo>@<tag>/<dir>` (a folder with `skill.json`); writing one:
 `docs/SKILLS.md` in the repository.
 
+## 2h. Worlds that live on their own
+
+Small models are good at reacting and bad at planning. These fields make a
+world that keeps going while the player watches (or joins in):
+
+- `"live": true` starts it living: everyone with a mind takes turns on their
+  own (`app/live.js`; P or the "let them live" button pauses and resumes). The
+  ones the player can see act every round, the rest every third. Mindless
+  monsters come for the player when near, else wander.
+- `"events"`: things the director (`app/director.js`) makes happen next to a
+  character the player can see, every few turns (at most one in 20 s): told to
+  it and to those near as an `[event]`, shown to the player as a narrator's
+  line. A string, or `{"text": "...", "spawn": "note", "note": "Meet me at
+  midnight.", "gold": 5}`; `{who}` is the character it happens to (told to
+  that one as "you"). `spawn` makes the thing real beside it (`note`,
+  `coin_pile` with `gold`, `mushroom`, `crate`, any object type).
+  `{"text": "...", "round": 8, "to": "morvax"}` happens once, when the live
+  rounds reach 8: the story's turning point ("The candle is out: Morvax must
+  choose now"). Generic events (dungeon, indoors, outdoors) fill in.
+- `"director": false` turns it off; `"director": 4` makes it every 4 turns
+  (default 5).
+- Write each character's `personality` as a name sentence and then several
+  short sentences of what it does ("You keep asking about the dental plan,
+  holidays and whether haunting counts as overtime."): each turn ends with
+  "Stay yourself: ..." and one of those sentences, picked at random, which
+  keeps small models from drifting into each other's voice.
+
+What characters can do with each other and the world (besides talking):
+`give(bread, pip)` and `give(10 gold, pip)` between characters (give(item)
+alone goes to the player; giving what it doesn't have fails), `walk(pip)` to
+someone, `carry(note)` (walks over to it when it is a few steps away; a note
+is read when picked up), `throw()` / `drop()`, `dig(north)` (through a wall,
+else a hole in the floor), `build(wall)` / `build(crate)` (never on top of
+something), `note(text)` (writes a note others can pick up and read),
+`eat(item)`, `look` (with a brain that can see: a picture from its own eyes,
+described in its own voice). Each prompt has a short menu of what it could do
+right where it stands ("You could, right here: carry(note) (2 steps west),
+dig(north), eat(bun), give(bun, pip)").
+
+Showcase worlds (the welcome screen, `scenarios/showcase.json`):
+`goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`,
+`haunted-tavern`. `tools/browser-test/live-watch.mjs <scenario> [seconds]`
+plays one live with the real model and keeps the transcript.
+
 ## 3. Layout engine (deterministic)
 
 1. **Grid.** Integer cells of the board. A cell is *solid* when it has a tile
