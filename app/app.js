@@ -4105,7 +4105,10 @@ function updateFirstPersonView(dt){
 }
 function updateFirstPersonButton(){
   const b=document.getElementById('firstPersonBtn'); if(!b) return;
-  b.hidden=!state.playerAvatar; b.classList.toggle('active',!!state.firstPerson);
+  const row=document.getElementById('viewBtns'); if(row) row.hidden=!state.playerAvatar;
+  b.classList.toggle('active',!!state.firstPerson);
+  const c=document.getElementById('cameraModeBtn');
+  if(c){ const free=state.cameraMode!=='follow' && !state.firstPerson; c.classList.toggle('active',free); c.querySelector('span').textContent=free?'follow camera':'free camera'; c.title=free?'camera follows you again (C)':'free camera: drag to turn, wheel to zoom (C)'; }
   b.title=state.firstPerson?'back to the overview (V)':'see through your avatar\'s eyes (V)';
   b.querySelector('span')&&(b.querySelector('span').textContent=state.firstPerson?'overview':'first person');
 }
@@ -4133,6 +4136,7 @@ function followCameraStart(){
   state.cameraMode='follow';
   const p=g.root.position;
   lockCamera(cam,true); cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z),false,false,true); cam.alpha=FOLLOW.alpha; cam.beta=FOLLOW.beta; cam.radius=state.followRadius||FOLLOW.radius;
+  updateFirstPersonButton();
 }
 function toggleCameraMode(){
   if(state.firstPerson) setFirstPerson(false);
@@ -4142,6 +4146,7 @@ function toggleCameraMode(){
     cam.radius=Math.min(cam.upperRadiusLimit,19); cam.beta=.95;
   }
   else followCameraStart();
+  updateFirstPersonButton();
   window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
 }
 function followAvatarCamera(dt){
@@ -4463,6 +4468,7 @@ function setupUI(){
   const avCb=document.getElementById('avatarToggle');
   if(avCb){ avCb.checked=!!state.playerAvatar; avCb.onchange=async()=>{ if(avCb.checked){ const c=state.camera.target; await spawnPlayerAvatar(Math.round(c.x),Math.round(c.z)+1); } else removePlayerAvatar(); saveWorldState(); }; }
   const fpBtn=document.getElementById('firstPersonBtn'); if(fpBtn) fpBtn.onclick=()=>setFirstPerson(!state.firstPerson);
+  const camBtn=document.getElementById('cameraModeBtn'); if(camBtn) camBtn.onclick=()=>toggleCameraMode();
   updateFirstPersonButton();
   const fireCb=document.getElementById('campfireToggle');
   if(fireCb){ fireCb.checked=state.campfire!==false; fireCb.onchange=()=>{ setCampfire(fireCb.checked); updatePerceptionUI(); saveWorldState(); }; }

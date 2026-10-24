@@ -44,7 +44,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261023y'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261025a'],
+    ['app.js?v=20261025b'],
     ['scenery.js?v=20261025a'],
     ['combat.js?v=20261024k'],
     ['darkness.js?v=20261025a'],
@@ -64,7 +64,7 @@
     ['procgen.js?v=20261024b'],
     ['scenario.js?v=20261024j'],
     ['registry.js?v=20261024a'],
-    ['tabletop.js?v=20261024a'],
+    ['tabletop.js?v=20261025a'],
     ['llm_js/world-integration.js?v=20261024n', 'module'],
   ];
 

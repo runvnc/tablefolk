@@ -34,7 +34,7 @@
   const saveOpts = () => { try { localStorage.setItem('tablefolk.tabletop', JSON.stringify({ grid: opt.grid, labels: opt.labels, bright: opt.bright, outside: opt.outside })); } catch {} };
   let cam = null, view = null, overlay = null, sel = null, drag = null, edited = false, flat = null, origLight = null;
   // zoom: 1 = the whole board fits; (cx, cz) the board point at the middle
-  let zoom = 1, cx = 0, cz = 0, pan = null, needDraw = false;
+  let zoom = 1, cx = 0, cz = 0, pan = null, needDraw = false, shown = null;
   const touches = new Map();
   document.documentElement.classList.add('tabletop');
 
@@ -100,9 +100,19 @@
     document.addEventListener('fullscreenchange', () => setTimeout(resize, 60));
     resize();
     look();
-    // characters' idle animations keep the labels where they are: redraw a few times a second
-    setInterval(draw, 500);
-    scene.onAfterRenderObservable.add(() => { if (needDraw) { needDraw = false; draw(); } });
+    // The overlay follows the 3D picture: drawn with the view a frame was
+    // rendered with, once the GPU has finished that frame. Drawn as soon as
+    // the frame was only submitted, the 2D canvas showed a frame or two ahead
+    // of the 3D one on a busy GPU, and the grid slid over the floor while
+    // panning. Characters' idle animations: a redraw a few times a second.
+    setInterval(() => draw(shown || view), 500);
+    scene.onAfterRenderObservable.add(() => {
+      if (!needDraw) return;
+      needDraw = false;
+      const v = view, q = engine._device?.queue;
+      if (q?.onSubmittedWorkDone) q.onSubmittedWorkDone().then(() => { shown = v; draw(v); }, () => {});
+      else { shown = v; draw(v); }
+    });
   }
   function look() {
     const w = W(), scene = w.state.scene;
@@ -148,15 +158,15 @@
     }
   }
   function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
-  function draw() {
-    if (!overlay || !view) return;
-    const dpr = Math.min(3, devicePixelRatio || 1);
-    overlay.width = Math.round(view.cw * dpr); overlay.height = Math.round(view.ch * dpr);
-    const ctx = overlay.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, view.cw, view.ch);
-    paintOverlay(ctx, view, view.cw / (2 * view.hw));
+  function draw(v = shown || view) {
+    if (!overlay || !v) return;
+    const dpr = Math.min(3, devicePixelRatio || 1), w = Math.round(v.cw * dpr), h = Math.round(v.ch * dpr);
+    if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; }
+    const ctx = overlay.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, v.cw, v.ch);
+    paintOverlay(ctx, v, v.cw / (2 * v.hw));
     if (opt.edit) {
-      const cell = view.cw / (2 * view.hw);
-      const box = (x, z, color, dash) => { const [px, py] = toPx(view, x, z); ctx.setLineDash(dash ? [6, 4] : []); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(px - cell / 2, py - cell / 2, cell, cell); ctx.setLineDash([]); };
+      const cell = v.cw / (2 * v.hw);
+      const box = (x, z, color, dash) => { const [px, py] = toPx(v, x, z); ctx.setLineDash(dash ? [6, 4] : []); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(px - cell / 2, py - cell / 2, cell, cell); ctx.setLineDash([]); };
       if (sel) box(sel.x, sel.z, '#ffd34d');
       if (drag?.to) box(drag.to[0], drag.to[1], '#7fe08a', true);
     }
