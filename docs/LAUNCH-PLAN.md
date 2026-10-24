@@ -154,3 +154,22 @@ Ideas, by how much they would add for how much work with a small model:
 - Tools: `tools/browser-test/live-watch.mjs` (watch a scenario live and
   keep the transcript), `tools/browser-test/render-tiles.mjs`,
   `tools/bump.py` (cache-busting versions for changed files and importers).
+
+**2026-10-24, later**
+
+- Welcome screen with five showcase worlds (all tested live with E2B, 0
+  errors; an 8-minute bakery run stayed coherent). The download question now
+  waits behind the welcome screen and intro card.
+- Characters: give things and gold to each other, walk(name), carry and
+  hand over what they hold, diagonal walks, plain action results, a
+  stay-in-character line, timed turning points, the same goal again ignored.
+- Generated worlds (cloud and in-browser) now come out living, with events.
+- Server for a public launch: visitors' use of the server AI is gated by the
+  admin page and rate-limited; requests through a proxy/tunnel are visitors.
+
+**Left for launch**
+- Mirror `gemma-4-E2B-it.litertlm` (vision model) on the R2 bucket (needs you).
+- Check phone layout (screenshots taken but not yet reviewed).
+- Wolf tile renders wrong; turned objects not shown turned in the editor.
+- The root landing page (index.html) still has the old pitch; the Bun server
+  redirects / to /app/.
