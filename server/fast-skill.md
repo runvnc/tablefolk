@@ -33,16 +33,39 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   // ...plus ONE map method (below)
 }
 
-Characters run on small models (2-4B). Personalities: plain sentences, 2-5 of
-them, facts stated outright ("The key costs 20 gold, never less than 15."),
-commands named when the character should use them ("Use give(item) to hand
-it over."). Every character needs a reason to talk to the player. Give each
-group member its own id (gob1, gob2...) and personality. 2-6 characters.
+Characters run on small models (2-4B). Personalities: plain sentences, 3-6 of
+them: first who they are ("Rattles, an armoured skeleton applicant."), then
+short sentences of what they DO, one trait each ("You keep asking about the
+dental plan."): the game reminds the character of one of those each turn, so
+each should stand alone. Facts stated outright ("The key costs 20 gold, never
+less than 15."), commands named when the character should use them ("Use
+give(item) to hand it over."). Every character needs a reason to talk to the
+player AND to the other characters: give them conflicting wants, a secret, a
+rivalry, a quirk, so they have something to do when nobody is talking to
+them. Give each group member its own id (gob1, gob2...) and personality.
+2-6 characters (3-4 talking ones is best: each takes a turn in turn).
+
+The world lives on its own: write "live": true, and 4-6 "events" (things that
+happen next to a character now and then, which they react to), plus one
+turning point late on:
+"events": [
+  "A rat runs across the floor.",
+  {"text": "{who} finds a crumpled note.", "spawn": "note", "note": "Meet me by the well."},
+  {"text": "A coin rolls to {who}'s feet.", "spawn": "coin_pile", "gold": 3},
+  {"text": "The bell rings: the king's messenger is at the door!", "round": 8, "to": "vexa"}
+]
+{who} is the character it happens to. Events should poke at the story (a
+clue, a rival's move, a deadline, something to argue about), and "round": N
+is the story's turning point, to the character "to".
 
 Commands: say whisper walk face emote give sell inventory look carry drop
-build note attack wield spell.spark spell.fireball. Allow only what the scene needs:
-`say` almost always, `walk` to move, `give`/`sell`/`inventory` for trading
-(give needs the player within 3 cells), `whisper` = only the player hears.
+throw dig build note eat remember feel attack wield spell.spark spell.fireball.
+Allow only what the scene needs: `say` almost always, `walk` to move (walk(name)
+goes to someone), `give`/`sell`/`inventory` for trading: give(item) to the
+player, give(item, name) or give(10 gold, name) to another character (both
+within 3 cells), `whisper` = only the player hears, carry(thing) picks up
+(and reads a note), dig/build for scenes about digging or building, eat for
+food, note to write notes others can find.
 Monsters: skeletons, zombies, rats, spiders, wolves, bats, slimes, ghosts are
 hostile by default: when the player is near they close in and attack (no
 LLM, no personality needed). Goblins, kobolds and orcs talk unless "hostile":

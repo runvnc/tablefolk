@@ -240,7 +240,7 @@
     try {
       await model(emit);
       // 1. plan
-      const planText = await ask(emit, 'plan', 'step 1/4: planning the world', 'You design small adventure scenes for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
+      const planText = await ask(emit, 'plan', 'step 1/5: planning the world', 'You design small adventure scenes for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
         `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(3-5 lines: at least one person the player can talk to, and monsters if there is danger. Example: - Brann | woodsman | the gravekeeper | wants the crypt sealed | knows the ghost was his sister. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
       const plan = parsePlan(planText, prompt);
       // 2. map
@@ -249,13 +249,13 @@
         ? `Write the outdoor map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "map": ["place campfire at center", "place tree x6 scattered at north", "paint water x8 cluster at east", "place player at south"], "objects": [{"type": "chest", "gold": 30, "items": ["silver key"]}]}\nMap lines: place <thing> [xN] [scattered|cluster|row] at center|north|south|east|west|random, or near/beside <thing>. Things: ${OUTDOOR_THINGS.join(', ')}. No characters yet.`
         : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${(plan.kind === 'village' ? VILLAGE : DUNGEON).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
       let mapOut = {};
-      try { mapOut = json(await ask(emit, 'map', 'step 2/4: drawing the map', 'You turn adventure plans into game data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${mapAsk}`)); }
+      try { mapOut = json(await ask(emit, 'map', 'step 2/5: drawing the map', 'You turn adventure plans into game data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${mapAsk}`)); }
       catch (e) { emit('progress', { stage: 'map', label: 'the map answer was not JSON; using the plan' }); }
       let built = buildMap(plan, mapOut);
       // 3. review
       if (plan.kind !== 'outdoor') {
         try {
-          const rev = json(await ask(emit, 'review', 'step 3/4: looking at the map', 'You check game maps against their plan. Answer with one JSON object, nothing else.',
+          const rev = json(await ask(emit, 'review', 'step 3/5: looking at the map', 'You check game maps against their plan. Answer with one JSON object, nothing else.',
             `The plan:\n${planText}\n\nThe map that was built has these places and things:\n${describeMap(built)}\n\nIs anything from the plan missing (a treasure, a clue, a place)? Answer JSON only: {"add": [{"type": "...", "in": "...", ...}], "${plan.kind === 'village' ? 'buildings' : 'rooms'}": number or null, "intro": "better intro or null"}. "add" may be empty. Object types: ${things.join(', ')}.`));
           if (Array.isArray(rev.add) && rev.add.length) mapOut.objects = [...(mapOut.objects || []), ...rev.add.slice(0, 6)];
           const key = plan.kind === 'village' ? 'buildings' : 'rooms';
@@ -268,11 +268,23 @@
       // 4. characters
       const where = plan.kind === 'outdoor' ? `"near": one of ${OUTDOOR_THINGS.join(', ')}` : `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
       const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
-      const chars = json(await ask(emit, 'characters', 'step 4/4: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
+      const chars = json(await ask(emit, 'characters', 'step 4/5: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
       buildAgents(plan, chars, built, scn);
       if (!scn.agents.length) throw new Error('the model wrote no characters');
       autoLock(scn, built);
-      // 5. the server's checks, and fixes
+      // 5. what happens now and then (director.js), and the world lives on its own
+      scn.live = true;
+      try {
+        const names = scn.agents.filter(a => !MINDLESS.has(a.model)).map(a => a.id);
+        const evText = await ask(emit, 'events', 'step 5/5: what happens now and then', 'You write little events for a game scene. Plain lines only.',
+          `The plan:\n${planText}\n\nWrite 5 short things that could happen in this scene, one per line, each under 20 words, that the characters (${names.join(', ')}) would react to: a clue, a noise, a rival's move, something lost or found. The last one is the big turning point of the story.`);
+        const lines = evText.split('\n').map(l => l.replace(/^[\s\-*\d.)]+/, '').trim()).filter(l => l.length > 10 && l.length < 180).slice(0, 5);
+        if (lines.length >= 2) {
+          const turn = lines.pop();
+          scn.events = [...lines, { text: turn, round: 8, ...(names[0] ? { to: names[0] } : {}) }];
+        }
+      } catch (e) { console.warn('[worldgen] events skipped:', e.message); }
+      // 6. the server's checks, and fixes
       let r = await finish(scn, prompt, t0);
       for (let round = 1; r.problems?.length && round <= 2; round++) {
         emit('progress', { stage: 'problems', problems: r.problems });
