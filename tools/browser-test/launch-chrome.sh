@@ -14,6 +14,7 @@
 # on the real GPU with the Vulkan flags below (checked: NVIDIA, not the
 # SwiftShader CPU fallback headless gets without them). Same profile, so the
 # cached model is reused; it can't run alongside the visible test Chrome.
+# Muted (--mute-audio): its sounds otherwise play through your speakers.
 set -u
 PROFILE="$HOME/.cache/tablefolk-test-chrome"
 URL="${1:-http://localhost:8000/app/?norender=1}"
@@ -51,7 +52,7 @@ place_window() {
 }
 if [ "${HEADLESS:-}" = 1 ]; then
   exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
-    --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" \
+    --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" --mute-audio \
     --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
     --disable-vulkan-surface --ignore-gpu-blocklist "$URL"
 fi
