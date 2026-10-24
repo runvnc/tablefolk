@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>vision test</title><body>
+<canvas id="c" width="320" height="240"></canvas><pre id="out"></pre>
+<script>
+const out = t => { document.getElementById('out').textContent += t + '\n'; };
+const q = new URLSearchParams(location.search);
+const w = new Worker('worker.js?v=' + (q.get('v') || '0.19.0-nightly.20261023'));
+window.results = []; window.done = false;
+w.onmessage = e => { const d = e.data; out(d.type + ': ' + (d.text || '') + (d.ms ? ' (' + d.ms + ' ms)' : '')); results.push(d);
+  if (d.type === 'loaded') { if (q.has('text')) w.postMessage({ type: 'text', text: 'Write a 150-word story about a goblin shopkeeper.' }); else ask(); } if (d.type === 'answer' || d.type === 'error') done = true; };
+function ask() {
+  const c = document.getElementById('c'), x = c.getContext('2d');
+  x.fillStyle = '#7ec0ee'; x.fillRect(0, 0, 320, 240); x.fillStyle = '#3a8d3a'; x.fillRect(0, 170, 320, 70);
+  x.fillStyle = '#d22'; x.beginPath(); x.arc(110, 120, 40, 0, 7); x.fill();
+  x.fillStyle = '#ffd400'; x.fillRect(200, 90, 70, 70);
+  c.toBlob(b => w.postMessage({ type: 'ask', blob: b, text: q.get('q') || 'Describe this picture in one sentence: shapes and colours.' }), 'image/png');
+}
+w.postMessage({ type: 'load', url: q.get('url') || '', key: q.get('key') || 'gemma4-e2b-litert', vision: q.get('vision') || 'GPU', tokens: +(q.get('tokens') || 256) });
+</script>
