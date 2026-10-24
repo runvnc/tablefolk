@@ -21,7 +21,7 @@ import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate, handleRevise, handleFinish, worldgenOptions } from './generate.js';
-import { setupAdmin, handleAdmin, savedWorld, isAdmin } from './admin.js';
+import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests } from './admin.js';
 
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
@@ -72,12 +72,12 @@ function limited(ip) {
   if (hits.size > 5000) for (const [k, v] of hits) if (!v.length || now - v[v.length - 1] > RATE_MS) hits.delete(k);
   return h.length > RATE;
 }
-async function proxy(req, url, prefix, ep, ip = '', which = 'cloud') {
+async function proxy(req, url, prefix, ep, ip = '', which = 'cloud', local = false) {
   const sub = url.pathname.slice(prefix.length);
   if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
   if (!['/models', '/chat/completions'].includes(sub)) return Response.json({ error: { message: 'only /models and /chat/completions are proxied' } }, { status: 404 });
   // the admin, or anyone on this machine itself (the owner), is not a visitor
-  const guest = !isAdmin(req) && !/^(127\.|::1$|::ffff:127\.)/.test(ip);
+  const guest = !isAdmin(req) && !local;
   if (guest && !config.guestBrain?.[which]) return Response.json({ error: { message: which === 'local' ? 'this server\'s local model is not open to visitors' : 'the server\'s AI is not open to visitors: use the brain in your browser' } }, { status: 403 });
   if (guest && req.method === 'POST' && limited(ip)) return Response.json({ error: { message: 'too many requests: wait a few minutes' } }, { status: 429 });
   let body;
@@ -153,11 +153,16 @@ async function listRoles() {
 const server = Bun.serve({
   port, hostname: config.host, idleTimeout: 255,
   async fetch(req, srv) {
-    const url = new URL(req.url), ip = srv?.requestIP?.(req)?.address || '';
+    // Behind a reverse proxy or tunnel every request comes from 127.0.0.1:
+    // the client's address is in its headers, and such a request is never
+    // "this machine". Only a direct loopback request is the owner's.
+    const fwd = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
+    const url = new URL(req.url), ip = fwd || srv?.requestIP?.(req)?.address || '', local = !fwd && /^(127\.|::1$|::ffff:127\.)/.test(ip);
+    if (local) ownerRequests.add(req);
     const p = url.pathname;
     if (p === '/') return Response.redirect('/app/', 302);
-    if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud');
-    if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local');
+    if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud', local);
+    if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local', local);
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
     if (p === '/api/revise') return handleRevise(req, url);

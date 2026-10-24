@@ -69,7 +69,12 @@ export async function setupAdmin({ reset = false } = {}) {
 }
 
 function cookies(req) { return Object.fromEntries((req.headers.get('cookie') || '').split(/;\s*/).filter(Boolean).map(c => { const i = c.indexOf('='); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))]; })); }
-export function isAdmin(req) { return authed(req); }
+// The owner: logged in, or at this machine itself (a direct loopback request,
+// not one through a reverse proxy: server.js marks those in ownerRequests).
+// Used for model choices and the AI proxies; the admin page itself always
+// needs the password.
+export const ownerRequests = new WeakSet();
+export function isAdmin(req) { return authed(req) || ownerRequests.has(req); }
 function authed(req) {
   const t = cookies(req).tf_admin, exp = t && sessions.get(t);
   if (!exp) return false;
