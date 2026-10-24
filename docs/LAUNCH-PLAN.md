@@ -102,3 +102,55 @@ Ideas, by how much they would add for how much work with a small model:
 ## Progress log
 
 (newest last)
+
+**2026-10-24 morning (overnight session)**
+
+- **Let them live** (`app/live.js`): P or the ▶ button next to the view
+  buttons; everyone with a mind takes turns on their own, the ones the
+  player can see every round, the rest every third; mindless monsters come
+  for the player or wander. A scenario can start that way (`"live": true`).
+- **The director** (`app/director.js`): every few turns (at most once in
+  20 s) something happens next to a character the player can see, told to
+  it and to those near, shown as a narrator's line, sometimes made real (a
+  note, coins, a mushroom, a crate). Scenario events first (`"events"`),
+  then generic ones for dungeons, indoors, outdoors. `"director": false|N`.
+- **Sight** (`look` with a vision model): the character's own view (the
+  player's fog and wall cutaway lifted for that frame, its own body hidden)
+  goes to the model, which says what it sees in the character's voice; told
+  to it next turn, and shown to the player as a picture card.
+  - In the browser: **Gemma 4 E2B with sight**, the full multimodal
+    `gemma-4-E2B-it.litertlm` (2.6 GB; the web builds are text-only, says the
+    model card), run by `@litert-lm/core@0.19.0-nightly.20261023` with
+    `visionBackend: GPU` (0.14-0.18 cannot take images in the main engine).
+    Tested in the game: ~4 s per picture, accurate and in character.
+    About 3.3 GB of graphics memory with the game: fine on a 6 GB card, too
+    much for 4 GB (the test Chrome ran out once with leftover workers).
+  - Or the endpoint brain's model (Gemma 4 26B takes images), when Brain
+    options > vision is on.
+  - The model downloads from Hugging Face (slow); **to do: mirror it on the
+    R2 bucket** next to the web builds (`MODEL_MIRRORS`), I did not upload
+    anything. A local copy can be named for tests with
+    `localStorage['tablefolk_model_url:gemma4-e2b-vision']`.
+- **Fixed on the way**:
+  - The worker's conversations overflowed the 8192-token context after a
+    few turns ("Input token ids are too long"), and every turn after failed
+    at once (which also made the director fire 20 events in a row): history
+    now kept to a budget, and a retry with none.
+  - The game's temperature never reached the engine; the vision model's own
+    defaults garbled lines, so it now gets the game's (top-p). The web
+    models keep their defaults (what the evals were run with).
+  - Echo guard: lines that copy what anyone said lately (or its own
+    catchphrase again), or quote the history's "grub says ..." wording.
+  - `look` is not on offer for three turns after one.
+  - "You could, right here: carry(note) (2 steps west), dig(north),
+    eat(bun), give(bun) to pip, build(wall)": a short menu in each prompt.
+  - `carry(note)` walks over and picks it up (it ignored its argument);
+    `dig(north)`; walking to a thing stops beside it; `build` never on top
+    of something; unknown emotes read "(grub frowns)".
+  - 404s for prop textures were a stale cache in the test profile only.
+- **Showcase**: `scenarios/goblin-bakery.json` (live, director events). In a
+  4-minute run with E2B: Grub accuses Thistle, Thistle finds and reads the
+  recipe note, Pip digs holes and throws things, the oven smokes; no errors.
+- Tools: `tools/browser-test/live-watch.mjs` (watch a scenario live and
+  keep the transcript), `tools/browser-test/render-tiles.mjs`,
+  `tools/bump.py` (cache-busting versions for changed files and importers).
