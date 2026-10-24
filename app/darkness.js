@@ -109,6 +109,9 @@
     const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
     mat.diffuseColor = mat.specularColor = mat.emissiveColor = BABYLON.Color3.Black(); mat.disableLighting = true;
     if (alpha < 1) { mat.alpha = alpha; mat.disableDepthWrite = true; }
+    // the follow camera cuts the tall boxes to a stub in front of the player
+    // (cutaway.js); their insides, drawn too, close the cut top in black
+    else if (h === FOG_H) { mat.backFaceCulling = false; window.tablefolkCutaway?.attach(mat); }
     m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.doNotSyncBoundingInfo = true;
     return m;
   }
@@ -279,5 +282,5 @@
   }
   function setFog(on) { fogOn = !!on; if (fogOn) update(true); else clearFog(); }
   window.addEventListener('tablefolk-inventory', () => setTimeout(tick, 0));
-  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), get on() { return dark && fogOn; }, carriesTorch, sightFor, torchMesh };
+  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), known: (x, z) => explored.has(Math.round(x) + ',' + Math.round(z)), exploredCount: () => explored.size, get on() { return dark && fogOn; }, carriesTorch, sightFor, torchMesh };
 })();

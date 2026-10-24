@@ -62,11 +62,16 @@
   // nearest local lights; a big merged floor near a dozen lanterns used to
   // get the first ones in scene order and drop the rest (the lava's light).
   // The board's tiles get glow decals instead.
-  const localLights = new Set(), PER_MESH = 4;
+  // Hidden meshes count too (a character in the fog, a door the cutaway
+  // hides): left out, they came back unlit by these lights, grey, until the
+  // next check. The budget is what the 8 a material holds leaves after the
+  // scene's other lights (carried torches come and go).
+  const localLights = new Set(), MAX_LIGHTS = 8;
   function refreshLocalLights() {
     if (!localLights.size || !state.scene) return;
     for (const L of localLights) if (L.isDisposed()) localLights.delete(L);
-    const meshes = state.scene.meshes.filter(m => m.isEnabled() && m.isVisible !== false && !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
+    const others = state.scene.lights.filter(L => !localLights.has(L) && L.isEnabled()).length, PER_MESH = Math.max(1, MAX_LIGHTS - others);
+    const meshes = state.scene.meshes.filter(m => !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
     const per = new Map([...localLights].map(L => [L, []])), pos = new Map([...localLights].map(L => [L, L.getAbsolutePosition()]));
     for (const m of meshes) {
       const s = m.getBoundingInfo?.().boundingSphere; if (!s) continue;

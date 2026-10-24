@@ -2,67 +2,124 @@
  * the way Diablo-like games keep the hero in sight under a high, fixed
  * camera. Used by app.js's "follow" camera (the default with an avatar).
  *
- * It works on the wall geometry itself, for every wall style: in merged
- * meshes (the walls' cores, door frames) the vertices in the cut area are
- * pushed down to the stub height; thin-instanced stones there are hidden;
- * door leaves there are hidden. Recomputed only when the player changes
- * square (or the walls are rebuilt), so it costs nothing per frame.
+ * The cut is made per pixel in the walls' own materials (a material plugin):
+ * a wall fragment above the stub height in the cut area is discarded. The
+ * area is whole squares: the rows in front of the player (towards the
+ * camera, +z), widening with distance. Nothing about the geometry changes
+ * (an older version clamped vertices, which bent long wall faces into
+ * slopes), so every wall style, door frame and door leaf is cut cleanly.
+ * Each cut wall square gets a dark lid at the stub height, so it reads as a
+ * solid low wall rather than a hollow one. The fog of war's black boxes
+ * (darkness.js) are cut the same way, so they never stand over the player.
  *
  *   window.tablefolkCutaway.update(x, z)   cut around this square (camera to the south)
  *   window.tablefolkCutaway.clear()        walls back to full height
- * Loaded after app.js; uses its globals (state).
+ *   window.tablefolkCutaway.attach(mat)    cut this material too (darkness.js's fog)
+ * Loaded after app.js; uses its globals (state, meta).
  */
 (function () {
-  const STUB = .45, AHEAD = .35, DEPTH = 7, WIDE = 8;
-  const orig = new WeakMap();   // mesh -> original positions or matrices
-  let key = '', cut = new Set();
+  // STUB above the floor; rows 1..DEPTH ahead; half width W0 in the first
+  // row, SLOPE more per row after
+  const STUB = .42, DEPTH = 4, W0 = 2.5, SLOPE = .75;
+  const cut = { x: 0, z: 0, on: 0, y: 0 };
+  const inArea = (cx, cz) => { const dz = cz - cut.z; return dz >= 1 && dz <= DEPTH && Math.abs(cx - cut.x) <= W0 + (dz - 1) * SLOPE; };
 
-  // the area that hides the player from a camera standing to the south (+z)
-  const inside = (x, z, px, pz) => z > pz + AHEAD && z < pz + DEPTH && Math.abs(x - px) < WIDE - (z - pz) * .3;
-
-  function meshes() { return (state.wallVisuals || []).filter(m => m && !m.isDisposed?.() && m.getTotalVertices); }
-  function apply(m, px, pz, top, on) {
-    if (m.metadata?.proxy && !m.thinInstanceCount) {
-      // a door leaf: hide it while it is in the way
-      const p = m.getAbsolutePosition(); m.isVisible = !(on && inside(p.x, p.z, px, pz));
-      return;
-    }
-    if (m.thinInstanceCount > 0) {
-      let o = orig.get(m);
-      if (!o) { const b = m._thinInstanceDataStorage?.matrixData; if (!b) return; o = { matrices: new Float32Array(b) }; orig.set(m, o); }
-      const out = new Float32Array(o.matrices), n = out.length / 16;
-      if (on) for (let i = 0; i < n; i++) {
-        const x = out[i * 16 + 12], y = out[i * 16 + 13], z = out[i * 16 + 14];
-        if (y > top + STUB && inside(x, z, px, pz)) for (let k = 0; k < 15; k++) out[i * 16 + k] = 0;
+  let Plugin = null;
+  function pluginClass() {
+    if (Plugin) return Plugin;
+    const WGSL = BABYLON.ShaderLanguage?.WGSL;
+    Plugin = class extends BABYLON.MaterialPluginBase {
+      constructor(mat) { super(mat, 'TablefolkCut', 300, { TFCUT: false }); this._enable(true); }
+      getClassName() { return 'TablefolkCutPlugin'; }
+      isCompatible() { return true; }
+      prepareDefines(defines) { defines.TFCUT = true; }
+      getUniforms(lang) {
+        const ubo = [{ name: 'tfCut', size: 4, type: 'vec4' }, { name: 'tfCutArea', size: 4, type: 'vec4' }];
+        return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFCUT\nuniform vec4 tfCut;\nuniform vec4 tfCutArea;\n#endif\n' };
       }
-      m.thinInstanceSetBuffer('matrix', out, 16, false);
-      return;
-    }
-    let o = orig.get(m);
-    if (!o) {
-      const p = m.getVerticesData(BABYLON.VertexBuffer.PositionKind); if (!p) return;
-      // positions are in the mesh's local space; walls sit at the origin
-      o = { positions: Float32Array.from(p) }; orig.set(m, o);
-      m.markVerticesDataAsUpdatable?.(BABYLON.VertexBuffer.PositionKind, true);
-    }
-    const out = Float32Array.from(o.positions), lim = top + STUB;
-    if (on) for (let i = 0; i < out.length; i += 3) if (out[i + 1] > lim && inside(out[i], out[i + 2], px, pz)) out[i + 1] = lim;
-    m.updateVerticesData(BABYLON.VertexBuffer.PositionKind, out, false, false);
-    m.refreshBoundingInfo?.();
+      bindForSubMesh(ubo) {
+        ubo.updateFloat4('tfCut', cut.x, cut.z, cut.on, cut.y);
+        ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, 0);
+      }
+      getCustomCode(type, lang) {
+        if (type !== 'fragment') return null;
+        if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFCUT
+if (uniforms.tfCut.z > 0.5 && fragmentInputs.vPositionW.y > uniforms.tfCut.w) {
+  let tfc = floor(fragmentInputs.vPositionW.xz + vec2f(0.5)) - uniforms.tfCut.xy;
+  if (tfc.y >= 1.0 && tfc.y <= uniforms.tfCutArea.y && abs(tfc.x) <= uniforms.tfCutArea.x + (tfc.y - 1.0) * uniforms.tfCutArea.z) { discard; }
+}
+#endif
+` };
+        return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFCUT
+if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
+  vec2 tfc = floor(vPositionW.xz + 0.5) - tfCut.xy;
+  if (tfc.y >= 1.0 && tfc.y <= tfCutArea.y && abs(tfc.x) <= tfCutArea.x + (tfc.y - 1.0) * tfCutArea.z) discard;
+}
+#endif
+` };
+      }
+    };
+    return Plugin;
   }
+  const attached = new WeakSet();
+  function attach(mat) {
+    if (!mat || attached.has(mat)) return;
+    if (mat.subMaterials) { attached.add(mat); for (const m of mat.subMaterials) attach(m); return; }
+    attached.add(mat);
+    try { new (pluginClass())(mat); } catch (e) { console.warn('[cutaway] plugin', mat.name, e); }
+  }
+
+  // Lids at the stub height: stone over cut wall squares, black over the
+  // squares the fog of war still hides (a cut fog box is open at the top,
+  // and its floor showed through)
+  const lids = {}; let key = '';
+  function lidMesh(kind) {
+    if (lids[kind] && !lids[kind].isDisposed()) return lids[kind];
+    const sc = state.scene, m = BABYLON.MeshBuilder.CreateBox('cutaway_lid_' + kind, { width: 1.003, depth: 1.003, height: .04 }, sc);
+    if (kind === 'stone') { const mat = new BABYLON.PBRMaterial('cutaway_lid_stone', sc); mat.albedoColor = new BABYLON.Color3(.13, .125, .12); mat.roughness = .9; mat.metallic = 0; mat.maxSimultaneousLights = 8; m.material = mat; m.receiveShadows = true; }
+    else { const mat = new BABYLON.StandardMaterial('cutaway_lid_black', sc); mat.diffuseColor = mat.specularColor = mat.emissiveColor = BABYLON.Color3.Black(); mat.disableLighting = true; m.material = mat; }
+    m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.doNotSyncBoundingInfo = true; m.isVisible = false;
+    return (lids[kind] = m);
+  }
+  function put(kind, list, y) {
+    const m = lidMesh(kind);
+    if (!list.length) { m.isVisible = false; return; }
+    const buf = new Float32Array(list.length * 16);
+    list.forEach(([x, z], n) => BABYLON.Matrix.Translation(x, y, z).copyToArray(buf, n * 16));
+    m.thinInstanceSetBuffer('matrix', buf, 16, false); m.isVisible = true;
+  }
+  function placeLids() {
+    const D = window.tablefolkDark, fog = !!D?.on, stone = [], black = [], walls = new Set();
+    if (cut.on) {
+      for (const b of state.blocks || []) {
+        if (!b || b.isDisposed?.()) continue;
+        const mm = meta(b); if (mm?.type !== 'wall' && mm?.type !== 'door') continue;
+        const p = b.getAbsolutePosition?.() || b.position, x = Math.round(p.x), z = Math.round(p.z);
+        walls.add(x + ',' + z);
+        if (mm.type === 'wall' && inArea(x, z) && (!fog || D.known(x, z))) stone.push([x, z]);
+      }
+      if (fog) for (let dz = 1; dz <= DEPTH; dz++) for (let dx = -Math.ceil(W0 + (dz - 1) * SLOPE); dx <= W0 + (dz - 1) * SLOPE; dx++) {
+        const x = cut.x + dx, z = cut.z + dz;
+        if (inArea(x, z) && !D.known(x, z) && (walls.has(x + ',' + z) || window.tablefolk?.hasGroundAt?.(x, z))) black.push([x, z]);
+      }
+    }
+    put('stone', stone, cut.y - .018); put('black', black, cut.y - .016);
+  }
+
   function update(x, z) {
-    const px = Math.round(x), pz = Math.round(z), list = meshes(), k = px + ',' + pz + '|' + list.reduce((a, m) => a + m.uniqueId, 0);
-    if (k === key) return;
-    key = k;
-    const top = state.terrainTopY ?? 0;
-    for (const m of list) try { apply(m, px, pz, top, true); } catch (e) { console.warn('[cutaway]', m.name, e); }
-    cut = new Set(list);
+    const sc = state.scene; if (!sc) return;
+    for (const m of state.wallVisuals || []) if (m?.material) attach(m.material);
+    cut.x = Math.round(x); cut.z = Math.round(z); cut.on = 1; cut.y = (state.terrainTopY ?? 0) + STUB;
+    // lids again when the player changes square, the walls are rebuilt or more is explored
+    const k = cut.x + ',' + cut.z + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0);
+    if (k !== key) { key = k; placeLids(); }
   }
   function clear() {
-    if (!cut.size) return;
-    const top = state.terrainTopY ?? 0;
-    for (const m of cut) if (!m.isDisposed?.()) try { apply(m, 0, 0, top, false); } catch {}
-    cut = new Set(); key = '';
+    if (!cut.on) return;
+    cut.on = 0; key = '';
+    for (const m of Object.values(lids)) if (!m.isDisposed()) m.isVisible = false;
   }
-  window.tablefolkCutaway = { update, clear };
+  window.tablefolkCutaway = { update, clear, attach };
 })();
