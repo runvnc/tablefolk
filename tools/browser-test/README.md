@@ -64,6 +64,13 @@ working together (walking, combat, darkness, objects); about 2.1 GB of GPU
 memory with the model. Headless Chrome leaves the WebGPU canvas black in
 page screenshots, so the images are read from the canvas (no UI in them);
 `SHOT_CANVAS=1 node shot.mjs out.jpg` does the same by hand.
+
+**Jank** (`node jank.mjs [url] [seconds]`, with a freshly launched Chrome
+for a cold start): every 0.5 s the frames drawn, the longest frame gap, the
+longest time the GPU took to finish a frame (a frozen picture even when the
+main thread is fine) and the longest delay of real mouse moves sent every
+100 ms, next to the model's status lines. Watching only the main thread
+missed the freeze while the model set up: its frames took 1-6.5 s on the GPU.
 Evals live in `evals/`: `shop` (prices in the personality), `shop-role` (the
 shopkeeper role), `feelings` (does a character remember being hit or given
 gold, five turns later).

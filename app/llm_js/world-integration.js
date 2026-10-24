@@ -88,10 +88,12 @@ function setStatus(status, noticeState = null) {
   const text = progress.text;
   const node = el('brainStatus');
   if (node) node.textContent = text;
-  // The model's warm-up keeps the GPU busy for a few seconds, and the
-  // game's own GPU calls then stalled the page: hold rendering meanwhile
-  // (app.js), under a small note, so the page stays responsive.
-  if (/warming up/i.test(text)) window.tablefolkHoldRender?.(true, 'Waking the characters…');
+  // Setting up the model (its weights onto the GPU, then a warm-up) keeps the
+  // GPU busy for several seconds: our frames queued behind it and each took
+  // 1-6.5 s to appear (tools/browser-test/jank.mjs), a frozen picture. Hold
+  // rendering meanwhile (app.js) under a small note: the page stays
+  // responsive and the picture comes back at once, with nothing queued.
+  if (/initializ|warming up/i.test(text)) window.tablefolkHoldRender?.(true, 'Waking the characters…');
   else if (/ready|fail|error|unavailable/i.test(text)) window.tablefolkHoldRender?.(false);
   if (noticeState) updateModelNotice(status, noticeState);
   else if (/ready/i.test(text)) updateModelNotice(status, 'ready');
@@ -530,6 +532,11 @@ async function main() {
     // consent prompt: the user may have changed the dropdown while it was open.
     const liveLabel = manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.label || manager.getModelKey();
     setStatus('auto-loading ' + liveLabel + '...');
+    // Let the world draw its first frames first (shaders, shadows, textures:
+    // a second or so of GPU work): started together with the model's setup
+    // they made the picture hitch for another second after it (jank.mjs).
+    const t0 = performance.now();
+    while (performance.now() - t0 < 6000 && (window.TABLEFOLK_FRAMES || 0) < 45) await new Promise(r => setTimeout(r, 100));
     console.log(cached ? '[character] loading cached model...' : '[character] starting approved download...', liveLabel);
     if (!await loadModelOnce(manager)) return;
     console.log('[character] auto-load completed, enabling buttons...');

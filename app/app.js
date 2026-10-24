@@ -96,11 +96,11 @@ function setOrthoZoom(camera,halfWidth){
   camera.orthoLeft=-halfWidth; camera.orthoRight=halfWidth; camera.orthoTop=halfWidth/aspect; camera.orthoBottom=-halfWidth/aspect;
   camera.metadata ||= {}; camera.metadata.orthoHalfWidth=halfWidth;
 }
-// Hold rendering for a while (at most 25 s), with a note over the picture:
-// world-integration.js does it while the local model warms up.
-let renderHeldUntil=0;
+// Hold rendering for a while (at most 40 s), with a note over the picture:
+// world-integration.js does it while the local model is set up.
+let renderHeldUntil=0, gpuFramesInFlight=0;
 window.tablefolkHoldRender=(on,text='')=>{
-  renderHeldUntil=on?performance.now()+25000:0;
+  renderHeldUntil=on?performance.now()+40000:0;
   let el=document.getElementById('renderHold');
   if(!el && on){ el=document.createElement('div'); el.id='renderHold'; el.innerHTML='<span class="spin"></span><span class="t"></span>'; document.body.appendChild(el); }
   if(el){ el.querySelector('.t').textContent=text; el.classList.toggle('show',!!on); }
@@ -5118,10 +5118,16 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   scene.onBeforeRenderObservable.add(()=>{ if(TABLEFOLK_FORCE_NO_RENDER) return; const now=performance.now(), dt=Math.min(.1,(now-lastAnimAt)/1000); lastAnimAt=now; window.TablefolkPerf?.begin('animate.characters'); animate(dt); window.TablefolkPerf?.end('animate.characters'); }); engine.runRenderLoop(()=>{
     if(TABLEFOLK_FORCE_NO_RENDER) return;
     if(renderHeldUntil && performance.now()<renderHeldUntil) return;
+    // GPU back-pressure: the model shares the GPU, and while it works our
+    // frames queued behind it (seconds each, and WebGPU calls then blocked
+    // the page). At most two frames in flight: a busy GPU slows the picture
+    // instead of jamming it, and input stays live.
+    if(gpuFramesInFlight>=2) return;
     if(window.TABLEFOLK_PAUSE_RENDER){ const fps=thinkFps(); if(fps<=0) return; if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     if(TABLEFOLK_FPS_CAP && performance.now()-lastFrameAt<1000/TABLEFOLK_FPS_CAP) return;
     lastFrameAt=performance.now();
-    scene.render();
+    scene.render(); window.TABLEFOLK_FRAMES=(window.TABLEFOLK_FRAMES||0)+1;
+    const dev=engine._device; if(dev?.queue?.onSubmittedWorkDone){ gpuFramesInFlight++; dev.queue.onSubmittedWorkDone().then(()=>gpuFramesInFlight--,()=>gpuFramesInFlight--); }
     const recorder=window.tablefolkFrameRecorder;
     if(recorder?.wantsFrame?.()) recorder.captureAfterRender(engine).catch(err=>recorder.fail?.(err));
   });
