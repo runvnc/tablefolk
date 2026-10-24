@@ -146,9 +146,10 @@ Besides the static files it serves:
 the terminal (without a terminal it makes one up and writes it to
 `.admin/initial-password.txt`); only a hash is kept, in `.admin/password.json`.
 Delete that file (or start with `--reset-admin`) to set a new one. The page
-has the server status, links (the world for players, the world in dev mode
-`/app/?dev=1`, the world builder), both LLM endpoints with a test button, what
-`/world/` shows players, the players' speech engine (Pocket-TTS small, 18M
+has an overview (status, links to the world for players, the world in dev
+mode `/app/?dev=1`, the world builder), both LLM endpoints with a test button,
+the world builder's models (cloud models offered, what guests may use) and
+what `/world/` shows players, the players' speech engine (Pocket-TTS small, 18M
 parameters, about 40 MB, English: the default; or the 100M one, about 120 MB,
 five languages; each player can pick another in the app's voice pane), voice genders and descriptions (used to cast voices
 and by the generator; also `/api/voices`), recent generations and the saved
@@ -156,21 +157,42 @@ worlds in `generated/` (play, play in dev mode, edit in the builder, delete),
 and a password change. Its settings live in `.admin/settings.json` and win
 over the environment. The `.admin` folder is never served and is git-ignored.
 
-**World builder editor**: in the builder view `/world/<prompt>` stays on the
-page when the scenario is ready and shows it as forms (story, goal and rules,
-player, each character with body, voice, hostile, hit points, brief,
-commands and inventory, the map settings, raw JSON); **play** opens the
-edited version, **quick map** draws the layout top-down with every character
-labelled (generated maps and grids). **Ask the AI for changes** sends the
-scenario and a request to `POST /api/revise` (the generator model) and
-replaces it with the answer; **undo** steps back. **Tabletop map** opens
-`/app/?tabletop=1#s=...` in a frame: the board straight from above with
-names and a grid, characters shown or hidden one by one, save PNG (up to 300
-px per square), print at one inch per square (tiled over letter pages) or on
-one page, full screen for a screen laid flat, and **move things** (drag, R
-turns, Delete removes); **use this layout** sends the scenario back with every
-position fixed. `?go` opens the world straight away as before;
-`/world/?edit=<file>` (admin) edits a saved world.
+**Where the builder's model runs**: the prompt form offers *in this browser*
+(Gemma on the visitor's GPU, step by step), *on this server* (the local model
+server, `litert-lm serve`) and *cloud* (the generator endpoint, OpenRouter by
+default), each with its models (`GET /api/worldgen/options`). An admin can use
+all of them and type any model; guests get what the admin page allows (which
+places, which cloud models), and the server refuses the rest.
+
+**World builder workspace**: when a world is ready the builder stays on the
+page with the **map editor** (`app/map-editor.js`): the board drawn from 2D
+tiles on a canvas (no 3D, so it is instant even for big maps). Drag monsters,
+people and things from the palette onto the map (or pick one and click),
+drag them around, select one to change it on the right (name, body,
+hostile or talking, hit points, weapon, gold, items, brief; a chest's gold and
+items, a note's text), draw walls (W, drag; on a wall it removes), make doors
+and lock them with a named key (D), paint floors (G), erase (X), undo and
+redo (Ctrl+Z / Ctrl+Shift+Z); wheel to zoom, drag the floor to pan, F to fit.
+The first edit turns any layout (generated rooms, a drawn grid) into fixed
+positions (`size`, `objects` with walls and doors, `paint`, everyone's `at`,
+`locked` by position); a world laid out by "map" lines is laid out once by
+the tabletop page in a hidden frame first. Below the map: **ask the AI for
+changes** (`POST /api/revise` with the same model choice, **undo**), and the
+story, player, characters, layout and raw JSON as forms. **Play**, **play in
+dev mode**, **print / tabletop** (`/app/?tabletop=1`: PNG, print at one inch
+per square, a screen laid flat, move things there too), **copy link**,
+**download**. `?go` opens the world straight away; `/world/?edit=<file>`
+(admin) edits a saved world.
+
+**Tiles** (`assets/tiles/`): a picture of every object, body and floor, seen
+from the south about 58 degrees up (floors straight down), on a transparent
+background, 128 pixels per square, rendered from the 3D models by the app
+itself: `/app/?tabletop=1&tiles=1[&only=a,b]` (`app/tile-render.js`), saved by
+`tools/browser-test/render-tiles.mjs`. `tiles.json` lists each one with its size
+and anchor (where the middle of its square, on the floor, falls in the
+image). Anything without a tile (a new pack item, a new body) is rendered on
+the spot by the map editor in a hidden frame, kept in that browser, and for a
+logged-in admin saved on the server (`POST /api/admin/tiles`).
 
 Settings come from the environment or `.env` (`OPENROUTER_API_KEY=` is used for
 OpenRouter). The server listens on 127.0.0.1 only unless `HOST` is set, since

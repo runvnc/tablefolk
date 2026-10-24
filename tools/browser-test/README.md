@@ -71,6 +71,10 @@ longest time the GPU took to finish a frame (a frozen picture even when the
 main thread is fine) and the longest delay of real mouse moves sent every
 100 ms, next to the model's status lines. Watching only the main thread
 missed the freeze while the model set up: its frames took 1-6.5 s on the GPU.
+**Tiles** (`node render-tiles.mjs [base] [only=a,b] [ppu]`): renders the 2D
+tiles of every object, body and floor in the test Chrome
+(`/app/?tabletop=1&tiles=1`) and writes `assets/tiles/` and its `tiles.json`;
+about 4 minutes for all of them, or pass a comma list.
 Evals live in `evals/`: `shop` (prices in the personality), `shop-role` (the
 shopkeeper role), `feelings` (does a character remember being hit or given
 gold, five turns later).
