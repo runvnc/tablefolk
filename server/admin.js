@@ -74,6 +74,18 @@ function cookies(req) { return Object.fromEntries((req.headers.get('cookie') || 
 // Used for model choices and the AI proxies; the admin page itself always
 // needs the password.
 export const ownerRequests = new WeakSet();
+// Each request's client address (server.js), and a per-address limiter for
+// the costly endpoints: limit(req, 'generate', 6, 3600e3) is false while the
+// visitor has made fewer than 6 such requests in the last hour.
+export const requestIps = new WeakMap();
+const buckets = new Map();
+export function overLimit(req, name, n, ms) {
+  if (isAdmin(req)) return false;
+  const key = name + '|' + (requestIps.get(req) || '?'), now = Date.now();
+  const h = (buckets.get(key) || []).filter(t => now - t < ms); h.push(now); buckets.set(key, h);
+  if (buckets.size > 20000) for (const [k, v] of buckets) if (!v.length || now - v[v.length - 1] > 864e5) buckets.delete(k);
+  return h.length > n;
+}
 export function isAdmin(req) { return authed(req) || ownerRequests.has(req); }
 function authed(req) {
   const t = cookies(req).tf_admin, exp = t && sessions.get(t);

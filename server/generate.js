@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import { OpenAI, collect } from '../app/llm_js/openai-client.js';
 import { config, ROOT, endpoint, LITERT_URL } from './config.js';
-import { isAdmin } from './admin.js';
+import { isAdmin, overLimit } from './admin.js';
 import { voicesText } from './settings.js';
 
 // The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
@@ -246,7 +246,8 @@ export async function handleRevise(req, url) {
   const request = String(body?.request || '').trim().slice(0, 2000), scenario = body?.scenario;
   if (!request || !scenario || typeof scenario !== 'object') return Response.json({ error: 'scenario and request required' }, { status: 400 });
   if (JSON.stringify(scenario).length > 400000) return Response.json({ error: 'scenario too large' }, { status: 413 });
-  const ep = pickEndpoint(url, req), enc = new TextEncoder();
+  let ep = pickEndpoint(url, req); const enc = new TextEncoder();
+  if (!ep.error && overLimit(req, 'revise', 20, 3600e3)) ep = { error: 'too many changes this hour: try again later' };
   if (ep.error) return Response.json({ error: ep.error }, { status: 403 });
   const stream = new ReadableStream({
     async start(ctl) {
@@ -266,7 +267,10 @@ function failed(prompt, ep, e) {
 export async function handleGenerate(req, url) {
   const prompt = (url.searchParams.get('prompt') || '').trim().slice(0, 2000);
   if (!prompt) return Response.json({ error: 'prompt required' }, { status: 400 });
-  const mode = url.searchParams.get('mode') || 'auto', ep = pickEndpoint(url, req);
+  const mode = url.searchParams.get('mode') || 'auto';
+  // a visitor builds at most 8 worlds an hour with the server's models
+  let ep = pickEndpoint(url, req);
+  if (!ep.error && overLimit(req, 'generate', 8, 3600e3)) ep = { error: 'you have built a lot of worlds this hour: try again later, or build in your browser' };
   // a stream (EventSource) gets the refusal as its "failed" event
   if (ep.error && url.searchParams.get('stream') === '1') return new Response(`event: failed\ndata: ${JSON.stringify({ error: ep.error })}\n\n`, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
   if (ep.error) return Response.json({ error: ep.error }, { status: 403 });
@@ -294,7 +298,12 @@ export async function handleGenerate(req, url) {
 // for the model to fix, else it is saved and its link returned.
 export async function handleFinish(req) {
   if (req.method !== 'POST') return Response.json({ error: 'POST {scenario, prompt}' }, { status: 405 });
-  const { scenario, prompt = '', model = 'browser', ms = 0 } = await req.json().catch(() => ({}));
+  const text = await req.text().catch(() => '');
+  const cors0 = { 'Access-Control-Allow-Origin': '*' };
+  if (text.length > 400000) return Response.json({ error: 'scenario too large' }, { status: 413, headers: cors0 });
+  if (overLimit(req, 'finish', 30, 3600e3)) return Response.json({ error: 'too many worlds saved this hour' }, { status: 429, headers: cors0 });
+  let parsed = {}; try { parsed = JSON.parse(text); } catch {}
+  const { scenario, prompt = '', model = 'browser', ms = 0 } = parsed || {};
   let problems;
   try { problems = checkScenario(scenario); } catch (e) { problems = [e.message]; }
   const cors = { 'Access-Control-Allow-Origin': '*' };   // tools/browser-test/worldgen-test.html runs on another port

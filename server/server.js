@@ -21,7 +21,7 @@ import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate, handleRevise, handleFinish, worldgenOptions } from './generate.js';
-import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests } from './admin.js';
+import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
 
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
@@ -159,6 +159,7 @@ const server = Bun.serve({
     const fwd = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
     const url = new URL(req.url), ip = fwd || srv?.requestIP?.(req)?.address || '', local = !fwd && /^(127\.|::1$|::ffff:127\.)/.test(ip);
     if (local) ownerRequests.add(req);
+    requestIps.set(req, ip);
     const p = url.pathname;
     if (p === '/') return Response.redirect('/app/', 302);
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud', local);
@@ -167,7 +168,11 @@ const server = Bun.serve({
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
     if (p === '/api/revise') return handleRevise(req, url);
     if (p === '/api/finish') return handleFinish(req);
-    if (p === '/api/transcribe' && req.method === 'POST') return transcribe(req);
+    if (p === '/api/transcribe' && req.method === 'POST') {
+      if (!isAdmin(req) && !config.guestBrain?.local) return Response.json({ error: 'speech input through this server is not open to visitors' }, { status: 403 });
+      if (overLimit(req, 'transcribe', 60, 600e3)) return Response.json({ error: 'too many requests: wait a few minutes' }, { status: 429 });
+      return transcribe(req);
+    }
     if (p === '/api/skills') return listSkills();
     if (p === '/api/roles') return listRoles();
     if (p === '/world' || p.startsWith('/world/')) return handleWorld(req, url, { saved: url.searchParams.get('edit') ? savedWorld(req, url.searchParams.get('edit')) : null });
