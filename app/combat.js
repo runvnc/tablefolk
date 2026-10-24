@@ -168,10 +168,22 @@
     return list.find(o => o.id?.toLowerCase() === t) || list.find(o => o.id?.toLowerCase().includes(t)) || null;
   }
 
+  // what a blow sounds like, by weapon kind (sfx.js)
+  const HIT_SOUND = { fists: 'hit', natural: 'hit', sword: 'hitBlade', axe: 'hitBlade', dagger: 'hitBlade', spear: 'hitBlade', club: 'hitBlunt', mace: 'hitBlunt', hammer: 'hitBlunt', staff: 'hitBlunt' };
+  function swingAnim(g) {
+    const wName = wielded(g), w = wName && (weaponFor(wName) || { kind: 'club' });
+    playClip(g, !w ? ['Melee_Unarmed_Attack_Punch_A'] : w.two ? ['Melee_2H_Attack_Chop'] : ['Melee_1H_Attack_Chop'], 900);
+    window.tablefolkHands?.swing(w || { kind: 'fists' });
+  }
   function attack(g, target) {
     if (g.defeated) return;
     const v = resolveTarget(g, target);
-    if (!v) { narrate(g, `attack failed: no ${target || 'one'} to attack${target ? '' : ' within reach'}`); if (isPlayer(g)) window.tablefolkToast?.(target ? `no ${target} here` : 'nobody within reach', { type: 'error' }); return; }
+    if (!v) {
+      narrate(g, `attack failed: no ${target || 'one'} to attack${target ? '' : ' within reach'}`);
+      // the player still swings at the air (a key press should always do something)
+      if (isPlayer(g)) { if (target) window.tablefolkToast?.(`no ${target} here`, { type: 'error' }); else { swingAnim(g); window.tablefolkSfx?.play('swing'); } }
+      return;
+    }
     const d = gap(g, v);
     if (d > REACH) { narrate(g, `attack failed: ${nameOf(v)} is ${d.toFixed(1)} cells away; walk next to them first`); if (isPlayer(g)) window.tablefolkToast?.(`${nameOf(v)} is too far away`, { type: 'error' }); return; }
     const nat = !isPlayer(g) && NATURAL[g.charModel];
@@ -180,6 +192,8 @@
     try { setCharacterFacing(g, new BABYLON.Vector3(v.root.position.x - g.root.position.x, 0, v.root.position.z - g.root.position.z).normalize()); } catch {}
     const clip = w.kind === 'fists' ? ['Melee_Unarmed_Attack_Punch_A', 'Melee_Unarmed_Attack_Kick'] : w.two ? ['Melee_2H_Attack_Chop', 'Melee_2H_Attack_Slice'] : w.kind === 'dagger' || w.kind === 'spear' ? ['Melee_1H_Attack_Stab'] : ['Melee_1H_Attack_Chop', 'Melee_1H_Attack_Slice_Diagonal', 'Melee_1H_Attack_Slice_Horizontal'];
     playClip(g, clip, 900);
+    window.tablefolkSfx?.play(w.two || w.kind === 'natural' && w.dmg >= 3 ? 'swingHeavy' : 'swing', g.root.position);
+    if (isPlayer(g)) window.tablefolkHands?.swing(w);
     const miss = Math.random() < .15, dmg = miss ? 0 : w.dmg + (Math.random() < .35 ? 1 : 0);
     const who = nameOf(g), whom = nameOf(v);
     const wThe = w.kind === 'natural' ? 'its ' + w.name : w.name === 'fists' ? 'bare fists' : 'the ' + w.name, wA = w.kind === 'natural' ? 'its ' + w.name : withA(w.name);
@@ -187,7 +201,7 @@
     if (isPlayer(g)) setTimeout(() => window.tablefolkPlay?.acted('attack'), 450);
     setTimeout(() => {
       if (v.defeated) return;
-      window.tablefolkSfx?.play(miss ? 'miss' : 'hit', v.root.position);
+      window.tablefolkSfx?.play(miss ? 'miss' : HIT_SOUND[w.kind] || 'hitBlunt', v.root.position);
       if (miss) { floatText(v, 'miss', '#cccccc'); narrate(g, `${who} swings at ${whom} with ${wThe} and misses`); tellVictim(v, `[event] ${who} attacks you with ${wA} and misses!`, who, false); tellWitnesses(g, v, `[event] ${who} attacks ${whom} with ${wA} and misses.`); return; }
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
@@ -297,7 +311,9 @@
   addEventListener('keydown', e => {
     if (e.key !== 'f' && e.key !== 'F') return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || e.ctrlKey || e.metaKey || e.altKey) return;
-    const g = state.playerAvatar; if (!g || g.defeated || state.npcBusy) return;
+    const g = state.playerAvatar; if (!g || g.defeated || e.repeat) return;
+    // a press that does nothing feels broken: say why
+    if (state.npcBusy) { window.tablefolkToast?.('wait: the others are taking their turn'); return; }
     attack(g, '');
   });
 
@@ -307,5 +323,5 @@
     renderPlayerHp();
   }
 
-  window.tablefolkCombat = { attack, wield, hpOf, setHp, defeat, hurt, heal, playClip, nameOf, resolveTarget, selfLine, statusWord, weaponFor, showWeapon, playerCommand, renderPlayerHp, reset, REACH };
+  window.tablefolkCombat = { attack, wield, weaponMesh, wielded, hpOf, setHp, defeat, hurt, heal, playClip, nameOf, resolveTarget, selfLine, statusWord, weaponFor, showWeapon, playerCommand, renderPlayerHp, reset, REACH };
 })();

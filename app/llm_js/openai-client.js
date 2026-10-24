@@ -80,11 +80,12 @@ export async function collect(result, onToken = null, onReasoning = null) {
     const c = result?.choices?.[0];
     return { text: c?.message?.content || '', finish_reason: c?.finish_reason, usage: result?.usage };
   }
-  let text = '', finish_reason = null, usage = null, thought = 0;
+  let text = '', finish_reason = null, usage = null, thought = 0, tail = '';
   for await (const chunk of result) {
     const c = chunk.choices?.[0];
     const r = c?.delta?.reasoning ?? c?.delta?.reasoning_content;
-    if (r) { thought += r.length; onReasoning?.(thought); }
+    // onReasoning(chars so far, the last ~600 chars of the thought text)
+    if (r) { thought += r.length; tail = (tail + r).slice(-600); onReasoning?.(thought, tail); }
     if (c?.delta?.content) { text += c.delta.content; onToken?.(text); }
     if (c?.finish_reason) finish_reason = c.finish_reason;
     if (chunk.usage) usage = chunk.usage;

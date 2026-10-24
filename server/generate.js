@@ -173,8 +173,8 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
     const out = await collect(await client.chat.completions.create({ model: ep.model, messages, stream: true, temperature: 0.7, max_tokens: maxTokens }), text => {
       chars = text.length;
       if (chars - last > 120) { last = chars; emit('progress', { stage: round ? 'repairing' : 'writing', chars, preview: text.slice(-160) }); }
-    }, thought => {
-      if (!chars && (lastT < 0 || thought - lastT > 200)) { lastT = thought; emit('progress', { stage: 'thinking', thought }); }
+    }, (thought, tail) => {
+      if (!chars && (lastT < 0 || thought - lastT > 80)) { lastT = thought; emit('progress', { stage: 'thinking', thought, preview: tail.slice(-220) }); }
     });
     raw = out.text;
     try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario); }
@@ -272,7 +272,8 @@ input[name=p]{flex:1 1 280px}button{background:var(--accent);color:var(--bg);bor
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 #stage{font-weight:600}#clock{color:var(--muted);font-variant-numeric:tabular-nums}
 #preview{font:12px/1.4 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-all;max-height:7.5em;overflow:hidden;margin-top:.5rem}
-#problems{color:#b5542e;font-size:.9rem}a{color:var(--accent)}
+#problems{color:#b5542e;font-size:.9rem}a{color:var(--accent)}#preview.thought{font-style:italic;font-family:inherit;word-break:normal}
+.load #stage{display:block;margin-top:1rem;font-weight:500;font-size:.85rem;color:var(--muted)}.load #preview{text-align:left;max-height:4.4em;opacity:.8;-webkit-mask-image:linear-gradient(transparent,#000 40%);mask-image:linear-gradient(transparent,#000 40%)}
 .load{margin-top:14vh;text-align:center}.load h1{font-size:1.6rem}
 .bar{height:14px;border-radius:7px;background:var(--track);overflow:hidden;margin:1.4rem 0 .7rem}
 #fill{height:100%;width:0;background:var(--accent);border-radius:7px}
@@ -333,7 +334,11 @@ if(words){
   const stageText={waiting:'waiting for the model',thinking:'thinking',writing:'writing',repairing:'fixing problems',problems:'fixing problems'};
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
-    $('stage').textContent=(stageText[d.stage]||d.stage)+'…'+(d.model?' ('+d.model+')':'')+(d.chars?' '+d.chars+' chars':'');
+    // about 4 characters a token
+    const tok=n=>' ~'+Math.round(n/4).toLocaleString()+' tokens';
+    $('stage').textContent=(stageText[d.stage]||d.stage)+'…'+(d.model?' ('+d.model+')':'')+(d.chars?tok(d.chars):d.thought?tok(d.thought)+' of thought':'');
+    if(view==='loading' && (d.thought||d.chars)){ $('stage').hidden=false; $('preview').hidden=false; }
+    $('preview').classList.toggle('thought',d.stage==='thinking');
     if(d.chars>seenChars){ pos+=(d.chars-seenChars)*PER_CHAR; seenChars=d.chars; }
     if(d.thought>seenThought){ pos+=(d.thought-seenThought)*PER_THOUGHT; seenThought=d.thought; }
     if(d.stage==='repairing' && !d.chars) seenChars=0;

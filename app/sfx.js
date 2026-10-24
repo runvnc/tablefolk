@@ -1,15 +1,17 @@
 /* sfx.js -- small synthesized sound effects (Web Audio, no files).
  *
  *   window.tablefolkSfx.play(name, pos)   name: doorOpen, doorClose,
- *       chestOpen, coins, pickup, hit, miss, step
+ *       chestOpen, coins, pickup, swing, swingHeavy, hit (fists), hitBlade,
+ *       hitBlunt, miss, step
  *   pos (optional {x, z}): quieter with distance from the listener (the
  *   player's avatar, else the camera target).
  *   window.tablefolkSfx.enabled           false mutes (saved in localStorage)
  *
  * The audio context starts on the first click or key press (browsers block
- * sound before a user gesture). Doors play recorded samples (Kenney's RPG
- * Audio, CC0, assets/sounds/kenney-rpg/), one picked at random; the rest
- * are synthesized, as are doors until their samples have loaded.
+ * sound before a user gesture). Doors and hits play recorded samples
+ * (Kenney's RPG Audio and Impact Sounds, CC0, assets/sounds/kenney-*), one
+ * picked at random, layered with a synthesized thump; the rest are
+ * synthesized, as are all of them until the samples have loaded.
  */
 (function () {
   let ctx = null, master = null, noiseBuf = null;
@@ -25,24 +27,30 @@
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return ctx;
   }
+  const n5 = (dir, f) => [0, 1, 2, 3, 4].map(i => dir + f + '_00' + i);
   const SAMPLES = {
-    doorOpen: ['doorOpen_1', 'doorOpen_2'],
-    doorClose: ['doorClose_1', 'doorClose_2', 'doorClose_3', 'doorClose_4'],
+    doorOpen: ['kenney-rpg/doorOpen_1', 'kenney-rpg/doorOpen_2'],
+    doorClose: ['kenney-rpg/doorClose_1', 'kenney-rpg/doorClose_2', 'kenney-rpg/doorClose_3', 'kenney-rpg/doorClose_4'],
+    punch: n5('kenney-impact/', 'impactPunch_heavy').concat(n5('kenney-impact/', 'impactPunch_medium')),
+    slice: ['kenney-rpg/knifeSlice', 'kenney-rpg/knifeSlice2', 'kenney-rpg/chop'],
+    soft: n5('kenney-impact/', 'impactSoft_heavy'),
+    metal: n5('kenney-impact/', 'impactMetal_medium'),
   };
   const decoded = {}; let loading = false;
   function loadSamples() {
     if (loading || !ctx) return; loading = true;
-    const base = new URL('../assets/sounds/kenney-rpg/', document.baseURI);
+    const base = new URL('../assets/sounds/', document.baseURI);
     for (const [name, files] of Object.entries(SAMPLES)) for (const f of files)
-      fetch(new URL(f + '.ogg?v=20261023a', base)).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+      fetch(new URL(f + '.ogg?v=20261024a', base)).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
         .then(b => ctx.decodeAudioData(b)).then(buf => (decoded[name] ||= []).push(buf))
         .catch(e => console.warn('sfx sample', f, e));
   }
-  function sample(name, out, t) {
+  function sample(name, out, t, gain = 1) {
     const list = decoded[name]; if (!list?.length) return false;
     const src = ctx.createBufferSource(); src.buffer = list[Math.floor(Math.random() * list.length)];
     src.playbackRate.value = .94 + Math.random() * .12;
-    src.connect(out); src.start(t);
+    let to = out; if (gain !== 1) { to = ctx.createGain(); to.gain.value = gain; to.connect(out); }
+    src.connect(to); src.start(t);
     return true;
   }
   const wake = () => { try { audio()?.resume(); loadSamples(); } catch {} };
@@ -102,6 +110,21 @@
     tone(t, .05, { wave: 'triangle', f0: 2600, f1: 1800, gain: gain * .5, attack: .001 }).g.connect(out);
   }
 
+  // A swing through the air: noise through a band that sweeps up and back
+  // down, loudest mid-swing.
+  function whoosh(out, t, dur, f0, f1, gain) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.6;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur * .55); f.frequency.exponentialRampToValueAtTime(f0 * .8, t + dur);
+    const g = ctx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + dur * .5); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(out); src.start(t, Math.random() * .5); src.stop(t + dur + .05);
+  }
+  // the weight of a blow landing: a short falling sine and a dull knock
+  function thump(out, t, gain) {
+    tone(t, .16, { f0: 120, f1: 45, gain: .55 * gain, attack: .002 }).g.connect(out);
+    noise(t, .08, { type: 'lowpass', freq: 500, gain: .5 * gain, attack: .001 }).connect(out);
+  }
+
   const SOUNDS = {
     doorOpen(out, t) { latch(out, t); creak(out, t + .03, .5, { rate0: 22, rate1: 55, body: 820 + Math.random() * 200 }); },
     doorClose(out, t) {
@@ -120,8 +143,14 @@
       }
     },
     pickup(out, t) { tone(t, .12, { wave: 'triangle', f0: 520, f1: 880, gain: .18 }).g.connect(out); tone(t + .08, .14, { wave: 'triangle', f0: 880, f1: 1320, gain: .14 }).g.connect(out); },
-    hit(out, t) { noise(t, .14, { type: 'lowpass', freq: 900, gain: .7 }).connect(out); tone(t, .12, { f0: 160, f1: 60, gain: .4 }).g.connect(out); },
-    miss(out, t) { noise(t, .22, { type: 'bandpass', freq: 1800, q: .6, gain: .25, attack: .06 }).connect(out); },
+    swing(out, t) { whoosh(out, t, .26, 700, 2600, .55); },
+    swingHeavy(out, t) { whoosh(out, t, .38, 380, 1500, .7); },
+    // fists: a recorded punch over a low body thump
+    hit(out, t) { sample('punch', out, t, 1.1) || noise(t, .14, { type: 'lowpass', freq: 900, gain: .7 }).connect(out); thump(out, t, .9); },
+    hitBlade(out, t) { sample('slice', out, t, .9); sample('punch', out, t + .01, .7) || noise(t, .1, { type: 'highpass', freq: 2500, gain: .4 }).connect(out); thump(out, t, .6); },
+    hitBlunt(out, t) { sample('soft', out, t, 1) || sample('punch', out, t); thump(out, t, 1.1); },
+    hitMetal(out, t) { sample('metal', out, t, .8); sample('punch', out, t, .6); thump(out, t, .5); },
+    miss(out, t) { whoosh(out, t, .18, 1400, 600, .2); },
     step(out, t) { noise(t, .07, { type: 'lowpass', freq: 420, gain: .18 }).connect(out); },
   };
 
@@ -130,7 +159,7 @@
     if (!audio() || ctx.state !== 'running') return;
     const v = volumeAt(pos); if (v < .02) return;
     const out = ctx.createGain(); out.gain.value = v; out.connect(master);
-    try { sample(name, out, ctx.currentTime) || SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
+    try { (SAMPLES[name] && sample(name, out, ctx.currentTime)) || SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
     setTimeout(() => { try { out.disconnect(); } catch {} }, 3000);
   }
 

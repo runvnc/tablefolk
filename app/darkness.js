@@ -9,6 +9,10 @@
  * right next to the player. Squares seen before stay on the map, dimmed;
  * characters there are hidden until seen again.
  *
+ * In first person the boxes would stand in the room like black glass, so
+ * there they are hidden and the dark is a black distance fog instead (the
+ * same squares still hide the characters in them).
+ *
  * Torches: anyone with a "torch" in their inventory carries it lit, in the
  * left hand (a warm light and a glow on the floor that follow them). Standing
  * torches can be picked up (E). In dark dungeons the player starts with one.
@@ -127,6 +131,7 @@
     // names start "board_" so scenery.js's local lights leave them alone
     black ||= fogMesh('board_fog_black', 1); dim ||= fogMesh('board_fog_dim', .62); flat ||= fogMesh('board_fog_flat', 1, FLAT_H);
     place(black, unknown); place(dim, remembered); place(flat, outside, (state.terrainTopY ?? 0) - .02 - FLAT_H / 2);
+    for (const m of [black, dim, flat]) m.setEnabled(!fpFog);
   }
   function showCharacters(all) {
     for (const g of state.characters) {
@@ -135,7 +140,20 @@
       if (!!g._fogHidden === show) { g._fogHidden = !show; g.root.setEnabled(show); }
     }
   }
+  // first person: no boxes, a black fog (the overview's is put back after)
+  let fpFog = null;
+  function firstPersonFog(want) {
+    const sc = state.scene; if (!sc || !!fpFog === want) return;
+    if (want) {
+      fpFog = { mode: sc.fogMode, density: sc.fogDensity, color: sc.fogColor.clone(), clear: sc.clearColor.clone() };
+      sc.fogMode = BABYLON.Scene.FOGMODE_EXP2; sc.fogDensity = .14; sc.fogColor = C3(0, 0, 0); sc.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+    } else {
+      sc.fogMode = fpFog.mode; sc.fogDensity = fpFog.density; sc.fogColor = fpFog.color; sc.clearColor = fpFog.clear; fpFog = null;
+    }
+    for (const m of [black, dim, flat]) m?.setEnabled(!want);
+  }
   function update(force) {
+    firstPersonFog(!!(dark && fogOn && state.firstPerson));
     if (!dark || !fogOn || !state.playerAvatar) return;
     seen = compute();
     for (const k of seen) explored.add(k);
@@ -144,6 +162,7 @@
     showCharacters(false);
   }
   function clearFog() {
+    firstPersonFog(false);
     for (const m of [black, dim, flat]) if (m) { m.dispose(false, true); }
     black = dim = flat = null; sig = '';
     showCharacters(true);
@@ -176,7 +195,9 @@
   }
   function lightTorch(g) {
     const sc = state.scene, t = { mesh: torchMesh() }, hand = leftHand(g);
-    if (hand) { t.mesh.root.parent = hand; hand.computeWorldMatrix(true); t.mesh.root.scaling.setAll(1 / (Math.abs(hand.absoluteScaling?.y) || 1)); }
+    // in a hand it only follows the hand's position, kept upright (hand bones
+    // point every which way: parented, the flame faced the floor)
+    if (hand) t.hand = hand;
     else { t.mesh.root.parent = g.root; t.mesh.root.position.set(.24 / (g.root.scaling.x || 1), .55 / (g.root.scaling.y || 1), .08); t.mesh.root.scaling.setAll(1 / (g.root.scaling.y || 1)); }
     // the light and the floor glow follow the character, unscaled
     t.holder = new BABYLON.TransformNode('torch_holder', sc);
@@ -186,6 +207,14 @@
     try { addLampPool(sc, t.holder, { warm: true }); } catch {}
     t.obs = sc.onBeforeRenderObservable.add(() => {
       const p = g.root.position; t.holder.position.set(p.x, state.terrainTopY ?? 0, p.z);
+      if (t.hand) {
+        // a little ahead of the body, so the flame clears the shoulder
+        const yaw = g.root.rotation.y;
+        t.hand.computeWorldMatrix(true); t.mesh.root.position.copyFrom(t.hand.getAbsolutePosition());
+        t.mesh.root.position.x -= Math.sin(yaw) * .1; t.mesh.root.position.z -= Math.cos(yaw) * .1;
+        // leaning a little forward, the way it is held
+        t.mesh.root.rotation.set(.22, g.root.rotation.y + Math.PI, 0);
+      }
       const f = performance.now() * .006;
       t.light.intensity = 1.6 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
       t.mesh.flame.scaling.set(1, 1 + Math.sin(f * 1.7) * .15, 1);
@@ -203,7 +232,8 @@
       if (!g?.root || g.root.isDisposed?.()) continue;
       const want = carriesTorch(g);
       if (want && !g._torch) lightTorch(g); else if (!want && g._torch) putOut(g);
-      if (g._torch) g._torch.mesh.root.setEnabled(!g._fogHidden);
+      // in first person your own torch is drawn in your hand (fp-hands.js)
+      if (g._torch) g._torch.mesh.root.setEnabled(!g._fogHidden && !(g === state.playerAvatar && state.firstPerson));
     }
   }
 
@@ -217,5 +247,5 @@
   }
   function setFog(on) { fogOn = !!on; if (fogOn) update(true); else clearFog(); }
   window.addEventListener('tablefolk-inventory', () => setTimeout(tick, 0));
-  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), get on() { return dark && fogOn; }, carriesTorch, sightFor };
+  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), get on() { return dark && fogOn; }, carriesTorch, sightFor, torchMesh };
 })();

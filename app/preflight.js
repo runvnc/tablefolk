@@ -30,7 +30,7 @@
     ['recorder.js?v=20261018a'],
     ['confirm-dialog.js?v=20261018a'],
     ['toast.js?v=20261018a'],
-    ['sfx.js?v=20261023a'],
+    ['sfx.js?v=20261024a'],
     ['ui-polish.js?v=20261019g'],
     ['tabs.js?v=20261022d'],
     ['library.js?v=20261018a'],
@@ -44,10 +44,11 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261023y'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261024i'],
+    ['app.js?v=20261024j'],
     ['scenery.js?v=20261019ze'],
-    ['combat.js?v=20261024i'],
-    ['darkness.js?v=20261023q'],
+    ['combat.js?v=20261024j'],
+    ['darkness.js?v=20261024a'],
+    ['fp-hands.js?v=20261024a'],
     ['senses.js?v=20261023p'],
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261024d'],
@@ -62,7 +63,7 @@
     ['scenario.js?v=20261024i'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261023j'],
-    ['llm_js/world-integration.js?v=20261024e', 'module'],
+    ['llm_js/world-integration.js?v=20261024f', 'module'],
   ];
 
   function browserSummary() {
