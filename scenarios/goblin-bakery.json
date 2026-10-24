@@ -1,0 +1,155 @@
+{
+ "v": 1,
+ "title": "The Goblin Bakery",
+ "subtitle": "Someone has stolen Grub's pie recipe. Everyone is a suspect.",
+ "intro": "Grub the goblin baker is sure someone stole his secret pie recipe. His rival Thistle runs the stall across the room, and Pip the rat-catcher is very, very hungry. Press P (or \"let them live\") and watch, or step in.",
+ "live": true,
+ "base": "plain",
+ "lighting": "bright",
+ "walls": "stone",
+ "floor": "wood",
+ "campfire": false,
+ "director": 4,
+ "player": {
+  "name": "Customer",
+  "gold": 20,
+  "items": [],
+  "model": "peasant"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "throw",
+  "dig",
+  "build",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "food": [
+  "pie",
+  "bread",
+  "bun",
+  "crumbs"
+ ],
+ "lore": [
+  "Grub's pie recipe was written on a scrap of paper and kept in the chest.",
+  "Thistle has wanted Grub's recipe for years.",
+  "Pip catches rats for a living but has caught none this week."
+ ],
+ "events": [
+  {
+   "text": "Smoke pours out of the oven. Something is burning!"
+  },
+  {
+   "text": "A customer bangs on the window and shouts: \"Is the pie ready yet?\""
+  },
+  {
+   "text": "{who} spots a floury footprint on the floor that is not their own."
+  },
+  {
+   "text": "A rat darts between {who}'s feet and vanishes under the counter."
+  },
+  {
+   "text": "A scrap of paper flutters out from behind a barrel.",
+   "spawn": "note",
+   "note": "Secret pie: three apples, one onion (do not tell Thistle), a pinch of rat."
+  },
+  {
+   "text": "The bell over the door rings, but nobody comes in."
+  }
+ ],
+ "agents": [
+  {
+   "id": "grub",
+   "model": "goblin",
+   "style": "anxious goblin baker",
+   "ttsVoiceId": "builtin:jean",
+   "personality": "Grub, a goblin baker who is proud, jumpy and dramatic. Your secret pie recipe has gone missing from your chest and you are sure someone here took it. You suspect Thistle most, but you suspect everyone a little. You sell bread for 2 gold and pie for 5 gold. You make big accusations, then take them back when someone is nice to you. You love being praised for your pies.",
+   "inventory": {
+    "gold": 12,
+    "items": [
+     {
+      "name": "bread",
+      "qty": 3
+     },
+     {
+      "name": "pie",
+      "qty": 2
+     },
+     {
+      "name": "rolling pin",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "thistle",
+   "model": "witch",
+   "style": "smug rival baker",
+   "ttsVoiceId": "builtin:eponine",
+   "personality": "Thistle, a smug baker who runs the stall across the room from Grub. You did NOT take the recipe, but you are delighted that it is gone and you would love to find it before Grub does. You tease Grub, flatter customers, and sell buns for 1 gold, cheaper than anything Grub sells. You secretly cannot bake pies at all.",
+   "inventory": {
+    "gold": 20,
+    "items": [
+     {
+      "name": "bun",
+      "qty": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "pip",
+   "model": "peasant",
+   "style": "starving rat-catcher",
+   "ttsVoiceId": "builtin:marius",
+   "personality": "Pip, a rat-catcher who has not eaten for two days and has no money. You are polite but you think only about food. You will do odd jobs, tell lies, or chase rats for a bite of pie. You did not take the recipe, but you saw a rat drag a scrap of paper behind the barrels.",
+   "inventory": {
+    "gold": 0,
+    "items": [
+     {
+      "name": "rat trap",
+      "qty": 1
+     }
+    ]
+   }
+  }
+ ],
+ "grid": [
+  "#############",
+  "#oKK...KK.BB#",
+  "#...........#",
+  "#.tt..1.....#",
+  "#...........#",
+  "#.....3.....#",
+  "#...........#",
+  "#.nn..2..ss.#",
+  "#...........#",
+  "#B.........C#",
+  "######Y######"
+ ],
+ "legend": {
+  "h": "chest"
+ },
+ "objects": [
+  {
+   "type": "chest",
+   "x": -3,
+   "z": -2,
+   "gold": 4,
+   "items": [
+    "flour sack"
+   ]
+  }
+ ]
+}

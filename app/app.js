@@ -3040,6 +3040,13 @@ function build(g,thing='wall',at=null){
   // keep the builder out of its own construction
   const lp=g.logicalPos||g.root.position;
   if(Math.hypot(lp.x-x,lp.z-z)<.6){ const p=g.root.position.add(g.dir.scale(1.25)); x=clamp(Math.round(p.x),-15,15); z=clamp(Math.round(p.z),-15,15); }
+  // never on top of something (a crate built onto the chest hid it) or someone
+  const taken=(cx,cz)=>!hasGroundAt(cx,cz) || isBlocked(cx,cz) || occupantAt(cx,cz,null) || (Math.abs(cx-lp.x)<.5&&Math.abs(cz-lp.z)<.5) || getObjects().some(o=>Math.round(o.x)===cx&&Math.round(o.z)===cz&&!['tile','light','hole','flowers','grass_tuft'].includes(o.type));
+  if(taken(x,z)){
+    const near=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]].map(([dx,dz])=>[x+dx,z+dz]).filter(([cx,cz])=>!taken(cx,cz)).sort((a,b)=>Math.hypot(a[0]-lp.x,a[1]-lp.z)-Math.hypot(b[0]-lp.x,b[1]-lp.z));
+    if(!near.length) return say(g,'no room to build there',false);
+    [x,z]=near[0];
+  }
   setCharacterFacing(g,new BABYLON.Vector3(Math.sign(x-lp.x),0,Math.sign(z-lp.z)));
   if(thing==='crate') makeCrate(state.scene,x,z); else if(thing==='door') makeDoor(state.scene,x,z,{}); else makeBlock(state.scene,x,z,false);
   say(g,'built '+thing+' at ('+x+','+z+')'); updatePerceptionUI(); saveWorldState();
@@ -3052,7 +3059,8 @@ function emote(g,name){
   // else just the word over its head (unknown ones used to make it dance).
   const NEAR={smile:'laugh',grin:'laugh',giggle:'laugh',chuckle:'laugh',happy:'cheer',celebrate:'cheer',nod:'bow',greet:'wave',hello:'wave',bye:'wave',applaud:'clap',rest:'sit',yawn:'sleep',tired:'sleep',curtsy:'bow'};
   if(!valid.includes(name)) name=NEAR[name]||name;
-  if(!valid.includes(name)){ emitBadge(g,name); log(g.id+' looks '+name); return say(g,`(${g.id} looks ${name})`,false); }
+  // "frown" -> "(grub frowns)"; longer words as they are ("(grub: deep in thought)")
+  if(!valid.includes(name)){ const v=/^[a-z]+$/.test(name)?(/(s|sh|ch|x)$/.test(name)?(/s$/.test(name)?name:name+'es'):name+'s'):null; emitBadge(g,name); log(g.id+' '+(v||name)); return say(g,v?`(${g.id} ${v})`:`(${g.id}: ${name})`,false); }
   log(g.id+' emotes: '+name);
   emitBadge(g,name);
   if(g._emoteTimeout) clearTimeout(g._emoteTimeout);

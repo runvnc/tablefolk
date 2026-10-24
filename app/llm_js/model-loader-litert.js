@@ -14,12 +14,13 @@
 const MODEL_CONFIG = {
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM)' },
+  'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight (LiteRT-LM)', vision: true },
 };
 
 let worker = null, shared = false;
 let nextId = 1;
 // One URL for every page (the game and the world builder), so they share it.
-const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261024c';
+const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261025a';
 // A model this browser has loaded before (so it is in OPFS): the engine runs
 // in a shared worker, which survives a reload or the step from the world
 // builder into the game: it keeps the model 2 minutes after the last page
@@ -117,15 +118,25 @@ export async function loadModel(modelKey, onProgress) {
     // object straight through to onProgress - preserve both shapes exactly.
     onProgress?.(p);
   };
+  let url = ''; try { url = localStorage.getItem('tablefolk_model_url:' + modelKey) || ''; } catch {}
   try {
-    try { await call('load', { modelKey }, { onProgress: wrappedProgress }); }
+    try { await call('load', { modelKey, url }, { onProgress: wrappedProgress }); }
     catch (e) {
+      // the worker runs another LiteRT-LM version (the vision model needs the
+      // nightly): a fresh dedicated worker for this one
+      if (/RESTART_WORKER/.test(e.message)) {
+        try { await call('unload'); } catch {}
+        try { shared ? worker.close() : worker.terminate(); } catch {}
+        worker = null; getWorker(true);
+        await call('load', { modelKey, url }, { onProgress: wrappedProgress });
+      } else {
       // a shared worker that cannot run it (no WebGPU there, say): once more, dedicated
       if (!shared) throw e;
       console.warn('[model-loader-litert] shared worker failed, using a dedicated one:', e.message);
       try { worker.close(); } catch {}
       worker = null; getWorker(true);
-      await call('load', { modelKey }, { onProgress: wrappedProgress });
+      await call('load', { modelKey, url }, { onProgress: wrappedProgress });
+      }
     }
     currentModel = modelKey;
     loaded = true;
@@ -178,6 +189,13 @@ export const litertClient = {
   async clearConversations(agentId = null) {
     await call('clearConversations', { agentId });
   },
+  // Vision models: what is in the picture (an image Blob), as an answer to
+  // prompt, with system as the character's own framing.
+  async see(image, prompt, system = '') {
+    const data = await call('see', { image, prompt, system });
+    return data.text;
+  },
+  canSee() { return !!MODEL_CONFIG[currentModel]?.vision && loaded; },
   // What the worker last sent to the model (tests/debugging).
   lastPrompt() { return call('debugLastPrompt'); },
   unload() {

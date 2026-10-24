@@ -493,3 +493,21 @@ html:fullscreen #ttBar { display:none; }
 #renderHold.show { opacity:1; }
 #renderHold .spin { width:16px; height:16px; border-radius:50%; border:2px solid rgba(242,235,222,.3); border-top-color:#f2c26b; animation:renderHoldSpin .9s linear infinite; }
 @keyframes renderHoldSpin { to { transform:rotate(360deg); } }
+
+/* live.js: let them live */
+.view-btns > .live-btn { flex-basis:100%; }
+.live-btn.active { background:rgba(120,220,140,.22); border-color:rgba(140,230,160,.55); color:#d8ffe0; }
+.live-status:empty { display:none; }
+.live-status { color:#cfe9d4; font-style:italic; }
+/* director.js: the narrator's line */
+#narration { position:fixed; left:50%; top:74px; transform:translate(-50%,-8px); max-width:min(640px,86vw); padding:.55rem 1.1rem; border-radius:12px;
+  background:rgba(22,18,14,.82); color:#f3e6cc; font:italic 500 15px/1.4 Georgia,serif; text-align:center; box-shadow:0 6px 20px rgba(0,0,0,.35);
+  opacity:0; transition:opacity .35s, transform .35s; pointer-events:none; z-index:30; }
+#narration.show { opacity:1; transform:translate(-50%,0); }
+/* world-integration.js: what a character sees when it looks (vision brains) */
+#sightCard { position:fixed; left:16px; bottom:120px; width:min(300px,70vw); margin:0; background:rgba(20,17,13,.9); border:1px solid rgba(255,220,160,.3); border-radius:12px; overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,.4); opacity:0; transform:translateY(8px); transition:opacity .3s, transform .3s; pointer-events:none; z-index:25; }
+#sightCard.show { opacity:1; transform:none; }
+#sightCard img { display:block; width:100%; aspect-ratio:448/320; object-fit:cover; }
+#sightCard figcaption { padding:.5rem .7rem; color:#f1e6cf; font-size:13px; line-height:1.4; }
+#sightCard b { color:#ffd98a; }

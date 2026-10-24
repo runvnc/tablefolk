@@ -121,5 +121,11 @@ if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
     cut.on = 0; key = '';
     for (const m of Object.values(lids)) if (!m.isDisposed()) m.isVisible = false;
   }
-  window.tablefolkCutaway = { update, clear, attach };
+  // a picture from a character's eyes (senses.js): walls whole for a frame;
+  // returns whether the cut was on, to put it back
+  function suspend(on) {
+    if (on) { const was = !!cut.on; cut.on = 0; return was; }
+    cut.on = 1; key = ''; return true;
+  }
+  window.tablefolkCutaway = { update, clear, attach, suspend };
 })();

@@ -1,7 +1,7 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261024d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261025a';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261024d';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached } from './model-loader-litert.js?v=20261024c';
+import { installDevConsole } from './dev-console.js?v=20261025a';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
@@ -603,7 +603,10 @@ async function main() {
     // its blows come from the routine, one a round)
     const enemy = !!window.tablefolkPlay?.isHostile(g);
     if (enemy && !(window.tablefolkPlay?.talksToo?.(g) && cfg.pendingChat?.length)) return false;
-    const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => !enemy || c === 'say' || c === 'whisper' || c === 'emote');
+    // look() twice in a row learns nothing new (small models loop on it): not
+    // on offer the turn after a look
+    const lookedLately = (world.getBrainConfig(g.id).recent || []).slice(-1).some(r => /\blook\b/.test(r));
+    const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => (!enemy || c === 'say' || c === 'whisper' || c === 'emote') && !(lookedLately && c === 'look'));
     if (!world.isTurnReady()) { return false; }
     // Inside a workflow (workflows.js), the workflow drives the turn: it asks
     // the model narrow questions and runs the resulting command.
@@ -761,7 +764,17 @@ async function main() {
         const t = String(c.text).toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
         if (t === heardNow || (t.includes(heardNow) && t.length < heardNow.length + 12)) { planCmds.splice(i, 1); echoed = true; }
       }
-      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(You only repeated what was said to you, so nobody heard it. Answer it in your own words.)']).slice(-5);
+      // ... and one that copies what someone else said lately (Pip saying
+      // Thistle's line word for word, as its own)
+      const words = t => new Set(String(t).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2));
+      const recentOthers = (world.state?.globalHistory || []).slice(-10).map(e => e.match(/^T\d+\s+([^:]+):\s*\S+\s+(?:say|whisper)\s+"(.*?)"(?:\s+->|$)/)).filter(m => m && m[1] !== g.id).map(m => words(m[2]));
+      for (let i = planCmds.length - 1; i >= 0; i--) {
+        const c = planCmds[i]; if (c.kind !== 'say' || !recentOthers.length) continue;
+        const mine = words(c.text); if (mine.size < 4) continue;
+        const copied = recentOthers.some(o => { let n = 0; for (const w of mine) if (o.has(w)) n++; return n / mine.size >= .7; });
+        if (copied) { planCmds.splice(i, 1); echoed = true; }
+      }
+      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(You only repeated what someone else just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
@@ -776,7 +789,8 @@ async function main() {
       else if (spokenTo) cfg.talkRun = spoke ? 1 : 0;
       else if (!spoke) cfg.talkRun = 0;
       else if ((cfg.talkRun = (cfg.talkRun || 0) + 1) >= 2) { cfg.talkRun = 0; cfg.quietTurns = 3; }
-      if (!planCmds.length) planCmds.push({ kind: 'look' });
+      // nothing usable: it stands and thinks (a look() here filled turns with looking around)
+      if (!planCmds.length) planCmds.push({ kind: 'emote', emote: 'ponders' });
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
         // Only the speech itself goes into the history, never instructions.
@@ -995,6 +1009,50 @@ async function main() {
     finally { replying = false; }
   };
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };
+  // ---- sight: look() with a brain that can see (senses.js calls lookFor) ----
+  // The character's own view (senses.snapshot) goes to the vision model: in
+  // the browser, Gemma 4 E2B with sight (litert-worker.js "see"); or the
+  // endpoint brain's model when Brain options > vision is on (Gemma 4 26B
+  // takes images). Its answer, in the character's voice, is told to it on
+  // its next turn, and shown to the player with the picture.
+  const VISION_PROMPT = 'This picture is what is in front of you right now, through your own eyes. In one or two short sentences, in your own voice, say what you see: the people and things that stand out, and anything odd. Only what is in the picture.';
+  window.tablefolkVision = {
+    available() {
+      const eng = getActiveEngine(manager);
+      return manager.isLoaded() && ((eng === 'litert-lm' && litertClient.canSee()) || (eng === 'openai' && !!el('agentVision')?.checked));
+    },
+    async lookFor(g) {
+      const img = await window.tablefolkSenses?.snapshot(g); if (!img) return null;
+      const cfg = world.getBrainConfig(g.id);
+      const system = `You are ${g.id}${cfg.style ? ', ' + cfg.style : ''}. ${String(cfg.personality || '').slice(0, 300)}`;
+      let text = '';
+      if (getActiveEngine(manager) === 'litert-lm') text = await litertClient.see(await (await fetch(img)).blob(), VISION_PROMPT, system);
+      else {
+        const ep = getEndpointConfig();
+        const r = await fetch(ep.baseURL + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(ep.apiKey ? { Authorization: 'Bearer ' + ep.apiKey } : {}) },
+          body: JSON.stringify({ model: ep.model || undefined, max_tokens: 160, temperature: .6, messages: [{ role: 'system', content: system }, { role: 'user', content: [{ type: 'text', text: VISION_PROMPT }, { type: 'image_url', image_url: { url: img } }] }] }) });
+        text = (await r.json())?.choices?.[0]?.message?.content || '';
+      }
+      text = String(text).replace(/\s+/g, ' ').replace(/^["\u201c]+|["\u201d]+$/g, '').trim().slice(0, 300);
+      if (!text) return null;
+      const c2 = world.getBrainConfig(g.id);
+      world.setBrainConfig(g.id, { pendingChat: (c2.pendingChat || []).concat([`[you looked] What you see: ${text}`]).slice(-5) });
+      appendLog(`${g.id} sees: ${text}`);
+      state0().globalHistory = (state0().globalHistory || []).concat([`T${state0().turn?.index ?? 0} ${g.id}: ${g.id} sees -> ${text}`]).slice(-20);
+      showSight(g.id, img, text);
+      return text;
+    },
+  };
+  const state0 = () => world.state;
+  function showSight(id, img, text) {
+    let card = document.getElementById('sightCard');
+    if (!card) { card = document.createElement('figure'); card.id = 'sightCard'; card.innerHTML = '<img alt=""><figcaption></figcaption>'; document.body.appendChild(card); }
+    card.querySelector('img').src = img;
+    card.querySelector('figcaption').innerHTML = '<b></b> <span></span>';
+    card.querySelector('b').textContent = id + ' sees:'; card.querySelector('span').textContent = text;
+    card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+    clearTimeout(showSight.t); showSight.t = setTimeout(() => card.classList.remove('show'), 10000);
+  }
   el('chatSend')?.addEventListener('click', sendChatToAgent);
   el('chatInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChatToAgent(); });
 }

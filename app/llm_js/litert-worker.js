@@ -17,10 +17,15 @@
 // classic worker's importScripts really does work, which is what the library
 // expects; dynamic import() is valid in classic scripts too, so we don't lose
 // anything by not being a module worker.
-let Engine;
-const engineLibReady = (async () => {
-  ({ Engine } = await import("https://cdn.jsdelivr.net/npm/@litert-lm/core@0.14.0/+esm"));
-})();
+// The library, by version: 0.14.0 for the text models (the tested one);
+// the vision model needs the nightly, the first release whose main engine
+// runs Gemma's vision encoder (0.14-0.18 say "images are not supported in
+// JS yet"). Loaded when a model is, so a page that never sees pays nothing.
+const LIB = '0.14.0';
+const libs = new Map();
+const libFor = ver => { if (!libs.has(ver)) libs.set(ver, import(`https://cdn.jsdelivr.net/npm/@litert-lm/core@${ver}/+esm`)); return libs.get(ver); };
+let libVersion = null;
+const engineLibReady = Promise.resolve();
 
 const MODEL_CONFIG = {
   'gemma4-e2b-litert': {
@@ -29,6 +34,16 @@ const MODEL_CONFIG = {
     // on Hugging Face, sha256 3a08e8d9...); HF's download speeds were too slow.
     modelUrl: 'https://geebr-models.mindroot.io/gemma-4-E2B-it-web.litertlm',
     vram: '~0.8GB in-memory (PLE memory-mapped)',
+  },
+  // Gemma 4 E2B with sight: the full multimodal file (the web builds above
+  // are text-only), 2.6 GB, its vision encoder run by the LiteRT-LM nightly.
+  // Characters' look() sends what they see (tablefolkVision, world-integration.js).
+  'gemma4-e2b-vision': {
+    label: 'Gemma 4 E2B with sight (LiteRT-LM)',
+    modelUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
+    vram: '~1.8 GB',
+    lib: '0.19.0-nightly.20261023',
+    vision: true,
   },
   'gemma4-e4b-litert': {
     label: 'Gemma 4 E4B (LiteRT-LM)',
@@ -40,7 +55,7 @@ const MODEL_CONFIG = {
   },
 };
 
-let engine = null;
+let engine = null, engineVision = false;
 let currentModel = null;
 let loading = false;
 
@@ -508,7 +523,8 @@ async function handle(e, post, tag) {
           onProgress({ phase: 'initialize', text: `Loading ${formatBytes(modelFile.size)} from device cache...` });
         } else {
           onProgress({ phase: 'download', percent: 0, text: 'Starting first-time model download...' });
-          modelFile = await downloadModelToOPFS(modelKey, cfg.modelUrl, onProgress);
+          // a test or a self-hosted copy can name its own URL (localStorage tablefolk_model_url:<key>)
+          modelFile = await downloadModelToOPFS(modelKey, e.data.url || cfg.modelUrl, onProgress);
         }
         onProgress({ phase: 'initialize', percent: 100, text: 'Download complete · initializing local brain...' });
         // The Emscripten glue that Engine.create() loads underneath tries to
@@ -523,8 +539,15 @@ async function handle(e, post, tag) {
         // (@litertjs/wasm-utils' createWasmLib) checks for a pre-existing
         // self.Module and honors self.Module.locateFile when set - so we
         // seed it ourselves, matching the CDN version pinned above.
-        self.Module = { locateFile: (path) => 'https://cdn.jsdelivr.net/npm/@litert-lm/core@0.14.0/wasm/' + path };
-        engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: 8192 } });
+        const ver = cfg.lib || LIB;
+        // one library per worker: a model on another version needs a fresh
+        // worker (model-loader-litert.js starts one when it sees this)
+        if (libVersion && libVersion !== ver) throw new Error('RESTART_WORKER: ' + modelKey + ' needs LiteRT-LM ' + ver);
+        const { Engine, Backend } = await libFor(ver); libVersion = ver;
+        self.Module = { locateFile: (path) => `https://cdn.jsdelivr.net/npm/@litert-lm/core@${ver}/wasm/` + path };
+        engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: 8192 },
+          ...(cfg.vision ? { visionBackend: Backend.GPU, maxVisionTokensPerImage: 256 } : {}) });
+        engineVision = !!cfg.vision;
         // Warm up before saying "ready": the first generation sets up the
         // GPU kernels, and that work held up the game's own GPU calls (the
         // page froze for seconds just after "ready"). Here it happens while
@@ -586,6 +609,21 @@ async function handle(e, post, tag) {
       const onToken = streaming ? (fullText) => reply({ type: 'token', text: fullText }) : null;
       const { text, thinking } = await serialize(() => generateText(messages, opts || {}, onToken));
       reply({ type: 'result', data: { text, thinking } });
+    } else if (type === 'see') {
+      // One picture, one question, its own short conversation (the live one
+      // is dropped first: one KV cache): what a character sees when it looks.
+      if (!engine || !engineVision) throw new Error('the loaded model cannot see');
+      const text = await serialize(async () => {
+        await dropLive();
+        const conv = await engine.createConversation({ preface: { messages: e.data.system ? [{ role: 'system', content: e.data.system }] : [] } });
+        try {
+          const r = await conv.sendMessage({ role: 'user', content: [{ type: 'image', data: e.data.image }, { type: 'text', text: e.data.prompt || 'What do you see?' }] });
+          return splitThinking(messageText(r)).text;
+        } finally { await disposeConversation(conv); }
+      });
+      reply({ type: 'result', data: { text } });
+    } else if (type === 'canSee') {
+      reply({ type: 'result', data: { vision: !!(engine && engineVision) } });
     } else if (type === 'debugLastPrompt') {
       reply({ type: 'result', data: lastSent });
     } else if (type === 'clearConversations') {

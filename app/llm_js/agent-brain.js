@@ -2,8 +2,8 @@ import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from 
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
 import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261018a';
 import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261018a';
-import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261024c';
-import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261024c';
+import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261025a';
+import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261025a';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
@@ -21,6 +21,8 @@ const SUPPORTED_MODELS = {
   'minicpm5-1b-gpu': { label: 'MiniCPM5-1B (GPU/WebGPU)', engine: 'transformers.js', size: '~1.4 GB', hidden: true },
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB' },
+  // The full multimodal E2B: characters really see when they look
+  'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight (LiteRT-LM)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
   'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },

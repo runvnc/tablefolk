@@ -146,6 +146,9 @@
     if (h?.length) { const last = h[h.length - 1]; if (last.startsWith('T') && last.includes(g.id + ':')) h[h.length - 1] = last + ' -> ' + desc; }
     try { emitBadge(g, 'looks around'); playRig(g, 'idle', true); } catch {}
     log(desc);
+    // a brain that can see: the picture too, described in its own words
+    // (world-integration.js tablefolkVision); told to it on its next turn
+    if (window.tablefolkVision?.available?.()) window.tablefolkVision.lookFor(g).catch(e => console.warn('[senses] vision', e));
     return desc;
   }
 
@@ -187,20 +190,44 @@
   // The character's own view, as a small JPEG data URL (vision brains). The
   // main camera is posed at the character's eyes for one frame (a second
   // camera or a render-target capture comes out blank with this WebGPU setup
-  // and its post-process pipelines), then put back.
+  // and its post-process pipelines), then put back. The player's fog of war
+  // and wall cutaway are lifted for that frame: they are the player's view,
+  // not the character's.
   async function snapshot(g, { width = 448, height = 320 } = {}) {
     const sc = state.scene, eng = state.engine, cam = sc?.activeCamera;
     if (!cam || !eng || cam.getClassName() !== 'ArcRotateCamera') return null;
     const p = pos(g), d = new BABYLON.Vector3(g.dir?.x || 0, 0, g.dir?.z || 1).normalize();
-    const eye = new BABYLON.Vector3(p.x + d.x * .3, (state.terrainTopY ?? 0) + .85, p.z + d.z * .3);
+    // at its eyes (about nine tenths of its height), its own body out of the way
+    const h = (g.figureHeight || g.root.getHierarchyBoundingVectors?.(true)?.max.y - (state.terrainTopY ?? 0) || 1.1);
+    const eye = new BABYLON.Vector3(p.x + d.x * .25, (state.terrainTopY ?? 0) + Math.max(.5, Math.min(2.2, h * .9)), p.z + d.z * .25);
     const look = eye.add(d.scale(4)).add(new BABYLON.Vector3(0, -.55, 0));
-    const save = { a: cam.alpha, b: cam.beta, r: cam.radius, t: cam.target.clone(), fov: cam.fov, minZ: cam.minZ, lr: cam.lowerRadiusLimit, lb: cam.lowerBetaLimit, ub: cam.upperBetaLimit };
-    cam.lowerRadiusLimit = null; cam.lowerBetaLimit = null; cam.upperBetaLimit = null;
+    const save = { a: cam.alpha, b: cam.beta, r: cam.radius, t: cam.target.clone(), fov: cam.fov, minZ: cam.minZ, lr: cam.lowerRadiusLimit, lb: cam.lowerBetaLimit, ub: cam.upperBetaLimit, la: cam.lowerAlphaLimit, ua: cam.upperAlphaLimit };
+    const fog = sc.meshes.filter(m => /^(board_fog_|cutaway_lid|selection_ring|selection_glow|player_ring)/.test(m.name) && m.isEnabled()), hidden = state.characters.filter(c => c._fogHidden && c.root && !c.defeated);
+    const cut = window.tablefolkCutaway?.suspend?.(true);
+    for (const m of fog) m.setEnabled(false);
+    for (const c of hidden) c.root.setEnabled(true);
+    const own = g.root.isEnabled(); g.root.setEnabled(false);
+    cam.lowerRadiusLimit = null; cam.lowerBetaLimit = null; cam.upperBetaLimit = null; cam.lowerAlphaLimit = null; cam.upperAlphaLimit = null;
     cam.setTarget(look); cam.setPosition(eye); cam.fov = 1.15; cam.minZ = .05;
-    try { return await BABYLON.Tools.CreateScreenshotAsync(eng, cam, { width, height }, 'image/jpeg'); }
+    // one frame rendered and finished here, then read off the canvas (Babylon's
+    // screenshot helpers came out black with WebGPU and our post-processing)
+    try {
+      eng.beginFrame(); sc.render(); eng.endFrame();
+      // toDataURL at once (drawing the WebGPU canvas into a 2D one came out
+      // black), then made small
+      const full = eng.getRenderingCanvas().toDataURL('image/jpeg', .9);
+      const im = new Image(); im.src = full; await im.decode();
+      const out = document.createElement('canvas'); out.width = width; out.height = height;
+      out.getContext('2d').drawImage(im, 0, 0, width, height);
+      return out.toDataURL('image/jpeg', .85);
+    }
     finally {
-      cam.lowerRadiusLimit = save.lr; cam.lowerBetaLimit = save.lb; cam.upperBetaLimit = save.ub;
+      cam.lowerRadiusLimit = save.lr; cam.lowerBetaLimit = save.lb; cam.upperBetaLimit = save.ub; cam.lowerAlphaLimit = save.la; cam.upperAlphaLimit = save.ua;
       cam.setTarget(save.t); cam.alpha = save.a; cam.beta = save.b; cam.radius = save.r; cam.fov = save.fov; cam.minZ = save.minZ;
+      for (const m of fog) m.setEnabled(true);
+      for (const c of hidden) if (c._fogHidden) c.root.setEnabled(false);
+      g.root.setEnabled(own);
+      if (cut) window.tablefolkCutaway?.suspend?.(false);
     }
   }
 
