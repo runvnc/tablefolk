@@ -130,6 +130,20 @@
     inventoryChanged(); render();
     return true;
   }
+  // A note: read, and taken along with its words (give it to someone, and
+  // they know what it says). Named by its first words: "note: Secret pie".
+  function takeNote(m) {
+    const mm = meta(m), text = (mm.noteText || noteTextFromHtml(mm.noteHtml || '') || '').trim();
+    const words = text.replace(/[^\w' ]+/g, ' ').trim().split(/\s+/).slice(0, 3).join(' ');
+    let name = words ? 'note: ' + words : 'note';
+    for (let n = 2; state.player.items.some(i => i.name.toLowerCase() === name.toLowerCase()); n++) name = (words ? 'note: ' + words : 'note') + ' ' + n;
+    state.player.items.push({ name, qty: 1, text, html: mm.noteHtml || '' });
+    toast('The note says: ' + (text || '(blank)') + ' (it is in your pack now)', 'success');
+    sfx('pickup', posOf(m));
+    note(`${playerName()} picks up a note. It says: ${text || '(blank)'}`);
+    disposeWorldObject(m);
+    inventoryChanged(); render();
+  }
   function takeGold(m) {
     const mm = meta(m), n = mm.opts?.gold != null ? Math.max(0, +mm.opts.gold || 0) : 10 + Math.floor(Math.random() * 21);
     state.player.gold = (state.player.gold || 0) + n;
@@ -183,7 +197,7 @@
     if (u.kind === 'use') { Promise.resolve(window.tablefolkPackages?.useThing(u.thing, g)).then(done => { if (done) acted('use'); }); return; }
     if (u.kind === 'door') { if (window.tablefolkLocks?.tryOpen(u.thing)) acted('use'); return; }
     if (u.kind === 'body') { if (searchBody(u.thing)) acted('use'); return; }
-    if (u.kind === 'note') { const mm = meta(u.thing); toast('The note says: ' + ((mm.noteText || noteTextFromHtml(mm.noteHtml || '')) || '(blank)')); return; }
+    if (u.kind === 'note') { takeNote(u.thing); acted('use'); return; }
     const p = u.kind === 'chest' ? posOf(u.thing) : null;
     if (p) setCharacterFacing(g, new BABYLON.Vector3(p.x - myPos().x, 0, p.z - myPos().z));
     const done = u.kind === 'chest' ? openChest(u.thing) : u.kind === 'gold' ? (takeGold(u.thing), true) : pickUp(u.thing);
@@ -204,6 +218,8 @@
     const g = me(), it = findItem(state.player.items, name); if (!it) return;
     if (state.player.wielding && state.player.wielding.toLowerCase() === it.name.toLowerCase()) window.tablefolkCombat?.wield(g, 'none');
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) state.player.items.splice(state.player.items.indexOf(it), 1);
+    // a note goes back on the floor, words and all
+    if (it.text != null && g) { const p = myPos(); try { makeObject('note', Math.round(p.x + (g.dir?.x || 0)), Math.round(p.z + (g.dir?.z || 1)), it.html ? { html: it.html } : { text: it.text }); } catch (e) { console.warn('[play] note drop', e); } }
     note(`${playerName()} drops the ${it.name}`);
     inventoryChanged(); render();
   }
@@ -226,6 +242,7 @@
         return `<li class="adv-drag" draggable="true" data-give="${n}" title="drag onto a character to give it"><span>${n}${(i.qty ?? 1) > 1 ? ` <small>x${i.qty}</small>` : ''}</span><span class="adv-acts">
           <button data-act="give" data-item="${n}" title="give to the nearest character (or drag the item onto one)">give</button>
           ${POTION.test(i.name) ? `<button data-act="drink" data-item="${n}">drink</button>` : ''}
+          ${i.text != null ? `<button data-act="read" data-item="${n}">read</button>` : ''}
           ${weapon ? `<button data-act="${held ? 'unwield' : 'wield'}" data-item="${n}">${held ? 'put away' : 'wield'}</button>` : ''}
           <button data-act="drop" data-item="${n}" title="drop">✕</button></span></li>`;
       }).join('')}</ul>` : '<p class="pane-note">Nothing yet. Open chests (E) and pick things up.</p>'}
@@ -241,6 +258,7 @@
     const b = e.target.closest?.('#advPane button[data-act]'); if (!b) return;
     const name = b.dataset.item, act = b.dataset.act, g = me();
     if (act === 'drink') drink(name);
+    if (act === 'read') { const it = findItem(state.player.items, name); toast('The note says: ' + (it?.text || '(blank)')); }
     else if (act === 'drop') drop(name);
     else if (act === 'wield' && g) { window.tablefolkCombat?.wield(g, name); render(); }
     else if (act === 'unwield' && g) { window.tablefolkCombat?.wield(g, 'none'); render(); }
@@ -280,7 +298,9 @@
       const it = findItem(state.player.items, what); if (!it || !(it.qty ?? 1)) return;
       if (state.player.wielding && state.player.wielding.toLowerCase() === it.name.toLowerCase()) window.tablefolkCombat?.wield(me(), 'none');
       it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) state.player.items.splice(state.player.items.indexOf(it), 1);
-      addItem(inv.items, it.name); given = 'the ' + it.name;
+      // a note's words go with it
+      if (it.text != null) { inv.items.push({ name: it.name, qty: 1, text: it.text }); given = `a note that says "${String(it.text).slice(0, 200)}"`; }
+      else { addItem(inv.items, it.name); given = 'the ' + it.name; }
     }
     const cfg = getBrainConfig(c.id);
     cfg.inventory = inv;

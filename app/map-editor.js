@@ -402,7 +402,7 @@
         const o = t.ref, holds = /chest|crate|barrel|bag|cabinet|nightstand|pot|vase/.test(o.type);
         box.innerHTML = `<div class="tfme-head">${thumb('objects', o.type)}<div><h3>${esc(nice(o.type))}</h3><span class="tfme-muted">at ${o.x}, ${o.z}${o.ry ? ' · turned' : ''}</span></div></div>
           <div class="tfme-form">
-            ${o.type === 'note' ? field('Text', 'text', o.text, 'area') : ''}
+            ${o.type === 'note' ? field('Text', 'text', o.text, 'area') + `<label class="wide"><span>Where</span><select data-k="wall"><option value="">lying on the floor</option>${['north', 'south', 'east', 'west'].map(w => `<option value="${w}"${o.wall === w ? ' selected' : ''}>pinned to the ${w} wall of its square</option>`).join('')}</select></label>` : ''}
             ${holds || o.type === 'coin_pile' ? field('Gold inside', 'gold', o.gold, 'number', 'min="0"') : ''}
             ${holds ? field('Items inside (comma)', 'items', (o.items || []).map(i => i?.name || i).join(', ')) : ''}
             ${o.type === 'key' || o.type === 'potion' || o.type === 'scroll' ? field('Name', 'name', o.name, 'text', 'placeholder="e.g. silver key"') : ''}

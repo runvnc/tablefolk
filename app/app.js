@@ -319,10 +319,11 @@ function debugRigAnims(g){ try{ console.log('[character rig]', g.id, 'clips:', O
 // short to reach around it. Arms are aimed at grip points from bone world
 // positions rather than per-rig axis conventions, so the same code works on the
 // Meshy and KayKit skeletons, layered on top of whatever clip is playing.
-const CARRY_LIFT_TIME=.35, CARRY_BLEND_IN=.3, CARRY_BLEND_OUT=.25, CARRY_OVERHEAD_HALF_WIDTH=.2, CARRY_OVERHEAD_HALF_HEIGHT=.24;
+const CARRY_LIFT_TIME=.35, CARRY_BLEND_IN=.3, CARRY_BLEND_OUT=.25, CARRY_OVERHEAD_HALF_WIDTH=.26, CARRY_OVERHEAD_HALF_HEIGHT=.3;   // wider or taller than this goes overhead (a half-square crate fits in the arms)
 // Bounds of an object's physical parts (a lamp's ground glow is not part of it).
 const solidPart=m=>m.name!=='lamp_pool';
 function beginCarry(g,h){
+  if(meta(h)?.type==='note'){ const mm=meta(h); h.rotationQuaternion=null; h.rotation.set(0,0,0); h.scaling.setAll(NOTE_HELD); delete mm.wall; delete mm.noteCell; if(mm.opts) delete mm.opts.wall; }
   h.computeWorldMatrix(true);
   const {min,max}=h.getHierarchyBoundingVectors(true,solidPart);
   const pos=h.getAbsolutePosition();
@@ -339,6 +340,8 @@ function beginCarry(g,h){
 }
 function endCarry(h,pos,gentle=false){
   delete h._carry;
+  // a note put down lies flat on the floor at floor size
+  if(meta(h)?.type==='note'){ layNote(h,pos.x,pos.z); h.position.x=pos.x; h.position.z=pos.z; return; }
   h.position.copyFrom(pos); h.computeWorldMatrix(true);
   // Held items are kinematic and steered with target transforms; teleport the
   // body to the drop point for one physics step before handing it back to the sim.
@@ -1014,7 +1017,7 @@ function makeObject(type,x,z,opts={}){
   if(type==='barrel') return makeBarrel(sc,x,z);
   if(type==='mushroom') return makeMushroom(sc,x,z);
   if(type==='lamp') return makeLamp(sc,x,z);
-  if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'));
+  if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'),opts);
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
   if(type==='door') return makeDoor(sc,x,z,opts);
   if(window.tablefolkScenery?.types.includes(type)) return window.tablefolkScenery.make(type,x,z,opts);
@@ -1031,8 +1034,8 @@ function keepLoot(m,opts){
 }
 function getObjects(){
   return state.props.concat(state.blocks).filter(m=>m && !m.isDisposed?.()).map(m=>{
-    const mm=meta(m)||{}, p=m.getAbsolutePosition?.()||m.position;
-    const ry=m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles().y : (m.rotation?.y||0);
+    const mm=meta(m)||{}, p0=m.getAbsolutePosition?.()||m.position, p=mm.noteCell?{x:mm.noteCell[0],z:mm.noteCell[1]}:p0;
+    const ry=mm.noteCell?0:(m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles().y : (m.rotation?.y||0));
     return {mesh:m,type:mm.type||m.name,x:p.x,z:p.z,ry:Math.abs(ry)>.01?+ry.toFixed(3):0,state:mm.state||'intact',noteHtml:mm.noteHtml,noteText:mm.noteText,rim:!!mm.rim,...(mm.opts&&Object.keys(mm.opts).length?{opts:mm.opts}:{})};
   }).filter(o=>!['tile','hole'].includes(o.type));
 }
@@ -1583,12 +1586,15 @@ function meshBounds(meshes){
 }
 const GEN_ASSET=()=>ASSET_BASE+'models/props/gen/';
 const genPrepare=c=>{ applyClayLookToMeshes(c.meshes,c.scene||state.scene,{detail:.11,detailScale:5}); for(const m of c.materials) plasticFinish(m,{coat:.5,coatRough:.14}); };
+const CRATE_SIZE=.5;
 function makeCrate(scene,x,z){
   // Keep the simple box as the physics/picking proxy, but make it invisible and
   // attach the same authored GLB used by decorative scenery. This preserves the
   // sandbox interaction contract while eliminating the duplicate generic visual.
-  const m=BABYLON.MeshBuilder.CreateBox('crate',{size:.72},scene);
-  m.position.set(x,(state.terrainTopY??0)+.36,z); m.isVisible=false;
+  // half a square: small enough to carry in the arms (at .72 it went
+  // overhead, bigger than the goblin carrying it)
+  const m=BABYLON.MeshBuilder.CreateBox('crate',{size:CRATE_SIZE},scene);
+  m.position.set(x,(state.terrainTopY??0)+CRATE_SIZE/2,z); m.isVisible=false;
   addToScene(m,state.materials.wood,{shape:'BOX',mass:1.4,restitution:.12});
   tag(m,'crate',{health:2,material:'wood',flammable:true}); state.props.push(m);
   loadModelInstance(scene,GEN_ASSET(),(window.tablefolkAsset||(f=>f))('crate.glb'),genPrepare).then(result=>{
@@ -1598,7 +1604,7 @@ function makeCrate(scene,x,z){
     const {min,max}=meshBounds(result.meshes);
     // crate.glb is modelled centred on its origin: centre it on the proxy box
     // (offsetting by half its height alone sank it halfway into the ground).
-    const ext=max.subtract(min), scale=.72/Math.max(ext.x,ext.z,1e-6);
+    const ext=max.subtract(min), scale=CRATE_SIZE/Math.max(ext.x,ext.z,1e-6);
     root.scaling.setAll(scale); root.position.copyFrom(min.add(max).scale(-.5*scale));
     for(const r of result.rootNodes) r.parent=root;
     for(const q of result.meshes){ q.metadata={proxy:m}; q.isPickable=true; q.receiveShadows=true; addShadow(q); }
@@ -1698,12 +1704,18 @@ function makeBakery(scene){ const x=-7,z=-4.5; const base=BABYLON.MeshBuilder.Cr
 function makeFence(scene,x0,z0,count,dir='x'){ for(let i=0;i<count;i++){ const x=x0+(dir==='x'?i*.52:0),z=z0+(dir==='z'?i*.52:0); const post=BABYLON.MeshBuilder.CreateCylinder('fence_post',{height:.52,diameter:.09,tessellation:5},scene); post.position.set(x,.33,z); addToScene(post,state.materials.wood,{motion:'static',shape:'CYLINDER',mass:0}); tag(post,'fence',{health:1,material:'wood',flammable:true}); } for(const y of [.32,.53]){ const rail=BABYLON.MeshBuilder.CreateBox('fence_rail',{width:dir==='x'?count*.52:.08,height:.07,depth:dir==='x'?.08:count*.52},scene); rail.position.set(x0+(dir==='x'?(count-1)*.26:0),y,z0+(dir==='z'?(count-1)*.26:0)); rail.material=state.materials.wood; addShadow(rail); } }
 
 function noteTextFromHtml(html){ const d=document.createElement('div'); d.innerHTML=String(html||''); return (d.textContent||d.innerText||'').replace(/\s+\n/g,'\n').trim(); }
+// The page, portrait like the sheet (.7 x 1), the type sized to how much is
+// written: a short note fills the page in big letters (17px on a square
+// texture was unreadable from the room).
+function noteFontPx(html){ const n=noteTextFromHtml(html).length; return n<40?54:n<90?42:n<180?32:n<360?24:18; }
 function renderNoteTexture(scene,html){
-  const W=512,H=512;
+  const W=512,H=732, FS=noteFontPx(html);
   const tex=new BABYLON.DynamicTexture('note_tex',{width:W,height:H},scene,true);
   tex.hasAlpha=false;
+  // the box's face maps the page sideways: turned a quarter, it reads left to right
+  tex.wAng=Math.PI/2;
   const ctx=tex.getContext();
-  const drawFallback=()=>{ ctx.fillStyle='#f3ecd8'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#3a2f22'; ctx.font='20px monospace'; const t=noteTextFromHtml(html); const words=t.split(/\s+/); let line='',y=46; for(const w of words){ if(ctx.measureText(line+w).width>W-40){ ctx.fillText(line,20,y); y+=26; line=''; } line+=w+' '; if(y>H-20) break; } ctx.fillText(line,20,y); tex.update(); };
+  const drawFallback=()=>{ ctx.fillStyle='#f3ecd8'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#17110a'; ctx.font='600 '+FS+'px Georgia, serif'; const t=noteTextFromHtml(html); const words=t.split(/\s+/); let line='',y=FS+30; for(const w of words){ if(ctx.measureText(line+w).width>W-60){ ctx.fillText(line,30,y); y+=Math.round(FS*1.3); line=''; } line+=w+' '; if(y>H-20) break; } ctx.fillText(line,30,y); tex.update(); };
   drawFallback();
   (async()=>{
     let html2=String(html||'');
@@ -1713,7 +1725,7 @@ function renderNoteTexture(scene,html){
     if(window.html2canvas){
       try{
         const host=document.createElement('div');
-        host.style.cssText='position:absolute;left:-10000px;top:0;width:'+W+'px;height:'+H+'px;margin:0;padding:18px;box-sizing:border-box;background:#f3ecd8;color:#2a2318;font-family:Georgia,serif;font-size:17px;line-height:1.4;overflow:hidden;word-wrap:break-word;';
+        host.style.cssText='position:absolute;left:-10000px;top:0;width:'+W+'px;height:'+H+'px;margin:0;padding:30px;box-sizing:border-box;background:#f3ecd8;color:#17110a;font-weight:600;font-family:Georgia,serif;font-size:'+FS+'px;line-height:1.3;overflow:hidden;word-wrap:break-word;';
         host.innerHTML=html2;
         document.body.appendChild(host);
         let canvas;
@@ -1748,19 +1760,45 @@ async function inlineNoteImages(html){
   }));
   return d.innerHTML;
 }
-function makeNote(scene,x,z,html='<p>empty note</p>'){
-  const m=BABYLON.MeshBuilder.CreateBox('note',{width:.6,height:.02,depth:.82},scene);
-  m.position.set(x,(state.terrainTopY??0)+.05,z);
+// A note is one sheet in paper proportions (.7 x 1, an A-page), shown at
+// three sizes: lying on the floor (NOTE_FLOOR of it), pinned to a wall (full
+// size, upright, so it reads from the room: "wall": "north" in a scenario,
+// or note() written facing a wall), and held (NOTE_HELD: paper next to a
+// person; beginCarry). Lit like paper with a faint glow of its own, so the
+// writing reads in a dim room (fully emissive, it washed out to white).
+// No physics body: it only lies, hangs or is carried, and its size changes.
+const NOTE_FLOOR=.5, NOTE_HELD=.3;
+const NOTE_WALLS={n:[0,-1],north:[0,-1],s:[0,1],south:[0,1],e:[-1,0],east:[-1,0],w:[1,0],west:[1,0]};
+function makeNote(scene,x,z,html='<p>empty note</p>',opts={}){
+  const m=BABYLON.MeshBuilder.CreateBox('note',{width:.7,height:.015,depth:1},scene);
   const mat=new BABYLON.StandardMaterial('note_mat',scene);
   const tex=renderNoteTexture(scene,html);
-  mat.diffuseTexture=tex; mat.emissiveTexture=tex; mat.specularColor=new BABYLON.Color3(.5,.5,.5);
-  mat.emissiveColor=new BABYLON.Color3(1,1,1);
-  m.material=mat;
-  addToScene(m,mat,{shape:'BOX',mass:.2,restitution:.05,friction:.6});
+  mat.diffuseTexture=tex; mat.emissiveTexture=tex; mat.emissiveColor=new BABYLON.Color3(.1,.1,.1); mat.diffuseColor=new BABYLON.Color3(.9,.88,.84);
+  mat.specularColor=new BABYLON.Color3(.08,.08,.08);
+  m.material=mat; m.isPickable=true; m.receiveShadows=true;
   tag(m,'note',{health:1,material:'paper',flammable:true});
   const mm=meta(m); mm.noteHtml=String(html||''); mm.noteText=noteTextFromHtml(html); mm.ownsMaterial=true;
+  const wall=NOTE_WALLS[String(opts.wall||'').toLowerCase()];
+  if(wall) pinNote(m,x,z,wall); else layNote(m,x,z);
   state.props.push(m);
   return m;
+}
+// upright on the wall on side `wall` ([dx, dz]) of square (x, z), facing into it
+function pinNote(m,x,z,wall){
+  const top=state.terrainTopY??0;
+  m.rotationQuaternion=null; m.scaling.setAll(1);
+  m.rotation.set(-Math.PI/2,Math.atan2(-wall[0],-wall[1]),0);
+  m.position.set(x+wall[0]*.47,top+1.15,z+wall[1]*.47);
+  const mm=meta(m); mm.wall=wall; mm.noteCell=[x,z];
+  // saved with it (getObjects, freezeLayout): which wall, on which square
+  mm.opts={...(mm.opts||{}),wall:wall[1]<0?'north':wall[1]>0?'south':wall[0]<0?'east':'west'};
+}
+function layNote(m,x,z){
+  // turned to read from the south, where the camera looks from
+  m.rotationQuaternion=null; m.scaling.setAll(NOTE_FLOOR); m.rotation.set(0,Math.PI,0);
+  // on top of the floor tiles (painted floors stand a little above the ground)
+  m.position.set(x,(state.terrainTopY??0)+.075,z);
+  const mm=meta(m); delete mm.wall; delete mm.noteCell; if(mm.opts) delete mm.opts.wall;
 }
 
 function makeShrine(scene){ const plinth=makeBlock(scene,4.5,-6.5,true); plinth.name='cracked_shrine_plinth'; plinth.scaling.set(1.2,.72,1.2); const c=createCrystal('hero_crystal',scene,1.35,.32); c.position.set(4.5,1.25,-6.5); c.material=state.materials.magic; addShadow(c); tag(c,'crystal',{health:3,material:'crystal'}); state.props.push(c); const l=new BABYLON.PointLight('shrine_glow',new BABYLON.Vector3(4.5,1.1,-6.5),scene); l.diffuse=new BABYLON.Color3(.25,.9,.85); l.intensity=.38; l.range=4.2; }
@@ -3089,10 +3127,13 @@ function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',t
 
 function note(g,html='<p>empty note</p>'){
   if(!html || !String(html).trim()) html='<p>empty note</p>';
-  const p=g.root.position.add(g.dir.scale(1.4));
-  const x=clamp(Math.round(p.x),-14,14), z=clamp(Math.round(p.z),-14,14);
-  const n=makeNote(state.scene,x,z,html);
-  state.target=n; say(g,'note inscribed'); updatePerceptionUI(); saveWorldState(); return n;
+  // facing a wall: pinned to it, on this square's side; else laid ahead
+  const lp=g.logicalPos||g.root.position, gx=Math.round(lp.x), gz=Math.round(lp.z), dx=Math.round(g.dir.x), dz=Math.round(g.dir.z);
+  const wallAhead=(dx||dz) && state.blocks.some(b=>meta(b)?.type==='wall' && Math.round(b.position.x)===gx+dx && Math.round(b.position.z)===gz+dz);
+  let n;
+  if(wallAhead) n=makeNote(state.scene,gx,gz,html,{wall:Math.abs(dx)>Math.abs(dz)?(dx<0?'e':'w'):(dz<0?'n':'s')});
+  else { const p=g.root.position.add(g.dir.scale(1.4)); n=makeNote(state.scene,clamp(Math.round(p.x),-14,14),clamp(Math.round(p.z),-14,14),html); }
+  state.target=n; say(g,wallAhead?`${g.id} pins a note to the wall`:`${g.id} writes a note and puts it down`); updatePerceptionUI(); saveWorldState(); return n;
 }
 function face(g,dir){ const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0]}; const v=dirs[String(dir||'n').toLowerCase()]||dirs.n; setCharacterFacing(g,new BABYLON.Vector3(v[0],v[1],v[2])); say(g,'facing '+String(dir||'n')); }
 function build(g,thing='wall',at=null){
@@ -3296,9 +3337,9 @@ function give(g,item){
     }
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
     setBrainConfig(g.id,{inventory:inv});
-    const oinv=charInventory(other); addItem(oinv.items,stock.name); setBrainConfig(other.id,{inventory:oinv});
+    const oinv=charInventory(other); if(stock.text!=null) oinv.items.push({name:stock.name,qty:1,text:stock.text}); else addItem(oinv.items,stock.name); setBrainConfig(other.id,{inventory:oinv});
     emitBadge(g,'gave '+stock.name);
-    window.tablefolkMind?.event(g,'gave',{item:stock.name,to:other.id}); window.tablefolkMind?.event(other,'given',{who:g.id,what:stock.name});
+    window.tablefolkMind?.event(g,'gave',{item:stock.name,to:other.id}); window.tablefolkMind?.event(other,'given',{who:g.id,what:stock.text!=null?`a note that says "${String(stock.text).slice(0,200)}"`:stock.name});
     return say(g,`${g.id} gives ${other.id} ${stock.name}`);
   }
   const recipient=playerName;
@@ -3307,7 +3348,7 @@ function give(g,item){
   if(av && !comeOver(g))
     return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
-  addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
+  if(stock.text!=null) state.player.items.push({name:stock.name,qty:1,text:stock.text}); else addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
   emitBadge(g,'gave '+stock.name); inventoryChanged();
   window.tablefolkMind?.event(g,'gave',{item:stock.name,to:recipient});
   return say(g,`${g.id} gives ${recipient} ${stock.name}`);

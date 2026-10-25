@@ -65,7 +65,10 @@ goes to someone), `give`/`sell`/`inventory` for trading: give(item) to the
 player, give(item, name) or give(10 gold, name) to another character (both
 within 3 cells), `whisper` = only the player hears, carry(thing) picks up
 (and reads a note), dig/build for scenes about digging or building, eat for
-food, note to write notes others can find.
+food, note to write notes others can find (written facing a wall, it is
+pinned there). A note object: {"type": "note", "x": 2, "z": -3, "text":
+"..."}; add "wall": "north" (or south/east/west) to pin it, big and upright,
+on that wall of its square: signs, wanted posters, rules, menus.
 Monsters: skeletons, zombies, rats, spiders, wolves, bats, slimes, ghosts are
 hostile by default: when the player is near they close in and attack (no
 LLM, no personality needed). Goblins, kobolds and orcs talk unless "hostile":

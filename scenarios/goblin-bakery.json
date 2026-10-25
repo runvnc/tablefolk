@@ -155,6 +155,13 @@
    "items": [
     "flour sack"
    ]
+  },
+  {
+   "type": "note",
+   "x": 2,
+   "z": -4,
+   "wall": "north",
+   "text": "GRUB'S BAKERY. Bread 2 gold. Pie 5 gold. NO RATS."
   }
  ],
  "size": [

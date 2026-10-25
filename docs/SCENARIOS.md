@@ -433,11 +433,19 @@ alone goes to the player; giving what it doesn't have fails), `walk(pip)` to
 someone, `carry(note)` (walks over to it when it is a few steps away; a note
 is read when picked up), `throw()` / `drop()`, `dig(north)` (through a wall,
 else a hole in the floor), `build(wall)` / `build(crate)` (never on top of
-something), `note(text)` (writes a note others can pick up and read),
+something), `note(text)` (writes a note others can pick up and read; facing a wall,
+it is pinned to the wall),
 `eat(item)`, `look` (with a brain that can see: a picture from its own eyes,
 described in its own voice). Each prompt has a short menu of what it could do
 right where it stands ("You could, right here: carry(note) (2 steps west),
 dig(north), eat(bun), give(bun, pip)").
+
+Notes: `{"type": "note", "x": 2, "z": -3, "text": "..."}` lies on the floor;
+with `"wall": "north"` (south, east, west) it hangs upright on that wall of
+its square, about a square tall, readable from the room (signs, posters,
+rules). Carried, a note is paper-sized in the hand. The player takes one with
+E: it is read, and goes in the pack with its words (give it to someone and
+they know what it says; drop it and it lies on the floor again).
 
 Showcase worlds (the welcome screen, `scenarios/showcase.json`):
 `goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`,

@@ -221,7 +221,7 @@ renderIncidents();
   try {
     const list = await (await fetch('/scenarios/showcase.json')).json();
     const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    box.innerHTML = list.map(w => `<a class="world-card" href="/app/?scenario=/scenarios/${encodeURIComponent(w.file)}">
+    box.innerHTML = list.map(w => `<a class="world-card" href="/app/?play=1&scenario=/scenarios/${encodeURIComponent(w.file)}">
       <div class="who">${(w.who || []).slice(0, 3).map(n => `<img alt="" src="/assets/tiles/characters/${esc(n)}.png" onerror="this.remove()">`).join('')}</div>
       <b>${esc(w.title)}</b><span>${esc(w.pitch)}</span></a>`).join('');
   } catch { box.closest('section')?.remove(); }

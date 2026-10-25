@@ -3,10 +3,10 @@
   "crate": {
    "file": "objects/crate.png",
    "w": 133,
-   "h": 164,
+   "h": 122,
    "anchor": [
     66,
-    107.7
+    65.7
    ]
   },
   "barrel": {
