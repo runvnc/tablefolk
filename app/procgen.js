@@ -457,6 +457,24 @@
     return { spec, Wd, D, cell, door: [mi, D - 1] };
   }
 
+  // The inside of a kept building as a scenario of its own (a subworld): the
+  // walls with a door at the front, the floor, the standard furniture, the
+  // player set down inside the door and a link back out at the square in
+  // front of it. The world builder lets it be edited like any map.
+  function interiorScenario(type) {
+    const { spec, Wd, D, cell, door } = walkInFootprint({ type, x: 0, z: 0, ry: 0 });
+    const objects = [], paint = [];
+    for (let i = 0; i < Wd; i++) for (let j = 0; j < D; j++) {
+      const [x, z] = cell(i, j);
+      if (i === 0 || j === 0 || i === Wd - 1 || j === D - 1) { objects.push({ type: i === door[0] && j === door[1] ? 'door' : 'wall', x, z }); continue; }
+      const t = WALK_IN_THINGS[spec.inside[j - 1]?.[i - 1]]; if (t) objects.push({ type: t, x, z });
+      paint.push({ x, z, mat: spec.floor });
+    }
+    const [ix, iz] = cell(door[0], D - 2), out = cell(door[0], D);
+    paint.push({ x: ix, z: cell(door[0], D - 1)[1], mat: spec.floor });
+    return { title: spec.name, base: 'plain', floor: spec.floor, size: [Math.max(11, Wd + 6), Math.max(9, D + 5)], objects, paint, agents: [],
+      player: { at: [ix, iz], facing: 'n' }, links: [{ at: out, to: 'back', name: 'outside' }], roofs: false };
+  }
   // A kept building ("keep": true: the model stays outside, the inside is a
   // subworld): the square in front of its door, `dist` squares from the
   // building's centre, and the one beyond it where the player is set down on
@@ -466,7 +484,7 @@
     const bx = Math.round(+b.x), bz = Math.round(+b.z), d = spec.pad || 2;
     return { pad: [bx + f[0] * d, bz + f[1] * d], beyond: [bx + f[0] * (d + 1), bz + f[1] * (d + 1)] };
   }
-  const api = { dungeon, village, applyToScenario, WALK_IN, WALK_IN_THINGS, walkInFootprint, doorPad, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
+  const api = { dungeon, village, applyToScenario, WALK_IN, WALK_IN_THINGS, walkInFootprint, doorPad, interiorScenario, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
   globalThis.TablefolkProcgen = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })();

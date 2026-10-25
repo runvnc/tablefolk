@@ -700,20 +700,7 @@
   const OUTDOORSY = new Set(['tree', 'flowers', 'grass_tuft', 'boulder', 'lily_pad']);
   // "keep": true leaves the model standing outside and makes the inside a
   // subworld (interiorOf) with a link at the square in front of the door.
-  function interiorOf(b) {
-    const { spec, Wd, D, cell, door } = footprint({ type: b.type, x: 0, z: 0, ry: 0 });
-    const objects = [], paint = [];
-    for (let i = 0; i < Wd; i++) for (let j = 0; j < D; j++) {
-      const [x, z] = cell(i, j);
-      if (i === 0 || j === 0 || i === Wd - 1 || j === D - 1) { objects.push({ type: i === door[0] && j === door[1] ? 'door' : 'wall', x, z }); continue; }
-      const t = INSIDE_GLYPHS[spec.inside[j - 1]?.[i - 1]]; if (t) objects.push({ type: t, x, z });
-    }
-    const [ix, iz] = cell(door[0], D - 2), out = cell(door[0], D);
-    for (let i = 1; i < Wd - 1; i++) for (let j = 1; j < D - 1; j++) { const [x, z] = cell(i, j); paint.push({ x, z, mat: spec.floor }); }
-    paint.push({ x: out[0], z: out[1] - 0, mat: spec.floor }, { x: cell(door[0], D - 1)[0], z: cell(door[0], D - 1)[1], mat: spec.floor });
-    return { title: spec.name, base: 'plain', floor: spec.floor, size: [Math.max(11, Wd + 6), Math.max(9, D + 5)], objects, paint, agents: [],
-      player: { at: [ix, iz], facing: 'n' }, links: [{ at: out, to: 'back', name: 'outside' }], roofs: false };
-  }
+  const interiorOf = b => window.TablefolkProcgen.interiorScenario(b.type);
   function expandBuildings(scn) {
     const isK = o => BUILDINGS[o.type] && o.enter !== false && o.keep;
     const isB = o => BUILDINGS[o.type] && o.enter !== false && !o.keep;

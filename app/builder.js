@@ -108,15 +108,28 @@
   function mapEditor() {
     if (ed || !window.tfMapEditor || !$('mapEditor')) return ed;
     ed = window.tfMapEditor.mount($('mapEditor'), {
-      onChange(s) { scn = s; formsSoon(); },
+      onChange(s) { if (inside) inside.parent.subworlds[inside.id] = s; else scn = s; formsSoon(); },
+      onEditInside({ id, type }) {
+        const root = inside ? inside.parent : scn;
+        (root.subworlds ||= {})[id] ||= window.TablefolkProcgen.interiorScenario(type);
+        inside = { id, parent: root, type }; insideBar(); ed.load(root.subworlds[id]);
+      },
     });
     return ed;
+  }
+  // the inside of a kept building is edited as a map of its own; the forms stay the world's
+  let inside = null;
+  function insideBar() {
+    let bar = $('insideBar');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'insideBar'; bar.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px 12px;margin:0 0 8px;border-radius:10px;background:#fff3cf;border:1px solid #e8c547;color:#3a2a08'; $('mapEditor').insertAdjacentElement('beforebegin', bar); }
+    bar.hidden = !inside;
+    if (inside) { bar.innerHTML = `<b>Editing the inside of ${esc(inside.id)}</b><span style="flex:1">Walls, floor, furniture and people here; the player comes in at the gold door square and leaves by the link at the bottom.</span><button type="button" id="insideBack">← back to the world</button>`; $('insideBack').onclick = () => { const p = inside.parent; inside = null; insideBar(); ed.load(p); }; }
   }
   let formsTimer = 0, edTimer = 0;
   // forms follow the map (not while typing in them)
   function formsSoon() { clearTimeout(formsTimer); formsTimer = setTimeout(() => { if (!$('editor')?.contains(document.activeElement)) render(); else formsSoon(); }, 300); }
   // the map follows the forms
-  function mapSoon() { clearTimeout(edTimer); edTimer = setTimeout(() => ed?.refresh(scn), 250); }
+  function mapSoon() { clearTimeout(edTimer); edTimer = setTimeout(() => { if (!inside) ed?.refresh(scn); }, 250); }
   // "map" lines: laid out by the tabletop page once
   function needsLayout(s) { return !s.generate && !(Array.isArray(s.grid) ? s.grid.length : s.grid) && (s.map?.length || 0) > 0; }
   async function layOut() {

@@ -411,7 +411,7 @@
             ${o.type === 'key' || o.type === 'potion' || o.type === 'scroll' ? field('Name', 'name', o.name, 'text', 'placeholder="e.g. silver key"') : ''}
             ${o.type === 'light' ? field('Colour', 'color', o.color, 'text', 'placeholder="#ffc98a"') + field('Range', 'range', o.range, 'number', 'step="0.5"') : ''}
           </div>
-          <div class="tfme-actions"><button type="button" data-act="turn">Turn (R)</button><button type="button" data-act="dup">Duplicate</button><button type="button" class="danger" data-act="del">Remove</button></div>`;
+          <div class="tfme-actions">${window.TablefolkProcgen?.WALK_IN?.[o.type] && o.keep && opts.onEditInside ? '<button type="button" data-act="inside">Edit the inside</button>' : ''}<button type="button" data-act="turn">Turn (R)</button><button type="button" data-act="dup">Duplicate</button><button type="button" class="danger" data-act="del">Remove</button></div>`;
       } else {
         const d = t.ref;
         box.innerHTML = `<h3>${t.kind === 'door' ? 'Door' : 'Wall'}</h3><p class="tfme-muted">at ${t.key.replace(',', ', ')}</p>
@@ -672,6 +672,10 @@
       if (act === 'undo') doUndo(); else if (act === 'redo') doRedo();
       else if (act === 'fit') fit(); else if (act === 'zoomin') zoomAt(1.25); else if (act === 'zoomout') zoomAt(.8);
       else if (act === 'del') remove(sel);
+      else if (act === 'inside' && sel?.kind === 'object') {
+        const o = sel.ref; if (!o.id) edit(() => { o.id = String(window.TablefolkProcgen.WALK_IN[o.type].name).replace(/ /g, '-') + '-' + Math.random().toString(36).slice(2, 5); });
+        opts.onEditInside({ id: o.id, type: o.type });
+      }
       else if (act === 'turn' && sel?.kind === 'object') edit(() => { sel.ref.ry = +(((sel.ref.ry || 0) + Math.PI / 2) % (Math.PI * 2)).toFixed(3) || undefined; if (!sel.ref.ry) delete sel.ref.ry; });
       else if (act === 'dup' && sel) {
         const [x, z] = selCell(), spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].map(([a, b]) => [x + a, z + b]).find(([a, b]) => inBoard(a, b) && !thingAt(a, b));
