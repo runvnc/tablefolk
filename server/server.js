@@ -161,7 +161,7 @@ const server = Bun.serve({
     if (local) ownerRequests.add(req);
     requestIps.set(req, ip);
     const p = url.pathname;
-    if (p === '/') return Response.redirect('/app/', 302);
+    // / is the landing page (index.html), served as a static file below
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud', local);
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local', local);
     if (p === '/api/generate') return handleGenerate(req, url);

@@ -171,8 +171,7 @@ Ideas, by how much they would add for how much work with a small model:
 - Mirror `gemma-4-E2B-it.litertlm` (vision model) on the R2 bucket (needs you).
 - Check phone layout (screenshots taken but not yet reviewed).
 - Wolf tile renders wrong; turned objects not shown turned in the editor.
-- The root landing page (index.html) still has the old pitch; the Bun server
-  redirects / to /app/.
+- Done: / serves the landing page (index.html); the app stays at /app/.
 
 **2026-10-25**
 
