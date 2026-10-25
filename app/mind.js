@@ -206,7 +206,9 @@
     for (const k of MOODS) m.mood[k] += (b[k] - m.mood[k]) * .07;
     m.mood.trust += (b.trust - m.mood.trust) * .015;
     for (const k of MOODS) if (m.mood[k] < .3) delete m.why[k];
-    if (needsOn(g)) { m.hunger = clamp01(m.hunger + .025); m.tired = clamp01(m.tired + .015); }
+    // slow: a living world gives each character a turn every 15-20 s, and at
+    // twice this a meal lasted three minutes ("Thistle keeps saying she's hungry")
+    if (needsOn(g)) { m.hunger = clamp01(m.hunger + .012); m.tired = clamp01(m.tired + .007); }
     if (/emote\(\s*"?sleep/i.test(line)) m.tired = 0;
     if ((cfg.goal || '') !== m.goal) { m.goal = cfg.goal || ''; m.goalTurn = m.turn; }
     if (m.feel && m.turn - m.feel.turn > 4) m.feel = null;
@@ -307,7 +309,7 @@
     setBrainConfig(g.id, { inventory: inv });
     const m = mindOf(g); m.hunger = Math.max(0, m.hunger - nourish); push(g, 'joy', .1);
     try { emitBadge(g, 'eats ' + it.name); inventoryChanged(); } catch {}
-    return say(g, `${g.id} eats ${/^[aeiou]/i.test(it.name) ? 'an' : 'a'} ${it.name}`, false);
+    return say(g, `${g.id} eats the ${it.name}`, false);
   }
 
   // ---- events from the rest of the game ----
