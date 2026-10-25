@@ -569,6 +569,8 @@
     }
     cv.addEventListener('pointerdown', e => {
       if (!L) return;
+      // back to the map: the tool keys work again after typing in a field
+      if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) document.activeElement.blur();
       cv.setPointerCapture(e.pointerId);
       const [px, py] = local(e), [x, z] = pxToCell(px, py);
       if (e.button === 1 || e.button === 2 || spaceDown) { panning = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; e.preventDefault(); return; }
