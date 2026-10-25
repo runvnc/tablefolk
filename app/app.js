@@ -40,7 +40,17 @@ const state = {
 // Engine chatter (the model's turns, prompts, errors) is toasted only in dev
 // mode; players see what happens in the world.
 const ENGINE_LINE=/\b(LLM|brain|prompt|history|sending \d+ messages|grammar|decide|raw output|engine|workflow step|turn \d+|tokens?)\b/i;
-function log(s){ try{ window.tablefolkPlay?.remember(s); }catch{} const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected ')||(!window.TABLEFOLK_DEV && ENGINE_LINE.test(s)); if(!muted) window.tablefolkToast?.(s,{type:'info'}); }catch{} }
+// Players see what the characters say and do in bubbles and the messages
+// pane: a toast for each of it (a whole look() description, every step) only
+// buried the screen. Toasts stay for what concerns the player.
+function npcLineNotForPlayer(s){
+  const ids=(state.characters||[]).map(c=>c.id); if(!ids.length) return false;
+  const t=String(s), who=ids.find(id=>t.startsWith(id+':')||t.startsWith(id+' ')); if(!who) return false;
+  if(/^\S+ (looks around|sees\b)/.test(t)) return true;
+  const me=(document.getElementById('chatName')?.value||'').trim();
+  return !(me && t.toLowerCase().includes(me.toLowerCase()));
+}
+function log(s){ try{ window.tablefolkPlay?.remember(s); }catch{} const box=document.getElementById('log'); const div=document.createElement('div'); div.className='logline'; div.textContent=s; box.prepend(div); while(box.children.length>10) box.lastChild.remove(); try{ const muted=(window._tablefolkLogToastMuteUntil&&performance.now()<window._tablefolkLogToastMuteUntil)||s.startsWith('selected ')||(!window.TABLEFOLK_DEV && (ENGINE_LINE.test(s)||npcLineNotForPlayer(s))); if(!muted) window.tablefolkToast?.(s.length>180?s.slice(0,177)+'…':s,{type:'info'}); }catch{} }
 function pickRandom(a){ return a[Math.floor(Math.random()*a.length)] }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 // Dev escape hatch: ?norender=1 skips the render loop entirely (animate() and
@@ -3046,7 +3056,7 @@ function carry(g,name=''){
   }
   return carryMesh(g,nearestTarget(g,1.8));
 }
-function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
+function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot

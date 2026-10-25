@@ -539,3 +539,13 @@ html:fullscreen #ttBar { display:none; }
 
 /* world-integration.js: the download question waits for the welcome screen and intro card */
 #modelLoadNotice.ducked { display:none !important; }
+/* phones: the top bar keeps the name, the worlds button and the brain's status */
+@media (max-width:700px) {
+  #topBar { gap:6px; padding:0 8px; }
+  #topBar .brand { font-size:14px; }
+  #topBar .topbar-brain { display:none; }
+  #topBar #brainStatus { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
+  #chatDock .avatar-hint { display:none; }
+  #chatDock { max-height:46vh; overflow:auto; }
+  #scenarioBanner { top:60px !important; bottom:auto !important; left:70px !important; right:8px !important; max-width:none !important; font-size:12px; }
+}
