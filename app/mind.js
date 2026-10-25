@@ -154,9 +154,11 @@
       push(g, 'joy', -.4);
       if (me) m.mood.trust = clamp01(m.mood.trust - .35);
       m.threat = d.by; m.threatTurn = m.turn;
+      if (!me) opinion(g, d.by, -.6, 'attacked you');
       addMemory(g, `${d.by} attacked you${d.hit === false ? ' (and missed)' : ''}.`, 3);
     } else if (kind === 'saw_attack') {
       push(g, t === 'brave' ? 'anger' : 'fear', .25, `${d.by} attacked ${d.victim}`);
+      if (!isPlayerName(d.by)) opinion(g, d.by, -.25, `attacked ${d.victim}`);
       if (me) m.mood.trust = clamp01(m.mood.trust - .15);
       addMemory(g, `${d.by} attacked ${d.victim}.`, 1.5);
     } else if (kind === 'saw_defeat') {
@@ -165,6 +167,7 @@
       addMemory(g, `${d.by ? d.by + ' struck down ' : 'You saw '}${d.victim}${d.by ? '' : ' fall'}.`, 2.5);
     } else if (kind === 'given') {
       push(g, 'joy', .35, `${d.who} gave you ${d.what}`); m.mood.anger *= .6;
+      if (!me) opinion(g, d.who, .35, `gave you ${d.what}`);
       if (me) m.mood.trust = clamp01(m.mood.trust + .25);
       addMemory(g, `${d.who} gave you ${d.what}.`, 2);
     } else if (kind === 'sold') {
@@ -177,6 +180,22 @@
       m.heard = String(d.text || '');
       if (me) m.mood.trust = clamp01(m.mood.trust + .004);
     }
+  }
+  // How it feels about the other characters (the player has trust, above):
+  // gifts and blows between them move it, so a feud or a friendship that
+  // the game saw happen stays in the prompt ("You like: pip (gave you a
+  // bun). You dislike: grub (attacked you).").
+  function opinion(g, who, dv, why) {
+    if (!who || who === g.id) return;
+    const m = mindOf(g); m.rel ||= {};
+    const r = m.rel[who] ||= { v: 0, why: '' };
+    r.v = Math.max(-1, Math.min(1, r.v + dv)); r.why = why;
+  }
+  function relLine(g) {
+    const rel = mindOf(g).rel || {}, ids = new Set(state.characters.filter(c => !c.defeated).map(c => c.id));
+    const like = [], dislike = [];
+    for (const [id, r] of Object.entries(rel)) { if (!ids.has(id)) continue; if (r.v >= .3) like.push(`${id} (${r.why})`); else if (r.v <= -.3) dislike.push(`${id} (${r.why})`); }
+    return [like.length ? 'You like: ' + like.join(', ') + '.' : '', dislike.length ? 'You dislike: ' + dislike.join(', ') + '.' : ''].filter(Boolean).join(' ');
   }
   // One of its turns went by: needs grow, feelings settle.
   function tick(g, line = '') {
@@ -232,6 +251,7 @@
     if (!g) return [];
     const cfg = getBrainConfig(g.id), m = mindOf(g), out = [];
     const f = feelLine(g); if (f) out.push(f);
+    const rl = relLine(g); if (rl) out.push(rl);
     const b = bodyLine(g); if (b) out.push(b);
     const w = want(g), urgent = /^(stay safe|get your wounds|get away|tell .* attacked|let .* stand for)/.test(w);
     if (w && (urgent || !cfg.goal)) out.push('You want: ' + w + '.');
@@ -299,5 +319,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { prepare, event, tick, cardLines, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { prepare, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();
