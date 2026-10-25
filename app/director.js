@@ -132,8 +132,8 @@
     el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(narrate.t); narrate.t = setTimeout(() => el.classList.remove('show'), 6500);
   }
-  // at most one event in 20 s, however fast turns go (skipped turns are fast)
-  let lastAt = 0;
+  // at most one event per eventGap(), however fast turns go
+  let lastAt = 0, gap = null;
   // Timed events ("events": [{"text": "...", "round": 8}]): once, when the
   // live rounds reach it, whatever the clock says; the story's turning points
   function timed() {
@@ -149,8 +149,10 @@
     if (off || !state.characters?.length) return;
     if (timed()) return;
     if (++turns % every) return;
-    if (performance.now() - lastAt < 20000) { turns--; return; }
-    lastAt = performance.now();
+    // spaced by the live pace (live.js eventGap: calm about every two minutes)
+    gap ??= window.tablefolkLive?.eventGap?.() ?? 20;
+    if (performance.now() - lastAt < gap * 1000) { turns--; return; }
+    lastAt = performance.now(); gap = null;
     // to someone the player can see, when there is someone
     const seen = state.characters.filter(o => !o.defeated && (window.tablefolkDark?.visible?.(posOf(o).x, posOf(o).z) ?? true));
     const target = seen.length ? seen[Math.floor(Math.random() * seen.length)] : c;

@@ -549,3 +549,6 @@ html:fullscreen #ttBar { display:none; }
   #chatDock { max-height:46vh; overflow:auto; }
   #scenarioBanner { top:60px !important; bottom:auto !important; left:70px !important; right:8px !important; max-width:none !important; font-size:12px; }
 }
+/* live.js: how much happens */
+.view-btns > .pace-pick { grid-column:1 / -1; order:-1; display:flex; align-items:center; justify-content:flex-end; gap:6px; margin:-2px 2px -2px 0; font-size:11px; color:#cfe9d4; }
+.pace-pick select { font:inherit; font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid rgba(140,230,160,.35); background:rgba(10,20,14,.6); color:#dfffe4; }

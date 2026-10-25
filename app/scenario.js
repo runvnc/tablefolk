@@ -850,7 +850,7 @@
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
-      live: !!s.live, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
+      live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // locks.js: locked doors and their keys
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
