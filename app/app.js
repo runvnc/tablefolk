@@ -3733,6 +3733,13 @@ function buildAgentPrompt(g, cfg) {
     // senses.js: a short menu of things it could do right here
     ...(window.tablefolkSenses?.hereLine ? [window.tablefolkSenses.hereLine(g)].filter(Boolean) : []),
     '',
+    // Who it is, near the end where a small model looks hardest: its
+    // personality sits at the top of the system prompt, and without this
+    // characters drift into each other's voice within a few turns (everyone
+    // talking like the necromancer about "the architecture of despair").
+    // Above the feelings and memories, which must stay last (the feelings
+    // eval: remembering being hit five turns later).
+    ...(personality ? ['Stay yourself: ' + inCharacter(g.id, style, personality)] : []),
     ...(window.tablefolkSkills ? window.tablefolkSkills.promptLines(g) : []),
     ...(window.tablefolkCombat && (allowedFor(g).has('attack') || cfg.wielding || (cfg.hp!=null && cfg.hp<(cfg.maxHp??10))) ? [window.tablefolkCombat.selfLine(g)] : []),
     ...(quest ? ['Quest: ' + quest] : []),
@@ -3741,11 +3748,6 @@ function buildAgentPrompt(g, cfg) {
     // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
-    // Last, where a small model looks hardest: who it is. Its personality sits
-    // at the top of the system prompt; without this, characters drift into
-    // each other's voice within a few turns (everyone talking like the
-    // necromancer about "the architecture of despair").
-    ...(personality ? ['Stay yourself: ' + inCharacter(g.id, style, personality)] : []),
   ].join('\n');
   return { systemMessage, commandReminder };
 }
