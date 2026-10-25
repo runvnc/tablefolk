@@ -7,7 +7,7 @@
 function renderNoteTextureSVG(tex,ctx,W,H,html){
   try{
     const fs=typeof noteFontPx==='function'?noteFontPx(html):17;
-    const css='margin:0;padding:30px;box-sizing:border-box;width:'+W+'px;height:'+H+'px;background:#f3ecd8;color:#17110a;font-weight:600;font-family:Georgia,serif;font-size:'+fs+'px;line-height:1.3;overflow:hidden;word-wrap:break-word;';
+    const css='margin:0;padding:30px;box-sizing:border-box;width:'+W+'px;height:'+H+'px;background:#f3ecd8;color:#0d0904;font-weight:700;font-family:Georgia,serif;font-size:'+fs+'px;line-height:1.25;overflow:hidden;word-wrap:break-word;';
     const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="'+css.replace(/"/g,"'")+'">'+String(html||'')+'</div></foreignObject></svg>';
     const img=new Image();
     img.onload=()=>{ try{ ctx.fillStyle='#f3ecd8'; ctx.fillRect(0,0,W,H); ctx.drawImage(img,0,0,W,H); tex.update(); }catch(e){ console.warn('note svg drawImage failed',e); } };

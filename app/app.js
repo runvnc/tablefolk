@@ -1707,7 +1707,7 @@ function noteTextFromHtml(html){ const d=document.createElement('div'); d.innerH
 // The page, portrait like the sheet (.7 x 1), the type sized to how much is
 // written: a short note fills the page in big letters (17px on a square
 // texture was unreadable from the room).
-function noteFontPx(html){ const n=noteTextFromHtml(html).length; return n<40?54:n<90?42:n<180?32:n<360?24:18; }
+function noteFontPx(html){ const n=noteTextFromHtml(html).length; return n<40?72:n<90?58:n<180?40:n<360?28:20; }
 function renderNoteTexture(scene,html){
   const W=512,H=732, FS=noteFontPx(html);
   const tex=new BABYLON.DynamicTexture('note_tex',{width:W,height:H},scene,true);
@@ -1715,7 +1715,7 @@ function renderNoteTexture(scene,html){
   // the box's face maps the page sideways: turned a quarter, it reads left to right
   tex.wAng=Math.PI/2;
   const ctx=tex.getContext();
-  const drawFallback=()=>{ ctx.fillStyle='#f3ecd8'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#17110a'; ctx.font='600 '+FS+'px Georgia, serif'; const t=noteTextFromHtml(html); const words=t.split(/\s+/); let line='',y=FS+30; for(const w of words){ if(ctx.measureText(line+w).width>W-60){ ctx.fillText(line,30,y); y+=Math.round(FS*1.3); line=''; } line+=w+' '; if(y>H-20) break; } ctx.fillText(line,30,y); tex.update(); };
+  const drawFallback=()=>{ ctx.fillStyle='#f3ecd8'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#0d0904'; ctx.font='700 '+FS+'px Georgia, serif'; const t=noteTextFromHtml(html); const words=t.split(/\s+/); let line='',y=FS+30; for(const w of words){ if(ctx.measureText(line+w).width>W-60){ ctx.fillText(line,30,y); y+=Math.round(FS*1.3); line=''; } line+=w+' '; if(y>H-20) break; } ctx.fillText(line,30,y); tex.update(); };
   drawFallback();
   (async()=>{
     let html2=String(html||'');
@@ -1725,7 +1725,7 @@ function renderNoteTexture(scene,html){
     if(window.html2canvas){
       try{
         const host=document.createElement('div');
-        host.style.cssText='position:absolute;left:-10000px;top:0;width:'+W+'px;height:'+H+'px;margin:0;padding:30px;box-sizing:border-box;background:#f3ecd8;color:#17110a;font-weight:600;font-family:Georgia,serif;font-size:'+FS+'px;line-height:1.3;overflow:hidden;word-wrap:break-word;';
+        host.style.cssText='position:absolute;left:-10000px;top:0;width:'+W+'px;height:'+H+'px;margin:0;padding:30px;box-sizing:border-box;background:#f3ecd8;color:#0d0904;font-weight:700;font-family:Georgia,serif;font-size:'+FS+'px;line-height:1.25;'+(noteTextFromHtml(html).length<120?'display:flex;flex-direction:column;justify-content:center;text-align:center;':'')+'overflow:hidden;word-wrap:break-word;';
         host.innerHTML=html2;
         document.body.appendChild(host);
         let canvas;
@@ -1764,8 +1764,9 @@ async function inlineNoteImages(html){
 // three sizes: lying on the floor (NOTE_FLOOR of it), pinned to a wall (full
 // size, upright, so it reads from the room: "wall": "north" in a scenario,
 // or note() written facing a wall), and held (NOTE_HELD: paper next to a
-// person; beginCarry). Lit like paper with a faint glow of its own, so the
-// writing reads in a dim room (fully emissive, it washed out to white).
+// person; beginCarry). Lit like paper, a little grey, with no glow of its
+// own: emissive, or near-white under a torch, it bloomed into a white haze
+// and the writing faded.
 // No physics body: it only lies, hangs or is carried, and its size changes.
 const NOTE_FLOOR=.5, NOTE_HELD=.3;
 const NOTE_WALLS={n:[0,-1],north:[0,-1],s:[0,1],south:[0,1],e:[-1,0],east:[-1,0],w:[1,0],west:[1,0]};
@@ -1773,7 +1774,7 @@ function makeNote(scene,x,z,html='<p>empty note</p>',opts={}){
   const m=BABYLON.MeshBuilder.CreateBox('note',{width:.7,height:.015,depth:1},scene);
   const mat=new BABYLON.StandardMaterial('note_mat',scene);
   const tex=renderNoteTexture(scene,html);
-  mat.diffuseTexture=tex; mat.emissiveTexture=tex; mat.emissiveColor=new BABYLON.Color3(.1,.1,.1); mat.diffuseColor=new BABYLON.Color3(.9,.88,.84);
+  mat.diffuseTexture=tex; mat.diffuseColor=new BABYLON.Color3(.72,.69,.64);
   mat.specularColor=new BABYLON.Color3(.08,.08,.08);
   m.material=mat; m.isPickable=true; m.receiveShadows=true;
   tag(m,'note',{health:1,material:'paper',flammable:true});
@@ -1786,9 +1787,11 @@ function makeNote(scene,x,z,html='<p>empty note</p>',opts={}){
 // upright on the wall on side `wall` ([dx, dz]) of square (x, z), facing into it
 function pinNote(m,x,z,wall){
   const top=state.terrainTopY??0;
-  m.rotationQuaternion=null; m.scaling.setAll(1);
+  // as big as fits the wall: up to a square tall, its top a little below the wall's
+  const h=wallH(), k=Math.min(1,Math.max(.35,(h-.25)*.8)), cy=top+Math.min(h-.12-k/2,.1+k/2+(h-k)*.45);
+  m.rotationQuaternion=null; m.scaling.setAll(k);
   m.rotation.set(-Math.PI/2,Math.atan2(-wall[0],-wall[1]),0);
-  m.position.set(x+wall[0]*.47,top+1.15,z+wall[1]*.47);
+  m.position.set(x+wall[0]*.47,cy,z+wall[1]*.47);
   const mm=meta(m); mm.wall=wall; mm.noteCell=[x,z];
   // saved with it (getObjects, freezeLayout): which wall, on which square
   mm.opts={...(mm.opts||{}),wall:wall[1]<0?'north':wall[1]>0?'south':wall[0]<0?'east':'west'};
