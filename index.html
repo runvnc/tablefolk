@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Give a tiny local character a world, a goal, and a few actions. Then watch what it decides to do." />
+  <meta name="description" content="Little worlds where the characters think for themselves, with a small AI running in your browser. Pick one and let them live." />
   <title>Tablefolk — Living Maps with Local AI Characters</title>
   <link rel="stylesheet" href="/home.css" />
   <script src="/home.js" defer></script>
@@ -22,11 +22,11 @@
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">A browser toybox for small local minds</p>
-        <h1>Give a character a world.<br><em>See what it does.</em></h1>
-        <p class="lede">Build a little 3D scene, choose the actions your character is allowed to take, and give it a task. A small Gemma model runs in your browser and chooses one move at a time.</p>
+        <h1>Set up a little world.<br><em>Let them live.</em></h1>
+        <p class="lede">A goblin baker who is sure his recipe was stolen. A dragon being audited. A ghost nobody takes seriously. The characters talk, argue, dig, build and hand each other things, run by a small Gemma model in your own browser, and things keep happening to them. Watch, or walk in and join.</p>
         <div class="hero-actions">
           <a class="button primary" href="/app/">Enter Tablefolk <span aria-hidden="true">→</span></a>
-          <a class="button quiet" href="#incidents">Watch an incident</a>
+          <a class="button quiet" href="/world/">Build a world</a>
         </div>
         <p class="local-note"><span></span> The character's brain runs on your device after the model downloads.</p>
       </div>
@@ -41,8 +41,16 @@
       </div>
     </section>
 
+    <section class="worlds-section" id="worlds">
+      <div class="section-heading">
+        <div><p class="eyebrow">Drop in</p><h2>Worlds to try</h2></div>
+        <p>Each one starts living on its own: press P to pause, talk to anyone in the chat box, or walk in and take things.</p>
+      </div>
+      <div id="worldList" class="world-list"></div>
+    </section>
+
     <section class="intro strip">
-      <p>Characters see a small compass-labeled map of their surroundings. They can only use the commands you enable, such as walking, speaking, picking things up, or causing regrettable property damage.</p>
+      <p>Characters see their surroundings, feel, remember and want things, and can only use the commands their world allows: talking, walking, giving, digging, building, picking things up, or causing regrettable property damage. With the sighted model, they really look.</p>
       <dl>
         <div><dt>Brain</dt><dd>Gemma 4 E2B</dd></div>
         <div><dt>Runs</dt><dd>In your browser</dd></div>

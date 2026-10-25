@@ -214,3 +214,15 @@ async function renderIncidents() {
 }
 
 renderIncidents();
+
+// Worlds to try: the app's showcase list, each opening straight into the world.
+(async () => {
+  const box = document.querySelector('#worldList'); if (!box) return;
+  try {
+    const list = await (await fetch('/scenarios/showcase.json')).json();
+    const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    box.innerHTML = list.map(w => `<a class="world-card" href="/app/?scenario=/scenarios/${encodeURIComponent(w.file)}">
+      <div class="who">${(w.who || []).slice(0, 3).map(n => `<img alt="" src="/assets/tiles/characters/${esc(n)}.png" onerror="this.remove()">`).join('')}</div>
+      <b>${esc(w.title)}</b><span>${esc(w.pitch)}</span></a>`).join('');
+  } catch { box.closest('section')?.remove(); }
+})();

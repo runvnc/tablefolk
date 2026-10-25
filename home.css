@@ -160,3 +160,14 @@ footer p { flex: 1; }
   html { scroll-behavior: auto; }
   .button:hover { transform: none; }
 }
+
+/* worlds to try (scenarios/showcase.json) */
+.worlds-section { padding: 70px 0 30px; }
+.world-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.world-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); background: var(--panel); text-decoration: none; color: inherit; transition: transform .15s, border-color .15s; }
+.world-card:hover { transform: translateY(-3px); border-color: var(--acid); }
+.world-card .who { display: flex; height: 80px; align-items: flex-end; overflow: hidden; }
+.world-card .who img { height: 128px; margin: 0 -24px -20px; }
+.world-card .who img:first-child { margin-left: -16px; }
+.world-card b { font-size: 18px; }
+.world-card span { color: var(--muted); font-size: 15px; line-height: 1.45; }
