@@ -3,7 +3,7 @@
 // Uses @huggingface/transformers with WebGPU acceleration.
 // Defaults to q4 (4-bit weights, 32-bit activations) to avoid shader-f16 issues
 // on older GPUs like RTX 2060. Falls back to CPU if WebGPU fails.
-import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1";
 
 const MODEL_CONFIG = {
   'lfm2.5-230m': {
@@ -21,6 +21,17 @@ const MODEL_CONFIG = {
     modelId: 'onnx-community/gemma-4-E2B-it-ONNX',
     dtype: 'q4',       // 4-bit weights, 32-bit activations - safe for GPUs without shader-f16
     vram: '~2GB',
+    device: 'webgpu',
+  },
+  // Prism ML's 1-bit Bonsai, the way the webml-community demo runs it
+  // (huggingface.co/spaces/webml-community/bonsai-webgpu): dtype q1 on WebGPU.
+  'bonsai-1.7b-onnx': {
+    label: 'Bonsai 1-bit 1.7B (Transformers.js)',
+    modelId: 'onnx-community/Bonsai-1.7B-ONNX',
+    dtype: 'q1',
+    attempts: [{ dtype: 'q1', device: 'webgpu', label: '1-bit WebGPU' }],
+    pipeline: true,
+    vram: '~0.4GB',
     device: 'webgpu',
   },
   'minicpm5-1b-gpu': {
@@ -113,6 +124,24 @@ export async function loadModel(modelKey, onProgress) {
   onProgress?.('Loading Transformers.js v4...');
   onProgress?.(`Model: ${cfg.label} (dtype: ${dtype}${!hasShaderF16 ? ' [no shader-f16]' : ''})`);
 
+  if (cfg.pipeline) {
+    // the demo's way: a text-generation pipeline (model.generate with a hand-made
+    // cache failed in GroupQueryAttention)
+    try {
+      const fileBytes = new Map();
+      model = await transformers.pipeline('text-generation', cfg.modelId, { dtype: cfg.dtype, device: cfg.device || 'webgpu', progress_callback: info => {
+        if (info.status === 'progress' && info.file && info.total) {
+          fileBytes.set(info.file, { loaded: info.loaded || 0, total: info.total });
+          let loaded = 0, total = 0; for (const f of fileBytes.values()) { loaded += f.loaded; total += f.total; }
+          onProgress?.({ phase: 'download', percent: Math.min(100, loaded / total * 100), text: `Model: ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB` });
+        }
+      } });
+      processor = model.tokenizer; currentModel = modelKey;
+      onProgress?.(`${cfg.label} ready`);
+      return { model, processor };
+    } catch (e) { model = null; processor = null; throw new Error(`Failed to load model: ${e.message}`); }
+    finally { loading = false; }
+  }
   const isGemma = modelKey === 'gemma4-e2b';
   const modelClass = isGemma ? transformers.Gemma4ForConditionalGeneration : transformers.AutoModelForCausalLM;
   try {
@@ -169,7 +198,7 @@ export async function loadModel(modelKey, onProgress) {
     // implemented) and falls through to q8 WebGPU which works. If q4 is cached it
     // may load but fail at generation - clear the model cache to force a fresh
     // download so it falls through to q8.
-    const attempts = [
+    const attempts = cfg.attempts || [
       { dtype: 'q4', device: 'webgpu', label: 'q4 WebGPU' },
       { dtype: 'q8', device: 'webgpu', label: 'q8 WebGPU' },
       { dtype: 'q8', device: 'wasm', label: 'q8 WASM' },

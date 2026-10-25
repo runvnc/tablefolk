@@ -17,6 +17,25 @@ function stripThinkBlocks(text) {
 // Build a fake engine object with chat.completions.create() that internally
 // calls Transformers.js model.generate().
 export function createTJSEngine(model, processor) {
+  // A text-generation pipeline (Bonsai): plain string messages, its own
+  // generate loop (loadModel's cfg.pipeline)
+  if (typeof model === 'function' && model.tokenizer) {
+    const run = async (messages, opts = {}) => {
+      const msgs = messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : (m.content || []).map(p => p?.text ?? '').join('') }));
+      const temperature = opts.temperature ?? 0.7;
+      const out = await model(msgs, { max_new_tokens: opts.max_tokens ?? 100, do_sample: temperature > 0, temperature: Math.max(.05, temperature), top_p: opts.top_p ?? 0.95, repetition_penalty: opts.repetition_penalty ?? 1.05 });
+      const last = out?.[0]?.generated_text; const text = Array.isArray(last) ? (last.at(-1)?.content || '') : String(last || '');
+      return stripThinkBlocks(text);
+    };
+    return {
+      chat: { completions: { create: async config => {
+        const text = await run(config.messages, config);
+        if (config.stream) return (async function* () { yield { choices: [{ delta: { content: text } }] }; })();
+        return { choices: [{ message: { content: text } }] };
+      } } },
+      unload: () => { try { model.dispose?.(); } catch {} },
+    };
+  }
   const tokenizer = processor.tokenizer;
 
   // AutoTokenizer (LFM2.5) has no .tokenizer property - `processor` IS the

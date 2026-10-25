@@ -15,7 +15,8 @@ skill (internals); `git log` has every commit.
   casts from them (`pack:<id>`).
 - **Speech input in the browser**: Underdog Bark 3.0 (Parakeet-TDT, ONNX) on
   onnxruntime-web, chosen in Brain options (`app/asr/`).
-- **Models**: Ternary Bonsai 1.7B and 8B (LiteRT-LM) in the picker;
+- **Models**: Bonsai 1-bit 1.7B (Transformers.js, WebGPU, tested) in the picker
+  (the LiteRT-LM Bonsai bundles don't run in the web engine yet: hidden);
   Nemotron 3.5 Bolt E4B registered (hidden until converted and mirrored:
   `tools/convert-litertlm.sh`); endpoint presets for Nemotron (Ollama,
   llama.cpp) and Bonsai.

@@ -68,11 +68,15 @@ const MODEL_CONFIG = {
     label: 'Ternary Bonsai 1.7B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-1.7B/resolve/main/bonsai-1.7b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~1 GB',
+    lib: '0.19.0-nightly.20261024',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
+    plainContent: true,
   },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-8B/resolve/main/bonsai-8b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~3 GB',
+    lib: '0.19.0-nightly.20261024',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
+    plainContent: true,
   },
 };
 
@@ -455,6 +459,9 @@ async function runTurn(systemContent, chatMessages, promptText, opts, onToken, t
 
 // Debug/test hook: exactly what the last turn sent (window.__tablefolkLiteRT.lastPrompt()).
 let lastSent = null;
+// Qwen-style chat templates (Bonsai) want string content; the library turns a
+// bare string into a list of parts, which they can't add to a string.
+const userMessage = text => MODEL_CONFIG[currentModel]?.plainContent ? { role: 'user', content: text } : text;
 async function sendTurn(conversation, promptText, opts, onToken) {
   lastSent = { agentId: opts.agentId || 'default', thinking: !!opts.extra_body?.enable_thinking, promptText, at: Date.now() };
   let fullText = '', channelText = '';
@@ -464,7 +471,7 @@ async function sendTurn(conversation, promptText, opts, onToken) {
 
   try {
     if (onToken) {
-      const stream = conversation.sendMessageStreaming(promptText);
+      const stream = conversation.sendMessageStreaming(userMessage(promptText));
       for await (const chunk of stream) {
         channelText += messageChannels(chunk);
         const text = messageText(chunk);
@@ -474,7 +481,7 @@ async function sendTurn(conversation, promptText, opts, onToken) {
         onToken(visible || ((channelText || /<\|channel/i.test(fullText)) ? '(thinking...)' : ''));
       }
     } else {
-      const response = await conversation.sendMessage(promptText);
+      const response = await conversation.sendMessage(userMessage(promptText));
       fullText = messageText(response);
       channelText = messageChannels(response);
     }

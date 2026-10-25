@@ -1,9 +1,9 @@
 import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from './model-loader.js?v=20261018a';
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
-import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261018a';
-import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261018a';
-import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261025g';
-import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261025f';
+import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261025c';
+import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261025b';
+import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261025i';
+import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261025h';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
@@ -26,8 +26,10 @@ const SUPPORTED_MODELS = {
   'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', hidden: true },
   // Prism ML's ternary Bonsai (Qwen3 based): small downloads; experimental,
   // not tested on every graphics card
-  'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM, tiny; experimental)', engine: 'litert-lm', size: '~0.8 GB' },
-  'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM, experimental)', engine: 'litert-lm', size: '~2.6 GB' },
+  'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM)', engine: 'litert-lm', size: '~0.8 GB', hidden: true },   // loads on the nightly engine, but a system message breaks its template and the GPU answers "!!!!" (2026-10-25, RTX 2060)
+  'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)', engine: 'litert-lm', size: '~2.6 GB', hidden: true },
+  // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's way)
+  'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB' },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No

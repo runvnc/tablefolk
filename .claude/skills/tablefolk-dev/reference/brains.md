@@ -29,12 +29,20 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   can be named with `localStorage['tablefolk_model_url:gemma4-e2b-vision']`.
 - **Other LiteRT-LM bundles** (same worker, `MODEL_CONFIG` in `litert-worker.js`
   and `SUPPORTED_MODELS` in `agent-brain.js`):
-  - **Ternary Bonsai 1.7B / 8B** (Prism ML, Qwen3 based, INT2 weights;
-    `litert-community/Ternary-Bonsai-*`, the `int2pc-32k-crashfix` builds so
-    the 8192-token context fits). Experimental: the bundles were made for
-    Android's GPU backend; whether the web engine runs them depends on the
-    graphics card (the 8B is untested on the maintainer's 6 GB card).
-    The chat template is Qwen3's with a reasoning block.
+  - **Ternary Bonsai 1.7B / 8B** (Prism ML, Qwen3 based, INT2;
+    `litert-community/Ternary-Bonsai-*`, entries `bonsai-*-litert`, **hidden**):
+    the bundles are Android-style (`tf_lite_prefill_decode`): the 0.14 web
+    engine refuses to stream them, the nightly (`lib` in `MODEL_CONFIG`) loads
+    them, but a system message breaks their Qwen template (the engine hands
+    the template a list of parts) and, without one, the RTX 2060 answered
+    "!!!!!" (tested 2026-10-25). Left in for a newer engine.
+  - **Bonsai 1-bit 1.7B on Transformers.js** (`bonsai-1.7b-onnx`, visible,
+    experimental): `onnx-community/Bonsai-1.7B-ONNX` dtype `q1` on WebGPU
+    (about 300 MB), the webml-community demo's way: a text-generation
+    pipeline (`pipeline: true` in `model-loader-tjs-v2.js`; the hand-made
+    `model.generate` call failed in GroupQueryAttention). Tested in the app
+    on the RTX 2060: answers in character. The larger Bonsai (2 4B, 9B, 27B)
+    run through an endpoint (llama.cpp, or OpenRouter `prism-ml/ternary-bonsai-2-27b`).
   - **Nemotron 3.5 Bolt E4B** (NVIDIA, Gemma 4 E4B post-trained; HF
     `nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16`, GGUF `...-4GB`): the Gemma
     architecture, so `litert-torch export_hf` should convert it
