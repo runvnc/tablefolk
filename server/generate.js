@@ -399,7 +399,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261024b"></script><script src="/app/map-editor.js?v=20261025e"></script><script src="/app/builder.js?v=20261025a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025a"></script><script src="/app/map-editor.js?v=20261025f"></script><script src="/app/builder.js?v=20261025a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -493,7 +493,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261024b').then(()=>load('/app/worldgen-browser.js?v=20261025d')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261025a').then(()=>load('/app/worldgen-browser.js?v=20261025d')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));

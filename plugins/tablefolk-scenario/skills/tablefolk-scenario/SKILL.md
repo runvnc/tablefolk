@@ -199,7 +199,10 @@ Grid digits are the agents in order: reordering `agents` moves them.
 - village: `well market_stand market_stalls cart broken_cart tent logs bed
   double_bed bookcase banner wall_banner target dummy pumpkin statue torch
   iron_chest fantasy_house stable windmill watch_tower bell_tower`
-  (bookcases and wall banners turn their backs to an adjacent wall)
+  (bookcases and wall banners turn their backs to an adjacent wall; `house`,
+  `fantasy_house` and `stable` become buildings to walk into, 5x5, 6x5 and
+  7x5 squares with their walls round the object's square, the door on the
+  front, south at `ry` 0, furnished unless things are placed inside)
 - dungeon dressing: `candelabra candles cabinet lectern cage chains
   wooden_chair nightstand apple_barrel pot vase broken_pot iron_crate`, and
   `key chalice rope`, which the player picks up with E

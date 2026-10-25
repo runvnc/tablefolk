@@ -437,7 +437,27 @@
     };
   }
 
-  const api = { dungeon, village, applyToScenario, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
+  // Buildings to go into (scenario.js expandBuildings): a house, timber house
+  // or stable placed as one thing becomes walls round a floor, the door in the
+  // middle of its front (+z at ry 0), "inside" its furniture (rows from the
+  // back wall; WALK_IN_THINGS). size: [across, deep] with the walls.
+  const WALK_IN = {
+    house: { name: 'house', size: [5, 5], floor: 'wood', inside: ['Z.K', '.t.', '(..'] },
+    fantasy_house: { name: 'timber house', size: [6, 5], floor: 'oak', inside: ['Z)K(', 'z.t.', '....'] },
+    stable: { name: 'stable', size: [7, 5], floor: 'dirt', inside: ['dfBfu', '.....', '|...C'] },
+  };
+  const WALK_IN_THINGS = { Z: 'bed', K: 'bookcase', t: 'table', ')': 'nightstand', '(': 'cabinet', z: 'wooden_chair', B: 'barrel', u: 'bucket', f: 'fence', d: 'logs', '|': 'apple_barrel', C: 'crate' };
+  // its squares: cell(i, j) for i across (0..size[0]-1), j from the back
+  // (0..size[1]-1); the door at door = [i, j]; turned by ry in quarter turns
+  function walkInFootprint(b) {
+    const spec = WALK_IN[b.type], q = ((Math.round((+b.ry || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+    const f = [[0, 1], [1, 0], [0, -1], [-1, 0]][q], a = [f[1], -f[0]];   // front, and across
+    const [Wd, D] = spec.size, bx = Math.round(+b.x), bz = Math.round(+b.z), mi = Math.floor((Wd - 1) / 2), mj = Math.floor((D - 1) / 2);
+    const cell = (i, j) => [bx + a[0] * (i - mi) + f[0] * (j - mj), bz + a[1] * (i - mi) + f[1] * (j - mj)];
+    return { spec, Wd, D, cell, door: [mi, D - 1] };
+  }
+
+  const api = { dungeon, village, applyToScenario, WALK_IN, WALK_IN_THINGS, walkInFootprint, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
   globalThis.TablefolkProcgen = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })();

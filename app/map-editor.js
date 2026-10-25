@@ -464,6 +464,11 @@
         for (let r = r0; r <= r1 + 1; r++) { const py = Math.round(view.oy + r * s) + .5; ctx.moveTo(view.ox + c0 * s, py); ctx.lineTo(view.ox + (c1 + 1) * s, py); }
         ctx.stroke();
       }
+      // buildings to go into: their walls, door and floor as the game will
+      // build them (scenario.js), and, while nothing is placed inside, a
+      // ghost of the furniture they come with
+      const PG = window.TablefolkProcgen, walkIn = o => PG?.WALK_IN?.[o.type] && o.enter !== false;
+      for (const o of L.objects) if (walkIn(o)) drawBuilding(ctx, o);
       // rooms' names, faint, under everything standing
       if (s >= 14) for (const p of L.places || []) {
         if (!Array.isArray(p.center)) continue;
@@ -476,7 +481,7 @@
         const [x, z] = k.split(',').map(Number), r = z + z0; if (r < r0 - 1 || r > r1 + 1) continue;
         push(r, () => cell.type === 'wall' ? drawWall(ctx, x, z) : drawDoor(ctx, x, z, cell));
       }
-      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref, +o.ry || 0)); }
+      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2 || walkIn(o)) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref, +o.ry || 0)); }
       const folk = [...L.agents.filter(at).map(a => ({ a, kind: 'agent' })), ...(at(L.player) ? [{ a: L.player, kind: 'player' }] : [])];
       for (const f of folk) { const r = f.a.at[1] + z0; push(r + .4, () => drawFolk(ctx, f)); }
       for (const r of [...rows.keys()].sort((a, b) => a - b)) for (const f of rows.get(r)) f();
@@ -486,6 +491,29 @@
       if (sel) { const p = selCell(); if (p) { const [px, py] = cellToPx(...p); ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3); ctx.setLineDash([]); } }
       if (drag?.to) { const [px, py] = cellToPx(...drag.to); ctx.fillStyle = 'rgba(127,224,138,.25)'; ctx.fillRect(px, py, s, s); ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
       if (armed && hover) { const [px, py] = cellToPx(...hover); ctx.globalAlpha = .65; drawThing(ctx, armed.kind === 'objects' ? 'objects' : 'characters', armed.name, hover[0], hover[1]); ctx.globalAlpha = 1; ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
+    }
+    function drawBuilding(ctx, b) {
+      const s = view.s, PG = window.TablefolkProcgen, { spec, Wd, D, cell, door } = PG.walkInFootprint(b), { x0, z0 } = geo();
+      const inner = [];
+      for (let i = 0; i < Wd; i++) for (let j = 0; j < D; j++) {
+        const [x, z] = cell(i, j), [px, py] = cellToPx(x, z), rim = i === 0 || j === 0 || i === Wd - 1 || j === D - 1;
+        if (!rim || (i === door[0] && j === door[1])) floorFill(ctx, spec.floor, px, py, s, x0 - x, z + z0);
+        if (!rim) { inner.push([i, j, x, z]); continue; }
+        if (i === door[0] && j === door[1]) { ctx.fillStyle = '#7a4f28'; ctx.fillRect(px + s * .2, py + s * .2, s * .6, s * .6); continue; }
+        const g = ctx.createLinearGradient(px, py, px + s, py + s); g.addColorStop(0, '#9a7b4f'); g.addColorStop(1, '#7a5e3a');
+        ctx.fillStyle = g; ctx.fillRect(px, py, s + .6, s + .6);
+      }
+      // the roof's outline, so it reads as one building
+      const xs = inner.map(c => c[2]), zs = inner.map(c => c[3]);
+      const [ax, ay] = cellToPx(Math.max(...xs) + 1, Math.min(...zs) - 1);
+      ctx.strokeStyle = 'rgba(255,220,150,.55)'; ctx.lineWidth = 2; ctx.strokeRect(ax + 1, ay + 1, (Math.max(...xs) - Math.min(...xs) + 3) * s - 2, (Math.max(...zs) - Math.min(...zs) + 3) * s - 2);
+      const key = (x, z) => Math.round(x) + ',' + Math.round(z), here = new Set(inner.map(c => key(c[2], c[3])));
+      if (!L.objects.some(o => o !== b && here.has(key(o.x, o.z)))) {
+        ctx.globalAlpha = .4;
+        for (const [i, j, x, z] of inner) { const t = PG.WALK_IN_THINGS[spec.inside[j - 1]?.[i - 1]]; if (t) drawThing(ctx, 'objects', t, x, z); }
+        ctx.globalAlpha = 1;
+      }
+      if (s >= 14) { const [px, py] = cellToPx(Math.round(b.x), Math.round(b.z)); ctx.font = `600 ${Math.round(Math.min(16, s * .38))}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(spec.name, px + s / 2, py + s * .55); }
     }
     function selCell() { const t = sel; if (!t) return null; if (t.kind === 'agent' || t.kind === 'player') return at(t.ref); if (t.kind === 'object') return [Math.round(t.ref.x), Math.round(t.ref.z)]; return t.key?.split(',').map(Number); }
     const wallAt = (x, z) => L.cells.get(x + ',' + z)?.type === 'wall';

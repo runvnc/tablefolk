@@ -76,7 +76,10 @@ true. Loot: {"type": "chest", "x": 2, "z": -1, "gold": 30, "items": ["silver
 key"]} (or "in": "treasure"); the player opens it with E. Coin piles hold
 "gold". Village props: well market_stand market_stalls cart tent logs bed
 bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
-fantasy_house stable windmill watch_tower bell_tower. Dungeon dressing:
+fantasy_house stable windmill watch_tower bell_tower. A house, fantasy_house
+or stable (one object at its centre) becomes a building to walk into: 5x5,
+6x5, 7x5 squares with its walls, door on its front (south at "ry" 0),
+furnished; keep its squares free. Dungeon dressing:
 candelabra candles cabinet lectern cage chains wooden_chair nightstand
 apple_barrel pot vase broken_pot iron_crate; key chalice rope are picked up.
 Locked doors: "locked": [{"in": "treasure", "key": "silver key"}] (top level)

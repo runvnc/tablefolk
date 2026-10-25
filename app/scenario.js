@@ -688,6 +688,60 @@
       player: playerAt && !Array.isArray(scn.player?.at) ? { ...scn.player, at: playerAt } : scn.player };
   }
 
+  // Buildings to go into: a house, timber house or stable placed as one thing
+  // becomes walls with a door on its front (+z at ry 0), a floor, and its
+  // standard furniture unless things were placed inside it already (roofs.js
+  // roofs it). One that would leave the board or cross other walls stays the
+  // closed model, and so does one with "enter": false.
+  // the specs and footprint: procgen.js (the world builder draws them too)
+  const BUILDINGS = window.TablefolkProcgen?.WALK_IN || {}, footprint = b => window.TablefolkProcgen.walkInFootprint(b);
+  const INSIDE_GLYPHS = window.TablefolkProcgen?.WALK_IN_THINGS || {};
+  const OUTDOORSY = new Set(['tree', 'flowers', 'grass_tuft', 'boulder', 'lily_pad']);
+  function expandBuildings(scn) {
+    const isB = o => BUILDINGS[o.type] && o.enter !== false;
+    if (!scn.objects.some(isB)) return scn;
+    const EDGE = edge(), key = (x, z) => Math.round(+x) + ',' + Math.round(+z);
+    let objects = scn.objects.filter(o => !isB(o)), agents = scn.agents, player = scn.player;
+    const paint = [...scn.paint], places = [...(scn.places || [])], warnings = [];
+    const walls = new Set(objects.filter(o => o.type === 'wall' || o.type === 'door').map(o => key(o.x, o.z)));
+    const total = {}, count = {};
+    for (const b of scn.objects.filter(isB)) total[b.type] = (total[b.type] || 0) + 1;
+    for (const b of scn.objects.filter(isB)) {
+      const { spec, Wd, D, cell, door } = footprint(b), rim = new Set(), inner = new Map();
+      const cells = [];
+      for (let i = 0; i < Wd; i++) for (let j = 0; j < D; j++) cells.push([i, j, ...cell(i, j)]);
+      if (cells.some(([, , x, z]) => Math.abs(x) > EDGE.x || Math.abs(z) > EDGE.z || walls.has(key(x, z)))) {
+        objects.push(b); warnings.push(`${spec.name} at ${b.x},${b.z}: no room for its walls there, so it stays closed`); continue;
+      }
+      for (const [i, j, x, z] of cells) {
+        if (i === 0 || j === 0 || i === Wd - 1 || j === D - 1) rim.add(key(x, z)); else inner.set(key(x, z), [i, j, x, z]);
+      }
+      // what stood where its walls go goes; what was placed inside stays
+      objects = objects.filter(o => !rim.has(key(o.x, o.z)) && !(inner.has(key(o.x, o.z)) && OUTDOORSY.has(o.type)));
+      const furnished = objects.some(o => inner.has(key(o.x, o.z)));
+      for (const [i, j, x, z] of cells) {
+        if (!rim.has(key(x, z))) continue;
+        const isDoor = i === door[0] && j === door[1];
+        objects.push({ type: isDoor ? 'door' : 'wall', x, z }); walls.add(key(x, z));
+        if (isDoor) paint.push({ x, z, mat: spec.floor });
+      }
+      for (const [i, j, x, z] of inner.values()) {
+        paint.push({ x, z, mat: spec.floor });
+        const t = !furnished && INSIDE_GLYPHS[spec.inside[j - 1]?.[i - 1]];
+        if (t) objects.push({ type: t, x, z });
+      }
+      // anyone standing in its walls steps inside, by the door
+      const [ix, iz] = cell(door[0], D - 2), moveIn = at => Array.isArray(at) && rim.has(key(at[0], at[1])) ? [ix, iz] : at;
+      agents = agents.map(a => ({ ...a, at: moveIn(a.at) }));
+      if (player) player = { ...player, at: moveIn(player.at) };
+      count[b.type] = (count[b.type] || 0) + 1;
+      const xs = [...inner.values()].map(c => c[2]), zs = [...inner.values()].map(c => c[3]);
+      places.push({ id: total[b.type] > 1 ? `${spec.name} ${count[b.type]}` : spec.name, kind: b.type === 'stable' ? 'stable' : 'house',
+        center: cell(Math.floor((Wd - 1) / 2), Math.floor((D - 1) / 2)), x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) });
+    }
+    return { ...scn, objects, paint, places, agents, player, gridWarnings: [...(scn.gridWarnings || []), ...warnings] };
+  }
+
   // Scenario with explicit objects/paint/positions -> the same in grid form,
   // over the whole board. Whatever a glyph can't say exactly (turned or
   // off-cell objects, tinted paint, characters 10+) stays in objects/paint/at.
@@ -923,7 +977,7 @@
     w.setWorldSize?.(...boardSizeFor(base));
     // The base's content and the grid become ordinary objects, paint and
     // positions for the build; the link and restart keep the compact form.
-    const scn = expandGrid(expandBase(base));
+    const scn = expandBuildings(expandGrid(expandBase(base)));
     // Layers, later wins per cell: the base's sea, then the grid, then "paint".
     scn.paint = [...(scn.basePaint || []), ...scn.paint];
     stopChecker();

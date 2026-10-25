@@ -192,6 +192,13 @@ Ideas, by how much they would add for how much work with a small model:
 - Roofs (`app/roofs.js`): walled rooms in a world with an outside (villages,
   Stonebrook) get thatched gable roofs, found from the walls themselves (doors
   and one-square open doorways close a room). The roof over the player's room
-  fades away, one between the camera and the player or under the pointer goes
-  see-through, R lifts them all. None in one-building worlds (the bakery), dark
+  fades away; with the follow camera one between the camera and the player
+  goes see-through. No peeking otherwise (the free camera keeps them on).
+  Courses of thatch with a normal map, rolled eaves, timber-trimmed gables,
+  chimneys on some.
+- Walk-in buildings: `house`, `fantasy_house` and `stable` placed as one
+  object become walled rooms with a door, floor and standard furniture
+  (things placed inside replace the furniture); the world builder draws their
+  walls and a ghost of the furniture. The watch tower, bell tower and windmill
+  stay closed models. None in one-building worlds (the bakery), dark
   worlds or dungeons; `"roofs": true|false` overrides.

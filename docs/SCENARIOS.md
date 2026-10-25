@@ -25,7 +25,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "size": [23, 17],                                      // board in cells, odd numbers (section 2c)
   "walls": "tabletop",                                   // or "stone" (natural rock), "modern" (smooth panels), "block" (old cubes)
   "wallHeight": 2,                                       // optional wall height multiplier (default 1; 2 = twice as tall)
-  "roofs": false,                                        // optional: thatched roofs on walled rooms (default: on when the world has an outside and is not dark or a dungeon; R lifts them)
+  "roofs": false,                                        // optional: thatched roofs on walled rooms (default: on when the world has an outside and is not dark or a dungeon; the roof of the room the player is in fades away)
   "campfire": true,                                      // island/clearing: false drops their campfire; plain/dungeon: true adds one
   "pathfinding": true,                                   // false: walks go in straight lines and stop at walls
   "earshot": 6,                                          // cells within which characters hear and see each other (default 6)
@@ -132,7 +132,12 @@ floor <material>
   coin_pile apple_crate carrot_crate`, the village set `well market_stand
   market_stalls cart broken_cart tent logs bed double_bed bookcase banner
   wall_banner target dummy pumpkin statue torch iron_chest fantasy_house
-  stable windmill watch_tower bell_tower` (bookcases, wall banners, cabinets
+  stable windmill watch_tower bell_tower` (`house`, `fantasy_house` and
+  `stable` are buildings to go into: each becomes walls round a floor, 5x5,
+  6x5 and 7x5 with the walls, the door in the middle of its front, +z at
+  `ry` 0, and standard furniture unless things are placed inside it; one that
+  would leave the board or cross walls, or has `"enter": false`, stays a
+  closed model) (bookcases, wall banners, cabinets
   and nightstands turn their backs to an adjacent wall), dungeon dressing
   `candelabra candles cabinet lectern cage chains wooden_chair nightstand
   apple_barrel pot vase broken_pot iron_crate key chalice rope` (Quaternius
