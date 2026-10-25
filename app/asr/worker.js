@@ -34,21 +34,39 @@ ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardw
 let enc = null, dec = null, pieces = null, loading = null;
 const say = m => postMessage(m);
 
+// R2 takes uploads up to 300 MiB through wrangler, so the big file is stored as
+// <name>.p000, .p001, ... and a <name>.parts.json ({ size, partSize, parts }),
+// fetched four at a time from the bucket's four hostnames (one connection each).
+const hostFor = (u, i) => u.replace('//geebr-models.mindroot.io', i % 4 ? `//geebr-models-${(i % 4) + 1}.mindroot.io` : '//geebr-models.mindroot.io');
+const pathFor = u => (/huggingface\.co/.test(u) ? 'onnx/' : '');
+async function readInto(resp, buf, at, onBytes) {
+  const reader = resp.body.getReader();
+  for (;;) { const { value, done } = await reader.read(); if (done) break; buf.set(value, at); at += value.length; onBytes(value.length); }
+}
 async function download(cache, name, urls, weight, base) {
   const hit = await cache.match('/asr/' + name);
   if (hit) return new Uint8Array(await hit.arrayBuffer());
   let lastErr;
-  for (const u of urls) {
+  for (const u0 of urls) {
+    const u = u0.replace(/\/?$/, '/');
     try {
-      const r = await fetch(u.replace(/\/?$/, '/') + (/huggingface\.co/.test(u) && name !== 'tokenizer.json' ? 'onnx/' : '') + name); if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
-      const total = +r.headers.get('content-length') || 0, reader = r.body.getReader();
-      let buf = total ? new Uint8Array(total) : null, chunks = [], got = 0;
-      for (;;) {
-        const { value, done } = await reader.read(); if (done) break;
-        if (buf) buf.set(value, got); else chunks.push(value);
-        got += value.length; say({ type: 'progress', note: `downloading ${name}`, fraction: base + weight * (total ? got / total : 0) });
+      let buf, got = 0, total = 0;
+      const tick = n => { got += n; say({ type: 'progress', note: `downloading ${name}`, fraction: base + weight * (total ? got / total : 0) }); };
+      const man = /huggingface\.co/.test(u) ? null : await fetch(u + name + '.parts.json').then(r => r.ok ? r.json() : null).catch(() => null);
+      if (man) {
+        total = man.size; buf = new Uint8Array(total);
+        let next = 0;
+        const lane = async () => { for (let i = next++; i < man.parts; i = next++) {
+          const r = await fetch(hostFor(u, i) + name + '.p' + String(i).padStart(3, '0')); if (!r.ok) throw new Error(`${name} part ${i}: HTTP ${r.status}`);
+          await readInto(r, buf, i * man.partSize, tick);
+        } };
+        await Promise.all([lane(), lane(), lane(), lane()]);
+      } else {
+        const r = await fetch(u + (name === 'tokenizer.json' ? '' : pathFor(u)) + name); if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+        total = +r.headers.get('content-length') || 0; buf = total ? new Uint8Array(total) : null;
+        if (buf) await readInto(r, buf, 0, tick);
+        else { buf = new Uint8Array(await r.arrayBuffer()); }
       }
-      if (!buf) { buf = new Uint8Array(got); let o = 0; for (const c of chunks) { buf.set(c, o); o += c.length; } }
       await cache.put('/asr/' + name, new Response(buf));
       return buf;
     } catch (e) { lastErr = e; }

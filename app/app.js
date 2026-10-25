@@ -3989,9 +3989,15 @@ fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.v
 // The designed voice library (assets/voices/, tools/fal-voices.py): samples
 // Pocket-TTS clones, named "pack:<id>"; preferred over the eight built-ins.
 fetch(ASSET_BASE+'voices/voices.json').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d)){ window.TABLEFOLK_PACK_VOICES=d.map(v=>({...v,id:'pack:'+v.id})); window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
+// which library voices suit a body (the rest of its gender when the model has no hint)
+const VOICE_HINT={ swordswoman:['hero_young_f','thief_f'], adventurer_woman:['hero_young_f','thief_f'], sorceress:['sorceress_f','noble_f'], witch:['crone_f','sorceress_f'], huntress:['huntress_f'],
+  villager_woman:['innkeeper_f','shy_f'], villager:['innkeeper_f','shy_f','farmer_m','tavern_m'], peasant_woman:['innkeeper_f','shy_f'], peasant:['farmer_m','tavern_m','scholar_m'], farmer:['farmer_m','tavern_m'],
+  swordsman:['knight_m','squire_m','rogue_m'], adventurer:['knight_m','squire_m','rogue_m'], woodsman:['rogue_m','farmer_m'], wanderer:['rogue_m','farmer_m'], king:['king_m'], wizard:['wizard_m','scholar_m'], hooded:['hooded_x','villain_m'],
+  knight:['knight_m','captain_m'], mage:['wizard_m','scholar_m'], ranger:['huntress_f','rogue_m'], barbarian:['dwarf_m','captain_m'], rogue:['rogue_m','thief_f'], woman:['hero_young_f','innkeeper_f'] };
 function defaultVoiceFor(id,model){
   const want=FEMALE_MODELS.has(model)?'female':'male';
-  const packs=(window.TABLEFOLK_PACK_VOICES||[]).filter(v=>v.gender===want).map(v=>v.id);
+  const all=window.TABLEFOLK_PACK_VOICES||[], hinted=(VOICE_HINT[String(model).replace(/_classic$/,'')]||[]).map(x=>'pack:'+x).filter(x=>all.some(v=>v.id===x));
+  const packs=hinted.length ? hinted : all.filter(v=>v.gender===want).map(v=>v.id);
   const cat=window.TABLEFOLK_VOICES||Object.entries(VOICE_GENDER).map(([id,gender])=>({id,gender}));
   const pool=packs.length ? packs : cat.filter(v=>v.gender===want).map(v=>'builtin:'+v.id); if(!pool.length) return null;
   let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0;
@@ -4102,7 +4108,7 @@ async function createPerson(id,pos,model,label){
 }
 async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   removePlayerAvatar();
-  model=model||state.avatarModel||'rogue';
+  model=model||state.avatarModel||'swordswoman';   // was the chibi rogue; the JRPG swordswoman is the default body now
   const pos=new BABYLON.Vector3(x,(state.terrainTopY??0),z);
   let g=null;
   if(isPersonModel(model)){
