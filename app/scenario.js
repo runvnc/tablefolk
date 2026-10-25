@@ -941,7 +941,7 @@
       // extra things characters can eat (names, or { name, nourish })
       food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
-    if (!out.agents.length) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
+    if (!out.agents.length && !s._sub) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
     // a frozen layout (freezeLayout) keeps the generated map's rooms
     else if (Array.isArray(s.places)) out.places = s.places;
@@ -1139,11 +1139,11 @@
     plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...packageWarnings, ...roleWarnings, ...skillWarnings);
     if (opts.restore) await w.restoreWorldState(opts.restore);
     const code = opts.code || await encodeScenario(base);
-    if (opts.sub) world = { scn: base, links: base.links };
+    if (opts.sub) world = { base, scn, links: scn.links };
     else {
       if (!opts.restore) active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
       else active = { ...opts.keepActive, timer: null };
-      world = { scn: base, links: base.links };
+      world = { base, scn, links: scn.links };
       try { history.replaceState(null, '', '#s=' + code); } catch {}
     }
     window.tablefolkDark?.start(scn.dark);
@@ -1168,7 +1168,7 @@
   // when you step onto the subworld's "back" link or press "leave". The
   // player, their pack and hit points carry across; the goal waits.
   const frames = [];                  // the maps left behind, innermost last
-  let world = { scn: null, links: [] };   // the map being played, and its links
+  let world = { base: null, scn: null, links: [] };   // the map being played, and its links
   let pads = [], padTimer = 0, lastCell = '', transition = false;
   const playerCell = () => { const av = W().getPlayerAvatar?.(), p = av && (av.logicalPos || av.root.position); return p ? Math.round(p.x) + ',' + Math.round(p.z) : ''; };
   function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; }
@@ -1176,7 +1176,7 @@
     clearPads();
     const sc = W().state.scene; if (!sc || window.TABLEFOLK_TABLETOP) return;
     let mat = sc.getMaterialByName('link_pad_mat');
-    if (!mat) { mat = new BABYLON.StandardMaterial('link_pad_mat', sc); mat.disableLighting = true; mat.emissiveColor = new BABYLON.Color3(1, .82, .35); mat.alpha = .5; }
+    if (!mat) { mat = new BABYLON.StandardMaterial('link_pad_mat', sc); mat.disableLighting = true; mat.emissiveColor = new BABYLON.Color3(1, .82, .35); mat.alpha = .32; }
     for (const l of links) {
       const m = BABYLON.MeshBuilder.CreateCylinder('link_pad', { diameter: .9, height: .03, tessellation: 40 }, sc);
       m.position.set(l.at[0], .07, l.at[1]); m.material = mat; m.isPickable = false; pads.push(m);
@@ -1192,7 +1192,7 @@
     if (l) (l.to === 'back' ? leaveWorld() : enterWorld(l));
   }
   async function enterWorld(l) {
-    const w = W(), parent = world.scn, sub0 = parent?.subworlds?.[l.to];
+    const w = W(), parent = world.base, sub0 = world.scn?.subworlds?.[l.to];
     if (transition || !active) return;
     if (!sub0) { window.tablefolkToast?.(`This way leads to "${l.to}", which is not in the scenario.`, { type: 'error' }); return; }
     transition = true;
@@ -1202,7 +1202,7 @@
       frames.push({ scn: parent, snap, active, code: active.code, name: l.name || l.to });
       stopChecker();
       const inherit = Object.fromEntries(['walls', 'wallHeight', 'lighting'].filter(k => parent[k] != null && sub0[k] == null).map(k => [k, parent[k]]));
-      const sub = { ...inherit, ...sub0, player: { ...(sub0.player || {}), model: av?.avatarModel, ...(w.state.player.wielding ? { wield: w.state.player.wielding } : {}) } };
+      const sub = { _sub: true, ...inherit, ...sub0, player: { ...(sub0.player || {}), model: av?.avatarModel, ...(w.state.player.wielding ? { wield: w.state.player.wielding } : {}) } };
       await playScenarioNow(sub, { sub: true });
       window.tablefolkToast?.(`You go into the ${l.name || l.to}.`, { type: 'success' });
     } catch (e) { console.error('[links]', e); window.tablefolkToast?.('could not go in: ' + (e?.message || e), { type: 'error' }); frames.pop(); startChecker(); }
@@ -1231,7 +1231,7 @@
 
   async function exitScenario() {
     const w = W();
-    stopChecker(); active = null; frames.length = 0; clearPads(); world = { scn: null, links: [] }; renderBanner(); hideEnd();
+    stopChecker(); active = null; frames.length = 0; clearPads(); world = { base: null, scn: null, links: [] }; renderBanner(); hideEnd();
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
     w.setWallHeight?.(1);

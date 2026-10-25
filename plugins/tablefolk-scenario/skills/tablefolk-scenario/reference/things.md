@@ -88,6 +88,40 @@ walk into:
   `"enter": false`, stays the old closed model (with a layout warning).
 - `windmill`, `watch_tower` and `bell_tower` stay closed models.
 
+### Keeping the model: `"keep": true` and subworlds
+
+`{"type": "stable", "x": 0, "z": -3, "keep": true}` leaves the building's own
+3D model standing and makes its inside a **subworld**: a separate small map
+(the same walls, floor and furniture as above) the player walks into. The
+world builder's "keep building models" box (on by default) sets it on new
+buildings, and the inspector has the box for each one.
+
+- The door square is the square in front of the model (two squares from its
+  centre; the builder draws it gold, the game as a glowing disc). Stepping
+  onto it from another square swaps the map for the inside at once; stepping
+  out through the inside's door onto its disc (or the banner's "leave"
+  button) puts you back, one square outside.
+- What you leave is kept as it was (characters, objects, doors, what they
+  remember); the player, the pack and hit points carry across. The goal
+  waits.
+- A kept building with no square in front of it on the board has no way in
+  (a layout note says so).
+
+The same mechanism is open to authors:
+
+```json
+"links": [{ "at": [4, -2], "to": "cellar", "name": "cellar door", "back": [4, -1] }],
+"subworlds": { "cellar": { "title": "Cellar", "generate": { "kind": "dungeon", "rooms": 4 },
+  "agents": [{ "id": "rat1", "model": "rat" }], "links": [{ "at": [0, 0], "to": "back" }] } }
+```
+
+A link is a square (`at`) and the subworld it leads to (`to`, a key of
+`subworlds`; `to: "back"` returns). `back` is where the player stands on
+returning (default: the link's own square). A subworld is any scenario
+(grid, objects, `generate`, characters); it takes the parent's `walls`,
+`wallHeight` and `lighting` unless it sets its own, and the player appears at
+its `player.at` (or where the layout puts them). Links nest.
+
 Code: `expandBuildings` in `app/scenario.js`, templates in `WALK_IN` in
 `app/procgen.js` (`walkInFootprint` gives the cells).
 

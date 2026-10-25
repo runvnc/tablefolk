@@ -64,6 +64,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `map` | layout lines | [map-lines.md](map-lines.md) |
 | `generate` | procedural dungeon or village | [generated.md](generated.md) |
 | `locked` | locked doors and their keys | [things.md](things.md) |
+| `subworlds`, `links` | other maps (a building's inside, a dungeon) and the squares that lead into them | [things.md](things.md) |
 | `player` | the player (below) | |
 | `allowed` | default commands for every character | [characters.md](characters.md) |
 | `agents` | the characters (below) | [characters.md](characters.md) |

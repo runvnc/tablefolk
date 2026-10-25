@@ -6,6 +6,13 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-25
 
+- **Subworlds and kept models**: `"keep": true` on a walk-in building leaves
+  its 3D model standing and makes the inside a separate map, entered by
+  stepping on the glowing square in front of the door (and left the same
+  way). General `links` and `subworlds` fields (a cellar, a dungeon) use the
+  same swap; the left map is kept as a snapshot. The world builder has a
+  "keep building models" option (default on) and a per-building box.
+
 - **Walk-in buildings**: `house`, `fantasy_house` and `stable` become walled
   rooms (5x5, 6x5, 7x5) with a door, a floor and standard furniture; things
   placed inside replace the furniture; the world builder draws their walls
