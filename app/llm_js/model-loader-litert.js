@@ -23,7 +23,7 @@ const MODEL_CONFIG = {
 let worker = null, shared = false;
 let nextId = 1;
 // One URL for every page (the game and the world builder), so they share it.
-const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261025e';
+const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261025g';
 // A model this browser has loaded before (so it is in OPFS): the engine runs
 // in a shared worker, which survives a reload or the step from the world
 // builder into the game: it keeps the model 2 minutes after the last page

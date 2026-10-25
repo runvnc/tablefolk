@@ -13,11 +13,23 @@
 import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.mjs';
 import { logMel } from './mel.js';
 
-const FILES = ['encoder_model_fp16.onnx', 'encoder_model_fp16.onnx_data', 'decoder_joint_model_fp16.onnx', 'tokenizer.json'];
+// fp16 (1.2 GB) on WebGPU where the card has shader-f16 (token-exact with the
+// reference on 19 of 20 clips); else int8 (0.84 GB) on WASM, which reads the
+// same words (the card measured it token-exact on fewer clips, but the text
+// matches on the ones checked). The int4 build is broken: never used.
+const VARIANTS = {
+  fp16: { enc: 'encoder_model_fp16.onnx', dec: 'decoder_joint_model_fp16.onnx', ep: 'webgpu', sizes: [0.001, 0.93, 0.06, 0.009] },
+  q8: { enc: 'encoder_model_quantized.onnx', dec: 'decoder_joint_model_quantized.onnx', ep: 'wasm', sizes: [0.004, 0.92, 0.07, 0.006] },
+};
+async function pickVariant(force) {
+  if (force && VARIANTS[force]) return force;
+  try { const a = await navigator.gpu?.requestAdapter(); if (a?.features.has('shader-f16')) return 'fp16'; } catch {}
+  return 'q8';
+}
 const GEN = { blank: 8192, durations: [0, 1, 2, 3, 4], hidden: 640, layers: 2, maxSymbols: 10, eos: 3 };
 const CACHE = 'tablefolk-asr-1';
 ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
-ort.env.wasm.numThreads = 1;
+ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
 
 let enc = null, dec = null, pieces = null, loading = null;
 const say = m => postMessage(m);
@@ -44,15 +56,15 @@ async function download(cache, name, urls, weight, base) {
   throw lastErr || new Error('no model source');
 }
 
-async function load(urls) {
+async function load(urls, force) {
   if (enc) return;
+  const V = VARIANTS[await pickVariant(force)], files = [V.enc, V.enc + '_data', V.dec, 'tokenizer.json'];
   const cache = await caches.open(CACHE);
-  const sizes = [0.001, 0.93, 0.06, 0.009]; let base = 0;
-  const got = {};
-  for (let i = 0; i < FILES.length; i++) { got[FILES[i]] = await download(cache, FILES[i], urls, sizes[i], base); base += sizes[i]; }
+  let base = 0; const got = {};
+  for (let i = 0; i < files.length; i++) { got[files[i]] = await download(cache, files[i], urls, V.sizes[i], base); base += V.sizes[i]; }
   say({ type: 'progress', note: 'starting the speech model', fraction: 1 });
-  enc = await ort.InferenceSession.create(got['encoder_model_fp16.onnx'], { executionProviders: ['webgpu'], externalData: [{ path: 'encoder_model_fp16.onnx_data', data: got['encoder_model_fp16.onnx_data'] }] });
-  dec = await ort.InferenceSession.create(got['decoder_joint_model_fp16.onnx'], { executionProviders: ['wasm'] });
+  enc = await ort.InferenceSession.create(got[V.enc], { executionProviders: [V.ep], externalData: [{ path: V.enc + '_data', data: got[V.enc + '_data'] }] });
+  dec = await ort.InferenceSession.create(got[V.dec], { executionProviders: ['wasm'] });
   const vocab = JSON.parse(new TextDecoder().decode(got['tokenizer.json'])).model.vocab;
   pieces = []; for (const [p, id] of Object.entries(vocab)) pieces[id] = p;
 }
@@ -88,7 +100,7 @@ async function transcribe(audio) {
 onmessage = async e => {
   const m = e.data;
   try {
-    if (m.type === 'load') { await (loading ||= load(m.urls)); say({ type: 'ready' }); }
+    if (m.type === 'load') { await (loading ||= load(m.urls, m.variant)); say({ type: 'ready' }); }
     else if (m.type === 'transcribe') { await loading; const t0 = performance.now(); const text = await transcribe(m.audio); say({ type: 'text', id: m.id, text, ms: Math.round(performance.now() - t0) }); }
   } catch (err) { loading = null; say({ type: 'error', id: m.id, message: String(err?.message || err) }); }
 };

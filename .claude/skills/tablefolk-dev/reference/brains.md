@@ -27,6 +27,22 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   3.3 GB of graphics memory with the game. It still downloads from Hugging
   Face (mirroring it on R2 is an open launch item); for tests a local copy
   can be named with `localStorage['tablefolk_model_url:gemma4-e2b-vision']`.
+- **Other LiteRT-LM bundles** (same worker, `MODEL_CONFIG` in `litert-worker.js`
+  and `SUPPORTED_MODELS` in `agent-brain.js`):
+  - **Ternary Bonsai 1.7B / 8B** (Prism ML, Qwen3 based, INT2 weights;
+    `litert-community/Ternary-Bonsai-*`, the `int2pc-32k-crashfix` builds so
+    the 8192-token context fits). Experimental: the bundles were made for
+    Android's GPU backend; whether the web engine runs them depends on the
+    graphics card (the 8B is untested on the maintainer's 6 GB card).
+    The chat template is Qwen3's with a reasoning block.
+  - **Nemotron 3.5 Bolt E4B** (NVIDIA, Gemma 4 E4B post-trained; HF
+    `nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16`, GGUF `...-4GB`): the Gemma
+    architecture, so `litert-torch export_hf` should convert it
+    (`tools/convert-litertlm.sh`, needs about 40 GB of RAM: not done on the
+    maintainer's 15 GB laptop). The picker entry `nemotron-bolt-e4b-litert`
+    is `hidden` until the converted file is on R2; then un-hide it and hide
+    the Gemma E4B. Until then it runs through an endpoint (llama.cpp or
+    Ollama on the GGUF; the Brain options have presets).
 - **Endpoint** (`openai-client.js`): any OpenAI-compatible server; by
   default this server's `/api/llm/v1` proxy (keys stay on the server). With
   Brain options > vision, each turn's newest message carries the character's
@@ -119,6 +135,17 @@ with `?trustSkills=1`, or after the player allows that package.
   the 100M model (`inference-worker.js`, five languages). Stereo pan and
   distance gain place voices. On by default (`tablefolkTtsEnabled !== '0'`).
   `silence(agent)` stops a defeated character mid-line.
-- Input: `app/speech-input.js` posts 16 kHz WAV to `/api/transcribe`
-  (Gemma `gemma4-e2b-mm` on `litert-lm serve`), else the browser's
-  SpeechRecognition.
+- Input: `app/speech-input.js`, chosen in Brain options (`tablefolk.speech`):
+  automatic (the server's `/api/transcribe`, Gemma `gemma4-e2b-mm` on
+  `litert-lm serve`, else the browser's SpeechRecognition); **in the
+  browser** with Underdog Bark 3.0 (`app/asr/`: `worker.js` runs
+  `ai-ecoverse/Underdog-Bark-3.0-ONNX`, a Parakeet-TDT 0.6B fine-tune, CC-BY-4.0,
+  on onnxruntime-web: the fp16 encoder on WebGPU where the card has
+  `shader-f16`, else int8 on WASM; `mel.js` is the log-mel frontend, checked
+  against the model card's fixture to 1e-4; files in the Cache API
+  `tablefolk-asr-1`, a one-time download asked first; the int4 build is
+  broken); or the browser's own recognition. Files are served from R2
+  `underdog-bark-3.0/` (then Hugging Face); `?asr=<url>` tries a folder first.
+- Voices: Pocket-TTS clones samples; the designed library
+  (`assets/voices/`, `tools/fal-voices.py`, `tools/voices.json`) is
+  `pack:<id>` (`ensurePack` in `pocket-tts-manager.js`).

@@ -66,12 +66,12 @@ const MODEL_CONFIG = {
   // (litert-community/Ternary-Bonsai-*): Qwen3 chat template inside.
   'bonsai-1.7b-litert': {
     label: 'Ternary Bonsai 1.7B (LiteRT-LM)',
-    modelUrl: 'https://geebr-models.mindroot.io/bonsai-1.7b-int2pc-32k-crashfix.litertlm',
+    modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-1.7B/resolve/main/bonsai-1.7b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~1 GB',
   },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
-    modelUrl: 'https://geebr-models.mindroot.io/bonsai-8b-int2pc-32k-crashfix.litertlm',
+    modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-8B/resolve/main/bonsai-8b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~3 GB',
   },
 };

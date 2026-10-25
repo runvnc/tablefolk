@@ -5,8 +5,13 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 
 ## Batch of 2026-10-25: interiors, attractive characters, voices, models
 
-Recorded from one long message. Status 2026-10-25: recorded only, not started;
-the plan comes after the user logs into wrangler (Cloudflare).
+Recorded from one long message. Status 2026-10-25 (later): done and tested: 1-4 (undo and drag/delete without
+confirm already existed: `editor-test.mjs` passes), 5 (six new people), 6
+(20 designed voices), 8 (speech input, tested with the model card's fixture),
+10 (Bonsai 1.7B and 8B in the picker; browser run of the 1.7B tested only if
+noted in the changelog); 9 and 11 partly: Nemotron has no .litertlm yet (needs a
+machine with ~40 GB RAM: `tools/convert-litertlm.sh`), so it is an endpoint
+preset until then.
 Ask first (see CLAUDE.md): paid fal.ai calls, model downloads, R2 uploads.
 
 ### A. World builder

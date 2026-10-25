@@ -69,6 +69,16 @@ idle model turned toward the camera.
   under the repo root, which is ignored). Meshy refuses gore words (a
   content-policy 422) and would not make a fleshy zombie. Paid: ask before
   running.
+- **People** (swordswoman, sorceress, huntress, villager_woman, swordsman,
+  wanderer): `tools/fal-character.py image|model|rig <name>`: a FLUX concept
+  image (look at it first: cheap), Meshy v6 image-to-3D with PBR in A-pose,
+  Meshy rigging with the same five clips, then `tools/finish-monster.sh <name>
+  work/people`. About $2 each. Prompts that worked: JRPG costume words
+  (split skirt, fitted bodice, thigh boots), "PG-13", a modest neckline.
+  The older body names are aliases of the new files in `FIGURES`.
+- **Voices**: `tools/fal-voices.py` (Qwen3-TTS Voice Design on fal.ai, a few
+  cents a clip) writes `assets/voices/<id>.mp3` and `voices.json` from
+  `tools/voices.json`.
 - Non-humanoids (dragon, spider): SkinTokens (VAST-AI-Research, MIT) rigs
   anything but has no animations; AssetFurnace (Bingeljell/image-to-3dlab)
   wraps it with 21 humanoid moves. Not used yet.
@@ -82,5 +92,7 @@ idle model turned toward the camera.
 The large browser models live in the `geebr-models` R2 bucket
 (Cloudflare, `wrangler`), served under four hostnames
 (`geebr-models[-2|-3|-4].mindroot.io`). Uploads cost the owner money and
-bandwidth: ask first. Everything else is served from the repo. `?assets=<url>`
+bandwidth: ask first. `wrangler r2 object put geebr-models/<key> --file <f>
+--remote` works (a first attempt can fail on the connection: repeat it); the
+speech model is under `underdog-bark-3.0/`, Bonsai bundles at the bucket root. Everything else is served from the repo. `?assets=<url>`
 or `window.TABLEFOLK_ASSETS` points the app at another asset host.
