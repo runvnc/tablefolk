@@ -59,6 +59,7 @@
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
     K: 'bookcase', Y: 'player', '@': 'player', '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern',
     '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
+  const keepModels = () => { try { return localStorage.getItem('tablefolk.keepModels') !== '0'; } catch { return true; } };
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nice = s => String(s || '').replace(/_/g, ' ');
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -247,6 +248,7 @@
         <button type="button" class="tfme-ib" data-act="zoomout" title="Zoom out (-)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
         <button type="button" class="tfme-ib" data-act="zoomin" title="Zoom in (+)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg></button>
         <button type="button" class="tfme-ib" data-act="fit" title="Fit the board (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+        <label class="tfme-check" title="Buildings you place keep their 3D model; the player walks into a separate map of the inside"><input type="checkbox" data-keepdefault ${keepModels() ? 'checked' : ''}> keep building models</label>
         <label class="tfme-check"><input type="checkbox" data-opt="labels" checked> names</label>
         <label class="tfme-check"><input type="checkbox" data-opt="grid" checked> grid</label>
         <span class="tfme-status" aria-live="polite"></span>
@@ -312,7 +314,7 @@
     function place(kind, name, x, z) {
       if (!inBoard(x, z)) return;
       edit(() => {
-        if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
+        if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z, ...(window.TablefolkProcgen?.WALK_IN?.[name] && keepModels() ? { keep: true } : {}) }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
         else {
           const monster = kind === 'monsters' || MONSTERS.includes(name);
           const a = { id: uniqueId(name.replace(/_(classic|warrior|farmer|woman)$/, '').replace(/_/g, '')), model: name, at: [x, z], ...(monster ? { hostile: true, style: nice(name) } : { style: nice(name), personality: '' }) };
@@ -402,6 +404,7 @@
         const o = t.ref, holds = /chest|crate|barrel|bag|cabinet|nightstand|pot|vase/.test(o.type);
         box.innerHTML = `<div class="tfme-head">${thumb('objects', o.type)}<div><h3>${esc(nice(o.type))}</h3><span class="tfme-muted">at ${o.x}, ${o.z}${o.ry ? ' · turned' : ''}</span></div></div>
           <div class="tfme-form">
+            ${window.TablefolkProcgen?.WALK_IN?.[o.type] ? `<label class="wide tfme-keep"><span><input type="checkbox" data-keep ${o.keep ? 'checked' : ''}> Keep the 3D model</span><small>${o.keep ? 'The model stays as it is. The player walks in at the gold door square in front of it, into a separate map of the inside.' : 'Off: the model is replaced by walls, a floor and a roof, and the inside is part of this map.'}</small></label>` : ''}
             ${o.type === 'note' ? field('Text', 'text', o.text, 'area') + `<label class="wide"><span>Where</span><select data-k="wall"><option value="">lying on the floor</option>${['north', 'south', 'east', 'west'].map(w => `<option value="${w}"${o.wall === w ? ' selected' : ''}>pinned to the ${w} wall of its square</option>`).join('')}</select></label>` : ''}
             ${holds || o.type === 'coin_pile' ? field('Gold inside', 'gold', o.gold, 'number', 'min="0"') : ''}
             ${holds ? field('Items inside (comma)', 'items', (o.items || []).map(i => i?.name || i).join(', ')) : ''}
@@ -467,7 +470,7 @@
       // buildings to go into: their walls, door and floor as the game will
       // build them (scenario.js), and, while nothing is placed inside, a
       // ghost of the furniture they come with
-      const PG = window.TablefolkProcgen, walkIn = o => PG?.WALK_IN?.[o.type] && o.enter !== false;
+      const PG = window.TablefolkProcgen, walkIn = o => PG?.WALK_IN?.[o.type] && o.enter !== false && !o.keep;
       for (const o of L.objects) if (walkIn(o)) drawBuilding(ctx, o);
       // rooms' names, faint, under everything standing
       if (s >= 14) for (const p of L.places || []) {
@@ -482,6 +485,11 @@
         push(r, () => cell.type === 'wall' ? drawWall(ctx, x, z) : drawDoor(ctx, x, z, cell));
       }
       for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2 || walkIn(o)) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref, +o.ry || 0)); }
+      // a kept building: the square in front of its door where the player goes in
+      for (const o of L.objects) if (PG?.WALK_IN?.[o.type] && o.keep && o.enter !== false) {
+        const { pad } = PG.doorPad(o); if (!inBoard(...pad)) continue;
+        push(Math.round(o.z) + z0 + .1, () => { const [px, py] = cellToPx(...pad); ctx.fillStyle = 'rgba(255,209,90,.45)'; ctx.strokeStyle = '#ffd15a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px + s / 2, py + s / 2, s * .4, s * .4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (s >= 20) { ctx.font = `700 ${Math.round(s * .26)}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3a2a08'; ctx.fillText('door', px + s / 2, py + s / 2); } });
+      }
       const folk = [...L.agents.filter(at).map(a => ({ a, kind: 'agent' })), ...(at(L.player) ? [{ a: L.player, kind: 'player' }] : [])];
       for (const f of folk) { const r = f.a.at[1] + z0; push(r + .4, () => drawFolk(ctx, f)); }
       for (const r of [...rows.keys()].sort((a, b) => a - b)) for (const f of rows.get(r)) f();
@@ -676,6 +684,10 @@
       else if ((act === 'todoor' || act === 'towall') && sel?.key) edit(() => { sel.ref.type = act === 'todoor' ? 'door' : 'wall'; if (act === 'towall') delete sel.ref.locked; sel.kind = sel.ref.type; });
       renderInspector();
     });
+    root.addEventListener('change', e => {
+      if (e.target.dataset.keep != null && sel?.kind === 'object') { edit(() => { if (e.target.checked) sel.ref.keep = true; else delete sel.ref.keep; }); renderInspector(); return; }
+      if (e.target.dataset.keepdefault != null) { try { localStorage.setItem('tablefolk.keepModels', e.target.checked ? '1' : '0'); } catch {} return; }
+    });
     root.addEventListener('change', e => { const o = e.target.dataset.opt; if (o) { showOpt[o] = e.target.checked; dirty = true; } if (e.target.classList.contains('tfme-mat')) setTool('floor'); });
     $('.tfme-search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase().replace(/\s+/g, '_'); if (query && tab !== 'objects' && !paletteList()[0]?.[1].length) { tab = 'objects'; root.querySelectorAll('.tfme-tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === tab)); } renderPalette(); });
     root.addEventListener('dragstart', e => {
@@ -766,6 +778,7 @@
 .tfme-form input,.tfme-form select,.tfme-form textarea{font:inherit;font-size:.86rem;color:var(--tfme-fg);background:var(--bg,#f4efe4);border:1px solid var(--tfme-line);border-radius:8px;padding:.35rem .5rem;width:100%;min-width:0}
 .tfme-form textarea{resize:vertical;line-height:1.4}
 .tfme-form input:focus,.tfme-form select:focus,.tfme-form textarea:focus,.tfme-search:focus{outline:2px solid color-mix(in srgb,var(--tfme-accent) 55%,transparent);outline-offset:0}
+.tfme-keep small{display:block;margin-top:3px;line-height:1.35}.tfme-keep input{width:auto}
 .tfme-actions{display:flex;gap:6px;flex-wrap:wrap}.tfme-actions button{font:inherit;font-size:.82rem;padding:.35rem .7rem;border-radius:8px;border:1px solid var(--tfme-line);background:var(--bg,#f4efe4);color:var(--tfme-fg);cursor:pointer}
 .tfme-actions button:hover{border-color:var(--tfme-accent)}.tfme-actions button.danger{color:#b5442e}
 .tfme-note{font-size:.8rem;background:rgba(242,201,76,.16);border:1px solid rgba(242,201,76,.4);padding:6px 8px;border-radius:8px}

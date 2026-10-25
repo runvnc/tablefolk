@@ -4407,9 +4407,8 @@ function clearConversationHistory() {
   log('chat and action history cleared');
 }
 
-function saveWorldState() {
-  try {
-    const data = {
+function worldStateData() {
+    return {
       characters: state.characters.map(g => ({
         id: g.id,
         x: g.root.position.x, y: g.root.position.y, z: g.root.position.z,
@@ -4426,7 +4425,7 @@ function saveWorldState() {
       }),
       blocks: state.blocks.filter(m => m && !m.isDisposed?.()).map(m => {
         const mm = meta(m);
-        return { type: mm?.type || 'wall', x: m.position.x, z: m.position.z, state: mm?.state || 'intact', health: mm?.health ?? 3, ...(mm?.rim ? {rim:true} : {}) };
+        return { type: mm?.type || 'wall', x: m.position.x, z: m.position.z, state: mm?.state || 'intact', health: mm?.health ?? 3, ...(mm?.rim ? {rim:true} : {}), ...(mm?.locked ? {locked:mm.locked} : {}) };
       }),
       brainConfigs: Array.from(state.brainConfigs.entries()),
       player: state.player,
@@ -4440,8 +4439,11 @@ function saveWorldState() {
       allowed: Array.from(state.allowed),
       ts: Date.now(),
     };
+}
+function saveWorldState() {
+  try {
     // Scenarios save under their own key so they never overwrite the sandbox.
-    localStorage.setItem(state.saveKey||'tablefolkState', JSON.stringify(data));
+    localStorage.setItem(state.saveKey||'tablefolkState', JSON.stringify(worldStateData()));
   } catch (e) { console.warn('saveWorldState failed:', e); }
 }
 
@@ -4489,7 +4491,7 @@ async function restoreWorldState(input) {
   for(const b of (data.blocks||[])){
     const cracked=b.state==='cracked';
     const obj=b.type==='door' ? makeDoor(state.scene,b.x,b.z,{}) : makeBlock(state.scene,b.x,b.z,cracked);
-    if(obj){ const mm=meta(obj); if(mm){ mm.state=b.state||'intact'; mm.health=b.health??mm.health; if(b.rim) mm.rim=true; } }
+    if(obj){ const mm=meta(obj); if(mm){ mm.state=b.state||'intact'; mm.health=b.health??mm.health; if(b.rim) mm.rim=true; if(b.locked) mm.locked=b.locked; } }
   }
   const palettes=[
     {hat:state.materials.hat1,belly:state.materials.belly1,dark:state.materials.foot},
@@ -4569,7 +4571,7 @@ function installWorldAPI(){
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,
-    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, restoreWorldState,
+    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, worldStateData, restoreWorldState,
   };
 }
 

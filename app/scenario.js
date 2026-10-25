@@ -698,9 +698,35 @@
   const BUILDINGS = window.TablefolkProcgen?.WALK_IN || {}, footprint = b => window.TablefolkProcgen.walkInFootprint(b);
   const INSIDE_GLYPHS = window.TablefolkProcgen?.WALK_IN_THINGS || {};
   const OUTDOORSY = new Set(['tree', 'flowers', 'grass_tuft', 'boulder', 'lily_pad']);
+  // "keep": true leaves the model standing outside and makes the inside a
+  // subworld (interiorOf) with a link at the square in front of the door.
+  function interiorOf(b) {
+    const { spec, Wd, D, cell, door } = footprint({ type: b.type, x: 0, z: 0, ry: 0 });
+    const objects = [], paint = [];
+    for (let i = 0; i < Wd; i++) for (let j = 0; j < D; j++) {
+      const [x, z] = cell(i, j);
+      if (i === 0 || j === 0 || i === Wd - 1 || j === D - 1) { objects.push({ type: i === door[0] && j === door[1] ? 'door' : 'wall', x, z }); continue; }
+      const t = INSIDE_GLYPHS[spec.inside[j - 1]?.[i - 1]]; if (t) objects.push({ type: t, x, z });
+    }
+    const [ix, iz] = cell(door[0], D - 2), out = cell(door[0], D);
+    for (let i = 1; i < Wd - 1; i++) for (let j = 1; j < D - 1; j++) { const [x, z] = cell(i, j); paint.push({ x, z, mat: spec.floor }); }
+    paint.push({ x: out[0], z: out[1] - 0, mat: spec.floor }, { x: cell(door[0], D - 1)[0], z: cell(door[0], D - 1)[1], mat: spec.floor });
+    return { title: spec.name, base: 'plain', floor: spec.floor, size: [Math.max(11, Wd + 6), Math.max(9, D + 5)], objects, paint, agents: [],
+      player: { at: [ix, iz], facing: 'n' }, links: [{ at: out, to: 'back', name: 'outside' }], roofs: false };
+  }
   function expandBuildings(scn) {
-    const isB = o => BUILDINGS[o.type] && o.enter !== false;
-    if (!scn.objects.some(isB)) return scn;
+    const isK = o => BUILDINGS[o.type] && o.enter !== false && o.keep;
+    const isB = o => BUILDINGS[o.type] && o.enter !== false && !o.keep;
+    if (!scn.objects.some(o => isB(o) || isK(o))) return scn;
+    const subworlds = { ...(scn.subworlds || {}) }, links = [...(scn.links || [])], kept = {}, keptWarnings = [];
+    for (const b of scn.objects.filter(isK)) {
+      const spec = BUILDINGS[b.type], n = kept[b.type] = (kept[b.type] || 0) + 1, id = b.id ? String(b.id) : `${spec.name.replace(/ /g, '-')}-${n}`;
+      const { pad, beyond } = window.TablefolkProcgen.doorPad(b), E0 = edge();
+      if (Math.abs(pad[0]) > E0.x || Math.abs(pad[1]) > E0.z) { keptWarnings.push(`${spec.name} at ${b.x},${b.z}: its door square is off the board, so it has no way in`); continue; }
+      subworlds[id] ||= interiorOf(b);
+      links.push({ at: pad, to: id, name: b.name ? String(b.name) : spec.name, back: Math.abs(beyond[0]) > E0.x || Math.abs(beyond[1]) > E0.z ? pad : beyond });
+    }
+    if (!scn.objects.some(isB)) return { ...scn, subworlds, links, gridWarnings: [...(scn.gridWarnings || []), ...keptWarnings] };
     const EDGE = edge(), key = (x, z) => Math.round(+x) + ',' + Math.round(+z);
     let objects = scn.objects.filter(o => !isB(o)), agents = scn.agents, player = scn.player;
     const paint = [...scn.paint], places = [...(scn.places || [])], warnings = [];
@@ -740,7 +766,7 @@
       places.push({ id: total[b.type] > 1 ? `${spec.name} ${count[b.type]}` : spec.name, kind: b.type === 'stable' ? 'stable' : 'house',
         center: cell(Math.floor((Wd - 1) / 2), Math.floor((D - 1) / 2)), x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) });
     }
-    return { ...scn, objects, paint, places, agents, player, gridWarnings: [...(scn.gridWarnings || []), ...warnings] };
+    return { ...scn, objects, paint, places, agents, player, subworlds, links, gridWarnings: [...(scn.gridWarnings || []), ...warnings, ...keptWarnings] };
   }
 
   // Scenario with explicit objects/paint/positions -> the same in grid form,
@@ -907,6 +933,9 @@
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
+      // subworlds: other maps (a building's inside, a dungeon) the player walks into through a link at a square
+      subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},
+      links: Array.isArray(s.links) ? s.links.filter(l => l && Array.isArray(l.at) && l.at.length === 2 && l.at.every(n => Number.isFinite(+n)) && l.to).slice(0, 64).map(l => ({ ...l, at: [Math.round(+l.at[0]), Math.round(+l.at[1])], to: String(l.to) })) : [],
       // locks.js: locked doors and their keys
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
@@ -967,6 +996,10 @@
   const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24 };
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
+    // opts.sub: a subworld entered through a link (the player, the goal and the
+    // banner stay the parent's); opts.restore: the parent coming back, its
+    // characters and objects put back from the snapshot taken on leaving
+    if (!opts.sub && !opts.restore) frames.length = 0;
     const base = normalizeScenario(input);
     // Extra asset packs first, so their object types exist for the layout.
     for (const r of await Promise.allSettled(base.packs.map(u => window.tablefolkPacks.load(u)))) {
@@ -974,6 +1007,7 @@
     }
     // Packages (packages.js): their items, skills, roles and workflows.
     const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages) : [];
+    const parentAgents = opts.restore ? base.agents : null;
     for (const m of packageWarnings) console.warn('[packages]', m);
     refreshThings();
     w.setWorldSize?.(...boardSizeFor(base));
@@ -999,9 +1033,12 @@
     // dark (darkness.js): fog of war, dim light, and the player brings a torch
     w.setLighting?.(scn.dark ? 'dim' : scn.lighting);
     const hasTorch = (scn.player?.items || []).some(i => /torch/i.test(i?.name || i));
-    w.setPlayer(scn.dark && !hasTorch ? { ...scn.player, items: [...(scn.player?.items || []), 'torch'] } : scn.player);
-    w.state.player.quests = [];   // give_quest (app.js)
-    if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 20); window.tablefolkCombat.reset(); }
+    if (!opts.sub && !opts.restore) {
+      w.setPlayer(scn.dark && !hasTorch ? { ...scn.player, items: [...(scn.player?.items || []), 'torch'] } : scn.player);
+      w.state.player.quests = [];   // give_quest (app.js)
+      if (window.tablefolkCombat) { w.state.player.maxHp = Math.max(1, +scn.player?.hp || 20); window.tablefolkCombat.reset(); }
+    } else if (scn.dark && !hasTorch && opts.sub && !(w.state.player.items || []).some(i => /torch/i.test(i?.name || i))) w.state.player.items.push({ name: 'torch', qty: 1 });
+    if (opts.restore) { scn.agents = []; scn.objects = []; scn.map = []; }
     // Sea cells first: they shape the land the layout engine places onto.
     const finalMat = new Map(scn.paint.map(c => [Math.round(+c.x) + ',' + Math.round(+c.z), c]));
     const holes = [...finalMat.values()].filter(c => c.mat === 'sea');
@@ -1012,7 +1049,7 @@
     const existing = w.getObjects().map(o => ({ type: o.type, x: o.x, z: o.z }));
     // The player's avatar (unless "player": {"avatar": false}) is laid out like
     // a character called "player"; by default it stands at the south side.
-    const withAvatar = scn.player?.avatar !== false;
+    const withAvatar = scn.player?.avatar !== false && !opts.restore;
     const playerAgent = withAvatar ? [{ id: 'player', at: Array.isArray(scn.player?.at) ? scn.player.at : undefined }] : [];
     const placesPlayer = scn.map.some(l => /\bplayer\b/i.test(l));
     const spec = { ...scn, agents: [...scn.agents, ...playerAgent], existing,
@@ -1032,9 +1069,9 @@
     // Roles (roles.js) and skills (skills.js): fetch every manifest the
     // scenario names first. A role brings its skills, so agents are read
     // with their role's skills added.
-    const roleWarnings = window.tablefolkRoles ? await window.tablefolkRoles.load(scn) : [];
+    const roleWarnings = window.tablefolkRoles ? await window.tablefolkRoles.load(parentAgents ? { ...scn, agents: parentAgents } : scn) : [];
     const withRole = a => window.tablefolkRoles ? window.tablefolkRoles.withRole(a) : a;
-    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: scn.agents.map(withRole) }) : [];
+    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: (parentAgents || scn.agents).map(withRole) }) : [];
     let first = null;
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
@@ -1100,24 +1137,101 @@
     w.inventoryChanged();
     w.saveWorldState();
     plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...packageWarnings, ...roleWarnings, ...skillWarnings);
+    if (opts.restore) await w.restoreWorldState(opts.restore);
     const code = opts.code || await encodeScenario(base);
-    active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
-    try { history.replaceState(null, '', '#s=' + code); } catch {}
+    if (opts.sub) world = { scn: base, links: base.links };
+    else {
+      if (!opts.restore) active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
+      else active = { ...opts.keepActive, timer: null };
+      world = { scn: base, links: base.links };
+      try { history.replaceState(null, '', '#s=' + code); } catch {}
+    }
     window.tablefolkDark?.start(scn.dark);
-    try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title, live: !!base.live } })); } catch {}
+    placePads(world.links);
+    try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title, live: !!base.live, sub: !!opts.sub } })); } catch {}
+    if (opts.sub) { renderBanner(); return { scenario: base, plan }; }
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
     // Art mode (?art=1) is for looking at the world: no intro card over it
     // (the banner's intro button still shows it).
-    if (!opts.testing && !window.TABLEFOLK_ART_MODE && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
+    if (!opts.testing && !opts.restore && !window.TABLEFOLK_ART_MODE && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
     startChecker();
     return { scenario: base, plan };
   }
 
+  // ---------- subworlds: links from one map into another ----------
+  // A link ({at, to, name, back}) is a glowing square. Stepping onto it (from
+  // another square) swaps the whole map for the subworld "to" (a building's
+  // inside, a dungeon): the map you leave is kept as a snapshot (characters,
+  // objects, doors, brains) and put back, with the player set down at "back",
+  // when you step onto the subworld's "back" link or press "leave". The
+  // player, their pack and hit points carry across; the goal waits.
+  const frames = [];                  // the maps left behind, innermost last
+  let world = { scn: null, links: [] };   // the map being played, and its links
+  let pads = [], padTimer = 0, lastCell = '', transition = false;
+  const playerCell = () => { const av = W().getPlayerAvatar?.(), p = av && (av.logicalPos || av.root.position); return p ? Math.round(p.x) + ',' + Math.round(p.z) : ''; };
+  function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; }
+  function placePads(links) {
+    clearPads();
+    const sc = W().state.scene; if (!sc || window.TABLEFOLK_TABLETOP) return;
+    let mat = sc.getMaterialByName('link_pad_mat');
+    if (!mat) { mat = new BABYLON.StandardMaterial('link_pad_mat', sc); mat.disableLighting = true; mat.emissiveColor = new BABYLON.Color3(1, .82, .35); mat.alpha = .5; }
+    for (const l of links) {
+      const m = BABYLON.MeshBuilder.CreateCylinder('link_pad', { diameter: .9, height: .03, tessellation: 40 }, sc);
+      m.position.set(l.at[0], .07, l.at[1]); m.material = mat; m.isPickable = false; pads.push(m);
+    }
+    lastCell = playerCell();
+    if (links.length) padTimer = setInterval(watchPads, 150);
+  }
+  function watchPads() {
+    if (transition || !active) return;
+    const c = playerCell(); if (!c || c === lastCell) return;
+    lastCell = c;
+    const l = world.links.find(l => l.at.join(',') === c);
+    if (l) (l.to === 'back' ? leaveWorld() : enterWorld(l));
+  }
+  async function enterWorld(l) {
+    const w = W(), parent = world.scn, sub0 = parent?.subworlds?.[l.to];
+    if (transition || !active) return;
+    if (!sub0) { window.tablefolkToast?.(`This way leads to "${l.to}", which is not in the scenario.`, { type: 'error' }); return; }
+    transition = true;
+    try {
+      const snap = JSON.parse(JSON.stringify(w.worldStateData())), av = w.getPlayerAvatar?.(), back = l.back || l.at;
+      if (snap.playerAvatar) { snap.playerAvatar.x = back[0]; snap.playerAvatar.z = back[1]; }
+      frames.push({ scn: parent, snap, active, code: active.code, name: l.name || l.to });
+      stopChecker();
+      const inherit = Object.fromEntries(['walls', 'wallHeight', 'lighting'].filter(k => parent[k] != null && sub0[k] == null).map(k => [k, parent[k]]));
+      const sub = { ...inherit, ...sub0, player: { ...(sub0.player || {}), model: av?.avatarModel, ...(w.state.player.wielding ? { wield: w.state.player.wielding } : {}) } };
+      await playScenarioNow(sub, { sub: true });
+      window.tablefolkToast?.(`You go into the ${l.name || l.to}.`, { type: 'success' });
+    } catch (e) { console.error('[links]', e); window.tablefolkToast?.('could not go in: ' + (e?.message || e), { type: 'error' }); frames.pop(); startChecker(); }
+    finally { transition = false; lastCell = playerCell(); renderBanner(); }
+  }
+  async function leaveWorld() {
+    const f = frames.pop(); if (!f || transition) return;
+    transition = true;
+    const w = W();
+    try {
+      const keep = JSON.parse(JSON.stringify(w.state.player));
+      await playScenarioNow(f.scn, { restore: f.snap, code: f.code, keepActive: f.active });
+      Object.assign(w.state.player, keep);
+      // weapons in hand come back (the restored bodies are new)
+      const C = window.tablefolkCombat;
+      if (C) {
+        for (const g of w.getAgents()) { const n = w.getBrainConfig(g.id).wielding; if (n) C.showWeapon(g, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n }); }
+        const av = w.getPlayerAvatar?.(), n = keep.wielding; if (av && n) C.showWeapon(av, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n });
+        C.renderPlayerHp();
+      }
+      w.inventoryChanged();
+      window.tablefolkToast?.(`You step outside.`, { type: 'success' });
+    } catch (e) { console.error('[links]', e); frames.push(f); window.tablefolkToast?.('could not go back: ' + (e?.message || e), { type: 'error' }); }
+    finally { transition = false; lastCell = playerCell(); renderBanner(); }
+  }
+
   async function exitScenario() {
     const w = W();
-    stopChecker(); active = null; renderBanner(); hideEnd();
+    stopChecker(); active = null; frames.length = 0; clearPads(); world = { scn: null, links: [] }; renderBanner(); hideEnd();
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
     w.setWallHeight?.(1);
@@ -1162,7 +1276,7 @@
     el.innerHTML = `<button type="button" class="scn-collapse" data-scn="collapse" title="hide">–</button><div class="scn-title">🎯 ${esc(active.scn.title)}</div>`
       + (g?.text ? `<div class="scn-goal">${esc(g.text)}</div>` : (active.scn.subtitle ? `<div class="scn-goal">${esc(active.scn.subtitle)}</div>` : ''))
       + `<div class="scn-meta">turn ${turns}${max ? ' / ' + max : ''} · you have ${W().getPlayer().gold || 0} gold</div>`
-      + `<div class="scn-actions">${active.scn.intro || g?.text ? '<button type="button" data-scn="intro">intro</button>' : ''}<button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
+      + `<div class="scn-actions">${active.scn.intro || g?.text ? '<button type="button" data-scn="intro">intro</button>' : ''}${frames.length ? `<button type="button" data-scn="leave">↩ leave the ${esc(frames.at(-1).name)}</button>` : ''}<button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
   }
   // The intro card doesn't block or blur the world; players can turn it off
   // (remembered) and bring it back with the banner's "intro" button.
@@ -1208,6 +1322,7 @@
     if ((act === 'collapse' || act === 'expand') && active) { active.collapsed = act === 'collapse'; renderBanner(goalContext()); }
     if (act === 'closesafety') { const s = document.getElementById('scenarioSafety'); if (s) s.hidden = true; }
     if (act === 'exit') exitScenario();
+    if (act === 'leave') leaveWorld();
     if (act === 'restart' && active) playScenario(active.scn, { code: active.code });
     if (act === 'share' && active) copy(linkFor(active.code), 'scenario link');
     if (act === 'copyresult') copy($('scenarioEnd')?.dataset.share || '', 'result');
