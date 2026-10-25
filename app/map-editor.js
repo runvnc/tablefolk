@@ -312,7 +312,7 @@
     function place(kind, name, x, z) {
       if (!inBoard(x, z)) return;
       edit(() => {
-        if (kind === 'object') { L.objects.push({ type: name, x, z }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
+        if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
         else {
           const monster = kind === 'monsters' || MONSTERS.includes(name);
           const a = { id: uniqueId(name.replace(/_(classic|warrior|farmer|woman)$/, '').replace(/_/g, '')), model: name, at: [x, z], ...(monster ? { hostile: true, style: nice(name) } : { style: nice(name), personality: '' }) };
@@ -476,7 +476,7 @@
         const [x, z] = k.split(',').map(Number), r = z + z0; if (r < r0 - 1 || r > r1 + 1) continue;
         push(r, () => cell.type === 'wall' ? drawWall(ctx, x, z) : drawDoor(ctx, x, z, cell));
       }
-      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref)); }
+      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref, +o.ry || 0)); }
       const folk = [...L.agents.filter(at).map(a => ({ a, kind: 'agent' })), ...(at(L.player) ? [{ a: L.player, kind: 'player' }] : [])];
       for (const f of folk) { const r = f.a.at[1] + z0; push(r + .4, () => drawFolk(ctx, f)); }
       for (const r of [...rows.keys()].sort((a, b) => a - b)) for (const f of rows.get(r)) f();
@@ -514,7 +514,10 @@
         ctx.fillRect(cx - r, cy - r * .5, r * 2, r * 1.5); ctx.strokeRect(cx - r, cy - r * .5, r * 2, r * 1.5);
       }
     }
-    function drawThing(ctx, kind, name, x, z, selected) {
+    // ry: an object turned in the world (radians) is drawn turned the same
+    // way about its square (the picture is from one side, so this only shows
+    // which way a bench or a table runs)
+    function drawThing(ctx, kind, name, x, z, selected, ry = 0) {
       const s = view.s, [px, py] = cellToPx(x, z);
       const t = tileFor(kind, name);
       if (!t) { want(kind, name); return badge(ctx, name, px, py, s, kind === 'characters' ? '#4a90e0' : '#8a7356'); }
@@ -522,7 +525,12 @@
       // a soft contact shadow
       ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(px + s / 2, py + s * .62, s * .36, s * .16, 0, 0, Math.PI * 2); ctx.fill();
       if (selected) { ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 10; }
-      ctx.drawImage(t.im, px + s / 2 - t.t.anchor[0] * k, py + s / 2 - t.t.anchor[1] * k, w, h);
+      const q = Math.round((ry || 0) / (Math.PI / 2)) % 4;
+      if (q) {
+        // screen right is -x, so a turn by +ry in the world is a turn the other way on screen
+        ctx.save(); ctx.translate(px + s / 2, py + s / 2); ctx.rotate(-q * Math.PI / 2);
+        ctx.drawImage(t.im, -t.t.anchor[0] * k, -t.t.anchor[1] * k, w, h); ctx.restore();
+      } else ctx.drawImage(t.im, px + s / 2 - t.t.anchor[0] * k, py + s / 2 - t.t.anchor[1] * k, w, h);
       ctx.shadowBlur = 0;
     }
     function badge(ctx, name, px, py, s, color) {

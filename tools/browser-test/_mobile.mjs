@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const S = '/tmp/claude-1000/-home-runvnc/bde8bf29-8007-4375-b49f-eeda1155bc3c/scratchpad/';
+const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = await b.contexts()[0].newPage();
+await page.setViewportSize({ width: 390, height: 844 });
+await page.goto('http://localhost:8000/app/?play=1'); await page.waitForTimeout(9000);
+await page.screenshot({ path: S + 'm1.png' });
+await page.click('.wl-world[data-play="0"]'); await page.waitForTimeout(8000);
+await page.evaluate(() => document.querySelector('#scenarioEnd [data-scn="close"]')?.click()); await page.waitForTimeout(1500);
+await page.screenshot({ path: S + 'm2.png' });
+await page.close(); await b.close();

@@ -9,7 +9,7 @@ page.on('pageerror', e => errs.push(String(e))); page.on('console', m => { if (m
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
 if (!process.env.KEEP) {
-  await page.goto('http://localhost:8001/world/?t=' + Date.now());
+  await page.goto('http://localhost:8000/world/?t=' + Date.now());
   await page.evaluate(async f => { const s = await (await fetch('/generated/' + f)).json(); const { prompt, mode, model, ...scn } = s; window.tfBuilder.show({ scenario: scn, model, ms: 0 }, { revise: { where: 'cloud' } }); }, file);
   await page.waitForTimeout(2500);
 }
