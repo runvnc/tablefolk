@@ -48,6 +48,7 @@
     ['scenery.js?v=20261025a'],
     ['combat.js?v=20261024k'],
     ['darkness.js?v=20261025a'],
+    ['roofs.js?v=20261025c'],
     ['cutaway.js?v=20261025d'],
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261024b'],

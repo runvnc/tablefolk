@@ -185,3 +185,13 @@ Ideas, by how much they would add for how much work with a small model:
 - Evals after all the prompt changes: shop-role 2/2, roles 4/4, smithy and
   companion pass, feelings 'hit' 3/3 (it fell to 0/2 when the new
   stay-in-character line sat below the feelings; moved above them).
+- Pacing (`app/live.js`): calm / lively / busy by the live button; each
+  character has its own next-turn time, a spoken line holds the next back,
+  those with nothing to react to mostly idle without the model, and the
+  player's own activity sets the tempo. The director spaces events by the pace.
+- Roofs (`app/roofs.js`): walled rooms in a world with an outside (villages,
+  Stonebrook) get thatched gable roofs, found from the walls themselves (doors
+  and one-square open doorways close a room). The roof over the player's room
+  fades away, one between the camera and the player or under the pointer goes
+  see-through, R lifts them all. None in one-building worlds (the bakery), dark
+  worlds or dungeons; `"roofs": true|false` overrides.

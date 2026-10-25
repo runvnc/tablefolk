@@ -25,6 +25,7 @@ localStorage key, so playing a scenario never overwrites your sandbox world.
   "size": [23, 17],                                      // board in cells, odd numbers (section 2c)
   "walls": "tabletop",                                   // or "stone" (natural rock), "modern" (smooth panels), "block" (old cubes)
   "wallHeight": 2,                                       // optional wall height multiplier (default 1; 2 = twice as tall)
+  "roofs": false,                                        // optional: thatched roofs on walled rooms (default: on when the world has an outside and is not dark or a dungeon; R lifts them)
   "campfire": true,                                      // island/clearing: false drops their campfire; plain/dungeon: true adds one
   "pathfinding": true,                                   // false: walks go in straight lines and stop at walls
   "earshot": 6,                                          // cells within which characters hear and see each other (default 6)
