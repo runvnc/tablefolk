@@ -1,0 +1,142 @@
+[
+ {
+  "id": "hero_young_f",
+  "name": "Mira",
+  "gender": "female",
+  "description": "young, bright and hopeful, a little breathless",
+  "file": "hero_young_f.mp3"
+ },
+ {
+  "id": "innkeeper_f",
+  "name": "Hettie",
+  "gender": "female",
+  "description": "warm, motherly, a laugh in it",
+  "file": "innkeeper_f.mp3"
+ },
+ {
+  "id": "sorceress_f",
+  "name": "Seraphine",
+  "gender": "female",
+  "description": "low, smooth and confident, a purr",
+  "file": "sorceress_f.mp3"
+ },
+ {
+  "id": "noble_f",
+  "name": "Lady Aldith",
+  "gender": "female",
+  "description": "crisp, refined, aristocratic",
+  "file": "noble_f.mp3"
+ },
+ {
+  "id": "crone_f",
+  "name": "Old Maud",
+  "gender": "female",
+  "description": "gravelly old crone, cackling",
+  "file": "crone_f.mp3"
+ },
+ {
+  "id": "shy_f",
+  "name": "Wren",
+  "gender": "female",
+  "description": "soft, shy, young",
+  "file": "shy_f.mp3"
+ },
+ {
+  "id": "huntress_f",
+  "name": "Kestrel",
+  "gender": "female",
+  "description": "steady, practical, outdoorsy",
+  "file": "huntress_f.mp3"
+ },
+ {
+  "id": "thief_f",
+  "name": "Pip",
+  "gender": "female",
+  "description": "cheeky, quick, street-smart",
+  "file": "thief_f.mp3"
+ },
+ {
+  "id": "knight_m",
+  "name": "Sir Aldric",
+  "gender": "male",
+  "description": "deep, heroic, steady",
+  "file": "knight_m.mp3"
+ },
+ {
+  "id": "dwarf_m",
+  "name": "Brom",
+  "gender": "male",
+  "description": "gravelly, gruff, hearty",
+  "file": "dwarf_m.mp3"
+ },
+ {
+  "id": "tavern_m",
+  "name": "Barnaby",
+  "gender": "male",
+  "description": "jolly, booming, round",
+  "file": "tavern_m.mp3"
+ },
+ {
+  "id": "wizard_m",
+  "name": "Orlen",
+  "gender": "male",
+  "description": "old, wise, dry and slow",
+  "file": "wizard_m.mp3"
+ },
+ {
+  "id": "squire_m",
+  "name": "Tam",
+  "gender": "male",
+  "description": "young, eager, earnest",
+  "file": "squire_m.mp3"
+ },
+ {
+  "id": "rogue_m",
+  "name": "Silas",
+  "gender": "male",
+  "description": "smooth, sly, amused",
+  "file": "rogue_m.mp3"
+ },
+ {
+  "id": "captain_m",
+  "name": "Captain Rook",
+  "gender": "male",
+  "description": "stern, barking, authoritative",
+  "file": "captain_m.mp3"
+ },
+ {
+  "id": "farmer_m",
+  "name": "Hob",
+  "gender": "male",
+  "description": "slow, gentle, country",
+  "file": "farmer_m.mp3"
+ },
+ {
+  "id": "scholar_m",
+  "name": "Pellam",
+  "gender": "male",
+  "description": "nervous, bookish, fussy",
+  "file": "scholar_m.mp3"
+ },
+ {
+  "id": "villain_m",
+  "name": "Mordrake",
+  "gender": "male",
+  "description": "cold, quiet, menacing",
+  "file": "villain_m.mp3"
+ },
+ {
+  "id": "king_m",
+  "name": "King Edric",
+  "gender": "male",
+  "description": "grand, resonant, weary",
+  "file": "king_m.mp3"
+ },
+ {
+  "id": "hooded_x",
+  "name": "Veil",
+  "gender": "female",
+  "description": "hushed, mysterious, androgynous",
+  "file": "hooded_x.mp3"
+ }
+]

@@ -348,6 +348,11 @@
         <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model with image input: gemma4-e2b-mm on litert-lm serve, Gemma 4 / GPT on OpenRouter; slower)</label>
         <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama. The key stays in this browser.</div>
       </details>
+      <label>Speech input (the 🎤 button) <select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
+        <option value="auto">Automatic: this server's Gemma, else the browser's</option>
+        <option value="bark">In this browser: Underdog Bark 3.0 (1.3 GB download once, private, needs WebGPU)</option>
+        <option value="browser">The browser's own recognition (Chrome, Edge)</option>
+      </select></label>
       <label class="spawn-mode-toggle"><input id="chatTestMode" type="checkbox" /> chat test mode (bare conversation, no perception)</label>
       <label class="spawn-mode-toggle"><input id="antiEcho" type="checkbox" /> anti-echo instructions (off by default - small models can confuse negative prompts)</label>
       <div class="cache-controls">
@@ -399,6 +404,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261025aav"></script>
+  <script src="preflight.js?v=20261025aax"></script>
 </body>
 </html>

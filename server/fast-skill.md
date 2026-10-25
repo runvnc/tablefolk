@@ -27,7 +27,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
     "personality": "Vexa, a sorceress who ... (the character's whole brief: who they are, what they want, hard facts, secrets, what they will and won't do, which commands to use when)",
     "allowed": ["say", "walk", "emote"],   // optional, replaces the default list for this character
     "inventory": { "gold": 0, "items": ["silver key"] },   // optional
-    "ttsVoiceId": "builtin:fantine"  // optional: alba azelma cosette eponine fantine javert jean marius
+    "ttsVoiceId": "pack:dwarf_m"  // optional: a voice from the list given with the request ("pack:<id>" or "builtin:<name>")
   } ],
   "goal": null                       // or a goal (below)
   // ...plus ONE map method (below)

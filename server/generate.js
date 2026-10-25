@@ -22,7 +22,7 @@ import { deflateRawSync } from 'node:zlib';
 import { OpenAI, collect } from '../app/llm_js/openai-client.js';
 import { config, ROOT, endpoint, LITERT_URL } from './config.js';
 import { isAdmin, overLimit } from './admin.js';
-import { voicesText } from './settings.js';
+import { voicesText, packVoices } from './settings.js';
 
 // The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
 export const recent = [];
@@ -37,7 +37,7 @@ const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'jave
 // app.js AVATAR_MODELS + FIGURES; MINDLESS as in play.js (hostile by default)
 const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
 const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian',
-  'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard',
+  'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman',
   'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'troll', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime']);
 // what picking up an object gives (app/play.js PICKUPS)
 const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
@@ -78,7 +78,7 @@ export function checkScenario(s) {
     // monsters that only fight need no brief
     if (!a.personality && (a.hostile || (a.hostile == null && MINDLESS.has(a.model)))) a.personality = `A hostile ${String(a.model).replace(/_/g, ' ')}.`;
     if (!a.personality) problems.push(`agent ${a.id}: needs a "personality"`);
-    if (a.ttsVoiceId) { const v = String(a.ttsVoiceId).replace(/^builtin:/, '').toLowerCase(); if (VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
+    if (a.ttsVoiceId) { const raw = String(a.ttsVoiceId).toLowerCase(), v = raw.replace(/^builtin:/, ''); if (packVoices().some(p => p.id === raw)) a.ttsVoiceId = raw; else if (VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
     for (const c of a.allowed || []) if (!COMMANDS.has(c)) problems.push(`agent ${a.id} "allowed": unknown command ${c}`);
   }
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
@@ -207,7 +207,7 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
   const t0 = Date.now(), prompt = label;
   const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 600000 });   // long thinking: up to 10 minutes
   const messages = [
-    { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId "builtin:<name>"; match the character): ${voicesText()}.` },
+    { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId as written here; match the character's age, gender and manner, and give different characters different voices): ${voicesText()}.` },
     { role: 'user', content: user },
   ];
   let scenario = null, problems = [], raw = '';
@@ -399,7 +399,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025b"></script><script src="/app/map-editor.js?v=20261025g"></script><script src="/app/builder.js?v=20261025a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025b"></script><script src="/app/map-editor.js?v=20261025h"></script><script src="/app/builder.js?v=20261025b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -493,7 +493,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261025b').then(()=>load('/app/worldgen-browser.js?v=20261025e')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261025b').then(()=>load('/app/worldgen-browser.js?v=20261025g')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));

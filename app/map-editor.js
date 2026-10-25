@@ -42,7 +42,7 @@
   };
   const FLOOR_NAMES = Object.keys(FLOORS);
   const MONSTERS = ['goblin', 'kobold', 'orc', 'troll', 'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'skeleton_classic', 'skeleton_warrior_classic', 'zombie', 'ghost', 'rat', 'spider', 'wolf', 'bat', 'slime', 'demon', 'giant', 'dragon', 'goblin_classic', 'orc_classic'];
-  const PEOPLE = ['villager', 'peasant', 'peasant_woman', 'farmer', 'woodsman', 'huntress', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'witch', 'wizard'];
+  const PEOPLE = ['villager', 'peasant', 'peasant_woman', 'farmer', 'woodsman', 'huntress', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman'];
   const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll']);
   const OBJECT_GROUPS = [
     ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note']],

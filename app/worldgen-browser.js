@@ -21,8 +21,8 @@
  *       {scenario, code, link, ms, model} or 'failed' {error}
  */
 (function () {
-  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261025e';
-  const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard'.split(' ');
+  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261025f';
+  const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman'.split(' ');
   const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon'.split(' ');
   const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon'.split(' '));
   const DUNGEON = 'entrance throne lair treasure library shrine barracks storage kitchen prison crypt alchemy'.split(' ');

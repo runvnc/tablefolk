@@ -1,0 +1,22 @@
+[
+ {"id":"hero_young_f","gender":"female","name":"Mira","tag":"young, bright and hopeful, a little breathless","description":"A young woman in her early twenties, clear bright hopeful voice, warm and energetic, a hint of breathlessness, clean studio recording, natural pacing."},
+ {"id":"innkeeper_f","gender":"female","name":"Hettie","tag":"warm, motherly, a laugh in it","description":"A warm middle-aged woman, motherly and cheerful, slightly husky, friendly pace with a smile in the voice, studio quality."},
+ {"id":"sorceress_f","gender":"female","name":"Seraphine","tag":"low, smooth and confident, a purr","description":"A confident woman in her late twenties, low smooth alto voice, slow seductive but refined delivery, calm and knowing, studio quality."},
+ {"id":"noble_f","gender":"female","name":"Lady Aldith","tag":"crisp, refined, aristocratic","description":"An aristocratic woman in her thirties, crisp precise upper-class English accent, cool and composed, measured pace, studio quality."},
+ {"id":"crone_f","gender":"female","name":"Old Maud","tag":"gravelly old crone, cackling","description":"A very old woman, rasping crackly voice, slow and wheezy, mischievous and cunning, like a village witch, studio quality."},
+ {"id":"shy_f","gender":"female","name":"Wren","tag":"soft, shy, young","description":"A shy teenage girl, soft quiet gentle voice, hesitant, slightly timid, sweet, studio quality."},
+ {"id":"huntress_f","gender":"female","name":"Kestrel","tag":"steady, practical, outdoorsy","description":"A capable woman in her thirties, steady low-mid voice, no-nonsense and calm, a ranger who speaks little, studio quality."},
+ {"id":"thief_f","gender":"female","name":"Pip","tag":"cheeky, quick, street-smart","description":"A cheeky young woman, fast playful voice, street-smart and sarcastic with a grin, a bit of cockney attitude, studio quality."},
+ {"id":"knight_m","gender":"male","name":"Sir Aldric","tag":"deep, heroic, steady","description":"A strong man in his thirties, deep resonant heroic voice, steady and honourable, measured pace like a knight, studio quality."},
+ {"id":"dwarf_m","gender":"male","name":"Brom","tag":"gravelly, gruff, hearty","description":"A gruff stocky older man, very deep gravelly voice with a Scottish burr, hearty and blunt, a dwarven blacksmith, studio quality."},
+ {"id":"tavern_m","gender":"male","name":"Barnaby","tag":"jolly, booming, round","description":"A jolly heavyset man, booming warm laughing voice, loud and friendly, a tavern keeper, studio quality."},
+ {"id":"wizard_m","gender":"male","name":"Orlen","tag":"old, wise, dry and slow","description":"A very old man, thin dry wise voice, slow thoughtful and a little amused, an elderly wizard, studio quality."},
+ {"id":"squire_m","gender":"male","name":"Tam","tag":"young, eager, earnest","description":"A teenage boy, eager earnest voice, a little high and quick, enthusiastic and nervous, studio quality."},
+ {"id":"rogue_m","gender":"male","name":"Silas","tag":"smooth, sly, amused","description":"A smooth sly man in his thirties, relaxed amused silky voice, charming and slightly dangerous, a roguish merchant, studio quality."},
+ {"id":"captain_m","gender":"male","name":"Captain Rook","tag":"stern, barking, authoritative","description":"A stern man in his forties, hard authoritative voice, clipped and commanding, a guard captain, studio quality."},
+ {"id":"farmer_m","gender":"male","name":"Hob","tag":"slow, gentle, country","description":"A gentle middle-aged farmer, slow warm country voice, rural accent, mild and kind, studio quality."},
+ {"id":"scholar_m","gender":"male","name":"Pellam","tag":"nervous, bookish, fussy","description":"A nervous bookish man in his twenties, thin fussy voice, quick and anxious, a scribe, studio quality."},
+ {"id":"villain_m","gender":"male","name":"Mordrake","tag":"cold, quiet, menacing","description":"A cold menacing man, quiet low voice, slow and deliberate, sinister calm, a necromancer, studio quality."},
+ {"id":"king_m","gender":"male","name":"King Edric","tag":"grand, resonant, weary","description":"An older man, grand resonant commanding voice, weary but regal, a king addressing his court, studio quality."},
+ {"id":"hooded_x","gender":"female","name":"Veil","tag":"hushed, mysterious, androgynous","description":"A mysterious hooded stranger, hushed whispery androgynous voice, calm and cryptic, studio quality."}
+]

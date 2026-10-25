@@ -69,9 +69,14 @@ export function voices() {
   const v = saved.voices || {};
   return VOICE_IDS.map(id => ({ id, gender: v[id]?.gender || DEFAULT_GENDER[id], description: v[id]?.description || '' }));
 }
+// The designed voice library (assets/voices/voices.json, tools/fal-voices.py):
+// ids as characters name them, "pack:<id>"
+export function packVoices() {
+  try { return JSON.parse(readFileSync(new URL('../assets/voices/voices.json', import.meta.url), 'utf8')).map(v => ({ id: 'pack:' + v.id, name: v.name, gender: v.gender, description: v.description })); } catch { return []; }
+}
 // For the generator's prompt: "alba (female, warm young woman), ..."
 export function voicesText() {
-  return voices().map(v => `${v.id} (${[v.gender, v.description].filter(Boolean).join(', ')})`).join(', ');
+  return voices().map(v => `builtin:${v.id} (${[v.gender, v.description].filter(Boolean).join(', ')})`).concat(packVoices().map(v => `${v.id} (${v.name}, ${v.gender}, ${v.description})`)).join(', ');
 }
 
 // What the admin page shows: keys only as "set" / not.

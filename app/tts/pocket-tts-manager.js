@@ -28,7 +28,7 @@
     status(text,state='idle'){ this.dispatchEvent(new CustomEvent('status',{detail:{text,state}})); }
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
-    voices(){ const cat=window.TABLEFOLK_VOICES||[]; return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat([...this.custom.values()].map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
+    voices(){ const cat=window.TABLEFOLK_VOICES||[]; const packs=(window.TABLEFOLK_PACK_VOICES||[]).map(v=>({id:v.id,name:`${v.name} (${[v.gender,v.description].filter(Boolean).join(', ')})`})); return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat(packs).concat([...this.custom.values()].filter(v=>!v.pack).map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
     async ensureAudio(){ if(!this.audioCtx){
       // 'interactive' asks Chrome for the smallest possible hardware audio
       // buffer (lowest latency, e.g. for synths/games where every ms
@@ -87,7 +87,7 @@
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:voiceId||cfg.ttsVoiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
-    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
+    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
     streamChunk(data,metrics={}){if(!this.pcmNode||!data.length)return;if(!this.receivedSamples&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;this.receivedSamples+=data.length;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(metrics?.chunkRtfx)||0;this.pendingAudio.push(data);this.flushAudio();}
@@ -188,6 +188,17 @@
     setVolume(v){localStorage.setItem('tablefolkTtsVolume',String(v));if(this.gain)this.gain.gain.value=Number(v);}
     setBufferMs(v){localStorage.setItem('tablefolkTtsBufferMs',String(v));}
     async addVoice(name,file){await this.ensureAudio();const ab=await file.arrayBuffer(), decoded=await this.audioCtx.decodeAudioData(ab), mono=this.toMono(decoded), audio0=this.resample(mono,decoded.sampleRate,24000);let audio=audio0.length>MAX_CUSTOM_VOICE_SAMPLES?audio0.slice(0,MAX_CUSTOM_VOICE_SAMPLES):audio0;if((audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME)).length===0)audio=new Float32Array(1);let peak=0;for(const x of audio)peak=Math.max(peak,Math.abs(x));if(peak>.001){const k=Math.min(1.8,.9/peak);for(let i=0;i<audio.length;i++)audio[i]*=k;}const id=crypto.randomUUID();const rec={id,name:name||file.name.replace(/\\.[^.]+$/,''),audio:Array.from(audio),created:Date.now()};await this.dbPut(rec);this.custom.set(id,rec);this.dispatchEvent(new Event('voiceschanged'));if(this.ready)await this.encode(rec);return id;}
+    // A voice from the designed library (assets/voices/): fetched, cloned like an
+    // uploaded sample (kept for this page only), used as custom:pack-<id>.
+    async ensurePack(id){
+      const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
+      const v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id); if(!v) throw new Error('unknown voice '+id);
+      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file); if(!r.ok) throw new Error('voice sample '+r.status);
+      const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
+      if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
+      let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }
+      const rec={id:key,name:v.name,audio:Array.from(audio),created:Date.now(),pack:true}; this.custom.set(key,rec); if(this.ready) await this.encode(rec); return 'custom:'+key;
+    }
     toMono(b){const out=new Float32Array(b.length);for(let c=0;c<b.numberOfChannels;c++){const d=b.getChannelData(c);for(let i=0;i<out.length;i++)out[i]+=d[i]/b.numberOfChannels;}return out;}
     resample(a,ir,or){if(ir===or)return a.slice();const n=Math.round(a.length*or/ir),o=new Float32Array(n),r=ir/or;for(let i=0;i<n;i++){const p=i*r,j=Math.floor(p),f=p-j;o[i]=(a[j]||0)*(1-f)+(a[Math.min(j+1,a.length-1)]||0)*f;}return o;}
     async encode(rec){return new Promise((resolve,reject)=>{this.pending.set('encode',{resolve,reject});const audio=Float32Array.from(rec.audio);this.worker.postMessage({type:'encode_voice',data:{voiceId:rec.id,audio}},[audio.buffer]);});}

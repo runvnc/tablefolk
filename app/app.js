@@ -3983,15 +3983,19 @@ const PERSON_H=1.3;
 // (female or male), the same one every time for the same id. Genders and
 // descriptions come from the server's /api/voices (set on its admin page),
 // else these defaults.
-const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch','huntress','peasant_woman']);
+const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
 const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
 fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
+// The designed voice library (assets/voices/, tools/fal-voices.py): samples
+// Pocket-TTS clones, named "pack:<id>"; preferred over the eight built-ins.
+fetch(ASSET_BASE+'voices/voices.json').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d)){ window.TABLEFOLK_PACK_VOICES=d.map(v=>({...v,id:'pack:'+v.id})); window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
 function defaultVoiceFor(id,model){
   const want=FEMALE_MODELS.has(model)?'female':'male';
+  const packs=(window.TABLEFOLK_PACK_VOICES||[]).filter(v=>v.gender===want).map(v=>v.id);
   const cat=window.TABLEFOLK_VOICES||Object.entries(VOICE_GENDER).map(([id,gender])=>({id,gender}));
-  const pool=cat.filter(v=>v.gender===want).map(v=>v.id); if(!pool.length) return null;
+  const pool=packs.length ? packs : cat.filter(v=>v.gender===want).map(v=>'builtin:'+v.id); if(!pool.length) return null;
   let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0;
-  return 'builtin:'+pool[h%pool.length];
+  return pool[h%pool.length];
 }
 // Figures: Quaternius characters and monsters (assets/models/characters/
 // quaternius/, CC0/CC-BY, see LICENSE.txt there). Each GLB brings its own
@@ -4002,8 +4006,15 @@ function defaultVoiceFor(id,model){
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
-  woodsman:{h:1.36}, huntress:{h:1.3}, peasant:{h:1.34}, peasant_woman:{h:1.28},
-  adventurer:{h:1.3}, adventurer_woman:{h:1.24}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, villager:{h:1.22}, witch:{h:1.3}, wizard:{h:1.28},
+  peasant:{h:1.34}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, wizard:{h:1.28},
+  // The main people are Meshy models made from JRPG concept art (tools/fal-character.py, 2026-10-25);
+  // the old Quaternius ones stay as <name>_classic.
+  swordswoman:{dir:'meshy',h:1.3,v:'20261025a'}, sorceress:{dir:'meshy',h:1.32,v:'20261025a'}, huntress:{dir:'meshy',h:1.3,v:'20261025a'}, villager_woman:{dir:'meshy',h:1.24,v:'20261025a'},
+  swordsman:{dir:'meshy',h:1.36,v:'20261025a'}, wanderer:{dir:'meshy',h:1.36,v:'20261025a'},
+  adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261025a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261025a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.24,v:'20261025a'},
+  villager:{dir:'meshy',file:'villager_woman',h:1.24,v:'20261025a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261025a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261025a'},
+  woodsman_classic:{file:'woodsman',h:1.36}, huntress_classic:{file:'huntress',h:1.3}, peasant_woman_classic:{file:'peasant_woman',h:1.28},
+  adventurer_classic:{file:'adventurer',h:1.3}, adventurer_woman_classic:{file:'adventurer_woman',h:1.24}, villager_classic:{file:'villager',h:1.22}, witch_classic:{file:'witch',h:1.3},
   skeleton:{dir:'meshy',h:1.3,v:'20261024a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261024a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261024a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
   troll:{dir:'meshy',h:2.15,v:'20261024a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261024a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261024a'}, orc_classic:{file:'orc',h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{file:'rat',h:.62,tint:[.62,.6,.62]},   // the wolf file's skinning is broken in Babylon: a big grey rat stands in bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
