@@ -87,5 +87,6 @@
       "y": 1.4
     }
   ],
-  "goal": null
+  "goal": null,
+  "wallHeight": 2
 }

@@ -59,5 +59,6 @@
     "R": "carpet",
     "h": "chest on stone"
   },
-  "goal": null
+  "goal": null,
+  "wallHeight": 2
 }
