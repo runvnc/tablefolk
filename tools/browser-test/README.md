@@ -52,7 +52,7 @@ node agenttest.mjs evals/shop-role.json evals/shop-role.txt 3 --base=http://loca
 Loads `<base>/app/?norender=1` fresh, waits for the cached model (never
 approves a download), plays the scenario file with the tactics file (the
 Scenario pane's format, plus `act:` lines and per-tactic `win:`/`lose:`, see
-docs/SCENARIOS.md section 7) and prints every turn: what the player said,
+the scenario skill's `reference/links-and-testing.md`) and prints every turn: what the player said,
 what the character said and the commands it ran. `--prompts` keeps the full
 prompt of each turn in the saved JSON (`results/agent-<name>-<ts>.json`).
 `--render` plays it with the 3D scene drawing too, cheaply: light quality

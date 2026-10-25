@@ -1,4 +1,4 @@
-# Skills
+# Skills and roles
 
 Skills make Tablefolk extensible the way asset packs do for models: a
 character "has the skill Magic", so it gets a `cast` command, a spell list,
@@ -166,7 +166,7 @@ what a character's job is, what it can do, and what things look like.
 - **GitHub**: tag a release; reference `gh:user/repo@tag/path`.
 
 Skills and roles can also travel inside a package (`tablefolk.json`)
-with models, workflows and code: docs/PACKAGES.md, which also covers how
+with models, workflows and code: [packages.md](packages.md), which also covers how
 they are found (the official list, npm, GitHub) and the trust rules for code.
 
 ## Ideas next

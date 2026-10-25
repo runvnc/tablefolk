@@ -132,7 +132,7 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
   the buyer's agreement (for every seller, role or not): otherwise
   `sell()` makes an offer, and the player gets a buy / no thanks card.
 - Roles are packages now (`roles/<name>/role.json`, loadable by URL, npm or
-  GitHub like skills, docs/SKILLS.md), and selling is the `trade` skill
+  GitHub like skills; scenario skill, `skills-and-roles.md`), and selling is the `trade` skill
   (`skills/trade/skill.json`, rules in `app/trade.js`): any character with
   it shows its wares and reads offers, not only a shopkeeper. Food comes
   from asset packs too (items tagged `food`, with `nourish`) and a
@@ -153,8 +153,8 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
   key is in the well" z 2.5. A character's own `knows` are always on the
   card; a short lore list (3 or fewer) whole, best first. Off in the
   Graphics pane ("smart memory"); keyword-only until it has loaded.
-- Not yet: roles starting workflows on cue, schedules, relationships
-  between characters.
+- Not yet: roles starting workflows on cue, schedules. (Opinions between
+  characters were added on 2026-10-24.)
 
 ## Order of work
 

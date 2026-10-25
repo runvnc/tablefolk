@@ -1,8 +1,9 @@
 /* tablefolk.world scenarios: shareable little games built on the sandbox.
  * Format, map description language, deterministic layout engine, goal
  * checker, #s= link encoding, banner/end screen and the 🎯 Scenario pane.
- * Design notes: docs/SCENARIOS.md. Needs the scenario hooks in
- * window.tablefolk (app.js installWorldAPI). */
+ * Reference: the scenario skill's chapters
+ * (plugins/tablefolk-scenario/skills/tablefolk-scenario/reference/).
+ * Needs the scenario hooks in window.tablefolk (app.js installWorldAPI). */
 (() => {
   'use strict';
   const W = () => window.tablefolk;
@@ -891,6 +892,7 @@
       base: ['island', 'clearing', 'dungeon', 'plain'].includes(s.base) ? s.base : 'plain', walls: ['block', 'modern', 'stone'].includes(s.walls) ? s.walls : 'tabletop',
       wallHeight: Number.isFinite(+s.wallHeight) && +s.wallHeight > 0 ? Math.min(4, Math.max(.25, +s.wallHeight)) : null,
       pathfinding: s.pathfinding !== false, campfire: s.campfire == null ? null : !!s.campfire,
+      roofs: typeof s.roofs === 'boolean' ? s.roofs : null,   // roofs.js: on/off over the default
       earshot: Number.isFinite(+s.earshot) && +s.earshot > 0 ? Math.min(99, +s.earshot) : null,
       size: Array.isArray(s.size) && s.size.length === 2 && s.size.every(n => Number.isFinite(+n)) ? [+s.size[0], +s.size[1]] : null,
       floor: PAINT_MATS.includes(s.floor) ? s.floor : null,

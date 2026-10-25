@@ -8,7 +8,7 @@
  *                "skillParams": { "magic": { "spells": ["spark", "heal"], "mana": 12 } } }],
  *   "player": { "skills": ["magic"] }
  *
- * Where skills come from (see docs/SKILLS.md):
+ * Where skills come from (see the scenario skill, reference/skills-and-roles.md):
  *   magic                    built-in: <app>/../skills/magic/skill.json
  *   https://.../skill.json   any URL (CORS)
  *   npm:pkg@1.2              npm through jsDelivr: cdn.jsdelivr.net/npm/pkg@1.2/skill.json

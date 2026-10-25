@@ -1,18 +1,22 @@
 ---
 name: tablefolk-scenario
-description: Create, edit and share tablefolk.world scenarios - small 3D worlds where in-browser LLM characters (Gemma, WebGPU) talk and act, described as JSON and shared as a #s= link. Use when the user wants a tablefolk.world map, scene, game, puzzle or roleplay ("make a tablefolk map with a shopkeeper and a dragon", "a tavern where X and Y argue"), wants to decode or change a scenario link, or wants to run tablefolk.world locally.
+description: Create, edit and share tablefolk.world scenarios - small 3D worlds where in-browser LLM characters (Gemma, WebGPU) talk and act, described as JSON and shared as a #s= link. Use when the user wants a tablefolk.world map, scene, game, puzzle or roleplay ("make a tablefolk map with a shopkeeper and a dragon", "a tavern where X and Y argue"), wants to decode or change a scenario link, or wants to run tablefolk.world, its world builder or server locally.
 ---
 
 # tablefolk.world scenarios
 
-A scenario is a JSON object: a base map, objects, one or more LLM characters,
-the commands they may use, and an optional goal. The JSON is compressed into the
-URL hash (`#s=...`), so **the link is the scenario**: no server, nothing to upload.
-Opening the link builds the world and starts it.
+A scenario is a JSON object: a map, objects, one or more LLM characters, the
+commands they may use, and an optional goal. The JSON is compressed into the
+URL hash (`#s=...`), so **the link is the scenario**: no server, nothing to
+upload. Opening the link builds the world and starts it.
 
 Typical job: the user describes a scene → you write the JSON → run
-`scripts/scenario_link.py encode` → hand the user the link (and save the JSON
-next to it so it can be edited later).
+`scripts/scenario_link.py encode` → hand the user the link the script printed
+(and save the JSON next to it, e.g. `scenarios/<slug>.json`, so it can be
+edited and re-encoded).
+
+This file is the overview. The details are in `reference/`, one chapter per
+topic: read only the chapters the job needs (table below).
 
 ## Run the app
 
@@ -22,13 +26,13 @@ cd tablefolk
 bun server/server.js 8000               # serves http://localhost:8000/app/
 ```
 
-- Needs desktop Chrome or Edge with WebGPU. The first time a character speaks,
-  the page asks before downloading the model (Gemma 4 E2B, ~2 GB, cached
-  afterwards in the browser).
-- A link works on any host serving the app; `scenario_link.py --base` sets it
-  (default `http://localhost:8000/app/`).
+- Needs desktop Chrome or Edge with WebGPU. The first time a character
+  speaks, the page asks before downloading the model (Gemma 4 E2B, ~2 GB,
+  cached afterwards). Never approve the download on the user's behalf.
 - Open links in the user's own browser (`xdg-open`, `open`, `start`) or just
-  print them. Never approve the model download on the user's behalf.
+  print them.
+- `/world/<prompt>` on the server writes a whole world from a prompt
+  ([reference/world-builder.md](reference/world-builder.md)).
 
 ## Make a link
 
@@ -36,487 +40,78 @@ bun server/server.js 8000               # serves http://localhost:8000/app/
 python3 scripts/scenario_link.py encode scene.json                 # prints the link
 python3 scripts/scenario_link.py encode scene.json --base https://example.com/app/
 python3 scripts/scenario_link.py decode '<link>'                   # back to JSON
-python3 scripts/scenario_link.py encode scene.json --html scene.html   # + a page that opens it (double-click)
+python3 scripts/scenario_link.py encode scene.json --html scene.html   # + a page that opens it
 ```
 
-`encode` prints warnings for obvious mistakes. Layout problems (an unknown word
-in a map line, a placement that had to be relaxed) only show in the app, in the
-🎯 Scenario pane's "layout notes".
+`encode` prints warnings for obvious mistakes; layout problems show only in
+the app's 🎯 Scenario pane ("layout notes").
 
-In the app, the 🎯 **Scenario** pane is the editor: example picker, JSON box,
-map-lines box, seed / re-roll, **Play**, **Copy link**, **From current world**
-(exports whatever you built in the sandbox, with exact positions) and
-**Generate** (the loaded model writes map lines from a one-line description).
+## A small scenario
 
-## Format
-
-```jsonc
+```json
 {
-  "v": 1,
-  "title": "The Stubborn Shopkeeper",
-  "subtitle": "",                  // banner text for open scenarios (no goal)
-  "intro": "Mog runs the only shop on the island.",   // shown on load
-  "seed": 7,                       // layout randomness; same JSON + seed = same map
-  "base": "plain",                 // plain (blank board, default) | island | clearing | dungeon
-  "size": [23, 17],                // board cells [cols, rows], odd, 5-63 (default 23x17)
-  "lighting": "bright",            // or "night", "dim" (night at half ambient)
-  "dark": true,                    // fog of war + carried torches (generated dungeons: default true)
-  "walls": "tabletop",             // or "stone" (natural rock walls), "modern" (painted panels), "block"
-  "wallHeight": 2,                 // optional wall height multiplier (default 1; 2 = twice as tall)
-  "floor": "stone",                // optional: paint the whole floor (materials below)
-  "campfire": true,                // island: false drops its campfire; plain: true adds one
-  "pathfinding": true,             // false: walks go straight and stop at walls (maze puzzles)
-  "earshot": 6,                    // characters hear/see each other within this many cells
-  "safety": false,                 // true: crisis-line banner if a message mentions self-harm
-  "player": { "name": "Traveller", "gold": 20, "items": [], "at": [0, 3] },
-                                   // + "avatar": false, "model": any body below (e.g. adventurer)
-  "allowed": ["say", "sell", "inventory", "emote"],   // default commands for every character
+  "v": 1, "title": "The Stubborn Shopkeeper", "seed": 7, "size": [15, 11],
+  "intro": "Mog runs the only shop in the village.",
+  "player": { "name": "Traveller", "gold": 20 },
+  "allowed": ["say", "walk", "emote", "give", "sell", "inventory"],
   "agents": [{
-    "id": "mog",                   // 1-24 chars [A-Za-z0-9_-]; also the name used in map lines
-    "allowed": ["say", "sell"],    // optional: this character's own commands (replaces the default)
-    "personality": "a grumpy shopkeeper. The magic sword costs 50 gold, never below 40.",
-    "quest": "",                   // optional private aim
-    "model": "villager",             // critter (default); people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer
-                                     // villager witch wizard; monsters: skeleton skeleton_warrior zombie goblin
-                                     // kobold orc troll skeleton_farmer rat spider wolf bat ghost slime demon giant dragon; older chibi
-                                     // people: woman rogue knight mage ranger barbarian
-    "hostile": false,                // true: fights the player with a built-in routine, no LLM (default true
-                                     // for mindless monsters: skeletons, zombie, rat, spider, wolf, bat, slime...)
-    "style": "grumpy old shopkeeper",   // what the character is, for its prompt
-    "inventory": { "gold": 0, "items": [{ "name": "magic sword", "qty": 1 }] },
-    "at": [0, -3], "facing": "s",  // optional; or place it with a map line
-    "ttsVoiceId": "builtin:jean",  // alba azelma cosette eponine fantine javert jean marius
-    "thinking": false, "showThoughts": true,
-    "chaos": 10,                   // 0-100 randomness
-    "fireballTemptation": 0        // 0-100, only matters with spell.fireball allowed
+    "id": "mog", "model": "villager", "role": "shopkeeper", "style": "grumpy old shopkeeper",
+    "personality": "Mog, the grumpy shopkeeper. You complain about the weather. You never give discounts to people who are rude.",
+    "inventory": { "items": ["magic sword", { "name": "healing potion", "qty": 3 }] },
+    "prices": { "magic sword": [50, 18], "healing potion": 8 }
   }],
-  "objects": [{ "type": "barrel", "x": 2, "z": 1 }],   // exact positions; "ry" (radians) turns it, notes take "text"
-  "paint": [{ "x": 0, "z": 0, "mat": "water" }],        // exact floor tiles
-  "packs": ["https://example.com/my-pack/pack.json"],  // optional extra asset packs (below)
-  "map": [                                             // or let the layout engine place things
+  "map": [
+    "floor wood",
     "place counter against north_wall",
     "place mog behind counter",
     "place barrel x3 beside counter",
     "place note \"No refunds\" in_front_of counter"
   ],
-  "goal": {                        // omit (or null) for an open scenario that never ends
-    "text": "Get the magic sword. You only have 20 gold.",
-    "win":  { "player_has": "magic sword" },
-    "lose": { "turns_over": 12 },  // or "maxTurns": 12
-    "winText": "Mog grumbles and hands it over.",
-    "loseText": "Mog closes the shop for the day.",
-    "score": "player_gold"         // player_gold | turns | turns_left | agent_gold:<id>
-  }
+  "goal": { "text": "Get the magic sword. You have 20 gold.",
+            "win": { "player_has": "magic sword" }, "lose": { "turns_over": 12 } }
 }
 ```
 
-The personality is the character's whole brief, and the models are small:
-write it in plain second-person-friendly sentences, state hard facts (prices,
-secrets, what it will and won't do) explicitly, and mention commands by name
-when the character should use them ("Use give() to hand something over.").
+Four ways to make the map, combinable: an ASCII `grid` (exact rooms), map
+lines (`map`, quick natural scenes), explicit `objects` / `paint`, and
+`generate` (a whole procedural dungeon or village, fastest for big places).
 
-### The board and coordinates
+## Chapters (`reference/`)
 
-The world is a board of 1x1 tiles standing in the sea, `"size": [cols, rows]`
-cells (odd numbers). Cells run from -(cols-1)/2 to (cols-1)/2 in x and
-likewise in z, around the centre (0, 0); with the default 23 x 17, x -11..11
-and z -8..8. Grid cell (row r, column c) of a centred grid R rows x C columns
-is x = (C-1)/2 - c, z = r - (R-1)/2. `sea` cells are holes: that's how you
-draw coasts and islands.
-**north = -z, south = +z, east = -x, west = +x.** The player starts at the
-south by default. Wide items (`table bench workbench desk sofa`) take two
-cells, a house about 2x2.
-
-`base: "island"` gives a ready island (grass, trees, house, boulders, fence,
-lantern, campfire, flowers, lily pads) as ordinary objects to build on;
-`"clearing"` the same land with only the campfire; `"dungeon"` a stone floor
-and a ring of walls. The default `"plain"` is the blank board.
-
-The island base is this 15 x 13 grid, centred (`,` grass, `-` sea; `%` tree,
-`H` house about 2x2 at (4,-1), `X` campfire at (0,0), `j` lantern at (3,1),
-`f` fence, `r` boulder, `*` flowers, `;` tuft, `q` lily pad):
-
-```
----------------    z = -6 (north)
-----,,,,,,-----
---,%,,%,,,,%,--
--,,,,,,*,,,,,%-
--%,;,,,,,,;,,,-
--,,H,,,,,,,r,,-
--,,,,,,X,,,,,%-    z = 0
---,,j,,,,,,,,,-
--%,,,,,,,*,,,--
--,,ffff,,,,,%,-
---,,,;,,r,,,,--
----%,,,,,,,----
-------q----q---    z = 6 (south); x = 7 (west, left) .. -7 (east, right)
-```
-
-With a bigger `size` the board grows and the island stays in the middle;
-**every cell outside it is already sea**, so you only draw what you add.
-
-### Layers (later wins on each cell)
-
-1. **base**: its sea, grass floor and objects;
-2. **grid**: every glyph you draw replaces the base's floor on that cell (draw
-   `,` grass or `=` wood on base sea to make land, jetties, islets; `-` turns
-   land into sea), and its objects are added; `.` leaves the cell as it was.
-   Nothing removes base objects except a `"plain"` base;
-3. **`objects`** and **`paint`**, explicit;
-4. **map lines**, laid out on what is left (free land cells only).
-
-### Islets and getting around
-
-Draw islets in the grid (land glyphs in the sea, at the right offset from the
-island, see the sketch above). Walking onto sea is a fall, so **connect islets
-with `=` wooden jetties** if the player should walk there. Chat reaches a
-character at any distance, but `give` and `sell` need the player within 3
-cells. Lily pads go on sea: `q` in the grid ("lily_pad on sea"), or
-`{"type": "lily_pad", "x": .., "z": ..}` on a sea cell.
-
-```jsonc
-// 31 x 21 archipelago on the island base: an islet to the east with a jetty
-"base": "island", "size": [31, 21],
-"grid": [ /* 21 rows of 31; only these rows differ from all '.' */ ],
-// row 10 (z = 0): "....................=====,2,,,."
-//   columns 20-24 are a jetty from the island's east coast (x -5..-9),
-//   25-29 an islet with agent 2 on it (x -10..-14); all other rows '.'.
-```
-
-A character with no `at`, grid digit or `place` line is put near the middle.
-Grid digits are the agents in order: reordering `agents` moves them.
-
-### Objects (`objects[].type` and map-line things)
-
-- props: `crate barrel mushroom lamp wall door note`, `counter` (a row of three walls). A door
-  fills a wall cell (put `+` in a wall run in the grid): a person-height wooden leaf with the
-  wall carried over the top; it swings open as anyone approaches, so doorways stay passable.
-- items: `chest table bench stool workbench cauldron anvil weapon_stand axe
-  pickaxe bucket bag potion scroll coin_pile apple_crate carrot_crate`. Loot:
-  `chest` and `iron_chest` take `"gold"` and `"items"` (the player opens them
-  with E and takes it all); `coin_pile` takes `"gold"` and is picked up by
-  walking over it; potions, scrolls and tools are picked up with E.
-- village: `well market_stand market_stalls cart broken_cart tent logs bed
-  double_bed bookcase banner wall_banner target dummy pumpkin statue torch
-  iron_chest fantasy_house stable windmill watch_tower bell_tower`
-  (bookcases and wall banners turn their backs to an adjacent wall; `house`,
-  `fantasy_house` and `stable` become buildings to walk into, 5x5, 6x5 and
-  7x5 squares with their walls round the object's square, the door on the
-  front, south at `ry` 0, furnished unless things are placed inside)
-- dungeon dressing: `candelabra candles cabinet lectern cage chains
-  wooden_chair nightstand apple_barrel pot vase broken_pot iron_crate`, and
-  `key chalice rope`, which the player picks up with E
-- modern: `desk office_chair armchair sofa coffee_table floor_lamp plant
-  bookshelf` (front faces south; `ry` turns them)
-- outdoors: `tree house boulder campfire lantern fence signpost` (solid),
-  `flowers grass_tuft lily_pad` (decoration: no collision, characters don't
-  see them; lily pads float on sea cells), `fence` is one cell along x (`ry`
-  1.5708 turns it north-south)
-- `light`: an invisible point light, `{"type": "light", "x": 2, "z": -1,
-  "color": "#ffb060", "intensity": 3, "range": 6, "y": 2}`. Campfires
-  (orange, intensity 8, range 6) and lanterns (warm, 1.35, range 6) light
-  themselves. `place light ...` in a map line gets the defaults (warm white,
-  intensity 3, range 6, 2 up); for colours, put lights in `objects`.
-
-The list above is complete for the built-in types. Of them, the model-based
-ones (items, tree, house, boulder, flowers, grass_tuft) are defined in the core
-pack, `assets/pack.json` (sizes, aliases). More types come from extra **asset
-packs**: a folder with a `pack.json` (glTF/GLB files plus size, physics and
-aliases per item, paths relative to the manifest) on any static host with
-CORS. List them in `"packs"`; their types (and aliases) then work everywhere a
-built-in type does: `objects`, map lines (`place big_anvil near table`), grid
-`legend` values, goals. Items 1.3 or more wide take two cells (two equal
-glyphs in a grid; `place` handles it). A relative pack URL resolves against the
-app's assets folder; an absolute URL must be reachable wherever the link is
-opened (a `localhost` pack only works locally). Format: `docs/SCENARIOS.md`
-section 4c; minimal example: `tools/browser-test/test-pack/pack.json`.
-
-### Floor materials (`floor`, `paint`, map `paint`)
-
-`stone flagstone dirt wood sand grass water lava` and modern `oak tile
-concrete carpet`. Water and lava block walking and placement. `sea` removes
-the tile (a hole to the sea; walking onto it is a fall).
-
-### Commands (`allowed`)
-
-`say walk face look touch push pull carry drop throw dig build repair panic
-emote note give give_quest sell inventory goal whisper attack wield workflow spell.push
-spell.spark spell.fireball`. Allow only what the scene needs: fewer choices make small
-models behave. The top-level `allowed` is every character's default; an agent's
-own `"allowed"` list replaces it for that character (a guard who can only
-`say` and `face`, a mage with `spell.spark`, a merchant with `sell`). `say` is almost always wanted; add `walk` for movement, `give`
-/ `sell` / `inventory` for trading, `emote` for flavour.
-`whisper` is speech only the player hears; characters only hear and see each
-other within `earshot` cells, and overhear what the player says to someone
-else nearby. `give` needs the player within 3 cells. Together these make
-secrets, hand-overs out of a guard's sight, and "lure him away" plans work.
-
-Trading: `give(item)` hands over an item the character has; `sell(item, price)`
-sells it for `price` gold, which the character chooses (haggling is just
-conversation: state the floor price in the personality). Either way the item
-lands in the player's inventory, so `player_has` sees it.
-
-## Combat (`attack`, `wield`, hit points)
-
-Everyone has hit points: agent `"hp"` (default 10), `"player": {"hp": 12}`.
-`"wield": "iron sword"` on an agent or the player puts a weapon in hand from
-the start (added to the inventory if missing). Commands: `wield(item)` holds a
-weapon from the inventory (`wield(none)` puts it away), `attack(target)` (an
-agent id or `player`) strikes someone next to you: fists 1, dagger/club/staff
-2, sword/axe/mace/spear 3, greatsword/warhammer 4, plus a small roll, 15%
-misses. At 0 a character is defeated: it falls and stops acting. The struck
-character and anyone within earshot hear about it at once. The player fights
-from the chat box: `/attack grub`, `/wield sword`, or F for the nearest foe.
-Goal predicates: `{"agent_defeated": "grub"}`, `{"agent_hp": ["grub", "<=", 3]}`,
-`{"player_hp": ["<", 5]}`, `{"player_defeated": true}` (a good `lose`).
-Allow `attack` only for characters who should fight, and say in the
-personality when they do ("If insulted twice, attack(player).").
-
-## Skills (installable abilities)
-
-`"skills": ["magic", "thievery"]` loads skill packages; give them to
-characters with `"skills": [...]` on an agent (or the player) and tune them
-with `"skillParams"`. Built in: `magic` (`cast(spell, target)`: spark,
-fireball, heal, light, push, frost; mana), `healing` (`bandage(target)`),
-`thievery` (`steal(target)`), `bard` (`sing(rest|courage)`), `trade`
-(selling with prices, a lowest price and the buyer's agreement). A skill's
-commands are allowed automatically for whoever has it.
-
-```json
-"skills": ["magic"],
-"agents": [{ "id": "vexa", "skills": ["magic"],
-  "skillParams": { "magic": { "spells": ["spark", "fireball", "heal"], "mana": 12 } }, "personality": "..." }]
-```
-
-More skills come from URLs, `npm:<package>@<version>` or
-`gh:<user>/<repo>@<tag>/<dir>` (a folder with `skill.json`); writing one:
-`docs/SKILLS.md` in the repository.
-
-## Roles (jobs, no code)
-
-`"role"` on an agent gives it a job: a duty line, the commands and skills
-it needs. Built in: `shopkeeper` and `innkeeper` (the trade skill: wares
-and prices are put in front of the model each turn, and `sell()` needs the
-buyer's agreement), `guard`, `quest_giver`, `companion` (follows the
-player by itself), `villager`. Sellers take `"prices"`: asking price, or
-`[asking, lowest]`.
-
-```json
-"agents": [{ "id": "mog", "role": "shopkeeper", "personality": "gruff orc trader",
-  "inventory": { "items": ["magic sword", { "name": "healing potion", "qty": 3 }] },
-  "prices": { "magic sword": [50, 40], "healing potion": 8 } }]
-```
-
-Characters also keep their own feelings, hunger, memories and goals (the
-game tracks them; `"needs": false` turns hunger off, `"lore"` lists world
-facts they may know, an agent's `"backstory"` and `"knows"` its own).
-
-## Packages (shared content)
-
-`"packages": ["smithy", "npm:tablefolk-smithy@1"]` loads a package
-(`tablefolk.json`): object types, skills, roles, workflows and code in one.
-After that its roles and skills are used by id (`"role": "blacksmith"`) and
-its items by type in the map. Built-in example: `smithy` (a `blacksmith`
-role, `smithing` skill with `forge(thing)`, `smith_anvil` and `bellows`
-objects). Format and publishing: `docs/PACKAGES.md` in the repository.
-
-## Workflows (keep small models on track)
-
-A workflow breaks a task into steps; the character's model only answers one
-narrow question at a time, and the steps decide what happens next. Put them
-in `"workflows"` and either start one on an agent (`"workflow": "haggle"`,
-it runs from the start) or allow the `workflow` command so the character can
-start one itself (`workflow(haggle, 30)`; `"workflows": ["haggle"]` on an
-agent limits which).
-
-```json
-"workflows": {
-  "haggle": {
-    "description": "sell the magic sword for a fair price",
-    "steps": [
-      { "id": "wait", "await": "speech", "save": "said" },
-      { "prompt": "The customer said: \"{{said}}\". How many gold coins did they offer? Answer 0 if none.", "parse": "number", "save": "bid" },
-      { "if": "bid >= 40", "then": "deal", "else": "counter" },
-      { "id": "counter", "prompt": "Refuse {{bid}} gold in one short grumpy sentence and ask for 50.", "parse": "line", "save": "reply" },
-      { "command": "say(\"{{reply}}\")", "goto": "wait", "max": 4, "exit": "giveup" },
-      { "id": "deal", "command": "sell(\"magic sword\", {{bid}})", "end": true },
-      { "id": "giveup", "command": "say(\"Bah. Come back with real money.\")", "end": true }
-    ]
-  }
-}
-```
-
-Steps: `prompt` (+ `parse`: text, line, number, yesno, word; `save`),
-`choose` (`{"choose": "Fight or flee?", "options": {"fight": "s1", "flee":
-"s2"}}`), `if` (`==` `!=` `>=` `<=` `>` `<` `contains`, `then`/`else`),
-`command` (any command line; takes the character's turn), `await`
-(`"speech"`: the next words or event addressed to it; `"turns"` with
-`"turns": N`), `set` (`{"set": {"tries": "{{tries}}+1"}}`), and `goto`,
-`end`, `max` + `exit` on any step. Templates: `{{var}}`, `{{me}}`,
-`{{player}}`, `{{input}}`. Tested with Gemma 4 E4B: greets, counters a low
-offer, sells at 42 (`scenarios/haggle-workflow.json`).
-
-## Generated dungeons and villages (`generate`, fastest)
-
-Let the app build the whole map from a seed, and say which place each
-character belongs in:
-
-```json
-{
-  "v": 1, "title": "The Sorceress Below", "seed": 7,
-  "generate": { "kind": "dungeon", "rooms": 9 },
-  "agents": [
-    { "id": "vexa", "model": "mage", "style": "proud sorceress", "in": "throne", "personality": "..." },
-    { "id": "grub", "style": "goblin guard", "personality": "..." }
-  ],
-  "objects": [{ "type": "chest", "in": "treasure" }]
-}
-```
-
-- `"kind": "dungeon"`: rooms joined by corridors, walls only around floors,
-  the sea outside (`"outside": "table"` keeps the bare board). Options:
-  `"rooms"` (3-16), `"size": [cols, rows]`, `"boss": "throne" | "lair"`.
-  Doorways get `+` doors and walls default to `"wallHeight": 2` (set
-  `"wallHeight": 1` for low tabletop walls).
-  Places: `entrance` (the player starts here), `throne`, `lair`, `treasure`,
-  `library`, `shrine`, `barracks`, `storage`, `kitchen`, `prison`, `crypt`,
-  `alchemy`, `room N`. Night lighting; dark (fog of war) unless `"dark": false`, with crypts,
-  prisons, storerooms, lairs and plain rooms unlit (the player's torch shows
-  them) and a light in every other room.
-- `"kind": "village"`: crossing roads, a flagstone `square` (the player starts
-  here) with a campfire and signpost, buildings with their doors onto the
-  roads. Options: `"buildings"` (3-14), `"size"`. Places: `tavern`, `smithy`,
-  `shop`, `temple`, `alchemist`, `guardhouse`, `library`, `stable`,
-  `house N` (or `house` for any), `square`, `pond`, `garden`.
-- `"in"` on an agent, an object, or the player puts it in that place (any
-  place named in `"in"` is always built). An agent with neither `"at"` nor
-  `"in"` goes where its id/style/personality suggests: goblins and monsters to
-  the lair, rulers and sorcerers to the throne room, guards to barracks,
-  priests to the shrine/temple, smiths to the smithy, innkeepers to the
-  tavern, merchants to the shop...
-- Same seed, same map. Change `"seed"` for another layout. `"walls"` defaults
-  to `"stone"` here; `"lighting"`, `"grid"`, `"legend"`, more `"objects"` and
-  `"goal"` all work as usual (a `"grid"` replaces the generated one).
-
-## ASCII grid (exact rooms, easiest to write)
-
-```jsonc
-"grid": [
-  "#########",
-  "#KK...v.#",
-  "#.tt..F.#",
-  "#.1...F.#",
-  "#RRR..2.#",
-  "#x..N.~~#",
-  "#..Y..~~#"
-],
-"legend": { "R": "carpet", "x": "chest on stone", "N": "note \"Quiet please\"" }
-```
-
-One glyph per cell, **top row = north, left = west**, centred on the board;
-odd sizes centre exactly. Without `"size"` the board is the grid plus two cells
-on every side (or exactly the grid if its outer ring is all `-` sea). `.` =
-empty. Defaults: floors `~` water (a pond) `,` grass `:` dirt `^` stone `&`
-lava `=` wood `_` oak, `-` sea (a hole); outdoors `%` tree `H` house `r`
-boulder `X` campfire `f` fence `I` signpost `j` lantern `*` flowers `;`
-grass_tuft `q` lily_pad; objects `#` wall `+` door `C` crate `B` barrel
-`M` mushroom `L` lamp `N` note `h` chest `w` workbench `t` table `n` bench `s`
-stool `o` cauldron `a` anvil `W` weapon_stand `/` axe `p` pickaxe `u` bucket `b`
-bag `P` potion `S` scroll `$` coin_pile `D` desk `c` office_chair `A` armchair
-`F` sofa `T` coffee_table `l` floor_lamp `v` plant `K` bookcase; `1`-`9` = the
-agents in order; `Y` = player. `legend` maps extra glyphs to an object, a
-material, an agent id, `"<thing> on <material>"` or `note "text"`. Wide items
-(`table bench workbench desk sofa`) use two equal glyphs side by side (`tt`) or
-stacked (turned). Things needing rotation go in `objects` with `ry`. Grid,
-`objects` and `map` lines combine (grid first). Prefer the grid for rooms and
-buildings; use map lines for loose, natural scatter.
-
-## Map lines (layout engine)
-
-```
-place <thing> [xN] [row|cluster|scattered] [<placement>]
-paint <material> [xN] [<placement>]
-path from <ref|area> to <ref|area>        ("stone path from ...")
-floor <material>
-```
-
-- placement: `at center|north|south|east|west|northeast|northwest|southeast|southwest|random`,
-  `against north_wall` (any edge), `beside X`, `near X`, `behind X`, `in_front_of X`, `around X`
-- X is anything placed earlier, an agent id, `player`, `house` or `campfire`
-- `place <agent id> ...` positions a character; `place player ...` the avatar
-- unknown words are ignored and reported; impossible placements are relaxed,
-  never fatal. Change `seed` to re-roll a layout.
-
-Use explicit `objects` for rooms that must look exact (walls, a furnished
-office); use map lines for quick, natural-looking scenes. They can be mixed:
-explicit objects go first and the layout engine works around them.
-
-## Goals
-
-Predicates are plain JSON (a link can't run code):
-
-| predicate | example |
+| chapter | read it for |
 |---|---|
-| `player_has` | `"magic sword"` or `["magic sword", 2]` |
-| `player_gold` | `[">=", 10]` |
-| `agent_has` | `["mog", "magic sword"]` |
-| `agent_gold` | `["mog", ">=", 30]` |
-| `agent_near` | `["mog", "campfire", 1.5]` (target: agent, object type, scenery or `[x, z]`) |
-| `object_near` | `["barrel", "house", 2]`; `["barrel", "campfire", 2, 2]` = at least 2 |
-| `object_count` | `["barrel", "<", 3]` |
-| `prop_state` | `["crate", "burned"]` |
-| `said` | `["mog", "deal"]` (substring; `"any"` = anyone) |
-| `turns_over` | `12` (one character reply = one turn) |
-| `agent_defeated` | `"grub"` |
-| `agent_hp` / `player_hp` | `["grub", "<=", 3]` / `["<", 5]` |
-| `player_defeated` | `true` |
-| combinators | `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` |
+| [format.md](reference/format.md) | every field of the JSON: top level, the player, characters, bodies (`model`), a full open-ended example |
+| [board.md](reference/board.md) | size and coordinates (north = -z, east = -x), base maps and the island sketch, layers, islets and jetties, floors, walls and `wallHeight`, light, darkness, roofs |
+| [grid.md](reference/grid.md) | the ASCII grid: glyph table, legend, wide items, export |
+| [map-lines.md](reference/map-lines.md) | the `place` / `paint` / `path` language and how the layout engine places things |
+| [generated.md](reference/generated.md) | `generate`: dungeons and villages, room and building kinds, `in`, auto-placement by role, fixed layouts |
+| [things.md](reference/things.md) | the object catalogue and where the lists live, walk-in buildings, notes, loot, locked doors, asset packs |
+| [characters.md](reference/characters.md) | commands (`allowed`), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
+| [combat.md](reference/combat.md) | hit points, weapons, hostile monsters and talking enemies, looting bodies |
+| [living.md](reference/living.md) | worlds that live on their own: `live`, `pace`, the director and `events`, writing personalities for it, showcase worlds |
+| [goals.md](reference/goals.md) | win / lose predicates and scores |
+| [workflows.md](reference/workflows.md) | step-by-step routines that keep small models on track |
+| [skills-and-roles.md](reference/skills-and-roles.md) | skills (magic, trade...) and roles (shopkeeper, guard...): using and writing them |
+| [packages.md](reference/packages.md) | `tablefolk.json` packages (items, skills, roles, workflows, code), finding and publishing them |
+| [links-and-testing.md](reference/links-and-testing.md) | links, the Scenario pane, the example scenarios, testing tactics |
+| [playing.md](reference/playing.md) | the app for players: controls, cameras, panes, dev mode, brains, voices, URL flags, the tabletop view |
+| [world-builder.md](reference/world-builder.md) | `/world/<prompt>`: where the model runs, the map editor, AI changes, tiles |
+| [server.md](reference/server.md) | running the Bun server: settings, routes, the admin page, visitor limits, local models |
 
-Item names match loosely ("potion" matches "healing potion").
-
-## Example: two characters, open-ended
-
-```json
-{
-  "v": 1, "title": "The Last Ferry", "seed": 4, "base": "clearing", "lighting": "night",
-  "intro": "The last ferry left an hour ago. Two strangers wait at the dock with you.",
-  "subtitle": "Find out who they are.",
-  "player": { "name": "Traveller", "gold": 5, "items": [] },
-  "allowed": ["say", "walk", "emote", "give"],
-  "agents": [
-    { "id": "ines", "model": "woman", "style": "tired ferry clerk", "ttsVoiceId": "builtin:fantine",
-      "personality": "Ines, the ferry clerk. You missed your own ferry home and are annoyed about it, but you are kind to travellers. You know Bram is lying about being a fisherman." },
-    { "id": "bram", "model": "rogue", "style": "nervous man in a wet coat", "ttsVoiceId": "builtin:javert",
-      "personality": "Bram. You say you are a fisherman, but you are a smuggler hiding a small chest. You change the subject when asked about the chest." }
-  ],
-  "map": [
-    "paint water x10 row against north_wall",
-    "place lamp x2 row beside water",
-    "place ines near lamp",
-    "place chest at east",
-    "place bram beside chest",
-    "place crate x3 cluster at west"
-  ],
-  "goal": null
-}
-```
-
-More examples: the 🎯 Scenario pane's example picker (shop, guard, lure,
-jailer, fire drill, maze, the Sounding Board office), whose JSON shows in the
-pane, and `scenarios/*.json` in the cloned repository (an ASCII-grid workshop,
-Low Tide with earshot and whispers, an archipelago with islets and a pack).
-The full reference is `docs/SCENARIOS.md` in the repository.
+To find one thing quickly: `grep -n '^#' reference/*.md` lists every heading;
+from the repository root, `python3 tools/docs.py <words>` prints the matching
+sections of every chapter.
 
 ## Checklist before handing over a link
 
 1. Every agent has a unique `id` and a `personality`; ids used in map lines and
    goals match exactly.
-2. `allowed` contains every command the personality or goal relies on (a goal
-   of `player_has` needs `give` or `sell`).
-3. Items a goal refers to exist in some inventory or on the map.
-4. Islets the player must reach are connected by jetties; anyone who sells
-   or gives can be reached on foot.
-5. `encode` printed no warnings (it checks agent ids in goals, commands,
-   grid digits, sizes and pack URLs, not layout; the app's 🎯 Scenario pane
-   shows layout notes). Save the JSON (e.g. `scenarios/<slug>.json`)
-   next to the link so it can be edited and re-encoded.
+2. `allowed` (or the agent's own list, role or skill) contains every command
+   the personality or goal relies on (a `player_has` goal needs `give`,
+   `sell`, a chest or a pick-up).
+3. Items a goal refers to exist in some inventory or on the map; a locked
+   door's key exists somewhere.
+4. Islets the player must reach are connected by jetties; anyone who sells or
+   gives can be reached on foot.
+5. With doors, `wallHeight` is 2.
+6. `encode` printed no warnings. Save the JSON next to the link.

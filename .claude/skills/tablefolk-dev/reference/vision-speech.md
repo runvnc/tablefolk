@@ -1,6 +1,11 @@
 # Vision and speech for Tablefolk characters
 
-Notes from October 2026: what works today, what was built, and what to try next.
+Design notes from October 2026: what was measured, what was built, and what
+to try next. **Update (2026-10-24):** characters can now see in the browser
+too: the "Gemma 4 E2B with sight" brain runs the full multimodal
+`gemma-4-E2B-it.litertlm` on the LiteRT-LM nightly with a GPU vision backend,
+and `look` sends the character's own view ([brains.md](brains.md)). Section 1
+below describes the state before that.
 
 ## 1. Gemma 4's own image and audio input
 

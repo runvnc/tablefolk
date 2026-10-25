@@ -5,7 +5,7 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 
 ## Batch of 2026-10-23, evening: characters that behave (high priority)
 
-Recorded from one long message; the plan is in `docs/MINDS.md`.
+Recorded from one long message; the plan is in `docs/MINDS.md` (now `.claude/skills/tablefolk-dev/reference/minds.md`).
 Status 2026-10-23: built (mind.js, roles.js, director, headless evals); open: EmbeddingGemma retrieval (needs approval for a ~200 MB download), roles starting workflows on cue, schedules, relationships.
 
 1. JRPG-style, dialog-driven adventure, with the LLM characters. The models are
@@ -71,7 +71,7 @@ Status 2026-10-23: built (mind.js, roles.js, director, headless evals); open: Em
    (blacksmith eval 4/4; the smith sometimes forges a second dagger it
    doesn't need, and forges without saying anything).
 4. **Finding packages:** (done) `registry/index.json` (PRs), npm keyword
-   and GitHub topic `tablefolk`, Library pane; `docs/PACKAGES.md`.
+   and GitHub topic `tablefolk`, Library pane; `docs/PACKAGES.md` (now the scenario skill's `reference/packages.md`).
    Not yet: the Library pane is dev-only; no in-game browser for players.
 
 ## Refinement hour (2026-10-23, from 16:25)

@@ -2,8 +2,9 @@
 # Local API credentials
 .env
 
-# Claude Code local config
-.claude/
+# Claude Code local config (the project skills in .claude/skills are shared)
+.claude/*
+!.claude/skills/
 
 # local Cloudflare R2 credentials
 r2.txt
@@ -17,3 +18,8 @@ generated/
 .admin/
 tools/browser-test/work/
 /work/
+
+# documentation site (docs/README.md)
+docs/node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

@@ -6,9 +6,9 @@ browser from wherever they are hosted:
 
 | Kind | File | What it brings |
 |---|---|---|
-| **asset pack** | `pack.json` | object types: models, sizes, tags (docs/SCENARIOS.md 4c) |
-| **skill** | `skill.json` | what a character can do: commands, resources, prompt lines (docs/SKILLS.md) |
-| **role** | `role.json` | a character's job: duty, commands, skills, behaviours (docs/SKILLS.md "Roles") |
+| **asset pack** | `pack.json` | object types: models, sizes, tags ([things.md](things.md#asset-packs-packs)) |
+| **skill** | `skill.json` | what a character can do: commands, resources, prompt lines ([skills-and-roles.md](skills-and-roles.md)) |
+| **role** | `role.json` | a character's job: duty, commands, skills, behaviours ([skills-and-roles.md](skills-and-roles.md#roles)) |
 | **package** | `tablefolk.json` | any mix of the above, plus workflows and code, in one download |
 
 ## Naming one
@@ -63,7 +63,7 @@ Every section is optional; paths are relative to the file.
     `uses.<name>`.
 - `skills`, `roles`: inline manifests keyed by id, or a list of paths
   (`["skills/smithing/skill.json"]`) or references.
-- `workflows`: routines (docs/SCENARIOS.md), usable by every scenario that
+- `workflows`: routines ([workflows.md](workflows.md)), usable by every scenario that
   loads the package (a scenario's own win on a name clash).
 - `modules`: code (below).
 
@@ -92,7 +92,7 @@ export default function (api) {   // api: state, meta, narrate, findTarget, comb
 - `effects`: usable in any skill's `effects` list.
 - `uses`: what E does on an item whose `use` is that name.
 
-A skill can still bring its own `module` (docs/SKILLS.md), and both follow
+A skill can still bring its own `module` ([skills-and-roles.md](skills-and-roles.md)), and both follow
 the same rule.
 
 **Trust.** Data is safe to load from anywhere, so scenario links can carry
