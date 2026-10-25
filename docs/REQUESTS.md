@@ -3,6 +3,52 @@
 The user's requests, recorded as given, with status. Newest batch first.
 Nothing here is cancelled by a later batch; a later batch only changes priority.
 
+## Batch of 2026-10-25: interiors, attractive characters, voices, models
+
+Recorded from one long message. Status 2026-10-25: recorded only, not started;
+the plan comes after the user logs into wrangler (Cloudflare).
+Ask first (see CLAUDE.md): paid fal.ai calls, model downloads, R2 uploads.
+
+### A. World builder
+
+1. **Keep the exterior model.** Dragging a building such as the stable onto the
+   builder map loses its interesting 3D model in the 3D world. Add an option
+   on the world builder screen to keep that model in the 3D world.
+2. **Interiors as subworlds.** Entering the kept building (needs a designated
+   door space) moves the player instantly into a "subworld" showing only the
+   interior. The exterior keeps the interesting architecture; the inside is a
+   detailed normal map. These are links that become part of the scenario, and
+   can also lead to dungeons and the like.
+3. **Drag without confirming.** Tiles and objects on the builder map are
+   simply dragged; no confirm dialog.
+4. **Delete without confirming, plus Undo.** Delete removes at once; add an
+   Undo feature.
+
+### B. Characters
+
+5. **Attractive human models.** The main human models are not attractive:
+   barely finished or unfinished blocky geometry. They should be a bit sexy
+   in a PG-13 way, like a Japanese RPG fighting character (a split dress or
+   similar). Options named: generate images and 3D models from images with
+   Meshy on fal.ai, and/or interactively edit the existing models.
+6. **Voices described by text.** Find the best voice generator where a voice
+   is described in text and then generated, on fal.ai if possible
+   (`FAL_API_KEY` in `.env`; `OPENROUTER_API_KEY` is also there). Give the
+   characters appropriate voices.
+
+### C. Speech in, models
+
+7. **Audio transcription options.** Review what the project offers today.
+8. **Underdog-Bark-3.0-ONNX** (`ai-ecoverse/Underdog-Bark-3.0-ONNX`) as an
+   option for talking to the AI characters with a microphone, in the browser.
+9. **Nemotron-3.5-Bolt-E4B-4GB**
+   (https://research.nvidia.com/labs/nemotron/Nemotron-3.5-Bolt-E4B-4GB) as
+   an option for the browser and server LLM, taking the place of the normal E4B.
+10. **Prism ML Bonsai** as a browser and server option, if possible. It cannot
+    be run on the user's laptop, so it cannot be tested here (say so in the docs).
+11. **Store Nemotron and the other models on the user's Cloudflare** (R2 bucket
+    `geebr-models`; the user logs into wrangler first).
+
 ## Batch of 2026-10-23, evening: characters that behave (high priority)
 
 Recorded from one long message; the plan is in `docs/MINDS.md` (now `.claude/skills/tablefolk-dev/reference/minds.md`).
