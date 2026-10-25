@@ -742,11 +742,11 @@
   },
   "peasant_woman": {
    "file": "characters/peasant_woman.png",
-   "w": 267,
-   "h": 324,
+   "w": 258,
+   "h": 314,
    "anchor": [
-    133.1,
-    210.8
+    129,
+    204.3
    ]
   },
   "adventurer": {
@@ -760,11 +760,11 @@
   },
   "adventurer_woman": {
    "file": "characters/adventurer_woman.png",
-   "w": 258,
-   "h": 314,
+   "w": 271,
+   "h": 329,
    "anchor": [
-    129,
-    204.3
+    135.1,
+    214.1
    ]
   },
   "hooded": {
@@ -796,20 +796,20 @@
   },
   "villager": {
    "file": "characters/villager.png",
-   "w": 254,
-   "h": 309,
+   "w": 258,
+   "h": 314,
    "anchor": [
-    126.9,
-    201.1
+    129,
+    204.3
    ]
   },
   "witch": {
    "file": "characters/witch.png",
-   "w": 271,
-   "h": 329,
+   "w": 275,
+   "h": 334,
    "anchor": [
-    135.1,
-    214.1
+    137.2,
+    217.4
    ]
   },
   "wizard": {
@@ -1071,6 +1071,51 @@
    "anchor": [
     130,
     206.4
+   ]
+  },
+  "swordswoman": {
+   "file": "characters/swordswoman.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "sorceress": {
+   "file": "characters/sorceress.png",
+   "w": 275,
+   "h": 334,
+   "anchor": [
+    137.2,
+    217.4
+   ]
+  },
+  "villager_woman": {
+   "file": "characters/villager_woman.png",
+   "w": 258,
+   "h": 314,
+   "anchor": [
+    129,
+    204.3
+   ]
+  },
+  "swordsman": {
+   "file": "characters/swordsman.png",
+   "w": 283,
+   "h": 344,
+   "anchor": [
+    141.3,
+    223.9
+   ]
+  },
+  "wanderer": {
+   "file": "characters/wanderer.png",
+   "w": 283,
+   "h": 344,
+   "anchor": [
+    141.3,
+    223.9
    ]
   }
  },

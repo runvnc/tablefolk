@@ -148,3 +148,12 @@ can turn it off or pick another engine in the Voice pane). `"ttsVoiceId"`:
 `builtin:alba azelma cosette eponine fantine javert jean marius`; the default
 fits the body. Voices are placed in space (stereo pan, quieter with
 distance). The Voice pane can also clone a voice from a sample.
+
+A library of 20 designed voices (`assets/voices/`, made from text
+descriptions with fal.ai's Qwen3-TTS Voice Design by `tools/fal-voices.py`;
+Pocket-TTS clones each sample the first time it speaks) is named
+`pack:<id>`: `hero_young_f innkeeper_f sorceress_f noble_f crone_f shy_f
+huntress_f thief_f knight_m dwarf_m tavern_m wizard_m squire_m rogue_m captain_m
+farmer_m scholar_m villain_m king_m hooded_x`. A character without a
+`ttsVoiceId` gets one of its gender from the library (the same one every
+time); the world generator casts from it by description.

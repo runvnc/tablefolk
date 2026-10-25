@@ -6,6 +6,20 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-25
 
+- **New people**: six JRPG-style Meshy characters (swordswoman, sorceress with
+  a split dress, huntress, village woman, swordsman, wanderer) from concept
+  art; `adventurer`, `adventurer_woman`, `witch`, `huntress`, `peasant_woman`,
+  `villager` and `woodsman` now use them (the old bodies are `*_classic`).
+- **Designed voices**: 20 voices described in text (fal.ai Qwen3-TTS Voice
+  Design), cloned by Pocket-TTS; characters get one by gender, the generator
+  casts from them (`pack:<id>`).
+- **Speech input in the browser**: Underdog Bark 3.0 (Parakeet-TDT, ONNX) on
+  onnxruntime-web, chosen in Brain options (`app/asr/`).
+- **Models**: Ternary Bonsai 1.7B and 8B (LiteRT-LM) in the picker;
+  Nemotron 3.5 Bolt E4B registered (hidden until converted and mirrored:
+  `tools/convert-litertlm.sh`); endpoint presets for Nemotron (Ollama,
+  llama.cpp) and Bonsai.
+
 - **Subworlds and kept models**: `"keep": true` on a walk-in building leaves
   its 3D model standing and makes the inside a separate map, entered by
   stepping on the glowing square in front of the door (and left the same

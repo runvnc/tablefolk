@@ -135,8 +135,14 @@ For agents and the player. The list lives in `FIGURES` in `app/app.js` (and
 the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
 `assets/tiles/characters/`.
 
-- **People**: `adventurer adventurer_woman hooded king farmer villager witch
-  wizard`; the realistic `woodsman huntress peasant peasant_woman`
+- **People**: the main ones are JRPG-style Meshy models made from concept
+  art (`swordswoman sorceress huntress villager_woman swordsman wanderer`);
+  the older names point at them (`adventurer_woman` is the swordswoman, `witch`
+  the sorceress, `peasant_woman` and `villager` the village woman,
+  `adventurer` the swordsman, `woodsman` the wanderer) and the earlier
+  Quaternius bodies stay as `adventurer_classic`, `adventurer_woman_classic`,
+  `woodsman_classic`, `huntress_classic`, `peasant_woman_classic`,
+  `villager_classic`, `witch_classic`. Also `hooded king farmer wizard peasant`
   (Quaternius Universal rig, built by `tools/build-figures.sh`); the older
   chibi KayKit `woman rogue knight mage ranger barbarian`; the clay
   `critter` (the default).
