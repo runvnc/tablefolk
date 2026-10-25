@@ -173,3 +173,16 @@ Ideas, by how much they would add for how much work with a small model:
 - Wolf tile renders wrong; turned objects not shown turned in the editor.
 - The root landing page (index.html) still has the old pitch; the Bun server
   redirects / to /app/.
+
+**2026-10-25**
+
+- Phone layout fixed (top bar, banner, chat dock); no toast for every
+  character line (only those that name the player).
+- Map editor: things from the Things tab were placed as characters (fixed);
+  turned objects drawn turned; clicking the map takes focus out of fields;
+  `tools/browser-test/editor-test.mjs` checks every tool (18 checks, pass).
+- Wolf: its file's skinning is broken in Babylon; a big grey rat stands in.
+- Landing page (index.html): new pitch and the showcase worlds.
+- Evals after all the prompt changes: shop-role 2/2, roles 4/4, smithy and
+  companion pass, feelings 'hit' 3/3 (it fell to 0/2 when the new
+  stay-in-character line sat below the feelings; moved above them).

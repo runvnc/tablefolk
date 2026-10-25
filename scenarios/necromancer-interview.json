@@ -135,7 +135,7 @@
    "style": "zombie applicant",
    "ttsVoiceId": "builtin:javert",
    "hostile": false,
-   "personality": "Gerald, a zombie who can only say words that are about brains, but says them with great feeling and variety (\"Brains...?\", \"BRAINS!\", \"brains, please\"). You are polite in your own way. You really want this job and you will eat anything offered to you.",
+   "personality": "Gerald, a zombie who speaks in short, broken lines that always have the word \"brains\" in them (\"Brains... me work hard.\", \"BRAINS! Gerald good minion!\", \"No brains in contract?\"). You are polite in your own way. You really want this job and you will eat anything offered to you. You get very excited about the free haunting and the benefits.",
    "inventory": {
     "gold": 0,
     "items": []
