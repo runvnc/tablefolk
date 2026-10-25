@@ -2,8 +2,8 @@ import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from 
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
 import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261018a';
 import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261018a';
-import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261025c';
-import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261025c';
+import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261025e';
+import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261025d';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
@@ -21,6 +21,13 @@ const SUPPORTED_MODELS = {
   'minicpm5-1b-gpu': { label: 'MiniCPM5-1B (GPU/WebGPU)', engine: 'transformers.js', size: '~1.4 GB', hidden: true },
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB' },
+  // NVIDIA's post-trained Gemma 4 E4B: takes the E4B's place once its
+  // .litertlm is on R2 (tools/convert-litertlm.sh); hidden until then.
+  'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', hidden: true },
+  // Prism ML's ternary Bonsai (Qwen3 based): small downloads; experimental,
+  // not tested on every graphics card
+  'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM, tiny; experimental)', engine: 'litert-lm', size: '~0.8 GB' },
+  'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM, experimental)', engine: 'litert-lm', size: '~2.6 GB' },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No

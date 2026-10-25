@@ -335,6 +335,13 @@
       <div class="section-subtitle">Brain options</div>
       <details id="llmEndpointBox" class="llm-endpoint">
         <summary>OpenAI-compatible endpoint (for the "endpoint" brain)</summary>
+        <label>Preset <select id="llmPreset"><option value="">(choose one to fill the fields)</option>
+          <option value="/api/llm/v1|">This server's default</option>
+          <option value="http://localhost:11434/v1|hf.co/ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF">Nemotron 3.5 Bolt E4B: Ollama on this machine</option>
+          <option value="http://localhost:8080/v1|nemotron-3.5-bolt-e4b">Nemotron 3.5 Bolt E4B: llama.cpp server on this machine (llama-server -hf ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF)</option>
+          <option value="/api/llm/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter through this server</option>
+          <option value="http://localhost:8080/v1|ternary-bonsai-2-4b">Bonsai 2 4B: llama.cpp server on this machine (prism-ml/Ternary-Bonsai-2-4B-gguf)</option>
+        </select></label>
         <label>Base URL <input id="llmBaseURL" type="text" placeholder="/api/llm/v1 (this server's default)" spellcheck="false" /></label>
         <label>API key <input id="llmApiKey" type="password" placeholder="blank: the server's key / none" autocomplete="off" /></label>
         <label>Model <input id="llmModel" type="text" placeholder="blank: the server's default" spellcheck="false" /></label>
@@ -392,6 +399,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261025aau"></script>
+  <script src="preflight.js?v=20261025aav"></script>
 </body>
 </html>

@@ -15,12 +15,15 @@ const MODEL_CONFIG = {
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM)' },
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight (LiteRT-LM)', vision: true },
+  'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM)' },
+  'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM)' },
+  'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)' },
 };
 
 let worker = null, shared = false;
 let nextId = 1;
 // One URL for every page (the game and the world builder), so they share it.
-const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261025c';
+const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261025d';
 // A model this browser has loaded before (so it is in OPFS): the engine runs
 // in a shared worker, which survives a reload or the step from the world
 // builder into the game: it keeps the model 2 minutes after the last page

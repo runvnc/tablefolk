@@ -53,6 +53,27 @@ const MODEL_CONFIG = {
     modelUrl: 'https://geebr-models.mindroot.io/gemma-4-E4B-it-web.litertlm',
     vram: 'larger; PLE memory-mapped',
   },
+  // NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4 E4B post-trained by NVIDIA): the
+  // same architecture, so it is converted with litert-torch
+  // (tools/convert-litertlm.sh) and mirrored on R2 once converted; it takes
+  // the place of the Gemma E4B in the picker (agent-brain.js).
+  'nemotron-bolt-e4b-litert': {
+    label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM)',
+    modelUrl: 'https://geebr-models.mindroot.io/nemotron-3.5-bolt-e4b-web.litertlm',
+    vram: 'larger; PLE memory-mapped',
+  },
+  // Prism ML's ternary (INT2) Bonsai, as LiteRT-LM bundles
+  // (litert-community/Ternary-Bonsai-*): Qwen3 chat template inside.
+  'bonsai-1.7b-litert': {
+    label: 'Ternary Bonsai 1.7B (LiteRT-LM)',
+    modelUrl: 'https://geebr-models.mindroot.io/bonsai-1.7b-int2pc-32k-crashfix.litertlm',
+    vram: '~1 GB',
+  },
+  'bonsai-8b-litert': {
+    label: 'Ternary Bonsai 8B (LiteRT-LM)',
+    modelUrl: 'https://geebr-models.mindroot.io/bonsai-8b-int2pc-32k-crashfix.litertlm',
+    vram: '~3 GB',
+  },
 };
 
 let engine = null, engineVision = false;

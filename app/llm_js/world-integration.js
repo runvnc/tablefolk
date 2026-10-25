@@ -1,7 +1,7 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261025za';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261025zc';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261025za';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025c';
+import { installDevConsole } from './dev-console.js?v=20261025zb';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025e';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261018a';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
@@ -484,6 +484,13 @@ async function main() {
         appendLog('endpoint settings saved: ' + getEndpointConfig().baseURL);
       });
     }
+    // presets: "base URL|model" fills the fields and saves them
+    el('llmPreset')?.addEventListener('change', e => {
+      const [url, model] = String(e.target.value || '').split('|'); if (!url) return;
+      if (f.baseURL) f.baseURL.value = url === '/api/llm/v1' ? '' : url; if (f.model) f.model.value = model || '';
+      setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model?.value.trim() });
+      appendLog('endpoint preset: ' + getEndpointConfig().baseURL + ' ' + (model || ''));
+    });
     if (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.engine === 'openai') el('llmEndpointBox')?.setAttribute('open', '');
   }
   // Initialize cache backend selector
