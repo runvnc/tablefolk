@@ -16,8 +16,8 @@ audio{height:32px;width:260px;max-width:100%}button{font:inherit;font-size:.8rem
 button:hover{border-color:var(--acc);color:var(--acc)}.tag{font-size:.72rem;padding:1px 7px;border-radius:999px;background:var(--line);color:var(--mut)}
 #st{color:var(--mut);font-size:.85rem}h3{margin:26px 0 0;color:var(--mut);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em}
 </style>
-<main><h1>Voice gallery</h1><p class="lead">The recorded samples, and "as the game says it": the clone Pocket-TTS makes of the sample, speaking the line below.</p>
-<div class="bar"><input id="line" value="I cannot believe it is already morning, and the gate is still closed."><span id="st"></span></div>
+<main><h1>Voice gallery</h1><p class="lead">The recorded samples, and "as the game says it": the clone Pocket-TTS makes of the sample, speaking a line that fits the mood (calm, joy, anger, fear, sadness), or yours if you type one.</p>
+<div class="bar"><input id="line" placeholder="leave empty: a line that fits each mood (or type your own, used for every button)"><span id="st"></span></div>
 <div id="acted"></div><h3>The first set (flat samples, not yet redone)</h3><div id="rest"></div>
 <iframe id="fr" title="clone" allow="autoplay" style="display:none"></iframe></main>
 <script>
@@ -29,11 +29,13 @@ function card(v){
   return `<div class="card"><h2>${esc(v.name)} <span class="tag">${esc(v.id)}</span> <span class="tag">${esc(v.gender)}</span>${acted?' <span class="tag">acted (ElevenLabs v4)</span>':''}</h2><div class="d">${esc(v.description)}</div>`
     +row(acted?'three emotions':'sample',v.file,'pack:'+v.id)+moods.map(([k,f])=>row(k,f,'pack:'+v.id+'@'+k)).join('')+'</div>';
 }
+const LINES={calm:'Good morning. The road looks quiet today.',joy:'We did it! I cannot believe we actually won!',anger:'You lied to me, and I will not forget it.',fear:'Something is moving out there. Stay close to me.',sadness:'I miss them so much. I wish they were still here.',main:'Well met, traveller. The road ahead is long, but I will walk it with you.'};
+const lineFor=voice=>$('line').value.trim()||LINES[voice.split('@')[1]||'main'];
 let pending=null;
 fetch(dir+'voices.json?t='+Date.now()).then(r=>r.json()).then(list=>{
   $('acted').innerHTML=list.filter(v=>v.elevenlabs_voice_id).map(card).join(''); $('rest').innerHTML=list.filter(v=>!v.elevenlabs_voice_id).map(card).join('');
 });
-document.addEventListener('click',e=>{ const b=e.target.closest('[data-try]'); if(!b) return; const m={type:'try',voice:b.dataset.try,text:$('line').value}, f=$('fr');
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-try]'); if(!b) return; const m={type:'try',voice:b.dataset.try,text:lineFor(b.dataset.try)}, f=$('fr');
   if(!f.getAttribute('src')){ pending=m; $('st').textContent='loading the speech engine (first time about 40 MB)…'; f.src='/app/voice-try.html'; } else f.contentWindow.postMessage(m,location.origin); });
 addEventListener('message',e=>{ if(e.origin!==location.origin||e.data?.type!=='voice-try') return;
   if(e.data.state==='ready'&&pending){ $('fr').contentWindow.postMessage(pending,location.origin); pending=null; return; } if(e.data.state!=='ready') $('st').textContent=e.data.text||e.data.state; });
