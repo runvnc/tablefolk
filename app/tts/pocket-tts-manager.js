@@ -90,7 +90,10 @@
     // a preview (the admin page's Try it): speaks even when the player has speech off
     speakTest(text,voiceId){ if(!text?.trim())return; this.queue.push({agent:{id:'preview'},text:String(text).slice(0,300),voice:voiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
     // a library voice with mood samples speaks in the one for the character's strongest feeling (mind.js: joy, fear, anger, sadness at .45 or more), else its main sample
-    moodVoice(agent,voice){ const v=voice?.startsWith('pack:')&&!voice.includes('@')&&(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===voice); if(!v?.moods) return voice; try{ if(!agent||agent.id==='player'||agent.id==='preview') return voice; const mood=window.tablefolkMind?.mindOf?.(agent)?.mood; if(!mood) return voice; let best=null; for(const k of ['anger','fear','sadness','joy']) if(v.moods[k]&&mood[k]>=.45&&(!best||mood[k]>mood[best])) best=k; return best?voice+'@'+best:voice; }catch{ return voice; } }
+    moodVoice(agent,voice){ const v=voice?.startsWith('pack:')&&!voice.includes('@')&&(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===voice); if(!v?.moods) return voice; try{ if(!agent||agent.id==='player'||agent.id==='preview') return voice; const mood=window.tablefolkMind?.mindOf?.(agent)?.mood; if(!mood) return voice; let best=null; for(const k of ['anger','fear','sadness','joy']) if(v.moods[k]&&mood[k]>=.45&&(!best||mood[k]>mood[best])) best=k;
+      // seductive: only for a character written that way (or told so with "ttsMood": "seductive"), when no strong feeling says otherwise
+      if(!best&&v.moods.seductive){ const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsMood==='seductive'||/\b(seduct\w*|flirt\w*|sultry|alluring|temptress|coquett\w*|smouldering|siren)\b/i.test((cfg.personality||'')+' '+(cfg.style||''))) best='seductive'; }
+      return best?voice+'@'+best:voice; }catch{ return voice; } }
     speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
     async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
@@ -214,7 +217,7 @@
     // Voice states (what the encoder and the first pass through the model make
     // of a sample) are kept in IndexedDB, per engine, so a voice is ready at
     // once on the next visit. Only the small engine's worker speaks this.
-    stateKey(k){ return this.engine+':v4:'+k; }
+    stateKey(k){ return this.engine+':v5:'+k; }
     stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
     async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
     async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
@@ -222,8 +225,8 @@
       if(this.engine!=='pocket-18m') return null;
       try{
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
-        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v4.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
-        const r=await fetch(base+'voices-state-18m-v4.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
+        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v5.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
+        const r=await fetch(base+'voices-state-18m-v5-'+(e.f||0)+'.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength===e.end-e.start?buf:null;
       }catch{ return null; }
     }

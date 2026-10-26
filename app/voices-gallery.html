@@ -29,7 +29,7 @@ function card(v){
   return `<div class="card"><h2>${esc(v.name)} <span class="tag">${esc(v.id)}</span> <span class="tag">${esc(v.gender)}</span>${acted?' <span class="tag">acted (ElevenLabs v4)</span>':''}</h2><div class="d">${esc(v.description)}</div>`
     +row(acted?'three emotions':'sample',v.file,'pack:'+v.id)+moods.map(([k,f])=>row(k,f,'pack:'+v.id+'@'+k)).join('')+'</div>';
 }
-const LINES={calm:'Good morning. The road looks quiet today.',joy:'We did it! I cannot believe we actually won!',anger:'You lied to me, and I will not forget it.',fear:'Something is moving out there. Stay close to me.',sadness:'I miss them so much. I wish they were still here.',main:'Well met, traveller. The road ahead is long, but I will walk it with you.'};
+const LINES={calm:'Good morning. The road looks quiet today.',joy:'We did it! I cannot believe we actually won!',anger:'You lied to me, and I will not forget it.',fear:'Something is moving out there. Stay close to me.',sadness:'I miss them so much. I wish they were still here.',seductive:'Come now, do not be shy. Stay a little longer.',main:'Well met, traveller. The road ahead is long, but I will walk it with you.'};
 const lineFor=voice=>$('line').value.trim()||LINES[voice.split('@')[1]||'main'];
 document.addEventListener('loadedmetadata',e=>{ const a=e.target, l=a.nextElementSibling; if(a.tagName==='AUDIO'&&l?.classList.contains('len')) l.textContent=a.duration.toFixed(1)+' s'; },true);
 let pending=null;

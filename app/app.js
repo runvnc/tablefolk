@@ -3993,7 +3993,7 @@ fetch(ASSET_BASE+'voices/voices.json').then(r=>r.ok?r.json():null).then(d=>{ if(
 const VOICE_HINT={ swordswoman:['hero_young_f','thief_f'], adventurer_woman:['hero_young_f','thief_f'], sorceress:['sorceress_f','noble_f'], witch:['crone_f','sorceress_f'], huntress:['huntress_f'],
   villager_woman:['innkeeper_f','shy_f'], villager:['innkeeper_f','shy_f','farmer_m','tavern_m'], peasant_woman:['innkeeper_f','shy_f'], peasant:['farmer_m','tavern_m','scholar_m'], farmer:['farmer_m','tavern_m'],
   swordsman:['knight_m','squire_m','rogue_m'], adventurer:['knight_m','squire_m','rogue_m'], woodsman:['rogue_m','farmer_m'], wanderer:['rogue_m','farmer_m'], king:['king_m'], wizard:['wizard_m','scholar_m'], hooded:['hooded_x','villain_m'],
-  knight:['knight_m','captain_m'], mage:['wizard_m','scholar_m'], ranger:['huntress_f','rogue_m'], barbarian:['dwarf_m','captain_m'], rogue:['rogue_m','thief_f'], woman:['hero_young_f','innkeeper_f'] };
+  knight:['knight_m','captain_m'], skeleton:['undead_m'], skeleton_classic:['undead_m'], skeleton_warrior:['undead_m'], skeleton_warrior_classic:['undead_m'], skeleton_farmer:['undead_m'], zombie:['undead_m'], ghost:['undead_m'], dragon:['dragon_m'], giant:['dragon_m'], troll:['dragon_m'], orc:['dragon_m'], orc_classic:['dragon_m'], demon:['dragon_m','villain_m'], mage:['wizard_m','scholar_m'], ranger:['huntress_f','rogue_m'], barbarian:['dwarf_m','captain_m'], rogue:['rogue_m','thief_f'], woman:['hero_young_f','innkeeper_f'] };
 function defaultVoiceFor(id,model){
   const want=FEMALE_MODELS.has(model)?'female':'male';
   const all=window.TABLEFOLK_PACK_VOICES||[], hinted=(VOICE_HINT[String(model).replace(/_classic$/,'')]||[]).map(x=>'pack:'+x).filter(x=>all.some(v=>v.id===x));

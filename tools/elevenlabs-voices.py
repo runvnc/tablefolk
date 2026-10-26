@@ -46,13 +46,18 @@ def age_mid(s):
 
 def score(d, v):
     ok = str(d.get('gender', '')).lower().startswith(v['gender'][0])
-    return (3 if ok else 0) - abs(age_mid(d.get('apparent_age')) - v['age']) / 15 + float(d.get('naturalness') or 5) / 5
+    age = 0 if v.get('age') is None else abs(age_mid(d.get('apparent_age')) - v['age']) / 15   # monsters have no age to match
+    return (3 if ok else 0) - age + float(d.get('naturalness') or 5) / 5
+
+def index_has(index, v): return any(e['id'] == v['id'] for e in index)
 
 def main():
     cfg = json.load(open(os.path.join(ROOT, 'tools/voices-eleven.json')))
-    want = set(sys.argv[1:]); index_path = os.path.join(OUT, 'voices.json'); index = json.load(open(index_path))
+    want = set(a for a in sys.argv[1:] if not a.startswith('--')); force = '--force' in sys.argv; index_path = os.path.join(OUT, 'voices.json'); index = json.load(open(index_path))
     for v in cfg:
         if want and v['id'] not in want: continue
+        if not index_has(index, v) : index.append({'id': v['id'], 'name': v['name'], 'gender': v['gender'], 'description': v['description'].split('.')[0], 'file': v['id'] + '.mp3'})
+        if any(e['id'] == v['id'] and e.get('elevenlabs_voice_id') for e in index) and not (want and force): continue
         print('==', v['id'], flush=True)
         best = None
         for rnd in range(3):   # up to three rounds of three previews until one fits
@@ -69,6 +74,7 @@ def main():
         open(os.path.join(OUT, v['id'] + '.mp3'), 'wb').write(audio)
         for e in index:
             if e['id'] == v['id']: e['elevenlabs_voice_id'] = vid; e['v'] = time.strftime('%Y%m%d%H%M')
+        json.dump(index, open(index_path, 'w'), indent=1)
         print('  saved', v['id'], len(audio) // 1024, 'KB voice', vid, flush=True)
     json.dump(index, open(index_path, 'w'), indent=1)
 
