@@ -25,7 +25,7 @@ def el(path, body=None, raw=False):
     r = urllib.request.Request('https://api.elevenlabs.io' + path, data=json.dumps(body).encode() if body is not None else None, headers={'xi-api-key': EL, 'Content-Type': 'application/json'})
     try:
         resp = urllib.request.urlopen(r, timeout=240); return resp.read() if raw else json.load(resp)
-    except urllib.error.HTTPError as e: sys.exit(f'ElevenLabs {path}: {e.code} {e.read().decode()[:400]}')
+    except urllib.error.HTTPError as e: raise RuntimeError(f'ElevenLabs {path}: {e.code} {e.read().decode()[:300]}')
 
 PROMPT = ("Listen to this clip and describe ONLY what you hear as JSON: gender, apparent_age (years range like 20-30), accent, timbre, "
           "emotional_expressiveness (1-10), emotions_heard (list), audio_quality_notes, naturalness (1-10), one_sentence_summary. Be critical.")
@@ -58,24 +58,27 @@ def main():
         if want and v['id'] not in want: continue
         if not index_has(index, v) : index.append({'id': v['id'], 'name': v['name'], 'gender': v['gender'], 'description': v['description'].split('.')[0], 'file': v['id'] + '.mp3'})
         if any(e['id'] == v['id'] and e.get('elevenlabs_voice_id') for e in index) and not (want and force): continue
-        print('==', v['id'], flush=True)
-        best = None
-        for rnd in range(3):   # up to three rounds of three previews until one fits
-            prev = el('/v1/text-to-voice/design', {'voice_description': v['description'], 'text': v['preview_text'], 'model_id': 'eleven_multilingual_ttv_v2'})['previews']
-            for i, p in enumerate(prev):
-                f = os.path.join(OUT, f'_{v["id"]}_prev.mp3'); open(f, 'wb').write(base64.b64decode(p['audio_base_64']))
-                d = argon(f); s = score(d, v); os.remove(f)
-                print(f'  round {rnd} preview {i}: {d.get("gender")} {d.get("apparent_age")} {d.get("accent")} | nat {d.get("naturalness")} | score {s:.2f}', flush=True)
-                if not best or s > best[0]: best = (s, p)
-            if best[0] >= 3.5: break
-        if best[0] < 2: print('  warning: no preview fit well; using the best of them', flush=True)
-        vid = el('/v1/text-to-voice', {'voice_name': v['name'] + ' (tablefolk)', 'voice_description': v['description'], 'generated_voice_id': best[1]['generated_voice_id']})['voice_id']
-        audio = el(f'/v1/text-to-speech/{vid}?output_format=mp3_44100_128', {'text': v['script'], 'model_id': 'eleven_v4', 'voice_settings': {'stability': v.get('stability', .35), 'similarity_boost': .8}}, raw=True)
-        open(os.path.join(OUT, v['id'] + '.mp3'), 'wb').write(audio)
-        for e in index:
-            if e['id'] == v['id']: e['elevenlabs_voice_id'] = vid; e['v'] = time.strftime('%Y%m%d%H%M')
-        json.dump(index, open(index_path, 'w'), indent=1)
-        print('  saved', v['id'], len(audio) // 1024, 'KB voice', vid, flush=True)
+        try:
+            print('==', v['id'], flush=True)
+            best = None
+            for rnd in range(3):   # up to three rounds of three previews until one fits
+                prev = el('/v1/text-to-voice/design', {'voice_description': v['description'], 'text': v['preview_text'], 'model_id': 'eleven_multilingual_ttv_v2'})['previews']
+                for i, p in enumerate(prev):
+                    f = os.path.join(OUT, f'_{v["id"]}_prev.mp3'); open(f, 'wb').write(base64.b64decode(p['audio_base_64']))
+                    d = argon(f); s = score(d, v); os.remove(f)
+                    print(f'  round {rnd} preview {i}: {d.get("gender")} {d.get("apparent_age")} {d.get("accent")} | nat {d.get("naturalness")} | score {s:.2f}', flush=True)
+                    if not best or s > best[0]: best = (s, p)
+                if best[0] >= 3.5: break
+            if best[0] < 2: print('  warning: no preview fit well; using the best of them', flush=True)
+            vid = el('/v1/text-to-voice', {'voice_name': v['name'] + ' (tablefolk)', 'voice_description': v['description'], 'generated_voice_id': best[1]['generated_voice_id']})['voice_id']
+            audio = el(f'/v1/text-to-speech/{vid}?output_format=mp3_44100_128', {'text': v['script'], 'model_id': 'eleven_v4', 'voice_settings': {'stability': v.get('stability', .35), 'similarity_boost': .8}}, raw=True)
+            open(os.path.join(OUT, v['id'] + '.mp3'), 'wb').write(audio)
+            for e in index:
+                if e['id'] == v['id']: e['elevenlabs_voice_id'] = vid; e['v'] = time.strftime('%Y%m%d%H%M')
+            json.dump(index, open(index_path, 'w'), indent=1)
+            print('  saved', v['id'], len(audio) // 1024, 'KB voice', vid, flush=True)
+        except Exception as ex:
+            print('  FAILED:', str(ex)[:300], flush=True)
     json.dump(index, open(index_path, 'w'), indent=1)
 
 if __name__ == '__main__':

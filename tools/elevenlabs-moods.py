@@ -14,7 +14,9 @@ cfg = json.load(open(os.path.join(ROOT, 'tools/voices-eleven.json'))); idx_path 
 want = set(a for a in sys.argv[1:] if not a.startswith('--')); only = [a[7:] for a in sys.argv[1:] if a.startswith('--only=')]   # --only=seductive: just that mood, the rest kept
 for v in cfg:
     if (want and v['id'] not in want) or 'moods' not in v: continue
-    e = next(x for x in idx if x['id'] == v['id']); vid = e['elevenlabs_voice_id']; e['moods'] = dict(e.get('moods') or {}) if only else {}
+    e = next(x for x in idx if x['id'] == v['id'])
+    if not e.get('elevenlabs_voice_id'): print('skip (no designed voice yet):', v['id']); continue
+    vid = e['elevenlabs_voice_id']; e['moods'] = dict(e.get('moods') or {}) if only else {}
     # one seed and steady settings for every sample of a voice (stability .3 let the identity drift: the dwarf scored 5 of 10 for "same speaker", 9 with these)
     def say(text):
         r = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128', data=json.dumps({'text': text, 'model_id': 'eleven_v4', 'seed': v.get('seed', 4242), 'voice_settings': {'stability': v.get('mood_stability', .5), 'similarity_boost': v.get('mood_similarity', .95), 'use_speaker_boost': True, 'style': 0}}).encode(), headers={'xi-api-key': KEY, 'Content-Type': 'application/json'})

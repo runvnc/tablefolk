@@ -18,7 +18,7 @@ button:hover{border-color:var(--acc);color:var(--acc)}.len{font-size:.8rem;color
 </style>
 <main><h1>Voice gallery</h1><p class="lead">The recorded samples, and "as the game says it": the clone Pocket-TTS makes of the sample, speaking a line that fits the mood (calm, joy, anger, fear, sadness), or yours if you type one.</p>
 <div class="bar"><input id="line" placeholder="leave empty: a line that fits each mood (or type your own, used for every button)"><span id="st"></span></div>
-<div id="acted"></div><h3>The first set (flat samples, not yet redone)</h3><div id="rest"></div>
+<div id="acted"></div><h3 id="resth" hidden>Older flat samples</h3><div id="rest"></div>
 <iframe id="fr" title="clone" allow="autoplay" style="display:none"></iframe></main>
 <script>
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])), $=id=>document.getElementById(id);
@@ -34,7 +34,7 @@ const lineFor=voice=>$('line').value.trim()||LINES[voice.split('@')[1]||'main'];
 document.addEventListener('loadedmetadata',e=>{ const a=e.target, l=a.nextElementSibling; if(a.tagName==='AUDIO'&&l?.classList.contains('len')) l.textContent=a.duration.toFixed(1)+' s'; },true);
 let pending=null;
 fetch(dir+'voices.json?t='+Date.now()).then(r=>r.json()).then(list=>{
-  $('acted').innerHTML=list.filter(v=>v.elevenlabs_voice_id).map(card).join(''); $('rest').innerHTML=list.filter(v=>!v.elevenlabs_voice_id).map(card).join('');
+  $('acted').innerHTML=list.filter(v=>v.elevenlabs_voice_id).map(card).join(''); const rest=list.filter(v=>!v.elevenlabs_voice_id); $('rest').innerHTML=rest.map(card).join(''); $('resth').hidden=!rest.length;
 });
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-try]'); if(!b) return; const m={type:'try',voice:b.dataset.try,text:lineFor(b.dataset.try)}, f=$('fr');
   if(!f.getAttribute('src')){ pending=m; $('st').textContent='loading the speech engine (first time about 40 MB)…'; f.src='/app/voice-try.html'; } else f.contentWindow.postMessage(m,location.origin); });

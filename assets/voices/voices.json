@@ -21,7 +21,17 @@
   "name": "Hettie",
   "gender": "female",
   "description": "warm, motherly, a laugh in it",
-  "file": "innkeeper_f.mp3"
+  "file": "innkeeper_f.mp3",
+  "elevenlabs_voice_id": "M1ThvDT0M76BcbnNzD8r",
+  "v": "202610252301",
+  "moods": {
+   "calm": "mood/innkeeper_f.calm.mp3",
+   "joy": "mood/innkeeper_f.joy.mp3",
+   "anger": "mood/innkeeper_f.anger.mp3",
+   "fear": "mood/innkeeper_f.fear.mp3",
+   "sadness": "mood/innkeeper_f.sadness.mp3",
+   "seductive": "mood/innkeeper_f.seductive.mp3"
+  }
  },
  {
   "id": "sorceress_f",
@@ -45,7 +55,17 @@
   "name": "Lady Aldith",
   "gender": "female",
   "description": "crisp, refined, aristocratic",
-  "file": "noble_f.mp3"
+  "file": "noble_f.mp3",
+  "elevenlabs_voice_id": "NwsW3TwqbzeH29OU3gd3",
+  "v": "202610252301",
+  "moods": {
+   "calm": "mood/noble_f.calm.mp3",
+   "joy": "mood/noble_f.joy.mp3",
+   "anger": "mood/noble_f.anger.mp3",
+   "fear": "mood/noble_f.fear.mp3",
+   "sadness": "mood/noble_f.sadness.mp3",
+   "seductive": "mood/noble_f.seductive.mp3"
+  }
  },
  {
   "id": "crone_f",
@@ -68,28 +88,67 @@
   "name": "Wren",
   "gender": "female",
   "description": "soft, shy, young",
-  "file": "shy_f.mp3"
+  "file": "shy_f.mp3",
+  "elevenlabs_voice_id": "xWEKMzYn2fzADZCHTell",
+  "v": "202610252301",
+  "moods": {
+   "calm": "mood/shy_f.calm.mp3",
+   "joy": "mood/shy_f.joy.mp3",
+   "anger": "mood/shy_f.anger.mp3",
+   "fear": "mood/shy_f.fear.mp3",
+   "sadness": "mood/shy_f.sadness.mp3"
+  }
  },
  {
   "id": "huntress_f",
   "name": "Kestrel",
   "gender": "female",
   "description": "steady, practical, outdoorsy",
-  "file": "huntress_f.mp3"
+  "file": "huntress_f.mp3",
+  "elevenlabs_voice_id": "XHJOE8M56MsYWzXrH1S0",
+  "v": "202610252301",
+  "moods": {
+   "calm": "mood/huntress_f.calm.mp3",
+   "joy": "mood/huntress_f.joy.mp3",
+   "anger": "mood/huntress_f.anger.mp3",
+   "fear": "mood/huntress_f.fear.mp3",
+   "sadness": "mood/huntress_f.sadness.mp3",
+   "seductive": "mood/huntress_f.seductive.mp3"
+  }
  },
  {
   "id": "thief_f",
   "name": "Pip",
   "gender": "female",
   "description": "cheeky, quick, street-smart",
-  "file": "thief_f.mp3"
+  "file": "thief_f.mp3",
+  "elevenlabs_voice_id": "WNRriHWeqHofU4HN3CI4",
+  "v": "202610252302",
+  "moods": {
+   "calm": "mood/thief_f.calm.mp3",
+   "joy": "mood/thief_f.joy.mp3",
+   "anger": "mood/thief_f.anger.mp3",
+   "fear": "mood/thief_f.fear.mp3",
+   "sadness": "mood/thief_f.sadness.mp3",
+   "seductive": "mood/thief_f.seductive.mp3"
+  }
  },
  {
   "id": "knight_m",
   "name": "Sir Aldric",
   "gender": "male",
   "description": "deep, heroic, steady",
-  "file": "knight_m.mp3"
+  "file": "knight_m.mp3",
+  "elevenlabs_voice_id": "Td6dhva8KbW1fNn8RdVP",
+  "v": "202610252302",
+  "moods": {
+   "calm": "mood/knight_m.calm.mp3",
+   "joy": "mood/knight_m.joy.mp3",
+   "anger": "mood/knight_m.anger.mp3",
+   "fear": "mood/knight_m.fear.mp3",
+   "sadness": "mood/knight_m.sadness.mp3",
+   "seductive": "mood/knight_m.seductive.mp3"
+  }
  },
  {
   "id": "dwarf_m",
@@ -113,7 +172,17 @@
   "name": "Barnaby",
   "gender": "male",
   "description": "jolly, booming, round",
-  "file": "tavern_m.mp3"
+  "file": "tavern_m.mp3",
+  "elevenlabs_voice_id": "rRi4XwAJCvsRaBNCeBqD",
+  "v": "202610252307",
+  "moods": {
+   "calm": "mood/tavern_m.calm.mp3",
+   "joy": "mood/tavern_m.joy.mp3",
+   "anger": "mood/tavern_m.anger.mp3",
+   "fear": "mood/tavern_m.fear.mp3",
+   "sadness": "mood/tavern_m.sadness.mp3",
+   "seductive": "mood/tavern_m.seductive.mp3"
+  }
  },
  {
   "id": "wizard_m",
@@ -136,55 +205,165 @@
   "name": "Tam",
   "gender": "male",
   "description": "young, eager, earnest",
-  "file": "squire_m.mp3"
+  "file": "squire_m.mp3",
+  "elevenlabs_voice_id": "caMv6k68QlcJYOwojGBP",
+  "v": "202610252302",
+  "moods": {
+   "calm": "mood/squire_m.calm.mp3",
+   "joy": "mood/squire_m.joy.mp3",
+   "anger": "mood/squire_m.anger.mp3",
+   "fear": "mood/squire_m.fear.mp3",
+   "sadness": "mood/squire_m.sadness.mp3"
+  }
  },
  {
   "id": "rogue_m",
   "name": "Silas",
   "gender": "male",
   "description": "smooth, sly, amused",
-  "file": "rogue_m.mp3"
+  "file": "rogue_m.mp3",
+  "elevenlabs_voice_id": "Eghu2t5KitGQAOCpqfX4",
+  "v": "202610252308",
+  "moods": {
+   "calm": "mood/rogue_m.calm.mp3",
+   "joy": "mood/rogue_m.joy.mp3",
+   "anger": "mood/rogue_m.anger.mp3",
+   "fear": "mood/rogue_m.fear.mp3",
+   "sadness": "mood/rogue_m.sadness.mp3",
+   "seductive": "mood/rogue_m.seductive.mp3"
+  }
  },
  {
   "id": "captain_m",
   "name": "Captain Rook",
   "gender": "male",
   "description": "stern, barking, authoritative",
-  "file": "captain_m.mp3"
+  "file": "captain_m.mp3",
+  "elevenlabs_voice_id": "brWG1ki5XQOzzwyfoTrn",
+  "v": "202610252302",
+  "moods": {
+   "calm": "mood/captain_m.calm.mp3",
+   "joy": "mood/captain_m.joy.mp3",
+   "anger": "mood/captain_m.anger.mp3",
+   "fear": "mood/captain_m.fear.mp3",
+   "sadness": "mood/captain_m.sadness.mp3",
+   "seductive": "mood/captain_m.seductive.mp3"
+  }
  },
  {
   "id": "farmer_m",
   "name": "Hob",
   "gender": "male",
   "description": "slow, gentle, country",
-  "file": "farmer_m.mp3"
+  "file": "farmer_m.mp3",
+  "elevenlabs_voice_id": "z3npNimWU2Q99Fuv7DZ4",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/farmer_m.calm.mp3",
+   "joy": "mood/farmer_m.joy.mp3",
+   "anger": "mood/farmer_m.anger.mp3",
+   "fear": "mood/farmer_m.fear.mp3",
+   "sadness": "mood/farmer_m.sadness.mp3",
+   "seductive": "mood/farmer_m.seductive.mp3"
+  }
  },
  {
   "id": "scholar_m",
   "name": "Pellam",
   "gender": "male",
   "description": "nervous, bookish, fussy",
-  "file": "scholar_m.mp3"
+  "file": "scholar_m.mp3",
+  "elevenlabs_voice_id": "UbtpaeUZvL90k0l8Wcge",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/scholar_m.calm.mp3",
+   "joy": "mood/scholar_m.joy.mp3",
+   "anger": "mood/scholar_m.anger.mp3",
+   "fear": "mood/scholar_m.fear.mp3",
+   "sadness": "mood/scholar_m.sadness.mp3",
+   "seductive": "mood/scholar_m.seductive.mp3"
+  }
  },
  {
   "id": "villain_m",
   "name": "Mordrake",
   "gender": "male",
   "description": "cold, quiet, menacing",
-  "file": "villain_m.mp3"
+  "file": "villain_m.mp3",
+  "elevenlabs_voice_id": "S7mzxSLiGbDN38Y90VrS",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/villain_m.calm.mp3",
+   "joy": "mood/villain_m.joy.mp3",
+   "anger": "mood/villain_m.anger.mp3",
+   "fear": "mood/villain_m.fear.mp3",
+   "sadness": "mood/villain_m.sadness.mp3",
+   "seductive": "mood/villain_m.seductive.mp3"
+  }
  },
  {
   "id": "king_m",
   "name": "King Edric",
   "gender": "male",
   "description": "grand, resonant, weary",
-  "file": "king_m.mp3"
+  "file": "king_m.mp3",
+  "elevenlabs_voice_id": "XwRLQWLmx80H6DRG1E1p",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/king_m.calm.mp3",
+   "joy": "mood/king_m.joy.mp3",
+   "anger": "mood/king_m.anger.mp3",
+   "fear": "mood/king_m.fear.mp3",
+   "sadness": "mood/king_m.sadness.mp3"
+  }
  },
  {
   "id": "hooded_x",
   "name": "Veil",
   "gender": "female",
   "description": "hushed, mysterious, androgynous",
-  "file": "hooded_x.mp3"
+  "file": "hooded_x.mp3",
+  "elevenlabs_voice_id": "ZpMNj1mm3rH65C27Ox65",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/hooded_x.calm.mp3",
+   "joy": "mood/hooded_x.joy.mp3",
+   "anger": "mood/hooded_x.anger.mp3",
+   "fear": "mood/hooded_x.fear.mp3",
+   "sadness": "mood/hooded_x.sadness.mp3",
+   "seductive": "mood/hooded_x.seductive.mp3"
+  }
+ },
+ {
+  "id": "undead_m",
+  "name": "The Hollow One",
+  "gender": "male",
+  "description": "A hollow, rasping undead being, like a risen skeleton lich or a corpse: a dry, whispering, echoing voice with a deep rattling breath, grave-cold, slow and menacing, ancient and rotting, hissing sibilants, inhuman",
+  "file": "undead_m.mp3",
+  "elevenlabs_voice_id": "qWl84XXOIPciOk3Z0tTm",
+  "v": "202610252303",
+  "moods": {
+   "calm": "mood/undead_m.calm.mp3",
+   "joy": "mood/undead_m.joy.mp3",
+   "anger": "mood/undead_m.anger.mp3",
+   "fear": "mood/undead_m.fear.mp3",
+   "sadness": "mood/undead_m.sadness.mp3"
+  }
+ },
+ {
+  "id": "dragon_m",
+  "name": "Ashmaw",
+  "gender": "male",
+  "description": "A colossal ancient dragon: an extremely deep, booming, resonant voice with a growling rumble in the chest, slow, majestic and imperious, theatrical British accent, rumbling bass, vast and powerful, with a hint of amusement and menace",
+  "file": "dragon_m.mp3",
+  "elevenlabs_voice_id": "T4FeFqPrlVLHigR27E57",
+  "v": "202610252304",
+  "moods": {
+   "calm": "mood/dragon_m.calm.mp3",
+   "joy": "mood/dragon_m.joy.mp3",
+   "anger": "mood/dragon_m.anger.mp3",
+   "fear": "mood/dragon_m.fear.mp3",
+   "sadness": "mood/dragon_m.sadness.mp3"
+  }
  }
 ]

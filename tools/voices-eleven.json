@@ -125,8 +125,8 @@
   "id": "shy_f",
   "name": "Wren",
   "gender": "female",
-  "age": 15,
-  "description": "A shy teenage girl of about fifteen, soft, quiet and gentle, hesitant and a little timid, sweet and young-sounding. Clean studio recording.",
+  "age": 21,
+  "description": "A soft-spoken, timid woman in her early twenties, light, gentle and quiet, hesitant and sweet, a little breathy and nervous. Clean studio recording.",
   "preview_text": "Um, hello. I'm sorry to bother you. I was just wondering if you knew where the old bridge is? I think I'm a bit lost, and it's getting dark.",
   "script": "[shy, hesitant] Um... hello. I'm sorry, I didn't mean to bother you. [excited, breathless] Oh! Is that a real sword? That's amazing! [scared, small] Please don't tell my father I came here.",
   "moods": {
@@ -203,14 +203,16 @@
    "fear": "[nervous, hushed] Keep it down, lads. Those cloaked fellows in the corner. I don't like their look.",
    "sadness": "[low, wistful] The old place was always louder, back when she was alive.",
    "seductive": "[warm, playful, rumbling] Ah, don't mind me, I'm just a big softie. Stay for another, eh?"
-  }
+  },
+  "seed": 2024,
+  "mood_stability": 0.7
  },
  {
   "id": "squire_m",
   "name": "Tam",
   "gender": "male",
   "age": 16,
-  "description": "A teenage boy of about sixteen, eager earnest voice, a little high and quick, enthusiastic and a bit nervous, young-sounding. Clean studio recording.",
+  "description": "A young-sounding eager man, boyish, earnest and a little high and quick, enthusiastic and slightly nervous, an apprentice squire. Clean studio recording.",
   "preview_text": "Sir, sir! I polished your armour twice, and I fed the horses, and I sharpened the sword just like you showed me. Can I come with you this time? Please?",
   "script": "[eager, excited] Sir, sir! I polished your armour twice! Can I come? [angry, cracking] I'm not a boy! I can fight, I swear it! [small, scared] ...I'm really glad you're here. It's dark.",
   "moods": {
@@ -236,7 +238,9 @@
    "fear": "[tense, whispering] Guards. Two of them, maybe three. Don't turn around.",
    "sadness": "[quiet, regretful] I had a brother, once. We were both fools.",
    "seductive": "[low, velvety, seductive] Well now. If I'd known you'd be here, I'd have worn something nicer."
-  }
+  },
+  "seed": 2024,
+  "mood_stability": 0.7
  },
  {
   "id": "captain_m",

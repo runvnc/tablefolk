@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-25
 
+- **All 22 library voices acted**, with mood samples; new monster voices (`undead_m`, `dragon_m`) used by default for skeletons, zombies and ghosts, and dragons, giants, trolls, orcs and demons; a `seductive` mood for characters written that way. States in `voices-state-18m-v5-*.bin` on R2 (about 325 MB, a voice starts in about 90 ms).
+
 - **Steadier voice identity**: mood and main samples of a voice share one seed and steadier ElevenLabs settings; Gemini 4 Argon rates "same speaker" 9-10 of 10 across a voice's samples and its clones (the dwarf was 5). States rebuilt (`-v4`).
 
 - **Mood voices** (a test): the five acted voices have a sample per mood; a character speaks in the clone for its strongest feeling (fear whispers, sadness is slow and breathy). The admin page has a button per mood. Anger needs a redo.
