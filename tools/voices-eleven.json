@@ -46,8 +46,8 @@
    "calm": "[calm, kindly] Ah, good morning. Do sit. I was just reading about dragons.",
    "joy": "[delighted, chuckling] Marvelous! It worked! Oh, I haven't felt this young in years!",
    "anger": "[stern, thundering] Enough! You have no idea what you have unleashed upon this world!",
-   "fear": "[alarmed, shaking] By the stars... it has woken. We must leave, now, quickly!",
-   "sadness": "[sorrowful, soft] I have buried many good friends. I am tired of burying friends."
+   "fear": "[alarmed, shaking, thin elderly voice] By the stars... it has woken. We must leave, now, quickly!",
+   "sadness": "[sorrowful, soft, thin elderly voice] I have buried many good friends. I am tired of burying friends."
   }
  },
  {
@@ -60,11 +60,11 @@
   "preview_text": "Aye, come in, come in, mind the sparks! I have been hammering since dawn and my throat is drier than the forge. If ye want a good blade ye'll pay a fair price, and nae haggling, ye hear me?",
   "script": "[booming, jolly] Ha! Another thirsty customer, aye? [furious] You call that a blade? I'd not use it to butter bread! [grudging respect, quiet] ...Fine. Fine. That's good steel. Bring me more.",
   "moods": {
-   "calm": "[gruff, calm] Aye, I can have that blade ready by morning. Two silver, no haggling.",
-   "joy": "[roaring laughter] Ha ha! Now that's a proper ale! Drinks are on me tonight, lads!",
+   "calm": "[gruff, calm] Aye, I can have that blade ready by morning. Two silver, nae haggling, ye ken?",
+   "joy": "[roaring laughter] Ha ha! Now that's a proper ale, aye! Drinks are on me tonight, lads!",
    "anger": "[furious, bellowing] Ye dare insult my forge?! I'll hammer ye flat, ye wee scunner!",
-   "fear": "[nervous, hushed] Och, there's something in the mine. I dinnae like it. Quiet now.",
-   "sadness": "[low, heavy] My brother's hammer. I couldnae lift it after he fell. Still cannae."
+   "fear": "[nervous, hushed, still gruff and deep] Och, there's something in the mine. I dinnae like it, lads. Quiet now.",
+   "sadness": "[low, heavy, deep] My brother's hammer. I couldnae lift it after he fell, aye. Still cannae."
   }
  },
  {

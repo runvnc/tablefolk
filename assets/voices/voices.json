@@ -6,7 +6,7 @@
   "description": "young, bright and hopeful, a little breathless",
   "file": "hero_young_f.mp3",
   "elevenlabs_voice_id": "fJalrSnGs9MWWsnHJJpn",
-  "v": "202610252147",
+  "v": "202610252208",
   "moods": {
    "calm": "mood/hero_young_f.calm.mp3",
    "joy": "mood/hero_young_f.joy.mp3",
@@ -29,7 +29,7 @@
   "description": "low, smooth and confident, a purr",
   "file": "sorceress_f.mp3",
   "elevenlabs_voice_id": "aM3TnWZWCNkM6PqQ9wb3",
-  "v": "202610252147",
+  "v": "202610252209",
   "moods": {
    "calm": "mood/sorceress_f.calm.mp3",
    "joy": "mood/sorceress_f.joy.mp3",
@@ -52,7 +52,7 @@
   "description": "gravelly old crone, cackling",
   "file": "crone_f.mp3",
   "elevenlabs_voice_id": "9MbF1XDKdQH3F704MkTs",
-  "v": "202610252147",
+  "v": "202610252208",
   "moods": {
    "calm": "mood/crone_f.calm.mp3",
    "joy": "mood/crone_f.joy.mp3",
@@ -96,7 +96,7 @@
   "description": "gravelly, gruff, hearty",
   "file": "dwarf_m.mp3",
   "elevenlabs_voice_id": "5myl6xq5hZzD9TBaLfN9",
-  "v": "202610252147",
+  "v": "202610252208",
   "moods": {
    "calm": "mood/dwarf_m.calm.mp3",
    "joy": "mood/dwarf_m.joy.mp3",
@@ -119,7 +119,7 @@
   "description": "old, wise, dry and slow",
   "file": "wizard_m.mp3",
   "elevenlabs_voice_id": "ciOvFeGvfBc7Q22wvHz2",
-  "v": "202610252147",
+  "v": "202610252208",
   "moods": {
    "calm": "mood/wizard_m.calm.mp3",
    "joy": "mood/wizard_m.joy.mp3",

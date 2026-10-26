@@ -214,7 +214,7 @@
     // Voice states (what the encoder and the first pass through the model make
     // of a sample) are kept in IndexedDB, per engine, so a voice is ready at
     // once on the next visit. Only the small engine's worker speaks this.
-    stateKey(k){ return this.engine+':v3:'+k; }
+    stateKey(k){ return this.engine+':v4:'+k; }
     stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
     async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
     async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
@@ -222,8 +222,8 @@
       if(this.engine!=='pocket-18m') return null;
       try{
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
-        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v3.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
-        const r=await fetch(base+'voices-state-18m-v3.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
+        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v4.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
+        const r=await fetch(base+'voices-state-18m-v4.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength===e.end-e.start?buf:null;
       }catch{ return null; }
     }

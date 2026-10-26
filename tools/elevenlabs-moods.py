@@ -15,9 +15,13 @@ want = set(sys.argv[1:])
 for v in cfg:
     if (want and v['id'] not in want) or 'moods' not in v: continue
     e = next(x for x in idx if x['id'] == v['id']); vid = e['elevenlabs_voice_id']; e['moods'] = {}
+    # one seed and steady settings for every sample of a voice (stability .3 let the identity drift: the dwarf scored 5 of 10 for "same speaker", 9 with these)
+    def say(text):
+        r = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128', data=json.dumps({'text': text, 'model_id': 'eleven_v4', 'seed': v.get('seed', 4242), 'voice_settings': {'stability': v.get('mood_stability', .5), 'similarity_boost': v.get('mood_similarity', .95), 'use_speaker_boost': True, 'style': 0}}).encode(), headers={'xi-api-key': KEY, 'Content-Type': 'application/json'})
+        return urllib.request.urlopen(r, timeout=240).read()
     for mood, text in v['moods'].items():
-        r = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128', data=json.dumps({'text': text, 'model_id': 'eleven_v4', 'voice_settings': {'stability': .3, 'similarity_boost': .8}}).encode(), headers={'xi-api-key': KEY, 'Content-Type': 'application/json'})
-        audio = urllib.request.urlopen(r, timeout=240).read(); name = f'mood/{v["id"]}.{mood}.mp3'; open(f'{OUT}/{name}', 'wb').write(audio); e['moods'][mood] = name
+        audio = say(text); name = f'mood/{v["id"]}.{mood}.mp3'; open(f'{OUT}/{name}', 'wb').write(audio); e['moods'][mood] = name
         print(v['id'], mood, len(audio) // 1024, 'KB', flush=True)
+    open(f'{OUT}/{v["id"]}.mp3', 'wb').write(say(v['script'])); print(v['id'], 'main sample', flush=True)
     e['v'] = time.strftime('%Y%m%d%H%M')
 json.dump(idx, open(idx_path, 'w'), indent=1)
