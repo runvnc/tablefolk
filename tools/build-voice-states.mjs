@@ -1,22 +1,22 @@
 // Precompute the Pocket-TTS (small engine) voice states of the designed voice
-// library (assets/voices/) in a headless Chrome and write them in the format of
-// the engine's own voices.bin (PTVB1 records), so a first visit needs no encoder
-// and no prefill: work/voice-states/voices-state-18m-v5-N.bin and .json (the byte
-// range of each "pack:<id>"). Upload both to R2 under pocket-tts/ (docs: assets.md).
-// Re-run after changing a voice's sample (and bump the key "v1" in the manager).
-//   node tools/build-voice-states.mjs [base=http://localhost:8001]   (needs launch-chrome.sh running)
+// library (assets/voices/) in a headless Chrome and write each as its own file in
+// the format of the engine's own voices.bin (PTVB1 records), so a first visit needs
+// no encoder and no prefill: work/voice-states/v6/<id>.bin and <id>@<mood>.bin (the
+// voice "pack:<id>"). Upload them to R2 under pocket-tts/states-v6/ (docs: assets.md).
+// Re-run for the voices whose samples changed and upload just those files.
+//   node tools/build-voice-states.mjs [voice id ...] [--base=http://localhost:8001]   (needs launch-chrome.sh running)
 import { chromium } from './browser-test/node_modules/playwright-core/index.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
-const base = process.argv[2] || 'http://localhost:8001', out = new URL('../work/voice-states/', import.meta.url).pathname;
+const args = process.argv.slice(2), base = (args.find(a => a.startsWith('--base=')) || '--base=http://localhost:8001').slice(7), only = args.filter(a => !a.startsWith('--')), out = new URL('../work/voice-states/v6/', import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223'), page = await b.contexts()[0].newPage();
-await page.goto(base + '/app/?norender=1&t=' + Date.now());
+await page.goto(base + '/app/?norender=1&states=/none/&t=' + Date.now());   // states=/none/: never take a state from R2, compute it
 await page.waitForFunction(() => window.tablefolkTTS && window.TABLEFOLK_PACK_VOICES, null, { timeout: 60000 });
 const ids = await page.evaluate(async () => {
   indexedDB.deleteDatabase('tablefolk-pocket-tts-states'); await new Promise(r => setTimeout(r, 300));
   await window.tablefolkTTS.load(); return window.TABLEFOLK_PACK_VOICES.flatMap(v => [v.id, ...Object.keys(v.moods || {}).map(k => v.id + '@' + k)]);
-});
-const files = [[]], index = {}; let pos = 0, fsz = 0;
+}).then(all => only.length ? all.filter(i => only.includes(i.slice(5).split('@')[0])) : all);
+let pos = 0;
 for (const id of ids) {
   const b64 = await page.evaluate(async id => {
     const T = window.tablefolkTTS; T.telemetry.firstAudioMs = null;
@@ -34,10 +34,8 @@ for (const id of ids) {
     const buf = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { buf.set(p, o); o += p.length; }
     let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000)); return btoa(s);
   }, id);
-  const buf = Buffer.from(b64, 'base64'); if (fsz + buf.length > 200e6) { files.push([]); fsz = 0; }   // wrangler takes 300 MiB at most
-  index[id] = { f: files.length - 1, start: fsz, end: fsz + buf.length }; fsz += buf.length; pos += buf.length; files.at(-1).push(buf);
+  const buf = Buffer.from(b64, 'base64'); pos += buf.length; writeFileSync(out + id.slice(5) + '.bin', buf);
   console.log(id, Math.round(buf.length / 1024), 'KB');
 }
-files.forEach((c, i) => writeFileSync(out + `voices-state-18m-v5-${i}.bin`, Buffer.concat(c))); writeFileSync(out + 'voices-state-18m-v5.json', JSON.stringify(index));
 console.log('wrote', out, Math.round(pos / 1048576), 'MB');
 await page.close(); await b.close().catch(() => {});
