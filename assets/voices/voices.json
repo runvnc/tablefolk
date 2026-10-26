@@ -6,7 +6,14 @@
   "description": "young, bright and hopeful, a little breathless",
   "file": "hero_young_f.mp3",
   "elevenlabs_voice_id": "fJalrSnGs9MWWsnHJJpn",
-  "v": "20261026a"
+  "v": "202610252147",
+  "moods": {
+   "calm": "mood/hero_young_f.calm.mp3",
+   "joy": "mood/hero_young_f.joy.mp3",
+   "anger": "mood/hero_young_f.anger.mp3",
+   "fear": "mood/hero_young_f.fear.mp3",
+   "sadness": "mood/hero_young_f.sadness.mp3"
+  }
  },
  {
   "id": "innkeeper_f",
@@ -22,7 +29,14 @@
   "description": "low, smooth and confident, a purr",
   "file": "sorceress_f.mp3",
   "elevenlabs_voice_id": "aM3TnWZWCNkM6PqQ9wb3",
-  "v": "20261026a"
+  "v": "202610252147",
+  "moods": {
+   "calm": "mood/sorceress_f.calm.mp3",
+   "joy": "mood/sorceress_f.joy.mp3",
+   "anger": "mood/sorceress_f.anger.mp3",
+   "fear": "mood/sorceress_f.fear.mp3",
+   "sadness": "mood/sorceress_f.sadness.mp3"
+  }
  },
  {
   "id": "noble_f",
@@ -38,7 +52,14 @@
   "description": "gravelly old crone, cackling",
   "file": "crone_f.mp3",
   "elevenlabs_voice_id": "9MbF1XDKdQH3F704MkTs",
-  "v": "20261026a"
+  "v": "202610252147",
+  "moods": {
+   "calm": "mood/crone_f.calm.mp3",
+   "joy": "mood/crone_f.joy.mp3",
+   "anger": "mood/crone_f.anger.mp3",
+   "fear": "mood/crone_f.fear.mp3",
+   "sadness": "mood/crone_f.sadness.mp3"
+  }
  },
  {
   "id": "shy_f",
@@ -75,7 +96,14 @@
   "description": "gravelly, gruff, hearty",
   "file": "dwarf_m.mp3",
   "elevenlabs_voice_id": "5myl6xq5hZzD9TBaLfN9",
-  "v": "20261026a"
+  "v": "202610252147",
+  "moods": {
+   "calm": "mood/dwarf_m.calm.mp3",
+   "joy": "mood/dwarf_m.joy.mp3",
+   "anger": "mood/dwarf_m.anger.mp3",
+   "fear": "mood/dwarf_m.fear.mp3",
+   "sadness": "mood/dwarf_m.sadness.mp3"
+  }
  },
  {
   "id": "tavern_m",
@@ -91,7 +119,14 @@
   "description": "old, wise, dry and slow",
   "file": "wizard_m.mp3",
   "elevenlabs_voice_id": "ciOvFeGvfBc7Q22wvHz2",
-  "v": "20261026a"
+  "v": "202610252147",
+  "moods": {
+   "calm": "mood/wizard_m.calm.mp3",
+   "joy": "mood/wizard_m.joy.mp3",
+   "anger": "mood/wizard_m.anger.mp3",
+   "fear": "mood/wizard_m.fear.mp3",
+   "sadness": "mood/wizard_m.sadness.mp3"
+  }
  },
  {
   "id": "squire_m",

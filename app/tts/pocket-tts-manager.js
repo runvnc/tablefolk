@@ -89,7 +89,9 @@
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     // a preview (the admin page's Try it): speaks even when the player has speech off
     speakTest(text,voiceId){ if(!text?.trim())return; this.queue.push({agent:{id:'preview'},text:String(text).slice(0,300),voice:voiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
-    speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:voiceId||cfg.ttsVoiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
+    // a library voice with mood samples speaks in the one for the character's strongest feeling (mind.js: joy, fear, anger, sadness at .45 or more), else its main sample
+    moodVoice(agent,voice){ const v=voice?.startsWith('pack:')&&!voice.includes('@')&&(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===voice); if(!v?.moods) return voice; try{ if(!agent||agent.id==='player'||agent.id==='preview') return voice; const mood=window.tablefolkMind?.mindOf?.(agent)?.mood; if(!mood) return voice; let best=null; for(const k of ['anger','fear','sadness','joy']) if(v.moods[k]&&mood[k]>=.45&&(!best||mood[k]>mood[best])) best=k; return best?voice+'@'+best:voice; }catch{ return voice; } }
+    speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
     async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
@@ -195,13 +197,13 @@
     // uploaded sample (kept for this page only), used as custom:pack-<id>.
     async ensurePack(id){
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
-      const v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id); if(!v) throw new Error('unknown voice '+id);
-      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+v.file+':'+(v.v||'')), hit=await this.loadState(ck);
+      const [baseId,mood]=id.split('@'), v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===baseId); if(!v) throw new Error('unknown voice '+id); const file=(mood&&v.moods?.[mood])||v.file;
+      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+file+':'+(v.v||'')), hit=await this.loadState(ck);
       if(hit){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await this.useState(rec,hit); return 'custom:'+key; }
       // precomputed on R2 (tools/build-voice-states.mjs): a range of one file, no encoder, no prefill
       const pre=await this.fetchPrecomputed(id);
       if(pre){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_bin',data:{voiceId:key,buf:pre}},[pre]); }); return 'custom:'+key; }
-      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
+      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
       const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
       let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }
@@ -212,7 +214,7 @@
     // Voice states (what the encoder and the first pass through the model make
     // of a sample) are kept in IndexedDB, per engine, so a voice is ready at
     // once on the next visit. Only the small engine's worker speaks this.
-    stateKey(k){ return this.engine+':v2:'+k; }
+    stateKey(k){ return this.engine+':v3:'+k; }
     stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
     async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
     async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
@@ -220,8 +222,8 @@
       if(this.engine!=='pocket-18m') return null;
       try{
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
-        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v2.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
-        const r=await fetch(base+'voices-state-18m-v2.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
+        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v3.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
+        const r=await fetch(base+'voices-state-18m-v3.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength===e.end-e.start?buf:null;
       }catch{ return null; }
     }

@@ -1,7 +1,7 @@
 // Precompute the Pocket-TTS (small engine) voice states of the designed voice
 // library (assets/voices/) in a headless Chrome and write them in the format of
 // the engine's own voices.bin (PTVB1 records), so a first visit needs no encoder
-// and no prefill: work/voice-states/voices-state-18m-v2.bin and .json (the byte
+// and no prefill: work/voice-states/voices-state-18m-v3.bin and .json (the byte
 // range of each "pack:<id>"). Upload both to R2 under pocket-tts/ (docs: assets.md).
 // Re-run after changing a voice's sample (and bump the key "v1" in the manager).
 //   node tools/build-voice-states.mjs [base=http://localhost:8001]   (needs launch-chrome.sh running)
@@ -14,7 +14,7 @@ await page.goto(base + '/app/?norender=1&t=' + Date.now());
 await page.waitForFunction(() => window.tablefolkTTS && window.TABLEFOLK_PACK_VOICES, null, { timeout: 60000 });
 const ids = await page.evaluate(async () => {
   indexedDB.deleteDatabase('tablefolk-pocket-tts-states'); await new Promise(r => setTimeout(r, 300));
-  await window.tablefolkTTS.load(); return window.TABLEFOLK_PACK_VOICES.map(v => v.id);
+  await window.tablefolkTTS.load(); return window.TABLEFOLK_PACK_VOICES.flatMap(v => [v.id, ...Object.keys(v.moods || {}).map(k => v.id + '@' + k)]);
 });
 const chunks = [], index = {}; let pos = 0;
 for (const id of ids) {
@@ -37,6 +37,6 @@ for (const id of ids) {
   const buf = Buffer.from(b64, 'base64'); index[id] = { start: pos, end: pos + buf.length }; pos += buf.length; chunks.push(buf);
   console.log(id, Math.round(buf.length / 1024), 'KB');
 }
-writeFileSync(out + 'voices-state-18m-v2.bin', Buffer.concat(chunks)); writeFileSync(out + 'voices-state-18m-v2.json', JSON.stringify(index));
+writeFileSync(out + 'voices-state-18m-v3.bin', Buffer.concat(chunks)); writeFileSync(out + 'voices-state-18m-v3.json', JSON.stringify(index));
 console.log('wrote', out, Math.round(pos / 1048576), 'MB');
 await page.close(); await b.close().catch(() => {});
