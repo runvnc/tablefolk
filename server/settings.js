@@ -72,7 +72,7 @@ export function voices() {
 // The designed voice library (assets/voices/voices.json, tools/fal-voices.py):
 // ids as characters name them, "pack:<id>"
 export function packVoices() {
-  try { return JSON.parse(readFileSync(new URL('../assets/voices/voices.json', import.meta.url), 'utf8')).map(v => ({ id: 'pack:' + v.id, name: v.name, gender: v.gender, description: v.description })); } catch { return []; }
+  try { return JSON.parse(readFileSync(new URL('../assets/voices/voices.json', import.meta.url), 'utf8')).map(v => ({ id: 'pack:' + v.id, name: v.name, gender: v.gender, description: v.description, file: v.file })); } catch { return []; }
 }
 // For the generator's prompt: "alba (female, warm young woman), ..."
 export function voicesText() {
@@ -85,7 +85,7 @@ export function publicSettings() {
     effective: { baseURL: config[k].baseURL, model: config[k].model, key: !!config[k].apiKey, provider: config[k].provider } });
   const env = { openrouter: !!process.env.OPENROUTER_API_KEY, openai: !!process.env.OPENAI_API_KEY };
   const keys = Object.fromEntries(['openrouter', 'openai'].map(p => [p, { saved: !!saved.keys?.[p], env: env[p] }]));
-  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), worldgen: config.worldgen, guestBrain: config.guestBrain };
+  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), packVoices: packVoices(), worldgen: config.worldgen, guestBrain: config.guestBrain };
 }
 
 // patch: { characters: {baseURL, model, apiKey, clearKey}, generator: ..., worldView, voices: [{id, gender, description}] }

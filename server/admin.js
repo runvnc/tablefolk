@@ -255,7 +255,9 @@ td .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.voices td
 <label for="ttsEngine">Players' speech engine</label>
 <select id="ttsEngine"><option value="pocket-18m">Pocket-TTS small: 18M parameters, about 40 MB, English</option><option value="pocket-100m">Pocket-TTS: 100M parameters, about 120 MB, 5 languages</option></select>
 <table class="voices" style="margin-top:14px"><thead><tr><th>Voice</th><th>Gender</th><th>Description</th></tr></thead><tbody id="voices"></tbody></table>
-<div class="row"><button class="btn primary" id="saveSpeech">Save speech settings</button></div></section>
+<div class="row"><button class="btn primary" id="saveSpeech">Save speech settings</button></div>
+<h3 style="margin-top:22px">Designed voice library</h3><p class="lead">Voices made from text descriptions (<code>tools/fal-voices.py</code>, files in <code>assets/voices/</code>); characters name them as <code>pack:&lt;id&gt;</code>. Play a sample to hear it. To change one, edit <code>tools/voices.json</code> and regenerate.</p>
+<table class="voices"><thead><tr><th>Voice</th><th>Name</th><th>Gender</th><th>Description</th><th>Sample</th></tr></thead><tbody id="packvoices"></tbody></table></section>
 <section id="worlds"><h2>Worlds</h2><p class="lead">Every world built here is saved in <code>generated/</code>. Recent runs since the server started are listed first.</p>
 <h3>Recent runs</h3><table><thead><tr><th>When</th><th>Prompt</th><th>Model</th><th>Result</th></tr></thead><tbody id="recent"></tbody></table>
 <h3 style="margin-top:22px">Saved worlds</h3><table><thead><tr><th>World</th><th>Saved</th><th></th></tr></thead><tbody id="gen"></tbody></table></section>
@@ -306,6 +308,7 @@ function render(){
   $('ttsEngine').value=se.ttsEngine;
   $('gbCloud').checked=se.guestBrain?.cloud!==false; $('gbLocal').checked=!!se.guestBrain?.local;
   $('voices').innerHTML=se.voices.map(v=>'<tr data-v="'+v.id+'"><td><b>'+v.id+'</b></td><td><select><option'+(v.gender==='female'?' selected':'')+'>female</option><option'+(v.gender==='male'?' selected':'')+'>male</option></select></td><td><input value="'+esc(v.description)+'" placeholder="e.g. warm, young, a little husky"></td></tr>').join('');
+  $('packvoices').innerHTML=(se.packVoices||[]).map(v=>'<tr><td><b>'+esc(v.id)+'</b></td><td>'+esc(v.name)+'</td><td>'+esc(v.gender)+'</td><td>'+esc(v.description)+'</td><td><audio controls preload="none" src="/app/assets/voices/'+esc(v.file)+'" style="height:30px;width:200px"></audio></td></tr>').join('')||'<tr><td colspan="5" class="muted">none yet</td></tr>';
   $('recent').innerHTML=S.recent.length?S.recent.map(g=>'<tr><td class="muted">'+ago(Date.now()-g.at)+' ago</td><td>'+esc(g.prompt)+'</td><td class="muted">'+esc(g.model)+'</td><td>'+(g.ok?'<span class="pill ok">'+(g.ms/1000).toFixed(1)+' s</span> '+esc(g.title||''):'<span class="pill bad">failed</span> <span class="muted">'+esc(g.error||'')+'</span>')+'</td></tr>').join(''):'<tr><td colspan="4" class="empty">None since the server started.</td></tr>';
   $('gen').innerHTML=S.generated.length?S.generated.map(g=>'<tr><td><b>'+esc(g.title)+'</b><br><span class="muted">'+esc(g.prompt)+(g.model?' · '+esc(g.model):'')+'</span></td><td class="muted" style="white-space:nowrap">'+new Date(g.at).toLocaleDateString()+'</td><td><div class="acts">'+(g.link?'<a class="btn primary" href="'+g.link.replace('/app/#','/app/?play=1#')+'" target="_blank">Play</a><a class="btn" href="'+g.builder+'" target="_blank">Edit</a><a class="btn" href="'+g.link.replace('/app/#','/app/?dev=1#')+'" target="_blank">Dev</a>':'')+'<button class="btn danger" data-del="'+esc(g.file)+'">Delete</button></div></td></tr>').join(''):'<tr><td colspan="3" class="empty">No saved worlds yet.</td></tr>';
 }
