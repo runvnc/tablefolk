@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Voice gallery</title>
+<!-- Every designed voice: the recorded sample (ElevenLabs / fal.ai, assets/voices/) and, with "as the game says it",
+     the Pocket-TTS clone of it speaking a line you type (voice-try.html in a hidden frame). Voices with mood samples
+     show one per mood. Static: open /app/voices-gallery.html on any running server. -->
+<style>
+:root{--bg:#f6f1e7;--card:#fffaf0;--ink:#2b2620;--mut:#7a7064;--line:#e2d8c6;--acc:#6b4f2a}
+@media(prefers-color-scheme:dark){:root{--bg:#17140f;--card:#211d16;--ink:#efe7d8;--mut:#a29882;--line:#3a3328;--acc:#d9b26a}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:22px 16px 60px}h1{margin:0 0 4px}p.lead{color:var(--mut);margin:0 0 16px}
+.bar{position:sticky;top:0;background:var(--bg);padding:8px 0 12px;z-index:2;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)}
+.bar input{flex:1;min-width:240px;padding:.45rem .6rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0}
+.card h2{margin:0;font-size:1.05rem}.card .d{color:var(--mut);font-size:.88rem;margin:2px 0 8px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0}.row b{min-width:78px;font-size:.85rem;text-transform:capitalize}
+audio{height:32px;width:260px;max-width:100%}button{font:inherit;font-size:.8rem;padding:.25rem .6rem;border-radius:999px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc);color:var(--acc)}.tag{font-size:.72rem;padding:1px 7px;border-radius:999px;background:var(--line);color:var(--mut)}
+#st{color:var(--mut);font-size:.85rem}h3{margin:26px 0 0;color:var(--mut);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em}
+</style>
+<main><h1>Voice gallery</h1><p class="lead">The recorded samples, and "as the game says it": the clone Pocket-TTS makes of the sample, speaking the line below.</p>
+<div class="bar"><input id="line" value="I cannot believe it is already morning, and the gate is still closed."><span id="st"></span></div>
+<div id="acted"></div><h3>The first set (flat samples, not yet redone)</h3><div id="rest"></div>
+<iframe id="fr" title="clone" allow="autoplay" style="display:none"></iframe></main>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])), $=id=>document.getElementById(id);
+const dir='/app/assets/voices/', src=(v,f)=>dir+f+'?v='+(v.v||'');
+function card(v){
+  const moods=Object.entries(v.moods||{}), acted=!!v.elevenlabs_voice_id;
+  const row=(label,file,id)=>`<div class="row"><b>${esc(label)}</b><audio controls preload="none" src="${esc(src(v,file))}"></audio><button data-try="${esc(id)}">as the game says it</button></div>`;
+  return `<div class="card"><h2>${esc(v.name)} <span class="tag">${esc(v.id)}</span> <span class="tag">${esc(v.gender)}</span>${acted?' <span class="tag">acted (ElevenLabs v4)</span>':''}</h2><div class="d">${esc(v.description)}</div>`
+    +row(acted?'three emotions':'sample',v.file,'pack:'+v.id)+moods.map(([k,f])=>row(k,f,'pack:'+v.id+'@'+k)).join('')+'</div>';
+}
+let pending=null;
+fetch(dir+'voices.json?t='+Date.now()).then(r=>r.json()).then(list=>{
+  $('acted').innerHTML=list.filter(v=>v.elevenlabs_voice_id).map(card).join(''); $('rest').innerHTML=list.filter(v=>!v.elevenlabs_voice_id).map(card).join('');
+});
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-try]'); if(!b) return; const m={type:'try',voice:b.dataset.try,text:$('line').value}, f=$('fr');
+  if(!f.getAttribute('src')){ pending=m; $('st').textContent='loading the speech engine (first time about 40 MB)…'; f.src='/app/voice-try.html'; } else f.contentWindow.postMessage(m,location.origin); });
+addEventListener('message',e=>{ if(e.origin!==location.origin||e.data?.type!=='voice-try') return;
+  if(e.data.state==='ready'&&pending){ $('fr').contentWindow.postMessage(pending,location.origin); pending=null; return; } if(e.data.state!=='ready') $('st').textContent=e.data.text||e.data.state; });
+</script></html>
