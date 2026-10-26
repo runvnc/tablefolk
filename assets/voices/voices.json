@@ -4,7 +4,9 @@
   "name": "Mira",
   "gender": "female",
   "description": "young, bright and hopeful, a little breathless",
-  "file": "hero_young_f.mp3"
+  "file": "hero_young_f.mp3",
+  "elevenlabs_voice_id": "fJalrSnGs9MWWsnHJJpn",
+  "v": "20261026a"
  },
  {
   "id": "innkeeper_f",
@@ -18,7 +20,9 @@
   "name": "Seraphine",
   "gender": "female",
   "description": "low, smooth and confident, a purr",
-  "file": "sorceress_f.mp3"
+  "file": "sorceress_f.mp3",
+  "elevenlabs_voice_id": "aM3TnWZWCNkM6PqQ9wb3",
+  "v": "20261026a"
  },
  {
   "id": "noble_f",
@@ -32,7 +36,9 @@
   "name": "Old Maud",
   "gender": "female",
   "description": "gravelly old crone, cackling",
-  "file": "crone_f.mp3"
+  "file": "crone_f.mp3",
+  "elevenlabs_voice_id": "9MbF1XDKdQH3F704MkTs",
+  "v": "20261026a"
  },
  {
   "id": "shy_f",
@@ -67,7 +73,9 @@
   "name": "Brom",
   "gender": "male",
   "description": "gravelly, gruff, hearty",
-  "file": "dwarf_m.mp3"
+  "file": "dwarf_m.mp3",
+  "elevenlabs_voice_id": "5myl6xq5hZzD9TBaLfN9",
+  "v": "20261026a"
  },
  {
   "id": "tavern_m",
@@ -81,7 +89,9 @@
   "name": "Orlen",
   "gender": "male",
   "description": "old, wise, dry and slow",
-  "file": "wizard_m.mp3"
+  "file": "wizard_m.mp3",
+  "elevenlabs_voice_id": "ciOvFeGvfBc7Q22wvHz2",
+  "v": "20261026a"
  },
  {
   "id": "squire_m",

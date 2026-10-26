@@ -4,7 +4,7 @@
   // the whole clip in one tensor, and long / frame-un-aligned inputs make ONNX
   // throw (surfacing as 'worker error <number>'). Cap at 12 s and frame-align
   // to the model's samples-per-frame (1920 @ 24 kHz) so encoding always works.
-  const MAX_CUSTOM_VOICE_SAMPLES = 24000 * 12;   // 12 seconds at 24 kHz
+  const MAX_CUSTOM_VOICE_SAMPLES = 24000 * 16;   // 16 seconds at 24 kHz
   const CUSTOM_FRAME = 1920;                      // MIMI samples per frame
   const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 
@@ -196,12 +196,12 @@
     async ensurePack(id){
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
       const v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id); if(!v) throw new Error('unknown voice '+id);
-      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+v.file), hit=await this.loadState(ck);
+      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+v.file+':'+(v.v||'')), hit=await this.loadState(ck);
       if(hit){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await this.useState(rec,hit); return 'custom:'+key; }
       // precomputed on R2 (tools/build-voice-states.mjs): a range of one file, no encoder, no prefill
       const pre=await this.fetchPrecomputed(id);
       if(pre){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_bin',data:{voiceId:key,buf:pre}},[pre]); }); return 'custom:'+key; }
-      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file); if(!r.ok) throw new Error('voice sample '+r.status);
+      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
       const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
       let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }
@@ -212,7 +212,7 @@
     // Voice states (what the encoder and the first pass through the model make
     // of a sample) are kept in IndexedDB, per engine, so a voice is ready at
     // once on the next visit. Only the small engine's worker speaks this.
-    stateKey(k){ return this.engine+':v1:'+k; }
+    stateKey(k){ return this.engine+':v2:'+k; }
     stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
     async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
     async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
@@ -220,8 +220,8 @@
       if(this.engine!=='pocket-18m') return null;
       try{
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
-        const idx=await (this._pidx||=fetch(base+'voices-state-18m.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
-        const r=await fetch(base+'voices-state-18m.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
+        const idx=await (this._pidx||=fetch(base+'voices-state-18m-v2.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
+        const r=await fetch(base+'voices-state-18m-v2.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength===e.end-e.start?buf:null;
       }catch{ return null; }
     }

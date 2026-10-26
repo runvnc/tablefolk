@@ -1,0 +1,22 @@
+[
+ {"id":"hero_young_f","name":"Mira","gender":"female","age":23,"stability":0.3,
+  "description":"A young woman in her early twenties, bright, clear and hopeful, with a breathless, energetic quality as if she has just been running. Warm, natural, expressive and a little eager. American accent. Clean studio recording.",
+  "preview_text":"I made it, I actually made it! I know the road was long and everyone told me I would never get here, but I did, and I am not going to stop now. Come on, let's go before the gates close.",
+  "script":"[breathless, excited] I made it! Did you see that? I actually made it! [angry, frustrated] No. You don't get to decide that for me. I'm not a child anymore! [softly, vulnerable] ...I'm just scared. But I'll do it anyway."},
+ {"id":"crone_f","name":"Old Maud","gender":"female","age":75,"stability":0.3,
+  "description":"An elderly grandmother, a very old WOMAN with a female voice, seventy-five or older, rasping, crackly and wheezy, slow and mischievous, like a village witch who knows everyone's secrets. Thin aged voice with a cunning edge and a dry cackle. English countryside accent.",
+  "preview_text":"Come closer, dearie, come closer, I do not bite. I have lived in these woods since before your grandmother was born, and I have seen things that would turn your hair white. Sit by the fire and I will tell you a story.",
+  "script":"[cackling] Ehehe, a visitor! Come closer, dearie, I don't bite. [menacing, low] But the woods do. And they remember every name. [sad, wistful] I was lovely once, you know. Lovely as spring."},
+ {"id":"wizard_m","name":"Orlen","gender":"male","age":75,"stability":0.35,
+  "description":"A very old man, in his seventies or eighties, thin dry and wise, slow and thoughtful with a gentle amusement, an elderly wizard with a slight tremor of age. Warm, scholarly, British accent.",
+  "preview_text":"Ah, there you are. I was beginning to think the tea would go cold. Sit down, my dear fellow, sit down. There are a great many things I must tell you, and I am afraid I have far less time to tell them than I once did.",
+  "script":"[warm, amused] Ah, there you are. I was beginning to think the tea would go cold. [grave, urgent] Listen carefully, child. What sleeps beneath this tower must never wake. [weary, tender] I am old. Be brave for me."},
+ {"id":"dwarf_m","name":"Brom","gender":"male","age":58,"stability":0.3,
+  "description":"A gruff, stocky older man in his late fifties, very deep and gravelly with a strong Scottish burr, hearty and blunt, a dwarven blacksmith who shouts over the noise of the forge. Rough and warm.",
+  "preview_text":"Aye, come in, come in, mind the sparks! I have been hammering since dawn and my throat is drier than the forge. If ye want a good blade ye'll pay a fair price, and nae haggling, ye hear me?",
+  "script":"[booming, jolly] Ha! Another thirsty customer, aye? [furious] You call that a blade? I'd not use it to butter bread! [grudging respect, quiet] ...Fine. Fine. That's good steel. Bring me more."},
+ {"id":"sorceress_f","name":"Seraphine","gender":"female","age":32,"stability":0.3,
+  "description":"A confident woman in her early thirties, low smooth alto voice, slow, seductive but refined delivery, calm and knowing, a sorceress who enjoys making people nervous. Subtle British accent. Rich, controlled and intimate.",
+  "preview_text":"Oh, don't look so worried, darling, I only want to talk. Sit, have some wine. You see, I have been watching you for quite some time now, and I think we could be very useful to one another.",
+  "script":"[low, seductive] Oh, don't look so worried, darling. I only want to talk. [cold, cutting] But cross me again, and you'll learn what I truly am. [softly, tired] ...Even I get lonely, you know."}
+]

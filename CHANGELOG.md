@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-25
 
+- **Acted voice samples**: five voices (breathless young woman, old crone, old wizard, dwarf, sorceress) redesigned with ElevenLabs Voice Design and recorded by Eleven v4 doing three emotions each (Gemini 4 Argon rates them 9-10 for expressiveness, against 5-6 before); samples may run to 16 s; precomputed states rebuilt (`-v2` on R2).
+
 - **Admin "Try it"**: each designed voice has a button that speaks a line you type with the game's own engine (the clone, from the cached or precomputed state), through a hidden frame (`app/voice-try.html`); the page's player still plays the original sample.
 
 - **Voice states are cached**: a cloned voice (the designed library and the Voice pane's own) is processed once per browser; later visits start it in about 100 ms instead of 1.5-1.8 s. The 20 library voices' states are also precomputed on R2, so even a first visit starts in about 100 ms.
