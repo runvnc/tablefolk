@@ -8,10 +8,13 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 Recorded from one long message. Status 2026-10-25 (later): done and tested: 1-4 (undo and drag/delete without
 confirm already existed: `editor-test.mjs` passes), 5 (six new people), 6
 (20 designed voices), 8 (speech input, tested with the model card's fixture),
-10 (Bonsai 1.7B and 8B in the picker; browser run of the 1.7B tested only if
-noted in the changelog); 9 and 11 partly: Nemotron has no .litertlm yet (needs a
-machine with ~40 GB RAM: `tools/convert-litertlm.sh`), so it is an endpoint
-preset until then.
+10 (Bonsai 1-bit 1.7B in the picker via Transformers.js: tested on the RTX 2060;
+the LiteRT-LM Bonsai bundles don't run in the web engine: hidden; the bigger
+Bonsai run through an endpoint); 11 (the speech model is on R2); 9 not
+finished: Nemotron 3.5 Bolt E4B has no .litertlm and the converter
+(`tools/convert-litertlm.sh`, untested) needs a machine with about 40 GB of RAM,
+so for now it is an endpoint preset (Ollama / llama.cpp on the GGUF) and a
+hidden picker entry that waits for the converted file on R2.
 Ask first (see CLAUDE.md): paid fal.ai calls, model downloads, R2 uploads.
 
 ### A. World builder

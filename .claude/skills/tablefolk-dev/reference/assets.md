@@ -93,6 +93,13 @@ The large browser models live in the `geebr-models` R2 bucket
 (Cloudflare, `wrangler`), served under four hostnames
 (`geebr-models[-2|-3|-4].mindroot.io`). Uploads cost the owner money and
 bandwidth: ask first. `wrangler r2 object put geebr-models/<key> --file <f>
---remote` works (a first attempt can fail on the connection: repeat it); the
-speech model is under `underdog-bark-3.0/`, Bonsai bundles at the bucket root. Everything else is served from the repo. `?assets=<url>`
+--remote` works (a first attempt can fail on the connection: repeat it) but
+refuses files over 300 MiB, and a single PUT over a slow line times out (about
+200 s): split big files into 64 MiB parts `<name>.p000 ...` plus a
+`<name>.parts.json` (`{ size, partSize, parts }`) and upload those; the speech
+model's worker (`app/asr/worker.js`) reads that layout, four parts at a time
+from the four hostnames. The speech model is under `underdog-bark-3.0/`
+(fp16 and int8 variants); Bonsai (Transformers.js) loads from Hugging Face.
+The maintainer's line was about 1 MB/s each way on 2026-10-25: a 1.2 GB file
+takes half an hour. Everything else is served from the repo. `?assets=<url>`
 or `window.TABLEFOLK_ASSETS` points the app at another asset host.
