@@ -13,7 +13,7 @@ main{max-width:980px;margin:0 auto;padding:22px 16px 60px}h1{margin:0 0 4px}p.le
 .card h2{margin:0;font-size:1.05rem}.card .d{color:var(--mut);font-size:.88rem;margin:2px 0 8px}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0}.row b{min-width:78px;font-size:.85rem;text-transform:capitalize}
 audio{height:32px;width:260px;max-width:100%}button{font:inherit;font-size:.8rem;padding:.25rem .6rem;border-radius:999px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer}
-button:hover{border-color:var(--acc);color:var(--acc)}.tag{font-size:.72rem;padding:1px 7px;border-radius:999px;background:var(--line);color:var(--mut)}
+button:hover{border-color:var(--acc);color:var(--acc)}.len{font-size:.8rem;color:var(--mut);min-width:3.2em;font-variant-numeric:tabular-nums}.tag{font-size:.72rem;padding:1px 7px;border-radius:999px;background:var(--line);color:var(--mut)}
 #st{color:var(--mut);font-size:.85rem}h3{margin:26px 0 0;color:var(--mut);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em}
 </style>
 <main><h1>Voice gallery</h1><p class="lead">The recorded samples, and "as the game says it": the clone Pocket-TTS makes of the sample, speaking a line that fits the mood (calm, joy, anger, fear, sadness), or yours if you type one.</p>
@@ -25,12 +25,13 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const dir='/app/assets/voices/', src=(v,f)=>dir+f+'?v='+(v.v||'');
 function card(v){
   const moods=Object.entries(v.moods||{}), acted=!!v.elevenlabs_voice_id;
-  const row=(label,file,id)=>`<div class="row"><b>${esc(label)}</b><audio controls preload="none" src="${esc(src(v,file))}"></audio><button data-try="${esc(id)}">as the game says it</button></div>`;
+  const row=(label,file,id)=>`<div class="row"><b>${esc(label)}</b><audio controls preload="metadata" src="${esc(src(v,file))}"></audio><span class="len" title="length of this sample">…</span><button data-try="${esc(id)}">as the game says it</button></div>`;
   return `<div class="card"><h2>${esc(v.name)} <span class="tag">${esc(v.id)}</span> <span class="tag">${esc(v.gender)}</span>${acted?' <span class="tag">acted (ElevenLabs v4)</span>':''}</h2><div class="d">${esc(v.description)}</div>`
     +row(acted?'three emotions':'sample',v.file,'pack:'+v.id)+moods.map(([k,f])=>row(k,f,'pack:'+v.id+'@'+k)).join('')+'</div>';
 }
 const LINES={calm:'Good morning. The road looks quiet today.',joy:'We did it! I cannot believe we actually won!',anger:'You lied to me, and I will not forget it.',fear:'Something is moving out there. Stay close to me.',sadness:'I miss them so much. I wish they were still here.',main:'Well met, traveller. The road ahead is long, but I will walk it with you.'};
 const lineFor=voice=>$('line').value.trim()||LINES[voice.split('@')[1]||'main'];
+document.addEventListener('loadedmetadata',e=>{ const a=e.target, l=a.nextElementSibling; if(a.tagName==='AUDIO'&&l?.classList.contains('len')) l.textContent=a.duration.toFixed(1)+' s'; },true);
 let pending=null;
 fetch(dir+'voices.json?t='+Date.now()).then(r=>r.json()).then(list=>{
   $('acted').innerHTML=list.filter(v=>v.elevenlabs_voice_id).map(card).join(''); $('rest').innerHTML=list.filter(v=>!v.elevenlabs_voice_id).map(card).join('');
