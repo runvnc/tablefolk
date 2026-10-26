@@ -6,7 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-25
 
-- **Voice states are cached**: a cloned voice (the designed library and the Voice pane's own) is processed once per browser; later visits start it in about 100 ms instead of 1.5-1.8 s.
+- **Voice states are cached**: a cloned voice (the designed library and the Voice pane's own) is processed once per browser; later visits start it in about 100 ms instead of 1.5-1.8 s. The 20 library voices' states are also precomputed on R2, so even a first visit starts in about 100 ms.
 
 - **New people**: six JRPG-style Meshy characters (swordswoman, sorceress with
   a split dress, huntress, village woman, swordsman, wanderer) from concept

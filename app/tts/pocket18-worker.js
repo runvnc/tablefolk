@@ -296,6 +296,13 @@ self.onmessage = async e => {
             postMessage({ type: "voice_encoded", voiceName: "custom:" + id });
             return;
         }
+        if (type === "load_voice_bin") {
+            // a precomputed voice record (tools/build-voice-states.mjs, voices.bin's format)
+            const v = parseVoice(data.buf); customAudio.set(data.voiceId, new Float32Array(1)); customStates.set(data.voiceId, { name: data.voiceId, tensors: v.tensors });
+            postMessage({ type: "voice_state", id: data.voiceId, tensors: v.tensors });
+            postMessage({ type: "voice_encoded", voiceName: "custom:" + data.voiceId });
+            return;
+        }
         if (type === "load_voice_state") {
             // a voice state computed on an earlier visit
             customAudio.set(data.voiceId, new Float32Array(1)); customStates.set(data.voiceId, { name: data.voiceId, tensors: data.tensors });

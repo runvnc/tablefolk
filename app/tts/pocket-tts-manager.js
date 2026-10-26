@@ -12,7 +12,7 @@
   // choice: this browser's (the voice pane, localStorage tablefolkTtsEngine),
   // else the server's default (admin page, /api/voices), else the first.
   const ENGINES={
-    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261025a',languages:false},
+    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261025b',languages:false},
     'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261018a',languages:true},
   };
   let serverEngine=null;
@@ -196,6 +196,9 @@
       const v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id); if(!v) throw new Error('unknown voice '+id);
       await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+v.file), hit=await this.loadState(ck);
       if(hit){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await this.useState(rec,hit); return 'custom:'+key; }
+      // precomputed on R2 (tools/build-voice-states.mjs): a range of one file, no encoder, no prefill
+      const pre=await this.fetchPrecomputed(id);
+      if(pre){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_bin',data:{voiceId:key,buf:pre}},[pre]); }); return 'custom:'+key; }
       await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file); if(!r.ok) throw new Error('voice sample '+r.status);
       const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
@@ -211,6 +214,15 @@
     stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
     async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
     async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
+    async fetchPrecomputed(id){
+      if(this.engine!=='pocket-18m') return null;
+      try{
+        const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
+        const idx=await (this._pidx||=fetch(base+'voices-state-18m.json').then(r=>r.ok?r.json():{}).catch(()=>({}))), e=idx[id]; if(!e) return null;
+        const r=await fetch(base+'voices-state-18m.bin',{headers:{Range:`bytes=${e.start}-${e.end-1}`}}); if(!r.ok) return null;
+        const buf=await r.arrayBuffer(); return buf.byteLength===e.end-e.start?buf:null;
+      }catch{ return null; }
+    }
     useState(rec,tensors){ return new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_state',data:{voiceId:rec.id,tensors}}); }); }
     async encode(rec){ rec.cacheKey||=this.stateKey('user:'+rec.id); const hit=await this.loadState(rec.cacheKey); if(hit) return this.useState(rec,hit); if(rec.stateOnly) throw new Error('voice state missing'); return this.encodeAudio(rec); }
     async encodeAudio(rec){return new Promise((resolve,reject)=>{this.pending.set('encode',{resolve,reject});const audio=Float32Array.from(rec.audio);this.worker.postMessage({type:'encode_voice',data:{voiceId:rec.id,audio}},[audio.buffer]);});}

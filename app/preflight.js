@@ -38,7 +38,7 @@
     ['https://cdn.babylonjs.com/babylon.js'],
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
-    ['tts/pocket-tts-manager.js?v=20261025b'],
+    ['tts/pocket-tts-manager.js?v=20261025d'],
     ['tts/tts-ui.js?v=20261024a'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],
