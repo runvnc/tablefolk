@@ -129,6 +129,8 @@ async function customVoice(id) {
     for (const s of specs) { const t = r[s.output]; tensors[s.name] = { dtype: t.type, shape: [...t.dims], data: t.data.slice() }; }
     const voice = { name: id, tensors };
     customStates.set(id, voice);
+    // the page keeps it (IndexedDB), so the next visit skips the encoder and the prefill
+    postMessage({ type: "voice_state", id, tensors });
     return voice;
 }
 const voiceFor = name => name.startsWith("custom:") ? customVoice(name.slice(7)) : presetVoice(name);
@@ -292,6 +294,12 @@ self.onmessage = async e => {
             const id = data.voiceId || "custom";
             customAudio.set(id, new Float32Array(data.audio)); customStates.delete(id);
             postMessage({ type: "voice_encoded", voiceName: "custom:" + id });
+            return;
+        }
+        if (type === "load_voice_state") {
+            // a voice state computed on an earlier visit
+            customAudio.set(data.voiceId, new Float32Array(1)); customStates.set(data.voiceId, { name: data.voiceId, tensors: data.tensors });
+            postMessage({ type: "voice_encoded", voiceName: "custom:" + data.voiceId });
             return;
         }
         if (type === "delete_voice") { customAudio.delete(data.voiceId); customStates.delete(data.voiceId); return; }

@@ -154,6 +154,7 @@ with `?trustSkills=1`, or after the player allows that package.
   `tablefolk-asr-1`, a one-time download asked first; the int4 build is
   broken); or the browser's own recognition. Files are served from R2
   `underdog-bark-3.0/` (then Hugging Face); `?asr=<url>` tries a folder first.
+- Voice states: a cloned voice costs 1.5-1.8 s the first time it speaks (the 39 MB encoder, then a pass through the flow LM that makes the state preset voices ship in `voices.bin`). The small engine's worker posts the state (`voice_state`) and the manager keeps it in IndexedDB `tablefolk-pocket-tts-states` (key `<engine>:v1:pack:<id>:<file>` or `user:<id>`); next visit `load_voice_state` skips both (about 100 ms to the first sound, measured). Not done: a shipped precomputed file for first visits.
 - Voices: Pocket-TTS clones samples; the designed library
   (`assets/voices/`, `tools/fal-voices.py`, `tools/voices.json`) is
   `pack:<id>` (`ensurePack` in `pocket-tts-manager.js`).

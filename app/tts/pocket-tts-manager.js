@@ -12,7 +12,7 @@
   // choice: this browser's (the voice pane, localStorage tablefolkTtsEngine),
   // else the server's default (admin page, /api/voices), else the first.
   const ENGINES={
-    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261024a',languages:false},
+    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261025a',languages:false},
     'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261018a',languages:true},
   };
   let serverEngine=null;
@@ -84,6 +84,7 @@
       if(m.type==='audio_chunk')this.streamChunk(new Float32Array(m.data),m.metrics);
       if(m.type==='generation_metrics')Object.assign(this.telemetry,m.metrics||{});
       if(m.type==='stream_ended'){if(this.directPort){ if(!this.receivedSamples)this.finishCurrent(false); /* else: worker already told the worklet stream-ended; the worklet 'drained' event finishes this item only after every buffered sample has actually played */ }else if(this.receivedSamples){this.pendingStreamEnd=true;this.flushAudio();}else this.finishCurrent(false);}
+      if(m.type==='voice_state') this.saveState(m.id,m.tensors);
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:voiceId||cfg.ttsVoiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
@@ -193,15 +194,26 @@
     async ensurePack(id){
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
       const v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id); if(!v) throw new Error('unknown voice '+id);
+      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+v.file), hit=await this.loadState(ck);
+      if(hit){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await this.useState(rec,hit); return 'custom:'+key; }
       await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+v.file); if(!r.ok) throw new Error('voice sample '+r.status);
       const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
       let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }
-      const rec={id:key,name:v.name,audio:Array.from(audio),created:Date.now(),pack:true}; this.custom.set(key,rec); if(this.ready) await this.encode(rec); return 'custom:'+key;
+      const rec={id:key,name:v.name,audio:Array.from(audio),created:Date.now(),pack:true,cacheKey:ck}; this.custom.set(key,rec); if(this.ready) await this.encode(rec); return 'custom:'+key;
     }
     toMono(b){const out=new Float32Array(b.length);for(let c=0;c<b.numberOfChannels;c++){const d=b.getChannelData(c);for(let i=0;i<out.length;i++)out[i]+=d[i]/b.numberOfChannels;}return out;}
     resample(a,ir,or){if(ir===or)return a.slice();const n=Math.round(a.length*or/ir),o=new Float32Array(n),r=ir/or;for(let i=0;i<n;i++){const p=i*r,j=Math.floor(p),f=p-j;o[i]=(a[j]||0)*(1-f)+(a[Math.min(j+1,a.length-1)]||0)*f;}return o;}
-    async encode(rec){return new Promise((resolve,reject)=>{this.pending.set('encode',{resolve,reject});const audio=Float32Array.from(rec.audio);this.worker.postMessage({type:'encode_voice',data:{voiceId:rec.id,audio}},[audio.buffer]);});}
+    // Voice states (what the encoder and the first pass through the model make
+    // of a sample) are kept in IndexedDB, per engine, so a voice is ready at
+    // once on the next visit. Only the small engine's worker speaks this.
+    stateKey(k){ return this.engine+':v1:'+k; }
+    stateDb(){ return this._sdb||=new Promise((res,rej)=>{ const q=indexedDB.open('tablefolk-pocket-tts-states',1); q.onupgradeneeded=()=>q.result.createObjectStore('states'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+    async loadState(key){ if(this.engine!=='pocket-18m') return null; try{ const d=await this.stateDb(); return await new Promise((r,j)=>{ const q=d.transaction('states').objectStore('states').get(key); q.onsuccess=()=>r(q.result||null); q.onerror=()=>j(q.error); }); }catch{ return null; } }
+    async saveState(id,tensors){ const rec=this.custom.get(id); if(!rec||!rec.cacheKey||this.engine!=='pocket-18m') return; try{ const d=await this.stateDb(); d.transaction('states','readwrite').objectStore('states').put(tensors,rec.cacheKey); }catch(e){ console.warn('voice state not kept',e); } }
+    useState(rec,tensors){ return new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_state',data:{voiceId:rec.id,tensors}}); }); }
+    async encode(rec){ rec.cacheKey||=this.stateKey('user:'+rec.id); const hit=await this.loadState(rec.cacheKey); if(hit) return this.useState(rec,hit); if(rec.stateOnly) throw new Error('voice state missing'); return this.encodeAudio(rec); }
+    async encodeAudio(rec){return new Promise((resolve,reject)=>{this.pending.set('encode',{resolve,reject});const audio=Float32Array.from(rec.audio);this.worker.postMessage({type:'encode_voice',data:{voiceId:rec.id,audio}},[audio.buffer]);});}
     async restoreCustomVoices(){for(const rec of this.custom.values())await this.encode(rec).catch(e=>console.warn('custom voice restore',e));this.dispatchEvent(new Event('voiceschanged'));}
     async deleteVoice(id){this.custom.delete(id);await this.dbDelete(id);this.worker?.postMessage({type:'delete_voice',data:{voiceId:id}});this.dispatchEvent(new Event('voiceschanged'));}
     db(){return new Promise((res,rej)=>{const q=indexedDB.open(DB,1);q.onupgradeneeded=()=>q.result.createObjectStore(STORE,{keyPath:'id'});q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}
