@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Try a voice</title>
+<!-- The admin page's "Try it" (server/admin.js) loads this in a hidden frame: it speaks a line in
+     a voice of the designed library with the game's own engine (Pocket-TTS clone, cached or
+     precomputed voice state), so it sounds as it will in a world. Messages in:
+     { type: 'try', voice: 'pack:dwarf_m', text }   out: { type: 'voice-try', state, text } -->
+<script>window.tablefolkPacks = { base: '/app/assets/' };</script>
+<script src="./tts/pocket-tts-manager.js?v=20261025e"></script>
+<script>
+const say = (state, text) => parent.postMessage({ type: 'voice-try', state, text }, location.origin);
+fetch('/app/assets/voices/voices.json').then(r => r.json()).then(d => { window.TABLEFOLK_PACK_VOICES = d.map(v => ({ ...v, id: 'pack:' + v.id })); say('ready', ''); });
+tablefolkTTS.addEventListener('status', e => say(e.detail.state, e.detail.text));
+tablefolkTTS.addEventListener('speechstart', () => say('speaking', ''));
+tablefolkTTS.addEventListener('speechend', () => say('idle', 'done'));
+addEventListener('message', e => { if (e.origin === location.origin && e.data?.type === 'try') tablefolkTTS.speakTest(e.data.text, e.data.voice); });
+</script>
