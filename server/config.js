@@ -29,6 +29,9 @@ export const LITERT_URL = env('LITERT_URL', 'http://127.0.0.1:9379/v1');
 // Native multimodal model for speech (and image) input: litert-lm import
 // --from-huggingface-repo litert-community/gemma-4-E2B-it-litert-lm gemma-4-E2B-it.litertlm gemma4-e2b-mm
 export const SPEECH_MODEL = env('LITERT_SPEECH_MODEL', 'gemma4-e2b-mm');
+// Breeze TTS 2 on this machine (breeze-server from HoppouAI/Breeze-TTS-2.cpp,
+// tools/breeze-server.sh): the page's "Breeze" speech engine, via /api/tts/breeze/
+export const BREEZE_URL = env('BREEZE_URL', 'http://127.0.0.1:8137');
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
 export const OPENAI_URL = 'https://api.openai.com/v1';
 

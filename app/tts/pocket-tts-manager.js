@@ -14,10 +14,21 @@
   const ENGINES={
     'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261025b',languages:false},
     'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261018a',languages:true},
+    // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
+    'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
+  // Breeze is picked by itself (nothing chosen in this browser) when its
+  // server answers and the graphics card has this much room left beside the
+  // chat model (hardware.js: freeGB); a 6 GB card with Gemma E2B keeps Pocket-TTS.
+  const BREEZE_GB=4;
+  async function breezeFits(){
+    if(!window.tablefolkBreeze || !await window.tablefolkBreeze.available()) return false;
+    for(let i=0;i<40&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
+    return (window.tablefolkDevice?.freeGB??0)>=BREEZE_GB;
+  }
   let serverEngine=null;
   const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
-  async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
+  async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; if(await breezeFits()) return 'breeze'; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
   const DB='tablefolk-pocket-tts', STORE='voices';
   const CACHE_MARKER='tablefolkTtsModelCached';
   const settings=()=>({enabled:localStorage.getItem('tablefolkTtsEnabled')!=='0',language:localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04',volume:Number(localStorage.getItem('tablefolkTtsVolume')||.85),bufferMs:clamp(Number(localStorage.getItem('tablefolkTtsBufferMs')||350),150,1500)});
@@ -75,8 +86,8 @@
     engines(){return Object.entries(ENGINES).map(([id,e])=>({id,label:e.label,languages:e.languages}));}
     // Switch engines: the running one is dropped and the new one loads now.
     async setEngine(id){ if(!ENGINES[id])return; localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const engine=this.engine=await chosenEngine(), E=ENGINES[engine]; this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language}}); }); return this.pendingLoad; }
-    async onMessage(m,resolve,reject){ if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready (CPU)`,'ready');resolve?.(); await this.restoreCustomVoices();} }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const engine=this.engine=await chosenEngine(), E=ENGINES[engine]; this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language}}); }); return this.pendingLoad; }
+    async onMessage(m,resolve,reject){ if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.client?'':' (CPU)'}`,'ready');resolve?.(); await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry
       if(m.type==='audio_chunk_meta'){this.receivedSamples++;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(m.metrics?.chunkRtfx)||0;if(!this.telemetry.audioArrivalMs&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;}
@@ -202,6 +213,8 @@
     // A voice from the designed library (assets/voices/): fetched, cloned like an
     // uploaded sample (kept for this page only), used as custom:pack-<id>.
     async ensurePack(id){
+      // an engine outside the browser (Breeze) clones library voices itself, by name
+      if(ENGINES[this.engine]?.client) return id;
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
       const [baseId,mood]=id.split('@'), v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===baseId); if(!v) throw new Error('unknown voice '+id); const file=(mood&&v.moods?.[mood])||v.file;
       await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+file+':'+(v.v||'')), hit=await this.loadState(ck);

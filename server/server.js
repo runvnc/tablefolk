@@ -16,10 +16,12 @@
 //   /admin              the admin page (password set on first start;
 //                       delete .admin/password.json or pass --reset-admin to reset)
 //   /api/voices         voice genders and descriptions (set on /admin)
+//   /api/tts/breeze/... Breeze TTS 2's breeze-server on this machine (BREEZE_URL):
+//                       health, voices, streamed speech, for the owner only
 // See server/config.js for the settings.
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
-import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
+import { config, ROOT, LITERT_URL, SPEECH_MODEL, BREEZE_URL } from './config.js';
 import { handleWorld, handleGenerate, handleRevise, handleFinish, worldgenOptions } from './generate.js';
 import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
 
@@ -99,6 +101,27 @@ async function proxy(req, url, prefix, ep, ip = '', which = 'cloud', local = fal
   }
 }
 
+// Breeze TTS 2 (breeze-server) on this machine, for the page's "Breeze" speech
+// engine (app/tts/breeze-client.js). Through here the page needs no CORS from
+// breeze-server and never asks the browser for local network access. Its GPU
+// is the owner's: visitors only when the admin page opens this machine's local model to them.
+async function breezeProxy(req, url, local) {
+  const sub = url.pathname.slice('/api/tts/breeze'.length);
+  if (!['/health', '/v1/voices', '/v1/audio/speech'].includes(sub)) return Response.json({ error: 'not proxied' }, { status: 404 });
+  if (!local && !isAdmin(req) && !config.guestBrain?.local) return Response.json({ error: 'this server\'s Breeze voice is not open to visitors' }, { status: 403 });
+  try {
+    const up = await fetch(BREEZE_URL + sub, {
+      method: req.method, headers: req.headers.get('content-type') ? { 'Content-Type': req.headers.get('content-type') } : {},
+      body: req.method === 'POST' ? await req.arrayBuffer() : undefined, signal: sub === '/health' ? AbortSignal.timeout(1500) : undefined,
+    });
+    const h = { 'Content-Type': up.headers.get('content-type') || 'application/octet-stream', 'Cache-Control': 'no-store' };
+    for (const k of ['x-sample-rate', 'x-sample-format']) if (up.headers.get(k)) h[k] = up.headers.get(k);
+    return new Response(up.body, { status: up.status, headers: h });
+  } catch (e) {
+    return Response.json({ error: `breeze-server at ${BREEZE_URL} unreachable: ${e.message}` }, { status: 502 });
+  }
+}
+
 // Speech to text with Gemma 4's own audio input (litert-lm serve and a model
 // with an audio encoder). The page posts 16 kHz mono WAV.
 let speechChecked = null;
@@ -163,6 +186,7 @@ const server = Bun.serve({
     const p = url.pathname;
     // / is the landing page (index.html), served as a static file below
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud', local);
+    if (p.startsWith('/api/tts/breeze/')) return breezeProxy(req, url, local);
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local', local);
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });

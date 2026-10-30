@@ -85,7 +85,11 @@ is fast.
 Speech is on by default (unless the player turned it off). Engines (Voice
 pane; the server's admin page sets the default): Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
-languages). Voices are placed in space. The slider beside the speaker
+languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs
+outside the browser in `breeze-server` on your own computer, about 3 GB of
+graphics memory: start it with `tools/breeze-server.sh`, then pick it under
+Engine; it is picked by itself when it runs and the card has room beside the
+chat model; its weights are for non-commercial use). Voices are placed in space. The slider beside the speaker
 button in the top bar (and the Voice pane) sets their volume. The Voice pane
 can clone a voice from a sample.
 

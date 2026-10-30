@@ -14,6 +14,15 @@
    "fear": "mood/hero_young_f.fear.mp3",
    "sadness": "mood/hero_young_f.sadness.mp3",
    "seductive": "mood/hero_young_f.seductive.mp3"
+  },
+  "text": "I made it! Did you see that? I actually made it! No. You don't get to decide that for me. I'm not a child anymore! ...I'm just scared. But I'll do it anyway.",
+  "mood_text": {
+   "calm": "Hi. I was just heading into town, if you want to walk with me.",
+   "joy": "Oh, it's wonderful! I can't believe it actually worked. Thank you!",
+   "anger": "I trusted you. And you lied to my face.",
+   "fear": "Did you hear that? Something's out there. Please, don't leave me alone.",
+   "sadness": "I really thought we'd make it home. I'm sorry. I'm so sorry.",
+   "seductive": "Oh, don't look at me like that. You'll make a girl blush."
   }
  },
  {
@@ -31,6 +40,15 @@
    "fear": "mood/innkeeper_f.fear.mp3",
    "sadness": "mood/innkeeper_f.sadness.mp3",
    "seductive": "mood/innkeeper_f.seductive.mp3"
+  },
+  "text": "Come in, love, come in! Sit down by the fire. And mind my floors, or you'll be scrubbing them yourself! There now. You look like you could use a hug.",
+  "mood_text": {
+   "calm": "Stew's on the table, love. Take as long as you like.",
+   "joy": "Oh, bless you! That's the best news I've had all year!",
+   "anger": "Not in my inn, you don't. Out. The lot of you.",
+   "fear": "Did you hear that on the stairs? Lock the door, quick.",
+   "sadness": "My Albert used to sit just there. I still set his place.",
+   "seductive": "Well now, aren't you a handsome one. Stay a while, love."
   }
  },
  {
@@ -48,6 +66,15 @@
    "fear": "mood/sorceress_f.fear.mp3",
    "sadness": "mood/sorceress_f.sadness.mp3",
    "seductive": "mood/sorceress_f.seductive.mp3"
+  },
+  "text": "Oh, don't look so worried, darling. I only want to talk. But cross me again, and you'll learn what I truly am. ...Even I get lonely, you know.",
+  "mood_text": {
+   "calm": "Good evening. Sit, and let me look at you. Don't be shy.",
+   "joy": "Oh, how wonderful. You actually did it. I'm almost impressed.",
+   "anger": "You will regret that. I promise you, darling, you will regret that.",
+   "fear": "That power... it isn't mine. It's using me. Help me.",
+   "sadness": "I loved him once. Funny, how magic can't undo that.",
+   "seductive": "Come closer, darling. I promise I won't bite. Much."
   }
  },
  {
@@ -65,6 +92,15 @@
    "fear": "mood/noble_f.fear.mp3",
    "sadness": "mood/noble_f.sadness.mp3",
    "seductive": "mood/noble_f.seductive.mp3"
+  },
+  "text": "Good evening. How very good of you to come. You will address me properly, or not at all. ...I was not always this unkind.",
+  "mood_text": {
+   "calm": "Do sit. The tea will be along presently.",
+   "joy": "Oh, how perfectly marvellous! I had quite given up hope!",
+   "anger": "How dare you. You forget whom you are addressing.",
+   "fear": "They are inside the walls. Please, we must go. Now.",
+   "sadness": "He promised he would return before the winter. It is nearly spring.",
+   "seductive": "You are staring, darling. Do go on; I rather like it."
   }
  },
  {
@@ -81,6 +117,14 @@
    "anger": "mood/crone_f.anger.mp3",
    "fear": "mood/crone_f.fear.mp3",
    "sadness": "mood/crone_f.sadness.mp3"
+  },
+  "text": "Ehehe, a visitor! Come closer, dearie, I don't bite. But the woods do. And they remember every name. I was lovely once, you know. Lovely as spring.",
+  "mood_text": {
+   "calm": "Sit down, dearie. The kettle's on, and the night is young.",
+   "joy": "Ehehehe! Oh, that's the best news I've had in a hundred years!",
+   "anger": "Get out of my house. Before I curse your bones to dust.",
+   "fear": "No, no, it's coming. I can feel it in the roots. Run, child, run!",
+   "sadness": "They're all gone now, the ones I knew. Just me and the wind."
   }
  },
  {
@@ -97,6 +141,14 @@
    "anger": "mood/shy_f.anger.mp3",
    "fear": "mood/shy_f.fear.mp3",
    "sadness": "mood/shy_f.sadness.mp3"
+  },
+  "text": "Um... hello. I'm sorry, I didn't mean to bother you. Oh! Is that a real sword? That's amazing! Please don't tell my father I came here.",
+  "mood_text": {
+   "calm": "It's all right. I like it here, it's quiet.",
+   "joy": "You remembered my name! Thank you, thank you so much!",
+   "anger": "You promised. And you broke it. Don't talk to me.",
+   "fear": "Something's behind the door. Please don't make me go in.",
+   "sadness": "I miss my mother. She used to sing me to sleep."
   }
  },
  {
@@ -114,6 +166,15 @@
    "fear": "mood/huntress_f.fear.mp3",
    "sadness": "mood/huntress_f.sadness.mp3",
    "seductive": "mood/huntress_f.seductive.mp3"
+  },
+  "text": "Stay behind me. The tracks are fresh. If I say run, you run. No questions. ...You did well today. Don't let it go to your head.",
+  "mood_text": {
+   "calm": "The wind's from the north. We should reach the ridge by dusk.",
+   "joy": "Ha! Got it! First shot, did you see that?",
+   "anger": "You were told to wait. People die when orders are ignored.",
+   "fear": "Don't move. It's right above us. Slowly, now.",
+   "sadness": "I tracked her for three days. I was too late.",
+   "seductive": "Careful. A girl could get used to having you around."
   }
  },
  {
@@ -131,6 +192,15 @@
    "fear": "mood/thief_f.fear.mp3",
    "sadness": "mood/thief_f.sadness.mp3",
    "seductive": "mood/thief_f.seductive.mp3"
+  },
+  "text": "Oh, this old thing? Finders keepers, mate! Guards! Run, run, run! ...Nobody ever waited for me before. Thanks.",
+  "mood_text": {
+   "calm": "Nah, it's quiet tonight. Even the rats are asleep.",
+   "joy": "Ha! Did you see his face? Priceless! Drinks are on him!",
+   "anger": "You sold me out. After everything. You rotten, lying snake.",
+   "fear": "They've found us, they've found us. Go, go, go!",
+   "sadness": "Everyone I grew up with is gone. It's just me now.",
+   "seductive": "Hey there, handsome. Want to see what else I can steal?"
   }
  },
  {
@@ -148,6 +218,15 @@
    "fear": "mood/knight_m.fear.mp3",
    "sadness": "mood/knight_m.sadness.mp3",
    "seductive": "mood/knight_m.seductive.mp3"
+  },
+  "text": "Stand behind me. No harm will come to you while I draw breath. Face me, coward, and answer for your crimes! ...I am tired, my friend. But I will not yield.",
+  "mood_text": {
+   "calm": "The road is clear, and the horses are rested. We ride at dawn.",
+   "joy": "Ha ha! Well fought, my friend! Come, the first round is mine!",
+   "anger": "You dishonour this hall, and every oath sworn within it.",
+   "fear": "Hold the line. It is larger than I thought. Steady, now.",
+   "sadness": "I carried him from the field myself. He was only a boy.",
+   "seductive": "Forgive my staring. It is not every day I forget my duty."
   }
  },
  {
@@ -165,6 +244,15 @@
    "fear": "mood/dwarf_m.fear.mp3",
    "sadness": "mood/dwarf_m.sadness.mp3",
    "seductive": "mood/dwarf_m.seductive.mp3"
+  },
+  "text": "Ha! Another thirsty customer, aye? You call that a blade? I'd not use it to butter bread! ...Fine. Fine. That's good steel. Bring me more.",
+  "mood_text": {
+   "calm": "Aye, I can have that blade ready by morning. Two silver, nae haggling, ye ken?",
+   "joy": "Ha ha! Now that's a proper ale, aye! Drinks are on me tonight, lads!",
+   "anger": "Ye dare insult my forge. Say it again, and I'll hammer ye flat.",
+   "fear": "Och, there's something in the mine. I dinnae like it, lads. Quiet now.",
+   "sadness": "My brother's hammer. I couldnae lift it after he fell, aye. Still cannae.",
+   "seductive": "Och, now, ye've a way of makin' a dwarf forget his anvil, aye."
   }
  },
  {
@@ -182,6 +270,15 @@
    "fear": "mood/tavern_m.fear.mp3",
    "sadness": "mood/tavern_m.sadness.mp3",
    "seductive": "mood/tavern_m.seductive.mp3"
+  },
+  "text": "Welcome, welcome! The first round's on the house! Oi! Not in my tavern! Take it outside! ...You lot are the best family a fat old barkeep could ask for.",
+  "mood_text": {
+   "calm": "Slow night. Pour yourself one, I'll polish the mugs.",
+   "joy": "Ha ha ha! Best joke I've heard in years! Another round!",
+   "anger": "Who broke my barrel. Speak up now, or you're all banned.",
+   "fear": "Keep it down, lads. Those cloaked fellows in the corner. I don't like their look.",
+   "sadness": "The old place was always louder, back when she was alive.",
+   "seductive": "Ah, don't mind me, I'm just a big softie. Stay for another, eh?"
   }
  },
  {
@@ -198,6 +295,14 @@
    "anger": "mood/wizard_m.anger.mp3",
    "fear": "mood/wizard_m.fear.mp3",
    "sadness": "mood/wizard_m.sadness.mp3"
+  },
+  "text": "Ah, there you are. I was beginning to think the tea would go cold. Listen carefully, child. What sleeps beneath this tower must never wake. I am old. Be brave for me.",
+  "mood_text": {
+   "calm": "Ah, good morning. Do sit. I was just reading about dragons.",
+   "joy": "Marvelous! It worked! Oh, I haven't felt this young in years!",
+   "anger": "Enough. You have no idea what you have unleashed upon this world.",
+   "fear": "By the stars... it has woken. We must leave, now, quickly!",
+   "sadness": "I have buried many good friends. I am tired of burying friends."
   }
  },
  {
@@ -214,6 +319,14 @@
    "anger": "mood/squire_m.anger.mp3",
    "fear": "mood/squire_m.fear.mp3",
    "sadness": "mood/squire_m.sadness.mp3"
+  },
+  "text": "Sir, sir! I polished your armour twice! Can I come? I'm not a boy! I can fight, I swear it! ...I'm really glad you're here. It's dark.",
+  "mood_text": {
+   "calm": "Yes, sir. The horses are fed and the gear is packed.",
+   "joy": "You said I did well? Really? Wait till I tell my mother!",
+   "anger": "That's not fair, sir. I did exactly what you said.",
+   "fear": "There's something in the trees, sir. I heard it breathing.",
+   "sadness": "I wanted to be like him. Now he's gone, and I'm still just a squire."
   }
  },
  {
@@ -231,6 +344,15 @@
    "fear": "mood/rogue_m.fear.mp3",
    "sadness": "mood/rogue_m.sadness.mp3",
    "seductive": "mood/rogue_m.seductive.mp3"
+  },
+  "text": "Ah, there you are. Do sit, I've been expecting you. Cross me once more, and the river will have you. ...You know, I almost like you. Almost.",
+  "mood_text": {
+   "calm": "Everything is arranged. All you need to do is smile.",
+   "joy": "Beautiful. Oh, that went better than I dared hope.",
+   "anger": "You stole from me. Nobody steals from me twice.",
+   "fear": "Guards. Two of them, maybe three. Don't turn around.",
+   "sadness": "I had a brother, once. We were both fools.",
+   "seductive": "Well now. If I'd known you'd be here, I'd have worn something nicer."
   }
  },
  {
@@ -248,6 +370,15 @@
    "fear": "mood/captain_m.fear.mp3",
    "sadness": "mood/captain_m.sadness.mp3",
    "seductive": "mood/captain_m.seductive.mp3"
+  },
+  "text": "Listen up. Nobody passes without my word. Draw your weapon, soldier! Now! ...Good people died today. Remember their names.",
+  "mood_text": {
+   "calm": "All quiet on the wall. Keep your eyes open all the same.",
+   "joy": "Ha! Well done, lads. Don't let it go to your heads.",
+   "anger": "I said hold the line. Who gave the order to retreat.",
+   "fear": "They outnumber us three to one. Hold steady. Hold steady.",
+   "sadness": "I wrote to forty families this winter. I'm tired of writing.",
+   "seductive": "Don't mistake me. I notice a good deal more than I let on."
   }
  },
  {
@@ -265,6 +396,15 @@
    "fear": "mood/farmer_m.fear.mp3",
    "sadness": "mood/farmer_m.sadness.mp3",
    "seductive": "mood/farmer_m.seductive.mp3"
+  },
+  "text": "Mornin' to ye. Fine day for plantin'. Get yer hands off me cattle! I'll not say it twice! ...Aye. It's a good life, simple as it is.",
+  "mood_text": {
+   "calm": "Rain's comin', I reckon. Best bring the sheep in.",
+   "joy": "Well, I'll be! Best harvest in twenty year!",
+   "anger": "Ye let the fox into the coop. Me whole winter's eggs.",
+   "fear": "Summat's been at the sheep. Big tracks. Stay close, now.",
+   "sadness": "The old dog's gone. Fifteen year she walked this field with me.",
+   "seductive": "Well, now. Ye've a smile that'd turn the milk sweet."
   }
  },
  {
@@ -282,6 +422,15 @@
    "fear": "mood/scholar_m.fear.mp3",
    "sadness": "mood/scholar_m.sadness.mp3",
    "seductive": "mood/scholar_m.seductive.mp3"
+  },
+  "text": "Oh! Mind the books, please, those are first editions! But look, look, this proves everything! ...You will keep this secret, won't you?",
+  "mood_text": {
+   "calm": "The archive closes at six. I shall put the kettle on.",
+   "joy": "It's real! The manuscript is real! Oh, I could weep!",
+   "anger": "You burned it. Four hundred years of scholarship. And you burned it.",
+   "fear": "It's moving. The statue's moving. Oh no, oh no.",
+   "sadness": "Nobody comes to the library now. Just me and the dust.",
+   "seductive": "Oh. I, um. You do have a rather lovely way of looking at a person."
   }
  },
  {
@@ -299,6 +448,15 @@
    "fear": "mood/villain_m.fear.mp3",
    "sadness": "mood/villain_m.sadness.mp3",
    "seductive": "mood/villain_m.seductive.mp3"
+  },
+  "text": "Do not be afraid. I only wish to understand you. Kneel, and I may let you live a little longer. ...Death is not an ending, you know. It is a doorway.",
+  "mood_text": {
+   "calm": "Everything proceeds exactly as I intended.",
+   "joy": "Ah. At last. How long I have waited for this moment.",
+   "anger": "You dare defy me in my own hall? I will unmake you.",
+   "fear": "Impossible. It should not be here. Stand back. Stand back!",
+   "sadness": "I buried her myself. And still she will not rest.",
+   "seductive": "Come closer. I have so rarely had such pleasant company."
   }
  },
  {
@@ -315,6 +473,14 @@
    "anger": "mood/king_m.anger.mp3",
    "fear": "mood/king_m.fear.mp3",
    "sadness": "mood/king_m.sadness.mp3"
+  },
+  "text": "My people, hear your king! We will not yield! Traitor! Bring him before me in chains! ...Forgive an old man. The crown grows heavy.",
+  "mood_text": {
+   "calm": "Rise, all of you. Let us hear what the council has decided.",
+   "joy": "Splendid! Let the bells ring, let the whole kingdom celebrate!",
+   "anger": "Silence. Who dares speak against the crown in this hall.",
+   "fear": "The walls will not hold. Send the children north, at once.",
+   "sadness": "I sent him to that war myself. My son, my only son."
   }
  },
  {
@@ -332,6 +498,15 @@
    "fear": "mood/hooded_x.fear.mp3",
    "sadness": "mood/hooded_x.sadness.mp3",
    "seductive": "mood/hooded_x.seductive.mp3"
+  },
+  "text": "You are looking for something, aren't you? Follow me no further, or you will not like what I show you. ...I was like you, once.",
+  "mood_text": {
+   "calm": "The path is quiet tonight. That is not always good.",
+   "joy": "Oh. So it worked. How very delightful.",
+   "anger": "You were warned. Everything that follows is on your head.",
+   "fear": "It saw me. It knows my name. Run.",
+   "sadness": "There was a house, once. There was a window with a light.",
+   "seductive": "Come closer. I only bite when asked."
   }
  },
  {
@@ -348,6 +523,14 @@
    "anger": "mood/undead_m.anger.mp3",
    "fear": "mood/undead_m.fear.mp3",
    "sadness": "mood/undead_m.sadness.mp3"
+  },
+  "text": "You have come to my tomb. Join us! Join us in the dark! ...So cold. I remember being warm.",
+  "mood_text": {
+   "calm": "The dead are patient. We have all the time in the world.",
+   "joy": "Heh heh heh. Another soul for the grave. Delicious.",
+   "anger": "Who disturbs my rest. I will take the marrow from your bones.",
+   "fear": "The light. It burns. Back! Keep it back!",
+   "sadness": "I had a name once. I cannot remember it."
   }
  },
  {
@@ -364,6 +547,14 @@
    "anger": "mood/dragon_m.anger.mp3",
    "fear": "mood/dragon_m.fear.mp3",
    "sadness": "mood/dragon_m.sadness.mp3"
+  },
+  "text": "So. A mortal dares to enter my hall. I will burn this kingdom to ash! ...Tell me, little thief, what makes you think you can win?",
+  "mood_text": {
+   "calm": "Sit, little one. I am old, and I am in a talkative mood.",
+   "joy": "Ha ha ha! Delightful! It has been centuries since I was this entertained!",
+   "anger": "You dare steal from me. I will melt the flesh from your bones.",
+   "fear": "No. That blade. It cannot be. Keep it away from me!",
+   "sadness": "I was the last of my kind. Now only silence fills these halls."
   }
  }
 ]

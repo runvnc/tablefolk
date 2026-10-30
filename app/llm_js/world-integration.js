@@ -4,7 +4,7 @@ import { installDevConsole } from './dev-console.js?v=20261030d';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025i';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261025c';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
-import { describeHardware } from './hardware.js?v=20261030e';
+import { describeHardware, usableGB } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
 
@@ -444,7 +444,8 @@ async function main() {
   // The best model this device's graphics card holds (a first visit starts
   // with it; the picker marks it either way).
   const device = await manager.pickForDevice().catch(() => null);
-  if (device) { appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key); window.tablefolkDevice = device; }
+  // freeGB: graphics memory left beside the chat model (the Breeze voice wants about 4)
+  if (device) { device.freeGB = (usableGB(device.hw) || 0) - (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.needGB || 3); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
   if (modelSelect) {
     modelSelect.textContent = '';
     if (device?.hw) modelSelect.title = 'Brain model. This device: ' + describeHardware(device.hw);

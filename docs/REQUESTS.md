@@ -4,6 +4,12 @@ The user's requests, recorded as given, with status. Newest batch first.
 Nothing here is cancelled by a later batch; a later batch only changes priority.
 
 
+## Devices, models and Breeze batch (2026-10-30)
+
+1. Does llmsizer know DGX Spark, RTX Spark, Apple M6? (DGX Spark yes; the others added by name in `hardware.js`)
+2. The endpoint brain: list the server's models in a picker. (done)
+3. Breeze TTS 2 (smallest model, voice cloning) as an option, enabled when memory allows; keep Pocket-TTS here. (done as a local-server engine, the user's choice: no browser build exists; tested against a mock server)
+
 ## Characters, cameras and brains batch (2026-10-30)
 
 1. Voice leftovers: anger as cold anger, `hooded_x` gender, tavern/rogue identity. (done; rogue 7-8 of 10, an accent drift in the designed voice)

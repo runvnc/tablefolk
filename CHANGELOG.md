@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-30
 
+- **Breeze TTS 2 as a speech engine**: BreezeBlue's 3B voice model, run by `breeze-server` on your own machine (`tools/breeze-server.sh` fetches it and the 2.46 GB Q4 model), cloning the library voices from their samples and transcripts; chosen by itself when it runs and the graphics card has room, otherwise an option in the Voice pane.
 - **The endpoint panel lists the server's models** (`GET /models`) in a picker and as suggestions in the model box.
 - **Newer chips in the device check**: RTX Spark (N1X), DGX Spark (GB10) and any Apple M-series by name (M6 and later included), with the smallest memory each ships with.
 - **Bonsai 2 27B replaces Bonsai 1.7B** in the model menu: Prism ML's ternary 27B (5.9 GB) on the webml-community WebGPU kernels, for graphics cards with 10 GB or more.

@@ -7,7 +7,7 @@ speaks a character in the clone of the sample for its dominant mood.
 
   ELEVENLABS_API_KEY=... python3 tools/elevenlabs-moods.py [id ...]     (paid: ElevenLabs characters)
 """
-import json, os, sys, time, urllib.request
+import json, os, re, sys, time, urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); OUT = os.path.join(ROOT, 'assets/voices'); os.makedirs(OUT + '/mood', exist_ok=True)
 KEY = os.environ.get('ELEVENLABS_API_KEY') or sys.exit('ELEVENLABS_API_KEY not set')
 cfg = json.load(open(os.path.join(ROOT, 'tools/voices-eleven.json'))); idx_path = OUT + '/voices.json'; idx = json.load(open(idx_path))
@@ -26,5 +26,8 @@ for v in cfg:
         audio = say(text); name = f'mood/{v["id"]}.{mood}.mp3'; open(f'{OUT}/{name}', 'wb').write(audio); e['moods'][mood] = name
         print(v['id'], mood, len(audio) // 1024, 'KB', flush=True)
     if not only: open(f'{OUT}/{v["id"]}.mp3', 'wb').write(say(v['script'])); print(v['id'], 'main sample', flush=True)
+    # exact transcripts, without the [tags]: engines that clone from a sample need them (Breeze TTS 2)
+    strip = lambda t: re.sub(r'\s+', ' ', re.sub(r'\[[^\]]*\]', '', t)).strip()
+    e['text'] = strip(v['script']); e['mood_text'] = {m: strip(v['moods'][m]) for m in e['moods'] if m in v['moods']}
     e['v'] = time.strftime('%Y%m%d%H%M')
 json.dump(idx, open(idx_path, 'w'), indent=1)

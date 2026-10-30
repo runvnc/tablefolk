@@ -4,6 +4,7 @@
      precomputed voice state), so it sounds as it will in a world. Messages in:
      { type: 'try', voice: 'pack:dwarf_m', text }   out: { type: 'voice-try', state, text } -->
 <script>window.tablefolkPacks = { base: '/app/assets/' };</script>
+<script src="./tts/breeze-client.js?v=20261030a"></script>
 <script src="./tts/pocket-tts-manager.js?v=20261025e"></script>
 <script>
 const say = (state, text) => parent.postMessage({ type: 'voice-try', state, text }, location.origin);

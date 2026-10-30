@@ -43,6 +43,9 @@
       tts.addEventListener('status',langs); langs();
       eng.onchange=async()=>{ if(!eng.value){localStorage.removeItem('tablefolkTtsEngine');} tts.setEnabled(true);$('ttsEnabled').checked=true; await tts.setEngine(eng.value||await (await fetch('/api/voices')).json().then(d=>d.ttsEngine).catch(()=>'pocket-18m')); if(!eng.value)localStorage.removeItem('tablefolkTtsEngine'); langs(); };
     }
+    // Breeze TTS 2: where its server is, and whether it answers
+    const bz=$('breezeUrl'), bzState=async()=>{ const st=$('breezeStatus'); if(!st||!window.tablefolkBreeze)return; window.tablefolkBreeze.reset(); const ok=await window.tablefolkBreeze.available(); st.textContent=ok?`Breeze TTS 2 answers at ${window.tablefolkBreeze.base()}: pick it under Engine.`:`Breeze TTS 2 is not running (start breeze-server: tools/breeze-server.sh).`; };
+    if(bz){ bz.value=localStorage.getItem('tablefolkBreezeUrl')||''; bz.onchange=()=>{ const v=bz.value.trim(); if(v)localStorage.setItem('tablefolkBreezeUrl',v); else localStorage.removeItem('tablefolkBreezeUrl'); bzState(); }; if(!window.TABLEFOLK_ART_MODE) bzState(); }
     $('ttsVolume').oninput=e=>tts.setVolume(e.target.value);
     $('ttsBufferMs').oninput=e=>tts.setBufferMs(e.target.value);
     $('testAgentVoice').onclick=()=>{const g=window.tablefolk?.getSelectedAgent?.();if(g){tts.setEnabled(true);$('ttsEnabled').checked=true;tts.speak(g,'Hello! This is my selected Pocket TTS voice.',$('agentTtsVoice').value);}};
