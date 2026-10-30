@@ -179,6 +179,31 @@ with `?trustSkills=1`, or after the player allows that package.
   the 100M model (`inference-worker.js`, five languages). Stereo pan and
   distance gain place voices. On by default (`tablefolkTtsEnabled !== '0'`).
   `silence(agent)` stops a defeated character mid-line.
+- **Breeze TTS 2** (engine `breeze`, `app/tts/breeze-client.js`): BreezeBlue's
+  3B model (English and Mandarin; weights research/non-commercial only) has
+  no browser build (2026-10-30: no ONNX, WebGPU or Transformers.js port;
+  the Qwen3-TTS browser ports don't clone), so it runs in `breeze-server`
+  (HoppouAI/Breeze-TTS-2.cpp, Vulkan, Apache-2.0) on the player's machine:
+  `tools/breeze-server.sh [q4_k-dd2|q4_k...]` downloads the v0.1.3 binary and
+  the 2.46 GB `q4_k-dd2` GGUF into `~/.cache/tablefolk-breeze` and starts it
+  on 8137 with `--cors` (about 3 GB of graphics memory). The page reaches it
+  through `/api/tts/breeze/` (server.js `breezeProxy`, `BREEZE_URL`; owner
+  only, or visitors when the admin opens the local model to them), so Chrome
+  never asks for local network access; the Voice pane's "Breeze server"
+  field can name the server itself instead. The client stands in for a
+  speech worker (same messages; `TablefolkBreezeWorker`), streams the
+  server's 24 kHz s16le PCM into the PCM worklet (a `reset` first, or the
+  worklet keeps the last line's end and the next never finishes), retries
+  `409 busy`, and aborts on stop. Library voices are saved on the server once
+  as `tf_<id>_<mood|main>_<v>` from the sample (decoded to a 24 kHz WAV) and
+  its transcript (`text` / `mood_text` in `voices.json`, written by
+  `elevenlabs-moods.py` without the [tags]); built-in and recorded voices
+  get a designed voice from their description. Chosen by itself only when
+  nothing is picked in this browser, the server answers and `freeGB`
+  (usable graphics memory minus the chat model's `needGB`) is 4 or more: the
+  RTX 2060 with E2B has 3, so it keeps Pocket-TTS. Tested against a mock
+  server (registration, streaming, three lines in a row, stop); not yet
+  against the real model.
 - Input: `app/speech-input.js`, chosen in Brain options (`tablefolk.speech`):
   automatic (the server's `/api/transcribe`, Gemma `gemma4-e2b-mm` on
   `litert-lm serve`, else the browser's SpeechRecognition); **in the
