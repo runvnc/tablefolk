@@ -127,18 +127,17 @@ function setupMouseWheelZoom(camera){
     // usually 100px) so a notch is ~10% and trackpads zoom smoothly.
     const px=ev.deltaY*(ev.deltaMode===1?33:ev.deltaMode===2?400:1);
     const factor=Math.exp(clamp(px,-150,150)*.001);
-    const zoomIn=px<0;
-    const focus=state.zoomFocus || state.target?.getAbsolutePosition?.() || state.selected?.root?.position;
-    // setTarget on its own keeps the camera where it is and recomputes the
-    // angles and radius from there: the view turned (and zoomed) with every
-    // notch. Keep them (the last flag) and move the camera with the target.
-    const radius=camera.radius;
-    if(focus){
-      const f=focus.clone ? focus.clone() : new BABYLON.Vector3(focus.x||0,focus.y||0,focus.z||0);
-      f.y=0.6;
-      if(state.cameraMode!=='follow') camera.setTarget(BABYLON.Vector3.Lerp(camera.target,f,(zoomIn?.42:.18)*Math.min(1,Math.abs(px)/100)),false,false,true);
+    // Zoom along the view: the centre of the screen stays put (it used to
+    // drift towards the last clicked square or the selected character). At
+    // the closest distance the free camera moves on in the direction it
+    // looks instead, over the ground.
+    const radius=camera.radius, want=radius*factor, near=camera.lowerRadiusLimit||3.5;
+    camera.radius=clamp(want,near,60);
+    if(want<near && state.cameraMode!=='follow'){
+      const f=camera.target.subtract(camera.position); f.y=0; if(f.lengthSquared()<1e-6) return;
+      state.followAvatar=false;
+      camera.setTarget(camera.target.add(f.normalize().scale(near-want)),false,false,true);
     }
-    camera.radius=clamp(radius*factor,3.5,60);
   },{passive:false});
 }
 function hashNoise(x,z){
@@ -525,7 +524,7 @@ function findBones(g){
   if(g._bones) return g._bones;
   const b={};
   if(g.rigRoot){
-    const map={head:['Head','head'],neck:['neck','Neck'],hips:['Hips','hips'],spine:['Spine01','Spine','spine'],chest:['Spine02','chest'],armL:['LeftArm','upperarm.l'],armR:['RightArm','upperarm.r'],forearmL:['LeftForeArm','lowerarm.l'],forearmR:['RightForeArm','lowerarm.r'],handL:['LeftHand','hand.l'],handR:['RightHand','hand.r'],legL:['LeftUpLeg','upperleg.l'],legR:['RightUpLeg','upperleg.r'],shinL:['LeftLeg','lowerleg.l'],shinR:['RightLeg','lowerleg.r'],root:['Armature','root']};
+    const map={head:['Head','head'],neck:['neck','Neck'],hips:['Hips','hips'],spine:['Spine01','Spine','spine'],chest:['Spine02','chest'],armL:['LeftArm','upperarm.l','UpperArm.L'],armR:['RightArm','upperarm.r','UpperArm.R'],forearmL:['LeftForeArm','lowerarm.l','LowerArm.L'],forearmR:['RightForeArm','lowerarm.r','LowerArm.R'],handL:['LeftHand','hand.l','Wrist.L'],handR:['RightHand','hand.r','Wrist.R'],legL:['LeftUpLeg','upperleg.l'],legR:['RightUpLeg','upperleg.r'],shinL:['LeftLeg','lowerleg.l'],shinR:['RightLeg','lowerleg.r'],root:['Armature','root']};
     const all=[g.rigRoot,...g.rigRoot.getDescendants(false)];
     for(const key of Object.keys(map)){
       for(const nm of map[key]){ const hit=all.find(n=>n.name===nm); if(hit){ b[key]=hit; break; } }
@@ -2639,6 +2638,36 @@ function setCharacterFacing(g,d){
   const yaw=yawForDir(g.dir);
   if(g.root) g.root.rotation.y=yaw;
 }
+// Turning to someone: the body turns smoothly to face them exactly (g.dir,
+// which the game logic reads, snaps to the nearest of the eight directions)
+// for a while, or until it walks off.
+function faceToward(g,other,ms=7000){
+  if(!g?.root || !other?.root || g===other || g.defeated || (g===state.playerAvatar && state.firstPerson)) return;
+  const a=g.root.position, b=other.root.position, dx=b.x-a.x, dz=b.z-a.z; if(Math.hypot(dx,dz)<.3) return;
+  g.dir=new BABYLON.Vector3(Math.abs(dx)>.38*Math.hypot(dx,dz)?Math.sign(dx):0,0,Math.abs(dz)>.38*Math.hypot(dx,dz)?Math.sign(dz):0);
+  g._faceAt={node:other.root,until:performance.now()+ms};
+}
+function bodyYaw(g,dt){
+  let want=yawForDir(g.dir); const f=g._faceAt;
+  if(f && !g.turnMove && performance.now()<f.until && !f.node.isDisposed?.()){
+    const a=g.root.position, b=f.node.position; if(Math.hypot(b.x-a.x,b.z-a.z)>.3) want=Math.atan2(-(b.x-a.x),-(b.z-a.z));
+  } else if(f) g._faceAt=null;
+  if(g===state.playerAvatar && state.firstPerson) return g.root.rotation.y;
+  let d=want-g.root.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
+  return g.root.rotation.y+d*Math.min(1,dt*9);
+}
+// Whom a spoken line is for: someone in earshot it names, else whoever spoke
+// to the speaker last (30 s), else the player when near, else the nearest.
+function addresseeOf(g,text){
+  const p=g.root.position, dist=c=>Math.hypot(c.root.position.x-p.x,c.root.position.z-p.z);
+  const near=c=>c && c!==g && !c.defeated && c.root && dist(c)<=(state.earshot||6);
+  const people=state.characters.filter(near), av=near(state.playerAvatar)?state.playerAvatar:null, t=String(text||'').toLowerCase();
+  const named=n=>n && new RegExp('(^|[^a-z0-9])'+n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z0-9])').test(t);
+  const hit=people.find(c=>named(c.id) || named(c.label)); if(hit) return hit;
+  if(av && named(playerName())) return av;
+  const h=g._heard; if(h && performance.now()-h.at<30000 && (h.who===av || people.includes(h.who))) return h.who;
+  return av || people.sort((a,b)=>dist(a)-dist(b))[0] || null;
+}
 function startTurnMove(g,d,distance=null){
   setCharacterFacing(g,d);
   const lp=g.logicalPos || new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
@@ -2720,13 +2749,21 @@ function say(g,text,voiced=false,{whisper=false}={}){
     }
   }
   // Dispatch speech before logging, DOM bubbles, animation, or history work. Only explicit say commands are voiced; action confirmations stay text-only.
-  if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
+  // How loud: softly to someone beside the speaker, up to full voice across a room.
+  const to=voiced && g!==state.playerAvatar ? addresseeOf(g,text) : null;
+  const toD=to ? Math.hypot(to.root.position.x-g.root.position.x,to.root.position.z-g.root.position.z) : 4;
+  const level=whisper ? .35 : toD<=1.6 ? .55 : toD<=3 ? .75 : 1;
+  if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId,level); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
   log(g.id+': '+text);
   try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced}})); }catch{}
   const div=document.createElement('div'); div.className=whisper?'bubble whisper':'bubble'; div.textContent=(whisper?'(whispers) ':'')+(text||'...').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:2.8});
   const speechRequested=localStorage.getItem('tablefolkTtsEnabled')!=='0' && getBrainConfig(g.id).ttsEnabled!==false;
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
+  if(voiced && g!==state.playerAvatar){
+    if(to){ faceToward(g,to); if(to!==state.playerAvatar && !to.turnMove && !to.speaking) faceToward(to,g); }
+    const p=g.root.position; for(const c of state.characters) if(c!==g && Math.hypot(c.root.position.x-p.x,c.root.position.z-p.z)<=(state.earshot||6)) c._heard={who:g,at:performance.now()};
+  }
   setTimeout(()=>{ if(g.anim==='talk' && (!speechRequested || window.tablefolkTTS?.current?.agent!==g)){ g.anim='idle'; playRig(g,'idle',true); g.speaking=false; if(g._headNodes)for(const h of g._headNodes)h.scaling.y=1; } },speechRequested?2000:900);
   if(state.globalHistory?.length){ const last=state.globalHistory[state.globalHistory.length-1]; if(last && last.startsWith('T') && last.includes(g.id+':')) state.globalHistory[state.globalHistory.length-1]=last+' -> '+text; }
 }
@@ -3273,7 +3310,7 @@ function sell(g,item,price){
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
   addItem(state.player.items,stock.name);
   setBrainConfig(g.id,{inventory:inv});
-  emitBadge(g,`+${price} gold`);
+  emitBadge(g,`+${price} gold`); startHandover(g,state.playerAvatar,stock.name);
   inventoryChanged();
   window.tablefolkMind?.event(g,'sold',{item:stock.name,price,buyer});
   return say(g,`${g.id} sells ${buyer} ${stock.name} for ${price} gold (${buyer} has ${state.player.gold} gold left)`);
@@ -3291,6 +3328,81 @@ function comeOver(g){
   if(d>(state.earshot||6)) return false;
   try{ walk(g,{type:'coord',x:Math.round(av.x),z:Math.round(av.z)}); }catch(e){ console.warn('comeOver',e); }
   return true;
+}
+// ---- handing things over ----
+// A give shows: the giver reaches out holding the thing (its tile picture,
+// else a token: coins for gold, a little parcel for anything else), it passes
+// into the receiver's reaching hand, and both arms go down again. They face
+// each other meanwhile; it waits while either is still walking over.
+const HANDOVER_T=1.6;
+let tileIndex=null; fetch(ASSET_BASE+'tiles/tiles.json').then(r=>r.ok?r.json():null).then(d=>{ tileIndex=d; }).catch(()=>{});
+function handoverToken(name){
+  const sc=state.scene, root=new BABYLON.TransformNode('handover_token',sc), words=String(name||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().split(/\s+/);
+  const objs=tileIndex?.objects||{}, keys=[words.join('_'),words.join('_').replace(/e?s$/,''),words[words.length-1],(words[words.length-1]||'').replace(/e?s$/,'')];
+  const tile=keys.map(k=>k && objs[k]).find(Boolean), mat=(n,c)=>{ const m=new BABYLON.StandardMaterial(n,sc); m.diffuseColor=c; m.specularColor=new BABYLON.Color3(.2,.2,.2); return m; };
+  if(tile){
+    const pl=BABYLON.MeshBuilder.CreatePlane('handover_pic',{width:.36,height:.36*tile.h/tile.w},sc), m=new BABYLON.StandardMaterial('handover_pic_mat',sc);
+    m.diffuseTexture=new BABYLON.Texture(ASSET_BASE+'tiles/'+tile.file,sc); m.diffuseTexture.hasAlpha=true; m.useAlphaFromDiffuseTexture=true; m.emissiveColor=new BABYLON.Color3(.85,.85,.85); m.disableLighting=true; m.backFaceCulling=false;
+    pl.material=m; pl.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL; pl.parent=root;
+  } else if(/\b(gold|coins?)\b/.test(words.join(' '))){
+    const m=mat('handover_gold',new BABYLON.Color3(1,.78,.25)); m.emissiveColor=new BABYLON.Color3(.35,.25,.05);
+    for(let i=0;i<3;i++){ const c=BABYLON.MeshBuilder.CreateCylinder('handover_coin',{diameter:.11,height:.022,tessellation:16},sc); c.material=m; c.position.set(i*.012,i*.024,-i*.01); c.parent=root; }
+  } else {
+    const box=BABYLON.MeshBuilder.CreateBox('handover_parcel',{width:.17,height:.12,depth:.13},sc); box.material=mat('handover_parcel_mat',new BABYLON.Color3(.62,.45,.27)); box.parent=root;
+    const strap=BABYLON.MeshBuilder.CreateBox('handover_strap',{width:.18,height:.125,depth:.03},sc); strap.material=mat('handover_strap_mat',new BABYLON.Color3(.85,.78,.6)); strap.parent=root;
+  }
+  for(const m of root.getChildMeshes()){ m.isPickable=false; m.receiveShadows=false; }
+  root.setEnabled(false);
+  return root;
+}
+function startHandover(from,to,name){
+  if(!state.scene || !from?.root || !to?.root || from===to) return;
+  faceToward(from,to,9000); if(!(to===state.playerAvatar && state.firstPerson)) faceToward(to,from,9000);
+  (state.handovers||=[]).push({from,to,token:handoverToken(name),t:0});
+}
+const smooth01=x=>{ x=clamp(x,0,1); return x*x*(3-2*x); };
+function handPoint(g){
+  const hand=g.rigged && findBones(g).handR;
+  if(hand && !(g===state.playerAvatar && state.firstPerson)){ refreshChain(hand); return hand.getAbsolutePosition().clone(); }
+  const p=g.root.position, f=new BABYLON.Vector3(-Math.sin(g.root.rotation.y),0,-Math.cos(g.root.rotation.y));
+  return new BABYLON.Vector3(p.x,(state.terrainTopY??0)+(g.height||PERSON_H)*(g===state.playerAvatar && state.firstPerson ? .7 : .55),p.z).add(f.scale(.35));
+}
+function updateHandovers(dt){
+  const list=state.handovers; if(!list?.length) return;
+  for(const h of list.slice()){
+    const {from,to,token}=h, gone=c=>!c?.root || c.root.isDisposed?.() || c.defeated;
+    if(gone(from) || gone(to)){ h.t=HANDOVER_T; }
+    else if(from.turnMove || to.turnMove){ token.setEnabled(false); continue; }
+    h.t+=dt; const u=h.t/HANDOVER_T;
+    if(u>=1){ token.dispose(false,true); list.splice(list.indexOf(h),1); if(from._reach?.h===h) delete from._reach; if(to._reach?.h===h) delete to._reach; continue; }
+    // the meeting point: between them at chest height, at most an arm's length out
+    const a=from.root.position, b=to.root.position, d=b.subtract(a); d.y=0; const len=d.length()||1;
+    const y=(state.terrainTopY??0)+Math.min(from.height||PERSON_H,to.height||PERSON_H)*.6;
+    const meetA=a.add(d.scale(Math.min(.5,len/2)/len)), meetB=b.subtract(d.scale(Math.min(.5,len/2)/len)); meetA.y=meetB.y=y;
+    from._reach={h,at:meetA,w:smooth01(u/.25)*(1-smooth01((u-.7)/.3))};
+    to._reach={h,at:meetB,w:smooth01((u-.2)/.25)*(1-smooth01((u-.75)/.25))};
+    // the thing: in the giver's hand, across, then in the receiver's
+    const pa=handPoint(from), pb=handPoint(to), k=smooth01((u-.3)/.3);
+    const pos=BABYLON.Vector3.Lerp(pa,pb,k); pos.y+=Math.sin(k*Math.PI)*.12;
+    token.position.copyFrom(pos); token.scaling.setAll(u<.12 ? smooth01(u/.12) : u>.85 ? 1-smooth01((u-.85)/.15) : 1); token.setEnabled(true);
+  }
+}
+// One arm out towards the reach point (two-bone IK, as poseCarryArms does).
+function poseReach(g){
+  const r=g._reach; if(!r || !g.rigged || r.w<=0 || state.held?.get(g.id)) return;
+  const b=findBones(g), arm=b.armR, fore=b.forearmR, hand=b.handR; if(!arm || !fore || !hand) return;
+  refreshChain(hand);
+  const sh=arm.getAbsolutePosition().clone(), el=fore.getAbsolutePosition(), wr=hand.getAbsolutePosition();
+  const fwd=r.at.subtract(g.root.position); fwd.y=0; fwd.normalize(); const right=BABYLON.Vector3.Cross(BABYLON.Vector3.Up(),fwd);
+  const side=BABYLON.Vector3.Dot(sh.subtract(g.root.position),right)>=0 ? 1 : -1;
+  const target=r.at.add(right.scale(side*.06));
+  const a=el.subtract(sh).length(), bl=wr.subtract(el).length();
+  const toT=target.subtract(sh); const d=clamp(toT.length(),Math.abs(a-bl)+1e-4,a+bl-1e-4); toT.normalize();
+  const pole=right.scale(side*.5).add(BABYLON.Vector3.Down());
+  const perp=pole.subtract(toT.scale(BABYLON.Vector3.Dot(pole,toT))).normalize();
+  const cosA=clamp((a*a+d*d-bl*bl)/(2*a*d),-1,1);
+  const elbow=sh.add(toT.scale(a*cosA)).add(perp.scale(a*Math.sqrt(1-cosA*cosA)));
+  aimBoneAt(arm,fore,elbow,r.w); aimBoneAt(fore,hand,target,r.w);
 }
 // give(item) to the player, or give(item, pip) / give(item to pip) to another
 // character: it changes hands when g has it and the receiver is within reach
@@ -3310,9 +3422,9 @@ function give(g,item){
   if(gm){
     const amt=Math.max(1,+(gm[1]||1)), have=+inv.gold||0;
     if(have<amt) return say(g,`give failed: ${g.id} has only ${have} gold`);
-    if(other){ const oinv=charInventory(other); inv.gold=have-amt; oinv.gold=(+oinv.gold||0)+amt; setBrainConfig(g.id,{inventory:inv}); setBrainConfig(other.id,{inventory:oinv}); window.tablefolkMind?.event(other,'given',{who:g.id,what:amt+' gold'}); emitBadge(g,'gave '+amt+' gold'); return say(g,`${g.id} gives ${other.id} ${amt} gold`); }
+    if(other){ const oinv=charInventory(other); inv.gold=have-amt; oinv.gold=(+oinv.gold||0)+amt; setBrainConfig(g.id,{inventory:inv}); setBrainConfig(other.id,{inventory:oinv}); window.tablefolkMind?.event(other,'given',{who:g.id,what:amt+' gold'}); emitBadge(g,'gave '+amt+' gold'); startHandover(g,other,'gold'); return say(g,`${g.id} gives ${other.id} ${amt} gold`); }
     if(state.playerAvatar && !comeOver(g)) return say(g,`give failed: ${playerName} is too far away; walk over to them first`);
-    inv.gold=have-amt; setBrainConfig(g.id,{inventory:inv}); state.player.gold=(+state.player.gold||0)+amt; inventoryChanged(); emitBadge(g,'gave '+amt+' gold');
+    inv.gold=have-amt; setBrainConfig(g.id,{inventory:inv}); state.player.gold=(+state.player.gold||0)+amt; inventoryChanged(); emitBadge(g,'gave '+amt+' gold'); startHandover(g,state.playerAvatar,'gold');
     return say(g,`${g.id} gives ${playerName} ${amt} gold`);
   }
   const stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item);
@@ -3341,7 +3453,7 @@ function give(g,item){
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
     setBrainConfig(g.id,{inventory:inv});
     const oinv=charInventory(other); if(stock.text!=null) oinv.items.push({name:stock.name,qty:1,text:stock.text}); else addItem(oinv.items,stock.name); setBrainConfig(other.id,{inventory:oinv});
-    emitBadge(g,'gave '+stock.name);
+    emitBadge(g,'gave '+stock.name); startHandover(g,other,stock.name);
     window.tablefolkMind?.event(g,'gave',{item:stock.name,to:other.id}); window.tablefolkMind?.event(other,'given',{who:g.id,what:stock.text!=null?`a note that says "${String(stock.text).slice(0,200)}"`:stock.name});
     return say(g,`${g.id} gives ${other.id} ${stock.name}`);
   }
@@ -3352,7 +3464,7 @@ function give(g,item){
     return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
   if(stock.text!=null) state.player.items.push({name:stock.name,qty:1,text:stock.text}); else addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
-  emitBadge(g,'gave '+stock.name); inventoryChanged();
+  emitBadge(g,'gave '+stock.name); inventoryChanged(); startHandover(g,state.playerAvatar,stock.name);
   window.tablefolkMind?.event(g,'gave',{item:stock.name,to:recipient});
   return say(g,`${g.id} gives ${recipient} ${stock.name}`);
 }
@@ -4012,13 +4124,15 @@ function defaultVoiceFor(id,model){
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
-  peasant:{h:1.34}, hooded:{h:1.3}, king:{h:1.32}, farmer:{h:1.28}, wizard:{h:1.28},
+  peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28},
   // The main people are Meshy models made from JRPG concept art (tools/fal-character.py, 2026-10-25);
   // the old Quaternius ones stay as <name>_classic.
-  swordswoman:{dir:'meshy',h:1.3,v:'20261025a'}, sorceress:{dir:'meshy',h:1.32,v:'20261025a'}, huntress:{dir:'meshy',h:1.3,v:'20261025a'}, villager_woman:{dir:'meshy',h:1.24,v:'20261025a'},
-  swordsman:{dir:'meshy',h:1.36,v:'20261025a'}, wanderer:{dir:'meshy',h:1.36,v:'20261025a'},
-  adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261025a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261025a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.24,v:'20261025a'},
-  villager:{dir:'meshy',file:'villager_woman',h:1.24,v:'20261025a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261025a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261025a'},
+  swordswoman:{dir:'meshy',h:1.3,v:'20261030a'}, sorceress:{dir:'meshy',h:1.32,v:'20261030a'}, huntress:{dir:'meshy',h:1.3,v:'20261030a'}, villager_woman:{dir:'meshy',h:1.26,v:'20261030a'},
+  swordsman:{dir:'meshy',h:1.36,v:'20261030a'}, wanderer:{dir:'meshy',h:1.36,v:'20261030a'},
+  // the king (2026-10-30): an older king in red and gold; the Quaternius one stays as king_classic
+  king:{dir:'meshy',h:1.38,v:'20261030a'}, king_classic:{file:'king',h:1.32},
+  adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261030a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261030a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261030a'},
+  villager:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261030a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261030a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261030a'},
   woodsman_classic:{file:'woodsman',h:1.36}, huntress_classic:{file:'huntress',h:1.3}, peasant_woman_classic:{file:'peasant_woman',h:1.28},
   adventurer_classic:{file:'adventurer',h:1.3}, adventurer_woman_classic:{file:'adventurer_woman',h:1.24}, villager_classic:{file:'villager',h:1.22}, witch_classic:{file:'witch',h:1.3},
   skeleton:{dir:'meshy',h:1.3,v:'20261024a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261024a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261024a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
@@ -4134,7 +4248,7 @@ async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
   g.playerRing=ring;
   setCameraArrowKeys(false);
   updateFirstPersonButton(); updatePerceptionUI();
-  if(!window.TABLEFOLK_TABLETOP && !state.firstPerson) followCameraStart();
+  if(!window.TABLEFOLK_TABLETOP && !state.firstPerson) freeCameraStart();
   return g;
 }
 // The overview camera turns on the arrow keys by default. With an avatar the
@@ -4313,17 +4427,20 @@ function updateFirstPersonButton(){
 }
 // Player chat appears as a bubble over the avatar (no voice, no history).
 window.addEventListener('tablefolk-player-chat',e=>{
-  const g=state.playerAvatar; if(!g) return;
+  const g=state.playerAvatar, to=state.characters.find(c=>c.id===e.detail?.agentId);
+  if(to && g){ to._heard={who:g,at:performance.now()}; if(!to.turnMove) faceToward(to,g); faceToward(g,to,4000); }
+  if(!g) return;
   const div=document.createElement('div'); div.className='bubble player-bubble'; div.textContent=String(e.detail?.text||'').slice(0,86);
   document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:3.2});
 });
 // Two cameras with an avatar (C switches; V is first person):
-// 'follow' (the default), Diablo-like: high and fixed, looking north from
+// 'overview' (the default), the free camera over the board (drag to orbit),
+// easing after the avatar when it moves; every wall stands at half height
+// there (cutaway.js), so no one is hidden behind one.
+// 'follow', Diablo-like: high and fixed, looking north from
 // the south at a steep angle, always centred on the avatar; it never turns,
 // so the keys always mean the same screen directions, and walls between it
 // and the avatar drop to a low stub (cutaway.js). The wheel zooms (7-30).
-// 'overview': the old free camera over the board (drag to orbit), easing
-// after the avatar when it moves.
 const FOLLOW={alpha:Math.PI/2,beta:.78,radius:16,min:7,max:30,height:.6};
 const FREE={lowerBetaLimit:.22,upperBetaLimit:1.42,panningSensibility:60};
 function lockCamera(cam,on){
@@ -4337,13 +4454,16 @@ function followCameraStart(){
   lockCamera(cam,true); cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z),false,false,true); cam.alpha=FOLLOW.alpha; cam.beta=FOLLOW.beta; cam.radius=state.followRadius||FOLLOW.radius;
   updateFirstPersonButton();
 }
+function freeCameraStart(){
+  const cam=state.camera; if(!cam) return;
+  state.cameraMode='overview'; lockCamera(cam,false); window.tablefolkCutaway?.clear();
+  // a good part of the board, not all of a big one, eased onto the avatar
+  cam.radius=Math.min(cam.upperRadiusLimit,19); cam.beta=.95; state.followAvatar=!!state.playerAvatar;
+  updateFirstPersonButton();
+}
 function toggleCameraMode(){
   if(state.firstPerson) setFirstPerson(false);
-  if(state.cameraMode==='follow'){
-    state.cameraMode='overview'; const cam=state.camera; lockCamera(cam,false); window.tablefolkCutaway?.clear();
-    // a good part of the board, not all of a big one
-    cam.radius=Math.min(cam.upperRadiusLimit,19); cam.beta=.95;
-  }
+  if(state.cameraMode==='follow') freeCameraStart();
   else followCameraStart();
   updateFirstPersonButton();
   window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
@@ -4357,6 +4477,7 @@ function followAvatarCamera(dt){
     const lp=g.logicalPos||p; window.tablefolkCutaway?.update(lp.x,lp.z);
     return;
   }
+  window.tablefolkCutaway?.half();
   if(!state.followAvatar) return;
   const want=new BABYLON.Vector3(p.x,.6,p.z);
   cam.setTarget(BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*3)),false,false,true);
@@ -4564,7 +4685,7 @@ async function loadWorldState() {
 
 function installWorldAPI(){
   const prior=window.tablefolk||{};
-  window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,
+  window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,startHandover,faceToward,
     getAgents:()=>state.characters.slice(), getSelectedAgent:()=>state.selected,
     getBrainConfig, setBrainConfig, refreshAgentSelect,
     getAllowedCommands:(agentId=null)=>Array.from(commandsFor(state.characters.find(x=>x.id===agentId))), allowedFor, commandsFor, canRun,
@@ -4749,12 +4870,12 @@ function updateCompassHUD(){
   const charFacing=character ? facingNameFromDir(character.dir)[0].toUpperCase() : '—';
   compassHud.querySelector('small').textContent='camera '+name+' · character '+charFacing+' · N=-Z E=-X';
 }
-function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
+function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
       if(g.turnMove.path){ const pp=pathPoint(g.turnMove,k); p=pp.p; if(pp.dir.lengthSquared()>1e-6) setCharacterFacing(g,legFacing(pp.dir)); } else p=BABYLON.Vector3.Lerp(g.turnMove.start,g.turnMove.end,k);
       // Walked off the island: fall instead of hovering over the sea.
       if(!hasGroundAt(p.x,p.z)){ const tm=g.turnMove, len=BABYLON.Vector3.Distance(tm.start,tm.end)||1; g.lastSafePos=tm.start.clone(); startFall(g,tm.end.subtract(tm.start).scale(clamp(len/tm.dur,1.4,3.4)/len)); continue; }
-      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=state.terrainTopY??0; if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=yawForDir(g.dir); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); continue; } positionHeldItem(g,dt);
-    const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=yawForDir(g.dir); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
+      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=state.terrainTopY??0; if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
+    const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=bodyYaw(g,dt); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
     else if(g.anim==='panic'){ g.root.rotation.y+=Math.sin(g.t*28)*.055; g.arms[0].rotation.z=.92+Math.sin(g.t*21)*.5; g.arms[1].rotation.z=-.92-Math.sin(g.t*19)*.5; g.head.scaling.x=1.06; }
     else if(g.anim==='talk'){ g.head.scaling.y=1+Math.sin(g.t*24)*.065; g.arms[0].rotation.z=.44; g.arms[1].rotation.z=-.44; }
     else if(g.anim==='cast'){ g.arms[0].rotation.z=1.05+Math.sin(g.t*18)*.1; g.arms[1].rotation.z=-1.05-Math.sin(g.t*18)*.1; g.head.position.y=1.15; }
@@ -5154,6 +5275,8 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
             Promise.resolve(spawnAt(state.spawnMode.type,tx,tz)).catch(err=>console.error('spawn failed',err));
             return;
           }
+          // First person walks with the keys only; a click never sends you off.
+          if(state.firstPerson) return;
           // With an avatar, clicking the ground walks it there (clicks on
           // characters still select them; Alt-click recentres the camera).
           const av=state.playerAvatar, owner=pick.pickedMesh?.metadata?.ownerId;

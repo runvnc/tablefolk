@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261025zh" />
+  <link rel="stylesheet" href="style.css?v=20261030b" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -36,6 +36,7 @@
       <select id="modelSelect" class="topbar-model-select" title="Brain model">
         <option value="gemma4-e2b-litert">Gemma 4 E2B</option>
       </select>
+      <button id="endpointBtn" type="button" hidden title="server address, key and model for the OpenAI-compatible brain">⚙ endpoint</button>
       <button id="loadBrains" type="button">load Gemma 4 E2B</button>
       <button id="startBrains" class="dev-only" type="button" disabled>start</button>
       <button id="stepBrains" class="dev-only" type="button" disabled>step</button>
@@ -50,8 +51,12 @@
     <div class="topbar-spacer"></div>
     <a id="adminLink" class="dev-only top-pill" href="/admin" title="server admin page">admin</a>
     <button id="ttsTopToggle" type="button" title="toggle speech" aria-label="toggle speech">🔇</button>
+    <input id="ttsTopVolume" type="range" min="0" max="1" step=".05" value=".85" title="voice volume" aria-label="voice volume" />
   </header>
 
+  <div id="endpointPop" class="endpoint-pop" hidden role="dialog" aria-label="OpenAI-compatible endpoint">
+    <div class="endpoint-pop-head"><strong>OpenAI-compatible endpoint</strong><button id="endpointDone" type="button">done</button></div>
+  </div>
   <div id="hud">
     <div id="modelLoadNotice" class="model-load-notice" role="status" aria-live="polite">
       <div class="model-load-head">
@@ -404,6 +409,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261025abs"></script>
+  <script src="preflight.js?v=20261030c"></script>
 </body>
 </html>

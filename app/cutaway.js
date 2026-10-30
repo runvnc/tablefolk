@@ -12,7 +12,12 @@
  * solid low wall rather than a hollow one. The fog of war's black boxes
  * (darkness.js) are cut the same way, so they never stand over the player.
  *
+ * The free camera (any angle) uses the second mode instead: every wall
+ * drops to half height, so characters behind or inside walls stay in
+ * sight; the fog of war's boxes stay whole there.
+ *
  *   window.tablefolkCutaway.update(x, z)   cut around this square (camera to the south)
+ *   window.tablefolkCutaway.half()         every wall at half height (free camera)
  *   window.tablefolkCutaway.clear()        walls back to full height
  *   window.tablefolkCutaway.attach(mat)    cut this material too (darkness.js's fog)
  * Loaded after app.js; uses its globals (state, meta).
@@ -20,16 +25,17 @@
 (function () {
   // STUB above the floor; rows 1..DEPTH ahead; half width W0 in the first
   // row, SLOPE more per row after
-  const STUB = .42, DEPTH = 4, W0 = 2.5, SLOPE = .75;
+  // on: 0 off, 1 the area ahead, 2 everywhere (HALF of the wall height)
+  const STUB = .42, DEPTH = 4, W0 = 2.5, SLOPE = .75, HALF = .5;
   const cut = { x: 0, z: 0, on: 0, y: 0 };
-  const inArea = (cx, cz) => { const dz = cz - cut.z; return dz >= 1 && dz <= DEPTH && Math.abs(cx - cut.x) <= W0 + (dz - 1) * SLOPE; };
+  const inArea = (cx, cz) => { if (cut.on === 2) return true; const dz = cz - cut.z; return dz >= 1 && dz <= DEPTH && Math.abs(cx - cut.x) <= W0 + (dz - 1) * SLOPE; };
 
   let Plugin = null;
   function pluginClass() {
     if (Plugin) return Plugin;
     const WGSL = BABYLON.ShaderLanguage?.WGSL;
     Plugin = class extends BABYLON.MaterialPluginBase {
-      constructor(mat) { super(mat, 'TablefolkCut', 300, { TFCUT: false }); this._enable(true); }
+      constructor(mat, fog) { super(mat, 'TablefolkCut', 300, { TFCUT: false }); this._fog = fog; this._enable(true); }
       getClassName() { return 'TablefolkCutPlugin'; }
       isCompatible() { return true; }
       prepareDefines(defines) { defines.TFCUT = true; }
@@ -38,7 +44,7 @@
         return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFCUT\nuniform vec4 tfCut;\nuniform vec4 tfCutArea;\n#endif\n' };
       }
       bindForSubMesh(ubo) {
-        ubo.updateFloat4('tfCut', cut.x, cut.z, cut.on, cut.y);
+        ubo.updateFloat4('tfCut', cut.x, cut.z, this._fog && cut.on === 2 ? 0 : cut.on, cut.y);
         ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, 0);
       }
       getCustomCode(type, lang) {
@@ -46,6 +52,7 @@
         if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
 #ifdef TFCUT
 if (uniforms.tfCut.z > 0.5 && fragmentInputs.vPositionW.y > uniforms.tfCut.w) {
+  if (uniforms.tfCut.z > 1.5) { discard; }
   let tfc = floor(fragmentInputs.vPositionW.xz + vec2f(0.5)) - uniforms.tfCut.xy;
   if (tfc.y >= 1.0 && tfc.y <= uniforms.tfCutArea.y && abs(tfc.x) <= uniforms.tfCutArea.x + (tfc.y - 1.0) * uniforms.tfCutArea.z) { discard; }
 }
@@ -54,6 +61,7 @@ if (uniforms.tfCut.z > 0.5 && fragmentInputs.vPositionW.y > uniforms.tfCut.w) {
         return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
 #ifdef TFCUT
 if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
+  if (tfCut.z > 1.5) discard;
   vec2 tfc = floor(vPositionW.xz + 0.5) - tfCut.xy;
   if (tfc.y >= 1.0 && tfc.y <= tfCutArea.y && abs(tfc.x) <= tfCutArea.x + (tfc.y - 1.0) * tfCutArea.z) discard;
 }
@@ -64,11 +72,11 @@ if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
     return Plugin;
   }
   const attached = new WeakSet();
-  function attach(mat) {
+  function attach(mat, fog = false) {
     if (!mat || attached.has(mat)) return;
-    if (mat.subMaterials) { attached.add(mat); for (const m of mat.subMaterials) attach(m); return; }
+    if (mat.subMaterials) { attached.add(mat); for (const m of mat.subMaterials) attach(m, fog); return; }
     attached.add(mat);
-    try { new (pluginClass())(mat); } catch (e) { console.warn('[cutaway] plugin', mat.name, e); }
+    try { new (pluginClass())(mat, fog); } catch (e) { console.warn('[cutaway] plugin', mat.name, e); }
   }
 
   // Lids at the stub height: stone over cut wall squares, black over the
@@ -98,9 +106,9 @@ if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
         const mm = meta(b); if (mm?.type !== 'wall' && mm?.type !== 'door') continue;
         const p = b.getAbsolutePosition?.() || b.position, x = Math.round(p.x), z = Math.round(p.z);
         walls.add(x + ',' + z);
-        if (mm.type === 'wall' && inArea(x, z) && (!fog || D.known(x, z))) stone.push([x, z]);
+        if (mm.type === 'wall' && cut.on === 1 && inArea(x, z) && (!fog || D.known(x, z))) stone.push([x, z]);
       }
-      if (fog) for (let dz = 1; dz <= DEPTH; dz++) for (let dx = -Math.ceil(W0 + (dz - 1) * SLOPE); dx <= W0 + (dz - 1) * SLOPE; dx++) {
+      if (fog && cut.on === 1) for (let dz = 1; dz <= DEPTH; dz++) for (let dx = -Math.ceil(W0 + (dz - 1) * SLOPE); dx <= W0 + (dz - 1) * SLOPE; dx++) {
         const x = cut.x + dx, z = cut.z + dz;
         if (inArea(x, z) && !D.known(x, z) && (walls.has(x + ',' + z) || window.tablefolk?.hasGroundAt?.(x, z))) black.push([x, z]);
       }
@@ -116,16 +124,23 @@ if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
     const k = cut.x + ',' + cut.z + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0);
     if (k !== key) { key = k; placeLids(); }
   }
+  function half() {
+    const sc = state.scene; if (!sc) return;
+    for (const m of state.wallVisuals || []) if (m?.material) attach(m.material);
+    cut.on = 2; cut.y = (state.terrainTopY ?? 0) + (state.wallHeightScale || 1) * 1.1 * HALF;
+    const k = 'half|' + (state.blocks?.length || 0) + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0);
+    if (k !== key) { key = k; placeLids(); }
+  }
   function clear() {
     if (!cut.on) return;
     cut.on = 0; key = '';
     for (const m of Object.values(lids)) if (!m.isDisposed()) m.isVisible = false;
   }
   // a picture from a character's eyes (senses.js): walls whole for a frame;
-  // returns whether the cut was on, to put it back
+  // returns the mode that was on (0 none), to put it back with suspend(mode)
   function suspend(on) {
-    if (on) { const was = !!cut.on; cut.on = 0; return was; }
-    cut.on = 1; key = ''; return true;
+    if (on === true) { const was = cut.on; cut.on = 0; return was; }
+    cut.on = on === false ? 1 : on; key = ''; return true;
   }
-  window.tablefolkCutaway = { update, clear, attach, suspend };
+  window.tablefolkCutaway = { update, half, clear, attach, suspend };
 })();

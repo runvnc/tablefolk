@@ -111,7 +111,7 @@
     if (alpha < 1) { mat.alpha = alpha; mat.disableDepthWrite = true; }
     // the follow camera cuts the tall boxes to a stub in front of the player
     // (cutaway.js); their insides, drawn too, close the cut top in black
-    else if (h === FOG_H) { mat.backFaceCulling = false; window.tablefolkCutaway?.attach(mat); }
+    else if (h === FOG_H) { mat.backFaceCulling = false; window.tablefolkCutaway?.attach(mat, true); }
     m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.doNotSyncBoundingInfo = true;
     return m;
   }

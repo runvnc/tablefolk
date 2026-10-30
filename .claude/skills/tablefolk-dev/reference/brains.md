@@ -41,8 +41,32 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     (about 300 MB), the webml-community demo's way: a text-generation
     pipeline (`pipeline: true` in `model-loader-tjs-v2.js`; the hand-made
     `model.generate` call failed in GroupQueryAttention). Tested in the app
-    on the RTX 2060: answers in character. The larger Bonsai (2 4B, 9B, 27B)
-    run through an endpoint (llama.cpp, or OpenRouter `prism-ml/ternary-bonsai-2-27b`).
+    on the RTX 2060: answers in character. **Hidden** since 2026-10-30:
+    Bonsai 2 27B took its place in the picker.
+- **Bonsai 2 27B** (`bonsai2-27b`, engine `bonsai2`, `bonsai2-engine.js`):
+  `prism-ml/Ternary-Bonsai-2-27B-gguf`, the 5.95 GB `PTQ1_0` file, on the
+  webml-community WebGPU kernel engine. That engine exists only inside its
+  demo page (Space `webml-community/ternary-bonsai-2-webgpu-kernels`), so the
+  page is fetched at a pinned revision, its second module script cut at the
+  `export{... as TernaryBonsai2 ...}` statement and imported from a blob URL
+  (xen0bit/smolbox does the same at build time); nothing of it is in the
+  repo. API: `TernaryBonsai2.load(null, { file, maxLength, chatTemplateArgs:
+  { enable_thinking: false }, onProgress })`, then `for await (const c of
+  model.generate(messages, { maxNewTokens }))` (`c.delta`); turns are
+  queued (one cache). Weights stream from Hugging Face into IndexedDB; a
+  localStorage flag marks a finished load. Not run on the maintainer's 6 GB
+  card; untested in the app with real weights.
+- **Choosing for the device** (`hardware.js`, `pickForDevice` in the
+  manager): the WebGL renderer string (fast GPU and default, the discrete one
+  preferred) is parsed and looked up in `gpu-memory.json` (1546 cards: VRAM
+  in GB, 0 for shared memory), ported from onepunk/llmsizer (MIT; data from
+  onepunk/open-gpu-db, Apache-2.0). Apple chips: Pro 16 GB, Max/Ultra 32 GB,
+  plain 8 (deviceMemory stops at 8); a shared GPU may use two thirds.
+  `needGB` in `SUPPORTED_MODELS` (E2B 3, E4B 6, Bonsai 2 10); a first visit
+  (no `?model=`, nothing saved) gets the biggest that fits, not saved as a
+  choice; an unknown card gets E2B. The RTX 2060 reads as 6 GB (E4B).
+  The larger Bonsai also run through an endpoint (llama.cpp, or OpenRouter
+  `prism-ml/ternary-bonsai-2-27b`).
   - **Nemotron 3.5 Bolt E4B** (NVIDIA, Gemma 4 E4B post-trained; HF
     `nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16`, GGUF `...-4GB`): the Gemma
     architecture, so `litert-torch export_hf` should convert it
@@ -52,7 +76,11 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     the Gemma E4B. Until then it runs through an endpoint (llama.cpp or
     Ollama on the GGUF; the Brain options have presets).
 - **Endpoint** (`openai-client.js`): any OpenAI-compatible server; by
-  default this server's `/api/llm/v1` proxy (keys stay on the server). With
+  default this server's `/api/llm/v1` proxy (keys stay on the server).
+  Picking it in the top bar opens `#endpointPop` with the Brain options'
+  endpoint fields moved into it (`⚙ endpoint` reopens it); it loads on
+  "done", not on the pick (a pick used to start turns through the proxy at
+  once). With
   Brain options > vision, each turn's newest message carries the character's
   view as an `image_url`. `window.tablefolkLLM` exposes the active brain as
   an OpenAI-style client.

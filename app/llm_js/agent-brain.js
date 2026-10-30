@@ -10,17 +10,21 @@ import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } fro
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261018a';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
+import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
+import { detectHardware, recommendModel } from './hardware.js?v=20261030d';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
+// needGB: graphics memory it wants with the game drawing beside it; a first
+// visit starts with the biggest one that fits (hardware.js).
 const SUPPORTED_MODELS = {
   'minicpm5-1b': { label: 'MiniCPM5-1B (CPU)', engine: 'wllama', size: '~690 MB', hidden: true },
   'minicpm5-1b-q8': { label: 'MiniCPM5-1B (CPU, Q8_0)', engine: 'wllama', size: '~1.15 GB', hidden: true },
   'minicpm5-1b-wgpu': { label: 'MiniCPM5-1B (WebGPU GGUF)', engine: 'wllama3', size: '~690 MB', hidden: true },
   'minicpm5-1b-wgpu-q8': { label: 'MiniCPM5-1B (WebGPU GGUF Q8_0)', engine: 'wllama3', size: '~1.15 GB', hidden: true },
   'minicpm5-1b-gpu': { label: 'MiniCPM5-1B (GPU/WebGPU)', engine: 'transformers.js', size: '~1.4 GB', hidden: true },
-  'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB' },
-  'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB' },
+  'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB', needGB: 3 },
+  'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', needGB: 6 },
   // NVIDIA's post-trained Gemma 4 E4B: takes the E4B's place once its
   // .litertlm is on R2 (tools/convert-litertlm.sh); hidden until then.
   'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', hidden: true },
@@ -28,8 +32,12 @@ const SUPPORTED_MODELS = {
   // not tested on every graphics card
   'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM)', engine: 'litert-lm', size: '~0.8 GB', hidden: true },   // loads on the nightly engine, but a system message breaks its template and the GPU answers "!!!!" (2026-10-25, RTX 2060)
   'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)', engine: 'litert-lm', size: '~2.6 GB', hidden: true },
-  // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's way)
-  'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB' },
+  // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's
+  // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
+  'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
+  // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
+  // (bonsai2-engine.js): far smarter, for cards with 10 GB or more
+  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10 },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
@@ -119,6 +127,13 @@ export function createAgentBrainManager(config = {}) {
 
   async function load() {
     if (loaded && engine) return engine;
+    if (getEngineType() === 'bonsai2') {
+      if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
+      engine = await loadBonsai2(status => onStatus(status));
+      loaded = true;
+      onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
+      return engine;
+    }
     if (getEngineType() === 'openai') {
       engine = createEndpointEngine();
       loaded = true;
@@ -194,6 +209,7 @@ export function createAgentBrainManager(config = {}) {
     }
 
     const generateFn = getEngineType() === 'openai' ? generateEndpoint
+      : getEngineType() === 'bonsai2' ? generateBonsai2
       : getEngineType() === 'transformers.js' ? generateTJS
       : getEngineType() === 'litert-lm' ? generateLiteRT
       : getEngineType() === 'wllama' ? generateWllama
@@ -241,7 +257,7 @@ export function createAgentBrainManager(config = {}) {
     return line;
   }
 
-  function setModel(modelKey) {
+  function setModel(modelKey, persist = true) {
     if (!SUPPORTED_MODELS[modelKey]) return false;
     if (currentModelKey === modelKey && loaded) return true;
     // Unload current engine if switching
@@ -251,8 +267,19 @@ export function createAgentBrainManager(config = {}) {
       loaded = false;
     }
     currentModelKey = modelKey;
-    persistModelChoice(modelKey);
+    if (persist) persistModelChoice(modelKey);
     return true;
+  }
+
+  // A first visit (no ?model=, nothing chosen before): the best model this
+  // device's graphics card holds. Returns { key, hw }; the choice is not saved.
+  async function pickForDevice() {
+    const hw = await detectHardware().catch(() => null);
+    let chosen = false;
+    try { chosen = new URLSearchParams(location.search).has('model') || !!localStorage.getItem('tablefolk_model'); } catch {}
+    const key = recommendModel(hw, Object.entries(SUPPORTED_MODELS).map(([key, m]) => ({ key, ...m })), DEFAULT_MODEL);
+    if (!chosen && !loaded && key !== currentModelKey) setModel(key, false);
+    return { key, hw, applied: !chosen };
   }
 
   function getModelKey() {
@@ -266,7 +293,8 @@ export function createAgentBrainManager(config = {}) {
     isLoaded: () => loaded,
     setModel,
     getModelKey,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, hidden: !!cfg.hidden })),
+    pickForDevice,
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, hidden: !!cfg.hidden })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

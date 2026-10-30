@@ -114,6 +114,14 @@ code { color:#ffe0a0; }
 .llm-endpoint label { display:flex; gap:6px; align-items:center; margin:4px 0; }
 .llm-endpoint input { flex:1; min-width:0; }
 .llm-endpoint-note { opacity:.7; margin-top:4px; line-height:1.35; }
+.endpoint-pop { position:fixed; top:60px; left:clamp(16px, 22vw, 250px); z-index:120; width:min(460px, calc(100vw - 32px)); box-sizing:border-box; padding:12px 14px; border-radius:10px; background:rgba(13,17,21,.94); border:1px solid rgba(255,255,255,.16); color:#fff; box-shadow:0 10px 30px rgba(0,0,0,.45); }
+.endpoint-pop[hidden] { display:none; }
+.endpoint-pop-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+.endpoint-pop-head button { flex:0 0 auto; width:auto; padding:5px 14px; }
+.endpoint-pop .llm-endpoint label { font-weight:normal; }
+.endpoint-pop .llm-endpoint summary { display:none; }
+.endpoint-pop .llm-endpoint label { flex-wrap:wrap; }
+.endpoint-pop .llm-endpoint select { max-width:100%; }
 .cache-backend-label { font-size:11px; display:flex; gap:4px; align-items:center; }
 .cache-backend-label select { padding:3px 5px; font-size:11px; }
 #clearCache { padding:5px 8px; font-size:11px; }
@@ -231,6 +239,8 @@ code { color:#ffe0a0; }
 #topBar .top-toggle input { width:16px; height:16px; accent-color:#d7ff9a; }
 #ttsTopToggle { flex:0 0 auto; width:36px; height:36px; padding:0; border-radius:50%; font-size:16px; background:rgba(255,255,255,.10); }
 #ttsTopToggle.on { background:rgba(215,255,154,.22); box-shadow:0 0 10px rgba(215,255,154,.18); }
+#ttsTopVolume { flex:0 0 auto; width:76px; accent-color:#d7ff9a; }
+@media (max-width:640px){ #ttsTopVolume { width:52px; } }
 
 
 #rail { position:fixed; left:10px; top:64px; z-index:60; display:flex; flex-direction:column; gap:6px; }

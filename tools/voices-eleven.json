@@ -11,7 +11,7 @@
   "moods": {
    "calm": "[calm, friendly] Hi. I was just heading into town, if you want to walk with me.",
    "joy": "[delighted, laughing] Oh, it's wonderful! I can't believe it actually worked. Thank you!",
-   "anger": "[furious, shouting] How dare you! I trusted you, and you lied to my face!",
+   "anger": "[cold, quiet anger, through clenched teeth] I trusted you. And you lied to my face.",
    "fear": "[terrified, whispering, trembling] Did you hear that? Something's out there. Please, don't leave me alone.",
    "sadness": "[sorrowful, tearful, quiet] I really thought we'd make it home. I'm sorry. I'm so sorry.",
    "seductive": "[playful, warm, flirtatious] Oh, don't look at me like that. You'll make a girl blush."
@@ -29,7 +29,7 @@
   "moods": {
    "calm": "[calm, wry] Sit down, dearie. The kettle's on, and the night is young.",
    "joy": "[cackling, gleeful] Ehehehe! Oh, that's the best news I've had in a hundred years!",
-   "anger": "[furious, hissing] Get out of my house, before I curse your bones to dust!",
+   "anger": "[low, cold, menacing] Get out of my house. Before I curse your bones to dust.",
    "fear": "[frightened, quavering] No, no, it's coming. I can feel it in the roots. Run, child, run!",
    "sadness": "[mournful, tired] They're all gone now, the ones I knew. Just me and the wind."
   }
@@ -46,7 +46,7 @@
   "moods": {
    "calm": "[calm, kindly] Ah, good morning. Do sit. I was just reading about dragons.",
    "joy": "[delighted, chuckling] Marvelous! It worked! Oh, I haven't felt this young in years!",
-   "anger": "[stern, thundering] Enough! You have no idea what you have unleashed upon this world!",
+   "anger": "[stern, low, cold anger] Enough. You have no idea what you have unleashed upon this world.",
    "fear": "[alarmed, shaking, thin elderly voice] By the stars... it has woken. We must leave, now, quickly!",
    "sadness": "[sorrowful, soft, thin elderly voice] I have buried many good friends. I am tired of burying friends."
   }
@@ -63,7 +63,7 @@
   "moods": {
    "calm": "[gruff, calm] Aye, I can have that blade ready by morning. Two silver, nae haggling, ye ken?",
    "joy": "[roaring laughter] Ha ha! Now that's a proper ale, aye! Drinks are on me tonight, lads!",
-   "anger": "[furious, bellowing] Ye dare insult my forge?! I'll hammer ye flat, ye wee scunner!",
+   "anger": "[low, seething, gruff] Ye dare insult my forge. Say it again, and I'll hammer ye flat.",
    "fear": "[nervous, hushed, still gruff and deep] Och, there's something in the mine. I dinnae like it, lads. Quiet now.",
    "sadness": "[low, heavy, deep] My brother's hammer. I couldnae lift it after he fell, aye. Still cannae.",
    "seductive": "[gruff, warm, teasing] Och, now, ye've a way of makin' a dwarf forget his anvil, aye."
@@ -98,7 +98,7 @@
   "moods": {
    "calm": "[calm, friendly] Stew's on the table, love. Take as long as you like.",
    "joy": "[delighted, laughing] Oh, bless you! That's the best news I've had all year!",
-   "anger": "[furious, sharp] Not in my inn, you don't! Out! Out, the lot of you!",
+   "anger": "[cold, firm, controlled anger] Not in my inn, you don't. Out. The lot of you.",
    "fear": "[frightened, whispering] Did you hear that on the stairs? Lock the door, quick.",
    "sadness": "[sad, tearful] My Albert used to sit just there. I still set his place.",
    "seductive": "[playful, warm and teasing] Well now, aren't you a handsome one. Stay a while, love."
@@ -132,7 +132,7 @@
   "moods": {
    "calm": "[quiet, gentle] It's all right. I like it here, it's quiet.",
    "joy": "[bright, giggling] You remembered my name! Thank you, thank you so much!",
-   "anger": "[upset, voice cracking] That's not fair! You promised, and you broke it!",
+   "anger": "[quiet, hurt, cold] You promised. And you broke it. Don't talk to me.",
    "fear": "[terrified, tiny whisper] Something's behind the door. Please don't make me go in.",
    "sadness": "[tearful, quiet] I miss my mother. She used to sing me to sleep."
   }
@@ -165,7 +165,7 @@
   "moods": {
    "calm": "[relaxed, casual] Nah, it's quiet tonight. Even the rats are asleep.",
    "joy": "[gleeful, laughing] Ha! Did you see his face? Priceless! Drinks are on him!",
-   "anger": "[snarling, angry] You sold me out! After everything, you rotten, lying snake!",
+   "anger": "[low, cold, venomous] You sold me out. After everything. You rotten, lying snake.",
    "fear": "[panicked, whispering fast] They've found us, they've found us. Go, go, go!",
    "sadness": "[small, tired] Everyone I grew up with is gone. It's just me now.",
    "seductive": "[playful, sultry, teasing] Hey there, handsome. Want to see what else I can steal?"
@@ -182,7 +182,7 @@
   "moods": {
    "calm": "[calm, dignified] The road is clear, and the horses are rested. We ride at dawn.",
    "joy": "[hearty, laughing] Ha ha! Well fought, my friend! Come, the first round is mine!",
-   "anger": "[cold fury, booming] You dishonour this hall and every oath sworn within it!",
+   "anger": "[cold, controlled fury, low] You dishonour this hall, and every oath sworn within it.",
    "fear": "[grave, hushed] Hold the line. It is larger than I thought. Steady, now.",
    "sadness": "[heavy, quiet] I carried him from the field myself. He was only a boy.",
    "seductive": "[low, warm, intimate] Forgive my staring. It is not every day I forget my duty."
@@ -199,13 +199,13 @@
   "moods": {
    "calm": "[relaxed, genial] Slow night. Pour yourself one, I'll polish the mugs.",
    "joy": "[roaring laughter] Ha ha ha! Best joke I've heard in years! Another round!",
-   "anger": "[bellowing, furious] Who broke my barrel?! Speak up, or you're all banned!",
+   "anger": "[low, stern, cold anger] Who broke my barrel. Speak up now, or you're all banned.",
    "fear": "[nervous, hushed] Keep it down, lads. Those cloaked fellows in the corner. I don't like their look.",
    "sadness": "[low, wistful] The old place was always louder, back when she was alive.",
    "seductive": "[warm, playful, rumbling] Ah, don't mind me, I'm just a big softie. Stay for another, eh?"
   },
-  "seed": 2024,
-  "mood_stability": 0.7
+  "seed": 777,
+  "mood_stability": 0.6
  },
  {
   "id": "squire_m",
@@ -218,7 +218,7 @@
   "moods": {
    "calm": "[earnest, steady] Yes, sir. The horses are fed and the gear is packed.",
    "joy": "[thrilled, laughing] You said I did well? Really? Wait till I tell my mother!",
-   "anger": "[upset, shouting] That's not fair, sir! I did exactly what you said!",
+   "anger": "[quiet, tight, cold anger] That's not fair, sir. I did exactly what you said.",
    "fear": "[terrified, whispering] There's something in the trees, sir. I heard it breathing.",
    "sadness": "[tearful, quiet] I wanted to be like him. Now he's gone, and I'm still just a squire."
   }
@@ -233,14 +233,14 @@
   "script": "[smooth, amused] Ah, there you are. Do sit, I've been expecting you. [cold, threatening] Cross me once more, and the river will have you. [quiet, honest] ...You know, I almost like you. Almost.",
   "moods": {
    "calm": "[relaxed, silky] Everything is arranged. All you need to do is smile.",
-   "joy": "[delighted, chuckling] Beautiful! Oh, that went better than I dared hope!",
+   "joy": "[pleased, low, quiet chuckle] Beautiful. Oh, that went better than I dared hope.",
    "anger": "[low, cold fury] You stole from me. Nobody steals from me twice.",
    "fear": "[tense, whispering] Guards. Two of them, maybe three. Don't turn around.",
    "sadness": "[quiet, regretful] I had a brother, once. We were both fools.",
    "seductive": "[low, velvety, seductive] Well now. If I'd known you'd be here, I'd have worn something nicer."
   },
-  "seed": 2024,
-  "mood_stability": 0.7
+  "seed": 777,
+  "mood_stability": 0.6
  },
  {
   "id": "captain_m",
@@ -253,7 +253,7 @@
   "moods": {
    "calm": "[calm, firm] All quiet on the wall. Keep your eyes open all the same.",
    "joy": "[rare, gruff laughter] Ha! Well done, lads. Don't let it go to your heads.",
-   "anger": "[barking, furious] I said hold the line! Who gave the order to retreat?!",
+   "anger": "[cold, clipped, controlled fury] I said hold the line. Who gave the order to retreat.",
    "fear": "[tense, low] They outnumber us three to one. Hold steady. Hold steady.",
    "sadness": "[hoarse, quiet] I wrote to forty families this winter. I'm tired of writing.",
    "seductive": "[low, gruff, restrained] Don't mistake me. I notice a good deal more than I let on."
@@ -270,7 +270,7 @@
   "moods": {
    "calm": "[slow, easy] Rain's comin', I reckon. Best bring the sheep in.",
    "joy": "[delighted, chuckling] Well, I'll be! Best harvest in twenty year!",
-   "anger": "[gruff, furious] Ye let the fox into the coop?! Me whole winter's eggs!",
+   "anger": "[low, gruff, seething] Ye let the fox into the coop. Me whole winter's eggs.",
    "fear": "[hushed, uneasy] Summat's been at the sheep. Big tracks. Stay close, now.",
    "sadness": "[low, quiet] The old dog's gone. Fifteen year she walked this field with me.",
    "seductive": "[shy, warm, teasing] Well, now. Ye've a smile that'd turn the milk sweet."
@@ -287,7 +287,7 @@
   "moods": {
    "calm": "[mild, precise] The archive closes at six. I shall put the kettle on.",
    "joy": "[thrilled, stammering] It's real! The manuscript is real! Oh, I could weep!",
-   "anger": "[indignant, squeaking] You burned it! Four hundred years of scholarship, and you burned it!",
+   "anger": "[cold, trembling, controlled anger] You burned it. Four hundred years of scholarship. And you burned it.",
    "fear": "[panicked, whispering] It's moving. The statue's moving. Oh no, oh no.",
    "sadness": "[quiet, soft] Nobody comes to the library now. Just me and the dust.",
    "seductive": "[flustered, shy, charming] Oh. I, um. You do have a rather lovely way of looking at a person."
@@ -321,7 +321,7 @@
   "moods": {
    "calm": "[calm, regal] Rise, all of you. Let us hear what the council has decided.",
    "joy": "[warm, booming laughter] Splendid! Let the bells ring, let the whole kingdom celebrate!",
-   "anger": "[thundering, furious] Silence! Who dares speak against the crown in this hall?!",
+   "anger": "[cold, commanding, low] Silence. Who dares speak against the crown in this hall.",
    "fear": "[grave, strained] The walls will not hold. Send the children north, at once.",
    "sadness": "[hollow, quiet] I sent him to that war myself. My son, my only son."
   }
@@ -329,9 +329,9 @@
  {
   "id": "hooded_x",
   "name": "Veil",
-  "gender": "female",
+  "gender": "male",
   "age": 30,
-  "description": "A mysterious hooded stranger, hushed whispery androgynous voice, calm and cryptic, soft and low, uncertain age around thirty. Clean studio recording.",
+  "description": "A mysterious hooded stranger, hushed whispery androgynous, slightly masculine voice, calm and cryptic, soft and low, uncertain age around thirty. Clean studio recording.",
   "preview_text": "You are looking for something, aren't you? Everyone who comes this way is. I can tell you where it is, but the answer will cost you more than gold.",
   "script": "[hushed, cryptic] You are looking for something, aren't you? [sharp, whispered threat] Follow me no further, or you will not like what I show you. [soft, sad] ...I was like you, once.",
   "moods": {
@@ -354,7 +354,7 @@
   "moods": {
    "calm": "[hollow, slow] The dead are patient. We have all the time in the world.",
    "joy": "[cold, rasping laugh] Heh heh heh. Another soul for the grave. Delicious.",
-   "anger": "[snarling, echoing] Who disturbs my rest?! I will rip the marrow from your bones!",
+   "anger": "[low, menacing, echoing growl] Who disturbs my rest. I will take the marrow from your bones.",
    "fear": "[rasping, shaken] The light. It burns. Back! Keep it back!",
    "sadness": "[mournful, ghostly] I had a name once. I cannot remember it."
   }
@@ -370,7 +370,7 @@
   "moods": {
    "calm": "[deep, slow, rumbling] Sit, little one. I am old, and I am in a talkative mood.",
    "joy": "[booming laughter] Ha ha ha! Delightful! It has been centuries since I was this entertained!",
-   "anger": "[roaring, thunderous] You dare steal from me?! I will melt the flesh from your bones!",
+   "anger": "[deep, slow, menacing rumble] You dare steal from me. I will melt the flesh from your bones.",
    "fear": "[low, shaken rumble] No. That blade. It cannot be. Keep it away from me!",
    "sadness": "[deep, mournful] I was the last of my kind. Now only silence fills these halls."
   }

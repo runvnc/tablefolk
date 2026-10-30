@@ -114,7 +114,8 @@ head clips the lintel). A `door` fills a wall cell (`+` in a grid): a wooden
 leaf with the wall carried over the top, swinging open as anyone approaches.
 
 With the follow camera, walls between the camera and the player drop to a low
-stub (`app/cutaway.js`), so tall walls never hide the hero.
+stub (`app/cutaway.js`), so tall walls never hide the hero. With the free
+camera every wall stands at half height; first person shows them whole.
 
 ## Light
 

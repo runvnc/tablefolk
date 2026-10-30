@@ -94,7 +94,7 @@
       // seductive: only for a character written that way (or told so with "ttsMood": "seductive"), when no strong feeling says otherwise
       if(!best&&v.moods.seductive){ const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsMood==='seductive'||/\b(seduct\w*|flirt\w*|sultry|alluring|temptress|coquett\w*|smouldering|siren)\b/i.test((cfg.personality||'')+' '+(cfg.style||''))) best='seductive'; }
       return best?voice+'@'+best:voice; }catch{ return voice; } }
-    speak(agent,text,voiceId){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
+    speak(agent,text,voiceId,level=1){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,level:clamp(+level||1,.1,1.5),text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
     async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
@@ -147,6 +147,9 @@
       if(cam&&cam.alpha!==undefined){ alpha=+cam.alpha.toFixed(2); beta=+cam.beta.toFixed(2); radius=+cam.radius.toFixed(2); }
       const srcAgent=this.spatialSourceAgent();
       const sp=this.spatialSourcePos();
+      // the volume setting times how loud this line is said (softer to someone
+      // beside the speaker, app.js say()) times the fall-off with distance
+      const vol=(this.volume??=settings().volume)*(this.current?.level??1);
       let pan=0, dist=0, g=1;
       if(sp){
         const dx=(sp.x||0)-L.x, dy=((sp.y||0)+.6)-L.y, dz=(sp.z||0)-L.z;
@@ -154,10 +157,10 @@
         pan=clamp((dx*R.x+dz*R.z)/(dist||1),-1,1);
         g=Math.max(.06,Math.min(1,1/(1+0.085*dist)));
         this.stereoPanner.pan.setTargetAtTime(pan,this.audioCtx.currentTime,.05);
-        this.gain.gain.setTargetAtTime(g,this.audioCtx.currentTime,.05);
+        this.gain.gain.setTargetAtTime(g*vol,this.audioCtx.currentTime,.05);
       } else {
         this.stereoPanner.pan.setTargetAtTime(0,this.audioCtx.currentTime,.05);
-        this.gain.gain.setTargetAtTime(1,this.audioCtx.currentTime,.05);
+        this.gain.gain.setTargetAtTime(vol,this.audioCtx.currentTime,.05);
       }
       this.spatialDebug={
         camPos:[+L.x.toFixed(1),+L.y.toFixed(1),+L.z.toFixed(1)],
@@ -193,7 +196,7 @@
     // Drop one character's queued lines and cut it off if it is speaking (it died).
     silence(agent){this.queue=this.queue.filter(i=>i.agent!==agent);if(this.current?.agent===agent){try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}}
     setEnabled(v){localStorage.setItem('tablefolkTtsEnabled',v?'1':'0');if(!v)this.stop();}
-    setVolume(v){localStorage.setItem('tablefolkTtsVolume',String(v));if(this.gain)this.gain.gain.value=Number(v);}
+    setVolume(v){localStorage.setItem('tablefolkTtsVolume',String(v));this.volume=Number(v);if(this.gain)this.gain.gain.value=Number(v);this.dispatchEvent(new Event('volumechange'));}
     setBufferMs(v){localStorage.setItem('tablefolkTtsBufferMs',String(v));}
     async addVoice(name,file){await this.ensureAudio();const ab=await file.arrayBuffer(), decoded=await this.audioCtx.decodeAudioData(ab), mono=this.toMono(decoded), audio0=this.resample(mono,decoded.sampleRate,24000);let audio=audio0.length>MAX_CUSTOM_VOICE_SAMPLES?audio0.slice(0,MAX_CUSTOM_VOICE_SAMPLES):audio0;if((audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME)).length===0)audio=new Float32Array(1);let peak=0;for(const x of audio)peak=Math.max(peak,Math.abs(x));if(peak>.001){const k=Math.min(1.8,.9/peak);for(let i=0;i<audio.length;i++)audio[i]*=k;}const id=crypto.randomUUID();const rec={id,name:name||file.name.replace(/\\.[^.]+$/,''),audio:Array.from(audio),created:Date.now()};await this.dbPut(rec);this.custom.set(id,rec);this.dispatchEvent(new Event('voiceschanged'));if(this.ready)await this.encode(rec);return id;}
     // A voice from the designed library (assets/voices/): fetched, cloned like an
@@ -226,7 +229,9 @@
       try{
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
         // one small file per state: states-v6/<voice>[@<mood>].bin (tools/build-voice-states.mjs)
-        const r=await fetch(base+'states-v6/'+id.slice(5)+'.bin'); if(!r.ok) return null;
+        // ?v=: the voice's version in voices.json, so a re-recorded voice is fetched anew past every cache
+        const pv=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id.split('@')[0])?.v;
+        const r=await fetch(base+'states-v6/'+id.slice(5)+'.bin'+(pv?'?v='+pv:'')); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength>1000?buf:null;
       }catch{ return null; }
     }

@@ -3,6 +3,23 @@
 The user's requests, recorded as given, with status. Newest batch first.
 Nothing here is cancelled by a later batch; a later batch only changes priority.
 
+
+## Characters, cameras and brains batch (2026-10-30)
+
+1. Voice leftovers: anger as cold anger, `hooded_x` gender, tavern/rogue identity. (done; rogue 7-8 of 10, an accent drift in the designed voice)
+2. Replace Bonsai 1.7B with Prism Bonsai 2 27B (5.9 GB) for bigger GPUs. (done: `bonsai2-engine.js`; not run here, 6 GB card)
+3. A RAM/VRAM detector (reuse one from GitHub) that runs the best model that fits. (done: `hardware.js`, from onepunk/llmsizer)
+4. Calmer default animation (body swing, looking around). (done: idle clip calmed in the GLBs)
+5. Characters face whom they talk to. (done)
+6. Giving shows an animation with the object passing between them. (done)
+7. Fix the red-haired villager woman's deformed limbs. (done: new model)
+8. A more detailed king. (done: new model)
+9. Voice volume control; softer when people are close. (done)
+10. The "OpenAI-compatible" brain needs URL and key fields. (done: a panel under the top bar)
+11. Start in free camera; in first person a click must not walk. (done)
+12. Third person / free: half-height walls or hide walls in front of characters. (done: half height)
+13. Wheel zoom along the view, not towards the last clicked square. (done)
+
 ## Batch of 2026-10-25: interiors, attractive characters, voices, models
 
 Recorded from one long message. Status 2026-10-25 (later): done and tested: 1-4 (undo and drag/delete without

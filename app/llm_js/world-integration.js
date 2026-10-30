@@ -1,8 +1,10 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261025zm';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261030d';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261025zk';
+import { installDevConsole } from './dev-console.js?v=20261030c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025i';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261025c';
+import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
+import { describeHardware } from './hardware.js?v=20261030d';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
 
@@ -266,6 +268,7 @@ function getActiveEngine(manager) {
 async function clearActiveModelCache(manager) {
   const engine = getActiveEngine(manager);
   if (engine === 'openai') return;
+  if (engine === 'bonsai2') return clearBonsai2Cache();
   if (engine === 'litert-lm') return clearLiteRTCache(manager.getModelKey());
   if (engine === 'wllama') return clearWllamaCache(manager.getModelKey());
   if (engine === 'wllama3') return clearWllama3Cache(manager.getModelKey());
@@ -275,6 +278,7 @@ async function clearActiveModelCache(manager) {
 async function hasActiveModelCached(manager) {
   const engine = getActiveEngine(manager);
   if (engine === 'openai') return true; // nothing to download
+  if (engine === 'bonsai2') return hasBonsai2Cached();
   if (engine === 'litert-lm') return hasLiteRTCached(manager.getModelKey());
   if (engine === 'wllama') return hasWllamaCached(manager.getModelKey());
   if (engine === 'wllama3') return hasWllama3Cached(manager.getModelKey());
@@ -437,14 +441,19 @@ async function main() {
   // Auto-load the brain on startup
   // Populate model selector
   const modelSelect = el('modelSelect');
+  // The best model this device's graphics card holds (a first visit starts
+  // with it; the picker marks it either way).
+  const device = await manager.pickForDevice().catch(() => null);
+  if (device) { appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key); window.tablefolkDevice = device; }
   if (modelSelect) {
     modelSelect.textContent = '';
+    if (device?.hw) modelSelect.title = 'Brain model. This device: ' + describeHardware(device.hw);
     for (const m of manager.getSupportedModels()) {
       // Hidden models only appear if one was picked explicitly via ?model=.
       if (m.hidden && m.key !== manager.getModelKey()) continue;
       const opt = document.createElement('option');
       opt.value = m.key;
-      opt.textContent = m.label;
+      opt.textContent = m.label + (device?.key === m.key && m.needGB ? ' ✓ best fit for this device' : '');
       modelSelect.appendChild(opt);
     }
     modelSelect.value = manager.getModelKey();
@@ -469,6 +478,8 @@ async function main() {
       // progress). This used to set "model switched ... - click load", which
       // the notice read as "loading" and showed as an endless busy bar while
       // nothing was happening.
+      // The endpoint brain waits for its settings (the panel opens; "done" loads it).
+      if (manager.getSupportedModels().find(m => m.key === newKey)?.engine === 'openai') { el('brainStatus') && (el('brainStatus').textContent = 'set the endpoint, then press done'); return; }
       el('brainStatus') && (el('brainStatus').textContent = 'switching to ' + (manager.getSupportedModels().find(m => m.key === newKey)?.label || newKey) + '…');
       el('loadBrains').click();
     });
@@ -491,7 +502,21 @@ async function main() {
       setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model?.value.trim() });
       appendLog('endpoint preset: ' + getEndpointConfig().baseURL + ' ' + (model || ''));
     });
-    if (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.engine === 'openai') el('llmEndpointBox')?.setAttribute('open', '');
+    // The fields live in a panel under the top bar while the endpoint brain is
+    // picked (the ⚙ endpoint button), and in the Debug pane otherwise.
+    const box = el('llmEndpointBox'), pop = el('endpointPop'), btn = el('endpointBtn'), home = box?.parentNode, next = box?.nextSibling;
+    const isEndpoint = () => manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.engine === 'openai';
+    const showPop = on => {
+      if (!box || !pop) return;
+      if (on) { pop.appendChild(box); box.setAttribute('open', ''); } else if (box.parentNode === pop) home?.insertBefore(box, next);
+      pop.hidden = !on;
+    };
+    const syncEndpointUi = (open = false) => { if (btn) btn.hidden = !isEndpoint(); if (!isEndpoint()) showPop(false); else if (open) showPop(true); };
+    btn?.addEventListener('click', () => showPop(pop.hidden));
+    el('endpointDone')?.addEventListener('click', () => { showPop(false); if (isEndpoint() && !manager.isLoaded()) el('loadBrains')?.click(); });
+    el('modelSelect')?.addEventListener('change', () => syncEndpointUi(true));
+    syncEndpointUi(false);
+    if (isEndpoint()) box?.setAttribute('open', '');
   }
   // Initialize cache backend selector
   const backendSelect = el('cacheBackend');

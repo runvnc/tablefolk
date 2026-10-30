@@ -6,7 +6,7 @@
   "description": "young, bright and hopeful, a little breathless",
   "file": "hero_young_f.mp3",
   "elevenlabs_voice_id": "fJalrSnGs9MWWsnHJJpn",
-  "v": "202610252233",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/hero_young_f.calm.mp3",
    "joy": "mood/hero_young_f.joy.mp3",
@@ -23,7 +23,7 @@
   "description": "warm, motherly, a laugh in it",
   "file": "innkeeper_f.mp3",
   "elevenlabs_voice_id": "M1ThvDT0M76BcbnNzD8r",
-  "v": "202610252301",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/innkeeper_f.calm.mp3",
    "joy": "mood/innkeeper_f.joy.mp3",
@@ -74,7 +74,7 @@
   "description": "gravelly old crone, cackling",
   "file": "crone_f.mp3",
   "elevenlabs_voice_id": "9MbF1XDKdQH3F704MkTs",
-  "v": "202610252208",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/crone_f.calm.mp3",
    "joy": "mood/crone_f.joy.mp3",
@@ -90,7 +90,7 @@
   "description": "soft, shy, young",
   "file": "shy_f.mp3",
   "elevenlabs_voice_id": "xWEKMzYn2fzADZCHTell",
-  "v": "202610252301",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/shy_f.calm.mp3",
    "joy": "mood/shy_f.joy.mp3",
@@ -123,7 +123,7 @@
   "description": "cheeky, quick, street-smart",
   "file": "thief_f.mp3",
   "elevenlabs_voice_id": "WNRriHWeqHofU4HN3CI4",
-  "v": "202610252302",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/thief_f.calm.mp3",
    "joy": "mood/thief_f.joy.mp3",
@@ -140,7 +140,7 @@
   "description": "deep, heroic, steady",
   "file": "knight_m.mp3",
   "elevenlabs_voice_id": "Td6dhva8KbW1fNn8RdVP",
-  "v": "202610252302",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/knight_m.calm.mp3",
    "joy": "mood/knight_m.joy.mp3",
@@ -157,7 +157,7 @@
   "description": "gravelly, gruff, hearty",
   "file": "dwarf_m.mp3",
   "elevenlabs_voice_id": "5myl6xq5hZzD9TBaLfN9",
-  "v": "202610252233",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/dwarf_m.calm.mp3",
    "joy": "mood/dwarf_m.joy.mp3",
@@ -174,7 +174,7 @@
   "description": "jolly, booming, round",
   "file": "tavern_m.mp3",
   "elevenlabs_voice_id": "rRi4XwAJCvsRaBNCeBqD",
-  "v": "202610252307",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/tavern_m.calm.mp3",
    "joy": "mood/tavern_m.joy.mp3",
@@ -191,7 +191,7 @@
   "description": "old, wise, dry and slow",
   "file": "wizard_m.mp3",
   "elevenlabs_voice_id": "ciOvFeGvfBc7Q22wvHz2",
-  "v": "202610252208",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/wizard_m.calm.mp3",
    "joy": "mood/wizard_m.joy.mp3",
@@ -207,7 +207,7 @@
   "description": "young, eager, earnest",
   "file": "squire_m.mp3",
   "elevenlabs_voice_id": "caMv6k68QlcJYOwojGBP",
-  "v": "202610252302",
+  "v": "202610301638",
   "moods": {
    "calm": "mood/squire_m.calm.mp3",
    "joy": "mood/squire_m.joy.mp3",
@@ -223,7 +223,7 @@
   "description": "smooth, sly, amused",
   "file": "rogue_m.mp3",
   "elevenlabs_voice_id": "Eghu2t5KitGQAOCpqfX4",
-  "v": "202610252308",
+  "v": "202610301648",
   "moods": {
    "calm": "mood/rogue_m.calm.mp3",
    "joy": "mood/rogue_m.joy.mp3",
@@ -240,7 +240,7 @@
   "description": "stern, barking, authoritative",
   "file": "captain_m.mp3",
   "elevenlabs_voice_id": "brWG1ki5XQOzzwyfoTrn",
-  "v": "202610252302",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/captain_m.calm.mp3",
    "joy": "mood/captain_m.joy.mp3",
@@ -257,7 +257,7 @@
   "description": "slow, gentle, country",
   "file": "farmer_m.mp3",
   "elevenlabs_voice_id": "z3npNimWU2Q99Fuv7DZ4",
-  "v": "202610252303",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/farmer_m.calm.mp3",
    "joy": "mood/farmer_m.joy.mp3",
@@ -274,7 +274,7 @@
   "description": "nervous, bookish, fussy",
   "file": "scholar_m.mp3",
   "elevenlabs_voice_id": "UbtpaeUZvL90k0l8Wcge",
-  "v": "202610252303",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/scholar_m.calm.mp3",
    "joy": "mood/scholar_m.joy.mp3",
@@ -308,7 +308,7 @@
   "description": "grand, resonant, weary",
   "file": "king_m.mp3",
   "elevenlabs_voice_id": "XwRLQWLmx80H6DRG1E1p",
-  "v": "202610252303",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/king_m.calm.mp3",
    "joy": "mood/king_m.joy.mp3",
@@ -320,7 +320,7 @@
  {
   "id": "hooded_x",
   "name": "Veil",
-  "gender": "female",
+  "gender": "male",
   "description": "hushed, mysterious, androgynous",
   "file": "hooded_x.mp3",
   "elevenlabs_voice_id": "ZpMNj1mm3rH65C27Ox65",
@@ -341,7 +341,7 @@
   "description": "A hollow, rasping undead being, like a risen skeleton lich or a corpse: a dry, whispering, echoing voice with a deep rattling breath, grave-cold, slow and menacing, ancient and rotting, hissing sibilants, inhuman",
   "file": "undead_m.mp3",
   "elevenlabs_voice_id": "qWl84XXOIPciOk3Z0tTm",
-  "v": "202610252303",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/undead_m.calm.mp3",
    "joy": "mood/undead_m.joy.mp3",
@@ -357,7 +357,7 @@
   "description": "A colossal ancient dragon: an extremely deep, booming, resonant voice with a growling rumble in the chest, slow, majestic and imperious, theatrical British accent, rumbling bass, vast and powerful, with a hint of amusement and menace",
   "file": "dragon_m.mp3",
   "elevenlabs_voice_id": "T4FeFqPrlVLHigR27E57",
-  "v": "202610252304",
+  "v": "202610301639",
   "moods": {
    "calm": "mood/dragon_m.calm.mp3",
    "joy": "mood/dragon_m.joy.mp3",

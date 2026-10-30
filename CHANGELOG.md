@@ -4,6 +4,18 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-10-30
+
+- **Bonsai 2 27B replaces Bonsai 1.7B** in the model menu: Prism ML's ternary 27B (5.9 GB) on the webml-community WebGPU kernels, for graphics cards with 10 GB or more.
+- **The best model for the device**: a first visit starts with the biggest brain the graphics card holds (the card found by name in a table of 1546 cards from onepunk/llmsizer and open-gpu-db), and the menu marks it.
+- **Endpoint settings in the top bar**: picking "OpenAI-compatible endpoint" opens a panel for the base URL, API key and model; it starts on "done".
+- **Free camera by default**, with every wall at half height so no one hides behind one; first person keeps full walls and a click there no longer walks; the wheel zooms along the view instead of drifting to the last clicked square.
+- **Characters face whom they talk to** (named, last speaker, or the player), speak softly up close and louder across a room; a **voice volume slider** sits in the top bar (the old one was overridden by the spatial gain).
+- **Hand-overs show**: giver and receiver reach out and the thing (its picture, coins, a parcel) passes between their hands.
+- **Calmer idles**: the Meshy people's idle clip keeps 30% of its motion (the head and hips swung about 90 degrees).
+- **New villager woman and king** (Meshy): the red-haired villager's limbs were deformed; the king is now an older king in red and gold (the old one is `king_classic`).
+- **Voices**: anger samples redone as cold anger (shouted lines cloned squeaky); the tavern keeper and rogue re-recorded for steadier identity (9 and 7-8 of 10); `hooded_x` is male.
+
 ## 2026-10-25
 
 - **Voice states are one file each** on R2 (`pocket-tts/states-v6/<voice>[@<mood>].bin`): no index, no bundles; the build tool takes voice ids, so a changed voice means re-uploading 6-7 small files. The old bundles are deleted from the bucket.

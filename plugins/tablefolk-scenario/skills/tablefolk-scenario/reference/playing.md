@@ -7,7 +7,12 @@ and "build your own"); the "worlds" button brings it back.
 ## First visit
 
 The first time a character speaks, the page asks before downloading the
-model (Gemma 4 E2B, about 2 GB, cached in the browser afterwards). The
+model, cached in the browser afterwards. A first visit starts with the best
+model the graphics card holds (`app/llm_js/hardware.js`: the card is found by
+name and its memory looked up in a table, since browsers never report free
+memory): Gemma 4 E2B (about 2 GB) below 6 GB, E4B from 6 GB, Bonsai 2 27B from
+10 GB. The menu marks that one "best fit for this device"; a model the player
+picked is kept. The
 question waits behind the welcome screen and the world's intro card. Never
 approve the download on a user's behalf.
 
@@ -16,7 +21,8 @@ approve the download on a user's behalf.
 | key | does |
 |---|---|
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
-| click the ground | walk there |
+| click the ground | walk there (not in first person: there only the keys walk) |
+| mouse wheel | zoom along the view: the middle of the screen stays put, and at the closest the free camera moves on that way |
 | E | use what is in front of you: open a chest, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
@@ -32,15 +38,22 @@ rook` (skills). The 🎤 button talks by voice (`app/speech-input.js`: the
 server's Gemma when it runs `litert-lm serve`, else the browser's speech
 recognition).
 
-**Cameras.** The follow camera (default with an avatar) is a high, fixed
-Diablo-style view behind the player; walls between it and the player drop to
-a stub, and a roof in the way turns see-through. The free camera (C) orbits
-and zooms freely; it never sees through roofs. First person (V) looks
-through the avatar's eyes.
+**Cameras.** The free camera (the default with an avatar) orbits (drag) and
+zooms freely and eases after the player; every wall stands at half height
+there, so no one is hidden behind one. The follow camera (C) is a high,
+fixed Diablo-style view behind the player; walls between it and the player
+drop to a stub, and a roof in the way turns see-through. First person (V)
+looks through the avatar's eyes, with walls at full height.
 
 **Giving.** Drag an item (or the gold) from the Adventurer pane onto a
 character close by, or press its "give" button (the nearest one). The
-character gets it and is told.
+character gets it and is told. Every hand-over shows: the two face each
+other, the giver reaches out with the thing (its picture, coins for gold, a
+little parcel for anything else) and it passes into the other's hand.
+
+**Talking.** A character turns to whoever it speaks to: someone near it names,
+else whoever spoke to it last, else the player when close. The listener turns
+back. It speaks softly to someone beside it and louder across a room.
 
 ## Panes and modes
 
@@ -59,7 +72,8 @@ command box.
 | Gemma 4 E2B (LiteRT-LM) | the default, ~2 GB, in the browser on WebGPU |
 | Gemma 4 E4B | larger (~3 GB), better at following rules |
 | Gemma 4 E2B with sight | the full multimodal model (~2.6 GB, needs a 6 GB graphics card): characters see when they `look` |
-| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp, Ollama; Brain options > vision sends pictures |
+| Bonsai 2 27B | Prism ML's ternary 27B (~5.9 GB), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
+| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp, Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it); "done" starts it. Vision sends pictures |
 
 Hidden test engines (MiniCPM, Transformers.js) are listed in
 `app/llm_js/agent-brain.js`. One model runs for all characters, in one shared
@@ -71,8 +85,9 @@ is fast.
 Speech is on by default (unless the player turned it off). Engines (Voice
 pane; the server's admin page sets the default): Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
-languages). Voices are placed in space. The Voice pane can clone a voice from
-a sample.
+languages). Voices are placed in space. The slider beside the speaker
+button in the top bar (and the Voice pane) sets their volume. The Voice pane
+can clone a voice from a sample.
 
 ## Graphics
 

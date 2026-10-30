@@ -308,6 +308,7 @@
     window.tablefolkMind?.event(c, 'given', { who, what: given });
     setBrainConfig(c.id, cfg);
     emitBadge(c, '+' + given.replace(/^the /, ''));
+    window.tablefolk?.startHandover?.(me(), c, what === 'gold' ? 'gold' : what);
     note(`${who} gives ${c.id} ${given}`);
     inventoryChanged(); render(); acted('give');
   }

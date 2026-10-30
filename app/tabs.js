@@ -89,6 +89,13 @@
     btn.addEventListener('click', () => { box.click(); sync(); });
     box.addEventListener('change', sync);
     sync();
+    // the voice volume slider beside it, kept in step with the Voice pane's
+    const top = document.getElementById('ttsTopVolume'), pane = document.getElementById('ttsVolume');
+    if (top) {
+      try { top.value = localStorage.getItem('tablefolkTtsVolume') || '.85'; } catch {}
+      top.addEventListener('input', () => { window.tablefolkTTS?.setVolume(top.value); if (pane) pane.value = top.value; });
+      pane?.addEventListener('input', () => { top.value = pane.value; });
+    }
   }
 
   function init() {

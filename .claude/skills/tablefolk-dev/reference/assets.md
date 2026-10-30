@@ -70,13 +70,19 @@ idle model turned toward the camera.
   content-policy 422) and would not make a fleshy zombie. Paid: ask before
   running.
 - **People** (swordswoman, sorceress, huntress, villager_woman, swordsman,
-  wanderer): `tools/fal-character.py image|model|rig <name>`: a FLUX concept
+  wanderer, king): `tools/fal-character.py image|model|rig <name>`: a FLUX concept
   image (look at it first: cheap), Meshy v6 image-to-3D with PBR in A-pose,
   Meshy rigging with the same five clips, then `tools/finish-monster.sh <name>
   work/people`. About $2 each. Prompts that worked: JRPG costume words
   (split skirt, fitted bodice, thigh boots), "PG-13", a modest neckline.
   The older body names are aliases of the new files in `FIGURES`.
-- **Voices, acted** (2026-10-26): `tools/elevenlabs-voices.py` (needs `ELEVENLABS_API_KEY`; the maintainer's is in `~/.config/fish/config.fish`) designs a voice with ElevenLabs Voice Design from `tools/voices-eleven.json`, lets Gemini 4 Argon pick the preview nearest the wanted gender and age, saves it in the account (one voice slot each) and records a three-emotion script with `eleven_v4` audio tags into `assets/voices/<id>.mp3` (about 11-15 s). Done for all 22 voices (and `tools/elevenlabs-moods.py` for the mood samples; `--only=seductive` adds one mood). fal's own `eleven-v4` endpoint takes premade voices only (22 names and the default library IDs), no design. After changing samples: `node tools/build-voice-states.mjs`, upload only the changed `work/voice-states/v6/*.bin` files to `pocket-tts/states-v6/`, bump `v6` in `stateKey` (and the folder name) only if the format changes.
+  Finish with `CALM=0.3 tools/finish-monster.sh <name> work/people` (the
+  idle keeps 30% of its motion; `merge-clips.mjs`). The rigger deforms arms
+  that touch the body or a long skirt: ask for "arms held out at 30 degrees
+  from the body so the hands do not touch the skirt, legs apart" and a
+  knee-length skirt with leggings (villager_woman, 2026-10-30). Long robes
+  and cloaks stretch when walking: ask for a short cape, "no long robe".
+- **Voices, acted** (2026-10-26): `tools/elevenlabs-voices.py` (needs `ELEVENLABS_API_KEY`; the maintainer's is in `~/.config/fish/config.fish`) designs a voice with ElevenLabs Voice Design from `tools/voices-eleven.json`, lets Gemini 4 Argon pick the preview nearest the wanted gender and age, saves it in the account (one voice slot each) and records a three-emotion script with `eleven_v4` audio tags into `assets/voices/<id>.mp3` (about 11-15 s). Done for all 22 voices (and `tools/elevenlabs-moods.py` for the mood samples; `--only=seductive` adds one mood). fal's own `eleven-v4` endpoint takes premade voices only (22 names and the default library IDs), no design. After changing samples: `node tools/build-voice-states.mjs`, upload only the changed `work/voice-states/v6/*.bin` files to `pocket-tts/states-v6/` (the client asks for them with `?v=<the voice's v>`, so a re-recorded voice gets past the CDN and browser caches), bump `v6` in `stateKey` (and the folder name) only if the format changes.
 - **Voices** (first set): `tools/fal-voices.py` (Qwen3-TTS Voice Design on fal.ai, a few
   cents a clip) writes `assets/voices/<id>.mp3` and `voices.json` from
   `tools/voices.json`.

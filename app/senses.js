@@ -255,7 +255,7 @@
       for (const m of fog) m.setEnabled(true);
       for (const c of hidden) if (c._fogHidden) c.root.setEnabled(false);
       g.root.setEnabled(own);
-      if (cut) window.tablefolkCutaway?.suspend?.(false);
+      if (cut) window.tablefolkCutaway?.suspend?.(cut);
     }
   }
 

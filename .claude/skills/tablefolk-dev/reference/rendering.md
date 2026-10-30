@@ -48,7 +48,11 @@ post-processing).
   player are cut per pixel in the walls' own materials (a material plugin
   discards fragments above a stub height in the cut squares); geometry is
   never changed (an older vertex clamp bent long walls into slopes). Cut
-  squares get a stone lid.
+  squares get a stone lid. The free camera uses a second mode (`half()`,
+  uniform `tfCut.z` = 2): every wall fragment above half the wall height is
+  discarded, with no lids (square lids looked like dark slabs over the thin
+  stone walls); the fog boxes' plugin (`attach(mat, true)`) ignores that
+  mode. `suspend(true)` returns the mode, `suspend(mode)` restores it.
 
 ## Darkness
 
@@ -85,6 +89,23 @@ when the follow camera's ray hits it, else 1; never in the free camera.
   backwards); Meshy models need no turn. Hair tint is matched by material
   name (`/hair/i`). Weapons follow the hand bone, falling back to
   `Wrist.R`, `Arm.R_end`, `LowerArm.R`.
+- Facing: `faceToward(g, other)` points `g.dir` (the logic's eight
+  directions) at someone and lets `bodyYaw` turn the body smoothly to face
+  them exactly for a while (7 s, until it walks). `say()` turns a speaker to
+  `addresseeOf(g, text)` (someone in earshot it names, else whoever spoke to
+  it in the last 30 s, `g._heard`, else the player when near, else the
+  nearest) and the listener back; the player's chat turns the character to
+  the player. The same distance sets how loud the line is (`level` to the
+  TTS manager: .55 beside, .75 near, 1 across a room, .35 whispered).
+- Hand-overs (`startHandover`, from `give`, `sell` and the player's gives in
+  `play.js`): a token (the item's tile picture as a billboard, coins, else a
+  parcel) moves from the giver's right hand to the receiver's over 1.6 s;
+  both reach with the right arm (`poseReach`, the carry code's two-bone IK);
+  it waits while either walks. Universal-rig arms are `UpperArm.R`,
+  `LowerArm.R`, `Wrist.R` in `findBones`.
+- Meshy idle clips are calmed in the GLB (`CALM=0.3 tools/finish-monster.sh`:
+  keys pulled toward the bone's mean pose, head/neck/hips half again): the
+  raw clip turned the head and hips about 90 degrees.
 - Speech bubbles sit a fixed 42 px above the projected head. The head bone's
   Y scale flaps while TTS speaks (`speechstart` / `speechend`).
 - First person hides the avatar and draws forearms in rendering group 1
@@ -100,8 +121,13 @@ y .075 (they were buried) and turn to read from the south.
 
 ## Cameras and views
 
-- Follow camera (default with an avatar): high and fixed behind the player,
-  starts at 16, zooms out to 30; free camera starts at 19.
+- Free camera ('overview', the default with an avatar since 2026-10-30;
+  `freeCameraStart`): starts at 19, eases after the avatar, walls at half
+  height. Follow camera (C): high and fixed behind the player, starts at 16,
+  zooms out to 30. The wheel (`setupMouseWheelZoom`) only changes the radius
+  (it used to pull the target towards `state.zoomFocus`, the last click);
+  below the minimum radius the free camera's target moves forward along the
+  view. In first person a click never walks.
 - Tabletop (`app/tabletop.js`): an orthographic FreeCamera with rotation (π/2,
   π, 0), so screen right is -x and screen down is +z;
   `toPx(v,x,z) = [(hw-(x-cx))/(2hw)*cw, (hh+(z-cz))/(2hh)*ch]`. PNGs come from
