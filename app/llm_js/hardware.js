@@ -42,10 +42,24 @@ export function parseRenderer(renderer) {
     .replace(/\(R\)|\(TM\)/g, '').replace(/\s*\(0x[0-9A-Fa-f]+\)\s*$/, '').replace(/\s+/g, ' ').trim();
 }
 
+// Chips that share system memory, newer than the table or listed there as
+// dedicated, with the least memory they ship with (GB): NVIDIA's RTX Spark
+// (N1X, Windows on Arm, Oct 2026: 24 GB in the smallest laptop) and DGX Spark
+// (GB10, 128 GB). Apple chips by name, so later generations (M6, M7...) need
+// no table entry: Ultra 64, Max 32, Pro 16, plain 16 from the M4 (8 before).
+const SHARED_CHIPS = [[/\bRTX Spark\b|\bN1X\b/i, 24], [/\bGB10\b|\bDGX Spark\b/i, 128]];
+export function sharedChipGB(name) {
+  for (const [re, gb] of SHARED_CHIPS) if (re.test(name || '')) return gb;
+  const m = String(name || '').match(/\bApple M(\d+)(?:\s+(Pro|Max|Ultra))?\b/i); if (!m) return null;
+  const tier = (m[2] || '').toLowerCase();
+  return tier === 'ultra' ? 64 : tier === 'max' ? 32 : tier === 'pro' ? 16 : +m[1] >= 4 ? 16 : 8;
+}
+
 // GB of the card's own memory; 0 when it shares system memory; null unknown.
 export function lookupVram(name, t) {
   const lower = name.toLowerCase(), keys = Object.keys(t.vram);
   if (!lower) return null;
+  if (sharedChipGB(name)) return 0;
   if (t.integrated.some(p => lower.includes(p.toLowerCase()))) return 0;
   for (const k of keys) if (k.toLowerCase() === lower) return t.vram[k];
   for (const [a, k] of Object.entries(t.aliases)) if (a.toLowerCase() === lower) return t.vram[k] ?? null;
@@ -65,7 +79,7 @@ export function detectHardware() {
     const parsed = seen.map(parseRenderer);
     const gpu = parsed.find(n => lookupVram(n, t) !== 0) || parsed[0] || null;
     const vram = gpu ? lookupVram(gpu, t) : null;
-    const hw = { gpu, renderer: seen[parsed.indexOf(gpu)] || null, vramGB: vram || null, shared: vram === 0 || /apple/i.test(gpu || ''),
+    const hw = { gpu, renderer: seen[parsed.indexOf(gpu)] || null, vramGB: vram || null, shared: vram === 0 || /apple/i.test(gpu || '') || !!sharedChipGB(gpu),
       ramGB: navigator.deviceMemory ?? null, webgpu: false, f16: false, maxBufferGB: null };
     try {
       const a = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
@@ -75,10 +89,8 @@ export function detectHardware() {
         hw.adapter = [a.info?.vendor, a.info?.architecture, a.info?.description].filter(Boolean).join(' ');
       }
     } catch {}
-    // Apple chips share memory: the Pro, Max and Ultra ones start at 16 GB or
-    // more (the browser reports at most 8), the plain ones at 8.
-    if (hw.shared && /apple/i.test(gpu || '')) hw.sharedGB = /\b(max|ultra)\b/i.test(gpu) ? 32 : /\bpro\b/i.test(gpu) ? 16 : 8;
-    else if (hw.shared) hw.sharedGB = hw.ramGB;
+    // shared memory: known chips by name (the browser reports at most 8 GB)
+    if (hw.shared) hw.sharedGB = sharedChipGB(gpu) || hw.ramGB;
     return hw;
   })();
 }

@@ -1,10 +1,10 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261030d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261030e';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261030c';
+import { installDevConsole } from './dev-console.js?v=20261030d';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025i';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261025c';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
-import { describeHardware } from './hardware.js?v=20261030d';
+import { describeHardware } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261018a';
 
@@ -495,12 +495,48 @@ async function main() {
         appendLog('endpoint settings saved: ' + getEndpointConfig().baseURL);
       });
     }
+    // The server's own list (OpenAI's GET /models: { data: [{ id }] }; this
+    // server's proxy passes it through) fills a picker and the model field's
+    // suggestions. Asked when the panel opens and when the address or key changes.
+    let listedFor = '';
+    async function listModels(force = false) {
+      const cfg = getEndpointConfig(), key = cfg.baseURL + '|' + cfg.apiKey, status = el('llmModelStatus'), pick = el('llmModelPick');
+      if (!pick || (!force && key === listedFor)) return; listedFor = key;
+      if (status) status.textContent = 'asking ' + cfg.baseURL + '/models…';
+      try {
+        const r = await fetch(cfg.baseURL + '/models', { headers: cfg.apiKey ? { Authorization: 'Bearer ' + cfg.apiKey } : {}, signal: AbortSignal.timeout(10000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json(), list = (j.data || j.models || []).map(m => ({ id: m.id || m.name, name: m.name && m.name !== m.id ? m.name : '' })).filter(m => m.id).sort((a, b) => a.id.localeCompare(b.id));
+        pick.textContent = ''; const none = document.createElement('option'); none.value = ''; none.textContent = list.length ? `(${list.length} models: choose one)` : '(the server lists none)'; pick.appendChild(none);
+        const dl = el('llmModelList'); if (dl) dl.textContent = '';
+        for (const m of list) {
+          const o = document.createElement('option'); o.value = m.id; o.textContent = m.id; if (m.name) o.title = m.name; pick.appendChild(o);
+          if (dl) { const d = document.createElement('option'); d.value = m.id; if (m.name) d.label = m.name; dl.appendChild(d); }
+        }
+        pick.value = list.some(m => m.id === f.model?.value.trim()) ? f.model.value.trim() : '';
+        if (status) status.textContent = list.length ? `${list.length} models on this server (type in the model box to search)` : '';
+      } catch (e) {
+        listedFor = ''; pick.textContent = ''; const o = document.createElement('option'); o.value = ''; o.textContent = '(could not list models)'; pick.appendChild(o);
+        if (status) status.textContent = 'could not list models: ' + (e.name === 'TimeoutError' ? 'no answer' : e.message) + ' (the model name can still be typed)';
+      }
+    }
+    el('llmModelPick')?.addEventListener('change', e => {
+      if (!e.target.value || !f.model) return;
+      f.model.value = e.target.value;
+      setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model.value.trim() });
+      appendLog('endpoint model: ' + f.model.value);
+    });
+    el('llmModelRefresh')?.addEventListener('click', () => listModels(true));
+    f.baseURL?.addEventListener('change', () => listModels());
+    f.apiKey?.addEventListener('change', () => listModels());
+    el('llmEndpointBox')?.addEventListener('toggle', e => { if (e.target.open) listModels(); });
     // presets: "base URL|model" fills the fields and saves them
     el('llmPreset')?.addEventListener('change', e => {
       const [url, model] = String(e.target.value || '').split('|'); if (!url) return;
       if (f.baseURL) f.baseURL.value = url === '/api/llm/v1' ? '' : url; if (f.model) f.model.value = model || '';
       setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model?.value.trim() });
       appendLog('endpoint preset: ' + getEndpointConfig().baseURL + ' ' + (model || ''));
+      listModels();
     });
     // The fields live in a panel under the top bar while the endpoint brain is
     // picked (the ⚙ endpoint button), and in the Debug pane otherwise.
@@ -508,7 +544,7 @@ async function main() {
     const isEndpoint = () => manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.engine === 'openai';
     const showPop = on => {
       if (!box || !pop) return;
-      if (on) { pop.appendChild(box); box.setAttribute('open', ''); } else if (box.parentNode === pop) home?.insertBefore(box, next);
+      if (on) { pop.appendChild(box); box.setAttribute('open', ''); listModels(); } else if (box.parentNode === pop) home?.insertBefore(box, next);
       pop.hidden = !on;
     };
     const syncEndpointUi = (open = false) => { if (btn) btn.hidden = !isEndpoint(); if (!isEndpoint()) showPop(false); else if (open) showPop(true); };

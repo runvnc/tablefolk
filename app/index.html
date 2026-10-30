@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261030b" />
+  <link rel="stylesheet" href="style.css?v=20261030d" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -349,7 +349,10 @@
         </select></label>
         <label>Base URL <input id="llmBaseURL" type="text" placeholder="/api/llm/v1 (this server's default)" spellcheck="false" /></label>
         <label>API key <input id="llmApiKey" type="password" placeholder="blank: the server's key / none" autocomplete="off" /></label>
-        <label>Model <input id="llmModel" type="text" placeholder="blank: the server's default" spellcheck="false" /></label>
+        <label>Model <input id="llmModel" type="text" list="llmModelList" placeholder="blank: the server's default" spellcheck="false" /></label>
+        <label>Server's models <select id="llmModelPick"><option value="">(not listed yet)</option></select> <button id="llmModelRefresh" type="button" title="ask the server which models it has (GET /models)">↻</button></label>
+        <datalist id="llmModelList"></datalist>
+        <div id="llmModelStatus" class="llm-endpoint-note"></div>
         <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model with image input: gemma4-e2b-mm on litert-lm serve, Gemma 4 / GPT on OpenRouter; slower)</label>
         <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama. The key stays in this browser.</div>
       </details>
@@ -409,6 +412,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261030c"></script>
+  <script src="preflight.js?v=20261030d"></script>
 </body>
 </html>

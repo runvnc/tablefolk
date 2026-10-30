@@ -60,8 +60,13 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   manager): the WebGL renderer string (fast GPU and default, the discrete one
   preferred) is parsed and looked up in `gpu-memory.json` (1546 cards: VRAM
   in GB, 0 for shared memory), ported from onepunk/llmsizer (MIT; data from
-  onepunk/open-gpu-db, Apache-2.0). Apple chips: Pro 16 GB, Max/Ultra 32 GB,
-  plain 8 (deviceMemory stops at 8); a shared GPU may use two thirds.
+  onepunk/open-gpu-db, Apache-2.0). The table ends at the M5 and has no RTX
+  Spark, so shared-memory chips are also known by name (`sharedChipGB`, the
+  smallest memory each ships with; deviceMemory stops at 8): RTX Spark / N1X
+  24 GB, DGX Spark (GB10) 128, Apple M<n> Ultra 64, Max 32, Pro 16, plain 16
+  from the M4 (8 before), so an M6 or M7 needs no entry. The renderer string
+  of an RTX Spark is assumed to contain "RTX Spark" or "N1X" (not seen yet).
+  Safari says only "Apple GPU" (E2B). A shared GPU may use two thirds.
   `needGB` in `SUPPORTED_MODELS` (E2B 3, E4B 6, Bonsai 2 10); a first visit
   (no `?model=`, nothing saved) gets the biggest that fits, not saved as a
   choice; an unknown card gets E2B. The RTX 2060 reads as 6 GB (E4B).
@@ -80,7 +85,10 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   Picking it in the top bar opens `#endpointPop` with the Brain options'
   endpoint fields moved into it (`⚙ endpoint` reopens it); it loads on
   "done", not on the pick (a pick used to start turns through the proxy at
-  once). With
+  once). `listModels()` asks `<baseURL>/models` (with the key) when the
+  panel opens and when the address or key changes, and fills
+  `#llmModelPick` and the model field's datalist; this server's proxy passes
+  `/models` through (OpenRouter: about 400). With
   Brain options > vision, each turn's newest message carries the character's
   view as an `image_url`. `window.tablefolkLLM` exposes the active brain as
   an OpenAI-style client.

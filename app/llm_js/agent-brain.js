@@ -11,7 +11,7 @@ import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-w
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
-import { detectHardware, recommendModel } from './hardware.js?v=20261030d';
+import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.

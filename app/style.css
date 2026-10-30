@@ -112,7 +112,10 @@ code { color:#ffe0a0; }
 .llm-endpoint { margin:4px 0 10px; font-size:12px; }
 .llm-endpoint summary { cursor:pointer; margin-bottom:6px; }
 .llm-endpoint label { display:flex; gap:6px; align-items:center; margin:4px 0; }
-.llm-endpoint input { flex:1; min-width:0; }
+.llm-endpoint input, .llm-endpoint select { flex:1; min-width:0; }
+.llm-endpoint label > button { flex:0 0 auto; width:auto; padding:2px 9px; }
+.llm-endpoint input[type=checkbox] { flex:0 0 auto; margin-top:2px; }
+.endpoint-pop .llm-endpoint label.spawn-mode-toggle { flex-wrap:nowrap; align-items:flex-start; }
 .llm-endpoint-note { opacity:.7; margin-top:4px; line-height:1.35; }
 .endpoint-pop { position:fixed; top:60px; left:clamp(16px, 22vw, 250px); z-index:120; width:min(460px, calc(100vw - 32px)); box-sizing:border-box; padding:12px 14px; border-radius:10px; background:rgba(13,17,21,.94); border:1px solid rgba(255,255,255,.16); color:#fff; box-shadow:0 10px 30px rgba(0,0,0,.45); }
 .endpoint-pop[hidden] { display:none; }
