@@ -33,7 +33,7 @@ textures) and `props/village/`.
 2. Add an item to `assets/pack.json` (fields in the scenario skill's
    `things.md`; `fit` for models of unknown scale).
 3. Render its tile: `node tools/browser-test/render-tiles.mjs
-   http://localhost:8001 only=<type>`.
+   http://localhost:8001 <type>[,<type>...]`.
 4. Optionally: a grid glyph (`GRID_GLYPHS`), generated furnishing
    (`procgen.js`), a pick-up (`PICKUPS`), the Spawn menu in
    `app/index.html`.

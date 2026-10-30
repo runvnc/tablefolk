@@ -742,11 +742,11 @@
   },
   "peasant_woman": {
    "file": "characters/peasant_woman.png",
-   "w": 258,
-   "h": 314,
+   "w": 263,
+   "h": 319,
    "anchor": [
-    129,
-    204.3
+    131,
+    207.6
    ]
   },
   "adventurer": {
@@ -778,11 +778,11 @@
   },
   "king": {
    "file": "characters/king.png",
-   "w": 275,
-   "h": 334,
+   "w": 287,
+   "h": 349,
    "anchor": [
-    137.2,
-    217.4
+    143.3,
+    227.2
    ]
   },
   "farmer": {
@@ -796,11 +796,11 @@
   },
   "villager": {
    "file": "characters/villager.png",
-   "w": 258,
-   "h": 314,
+   "w": 263,
+   "h": 319,
    "anchor": [
-    129,
-    204.3
+    131,
+    207.6
    ]
   },
   "witch": {
@@ -1093,11 +1093,11 @@
   },
   "villager_woman": {
    "file": "characters/villager_woman.png",
-   "w": 258,
-   "h": 314,
+   "w": 263,
+   "h": 319,
    "anchor": [
-    129,
-    204.3
+    131,
+    207.6
    ]
   },
   "swordsman": {
@@ -1116,6 +1116,15 @@
    "anchor": [
     141.3,
     223.9
+   ]
+  },
+  "king_classic": {
+   "file": "characters/king_classic.png",
+   "w": 275,
+   "h": 334,
+   "anchor": [
+    137.2,
+    217.4
    ]
   }
  },
