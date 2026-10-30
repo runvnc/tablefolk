@@ -107,6 +107,13 @@ refuses files over 300 MiB, and a single PUT over a slow line times out (about
 model's worker (`app/asr/worker.js`) reads that layout, four parts at a time
 from the four hostnames. The speech model is under `underdog-bark-3.0/`
 (fp16 and int8 variants); Bonsai (Transformers.js) loads from Hugging Face.
+Breeze TTS 2 is under `breeze-tts-2/`: HoppouAI's `breeze-tts-2-q4_k-dd2.gguf`
+in 37 parts with a `parts.json` (size, part size, part names, SHA-256), the
+breeze-server v0.1.3 Linux and Windows builds, `LICENSE-model.txt`
+(BreezeBlue's research and non-commercial licence: redistribution only for
+that, with the licence and a NOTICE), `NOTICE.txt` (its required wording and
+"Derived from Breeze TTS 2...") and the runtime's Apache licence;
+`tools/breeze-server.sh` reads that layout.
 The maintainer's line was about 1 MB/s each way on 2026-10-25: a 1.2 GB file
 takes half an hour. Everything else is served from the repo. `?assets=<url>`
 or `window.TABLEFOLK_ASSETS` points the app at another asset host.

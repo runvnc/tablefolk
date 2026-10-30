@@ -184,9 +184,11 @@ with `?trustSkills=1`, or after the player allows that package.
   no browser build (2026-10-30: no ONNX, WebGPU or Transformers.js port;
   the Qwen3-TTS browser ports don't clone), so it runs in `breeze-server`
   (HoppouAI/Breeze-TTS-2.cpp, Vulkan, Apache-2.0) on the player's machine:
-  `tools/breeze-server.sh [q4_k-dd2|q4_k...]` downloads the v0.1.3 binary and
-  the 2.46 GB `q4_k-dd2` GGUF into `~/.cache/tablefolk-breeze` and starts it
-  on 8137 with `--cors` (about 3 GB of graphics memory). The page reaches it
+  `tools/breeze-server.sh [port] [--download-only]` downloads the v0.1.3
+  binary and the 2.46 GB `q4_k-dd2` GGUF into `~/.cache/tablefolk-breeze`
+  (from the R2 mirror `breeze-tts-2/`, about 2 minutes; else Hugging Face and
+  GitHub) and starts it on 8137 with `--cors` (about 3 GB of graphics
+  memory). The page reaches it
   through `/api/tts/breeze/` (server.js `breezeProxy`, `BREEZE_URL`; owner
   only, or visitors when the admin opens the local model to them), so Chrome
   never asks for local network access; the Voice pane's "Breeze server"
