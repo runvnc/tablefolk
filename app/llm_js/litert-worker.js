@@ -71,6 +71,16 @@ const MODEL_CONFIG = {
     lib: '0.19.0-nightly.20261024',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
     plainContent: true,
   },
+  // OpenBMB's MiniCPM5-2B (2.5B dense, Apache-2.0, Sep 2026): mlboydaisuke's
+  // int4 LiteRT-LM bundle (1.55 GB; the 2026-10-13 re-pack with LiteRT-LM's
+  // own minicpm5 template, which needs the 0.18+ library; answers directly
+  // unless asked to think). Smaller than Gemma E2B, to leave room for Breeze.
+  'minicpm5-2b-litert': {
+    label: 'MiniCPM5 2B (LiteRT-LM, int4)',
+    modelUrl: 'https://huggingface.co/mlboydaisuke/MiniCPM5-2B-LiteRT/resolve/main/MiniCPM5-2B_int4.litertlm',   // not mirrored on R2 yet
+    vram: '~1.6 GB',
+    lib: '0.19.0-nightly.20261024',
+  },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-8B/resolve/main/bonsai-8b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet

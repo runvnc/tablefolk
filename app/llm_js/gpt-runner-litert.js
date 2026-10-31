@@ -3,7 +3,7 @@
 // gpt-runner.js's generate() signature.
 // Conversation/KV-cache state now lives inside the worker (see
 // litert-worker.js); this file just proxies requests to it.
-import { getCurrentModel, litertClient } from './model-loader-litert.js?v=20261025i';
+import { getCurrentModel, litertClient } from './model-loader-litert.js?v=20261030b';
 
 export function clearLiteRTConversations(agentId = null) {
   litertClient.clearConversations(agentId).catch(err => console.warn('[tablefolk-litert] clearConversations failed', err));

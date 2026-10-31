@@ -3,7 +3,7 @@
 // Uses @huggingface/transformers with WebGPU acceleration.
 // Defaults to q4 (4-bit weights, 32-bit activations) to avoid shader-f16 issues
 // on older GPUs like RTX 2060. Falls back to CPU if WebGPU fails.
-import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1";
+import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";   // 4.3.2: the first with LFM3 (lfm3)
 
 const MODEL_CONFIG = {
   'lfm2.5-230m': {
@@ -32,6 +32,18 @@ const MODEL_CONFIG = {
     attempts: [{ dtype: 'q1', device: 'webgpu', label: '1-bit WebGPU' }],
     pipeline: true,
     vram: '~0.4GB',
+    device: 'webgpu',
+  },
+  // Liquid AI's LFM3-1.7B (Oct 27 2026; LFM Open License 1.0: free under $10M
+  // revenue): the official ONNX export through a text-generation pipeline.
+  // dtype 'auto': q4f16 (1.38 GB) where the GPU has shader-f16, else q4
+  // (1.63 GB, 32-bit activations; Chrome on Linux with NVIDIA).
+  'lfm3-1.7b-onnx': {
+    label: 'LFM3 1.7B (Transformers.js)',
+    modelId: 'LiquidAI/LFM3-1.7B-ONNX',
+    dtype: 'auto',
+    pipeline: true,
+    vram: '~1.5-1.8GB',
     device: 'webgpu',
   },
   'minicpm5-1b-gpu': {
@@ -119,7 +131,7 @@ export async function loadModel(modelKey, onProgress) {
   await detectShaderF16();
   // Use cfg.dtype if specified (e.g. LFM2.5 needs q8 to avoid GatherBlockQuantized),
   // otherwise q4f16 if shader-f16 is available, else q4 (32-bit activations).
-  const dtype = cfg.dtype || (hasShaderF16 ? 'q4f16' : 'q4');
+  const dtype = cfg.dtype && cfg.dtype !== 'auto' ? cfg.dtype : (hasShaderF16 ? 'q4f16' : 'q4');
 
   onProgress?.('Loading Transformers.js v4...');
   onProgress?.(`Model: ${cfg.label} (dtype: ${dtype}${!hasShaderF16 ? ' [no shader-f16]' : ''})`);
@@ -129,7 +141,7 @@ export async function loadModel(modelKey, onProgress) {
     // cache failed in GroupQueryAttention)
     try {
       const fileBytes = new Map();
-      model = await transformers.pipeline('text-generation', cfg.modelId, { dtype: cfg.dtype, device: cfg.device || 'webgpu', progress_callback: info => {
+      model = await transformers.pipeline('text-generation', cfg.modelId, { dtype, device: cfg.device || 'webgpu', progress_callback: info => {
         if (info.status === 'progress' && info.file && info.total) {
           fileBytes.set(info.file, { loaded: info.loaded || 0, total: info.total });
           let loaded = 0, total = 0; for (const f of fileBytes.values()) { loaded += f.loaded; total += f.total; }

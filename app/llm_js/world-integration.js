@@ -1,8 +1,8 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261030e';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261030i';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261030d';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261025i';
-import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261025c';
+import { installDevConsole } from './dev-console.js?v=20261030f';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030b';
+import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030a';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
 import { describeHardware, usableGB } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';

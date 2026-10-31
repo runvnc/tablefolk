@@ -5,6 +5,7 @@
 //
 //   node agenttest.mjs <scenario.json> <tactics.txt> [runs] [--prompts] [--base=http://localhost:8001]
 //                      [--render[=light|medium|high]] [--fps=10] [--size=640x360]
+//                      [--model=<key>] [--llm=<url> --llm-model=<name>]
 //
 // --render draws the 3D scene too (default light quality, 10 fps, a 640x360
 // page) for tests that need everything working together, and saves a
@@ -33,7 +34,11 @@ page.on('console', m => { const t = m.text(); if (/\berror\b|failed/i.test(t) &&
 // A fresh page (so it runs the code on disk): no 3D rendering, so the model
 // has the GPU to itself, or with --render a small, low-quality, capped scene.
 if (render) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setDeviceMetricsOverride', { width: vw, height: vh, deviceScaleFactor: 1, mobile: false }); }
-await page.goto(base + '/app/' + (render ? `?gfx=${render}&fps=${fps}` : '?norender=1'));
+// --model=<key> picks the brain for this run (any SUPPORTED_MODELS key, hidden
+// ones too); --llm=<url> with --llm-model=<name> points the endpoint brain at
+// an OpenAI-compatible server (llama-server, Ollama ...).
+const pick = [flag('model') && 'model=' + flag('model').split('=')[1], flag('llm=') && 'llm=' + encodeURIComponent(flag('llm=').slice(6)), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model').split('=')[1])].filter(Boolean).join('&');
+await page.goto(base + '/app/' + (render ? `?gfx=${render}&fps=${fps}` : '?norender=1') + (pick ? '&' + pick : ''));
 const shotDir = render ? `results/shots-${path.basename(scnFile, '.json')}-${Date.now()}` : null;
 if (shotDir) fs.mkdirSync(shotDir, { recursive: true });
 let shotN = 0;
