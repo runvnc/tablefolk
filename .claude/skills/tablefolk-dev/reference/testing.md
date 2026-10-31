@@ -59,7 +59,18 @@ node close.mjs                                         # always close it: it hol
 `shop` (prices in the personality), `shop-role` (the shopkeeper role),
 `roles`, `smithy` (a package's role and skill), `companion`, `feelings`
 (remembering being hit or given gold five turns later), and `*-chaos`
-copies at chaos 50. Last baseline (2026-10-24, E2B): shop-role 2/2, roles
+copies at chaos 50. Point the test Chrome's output at a file on disk, not
+in /tmp: headless Chrome's log grew to 7 GB in two hours of evals and filled
+the 7.8 GB RAM disk (Claude Code's temp folder is there too). 2026-10-30 (RUNS=2, 36 scenario runs, each model at its
+makers' recommended sampling, sampling.js): Gemma 4 E2B on LiteRT-LM 0.19.0
+35/36 (one lowball sale); LFM3-1.7B on the WebGPU kernels (greedy) 30/36
+(misses: haggling and list prices from the personality alone, recalling a
+gift, one dagger commission); MiniCPM5-2B int4 on the LiteRT nightly at
+temperature 1.0 25/36 (haggle to 45 0/4, potion at list price 0/2, dagger
+0/2, quest giver 0/2), against 31/36 the same day with the bundle's own
+sampler. `agenttest.mjs --model=<key>` picks the brain; `--llm=<url>
+--llm-model=<name>` an endpoint. The full set takes 6-10 minutes a model.
+Before that (2026-10-24, E2B): shop-role 2/2, roles
 4/4, smithy and companion pass, feelings 'hit' 3/3. Run them after any
 prompt change: the feelings eval fell to 0/2 once just from moving the
 "Stay yourself" line below the feelings.

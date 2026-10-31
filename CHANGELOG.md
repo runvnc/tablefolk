@@ -6,6 +6,10 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-30
 
+- **Window view (H)**: the webcam follows your head (MediaPipe face tracking in the browser) and the free camera moves with it, like looking into the diorama through a window.
+- **Recommended sampling per model** (Gemma 1.0, MiniCPM5 1.0, LFM3 0.1 ...) instead of the game's temperature; the LiteRT models had been running on hidden bundle defaults.
+- **Latest libraries**: LiteRT-LM 0.19.0, Transformers.js 4.3.2 everywhere, onnxruntime-web 1.31.1, wllama 3.8.1.
+- **Smaller brains on trial** (hidden): MiniCPM5-2B on LiteRT-LM and LFM3-1.7B on WebGPU kernels (runs without shader-f16); evals: Gemma E2B 35/36, LFM3 30/36, MiniCPM5 25/36.
 - **Breeze TTS 2 in the browser**: Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend (two codec ops rewritten, bit-identical), the 2.5 GB model downloaded once from R2 into the browser's storage; an opt-in Voice-pane engine. Proven end to end on the CPU; GPU speed still to be measured on a machine whose Chrome offers shader-f16.
 - **Breeze TTS 2 as a speech engine**: BreezeBlue's 3B voice model, run by `breeze-server` on your own machine (`tools/breeze-server.sh` fetches it and the 2.46 GB Q4 model), cloning the library voices from their samples and transcripts; chosen by itself when it runs and the graphics card has room, otherwise an option in the Voice pane.
 - **The endpoint panel lists the server's models** (`GET /models`) in a picker and as suggestions in the model box.

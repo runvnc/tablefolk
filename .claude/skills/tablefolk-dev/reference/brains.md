@@ -56,6 +56,30 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   queued (one cache). Weights stream from Hugging Face into IndexedDB; a
   localStorage flag marks a finished load. Not run on the maintainer's 6 GB
   card; untested in the app with real weights.
+- **Sampling** (`sampling.js`, 2026-10-30): a model with makers' recommended
+  settings is always run with them, not the game's chaos temperature
+  (0.3/0.5/0.8): Gemma 4 temperature 1.0, top-p 0.95, top-k 64; MiniCPM5 1.0,
+  top-p 0.95, min-p 0; LFM3 0.1, top-k 50, repetition penalty 1.1. The LiteRT
+  worker sets them on the conversation (type 2, top-k capped at 64: 256 gave
+  random tokens); before, LiteRT text models ran on each bundle's hidden
+  defaults. The endpoint brain sends top_p/top_k/min_p/repetition_penalty
+  matched by the server's model name. Measured: MiniCPM5-2B did worse at its
+  recommended 1.0 (25/36) than on its bundle's sampler (31/36).
+- **Libraries** (checked 2026-10-30): LiteRT-LM 0.19.0 (released that day;
+  MiniCPM5 stays on 0.19.0-nightly.20261024 because 0.19.0 garbles it, the
+  vision model on its tested nightly), Transformers.js 4.3.2 everywhere (one
+  runner had been on 4.2.0 beside the loader's 4.3.x), onnxruntime-web 1.31.1
+  (Pocket-TTS, speech input), wllama 3.8.1; pako stays 1.0.11 for UPNG's APNG.
+- **Smaller brains on trial** (hidden, `?model=`): `minicpm5-2b-litert`
+  (mlboydaisuke's int4 bundle, 1.55 GB) and `lfm3-1.7b-webgpu`
+  (`lfm3-engine.js`: the webml-community Lfm3ForCausalLM WebGPU runtime,
+  Apache-2.0, fetched from its Space at a pinned revision and imported from a
+  blob URL since HF serves it as text/plain; Liquid's 1.1 GB Q4_K_M GGUF;
+  greedy only, no repetition penalty; 32-bit kernels without shader-f16, so it
+  runs on the RTX 2060; about 1.7 GB of graphics memory, a 0.7 s answer).
+  Liquid's LFM3 ONNX export did not work on Transformers.js 4.3.2 (it feeds
+  num_logits_to_keep, the export wants logits_to_keep; renamed, it then died
+  with "divide by zero"). Eval scores: testing.md.
 - **Choosing for the device** (`hardware.js`, `pickForDevice` in the
   manager): the WebGL renderer string (fast GPU and default, the discrete one
   preferred) is parsed and looked up in `gpu-memory.json` (1546 cards: VRAM

@@ -121,6 +121,18 @@ y .075 (they were buried) and turn to read from the south.
 
 ## Cameras and views
 
+- Window view (`app/head-window.js`, H, Graphics pane): head-coupled
+  perspective from the webcam. MediaPipe's FaceDetector (tasks-vision
+  1.2.0, WebAssembly from jsdelivr, CPU delegate; the 230 KB BlazeFace
+  short-range model in `assets/models/mediapipe/`) gives the eyes' midpoint
+  and spacing; against a neutral pose (the first 15 frames, then a slow
+  drift) the free camera's alpha and beta get offsets (up to 0.45 rad;
+  their sign taken from the camera's own right and up vectors) and the
+  radius a factor (leaning in, 0.7-1.3). They are added and taken out every
+  frame, so dragging and the wheel still work; nothing in the follow camera
+  (locked angles) or first person. `tablefolkHeadWindow.setHead(x, y, near)`
+  simulates a head for tests; headless Chrome takes a fake camera with
+  `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`.
 - Free camera ('overview', the default with an avatar since 2026-10-30;
   `freeCameraStart`): starts at 19, eases after the avatar, walls at half
   height. Follow camera (C): high and fixed behind the player, starts at 16,

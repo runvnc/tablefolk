@@ -27,6 +27,7 @@ approve the download on a user's behalf.
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
 | C | follow camera / free camera |
+| H | window view: the webcam follows your head and the free camera moves with it, like looking into the diorama through a window (face tracking in the browser; a small preview shows while it runs) |
 | P | let them live (everyone acts on their own) / pause |
 | I | the Adventurer pane |
 | Enter | chat |
