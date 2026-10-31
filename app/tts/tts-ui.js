@@ -38,10 +38,12 @@
     const eng=$('ttsEngine');
     if(eng){
       for(const e of tts.engines()){const o=document.createElement('option');o.value=e.id;o.textContent=e.label;eng.appendChild(o);}
+      // Breeze in the browser runs on ggml's WebGPU backend, which needs shader-f16 (Chrome on Linux with NVIDIA lacks it)
+      navigator.gpu?.requestAdapter({powerPreference:'high-performance'}).then(a=>{ const o=[...eng.options].find(x=>x.value==='breeze-web'); if(o&&!a?.features?.has('shader-f16')){ o.disabled=true; o.textContent+=' (not on this browser: no WebGPU shader-f16)'; } }).catch(()=>{});
       eng.value=localStorage.getItem('tablefolkTtsEngine')||'';
       const langs=()=>{const id=eng.value||tts.engine;$('ttsLanguageBox').hidden=!tts.engines().find(e=>e.id===id)?.languages;};
       tts.addEventListener('status',langs); langs();
-      eng.onchange=async()=>{ if(!eng.value){localStorage.removeItem('tablefolkTtsEngine');} tts.setEnabled(true);$('ttsEnabled').checked=true; await tts.setEngine(eng.value||await (await fetch('/api/voices')).json().then(d=>d.ttsEngine).catch(()=>'pocket-18m')); if(!eng.value)localStorage.removeItem('tablefolkTtsEngine'); langs(); };
+      eng.onchange=async()=>{ if(eng.value==='breeze-web'&&localStorage.getItem('tablefolkBreezeWebReady')!=='1'&&!(await window.confirmDialog?.('Breeze TTS 2 runs in this browser on the graphics card: a 2.5 GB download (once), and it wants about 4 GB of graphics memory beside the chat model. Its voice model is for non-commercial use (BreezeBlue licence).',{title:'Download Breeze TTS 2?',confirmText:'download'})??confirm('Download Breeze TTS 2 (2.5 GB)?'))){ eng.value=localStorage.getItem('tablefolkTtsEngine')||''; return; } if(!eng.value){localStorage.removeItem('tablefolkTtsEngine');} tts.setEnabled(true);$('ttsEnabled').checked=true; await tts.setEngine(eng.value||await (await fetch('/api/voices')).json().then(d=>d.ttsEngine).catch(()=>'pocket-18m')); if(!eng.value)localStorage.removeItem('tablefolkTtsEngine'); langs(); };
     }
     // Breeze TTS 2: where its server is, and whether it answers
     const bz=$('breezeUrl'), bzState=async()=>{ const st=$('breezeStatus'); if(!st||!window.tablefolkBreeze)return; window.tablefolkBreeze.reset(); const ok=await window.tablefolkBreeze.available(); st.textContent=ok?`Breeze TTS 2 answers at ${window.tablefolkBreeze.base()}: pick it under Engine.`:`Breeze TTS 2 is not running (start breeze-server: tools/breeze-server.sh).`; };

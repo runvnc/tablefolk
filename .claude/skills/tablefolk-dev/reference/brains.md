@@ -206,6 +206,34 @@ with `?trustSkills=1`, or after the player allows that package.
   RTX 2060 with E2B has 3, so it keeps Pocket-TTS. Tested against a mock
   server (registration, streaming, three lines in a row, stop); not yet
   against the real model.
+- **Breeze TTS 2 in the browser** (engine `breeze-web`,
+  `app/tts/breeze-web-worker.js`, `app/tts/breeze-web/breeze.{mjs,wasm}`):
+  Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend
+  (`tools/breeze-web/build.sh`: emsdk in `~/.cache/tablefolk-build`, Breeze at
+  2904b9a, JSPI, `-sMAXIMUM_MEMORY=4GB`), the first browser build of the model
+  anywhere we could find (2026-10-30). ggml-webgpu lacked two ops Breeze's
+  codec uses (`ROLL`, `CONV_TRANSPOSE_1D`): `portable-conv.patch` writes them
+  with mul_mat, pad and add (bit-identical audio on the CPU build).
+  `tf_breeze.cpp` exports `tf_init`, `tf_encode` (sample to voice codes),
+  `tf_generate` (streams through `Module.onAudio`; a stop flag in memory) as
+  JSPI async exports. The worker speaks the speech-worker messages; the model
+  (the R2 mirror's q4_k-dd2) is downloaded once into OPFS
+  (`tablefolk-breeze/`, parts written at their offsets, a `.ok` marker), then
+  mounted with WORKERFS so the loader reads it tensor by tensor; voice codes
+  are kept in IndexedDB `tablefolk-breeze-voices`. The manager decodes a
+  library sample and sends it with its transcript (`cloneByText`), and
+  forwards the worker's download progress (`progress`). The Voice pane asks
+  before the 2.5 GB download and disables the option without `shader-f16`.
+  **ggml-webgpu requires `shader-f16`**: Chrome on Linux with NVIDIA's Vulkan
+  driver doesn't offer it (the RTX 2060 here; no Chrome flag helped), so the
+  maintainer's machine only ran the CPU fallback (localStorage
+  `tablefolkBreezeCpu=1`, about 1/200 realtime: a second of speech in four
+  minutes), which proved the download, load (12 s from OPFS), synthesis and
+  streaming end to end. GPU speed is unmeasured: test on Windows (D3D12), a
+  Mac, or AMD/Intel on Linux. Traps found: pointers above 2 GB come back
+  negative in JS (use `>>> 2`), exported HEAP views go stale when memory grows
+  (take fresh views of `wasmMemory`), and `bump.py` does not update a worker
+  URL inside a JS string or voice-try.html's tags (bump them by hand).
 - Input: `app/speech-input.js`, chosen in Brain options (`tablefolk.speech`):
   automatic (the server's `/api/transcribe`, Gemma `gemma4-e2b-mm` on
   `litert-lm serve`, else the browser's SpeechRecognition); **in the

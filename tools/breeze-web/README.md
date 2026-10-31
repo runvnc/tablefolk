@@ -1,4 +1,4 @@
-# Breeze TTS 2 in the browser (work in progress)
+# Breeze TTS 2 in the browser
 
 Goal: HoppouAI/Breeze-TTS-2.cpp (ggml) compiled to WebAssembly with ggml's
 WebGPU backend, so the same `breeze-tts-2-q4_k-dd2.gguf` mirrored on R2
@@ -18,7 +18,7 @@ of the stride, F32 kernels: true for the codec). On under `__EMSCRIPTEN__`,
 natively with `BREEZE_PORTABLE_CONV=1`. Checked on the CPU build: the audio is
 bit-identical to the native ops (38400 samples, seed 7).
 
-Next: build with Emscripten (`-DGGML_WEBGPU=ON -DBREEZE_VULKAN=OFF`), export
-the C API (`include/breeze/`), load the GGUF from a fetched buffer (no mmap;
-the 4 GB wasm32 heap: stream tensors to the GPU), and plug it into
-`app/tts/breeze-client.js` as an in-browser engine.
+`build.sh` builds it (emsdk in `~/.cache/tablefolk-build/emsdk`) into
+`app/tts/breeze-web/`; `tf_breeze.cpp` is the interface the worker
+(`app/tts/breeze-web-worker.js`) calls. Status and traps: the maintainer
+skill's brains.md ("Breeze TTS 2 in the browser").
