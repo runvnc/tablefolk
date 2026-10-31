@@ -3,7 +3,7 @@
 // Uses @huggingface/transformers with WebGPU acceleration.
 // Defaults to q4 (4-bit weights, 32-bit activations) to avoid shader-f16 issues
 // on older GPUs like RTX 2060. Falls back to CPU if WebGPU fails.
-import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";   // 4.3.2: the first with LFM3 (lfm3)
+import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";   // the latest release (2026-10-27)
 
 const MODEL_CONFIG = {
   'lfm2.5-230m': {

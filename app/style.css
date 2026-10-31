@@ -565,3 +565,7 @@ html:fullscreen #ttBar { display:none; }
 /* live.js: how much happens */
 .view-btns > .pace-pick { grid-column:1 / -1; order:-1; display:flex; align-items:center; justify-content:flex-end; gap:6px; margin:-2px 2px -2px 0; font-size:11px; color:#cfe9d4; }
 .pace-pick select { font:inherit; font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid rgba(140,230,160,.35); background:rgba(10,20,14,.6); color:#dfffe4; }
+
+/* head-window.js: the webcam preview while the window view runs */
+.head-window-preview { position:fixed; left:16px; bottom:16px; width:120px; height:90px; z-index:65; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,.25); box-shadow:0 4px 14px rgba(0,0,0,.4); opacity:.85; pointer-events:none; }
+.head-window-preview i { position:absolute; left:50%; top:50%; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background:#d7ff9a; box-shadow:0 0 6px #d7ff9a; }

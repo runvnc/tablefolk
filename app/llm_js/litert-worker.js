@@ -43,7 +43,7 @@ const MODEL_CONFIG = {
     label: 'Gemma 4 E2B with sight (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
     vram: '~1.8 GB',
-    lib: '0.19.0',
+    lib: '0.19.0-nightly.20261023',   // the build it was tested with; 0.19.0 stable not tried with it yet
     vision: true,
   },
   'gemma4-e4b-litert': {
@@ -80,7 +80,7 @@ const MODEL_CONFIG = {
     label: 'MiniCPM5 2B (LiteRT-LM, int4)',
     modelUrl: 'https://huggingface.co/mlboydaisuke/MiniCPM5-2B-LiteRT/resolve/main/MiniCPM5-2B_int4.litertlm',   // not mirrored on R2 yet
     vram: '~1.6 GB',
-    lib: '0.19.0',
+    lib: '0.19.0-nightly.20261024',   // 0.19.0 stable made it speak random tokens and <s><s><s> (2026-10-30); this nightly works
   },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
@@ -361,11 +361,12 @@ function prefaceMessages(system, messages, reserve = 0) {
 // The live conversation for key, rebuilt from history if another one was live.
 // A model with recommended sampling (the brain's sampling.js: Gemma 4 and
 // MiniCPM5 want temperature 1.0, top-p 0.95) gets it set on the conversation
-// (type 2: top-p with a top-k cap; 256 where the makers give no top-k), not
+// (type 2: top-p with a top-k cap of at most 64: at 256 MiniCPM5 spoke
+// random tokens on the GPU sampler, 2026-10-30), not
 // the bundle's defaults. The vision model's own defaults ran hot (garbled
 // lines: "I't", "you's"): without a recommendation it gets the game's
 // temperature and top-p 0.95, top-k 64; other models keep the bundle's.
-const samplerFor = s => (s?.recommended || engineVision) ? { sessionConfig: { samplerParams: { type: 2, p: s?.top_p ?? .95, k: s?.top_k ?? (s?.recommended ? 256 : 64), temperature: Number.isFinite(+s?.temperature) ? Math.max(.05, +s.temperature) : .5 } } } : {};
+const samplerFor = s => (s?.recommended || engineVision) ? { sessionConfig: { samplerParams: { type: 2, p: s?.top_p ?? .95, k: Math.min(64, s?.top_k ?? 64), temperature: Number.isFinite(+s?.temperature) ? Math.max(.05, +s.temperature) : .5 } } } : {};
 async function liveConversation(key, agentId, system, historyOverride = null, sampling, reserve = 0, slim = false) {
   if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride && !slim && live.chars + reserve < CHAR_BUDGET) {
     live.turns += 1; live.chars += reserve;
