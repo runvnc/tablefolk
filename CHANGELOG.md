@@ -6,7 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-31
 
-- **Breeze TTS 2 in the browser speaks properly on the GPU**: rebuilt on Breeze-TTS-2.cpp's latest (87b4366, its codec no longer needs our convolution rewrite) with a ggml fix from upstream (block-quantized weight views at the browser's 256-byte alignment read the wrong blocks, so all but the first of each frame's 15 depth codes came out wrong and the speech was static). Clean speech in Chrome on an RTX 2060 at 0.62x realtime, first sound after 2.8 s, about 3 GB of graphics memory. Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia` for WebGPU's shader-f16; the Voice pane says so. Test page: `tools/browser-test/breeze-web-test.html`.
+- **Breeze TTS 2 in the browser speaks properly on the GPU**: rebuilt on Breeze-TTS-2.cpp's latest (87b4366, its codec no longer needs our convolution rewrite) with current ggml (v0.28.0; Breeze's bundled one lacks a WebGPU fix: block-quantized weight views at the browser's 256-byte alignment read the wrong blocks, so all but the first of each frame's 15 depth codes came out wrong and the speech was static). Clean speech in Chrome on an RTX 2060 at 0.62x realtime, first sound after 2.8 s, about 3 GB of graphics memory. Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia` for WebGPU's shader-f16; the Voice pane says so. Test page: `tools/browser-test/breeze-web-test.html`.
 - **Breeze's text-encoder-on-the-CPU option proposed upstream** as `--te-cpu` ([HoppouAI/Breeze-TTS-2.cpp#17](https://github.com/HoppouAI/Breeze-TTS-2.cpp/pull/17)); checked first that nothing upstream does it (still 914 MiB less on their latest).
 
 ## 2026-10-30

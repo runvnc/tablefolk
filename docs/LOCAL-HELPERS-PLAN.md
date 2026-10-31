@@ -12,7 +12,7 @@ most of them only work on the maintainer's Linux machine because they live in
 | Breeze TTS 2 server | HoppouAI's `breeze-server` (Breeze-TTS-2.cpp), Vulkan | v0.1.3 release binary on R2 (`breeze-tts-2/`); **patched v0.1.5 build only in `~/.cache/tablefolk-breeze/build/`** | Linux x64 only, via `tools/breeze-server.sh`, and without the memory patch |
 | Breeze memory patch | `tools/breeze-server/te-cpu.patch`: text encoder on the CPU, 3.0 to 2.1 GB of graphics memory | in the repo; built by `tools/breeze-server/build.sh` | only if they can build C++ with Vulkan |
 | Breeze model | `breeze-tts-2-q4_k-dd2.gguf` (2.46 GB), 37 parts, licence and NOTICE | R2 `breeze-tts-2/` | yes (downloaded by the script) |
-| Breeze in the browser | `app/tts/breeze-web/` (WebAssembly + ggml WebGPU), Breeze 87b4366 + an upstream ggml fix | in the repo | browsers with WebGPU `shader-f16`; Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia`. 0.62x realtime on an RTX 2060 |
+| Breeze in the browser | `app/tts/breeze-web/` (WebAssembly + ggml WebGPU), Breeze 87b4366 + current ggml | in the repo | browsers with WebGPU `shader-f16`; Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia`. 0.62x realtime on an RTX 2060 |
 | llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain | official release, downloaded by hand into `~/.cache/tablefolk-llm/` | no script |
 | LFM3-1.7B (server) | `LFM3-1.7B-Q4_K_M.gguf` (1.1 GB) | Hugging Face, downloaded by hand | no script |
 | LFM3-1.7B (browser) | `lfm3-1.7b-webgpu`, webml-community runtime from its HF Space (pinned) + the GGUF from HF | code in the repo, hidden model | yes for testers (`?model=lfm3-1.7b-webgpu`); depends on an HF Space staying up |
@@ -55,7 +55,7 @@ One step per platform for a player:
   dulls the high end on long passages. Decide whether to mirror `q4_k` too
   and make it the default.
 - **In-browser Breeze rebuilt on 87b4366** (done 2026-10-31): the
-  convolution patch is gone; one upstream ggml fix (#28382) is backported.
+  convolution patch is gone, and it uses current ggml (v0.28.0).
 
 ### 2. Launch scripts per platform (about 2 hours)
 
@@ -106,8 +106,9 @@ One step per platform for a player:
   `--enable-dawn-features=vulkan_enable_f16_on_nvidia`; patching ggml's
   shaders to run without `shader-f16` is only needed for players who will
   not start Chrome with a flag.
-- When Breeze bumps its ggml past 2026-09-12, drop
-  `tools/breeze-web/ggml-webgpu-backports.patch`.
+- Speed: ggml-webgpu's Q2_K matrix-vector kernel (the depth decoder) is
+  the bottleneck, 2.3x slower than ggml's Vulkan one; a faster WGSL kernel
+  would be an upstream ggml contribution.
 - Its memory: about 2.5 GB of model on the GPU. The text encoder could run
   in WebAssembly on the CPU here too (single-threaded, slower than native).
 

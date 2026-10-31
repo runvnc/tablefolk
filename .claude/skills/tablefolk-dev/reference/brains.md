@@ -256,12 +256,11 @@ with `?trustSkills=1`, or after the player allows that package.
   (`tools/breeze-web/build.sh`: emsdk in `~/.cache/tablefolk-build`, Breeze at
   87b4366, JSPI, `-sMAXIMUM_MEMORY=4GB`; details in `tools/breeze-web/README.md`).
   87b4366's vocoder needs no op ggml-webgpu lacks (the old portable-conv
-  patch is gone). `ggml-webgpu-backports.patch` carries llama.cpp #28382 and
-  #28045 into Breeze's ggml (2026-08-25): without #28382 a view into a
-  block-quantized weight at an offset the browser's 256-byte alignment splits
-  mid-block reads the wrong blocks, which broke all depth-decoder heads but
-  the first (static and fragments). #29471 (unaligned set_tensor through a
-  compute memset) hung generation under JSPI: left out.
+  patch is gone), and build.sh swaps in current ggml (v0.28.0, facdc44):
+  Breeze's bundled ggml (2026-08-25) predates llama.cpp #28382, without which
+  a view into a block-quantized weight at an offset the browser's 256-byte
+  alignment splits mid-block reads the wrong blocks, which broke all
+  depth-decoder heads but the first (static and fragments).
   `tf_breeze.cpp` exports `tf_init`, `tf_encode` (sample to voice codes),
   `tf_generate` (streams through `Module.onAudio`; a stop flag in memory), and
   the diagnostics `tf_stages` / `tf_hash_tensors` (worker messages
@@ -278,7 +277,9 @@ with `?trustSkills=1`, or after the player allows that package.
   `vulkan_enable_f16_on_nvidia` toggle); `--enable-dawn-features=vulkan_enable_f16_on_nvidia`
   brings it back (the test Chrome passes it). Measured 2026-10-31 on the RTX
   2060: load 12 s from OPFS, first sound 2.8 s, 0.62x realtime, about 2.6 GB of
-  graphics memory, speech clean (Gemini). `tools/browser-test/breeze-web-test.html`
+  graphics memory, speech clean (Gemini); the same with ggml v0.28.0. Native
+  Vulkan does 1.8x: ggml-webgpu's Q2_K matrix-vector kernel in the depth
+  decoder is the bottleneck (speed table in `tools/breeze-web/README.md`). `tools/browser-test/breeze-web-test.html`
   (+ `breeze-web-test.mjs` headless) speaks a line and shows those numbers.
   Traps found: pointers above 2 GB come back negative in JS (use `>>> 2`),
   exported HEAP views go stale when memory grows (take fresh views of

@@ -14,7 +14,13 @@ if ! git diff --quiet; then git checkout -- .; fi
 git fetch -q origin
 git checkout -q "$REV"
 git submodule update -q --init --recursive
-git -C third_party/ggml checkout -q -- . && git -C third_party/ggml apply "$HERE/ggml-webgpu-backports.patch"
+# current ggml (v0.28.0) instead of the one Breeze bundles (2026-08-25): it has
+# the WebGPU fixes the browser needs (llama.cpp #28382: block-quantized views at
+# the browser's 256-byte binding alignment) and faster kernels
+GGML_REV=facdc44a67da17df4433adcc468b424f48e9ded2
+git -C third_party/ggml checkout -q -- .
+git -C third_party/ggml cat-file -e "$GGML_REV^{commit}" 2>/dev/null || git -C third_party/ggml fetch -q https://github.com/ggml-org/ggml "$GGML_REV"
+git -C third_party/ggml checkout -q "$GGML_REV"
 grep -q convtr1d_stream src/codec_decoder.cpp || { echo "expected Breeze with the matmul vocoder (v0.1.6 work, 87b4366 or later)"; exit 1; }
 emcmake cmake -S . -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DBREEZE_VULKAN=OFF -DGGML_WEBGPU=ON -DGGML_WEBGPU_JSPI=ON -DGGML_OPENMP=OFF -DGGML_NATIVE=OFF \

@@ -14,15 +14,17 @@ emdawnwebgpu port).
 - **Breeze at 87b4366 (v0.1.6 work) or later.** Its vocoder writes the
   transposed convolution as a matmul and has no `ROLL`, the two ops
   ggml-webgpu lacks, so the old `portable-conv.patch` (for 2904b9a) is gone.
-- **`ggml-webgpu-backports.patch`**, applied inside `third_party/ggml`: two
-  fixes from llama.cpp that came after Breeze's ggml (#28382, #28045; #29471,
-  unaligned set_tensor through a compute memset, hung generation under JSPI
-  and is left out). The one that matters is #28382: a view into a block-quantized weight at an offset that the
-  browser's 256-byte binding alignment splits mid-block read the wrong blocks.
-  Breeze's depth decoder takes each codebook's head as such a view
-  (Q2_K, 689,136 bytes apart), so in the browser only the first of the 15
-  depth codes came out right and the speech was static and fragments. Native
-  Dawn on NVIDIA asks for a smaller alignment, which hid it there.
+- **Current ggml** (v0.28.0, facdc44, 2026-10-28) in place of the one Breeze
+  bundles (2026-08-25); `build.sh` checks it out inside `third_party/ggml`.
+  Breeze builds against it unchanged. The bundled one has a WebGPU bug that
+  llama.cpp #28382 fixed on 2026-09-12: a view into a block-quantized weight
+  at an offset the browser's 256-byte binding alignment splits mid-block reads
+  the wrong blocks. Breeze's depth decoder takes each codebook's head as such
+  a view (Q2_K, 689,136 bytes apart), so only the first of the 15 depth codes
+  came out right and the speech was static and fragments. Dawn on NVIDIA
+  natively asks for a smaller alignment, which hid it there. (Backporting
+  #28382 alone also worked; #29471 from the same period hung generation
+  under JSPI.)
 - `tf_breeze.cpp` is the interface the worker (`app/tts/breeze-web-worker.js`)
   calls. Two diagnostics, run by the worker on `debug_stages` / `debug_hash`
   messages: `tf_stages` (`debug-stages.hpp`: every stage on fixed inputs, as
@@ -50,3 +52,21 @@ headers need C++20 under GCC) and run `breeze-cli` with the same line.
 
 Status and traps: the maintainer skill's brains.md ("Breeze TTS 2 in the
 browser").
+
+## Speed (RTX 2060, 2026-10-31, an 8 s line)
+
+| | backbone | depth decoder | vocoder | realtime |
+|---|---|---|---|---|
+| native Vulkan | 8.4 ms/frame | 28.7 | 4.9 | about 1.8x |
+| native WebGPU, bundled ggml | 13.9 | 71.0 | 15.8 | about 0.73x |
+| native WebGPU, ggml v0.28.0 | 13 | 63-66 | 7-15 | about 0.8x |
+| Chrome, either ggml | | | | 0.61-0.62x, first sound 2.8-3 s |
+
+GPU-bound (ggml's WebGPU profile: 8.7 s of GPU time for an 11 s run). The
+depth decoder reruns its layers 15 times per frame, and the Q2_K
+matrix-vector kernel (`mul_mat_vec_q2_K_f32_sg_reduce`) is 41% of GPU time,
+quantizing its input to Q8 another 9%; turning that dot4 path off is slower
+(92 ms/frame). ggml's Vulkan kernels do the same work about 2.3x faster. The
+browser build gets no subgroup-matrix kernels (ggml leaves them out under
+Emscripten), which is why native gained a little from the newer ggml and
+Chrome did not. Profiling: build natively with `-DGGML_WEBGPU_GPU_PROFILE=ON`.

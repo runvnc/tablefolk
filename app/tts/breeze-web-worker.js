@@ -63,7 +63,7 @@ async function load(opts = {}) {
   const t0 = performance.now();
   const file = await opfsModel((n, total) => status(`Downloading Breeze TTS 2 ${Math.floor(100 * n / total)}% (${(n / 2 ** 30).toFixed(2)} / ${(total / 2 ** 30).toFixed(2)} GB, once)`));
   status('Breeze TTS 2: loading onto the GPU…');
-  const create = (await import('./breeze-web/breeze.mjs?v=20261031f')).default;
+  const create = (await import('./breeze-web/breeze.mjs?v=20261031h')).default;
   M = await create({ print: s => console.log('[breeze]', s), printErr: s => console.warn('[breeze]', s) });
   M.FS.mkdir('/m'); M.FS.mount(M.WORKERFS || M.FS.filesystems.WORKERFS, { files: [file] }, '/m');
   const rc = await M.ccall('tf_init', 'number', ['string'], ['/m/' + MODEL], { async: true });
