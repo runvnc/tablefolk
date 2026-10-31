@@ -63,7 +63,7 @@ async function load(opts = {}) {
   const t0 = performance.now();
   const file = await opfsModel((n, total) => status(`Downloading Breeze TTS 2 ${Math.floor(100 * n / total)}% (${(n / 2 ** 30).toFixed(2)} / ${(total / 2 ** 30).toFixed(2)} GB, once)`));
   status('Breeze TTS 2: loading onto the GPU…');
-  const create = (await import('./breeze-web/breeze.mjs?v=20261030g')).default;
+  const create = (await import('./breeze-web/breeze.mjs?v=20261031f')).default;
   M = await create({ print: s => console.log('[breeze]', s), printErr: s => console.warn('[breeze]', s) });
   M.FS.mkdir('/m'); M.FS.mount(M.WORKERFS || M.FS.filesystems.WORKERFS, { files: [file] }, '/m');
   const rc = await M.ccall('tf_init', 'number', ['string'], ['/m/' + MODEL], { async: true });
@@ -72,9 +72,10 @@ async function load(opts = {}) {
   M.onAudio = pcm => onAudio(pcm);
   const backend = M.UTF8ToString(M._tf_backend());
   console.info('[breeze] devices:', M.UTF8ToString(M._tf_devices()), '| using', backend);
-  // ggml's WebGPU backend needs the shader-f16 feature (missing in Chrome on
-  // Linux with NVIDIA's Vulkan driver); on the CPU a line takes minutes
-  if (!/webgpu/i.test(backend) && !opts.allowCpu) { M = null; throw new Error('Breeze TTS 2 needs a graphics card with WebGPU shader-f16 support in this browser; this one runs it only on the CPU (far too slow)'); }
+  // ggml's WebGPU backend needs the shader-f16 feature: Chrome on Linux with
+  // NVIDIA's Vulkan driver hides it unless started with
+  // --enable-dawn-features=vulkan_enable_f16_on_nvidia. On the CPU a line takes minutes.
+  if (!/webgpu/i.test(backend) && !opts.allowCpu) { M = null; throw new Error('Breeze TTS 2 needs WebGPU shader-f16 in this browser (Chrome on Linux with NVIDIA: start it with --enable-dawn-features=vulkan_enable_f16_on_nvidia); without it, it runs only on the CPU (far too slow)'); }
   postMessage({ type: 'runtime_info', data: { backend: 'Breeze TTS 2 in this browser (' + backend + ')' } });
   postMessage({ type: 'bundle_loaded', sampleRate: M._tf_sample_rate() || 24000 });
   postMessage({ type: 'loaded', loadMs: Math.round(performance.now() - t0) });
@@ -141,6 +142,8 @@ self.onmessage = e => {
       if (type === 'load') return await (loading ||= load(data).catch(err => { loading = null; throw err; }));
       if (type === 'encode_voice' || type === 'load_voice_state' || type === 'load_voice_bin') { if (type === 'encode_voice') await encode(data); postMessage({ type: 'voice_encoded', voiceId: data.voiceId }); return; }
       if (type === 'generate') return await generate(data);
+      if (type === 'debug_stages') { const p = await M.ccall('tf_stages', 'number', [], [], { async: true }); postMessage({ type: 'debug_stages', text: M.UTF8ToString(p) }); return; }
+      if (type === 'debug_hash') { const p = await M.ccall('tf_hash_tensors', 'number', [], [], { async: true }); postMessage({ type: 'debug_hash', text: M.UTF8ToString(p) }); return; }
     } catch (err) { console.error('[breeze]', err?.stack || err); postMessage({ type: 'error', error: String(err?.message || err) }); }
   });
 };

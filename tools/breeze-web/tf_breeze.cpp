@@ -8,11 +8,14 @@
 // tf_stop_flag() stops a generation at its next chunk.
 #include "breeze/generation.h"
 #include "breeze/model.h"
+#include "debug-stages.hpp"
 
 #include "ggml-backend.h"
 
 #include <emscripten.h>
 
+#include <algorithm>
+#include <cstdio>
 #include <exception>
 #include <string>
 #include <vector>
@@ -45,6 +48,31 @@ EMSCRIPTEN_KEEPALIVE const char * tf_devices(void) {
         s += std::string(i ? ", " : "") + ggml_backend_dev_name(d) + " (" + std::to_string((int) ggml_backend_dev_type(d)) + ": " + ggml_backend_dev_description(d) + ")";
     }
     return s.c_str();
+}
+
+// diagnostics: "name bytes fnv1a64" for every weight as read back from the
+// GPU, sorted by name (compare with a native build to find bad loads)
+EMSCRIPTEN_KEEPALIVE const char * tf_hash_tensors(void) {
+    static std::string out; out.clear();
+    std::vector<std::string> names;
+    for (auto & kv : g_model.gg.tensors) names.push_back(kv.first);
+    std::sort(names.begin(), names.end());
+    std::vector<unsigned char> buf;
+    for (auto & n : names) {
+        ggml_tensor * t = g_model.gg.tensors[n];
+        const size_t sz = ggml_nbytes(t); buf.resize(sz);
+        ggml_backend_tensor_get(t, buf.data(), 0, sz);
+        unsigned long long h = 1469598103934665603ULL;
+        for (size_t i = 0; i < sz; i++) { h ^= buf[i]; h *= 1099511628211ULL; }
+        char line[512]; snprintf(line, sizeof line, "%s %zu %016llx\n", n.c_str(), sz, h); out += line;
+    }
+    return out.c_str();
+}
+
+EMSCRIPTEN_KEEPALIVE const char * tf_stages(void) {
+    static std::string out;
+    try { out = tf_stages(g_model, g_codec); } catch (const std::exception & e) { out = std::string("error: ") + e.what(); }
+    return out.c_str();
 }
 
 // 0 on success

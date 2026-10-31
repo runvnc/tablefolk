@@ -17,7 +17,7 @@
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
-    'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 4 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261030g',languages:false,cloneByText:true,progress:true},
+    'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261031g',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
   // Breeze is picked by itself (nothing chosen in this browser) when its

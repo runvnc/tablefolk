@@ -15,6 +15,8 @@
 # SwiftShader CPU fallback headless gets without them). Same profile, so the
 # cached model is reused; it can't run alongside the visible test Chrome.
 # Muted (--mute-audio): its sounds otherwise play through your speakers.
+# --enable-dawn-features=vulkan_enable_f16_on_nvidia: WebGPU shader-f16 on
+# NVIDIA under Linux (Chrome hides it otherwise; Breeze in the browser needs it).
 set -u
 PROFILE="$HOME/.cache/tablefolk-test-chrome"
 URL="${1:-http://localhost:8000/app/?norender=1}"
@@ -54,10 +56,10 @@ if [ "${HEADLESS:-}" = 1 ]; then
   exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
     --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" --mute-audio \
     --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
-    --disable-vulkan-surface --ignore-gpu-blocklist "$URL"
+    --disable-vulkan-surface --ignore-gpu-blocklist --enable-dawn-features=vulkan_enable_f16_on_nvidia "$URL"
 fi
 place_window &
 
 exec "$CHROME" --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
-  --no-first-run --no-default-browser-check --class="$CLASS" \
+  --no-first-run --no-default-browser-check --class="$CLASS" --enable-dawn-features=vulkan_enable_f16_on_nvidia \
   --window-size="$W,$H" --new-window "$URL"

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breeze in the browser: test</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f5f2; --fg: #1d1d1b; --muted: #6b6a66; --line: #d9d6cf; --ok: #2f7d43; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #171716; --fg: #ecebe7; --muted: #9a9892; --line: #383734; --ok: #6fcf86; --bad: #f2867e; } }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 24px 16px; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; }
+  textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; }
+  button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--fg); color: var(--bg); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  td { border-top: 1px solid var(--line); padding: 6px 4px; vertical-align: top; }
+  td:first-child { color: var(--muted); width: 38%; }
+  pre { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Breeze TTS 2 in this browser</h1>
+  <p class="lead">Runs <code>app/tts/breeze-web-worker.js</code> on its own: the first run downloads the 2.46 GB model from the Tablefolk mirror into this site's storage. Linux with an NVIDIA card: start Chrome with <code>--enable-dawn-features=vulkan_enable_f16_on_nvidia</code>, or WebGPU has no <code>shader-f16</code>.</p>
+  <label for="text">Line to speak</label>
+  <textarea id="text" rows="3">Well met, traveller. The road north is muddy after the rain, but the inn at the crossing still has a warm fire and a free bed.</textarea>
+  <div class="row">
+    <button id="run">Load and speak</button>
+    <button id="again" disabled>Speak again</button>
+    <label><input type="checkbox" id="cpu"> allow the CPU fallback (very slow)</label>
+  </div>
+  <table id="out"></table>
+  <div class="row"><audio id="audio" controls hidden></audio></div>
+  <pre id="log"></pre>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const rows = {};
+function show(k, v, cls) {
+  if (!rows[k]) { const tr = document.createElement('tr'); tr.innerHTML = '<td></td><td></td>'; tr.firstChild.textContent = k; $('out').append(tr); rows[k] = tr.lastChild; }
+  rows[k].textContent = v; rows[k].className = cls || '';
+}
+const log = s => { $('log').textContent += s + '\n'; console.log(s); };
+
+// what this browser's WebGPU offers
+(async () => {
+  try {
+    const a = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
+    if (!a) return show('WebGPU', 'none', 'bad');
+    const i = a.info || {};
+    show('GPU', [i.vendor, i.architecture, i.description].filter(Boolean).join(' / ') || 'unknown');
+    show('shader-f16', a.features.has('shader-f16') ? 'yes' : 'no (Breeze would fall back to the CPU)', a.features.has('shader-f16') ? 'ok' : 'bad');
+    show('max buffer', (a.limits.maxBufferSize / 2 ** 20).toFixed(0) + ' MiB, storage binding ' + (a.limits.maxStorageBufferBindingSize / 2 ** 20).toFixed(0) + ' MiB');
+  } catch (e) { show('WebGPU', String(e), 'bad'); }
+})();
+
+let worker = null, chunks = [], started = 0, firstAt = 0, done = null;
+function ensureWorker() {
+  if (worker) return worker;
+  worker = new Worker('/app/tts/breeze-web-worker.js?v=20261031g', { type: 'module' });
+  worker.onmessage = e => {
+    const m = e.data || {};
+    if (m.type === 'status') { show('status', m.status); }
+    else if (m.type === 'runtime_info') show('backend', m.data.backend, /webgpu/i.test(m.data.backend) ? 'ok' : 'bad');
+    else if (m.type === 'loaded') { show('load', (m.loadMs / 1000).toFixed(1) + ' s (download excluded only when cached)'); done?.resolve(); }
+    else if (m.type === 'generation_started') { chunks = []; started = performance.now(); firstAt = 0; }
+    else if (m.type === 'audio_chunk') { if (!firstAt) firstAt = performance.now(); chunks.push(new Float32Array(m.data)); }
+    else if (m.type === 'generation_metrics') {
+      const t = m.metrics;
+      show('first audio', (t.firstAudioMs / 1000).toFixed(2) + ' s');
+      show('speech', t.audioDuration.toFixed(2) + ' s in ' + t.genTime.toFixed(2) + ' s');
+      show('speed', t.rtfx.toFixed(2) + 'x realtime', t.rtfx >= 1 ? 'ok' : 'bad');
+      window.RESULT = { ...t };
+    }
+    else if (m.type === 'stream_ended') { finish(); done?.resolve(); }
+    else if (m.type === 'error') { show('error', m.error, 'bad'); window.RESULT = { error: m.error }; done?.reject(new Error(m.error)); }
+  };
+  worker.onerror = e => { show('error', e.message || 'worker failed', 'bad'); window.RESULT = { error: e.message || 'worker failed' }; };
+  return worker;
+}
+const step = (msg) => new Promise((resolve, reject) => { done = { resolve, reject }; worker.postMessage(msg); });
+
+function finish() {
+  const n = chunks.reduce((t, c) => t + c.length, 0), pcm = new Float32Array(n); let o = 0;
+  for (const c of chunks) { pcm.set(c, o); o += c.length; }
+  const wav = toWav(pcm, 24000);
+  const a = $('audio'); a.src = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })); a.hidden = false;
+  const u8 = new Uint8Array(wav); let bin = ''; for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 32768));
+  window.WAV = btoa(bin);   // for tests
+  if (window.RESULT) window.RESULT.done = true;
+}
+function toWav(pcm, rate) {
+  const b = new ArrayBuffer(44 + pcm.length * 2), v = new DataView(b), w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 32767, true);
+  return b;
+}
+
+async function speak() {
+  window.RESULT = null; $('again').disabled = true;
+  try { await step({ type: 'generate', data: { text: $('text').value, voice: 'designed', instruction: 'A warm, friendly middle-aged innkeeper. Speak clearly and naturally.' } }); }
+  catch (e) { log('error: ' + e.message); }
+  $('again').disabled = false;
+}
+$('run').onclick = async () => {
+  $('run').disabled = true; ensureWorker();
+  try { await step({ type: 'load', data: { allowCpu: $('cpu').checked } }); await speak(); }
+  catch (e) { log('error: ' + e.message); $('run').disabled = false; }
+};
+$('again').onclick = speak;
+</script>
+</body>
+</html>
