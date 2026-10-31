@@ -14,6 +14,7 @@
 # on the real GPU with the Vulkan flags below (checked: NVIDIA, not the
 # SwiftShader CPU fallback headless gets without them). Same profile, so the
 # cached model is reused; it can't run alongside the visible test Chrome.
+# Its output goes to ~/.cache/tablefolk-test-chrome.log (TEST_CHROME_LOG), capped at 200 MB.
 # Muted (--mute-audio): its sounds otherwise play through your speakers.
 # --enable-dawn-features=vulkan_enable_f16_on_nvidia: WebGPU shader-f16 on
 # NVIDIA under Linux (Chrome hides it otherwise; Breeze in the browser needs it).
@@ -53,6 +54,19 @@ place_window() {
   fi
 }
 if [ "${HEADLESS:-}" = 1 ]; then
+  # Chrome's output goes to a log in ~/.cache (never /tmp: a RAM disk here, and
+  # a GPU-error flood once filled it with 7 GB), kept under 200 MB: when it
+  # grows past that, the commonest lines are noted in tablefolk-chromelog-flood.txt
+  # and the log starts again. The guard ends with Chrome (exec keeps this PID).
+  LOG="${TEST_CHROME_LOG:-$HOME/.cache/tablefolk-test-chrome.log}"; : > "$LOG"
+  ( while kill -0 $$ 2>/dev/null; do
+      if [ "$(stat -c %s "$LOG" 2>/dev/null || echo 0)" -gt 209715200 ]; then
+        { date; head -c 50000000 "$LOG" | cut -c1-140 | sed -E 's/[0-9]+/N/g' | sort | uniq -c | sort -rn | head -8; } >> "$HOME/.cache/tablefolk-chromelog-flood.txt"
+        truncate -s 0 "$LOG"
+      fi
+      sleep 20
+    done ) >/dev/null 2>&1 &
+  exec >> "$LOG" 2>&1
   exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
     --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" --mute-audio \
     --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \

@@ -16,7 +16,7 @@ most of them only work on the maintainer's Linux machine because they live in
 | llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain | official release, downloaded by hand into `~/.cache/tablefolk-llm/` | no script |
 | LFM3-1.7B (server) | `LFM3-1.7B-Q4_K_M.gguf` (1.1 GB) | Hugging Face, downloaded by hand | no script |
 | LFM3-1.7B (browser) | `lfm3-1.7b-webgpu`, webml-community runtime from its HF Space (pinned) + the GGUF from HF | code in the repo, hidden model | yes for testers (`?model=lfm3-1.7b-webgpu`); depends on an HF Space staying up |
-| Test-browser log guard | keeps headless Chrome's log from filling `/tmp` | `~/.cache/tablefolk-chromelog-guard.sh` | maintainer only |
+| Test-browser log guard | keeps headless Chrome's log from filling `/tmp` | `tools/browser-test/launch-chrome.sh` (headless) | yes |
 
 ## Goal
 
@@ -112,7 +112,7 @@ One step per platform for a player:
 - Its memory: about 2.5 GB of model on the GPU. The text encoder could run
   in WebAssembly on the CPU here too (single-threaded, slower than native).
 
-### 6. Test tooling (30 minutes)
+### 6. Test tooling (done 2026-10-31)
 
 - Move the log guard into `tools/browser-test/launch-chrome.sh`: write the
   headless Chrome's output to `~/.cache/tablefolk-test-chrome.log` (never
