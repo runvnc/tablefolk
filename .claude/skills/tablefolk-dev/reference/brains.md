@@ -204,8 +204,13 @@ with `?trustSkills=1`, or after the player allows that package.
   nothing is picked in this browser, the server answers and `freeGB`
   (usable graphics memory minus the chat model's `needGB`) is 4 or more: the
   RTX 2060 with E2B has 3, so it keeps Pocket-TTS. Tested against a mock
-  server (registration, streaming, three lines in a row, stop); not yet
-  against the real model.
+  server (registration, streaming, three lines in a row, stop) and against
+  the real model on the RTX 2060 (native Vulkan has fp16, so no shader-f16
+  problem there; 2026-10-30): about 3 GB of graphics memory, 1.37x realtime
+  for a 10 s designed line; in the game path (proxy, `breeze` engine) first
+  audio about 0.5 s for a saved voice and 1.3-1.7 s the first time a voice is
+  cloned, 1.0-1.4x realtime; Gemini 4 Argon rated the dwarf (anger) and
+  innkeeper clones 10/10 "same speaker" against their samples.
 - **Breeze TTS 2 in the browser** (engine `breeze-web`,
   `app/tts/breeze-web-worker.js`, `app/tts/breeze-web/breeze.{mjs,wasm}`):
   Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend
