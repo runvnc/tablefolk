@@ -4,7 +4,9 @@
 # memory and runs it on the CPU (once per line, about 0.5 s on 6 threads),
 # so Breeze needs about 2.1 GB of graphics memory instead of 3.0 (measured
 # on an RTX 2060, 2026-10-31; same voice, clean speech). tools/breeze-server.sh
-# uses this build when it exists.
+# uses this build when it exists. Proposed upstream as --te-cpu in
+# https://github.com/HoppouAI/Breeze-TTS-2.cpp/pull/17; once a release has
+# it, use that release with --te-cpu instead.
 #
 #   tools/breeze-server/build.sh
 # Needs cmake, ninja, a C++ compiler, the Vulkan headers and glslc; the

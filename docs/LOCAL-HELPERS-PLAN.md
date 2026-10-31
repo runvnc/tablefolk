@@ -31,10 +31,14 @@ One step per platform for a player:
 
 ### 1. Breeze server for everyone (about 4-6 hours, mostly CI and testing)
 
-- **Upstream the memory patch first.** Open a PR to HoppouAI/Breeze-TTS-2.cpp
-  with `te-cpu.patch` as an option (`--te-cpu` / `BREEZE_TE_CPU`). If it is
-  merged, we use their official Windows and Linux releases and stop building
-  our own. If not, keep building ours (next item).
+- **Upstream the memory patch first.** Checked 2026-10-31: still needed on
+  their HEAD (87b4366, v0.1.6 work); no issue, PR or release offers partial
+  offload (only `--cpu` for everything). On HEAD it saves 914 MiB (peak
+  2725 to 1811 MiB, first audio about 0.2 to 0.75 s). Opened as
+  [HoppouAI/Breeze-TTS-2.cpp#17](https://github.com/HoppouAI/Breeze-TTS-2.cpp/pull/17)
+  (`--te-cpu` / `BREEZE_TE_CPU`, branch `runvnc:te-cpu`). If it is merged,
+  we use their official Windows and Linux releases and stop building our
+  own. If not, keep building ours (next item).
 - **Our own builds (fallback):** a GitHub Actions workflow in this repo that
   checks out Breeze at a pinned tag, applies the patch and builds
   `breeze-server` for:
