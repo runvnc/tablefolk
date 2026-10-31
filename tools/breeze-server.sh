@@ -24,7 +24,11 @@ VER=v0.1.3; MODEL_NAME=breeze-tts-2-q4_k-dd2.gguf
 R2=(https://geebr-models.mindroot.io https://geebr-models-2.mindroot.io https://geebr-models-3.mindroot.io https://geebr-models-4.mindroot.io)
 DIR="$HOME/.cache/tablefolk-breeze"; mkdir -p "$DIR/voices"
 
-BIN="$(find "$DIR" -path "$DIR/mirror" -prune -o -name breeze-server -type f -print 2>/dev/null | head -1)"
+# tools/breeze-server/build.sh's build (v0.1.5 + te-cpu.patch) first: with
+# BREEZE_TE_CPU=1 (the default here) its text encoder runs on the CPU and
+# Breeze needs about 2.1 GB of graphics memory instead of 3.0
+if [ -x "$DIR/build/breeze-server" ]; then BIN="$DIR/build/breeze-server"; export BREEZE_TE_CPU="${BREEZE_TE_CPU:-1}";
+else BIN="$(find "$DIR" \( -path "$DIR/mirror" -o -path "$DIR/build" \) -prune -o -name breeze-server -type f -print 2>/dev/null | head -1)"; fi
 if [ -z "$BIN" ]; then
   TGZ="breeze-tts-2-$VER-linux-x64-vulkan.tar.gz"
   echo "downloading breeze-server $VER (linux x64, Vulkan, 72 MB)…"

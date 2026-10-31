@@ -235,6 +235,21 @@ with `?trustSkills=1`, or after the player allows that package.
   audio about 0.5 s for a saved voice and 1.3-1.7 s the first time a voice is
   cloned, 1.0-1.4x realtime; Gemini 4 Argon rated the dwarf (anger) and
   innkeeper clones 10/10 "same speaker" against their samples.
+  Memory, by part (q4_k-dd2): the T5Gemma2 text encoder 903 MiB (a 262k-word
+  table), backbone 759, codec 377 (float32 convolutions), depth decoder 225,
+  audio embeddings 68; float32 KV caches and vocoder scratch add about 0.8
+  GB. Breeze and Gemma E2B together ran the 6 GB card out of memory, and
+  ggml-vulkan then kept going on failed allocations: scrambled speech with
+  the real line faint in it ("ErrorOutOfDeviceMemory" in the server log).
+  `tools/breeze-server/build.sh` builds v0.1.5 with `te-cpu.patch`:
+  BREEZE_TE_CPU=1 (the script's default) loads the `te.*` tensors into a CPU
+  buffer (twins in their own context; the originals point at them, so the
+  GPU allocation skips them) and runs the encoder graph on ggml's CPU
+  backend (BREEZE_TE_THREADS, default half the cores). Measured on the RTX
+  2060: peak 3005 to 2149 MiB above idle, first audio 0.42 to 0.86 s (the
+  encoder takes 0.5 s on 6 threads), Gemini 4 Argon heard the same speaker
+  (9-10/10) and the exact words in both. Its Vulkan build needs the SPIR-V
+  headers (fetched into ~/.cache/tablefolk-build when missing).
 - **Breeze TTS 2 in the browser** (engine `breeze-web`,
   `app/tts/breeze-web-worker.js`, `app/tts/breeze-web/breeze.{mjs,wasm}`):
   Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend

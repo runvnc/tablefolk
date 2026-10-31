@@ -1,0 +1,147 @@
+diff --git a/include/breeze/gguf_loader.h b/include/breeze/gguf_loader.h
+index d407625..af4d2b0 100644
+--- a/include/breeze/gguf_loader.h
++++ b/include/breeze/gguf_loader.h
+@@ -17,7 +17,11 @@ struct GGUFModel {
+     ggml_backend_buffer_t buffer = nullptr;
+     std::unordered_map<std::string, ggml_tensor *> tensors;
+ 
+-    bool load(const std::string & path, Backend & be);
++    // tensors whose names start with cpu_prefix go to cpu_be instead of be
++    // (BREEZE_TE_CPU: the text encoder in system memory)
++    bool load(const std::string & path, Backend & be, Backend * cpu_be = nullptr, const char * cpu_prefix = nullptr);
++    ggml_context * meta_cpu = nullptr;
++    ggml_backend_buffer_t buffer_cpu = nullptr;
+     void free();
+ 
+     ggml_tensor * get(const std::string & name) const;
+diff --git a/include/breeze/model.h b/include/breeze/model.h
+index cb89dbe..eeb6156 100644
+--- a/include/breeze/model.h
++++ b/include/breeze/model.h
+@@ -12,6 +12,10 @@ namespace breeze {
+ 
+ struct BreezeModel {
+     Backend backend;
++    // BREEZE_TE_CPU=1: the text encoder (about 0.9 GB, run once per line) in
++    // system memory on the CPU backend, leaving the GPU for the rest
++    Backend cpu;
++    bool te_cpu = false;
+     GGUFModel gg;
+     BreezeConfig cfg;
+     Tokenizer tok;
+diff --git a/src/gguf_loader.cpp b/src/gguf_loader.cpp
+index e042aef..ced96d7 100644
+--- a/src/gguf_loader.cpp
++++ b/src/gguf_loader.cpp
+@@ -1,6 +1,9 @@
+ #include "breeze/gguf_loader.h"
+ 
+ #include <cstdio>
++#include <cstring>
++#include <utility>
++#include <vector>
+ #include <stdexcept>
+ 
+ namespace breeze {
+@@ -11,11 +14,35 @@ namespace breeze {
+ #define breeze_fseek fseeko
+ #endif
+ 
+-bool GGUFModel::load(const std::string & path, Backend & be) {
++bool GGUFModel::load(const std::string & path, Backend & be, Backend * cpu_be, const char * cpu_prefix) {
+     gguf_init_params gp{ /*no_alloc=*/true, /*ctx=*/&meta };
+     gguf = gguf_init_from_file(path.c_str(), gp);
+     if (!gguf) return false;
+ 
++    // Tensors for the CPU get twins in their own context, allocated in a CPU
++    // buffer; the originals then point at the twins' memory, so the GPU
++    // allocation below skips them (it only allocates tensors without data).
++    if (cpu_be && cpu_be->backend && cpu_prefix) {
++        const size_t plen = strlen(cpu_prefix);
++        const int64_t nt = gguf_get_n_tensors(gguf);
++        ggml_init_params cp{ ggml_tensor_overhead() * (size_t) (nt + 1), nullptr, true };
++        meta_cpu = ggml_init(cp);
++        std::vector<std::pair<ggml_tensor *, ggml_tensor *>> twins;
++        for (int64_t i = 0; i < nt; i++) {
++            const char * name = gguf_get_tensor_name(gguf, i);
++            if (strncmp(name, cpu_prefix, plen) != 0) continue;
++            ggml_tensor * t = ggml_get_tensor(meta, name);
++            ggml_tensor * d = ggml_dup_tensor(meta_cpu, t);
++            ggml_set_name(d, name);
++            twins.emplace_back(t, d);
++        }
++        if (!twins.empty()) {
++            buffer_cpu = ggml_backend_alloc_ctx_tensors(meta_cpu, cpu_be->backend);
++            if (!buffer_cpu) return false;
++            for (auto & [t, d] : twins) { t->data = d->data; t->buffer = d->buffer; }
++        }
++    }
++
+     buffer = ggml_backend_alloc_ctx_tensors(meta, be.backend);
+     if (!buffer) return false;
+ 
+@@ -42,6 +69,10 @@ bool GGUFModel::load(const std::string & path, Backend & be) {
+ 
+ void GGUFModel::free() {
+     if (buffer) ggml_backend_buffer_free(buffer);
++    if (buffer_cpu) ggml_backend_buffer_free(buffer_cpu);
++    if (meta_cpu) ggml_free(meta_cpu);
++    buffer_cpu = nullptr;
++    meta_cpu = nullptr;
+     if (meta) ggml_free(meta);
+     if (gguf) gguf_free(gguf);
+     buffer = nullptr;
+diff --git a/src/model.cpp b/src/model.cpp
+index 8351e2d..da6386b 100644
+--- a/src/model.cpp
++++ b/src/model.cpp
+@@ -1,10 +1,26 @@
+ #include "breeze/model.h"
++#include "ggml-cpu.h"
++
++#include <algorithm>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <thread>
+ 
+ namespace breeze {
+ 
+ bool BreezeModel::load(const std::string & path, bool prefer_gpu) {
+     backend.init(prefer_gpu);
+-    if (!gg.load(path, backend)) return false;
++    const char * te = std::getenv("BREEZE_TE_CPU");
++    te_cpu = backend.is_gpu && te && *te && strcmp(te, "0") != 0;
++    if (te_cpu) {
++        cpu.init(false);
++        const char * nt = std::getenv("BREEZE_TE_THREADS");
++        int n = nt ? std::atoi(nt) : (int) std::max(1u, std::thread::hardware_concurrency() / 2);
++        ggml_backend_cpu_set_n_threads(cpu.backend, std::max(1, n));
++        fprintf(stderr, "text encoder on the CPU (%d threads)\n", std::max(1, n));
++    }
++    if (!gg.load(path, backend, te_cpu ? &cpu : nullptr, te_cpu ? "te." : nullptr)) return false;
+     cfg = parse_config(gg);
+     if (!tok.load(gg)) return false;
+     return true;
+@@ -12,6 +28,7 @@ bool BreezeModel::load(const std::string & path, bool prefer_gpu) {
+ 
+ void BreezeModel::free() {
+     gg.free();
++    if (te_cpu) cpu.free();
+     backend.free();
+ }
+ 
+diff --git a/src/text_encoder.cpp b/src/text_encoder.cpp
+index e42f626..d64f2a2 100644
+--- a/src/text_encoder.cpp
++++ b/src/text_encoder.cpp
+@@ -67,7 +67,7 @@ std::vector<float> text_encoder_forward(BreezeModel & m, const std::vector<int>
+     x = rms_norm(g.ctx, x, m.w("te.output_norm.weight"), c.rms_eps);
+     x = linear(g.ctx, m.w("te.proj.weight"), x);
+ 
+-    g.compute(m.backend, x);
++    g.compute(m.te_cpu ? m.cpu : m.backend, x);
+     return tensor_to_f32(x);
+ }
+ 
