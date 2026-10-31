@@ -69,7 +69,9 @@ async function createEngine(){
     return new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true},true);
   }
   if(!navigator.gpu) throw new Error('WebGPU unavailable in this browser');
-  const engine = new BABYLON.WebGPUEngine(canvas,{antialias:true,adaptToDeviceRatio:true});
+  // Light quality renders one pixel per screen point on high-DPI screens (2x
+  // the pixels there cost 4x the fill and render-target memory).
+  const engine = new BABYLON.WebGPUEngine(canvas,{antialias:true,adaptToDeviceRatio:!window.TABLEFOLK_GFX?.lite});
   await engine.initAsync(); return engine;
 }
 function mat(scene,name,texture,opts={}){
@@ -642,7 +644,8 @@ async function createGeneratedCritter(scene,id,pos){
   // second container and retargeted by matching the generated skeleton node names.
   // ?v busts browser caches of the model; bump it whenever the GLB changes
   // (20261010: right-hand vertices re-weighted off the hips/thigh).
-  const idleRes=await BABYLON.SceneLoader.ImportMeshAsync('',TABLEFOLK_ASSET,'critter_rigged.glb?v=20261018a',scene,null,'.glb');
+  // (20261031: a .1k copy with 1024 px textures for medium and light, tablefolkAsset)
+  const idleRes=await BABYLON.SceneLoader.ImportMeshAsync('',TABLEFOLK_ASSET,(window.tablefolkAsset?.('critter_rigged.glb')||'critter_rigged.glb')+'?v=20261031a',scene,null,'.glb');
   const root=new BABYLON.TransformNode(id,scene);
   root.position.copyFrom(pos); root.scaling.setAll(.87);
   const importedRoot=idleRes.meshes.find(m=>m.name==='__root__') || idleRes.meshes[0];
@@ -693,7 +696,9 @@ async function createGeneratedCritter(scene,id,pos){
     if(rigAnims.Walking_A) owned.groups.push(rigAnims.Walking_A);
     // Keep the source hierarchy alive (but invisible): Babylon cloned animation
     // targets can share transform/skeleton internals with this imported source.
-    for(const m of walkRes.meshes||[]){ m.setEnabled(false); m.isVisible=false; m.isPickable=false; }
+    // Its meshes are never drawn: their materials and two 2048 px textures
+    // (about 42 MB of GPU memory per critter) go now.
+    for(const m of walkRes.meshes||[]){ m.setEnabled(false); m.isVisible=false; m.isPickable=false; if(m.material){ try{ m.material.dispose(false,true); }catch{} m.material=null; } }
   }catch(e){ console.warn('generated character walk animation failed to load',e); }
   const collider=BABYLON.MeshBuilder.CreateBox(id+'_collider',{width:.72,height:1.42,depth:.66},scene);
   collider.position.copyFrom(root.position); collider.position.y+=.72; collider.isVisible=false; collider.metadata={ownerId:id};
@@ -1285,7 +1290,10 @@ function rebuildWallVisuals(){
 // colour per copy).
 function fieldstoneRock(sc){
   if(state.fieldRock && !state.fieldRock.isDisposed()) return state.fieldRock;
-  const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:3,flat:false},sc);
+  // Light quality: subdivisions 2, not 3 (2.25x fewer vertices; a walled
+  // room has thousands of stones and the walls were half the scene's
+  // vertices). At 1 the stones turned into pointed lenses with gaps.
+  const m=BABYLON.MeshBuilder.CreateIcoSphere('fieldstone_src',{radius:.5,subdivisions:window.TABLEFOLK_GFX?.lite?2:3,flat:false},sc);
   const pos=m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
   // Flat slabs: a superellipsoid (the sphere pushed out to a box with softly
   // rounded edges) so faces pack tight and little mortar shows, with gently
@@ -2120,7 +2128,9 @@ const TILE_COLORS={ board:[.46,.44,.41], stone:[.40,.39,.37], flagstone:[.33,.33
 const TILE_FLOORS=new Set(['grass','stone','flagstone','dirt','sand']);
 const BOARD_MODEL_H=.84;
 const boardTileReady=new Map(), boardTileLoads=new Map();
-function boardTileFile(n){ return n>2500 ? null : n>900 ? 'grass_v7_orm.med2.glb' : 'grass_v7_orm.1k.glb'; }
+// Light quality: the simplified tile on every board (2.2x fewer vertices),
+// boxes past 900 cells.
+function boardTileFile(n){ const lite=window.TABLEFOLK_GFX?.lite; return n>(lite?900:2500) ? null : (lite || n>900) ? 'grass_v7_orm.med2.glb' : 'grass_v7_orm.1k.glb'; }
 function loadBoardTile(file){
   if(!boardTileLoads.has(file)) boardTileLoads.set(file, BABYLON.SceneLoader.ImportMeshAsync('',TILE_ASSET,file,state.scene).then(r=>{
     const src=r.meshes.find(m=>m.getTotalVertices?.()>0);
@@ -5176,6 +5186,8 @@ function makeCampfire(scene,x=1.8,z=2.6){
   light.diffuse=new BABYLON.Color3(1,.54,.18); light.intensity=8.4; light.range=6.2; light.radius=.18;
   // A small cubemap is enough for this short-range, flickering practical light.
   // Register the current scene and let addShadow() add future dynamic meshes.
+  // Light quality: no shadow map at all (a 512 cubemap, six passes a frame).
+  if(window.TABLEFOLK_GFX?.lite){ scene.onBeforeRenderObservable.add(()=>{ const t=performance.now()*.004; const f=1+Math.sin(t)*.08+Math.sin(t*2.7)*.05; flame.scaling.set(f,1+Math.sin(t*1.7)*.12,f); light.intensity=8.0+Math.sin(t*3.1)*.75; }); return; }
   const fireShadow=new BABYLON.ShadowGenerator(512,light);
   fireShadow.usePercentageCloserFiltering=true;
   fireShadow.filteringQuality=BABYLON.ShadowGenerator.QUALITY_LOW;
@@ -5321,10 +5333,13 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // swapping this key light for a DirectionalLight shadow (1 pass instead
   // of 6) since it's meant to read as a fixed diorama key, not an
   // omnidirectional source.
-  const cornerShadow=new BABYLON.ShadowGenerator(1024,cornerKey);
-  cornerShadow.usePercentageCloserFiltering=true;
-  cornerShadow.filteringQuality=BABYLON.ShadowGenerator.QUALITY_MEDIUM;
-  cornerShadow.bias=.0004; cornerShadow.normalBias=.004; cornerShadow.darkness=.38;
+  // Light quality: no key shadow map (a 1024 cubemap, 32 MB and six passes a frame).
+  const cornerShadow=window.TABLEFOLK_GFX?.lite ? null : new BABYLON.ShadowGenerator(1024,cornerKey);
+  if(cornerShadow){
+    cornerShadow.usePercentageCloserFiltering=true;
+    cornerShadow.filteringQuality=BABYLON.ShadowGenerator.QUALITY_MEDIUM;
+    cornerShadow.bias=.0004; cornerShadow.normalBias=.004; cornerShadow.darkness=.38;
+  }
   const rim=new BABYLON.DirectionalLight('teal_rim',new BABYLON.Vector3(.62,-.34,-.68),scene);
   rim.intensity=.22; rim.diffuse=new BABYLON.Color3(.34,.72,.82); rim.specular=new BABYLON.Color3(.20,.42,.48);
   const fill=new BABYLON.PointLight('cool_fill',new BABYLON.Vector3(-9,5,7),scene);

@@ -52,7 +52,7 @@
   // Generated models ship with four 4096px textures each (~360 MB of GPU
   // memory per model with mipmaps). Medium/light load the .1k.glb copies
   // (textures 1024px; geometry and materials identical).
-  const HAS_1K = new Set(['barrel.glb', 'blade_cluster.glb', 'crate.glb', 'daisy_clump.glb', 'house.glb', 'rock_boulder3.glb', 'tree.glb',
+  const HAS_1K = new Set(['critter_rigged.glb', 'barrel.glb', 'blade_cluster.glb', 'crate.glb', 'daisy_clump.glb', 'house.glb', 'rock_boulder3.glb', 'tree.glb',
     'cliff_rock_a.glb', 'cliff_rock_b.glb', 'cliff_straight_a.glb', 'cliff_straight_b.glb', 'grass_v7_orm.glb']);
   // Medium also has geometry-simplified copies (meshoptimizer) of the two
   // models that dominate the vertex count: the grass tile (4368 -> 1946
@@ -64,7 +64,7 @@
   // terrain (?island=1) keeps 4096px textures on high.
   const PROPS = new Set(['barrel.glb', 'blade_cluster.glb', 'crate.glb', 'daisy_clump.glb', 'house.glb', 'rock_boulder3.glb', 'tree.glb']);
   window.tablefolkAsset = file => settings.quality === 'high' ? (PROPS.has(file) ? file.replace(/\.glb$/, '.1k.glb') : file)
-    : (settings.quality === 'medium' && MED[file]) ? MED[file]
+    : (settings.quality !== 'high' && MED[file]) ? MED[file]   // light uses the simplified geometry too
     : HAS_1K.has(file) ? file.replace(/\.glb$/, '.1k.glb') : file;
 
   function applyShadow(gen, enabled, every) {

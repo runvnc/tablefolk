@@ -119,6 +119,23 @@ fallback). Wall notes are sized and placed from `wallH()`; notes have no
 emissive and slightly grey paper (bloom washed them out). Floor notes sit at
 y .075 (they were buried) and turn to read from the south.
 
+## Light quality (`?gfx=light`, Graphics pane)
+
+Measured on the haunted tavern (2026-10-31): the test Chrome's GPU process
+281 MiB at light, 620 at medium. Light: the simple voxel island and sea, no
+post-process pipeline, SSAO or glow; no shadow generators at all (the key
+light's 1024 and the campfire's 512 cubemaps were still allocated, 32 MB,
+when only switched off); `adaptToDeviceRatio` off (one pixel per screen
+point); fieldstone wall stones from an icosphere of subdivision 2, not 3
+(2.25x fewer vertices; at 1 they became pointed lenses with gaps); the
+simplified board tile (`grass_v7_orm.med2.glb`) on every board and boxes past
+900 cells; the `.1k` copies (`critter_rigged.1k.glb` made with
+`tools/shrink-textures.mjs`, textures only, so the mouth morph's vertex
+layout is untouched). Every quality now drops the critter walking clip's
+materials and textures after its animation is taken (2 x 21 MB a critter).
+The tavern went from 1.95 M to 1.02 M vertices and from 272 to 166 MB of
+textures.
+
 ## Cameras and views
 
 - Window view (`app/head-window.js`, H, Graphics pane): head-coupled

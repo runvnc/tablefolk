@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-30
 
+- **Lighter light mode**: no shadow maps at all, one pixel per screen point, lighter wall stones and floor tiles, 1024 px critter textures; the critter's walking clip no longer keeps its own textures in any mode. The tavern scene: 281 MB of graphics memory at light (620 at medium), half the vertices.
 - **Breeze needs 0.9 GB less graphics memory**: its text encoder runs on the CPU (a small patch on Breeze-TTS-2.cpp v0.1.5, `tools/breeze-server/build.sh`), 2.1 GB instead of 3.0, about half a second more before speech; with both Breeze and Gemma on a 6 GB card the GPU had run out and the speech came out scrambled.
 - **Window view (H)**: the webcam follows your head (MediaPipe face tracking in the browser) and the free camera moves with it, like looking into the diorama through a window.
 - **Recommended sampling per model** (Gemma 1.0, MiniCPM5 1.0, LFM3 0.1 ...) instead of the game's temperature; the LiteRT models had been running on hidden bundle defaults.

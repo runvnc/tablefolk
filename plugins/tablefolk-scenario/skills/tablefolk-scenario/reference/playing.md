@@ -105,7 +105,7 @@ embedding model). URL flags for weak machines and testing:
 
 | flag | effect |
 |---|---|
-| `?gfx=light\|medium\|high` | quality for this page (shadows and moving sea off below high) |
+| `?gfx=light\|medium\|high` | quality for this page (shadows and moving sea off below high). Light is for small graphics cards: the simple island, no shadow maps or post effects, one pixel per screen point, lighter wall stones and floor tiles, 1024 px character textures (about 280 MB of graphics memory for the tavern scene, against 620 MB at medium) |
 | `?fps=N` | cap the frame rate |
 | `?norender=1` | no 3D drawing at all (the model gets the GPU) |
 | `?art=1` | no model, no voices, no intro card: art review |
