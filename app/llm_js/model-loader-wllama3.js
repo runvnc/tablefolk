@@ -16,12 +16,12 @@
 //
 // 2.3.7 is deliberately left in place and untouched, so a failed experiment
 // here cannot break the working CPU engine.
-import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.6.0/esm/index.js';
+import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js';
 
 // 3.x ships ONE wasm and takes { default: url }; the old
 // single-thread/multi-thread keys are deprecated.
 const WLLAMA3_WASM = {
-  default: 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.6.0/src/wasm/wllama.wasm',
+  default: 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/src/wasm/wllama.wasm',
 };
 
 const HF_BASE = 'https://huggingface.co/openbmb/MiniCPM5-1B-GGUF/resolve/main/';

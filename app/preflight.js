@@ -39,7 +39,7 @@
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
     ['tts/breeze-client.js?v=20261030c'],
-    ['tts/pocket-tts-manager.js?v=20261030g'],
+    ['tts/pocket-tts-manager.js?v=20261030h'],
     ['tts/tts-ui.js?v=20261030c'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],
@@ -55,13 +55,13 @@
     ['fp-hands.js?v=20261024b'],
     ['senses.js?v=20261030a'],
     ['packages.js?v=20261024a'],
-    ['embed.js?v=20261024d'],
+    ['embed.js?v=20261030a'],
     ['mind.js?v=20261025a'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261030a'],
     ['live.js?v=20261025e'],
     ['director.js?v=20261025zc'],
-    ['speech-input.js?v=20261025a'],
+    ['speech-input.js?v=20261030a'],
     ['workflows.js?v=20261024a'],
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
@@ -71,7 +71,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261025b'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261030h', 'module'],
+    ['llm_js/world-integration.js?v=20261030u', 'module'],
   ];
 
   function browserSummary() {

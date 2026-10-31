@@ -504,7 +504,7 @@ async function loadOrt() {
     }
 
     postMessage({ type: "status", status: "Loading ONNX Runtime...", state: "loading" });
-    const version = "1.20.0";
+    const version = "1.31.1";
     const cdnBase = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/`;
     const ortModule = await import(`https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/ort.min.mjs`);
     ort = ortModule.default || ortModule;

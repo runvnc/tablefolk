@@ -29,7 +29,7 @@
     if (off()) { api.state = 'off'; return Promise.resolve(false); }
     api.state = 'loading';
     ready = new Promise(resolve => {
-      worker = new Worker(new URL('embed-worker.js?v=20261024c', location.href), { type: 'module' });
+      worker = new Worker(new URL('embed-worker.js?v=20261030a', location.href), { type: 'module' });
       let toasted = false;
       worker.onmessage = e => {
         const d = e.data;

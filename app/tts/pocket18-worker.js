@@ -20,7 +20,7 @@
 // keeps its own states, zeroed at the start of an utterance.
 
 const BASE = "https://huggingface.co/maxime/pocket-tts-18m-onnx/resolve/main/english_18m_refl_2026-10/";
-const ORT_VERSION = "1.20.0";
+const ORT_VERSION = "1.31.1";
 const SENTENCEPIECE_URL = "https://huggingface.co/spaces/KevinAHM/pocket-tts-web/resolve/main/sentencepiece.js";
 const CACHE = "tablefolk-tts-pocket18";
 const MAX_TOKENS_PER_CHUNK = 50, FIRST_DECODE = 4, DECODE = 6, CACHE_STEP = 64;

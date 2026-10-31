@@ -47,6 +47,8 @@ for (;;) {
   const s = await status().catch(() => ({}));
   if (s.consent && process.env.APPROVE_DOWNLOAD !== '1') { console.log('The model is not cached in the test profile and needs a download; not approving it (APPROVE_DOWNLOAD=1 to allow).'); await b.close(); process.exit(2); }
   if (s.consent) await page.evaluate(() => document.getElementById('approveModelDownload')?.click());
+  // engines that never load by themselves (Transformers.js: "click load")
+  if (/click load/i.test(s.brain || '')) await page.evaluate(() => document.getElementById('loadBrains')?.click());
   if (s.ready && / ready/.test(s.brain)) break;
   if (Date.now() - t0 > 600000) { console.log('timed out waiting for the model:', s.brain); await b.close(); process.exit(3); }
   await new Promise(r => setTimeout(r, 2000));

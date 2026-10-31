@@ -17,11 +17,12 @@
 // classic worker's importScripts really does work, which is what the library
 // expects; dynamic import() is valid in classic scripts too, so we don't lose
 // anything by not being a module worker.
-// The library, by version: 0.14.0 for the text models (the tested one);
-// the vision model needs the nightly, the first release whose main engine
-// runs Gemma's vision encoder (0.14-0.18 say "images are not supported in
-// JS yet"). Loaded when a model is, so a page that never sees pays nothing.
-const LIB = '0.14.0';
+// The library: 0.19.0 (released 2026-10-30) for every model. The text models
+// ran on 0.14.0 before; the vision model, Bonsai and MiniCPM5 needed the 0.19
+// nightlies (0.14-0.18 had no vision in JS, couldn't stream the
+// prefill/decode bundles, or read MiniCPM5's content-parts template). A
+// model may still pin its own with `lib`.
+const LIB = '0.19.0';
 const libs = new Map();
 const libFor = ver => { if (!libs.has(ver)) libs.set(ver, import(`https://cdn.jsdelivr.net/npm/@litert-lm/core@${ver}/+esm`)); return libs.get(ver); };
 let libVersion = null;
@@ -42,7 +43,7 @@ const MODEL_CONFIG = {
     label: 'Gemma 4 E2B with sight (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
     vram: '~1.8 GB',
-    lib: '0.19.0-nightly.20261023',
+    lib: '0.19.0',
     vision: true,
   },
   'gemma4-e4b-litert': {
@@ -68,7 +69,7 @@ const MODEL_CONFIG = {
     label: 'Ternary Bonsai 1.7B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-1.7B/resolve/main/bonsai-1.7b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~1 GB',
-    lib: '0.19.0-nightly.20261024',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
+    lib: '0.19.0',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
     plainContent: true,
   },
   // OpenBMB's MiniCPM5-2B (2.5B dense, Apache-2.0, Sep 2026): mlboydaisuke's
@@ -79,13 +80,13 @@ const MODEL_CONFIG = {
     label: 'MiniCPM5 2B (LiteRT-LM, int4)',
     modelUrl: 'https://huggingface.co/mlboydaisuke/MiniCPM5-2B-LiteRT/resolve/main/MiniCPM5-2B_int4.litertlm',   // not mirrored on R2 yet
     vram: '~1.6 GB',
-    lib: '0.19.0-nightly.20261024',
+    lib: '0.19.0',
   },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-8B/resolve/main/bonsai-8b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
     vram: '~3 GB',
-    lib: '0.19.0-nightly.20261024',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
+    lib: '0.19.0',   // the 0.14 web engine can't stream these (tf_lite_prefill_decode) bundles
     plainContent: true,
   },
 };
@@ -358,11 +359,14 @@ function prefaceMessages(system, messages, reserve = 0) {
 }
 
 // The live conversation for key, rebuilt from history if another one was live.
-// The vision model's own sampler defaults ran hot (garbled lines: "I't",
-// "you's"): it gets the game's temperature, top-p. The web text models keep
-// the defaults they were tuned and tested with.
-const samplerFor = temperature => engineVision ? { sessionConfig: { samplerParams: { type: 2, p: .95, k: 64, temperature: Number.isFinite(+temperature) ? Math.max(.05, +temperature) : .5 } } } : {};
-async function liveConversation(key, agentId, system, historyOverride = null, temperature, reserve = 0, slim = false) {
+// A model with recommended sampling (the brain's sampling.js: Gemma 4 and
+// MiniCPM5 want temperature 1.0, top-p 0.95) gets it set on the conversation
+// (type 2: top-p with a top-k cap; 256 where the makers give no top-k), not
+// the bundle's defaults. The vision model's own defaults ran hot (garbled
+// lines: "I't", "you's"): without a recommendation it gets the game's
+// temperature and top-p 0.95, top-k 64; other models keep the bundle's.
+const samplerFor = s => (s?.recommended || engineVision) ? { sessionConfig: { samplerParams: { type: 2, p: s?.top_p ?? .95, k: s?.top_k ?? (s?.recommended ? 256 : 64), temperature: Number.isFinite(+s?.temperature) ? Math.max(.05, +s.temperature) : .5 } } } : {};
+async function liveConversation(key, agentId, system, historyOverride = null, sampling, reserve = 0, slim = false) {
   if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride && !slim && live.chars + reserve < CHAR_BUDGET) {
     live.turns += 1; live.chars += reserve;
     return live.conv;
@@ -371,7 +375,7 @@ async function liveConversation(key, agentId, system, historyOverride = null, te
   let h = histories.get(key);
   if (!h) { h = { agentId: String(agentId || 'default'), system, messages: [] }; histories.set(key, h); }
   const preface = prefaceMessages(system, slim ? [] : (historyOverride || h.messages), reserve);
-  const conv = await engine.createConversation({ preface: { messages: preface }, ...samplerFor(temperature) });
+  const conv = await engine.createConversation({ preface: { messages: preface }, ...samplerFor(sampling) });
   live = { key, conv, turns: 1, chars: sizeOf(preface) + reserve };
   return conv;
 }
@@ -451,7 +455,7 @@ async function runTurn(systemContent, chatMessages, promptText, opts, onToken, t
   const agentId = String(opts.agentId || 'default');
   const key = agentId + ':' + (thinking ? 'think:' : '') + hashSystemPrompt(systemContent || '');
   // room for the prompt and about 1000 characters of answer
-  const conversation = await liveConversation(key, agentId, systemContent, thinking ? chatMessages.slice(0, -1) : null, opts.temperature, promptText.length + 1000, !!opts._slim);
+  const conversation = await liveConversation(key, agentId, systemContent, thinking ? chatMessages.slice(0, -1) : null, { temperature: opts.temperature, top_p: opts.top_p, top_k: opts.top_k, recommended: opts.recommended }, promptText.length + 1000, !!opts._slim);
   try {
     const out = await sendTurn(conversation, promptText, opts, onToken);
     if (!thinking) {

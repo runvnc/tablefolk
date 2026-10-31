@@ -93,7 +93,7 @@
     try { localStorage.setItem('tablefolk.barkOk', '1'); } catch {}
     const urls = (new URLSearchParams(location.search).get('asr') ? [new URLSearchParams(location.search).get('asr')] : []).concat(BARK_URLS);
     barkReady = new Promise((res, rej) => {
-      barkWorker = new Worker('/app/asr/worker.js?v=1', { type: 'module' });
+      barkWorker = new Worker('/app/asr/worker.js?v=20261030a', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
         if (m.type === 'progress') setState('busy', `speech model: ${m.note} ${Math.round(m.fraction * 100)}%`);

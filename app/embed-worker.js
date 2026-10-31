@@ -2,7 +2,7 @@
 // embed.js. Transformers.js caches the model in Cache Storage per origin.
 //   in:  { type: 'load' } | { id, texts: [...] }
 //   out: { type: 'ready', device } | { type: 'progress', loaded, total } | { type: 'error', error } | { id, vectors }
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1';
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
 
 const MODEL = 'onnx-community/embeddinggemma-2-ONNX', DIM = 256;
 let extractor = null;

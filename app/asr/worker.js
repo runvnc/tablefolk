@@ -10,7 +10,7 @@
  *               { type: 'text', id, text, ms } | { type: 'error', id?, message }
  * Files are kept in the Cache API (tablefolk-asr-1), so a download happens once.
  */
-import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.webgpu.min.mjs';
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.webgpu.min.mjs';
 import { logMel } from './mel.js';
 
 // fp16 (1.2 GB) on WebGPU where the card has shader-f16 (token-exact with the
@@ -28,7 +28,7 @@ async function pickVariant(force) {
 }
 const GEN = { blank: 8192, durations: [0, 1, 2, 3, 4], hidden: 640, layers: 2, maxSymbols: 10, eos: 3 };
 const CACHE = 'tablefolk-asr-1';
-ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/';
 ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
 
 let enc = null, dec = null, pieces = null, loading = null;

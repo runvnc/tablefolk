@@ -1,7 +1,7 @@
 // Transformers.js v4 generation runner - wraps Gemma4ForConditionalGeneration
 // to provide a WebLLM-compatible chat.completions.create() interface.
 // This allows agent-brain.js and gpt-runner.js to work with both engines.
-import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+import * as transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
 import { getCurrentModel } from './model-loader-tjs-v2.js';
 
 function stripThinkBlocks(text) {
@@ -23,7 +23,7 @@ export function createTJSEngine(model, processor) {
     const run = async (messages, opts = {}) => {
       const msgs = messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : (m.content || []).map(p => p?.text ?? '').join('') }));
       const temperature = opts.temperature ?? 0.7;
-      const out = await model(msgs, { max_new_tokens: opts.max_tokens ?? 100, do_sample: temperature > 0, temperature: Math.max(.05, temperature), top_p: opts.top_p ?? 0.95, repetition_penalty: opts.repetition_penalty ?? 1.05 });
+      const out = await model(msgs, { max_new_tokens: opts.max_tokens ?? 100, do_sample: temperature > 0, temperature: Math.max(.05, temperature), top_p: opts.top_p ?? 0.95, ...(opts.top_k ? { top_k: opts.top_k } : {}), repetition_penalty: opts.repetition_penalty ?? 1.05 });
       const last = out?.[0]?.generated_text; const text = Array.isArray(last) ? (last.at(-1)?.content || '') : String(last || '');
       return stripThinkBlocks(text);
     };
@@ -42,6 +42,7 @@ export function createTJSEngine(model, processor) {
   // tokenizer, and its _call signature is (text, options). AutoProcessor
   // (Gemma) has .tokenizer and accepts (text, images, audio, options).
   const isPlainTokenizer = !processor.tokenizer;
+
   async function tokenize(prompt) {
     return isPlainTokenizer
       ? await processor(prompt, { add_special_tokens: false })
@@ -89,7 +90,8 @@ export function createTJSEngine(model, processor) {
         max_new_tokens: maxNewTokens,
         do_sample: doSample,
         temperature: temperature,
-        top_p: 0.95,
+        top_p: opts.top_p ?? 0.95,
+        ...(opts.top_k ? { top_k: opts.top_k } : {}),
         repetition_penalty: repetitionPenalty,
       });
 
@@ -152,7 +154,8 @@ export function createTJSEngine(model, processor) {
       max_new_tokens: maxNewTokens,
       do_sample: doSample,
       temperature: temperature,
-      top_p: 0.95,
+      top_p: opts.top_p ?? 0.95,
+      ...(opts.top_k ? { top_k: opts.top_k } : {}),
       repetition_penalty: repetitionPenalty,
       streamer: streamer,
     });
@@ -203,7 +206,8 @@ export async function generate(engine, prompt, opts = {}) {
       messages: opts.messages,
       max_tokens: maxTokens,
       temperature,
-      top_p: 0.95,
+      top_p: opts.topP ?? 0.95,
+      top_k: opts.topK,
       repetition_penalty: opts.repetitionPenalty ?? 1.05,
     };
     if (!enableThinking) genConfig.extra_body = { enable_thinking: false };

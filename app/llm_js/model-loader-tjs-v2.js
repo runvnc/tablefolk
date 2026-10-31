@@ -34,18 +34,6 @@ const MODEL_CONFIG = {
     vram: '~0.4GB',
     device: 'webgpu',
   },
-  // Liquid AI's LFM3-1.7B (Oct 27 2026; LFM Open License 1.0: free under $10M
-  // revenue): the official ONNX export through a text-generation pipeline.
-  // dtype 'auto': q4f16 (1.38 GB) where the GPU has shader-f16, else q4
-  // (1.63 GB, 32-bit activations; Chrome on Linux with NVIDIA).
-  'lfm3-1.7b-onnx': {
-    label: 'LFM3 1.7B (Transformers.js)',
-    modelId: 'LiquidAI/LFM3-1.7B-ONNX',
-    dtype: 'auto',
-    pipeline: true,
-    vram: '~1.5-1.8GB',
-    device: 'webgpu',
-  },
   'minicpm5-1b-gpu': {
     label: 'MiniCPM5-1B (GPU/WebGPU)',
     modelId: 'skjortan/MiniCPM5-1B-ONNX',
@@ -131,7 +119,7 @@ export async function loadModel(modelKey, onProgress) {
   await detectShaderF16();
   // Use cfg.dtype if specified (e.g. LFM2.5 needs q8 to avoid GatherBlockQuantized),
   // otherwise q4f16 if shader-f16 is available, else q4 (32-bit activations).
-  const dtype = cfg.dtype && cfg.dtype !== 'auto' ? cfg.dtype : (hasShaderF16 ? 'q4f16' : 'q4');
+  const dtype = cfg.dtype || (hasShaderF16 ? 'q4f16' : 'q4');
 
   onProgress?.('Loading Transformers.js v4...');
   onProgress?.(`Model: ${cfg.label} (dtype: ${dtype}${!hasShaderF16 ? ' [no shader-f16]' : ''})`);

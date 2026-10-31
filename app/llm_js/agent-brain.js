@@ -1,17 +1,19 @@
 import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from './model-loader.js?v=20261018a';
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
-import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261030a';
-import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261025b';
-import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261030b';
-import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030a';
+import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261030f';
+import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261030d';
+import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from './model-loader-litert.js?v=20261030d';
+import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030d';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
-import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261018a';
+import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261030a';
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261018a';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
+import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
+import { samplingFor } from './sampling.js?v=20261030b';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
@@ -34,9 +36,9 @@ const SUPPORTED_MODELS = {
   'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)', engine: 'litert-lm', size: '~2.6 GB', hidden: true },
   // OpenBMB's MiniCPM5-2B, int4 (1.55 GB): a smaller brain that leaves room
   // for the Breeze voice on a 6 GB card; hidden while it is being evaluated
-  // Liquid AI's LFM3-1.7B on Transformers.js (q4, about 1.6 GB): another small
-  // brain beside Breeze; hidden while it is being evaluated
-  'lfm3-1.7b-onnx': { label: 'LFM3 1.7B (Transformers.js, smaller)', engine: 'transformers.js', size: '~1.6 GB', hidden: true },
+  // LFM3-1.7B on the webml-community WebGPU kernels (lfm3-engine.js): the GGUF,
+  // and 32-bit kernels where the GPU lacks shader-f16; hidden while evaluated
+  'lfm3-1.7b-webgpu': { label: 'LFM3 1.7B (WebGPU kernels, smaller)', engine: 'lfm3', size: '~1.1 GB', hidden: true },
   'minicpm5-2b-litert': { label: 'MiniCPM5 2B (LiteRT-LM, smaller)', engine: 'litert-lm', size: '~1.6 GB', hidden: true },
   // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's
   // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
@@ -75,6 +77,12 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   // Settings may change between turns; rebuild the client when they do.
   if (fresh.baseURL !== engine.client.baseURL || fresh.apiKey !== engine.client.apiKey) Object.assign(engine, createEndpointEngine());
   const body = { model: fresh.model || undefined, messages: opts.messages || [], max_tokens: opts.maxTokens ?? 256, temperature: opts.temperature ?? 0.7, stream: true };
+  // a model with recommended sampling (sampling.js): llama.cpp and OpenRouter
+  // take top_k, min_p and repetition_penalty beside the OpenAI fields
+  if (opts.topP != null) body.top_p = opts.topP;
+  if (opts.topK != null) body.top_k = opts.topK;
+  if (opts.minP != null) body.min_p = opts.minP;
+  if (samplingFor(fresh.model)?.repetition_penalty) body.repetition_penalty = opts.repetitionPenalty;
   if (opts.dryRun) return '';
   const started = performance.now();
   const out = await collect(await engine.client.chat.completions.create(body), opts.onToken ? text => opts.onToken(text, true) : null);
@@ -133,6 +141,13 @@ export function createAgentBrainManager(config = {}) {
 
   async function load() {
     if (loaded && engine) return engine;
+    if (getEngineType() === 'lfm3') {
+      if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
+      engine = await loadLfm3(status => onStatus(status));
+      loaded = true;
+      onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
+      return engine;
+    }
     if (getEngineType() === 'bonsai2') {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
       engine = await loadBonsai2(status => onStatus(status));
@@ -216,6 +231,7 @@ export function createAgentBrainManager(config = {}) {
 
     const generateFn = getEngineType() === 'openai' ? generateEndpoint
       : getEngineType() === 'bonsai2' ? generateBonsai2
+      : getEngineType() === 'lfm3' ? generateLfm3
       : getEngineType() === 'transformers.js' ? generateTJS
       : getEngineType() === 'litert-lm' ? generateLiteRT
       : getEngineType() === 'wllama' ? generateWllama
@@ -233,13 +249,17 @@ export function createAgentBrainManager(config = {}) {
       useGrammar,
       constraintInstruction,
     });
+    // The makers' recommended sampling for this model (sampling.js) wins over
+    // the game's temperature; the endpoint brain is matched by its model name.
+    const rec = samplingFor(getEngineType() === 'openai' ? getEndpointConfig().model : currentModelKey);
     let text;
     try {
       text = await generateFn(engine, '', {
         maxTokens: agent.maxTokens || 256, // room for long multi-line plans/poems
-        temperature: agent.temperature ?? 0,
+        temperature: rec?.temperature ?? agent.temperature ?? 0,
+        topP: rec?.top_p, topK: rec?.top_k, minP: rec?.min_p,
         frequencyPenalty: agent.frequencyPenalty ?? 0.15,
-        repetitionPenalty: agent.repetitionPenalty ?? 1.05,
+        repetitionPenalty: rec?.repetition_penalty ?? agent.repetitionPenalty ?? 1.05,
         responseFormat,
         constraintInstruction,
         messages: agent.messages || [],

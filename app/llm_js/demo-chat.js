@@ -1,6 +1,6 @@
 // LFM2.5-230M standalone chat demo - copied from /files/testlfm/lfm2.5-230m-web/index.html
 // Provides its own load-model UI + chat UI, independent of the agent brain system.
-import { AutoTokenizer, AutoModelForCausalLM, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+import { AutoTokenizer, AutoModelForCausalLM, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
 
 const MODEL_ID = "LiquidAI/LFM2.5-230M-ONNX";
 
