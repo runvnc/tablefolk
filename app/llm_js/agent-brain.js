@@ -83,6 +83,11 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   if (opts.topK != null) body.top_k = opts.topK;
   if (opts.minP != null) body.min_p = opts.minP;
   if (samplingFor(fresh.model)?.repetition_penalty) body.repetition_penalty = opts.repetitionPenalty;
+  // The models in sampling.js think by default in their chat templates (LFM3:
+  // enable_thinking defaults to true, and all of max_tokens went into
+  // reasoning_content, leaving no answer); llama.cpp and vLLM take the switch.
+  // Not sent to others: strict APIs refuse unknown fields.
+  if (samplingFor(fresh.model) && !opts.enableThinking) body.chat_template_kwargs = { enable_thinking: false };
   if (opts.dryRun) return '';
   const started = performance.now();
   const out = await collect(await engine.client.chat.completions.create(body), opts.onToken ? text => opts.onToken(text, true) : null);
