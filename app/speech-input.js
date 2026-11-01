@@ -9,19 +9,26 @@
  *   2. Otherwise the browser's built-in speech recognition (Chrome/Edge).
  * The words go into the chat box and are sent like typed text.
  *
- * Brain options > "Speech input" can pick one: in this browser with Underdog
- * Bark 3.0 (a 1.3 GB speech model on WebGPU, app/asr/, downloaded once, asked
- * first; nothing leaves the machine), the server's Gemma, or the browser's
- * own recognition.
+ * The Voice pane's "Speech input" picks one. Automatic (the default):
+ * Underdog Bark 3.0 in this browser (app/asr/; asked once before its download,
+ * nothing leaves the machine), else the server's Gemma, else the browser's.
+ * Bark runs fp16 on the graphics card (1.3 GB download, about 1.2 GB of
+ * graphics memory, 0.4 s a sentence) when the card has shader-f16 and 1.5 GB
+ * left beside the chat model (and Breeze, when it speaks), else int8 on the
+ * processor (0.9 GB, no graphics memory, about 1.2 s a sentence). Measured with
+ * tools/browser-test/asr-test.mjs (2026-11-01): 1.3% WER on LibriSpeech,
+ * against 4.0% for Gemma 4 E2B's audio input at ten times the time.
  */
 (function () {
   let mode = null; // 'gemma' | 'browser' | null
   const $ = id => document.getElementById(id);
 
   const pick = () => { try { return localStorage.getItem('tablefolk.speech') || 'auto'; } catch { return 'auto'; } };
+  const barkOk = () => { try { return localStorage.getItem('tablefolk.barkOk'); } catch { return null; } };   // '1' yes, '0' declined
   async function detect() {
-    if (pick() === 'bark' && navigator.gpu) return 'bark';
-    if (pick() === 'browser' && (window.SpeechRecognition || window.webkitSpeechRecognition)) return 'browser';
+    const p = pick();
+    if (p === 'bark' || p === 'bark-cpu' || (p === 'auto' && barkOk() !== '0')) return 'bark';
+    if (p === 'browser' && (window.SpeechRecognition || window.webkitSpeechRecognition)) return 'browser';
     try {
       const r = await fetch('/api/status', { signal: AbortSignal.timeout(2500) });
       if (r.ok && (await r.json()).speech) return 'gemma';
@@ -84,26 +91,41 @@
     return (await off.startRendering()).getChannelData(0);
   }
   // ---- Underdog Bark (in this browser): the model lives in a worker
+  // fp16 on the graphics card when it has room, else int8 on the processor
+  async function barkPlan() {
+    const forced = new URLSearchParams(location.search).get('asrvariant');   // ?asrvariant=q8|fp16|q4 (q4: tests only, garbles some long clips)
+    if (forced) return { variant: forced, gb: forced === 'q4' ? 0.5 : forced === 'q8' ? 0.9 : 1.3 };
+    let f16 = false; try { f16 = !!(await navigator.gpu?.requestAdapter())?.features.has('shader-f16'); } catch {}
+    const d = window.tablefolkDevice, breeze = /breeze/.test($('ttsEngine')?.value || '');
+    const roomy = !d || d.freeGB == null || d.freeGB - (breeze ? 3 : 0) >= 1.5;
+    return f16 && roomy && pick() !== 'bark-cpu' ? { variant: 'fp16', gb: 1.3 } : { variant: 'q8', gb: 0.9 };
+  }
+  // asked before recording (not after): yes keeps it, no falls back for good (the pane can pick it again)
+  async function barkAsk() {
+    if (barkOk() === '1') return true;
+    const { gb } = await barkPlan();
+    const yes = confirm(`Speech input in this browser needs a one-time ${gb} GB download (Underdog Bark 3.0, kept in the browser; your voice never leaves this computer). Download it?`);
+    try { localStorage.setItem('tablefolk.barkOk', yes ? '1' : '0'); } catch {}
+    return yes;
+  }
   const BARK_URLS = ['https://geebr-models.mindroot.io/underdog-bark-3.0/', 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/'];
   let barkWorker = null, barkReady = null, barkId = 0; const barkWait = new Map();
   function barkLoad() {
     if (barkReady) return barkReady;
-    const asked = (() => { try { return localStorage.getItem('tablefolk.barkOk') === '1'; } catch { return false; } })();
-    if (!asked && !confirm('Speech input in this browser needs a one-time 1.3 GB download (Underdog Bark 3.0, kept in the browser; nothing is sent anywhere). Download it?')) return Promise.reject(new Error('download declined'));
-    try { localStorage.setItem('tablefolk.barkOk', '1'); } catch {}
+    if (barkOk() !== '1') return Promise.reject(new Error('download not approved'));
     const urls = (new URLSearchParams(location.search).get('asr') ? [new URLSearchParams(location.search).get('asr')] : []).concat(BARK_URLS);
-    barkReady = new Promise((res, rej) => {
-      barkWorker = new Worker('/app/asr/worker.js?v=20261030a', { type: 'module' });
+    barkReady = barkPlan().then(plan => new Promise((res, rej) => {
+      barkWorker = new Worker('/app/asr/worker.js?v=20261101a', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
-        if (m.type === 'progress') setState('busy', `speech model: ${m.note} ${Math.round(m.fraction * 100)}%`);
+        if (m.type === 'progress') { const b = button(); if (b) b.title = `speech model: ${m.note} ${Math.round(m.fraction * 100)}%`; }   // the title only: it loads while you speak
         else if (m.type === 'ready') res();
         else if (m.type === 'text') barkWait.get(m.id)?.resolve(m.text), barkWait.delete(m.id);
         else if (m.type === 'error') { if (m.id != null) barkWait.get(m.id)?.reject(new Error(m.message)), barkWait.delete(m.id); else { barkReady = null; rej(new Error(m.message)); } }
       };
       barkWorker.onerror = e => { barkReady = null; rej(new Error(e.message || 'speech worker failed')); };
-      barkWorker.postMessage({ type: 'load', urls });
-    });
+      barkWorker.postMessage({ type: 'load', urls, variant: plan.variant });
+    }));
     return barkReady;
   }
   async function barkText(pcm) {
@@ -137,6 +159,10 @@
     if (recog) { recog.stop(); return; }
     if (button()?.dataset.state === 'busy') return;
     mode ??= await detect();
+    if (mode === 'bark') {
+      if (!(await barkAsk())) { if (pick() === 'auto') { mode = await detect(); } else { window.tablefolkToast?.('speech input: Underdog Bark not downloaded (pick another in the Voice pane)', { type: 'error' }); return; } }
+      else barkLoad().catch(e => window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }));   // downloads while you speak
+    }
     try {
       if (mode === 'gemma' || mode === 'bark') await startRecording();
       else if (mode === 'browser') startBrowser();

@@ -18,6 +18,8 @@
 # Muted (--mute-audio): its sounds otherwise play through your speakers.
 # --enable-dawn-features=vulkan_enable_f16_on_nvidia: WebGPU shader-f16 on
 # NVIDIA under Linux (Chrome hides it otherwise; Breeze in the browser needs it).
+# CHROME_EXTRA: more flags, e.g. a WAV file as the microphone:
+#   CHROME_EXTRA="--use-fake-ui-for-media-stream --use-fake-device-for-media-stream --use-file-for-fake-audio-capture=/path/clip.wav"
 set -u
 PROFILE="$HOME/.cache/tablefolk-test-chrome"
 URL="${1:-http://localhost:8000/app/?norender=1}"
@@ -70,10 +72,10 @@ if [ "${HEADLESS:-}" = 1 ]; then
   exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
     --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" --mute-audio \
     --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
-    --disable-vulkan-surface --ignore-gpu-blocklist --enable-dawn-features=vulkan_enable_f16_on_nvidia "$URL"
+    --disable-vulkan-surface --ignore-gpu-blocklist --enable-dawn-features=vulkan_enable_f16_on_nvidia ${CHROME_EXTRA:-} "$URL"
 fi
 place_window &
 
 exec "$CHROME" --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
   --no-first-run --no-default-browser-check --class="$CLASS" --enable-dawn-features=vulkan_enable_f16_on_nvidia \
-  --window-size="$W,$H" --new-window "$URL"
+  --window-size="$W,$H" ${CHROME_EXTRA:-} --new-window "$URL"

@@ -291,6 +291,14 @@
       <small class="tts-note">Buffering trades startup delay for glitch resistance. Takes effect the next time speech starts fresh in this tab (reload if you've already spoken this session).</small>
       <div id="ttsStatus">Pocket-TTS off</div>
       <div id="ttsTelemetry">backend: WASM CPU · waiting for speech metrics</div>
+      <div class="section-subtitle">Speech input (the 🎤 button)</div>
+      <label><select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
+        <option value="auto">Automatic: Underdog Bark in this browser (asks before its download), else this server's Gemma, else the browser's</option>
+        <option value="bark">In this browser: Underdog Bark 3.0 (private; on the graphics card when it has room, else the processor)</option>
+        <option value="bark-cpu">In this browser, on the processor: Underdog Bark 3.0 int8 (0.9 GB, no graphics memory, about 1 s a sentence)</option>
+        <option value="gemma">This server's Gemma 4 audio input (bun server/server.js --litert)</option>
+        <option value="browser">The browser's own recognition (Chrome and Edge send the audio to their makers)</option>
+      </select></label>
       <div class="section-subtitle">Custom voice sample</div>
       <input id="customVoiceName" type="text" placeholder="voice name" />
       <input id="customVoiceFile" type="file" accept="audio/*" />
@@ -363,11 +371,6 @@
         <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model with image input: gemma4-e2b-mm on litert-lm serve, Gemma 4 / GPT on OpenRouter; slower)</label>
         <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama. The key stays in this browser.</div>
       </details>
-      <label>Speech input (the 🎤 button) <select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
-        <option value="auto">Automatic: this server's Gemma, else the browser's</option>
-        <option value="bark">In this browser: Underdog Bark 3.0 (1.3 GB download once, private, needs WebGPU)</option>
-        <option value="browser">The browser's own recognition (Chrome, Edge)</option>
-      </select></label>
       <label class="spawn-mode-toggle"><input id="chatTestMode" type="checkbox" /> chat test mode (bare conversation, no perception)</label>
       <label class="spawn-mode-toggle"><input id="antiEcho" type="checkbox" /> anti-echo instructions (off by default - small models can confuse negative prompts)</label>
       <div class="cache-controls">
@@ -420,6 +423,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261101u"></script>
+  <script src="preflight.js?v=20261101y"></script>
 </body>
 </html>

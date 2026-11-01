@@ -2,6 +2,7 @@
 // its transcript in voices.json; the mood samples too) through the page's
 // speech engines, with word error rates and times.
 //   node asr-test.mjs [--engines=bark,gemma] [--set=main|moods|all] [--noisy] [--limit=N] [--base=http://localhost:8001]
+//   node asr-test.mjs --clips=clips.json ...   other clips: [{ id, file (absolute path), text }]
 // bark:  Underdog Bark 3.0 in the page (tablefolkSpeech.barkText; downloads 1.3 GB once into the test profile)
 // gemma: the server's /api/transcribe (bun server/server.js 8001 --litert, gemma4-e2b-mm; 60 clips per 10 minutes)
 // --noisy also runs each clip as a cheap laptop mic would hear it (ffmpeg:
@@ -11,7 +12,7 @@ import { chromium } from 'playwright-core';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { tmpdir } from 'os';
-const arg = (k, d) => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1] || d;
+const arg = (k, d) => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=').slice(1).join('=') || d;
 const engines = arg('engines', 'bark').split(','), set = arg('set', 'main'), base = arg('base', 'http://localhost:8001'), limit = +arg('limit', 999);
 const noisy = process.argv.includes('--noisy');
 const ROOT = new URL('../../', import.meta.url).pathname, tmp = `${process.env.ASR_TMP || tmpdir()}/tablefolk-asr`; mkdirSync(tmp, { recursive: true });
@@ -22,12 +23,14 @@ for (const v of voices) {
   if (set !== 'moods') clips.push({ id: v.id, file: `assets/voices/${v.id}.mp3`, text: v.text });
   if (set !== 'main') for (const [m, t] of Object.entries(v.mood_text || {})) if (existsSync(`${ROOT}assets/voices/mood/${v.id}.${m}.mp3`)) clips.push({ id: `${v.id}@${m}`, file: `assets/voices/mood/${v.id}.${m}.mp3`, text: t });
 }
-clips = clips.filter(c => c.text && existsSync(ROOT + c.file)).slice(0, limit);
+if (arg('clips')) clips = JSON.parse(readFileSync(arg('clips'), 'utf8'));   // [{ id, file (absolute), text }], e.g. LibriSpeech clips
+const path = f => f.startsWith('/') ? f : ROOT + f;
+clips = clips.filter(c => c.text && existsSync(path(c.file))).slice(0, limit);
 const variants = noisy ? ['clean', 'laptop'] : ['clean'];
 function audio(c, variant) {
-  if (variant === 'clean') return readFileSync(ROOT + c.file);
+  if (variant === 'clean') return readFileSync(path(c.file));
   const out = `${tmp}/${c.id.replace('@', '.')}.laptop.wav`;
-  if (!existsSync(out)) execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', ROOT + c.file, '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.02:sample_rate=16000', '-filter_complex',
+  if (!existsSync(out)) execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path(c.file), '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.02:sample_rate=16000', '-filter_complex',
     '[0:a]aresample=16000,highpass=f=300,lowpass=f=3400,volume=0.6,adelay=1000|1000,apad=pad_dur=1[s];[s][1:a]amix=inputs=2:duration=first:normalize=0[o]', '-map', '[o]', '-ac', '1', out]);
   return readFileSync(out);
 }
@@ -44,7 +47,7 @@ const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
 const p = b.contexts()[0].pages()[0];
 p.on('pageerror', e => console.log('  [pageerror]', e.message));
 p.on('console', m => { if (/asr|bark|onnx|webgpu/i.test(m.text())) console.log('  [page]', m.text().slice(0, 200)); });
-await p.goto(base + '/app/?art=1');
+await p.goto(base + '/app/?art=1' + (arg('query') ? '&' + arg('query') : ''));   // --query=asrvariant=q8
 await p.waitForFunction(() => window.tablefolkSpeech?.barkText, null, { timeout: 90000 });
 await p.evaluate(() => localStorage.setItem('tablefolk.barkOk', '1'));
 const info = await p.evaluate(async () => { const a = await navigator.gpu?.requestAdapter(); return { gpu: !!a, f16: !!a?.features.has('shader-f16'), vendor: a?.info?.vendor, arch: a?.info?.architecture }; });

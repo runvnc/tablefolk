@@ -19,6 +19,7 @@ import { logMel } from './mel.js';
 // matches on the ones checked). The int4 build is broken: never used.
 const VARIANTS = {
   fp16: { enc: 'encoder_model_fp16.onnx', dec: 'decoder_joint_model_fp16.onnx', ep: 'webgpu', sizes: [0.001, 0.93, 0.06, 0.009] },
+  q4: { enc: 'encoder_model_q4f16.onnx', dec: 'decoder_joint_model_q4f16.onnx', ep: 'webgpu', sizes: [0.003, 0.862, 0.133, 0.002] },   // 0.52 GB (testing: ?asrvariant=q4)
   q8: { enc: 'encoder_model_quantized.onnx', dec: 'decoder_joint_model_quantized.onnx', ep: 'wasm', sizes: [0.004, 0.92, 0.07, 0.006] },
 };
 async function pickVariant(force) {
