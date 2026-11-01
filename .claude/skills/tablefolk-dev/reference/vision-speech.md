@@ -67,7 +67,21 @@ noise at about 20 dB SNR and a second of noise either side.
 | Bark 3.0 fp16, WebGPU | 1.3% / 1.8% | 3.4% / 3.5% | 0.4 s | about 1.2 GB of graphics memory; 1.3 GB download |
 | Bark 3.0 int8, WASM (12 threads) | 1.3% / 1.8% | not run | 1.2-1.4 s | about 1 GB of RAM, no graphics memory; 0.9 GB download |
 | Bark 3.0 q4f16, WebGPU | 12.1% / 14.6% | not run | 0.3 s | about 0.95 GB; 0.52 GB download. Usually exact, but one 13 s clip came out as 9 wrong words: tests only |
+| Chrome 155 on-device (`processLocally`, fed by `start(track)`) | 3.6% / 2.0% | not run | the latest words at once on stop | Google's pack: about 300 MB on disk (`SODA*` in the profile), no graphics memory |
+| LFM3-Omni-2B on llama.cpp (Q4_K_M, Q8 projector on the CPU) | 1.6% / 1.8% | not run | 0.7 s | about 2.5 GB of graphics memory with the model (it is the brain too); 1.6 GB download |
 | Gemma 4 E2B audio (`litert-lm serve`, audio on the CPU) | 4.0% / 5.2% | 4.0% / 5.0% (main 22) | 3.6-4.8 s | 2.4 GB model on the server |
+
+Numbers are scored as words ("36" = "thirty six"). With the card full
+(Breeze 2.3 GB and LFM3-Omni 2.5 GB beside the game: 5.7 of 6 GB), Bark fp16
+failed 22 of 40 clips with WebGPU buffer errors (the longer clips); since then
+the first such error moves it to the processor for the session and reads the
+clip again there (rerun under the same load: 40 of 40, 1.3 s a clip).
+Chrome only finalises a phrase after a pause and drops unfinished text on
+`stop()`: `speech-input.js` keeps the latest hypothesis (final or not) and
+sends that. Chrome's recognition ignores a fake microphone file
+(`--use-file-for-fake-audio-capture`): tests pass it a Web Audio track.
+LFM3-Omni's audio projector on Vulkan took 5-8 s a clip (prompt processing at
+12-24 tokens/s); with `--no-mmproj-offload` (on the CPU) 0.3-0.9 s.
 
 Bark's errors on the acted clips are mostly right: it leaves out laughs
 ("Ha ha!") and writes dialect in standard spelling; its real misses were heavy
@@ -93,21 +107,19 @@ built.
    fine-tuned for English (Conway Research, CC-BY-4.0, ONNX in
    `ai-ecoverse/Underdog-Bark-3.0-ONNX`, October 2026). Best measured, fast
    on either device, private. English only.
-2. **Chrome's on-device recognition** (`SpeechRecognition` with
-   `processLocally = true`; `SpeechRecognition.available()` said
-   "downloadable" in Chrome 155, `install()` fetches Google's language pack).
-   No download from us and little memory: the right fallback for weak
-   machines and phones. Chrome/Edge only; accuracy not measured (installing
-   the pack in the test profile was left for the maintainer's OK).
+2. **Chrome's on-device recognition** (built into the "browser" choice:
+   `processLocally` when `available()` says so; `install()` on the 🎤 click
+   took 9 s for en-US). 3.6% / 2.0%, no graphics memory, nothing from us to
+   download: the right fallback for weak machines. Chrome/Edge only.
 3. **Parakeet-TDT 0.6B v3** itself (25 European languages, same architecture
    and frontend, so `app/asr/` could load an ONNX export of it with little
    change): for players who don't speak English.
-4. **LFM3-Audio-2B / LFM3-Omni-2B** (Liquid AI, late October 2026; LFM Open
-   License): audio in, text or speech out, 18 languages, 6.23% WER on the
-   Open ASR set (Bark's base Parakeet v3 is about 6% there), streaming
-   "LiveASR", GGUF for llama.cpp (`--audio`). Fits the llama.cpp helper:
-   one model could hear the player, think and speak. Not in the browser.
-   Worth a test as a helper brain that takes the player's audio directly.
+4. **LFM3-Omni-2B / LFM3-Audio-2B** (Liquid AI, late October 2026; LFM Open
+   License): audio in, text or speech out, 18 languages, streaming
+   "LiveASR". Built as the helper choice (`tools/llama-server.sh --omni`;
+   the page finds it by `GET /props` `modalities.audio`): 1.6% on
+   LibriSpeech at 0.7 s, nearly as good as Bark, and the same model can be the
+   characters' brain. Not in the browser.
 5. **Moonshine** (Useful Sensors, tiny models down to 27 MB, transformers.js
    on WebGPU or WASM): for phones and very weak machines; less accurate.
 6. **Gemma 4 E2B/E4B audio input**: measured worse and ten times slower than

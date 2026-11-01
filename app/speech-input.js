@@ -187,7 +187,7 @@
   // ---- Browser path.
   let recog = null;
   // Chrome's on-device recognition when it has (or can install) the language pack: the audio stays here.
-  // Measured on LibriSpeech (asr-test.mjs, 2026-11-01): 4.7% WER clean, 3.1% through a laptop-mic filter.
+  // Measured on LibriSpeech (asr-test.mjs, 2026-11-01): 3.6% WER clean, 2.0% through a laptop-mic filter.
   async function startBrowser() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition, lang = navigator.language || 'en-US';
     let local = false;

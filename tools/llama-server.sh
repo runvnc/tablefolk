@@ -9,7 +9,7 @@
 #   tools/llama-server.sh [port] [--download-only] [--omni]
 #   --omni: LFM3-Omni-2B instead (Q4_K_M 1.1 GB + its Q8 audio/vision projector
 #           0.5 GB, same licence): one model that also hears, so the 🎤 button
-#           can use it (2.7% WER on LibriSpeech, 0.5 s a sentence, 2026-11-01).
+#           can use it (1.6% WER on LibriSpeech, 0.7 s a sentence, 2026-11-01).
 #           The projector runs on the CPU (--no-mmproj-offload): on Vulkan its
 #           audio encoder took 5-8 s a sentence, on the CPU 0.3-0.9 s.
 #   LLAMA_MODEL=/path/other.gguf tools/llama-server.sh     another model
