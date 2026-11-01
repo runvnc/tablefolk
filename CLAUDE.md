@@ -40,7 +40,7 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - Record the user's request batches in `docs/REQUESTS.md` when asked; log
   changes in `CHANGELOG.md`, never in the README.
 
-## Open items (2026-10-31)
+## Open items (2026-11-01)
 
 - Mirror the vision model (`gemma-4-E2B-it.litertlm`) on the R2 bucket:
   waiting for the user's decision.
@@ -49,4 +49,12 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR
   HoppouAI/Breeze-TTS-2.cpp#17 open; Windows scripts untested; R2 mirror
   of LFM3 waits for the user).
+- Light dynamic props (chairs, stools, crates) can be flung across the map
+  when a walker's path goes through their cell (an ANIMATED collider pushing
+  them; seen 2026-11-01 in `uses-test.mjs`). Chests, anvils and cauldrons are
+  static now; the rest wants paths that go around them, or a gentler push.
+- Using things (`app/uses.js`, 2026-11-01): Gemma E2B 10/15 on
+  `evals/uses.json`; fetching from a chest (open, take, give in two turns)
+  0/3. A visual day/night cycle is not built: routines follow the
+  scenario's static `night` lighting.
 - More in `docs/LAUNCH-PLAN.md` ("Left for launch").
