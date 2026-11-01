@@ -11,7 +11,8 @@
  *   - a line spoken holds the next one back PACE.quiet seconds;
  *   - a character with nothing to react to (nothing said or happened to it,
  *     nothing urgent) mostly idles without its brain: a step, a turn, or
- *     nothing (PACE.idle of its turns);
+ *     nothing (PACE.idle of its turns), or its routine with the things
+ *     around it (uses.js: a bed at night, its work station by day);
  *   - someone spoken to, or told of an event, goes after a short pause;
  *   - the player's own doing sets the tempo: for 30 s after the player acts
  *     or talks things move faster, and after 3 minutes without, slower.
@@ -85,6 +86,8 @@
   }
   // a turn without the brain: a step, a look elsewhere, or nothing
   async function idle(c) {
+    // routines first: a bed at night, the anvil for a smith by day (uses.js)
+    if (window.tablefolkUses?.routine(c)) return;
     const r = Math.random();
     if (r < .35) await wander(c);
     else if (r < .6) { const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][Math.floor(Math.random() * 4)]; try { setCharacterFacing(c, new BABYLON.Vector3(d[0], 0, d[1])); } catch {} }

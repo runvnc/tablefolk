@@ -7,8 +7,9 @@ skill (internals); `git log` has every commit.
 ## 2026-11-01
 
 - **Characters use things**: `use(thing)` opens and closes chests, sits on benches, stools and chairs, lies down on beds to rest, hammers at an anvil, works at a workbench, stirs a cauldron, chops a tree (firewood), breaks stone off a boulder, drinks from a well, reads at a lectern, practises on a dummy, takes an apple from a barrel; `take(item, chest)` and `put(item, chest)` take from and store in an open chest, which keeps what it holds (the player finds a ring a character put away). Sitting and lying last through talk; anything else gets the character up beside the seat. A tired character is told to use a bed nearby. The player does the same with E (E on an open, empty chest closes it). Offered in the "you could, right here" menu only with such a thing close by.
+- **Routines in a living world**: idle turns use the things around: at night (the `night` lighting) characters go to bed in a bed nearby and get up by day; a smith works at the anvil, a cook at the cauldron, a scholar at the lectern, a guard at the dummy (by role, look or personality); others sit on a bench now and then.
 - **The Meshy people and monsters carry 42 more clips**: KayKit's CC0 animation library retargeted onto their skeletons (`tools/retarget-people.sh`): sitting on chairs and the floor, lying down, chopping, hammering, sawing, digging, picking up, running, waving, cheering, casting, bow and melee moves. Running and waving no longer fall back to walking and idle. About 100 KB more per model.
-- **Chests stay put**: they are static now (a character stepping beside one could fling it across the map).
+- **Chests, anvils and cauldrons stay put**: they are static now (too heavy to carry anyway); a character walking through one could fling it across the map.
 
 ## 2026-10-31
 

@@ -77,7 +77,7 @@
         "fantasy"
       ]
     },
-    "cauldron": {
+    "cauldron": { "static": true,
       "file": "models/props/Cauldron.gltf",
       "w": 0.8,
       "h": 0.7,
@@ -94,7 +94,7 @@
         "pot"
       ]
     },
-    "anvil": {
+    "anvil": { "static": true,
       "file": "models/props/Anvil.gltf",
       "w": 0.9,
       "h": 0.55,

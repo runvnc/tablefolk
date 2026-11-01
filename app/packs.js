@@ -65,7 +65,7 @@
 
   window.tablefolkPacks = {
     base, items, load, add,
-    ready: load('pack.json?v=20261101a'),
+    ready: load('pack.json?v=20261101b'),
     onItems: fn => listeners.push(fn),
   };
 })();

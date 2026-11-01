@@ -150,7 +150,8 @@ reads it. Map lines and grid legends take `note "text"`.
   A chest without either holds a little gold and sometimes a healing potion.
   Characters open and close chests, take from them and store in them
   (`use`, `take`, `put`: [characters.md](characters.md#using-things)); what
-  a chest holds is kept with it. Chests stay where they are put (static).
+  a chest holds is kept with it. Chests, anvils and cauldrons stay where they
+  are put (static).
 - `coin_pile` takes `"gold"` (default 10-30) and is picked up by walking over
   it.
 - `potion scroll axe pickaxe bag bucket key chalice rope torch` are picked up

@@ -23,6 +23,10 @@
  * emote(sit) / emote(sleep), and walk to a bed when told to go to bed: all
  * understood (find, emoteUse, walkOnto: walking onto a bed or seat gets on it).
  *
+ * Routines (live.js idle turns, routine()): asleep in a bed nearby at night,
+ * up in the morning; by day at the station that fits the role (smith: anvil,
+ * cook: cauldron, scholar: lectern...) or on a bench for a while.
+ *
  * Chests hold opts.contents {gold, items} (filled from the scenario's
  * opts.gold/items, or the seeded loot, the first time it is looked into);
  * the player's E on a chest (play.js) takes all of it; opts.opened marks one
@@ -31,7 +35,7 @@
  * The clips are the KayKit ones (Meshy people carry them too:
  * tools/retarget-people.sh). Figures without them play their idle.
  *
- *   window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, walkOnto, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe }
+ *   window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, routine, walkOnto, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe }
  */
 (function () {
   const KIND = {
@@ -142,6 +146,7 @@
     const k = kindOf(o.type);
     if (!k) return say(g, `${g.id} cannot think of a use for the ${nice(o.type)}`, false);
     if (k === 'chest') return reach(g, o, () => toggleChest(g, o));
+    if ((k === 'bed' || k === 'seat') && occupied(o, g)) return say(g, `someone is already on the ${nice(o.type)}`, false);
     if (k === 'bed' || k === 'seat') return reach(g, o, () => settle(g, o, k === 'bed' ? 'lie' : 'sit'));
     return reach(g, o, () => work(g, o, k));
   }
@@ -371,6 +376,40 @@
     return true;
   }
 
+  // ------------------------------------------------------------- routines
+  // A live world's idle turn (live.js, no brain): what someone does with the
+  // things around them. At night (the "night" lighting) a bed nearby is slept
+  // in, till it is day again; by day a station that fits the character's
+  // role or description is worked at (a smith at the anvil), or a seat nearby
+  // is sat on for a while. Returns true when it did something.
+  const STATION = [
+    [/smith|forge|farrier|armou?rer/i, 'anvil'], [/carpent|joiner|woodwork|craftsm|tinker/i, 'workbench'],
+    [/cook|innkeep|tavern|alchem|brew|witch|kitchen|baker/i, 'cauldron'], [/woodcut|woodsm|lumber|forester|logger/i, 'chop'],
+    [/miner|mason|quarr|stonecut/i, 'mine'], [/scholar|scribe|priest|wizard|mage|librar|sage|monk|sorcer|teacher/i, 'read'],
+    [/guard|soldier|knight|warrior|squire|archer|captain|fighter|swords/i, 'train'],
+  ];
+  const isNight = () => state.lighting === 'night';
+  function routine(g) {
+    if (!g || g === state.playerAvatar || g.defeated) return false;
+    if (isNight()) {
+      if (g.pose?.mode === 'lie') return true;   // asleep: sleeps on
+      const bed = nearby(g, 10).find(o => o.k === 'bed' && !occupied(o, g));
+      if (bed && Math.random() < .6) { useThing(g, bed); return true; }
+      return false;
+    }
+    if (g.pose?.mode === 'lie') { standUp(g); say(g, `${g.id} gets up`, false); return true; }   // morning
+    const cfg = getBrainConfig(g.id), who = [cfg.role, g.style, cfg.personality].filter(Boolean).join(' ');
+    const k = STATION.find(([re]) => re.test(who))?.[1];
+    const station = k && nearby(g, 9).find(o => o.k === k);
+    if (g.pose) { if (Math.random() < (station ? .7 : .35)) { standUp(g); return true; } return Math.random() < .7; }   // sits a while
+    if (station) { if (Math.random() < .6) { useThing(g, station); return true; } return false; }   // a worker works (or wanders)
+    const seat = nearby(g, 6).find(o => o.k === 'seat' && !occupied(o, g));
+    if (seat && Math.random() < .2) { useThing(g, seat); return true; }
+    return false;
+  }
+  // someone else is already on it
+  const occupied = (o, g) => state.characters.concat(state.playerAvatar || []).some(c => c !== g && c.pose?.on === o.mesh);
+
   // ------------------------------------------------------- prompt helpers
   // "use(bed) (2 steps north: lie down and rest)": the nearest few usable
   // things, for senses.js hereLine
@@ -410,5 +449,5 @@
       (chest ? `; take(item, ${chest.type}) and put(item, ${chest.type}) to take from or store in a chest` : '');
   }
 
-  window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe };
+  window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe };
 })();

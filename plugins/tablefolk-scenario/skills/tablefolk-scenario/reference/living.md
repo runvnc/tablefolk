@@ -30,8 +30,16 @@ Pacing runs on real time:
   twice as long;
 - a spoken line holds the next one back a quiet gap;
 - a character with nothing to react to (nothing said or happened to it,
-  nothing urgent) mostly idles without the model: a step, a turn, or
-  nothing;
+  nothing urgent) mostly idles without the model: a step, a turn,
+  nothing, or a **routine** with the things around it: with the `night`
+  lighting, a bed within 10 cells is slept in (up again by day); by day, a
+  character whose role, look or personality names a trade works at its
+  station within 9 cells (smith: `anvil`, carpenter: `workbench`, cook,
+  innkeeper or alchemist: `cauldron`, woodcutter: a `tree` or `logs`, miner
+  or mason: `boulder`, scholar, priest or mage: `lectern` / `bookcase`, guard
+  or soldier: `dummy` / `target`), others now and then sit on a bench
+  nearby. Put the station near the character
+  ([characters.md](characters.md#using-things));
 - someone spoken to, or told of an event, goes after a short pause;
 - for 30 s after the player acts or talks things move faster; after 3 minutes
   without, slower.
