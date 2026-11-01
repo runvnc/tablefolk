@@ -13,7 +13,7 @@ most of them only work on the maintainer's Linux machine because they live in
 | Breeze memory patch | `tools/breeze-server/te-cpu.patch`: text encoder on the CPU, 3.0 to 2.1 GB of graphics memory | in the repo; built by `tools/breeze-server/build.sh` | only if they can build C++ with Vulkan |
 | Breeze model | `breeze-tts-2-q4_k-dd2.gguf` (2.46 GB), 37 parts, licence and NOTICE | R2 `breeze-tts-2/` | yes (downloaded by the script) |
 | Breeze in the browser | `app/tts/breeze-web/` (WebAssembly + ggml WebGPU), Breeze 87b4366 + current ggml | in the repo | browsers with WebGPU `shader-f16`; Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia`. 0.62x realtime on an RTX 2060 |
-| llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain | official release, fetched by `tools/llama-server.sh` / `.ps1` into `~/.cache/tablefolk-llm/` | yes (Linux, macOS; Windows untested) |
+| llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain (`--omni`: LFM3-Omni-2B with its audio projector on the CPU, also the 🎤 button's ears) | official release, fetched by `tools/llama-server.sh` / `.ps1` into `~/.cache/tablefolk-llm/` | yes (Linux, macOS; Windows untested) |
 | LFM3-1.7B (server) | `LFM3-1.7B-Q4_K_M.gguf` (1.1 GB) | Hugging Face, fetched by the same scripts | yes |
 | LFM3-1.7B (browser) | `lfm3-1.7b-webgpu`, webml-community runtime from its HF Space (pinned) + the GGUF from HF | code in the repo, hidden model | yes for testers (`?model=lfm3-1.7b-webgpu`); depends on an HF Space staying up |
 | Test-browser log guard | keeps headless Chrome's log from filling `/tmp` | `tools/browser-test/launch-chrome.sh` (headless) | yes |

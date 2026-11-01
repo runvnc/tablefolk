@@ -6,7 +6,8 @@
 #
 #   powershell -ExecutionPolicy Bypass -File tools\llama-server.ps1 [-Port 8080] [-DownloadOnly]
 # The same as tools/llama-server.sh on Linux and macOS. (Untested on Windows.)
-param([int]$Port = 8080, [switch]$DownloadOnly, [string]$Model = "")
+# -Omni: LFM3-Omni-2B and its audio/vision projector (1.6 GB), a model that also hears (the 🎤 button)
+param([int]$Port = 8080, [switch]$DownloadOnly, [string]$Model = "", [switch]$Omni)
 $ErrorActionPreference = "Stop"; $ProgressPreference = "SilentlyContinue"
 $Ver = "b12015"
 $Dir = Join-Path $env:LOCALAPPDATA "tablefolk-llm"; New-Item -ItemType Directory -Force $Dir | Out-Null
@@ -20,6 +21,15 @@ if (-not $Bin) {
   Expand-Archive (Join-Path $Dir $Zip) -DestinationPath $BinDir -Force; Remove-Item (Join-Path $Dir $Zip)
   $Bin = Get-ChildItem -Path $BinDir -Recurse -Filter llama-server.exe | Select-Object -First 1
 }
+$Proj = @()
+if ($Omni) {
+  $Hf = "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/main"
+  if (-not $Model) { $Model = Join-Path $Dir "LFM3-Omni-2B-Q4_K_M.gguf" }
+  $Mm = Join-Path $Dir "mmproj-LFM3-Omni-2B-Q8_0.gguf"
+  if (-not (Test-Path $Model)) { Write-Host "downloading LFM3-Omni-2B Q4_K_M (1.1 GB, once)..."; Invoke-WebRequest "$Hf/LFM3-Omni-2B-Q4_K_M.gguf" -OutFile "$Model.part"; Move-Item "$Model.part" $Model }
+  if (-not (Test-Path $Mm)) { Write-Host "downloading its audio/vision projector (0.5 GB, once)..."; Invoke-WebRequest "$Hf/mmproj-LFM3-Omni-2B-Q8_0.gguf" -OutFile "$Mm.part"; Move-Item "$Mm.part" $Mm }
+  $Proj = @("--mmproj", $Mm, "--no-mmproj-offload")   # the audio encoder is ten times faster on the CPU than on Vulkan
+}
 if (-not $Model) { $Model = Join-Path $Dir "LFM3-1.7B-Q4_K_M.gguf" }
 if (-not (Test-Path $Model)) {
   Write-Host "downloading LFM3-1.7B Q4_K_M (1.1 GB, once)..."
@@ -28,4 +38,4 @@ if (-not (Test-Path $Model)) {
 }
 if ($DownloadOnly) { Write-Host "ready: $($Bin.FullName) $Model"; exit 0 }
 Write-Host "llama-server on http://127.0.0.1:$Port/v1 (Tablefolk: Brain options, OpenAI-compatible endpoint)"
-& $Bin.FullName -m $Model --alias (([IO.Path]::GetFileNameWithoutExtension($Model)) -replace "-Q[0-9].*","") -ngl 99 -c 8192 --jinja --host 127.0.0.1 --port $Port
+& $Bin.FullName -m $Model --alias (([IO.Path]::GetFileNameWithoutExtension($Model)) -replace "-Q[0-9].*","") -ngl 99 -c 8192 --jinja @Proj --host 127.0.0.1 --port $Port

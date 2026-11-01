@@ -6,13 +6,18 @@
 # LFM3-1.7B Q4_K_M GGUF (1.1 GB; LFM Open License 1.0, free for organisations
 # under $10M revenue). About 1.3 GB of graphics memory.
 #
-#   tools/llama-server.sh [port] [--download-only]
+#   tools/llama-server.sh [port] [--download-only] [--omni]
+#   --omni: LFM3-Omni-2B instead (Q4_K_M 1.1 GB + its Q8 audio/vision projector
+#           0.5 GB, same licence): one model that also hears, so the 🎤 button
+#           can use it (2.7% WER on LibriSpeech, 0.5 s a sentence, 2026-11-01).
+#           The projector runs on the CPU (--no-mmproj-offload): on Vulkan its
+#           audio encoder took 5-8 s a sentence, on the CPU 0.3-0.9 s.
 #   LLAMA_MODEL=/path/other.gguf tools/llama-server.sh     another model
 # On Windows: tools/llama-server.ps1. On a Mac, double-click
 # tools/llama-server.command.
 set -euo pipefail
-PORT=8080; ONLY_DL=0
-for a in "$@"; do case "$a" in --download-only) ONLY_DL=1 ;; *[!0-9]*) ;; *) PORT="$a" ;; esac; done
+PORT=8080; ONLY_DL=0; OMNI=0
+for a in "$@"; do case "$a" in --download-only) ONLY_DL=1 ;; --omni) OMNI=1 ;; *[!0-9]*) ;; *) PORT="$a" ;; esac; done
 VER=b12015
 DIR="$HOME/.cache/tablefolk-llm"; mkdir -p "$DIR"
 case "$(uname -s)-$(uname -m)" in
@@ -33,7 +38,15 @@ if [ -z "$BIN" ]; then
   [ "$(uname -s)" = Darwin ] && xattr -dr com.apple.quarantine "$DIR/llama-$VER" 2>/dev/null || true
 fi
 
-MODEL="${LLAMA_MODEL:-$DIR/LFM3-1.7B-Q4_K_M.gguf}"
+MMPROJ=()
+if [ "$OMNI" = 1 ]; then
+  MODEL="${LLAMA_MODEL:-$DIR/LFM3-Omni-2B-Q4_K_M.gguf}"; PROJ="$DIR/mmproj-LFM3-Omni-2B-Q8_0.gguf"
+  HF=https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/main
+  [ -f "$MODEL" ] || { echo "downloading LFM3-Omni-2B Q4_K_M (1.1 GB, once)…"; curl -fL --progress-bar "$HF/LFM3-Omni-2B-Q4_K_M.gguf" -o "$MODEL.part" && mv "$MODEL.part" "$MODEL"; }
+  [ -f "$PROJ" ] || { echo "downloading its audio/vision projector (0.5 GB, once)…"; curl -fL --progress-bar "$HF/mmproj-LFM3-Omni-2B-Q8_0.gguf" -o "$PROJ.part" && mv "$PROJ.part" "$PROJ"; }
+  MMPROJ=(--mmproj "$PROJ" --no-mmproj-offload)
+fi
+MODEL="${MODEL:-${LLAMA_MODEL:-$DIR/LFM3-1.7B-Q4_K_M.gguf}}"
 if [ ! -f "$MODEL" ]; then
   echo "downloading LFM3-1.7B Q4_K_M (1.1 GB, once)…"
   curl -fL --progress-bar "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/LFM3-1.7B-Q4_K_M.gguf" -o "$MODEL.part" && mv "$MODEL.part" "$MODEL"
@@ -42,4 +55,4 @@ fi
 echo "llama-server on http://127.0.0.1:$PORT/v1 (Tablefolk: Brain options, OpenAI-compatible endpoint)"
 # -ngl 99: every layer on the GPU; --jinja: the model's own chat template;
 # llama-server answers CORS requests, so a page on another origin can call it
-exec "$BIN" -m "$MODEL" --alias "$(basename "$MODEL" .gguf | sed "s/-Q[0-9].*//")" -ngl 99 -c 8192 --jinja --host 127.0.0.1 --port "$PORT"
+exec "$BIN" -m "$MODEL" --alias "$(basename "$MODEL" .gguf | sed "s/-Q[0-9].*//")" -ngl 99 -c 8192 --jinja ${MMPROJ[@]+"${MMPROJ[@]}"} --host 127.0.0.1 --port "$PORT"

@@ -11,7 +11,11 @@
  *
  * The Voice pane's "Speech input" picks one. Automatic (the default):
  * Underdog Bark 3.0 in this browser (app/asr/; asked once before its download,
- * nothing leaves the machine), else the server's Gemma, else the browser's.
+ * nothing leaves the machine), else the server's Gemma, else a llama.cpp model
+ * with audio input on this computer (LFM3-Omni-2B: tools/llama-server.sh
+ * --omni; found through the endpoint settings or the helper finder), else the
+ * browser's: Chrome's on-device recognition when it has it (its language pack,
+ * about 300 MB, installed on the first 🎤 click), else its cloud one.
  * Bark runs fp16 on the graphics card (1.3 GB download, about 1.2 GB of
  * graphics memory, 0.4 s a sentence) when the card has shader-f16 and 1.5 GB
  * left beside the chat model (and Breeze, when it speaks), else int8 on the
@@ -20,7 +24,8 @@
  * against 4.0% for Gemma 4 E2B's audio input at ten times the time.
  */
 (function () {
-  let mode = null; // 'gemma' | 'browser' | null
+  let mode = null; // 'bark' | 'gemma' | 'llama' | 'browser' | null
+  let llama = null;   // { base, model } of a llama.cpp server whose model hears (GET /props: modalities.audio)
   const $ = id => document.getElementById(id);
 
   const pick = () => { try { return localStorage.getItem('tablefolk.speech') || 'auto'; } catch { return 'auto'; } };
@@ -29,11 +34,35 @@
     const p = pick();
     if (p === 'bark' || p === 'bark-cpu' || (p === 'auto' && barkOk() !== '0')) return 'bark';
     if (p === 'browser' && (window.SpeechRecognition || window.webkitSpeechRecognition)) return 'browser';
-    try {
+    if (p === 'llama' && (await findLlama())) return 'llama';
+    if (p !== 'llama') try {
       const r = await fetch('/api/status', { signal: AbortSignal.timeout(2500) });
       if (r.ok && (await r.json()).speech) return 'gemma';
     } catch {}
+    if (p !== 'gemma' && (await findLlama())) return 'llama';
     return (window.SpeechRecognition || window.webkitSpeechRecognition) ? 'browser' : null;
+  }
+
+  // the endpoint brain's server (when it is not this server's proxy), and llama.cpp's
+  // usual port once the helper finder has run (probing 127.0.0.1 unasked makes Chrome ask)
+  async function findLlama() {
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem('tablefolk_llm_endpoint') || '{}') || {}; } catch {}
+    const bases = [saved.baseURL && !/^\/api\//.test(saved.baseURL) ? saved.baseURL : null, localStorage.getItem('tablefolkHelpers') === '1' ? 'http://127.0.0.1:8080/v1' : null].filter(Boolean);
+    for (const b of bases) {
+      const base = b.replace(/\/+$/, '');
+      try {
+        const r = await fetch(base.replace(/\/v1$/, '') + '/props', { signal: AbortSignal.timeout(2000) }), d = r.ok ? await r.json() : null;
+        if (d?.modalities?.audio) return (llama = { base, model: d.model_alias || saved.model || '' });
+      } catch {}
+    }
+    return (llama = null);
+  }
+  async function llamaText(wav) {
+    const u8 = new Uint8Array(wav); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+    const r = await fetch(llama.base + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: llama.model || undefined, temperature: 0, max_tokens: 400,
+      messages: [{ role: 'system', content: 'Perform ASR in English.' }, { role: 'user', content: [{ type: 'input_audio', input_audio: { data: btoa(bin), format: 'wav' } }] }] }) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || 'llama.cpp transcription failed');
+    return d.choices?.[0]?.message?.content || '';
   }
 
   function button() {
@@ -70,6 +99,7 @@
       try {
         if (mode === 'bark') { deliver(await barkText(await toPcm16k(new Blob(chunks, { type: rec.mimeType })))); return; }
         const wav = await toWav16k(new Blob(chunks, { type: rec.mimeType }));
+        if (mode === 'llama') { deliver(await llamaText(wav)); return; }
         const r = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'transcription failed');
@@ -98,7 +128,7 @@
     let f16 = false; try { f16 = !!(await navigator.gpu?.requestAdapter())?.features.has('shader-f16'); } catch {}
     const d = window.tablefolkDevice, breeze = /breeze/.test($('ttsEngine')?.value || '');
     const roomy = !d || d.freeGB == null || d.freeGB - (breeze ? 3 : 0) >= 1.5;
-    return f16 && roomy && pick() !== 'bark-cpu' ? { variant: 'fp16', gb: 1.3 } : { variant: 'q8', gb: 0.9 };
+    return f16 && roomy && pick() !== 'bark-cpu' && !barkCpuOnly ? { variant: 'fp16', gb: 1.3 } : { variant: 'q8', gb: 0.9 };
   }
   // asked before recording (not after): yes keeps it, no falls back for good (the pane can pick it again)
   async function barkAsk() {
@@ -128,9 +158,20 @@
     }));
     return barkReady;
   }
+  // A WebGPU error (seen with the card full: Breeze and llama.cpp beside the game, 5.7 of 6 GB) moves
+  // Bark to the processor for the rest of the session and reads the clip again there.
+  let barkCpuOnly = false;
   async function barkText(pcm) {
     await barkLoad();
-    return new Promise((resolve, reject) => { const id = ++barkId; barkWait.set(id, { resolve, reject }); barkWorker.postMessage({ type: 'transcribe', id, audio: pcm }, [pcm.buffer]); });
+    const copy = pcm.slice();
+    const once = audio => new Promise((resolve, reject) => { const id = ++barkId; barkWait.set(id, { resolve, reject }); barkWorker.postMessage({ type: 'transcribe', id, audio }, [audio.buffer]); });
+    try { return await once(pcm); }
+    catch (e) {
+      if (barkCpuOnly || !/webgpu|OrtRun|GPU/i.test(e.message)) throw e;
+      barkCpuOnly = true; barkWorker?.terminate(); barkWorker = null; barkReady = null;
+      window.tablefolkToast?.('speech: the graphics card is full; Underdog Bark moves to the processor', { type: 'info' });
+      await barkLoad(); return once(copy);
+    }
   }
   async function toWav16k(blob) {
     const pcm = await toPcm16k(blob);
@@ -145,13 +186,23 @@
 
   // ---- Browser path.
   let recog = null;
-  function startBrowser() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recog = new SR(); recog.lang = navigator.language || 'en-US'; recog.interimResults = false; recog.maxAlternatives = 1;
-    recog.onresult = e => deliver(e.results[0]?.[0]?.transcript);
-    recog.onerror = e => window.tablefolkToast?.('speech: ' + e.error, { type: 'error' });
-    recog.onend = () => { recog = null; setState('idle'); };
-    recog.start(); setState('rec', 'listening… (stops when you pause)');
+  // Chrome's on-device recognition when it has (or can install) the language pack: the audio stays here.
+  // Measured on LibriSpeech (asr-test.mjs, 2026-11-01): 4.7% WER clean, 3.1% through a laptop-mic filter.
+  async function startBrowser() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition, lang = navigator.language || 'en-US';
+    let local = false;
+    try {
+      const o = { langs: [lang], processLocally: true }, a = await SR.available?.(o);
+      if (a === 'available') local = true;
+      else if (a === 'downloadable' || a === 'downloading') { setState('busy', 'installing Chrome\'s speech recognition for ' + lang + '…'); local = !!(await SR.install(o)); }
+    } catch {}
+    recog = new SR(); recog.lang = lang; recog.interimResults = true; recog.continuous = true; recog.maxAlternatives = 1;
+    if (local) recog.processLocally = true;
+    let latest = '';
+    recog.onresult = e => { latest = [...e.results].map(x => x[0].transcript).join(' '); };   // on stop, the latest words (final or not)
+    recog.onerror = e => { if (e.error !== 'aborted') window.tablefolkToast?.('speech: ' + e.error, { type: 'error' }); };
+    recog.onend = () => { recog = null; setState('idle'); deliver(latest); };
+    recog.start(); setState('rec', (local ? 'listening (on this device)' : 'listening (the browser\'s cloud recognition)') + '… click to send');
   }
 
   async function toggle() {
@@ -164,13 +215,13 @@
       else barkLoad().catch(e => window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }));   // downloads while you speak
     }
     try {
-      if (mode === 'gemma' || mode === 'bark') await startRecording();
-      else if (mode === 'browser') startBrowser();
+      if (mode === 'gemma' || mode === 'bark' || mode === 'llama') await startRecording();
+      else if (mode === 'browser') await startBrowser();
       else window.tablefolkToast?.('no speech input: run the Tablefolk server with litert-lm serve, or use Chrome', { type: 'error' });
     } catch (e) { window.tablefolkToast?.('microphone: ' + e.message, { type: 'error' }); setState('idle'); }
   }
 
-  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(m => { mode = m; const b = button(); if (b) b.title = (m === 'bark' ? 'speak (Underdog Bark, in this browser)' : m === 'gemma' ? 'speak (Gemma 4 audio on this machine)' : m === 'browser' ? 'speak (browser speech recognition)' : 'speech input unavailable') + ' - click to start, click again to send'; }); };
+  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(m => { mode = m; const b = button(); if (b) b.title = (m === 'bark' ? 'speak (Underdog Bark, in this browser)' : m === 'gemma' ? 'speak (Gemma 4 audio on this machine)' : m === 'llama' ? `speak (${llama?.model || 'llama.cpp'} on this computer)` : m === 'browser' ? 'speak (browser speech recognition)' : 'speech input unavailable') + ' - click to start, click again to send'; }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; detect().then(x => mode = x); } };
 })();

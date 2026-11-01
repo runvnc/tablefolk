@@ -66,7 +66,7 @@
     ['play.js?v=20261101a'],
     ['live.js?v=20261101a'],
     ['director.js?v=20261025zc'],
-    ['speech-input.js?v=20261101e'],
+    ['speech-input.js?v=20261101g'],
     ['workflows.js?v=20261024a'],
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],

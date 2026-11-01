@@ -41,8 +41,12 @@ text in the browser by Underdog Bark 3.0 (English; asked once before its
 download of 0.9-1.3 GB; nothing leaves the computer). It runs on the graphics
 card when there is room beside the characters' model, else on the processor
 (about a second a sentence). The Voice pane's "Speech input" can pick the
-processor, the server's Gemma (`litert-lm serve`) or the browser's own
-recognition (Chrome and Edge send the audio to their makers).
+processor, the server's Gemma (`litert-lm serve`), llama.cpp with a model
+that hears (`tools/llama-server.sh --omni`), or the browser's own
+recognition: Chrome's on-device one when it has it (it installs a language
+pack of about 300 MB on the first click), else its makers' servers. When the
+player declines Bark's download, Automatic takes the next of these that
+answers.
 
 **Cameras.** The free camera (the default with an avatar) orbits (drag) and
 zooms freely and eases after the player; every wall stands at half height
@@ -79,7 +83,7 @@ command box.
 | Gemma 4 E4B | larger (~3 GB), better at following rules |
 | Gemma 4 E2B with sight | the full multimodal model (~2.6 GB, needs a 6 GB graphics card): characters see when they `look` |
 | Bonsai 2 27B | Prism ML's ternary 27B (~5.9 GB), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
-| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp (`tools/llama-server.sh`, `.ps1` on Windows, `.command` on a Mac: LFM3-1.7B on http://127.0.0.1:8080/v1, about 1.3 GB of graphics memory), Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
+| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp (`tools/llama-server.sh`, `.ps1` on Windows, `.command` on a Mac: LFM3-1.7B on http://127.0.0.1:8080/v1, about 1.3 GB of graphics memory; `--omni` (`-Omni` on Windows) runs LFM3-Omni-2B instead, which also hears, so the 🎤 button can use it), Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
 
 Hidden test engines (MiniCPM, Transformers.js) are listed in
 `app/llm_js/agent-brain.js`. One model runs for all characters, in one shared

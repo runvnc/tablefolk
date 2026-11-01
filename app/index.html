@@ -293,11 +293,12 @@
       <div id="ttsTelemetry">backend: WASM CPU · waiting for speech metrics</div>
       <div class="section-subtitle">Speech input (the 🎤 button)</div>
       <label><select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
-        <option value="auto">Automatic: Underdog Bark in this browser (asks before its download), else this server's Gemma, else the browser's</option>
+        <option value="auto">Automatic: Underdog Bark in this browser (asks before its download), else this server's Gemma, else llama.cpp with a model that hears, else the browser's</option>
         <option value="bark">In this browser: Underdog Bark 3.0 (private; on the graphics card when it has room, else the processor)</option>
         <option value="bark-cpu">In this browser, on the processor: Underdog Bark 3.0 int8 (0.9 GB, no graphics memory, about 1 s a sentence)</option>
         <option value="gemma">This server's Gemma 4 audio input (bun server/server.js --litert)</option>
-        <option value="browser">The browser's own recognition (Chrome and Edge send the audio to their makers)</option>
+        <option value="llama">llama.cpp on this computer with a model that hears (LFM3-Omni-2B: tools/llama-server.sh --omni)</option>
+        <option value="browser">The browser's own recognition (Chrome on the device when it can, about 300 MB once; else its makers' servers)</option>
       </select></label>
       <div class="section-subtitle">Custom voice sample</div>
       <input id="customVoiceName" type="text" placeholder="voice name" />
@@ -423,6 +424,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261101y"></script>
+  <script src="preflight.js?v=20261101aa"></script>
 </body>
 </html>
