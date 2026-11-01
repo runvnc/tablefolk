@@ -58,5 +58,12 @@ await shot('tree', [4, -3], [4, 1.2, 1.2]);
 await run('mira', 'walk(2,1)', 4000);
 await run('mira', 'use(stool)', 4000);
 await shot('stool', [3, 3], [3.5, 1.3, 1.2]);
+// the player's E: beside the bench (tor got up when he went to work), then beside the chest
+for (const [x, z, what] of [[0, 3, 'bench'], [2, 1, 'chest'], [2, 1, 'chest again']]) {
+  const r = await p.evaluate(([x, z]) => { const a = TABLEFOLK_STATE.playerAvatar; tablefolk.setCharacterLogicalPosition ? null : null; a.logicalPos.x = x; a.logicalPos.z = z; a.root.position.x = x; a.root.position.z = z; tablefolkPlay.use(); return null; }, [x, z]);
+  await p.waitForTimeout(1500);
+  console.log('player E at', what, JSON.stringify(await p.evaluate(() => ({ pose: TABLEFOLK_STATE.playerAvatar.pose?.mode || null, clip: TABLEFOLK_STATE.playerAvatar._lastRigAnimName, gold: TABLEFOLK_STATE.player.gold, items: TABLEFOLK_STATE.player.items.map(i => i.name), toast: [...document.querySelectorAll('.toast, .tf-toast')].slice(-1).map(e => e.textContent).join('') }))));
+}
+await shot('player-bench', [-1, 3], [3.5, 1.3, 1.2]);
 console.log(JSON.stringify(await p.evaluate(() => tablefolk.getObjects().filter(o => o.type === 'chest').map(o => ({ state: o.state, opts: o.opts })))));
 process.exit(0);
