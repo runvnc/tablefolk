@@ -88,6 +88,11 @@ sampler. `agenttest.mjs --model=<key>` picks the brain; `--llm=<url>
 all its own command lines, untouched by the filter: a lowball sale, settling
 at 40, not recalling a hit). `EVAL_ARGS` passes flags to agenttest.mjs
 (`--llm=http://127.0.0.1:8080/v1 --llm-model=LFM3-1.7B`).
+LFM3-Omni-2B (Q4_K_M, llama.cpp, `--model=endpoint --llm=... --llm-model=LFM3-Omni-2B`;
+without `--model=endpoint` the profile's saved brain wants its download),
+2026-11-01: micro-eval 7/10 (small talk 2/2, horseshoe 2/2, lowball 2/2,
+haggle to 45 0/2, remembering a hit 1/2), 0.3-1.3 s a turn: weaker than
+LFM3-1.7B as a brain, but it also hears (vision-speech.md).
 Micro-eval (`micro-eval.sh`: villager small talk, horseshoe, haggle to 45,
 lowball, remembering a hit; `--think` makes everyone reason first and prints
 tokens and seconds per turn), LFM3-1.7B on llama.cpp, RTX 2060, 2026-10-31:

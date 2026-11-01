@@ -119,7 +119,8 @@ built.
    "LiveASR". Built as the helper choice (`tools/llama-server.sh --omni`;
    the page finds it by `GET /props` `modalities.audio`): 1.6% on
    LibriSpeech at 0.7 s, nearly as good as Bark, and the same model can be the
-   characters' brain. Not in the browser.
+   characters' brain (micro-eval 7/10 against LFM3-1.7B's 9/10: it doesn't
+   haggle). Not in the browser.
 5. **Moonshine** (Useful Sensors, tiny models down to 27 MB, transformers.js
    on WebGPU or WASM): for phones and very weak machines; less accurate.
 6. **Gemma 4 E2B/E4B audio input**: measured worse and ten times slower than
