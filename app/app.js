@@ -2796,7 +2796,7 @@ function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar)
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
 function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
-  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(a==='use'||a==='close') return {kind:a,target:[b,...rest].filter(Boolean).join(' ')}; if(a==='put'||a==='take') return {kind:a,arg:[b,...rest].filter(Boolean).join(' ')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
+  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(['sit','sleep','rest','nap','lie'].includes(a.toLowerCase().replace(/\.$/,'')) && (!b || /^down\.?$/i.test(b)) && !rest.length) return {kind:'emote',emote:/^sit/i.test(a)?'sit':'sleep'}; if(a==='use'||a==='close') return {kind:a,target:[b,...rest].filter(Boolean).join(' ')}; if(a==='put'||a==='take') return {kind:a,arg:[b,...rest].filter(Boolean).join(' ')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
 function parseWalkDestination(arg){
   arg=String(arg||'').trim();
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1).trim();
@@ -2859,6 +2859,8 @@ function parseLLMCommandLine(line){
   // carry(note), dig(north), push(barrel): the thing (or way) named, if any
   if(['carry','dig','push','pull','repair'].includes(name)) return {kind:name,target:String(arg||'').trim().replace(/^["']|["']$/g,'')};
   if(['look','drop','throw','panic','inventory'].includes(name)) return {kind:name};
+  // sit() / sleep() / rest(): the emote (on a seat or bed when one is near: uses.js)
+  if(['sit','sleep','rest','nap','lie'].includes(name)) return {kind:'emote',emote:name==='rest'||name==='lie'||name==='nap'?'sleep':name};
   // a skill's command (skills.js): cast(fireball, gob1)
   if(window.tablefolkSkills?.isCommand(name)) return {kind:'skill',name,args:arg?arg.split(',').map(x=>x.trim().replace(/^["']|["']$/g,'')).filter(Boolean):[]};
   return null;
@@ -2992,6 +2994,8 @@ function whoByName(name,g){
   return state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===n)||null;
 }
 function walk(g,destination){
+  // onto a bed or a seat (walk(bed), or to its very cell): lie or sit on it (uses.js)
+  if(g!==state.playerAvatar && window.tablefolkUses?.walkOnto(g,destination)) return;
   const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0],ne:[-1,0,-1],nw:[1,0,-1],se:[-1,0,1],sw:[1,0,1]};
   const lp=g.logicalPos||new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
   let d=null, travel=g.stepDistance||1.0, description=String(destination||''), targetObject=false;
@@ -3227,7 +3231,7 @@ function emote(g,name){
   const valid=['dance','laugh','sit','wave','clap','cheer','sleep','bow'];
   name=String(name||'dance').toLowerCase().replace(/^["']|["']$/g,'').trim();
   // sit / sleep beside a seat or bed: on it (uses.js)
-  if(window.tablefolkUses?.emoteUse(g,{rest:'sit',nap:'sleep',yawn:'sleep',tired:'sleep'}[name]||name)) return;
+  if(window.tablefolkUses?.emoteUse(g,/sleep|nap|bed|lie|tired|yawn|doze|exhaust/.test(name)?'sleep':/sit|seat|bench|chair|rest/.test(name)?'sit':name)) return;
   // Models invent emotes (frown, smile, nod, gossip): the nearest real one,
   // else just the word over its head (unknown ones used to make it dance).
   const NEAR={smile:'laugh',grin:'laugh',giggle:'laugh',chuckle:'laugh',happy:'cheer',celebrate:'cheer',nod:'bow',greet:'wave',hello:'wave',bye:'wave',applaud:'clap',rest:'sit',yawn:'sleep',tired:'sleep',curtsy:'bow'};

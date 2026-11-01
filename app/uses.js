@@ -19,8 +19,9 @@
  * pose's facing, and the model is lifted onto the seat or mattress (measured
  * from its bones once the clip plays, so KayKit and Meshy rigs both fit).
  *
- * Small models name things by their map labels ("use(h1 chest)") and reach
- * for emote(sit) / emote(sleep): both are understood (find, emoteUse).
+ * Small models name things by their map labels ("use(h1 chest)"), reach for
+ * emote(sit) / emote(sleep), and walk to a bed when told to go to bed: all
+ * understood (find, emoteUse, walkOnto: walking onto a bed or seat gets on it).
  *
  * Chests hold opts.contents {gold, items} (filled from the scenario's
  * opts.gold/items, or the seeded loot, the first time it is looked into);
@@ -30,7 +31,7 @@
  * The clips are the KayKit ones (Meshy people carry them too:
  * tools/retarget-people.sh). Figures without them play their idle.
  *
- *   window.tablefolkUses = { use, put, take, shut, emoteUse, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe }
+ *   window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, walkOnto, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe }
  */
 (function () {
   const KIND = {
@@ -100,11 +101,13 @@
   function reach(g, o, then) {
     if (o.d <= REACH) return then();
     const c = besideCell(g, o);
-    walk(g, { type: 'coord', x: c.x, z: c.z, label: 'the ' + nice(o.type) });
+    g._usesWalking = true; try { walk(g, { type: 'coord', x: c.x, z: c.z, label: 'the ' + nice(o.type) }); } finally { g._usesWalking = false; }
     const ms = (g.turnMove?.dur || 1) * 1000 + 150;
     setTimeout(() => {
       const q = posOf(g);
-      if (!o.mesh.isDisposed?.() && Math.hypot(o.x - q.x, o.z - q.z) <= REACH + .1) then();
+      if (o.mesh.isDisposed?.()) return;
+      if (Math.hypot(o.x - q.x, o.z - q.z) <= REACH + .4) then();
+      else say(g, `${g.id} could not get to the ${nice(o.type)}`, false);
     }, ms);
   }
   // a jump, not a sweep: an ANIMATED collider sent somewhere with the usual
@@ -133,6 +136,9 @@
     if (!g) return;
     const o = find(g, name);
     if (!o) return say(g, `there is no ${name || 'thing'} in sight to use`, false);
+    return useThing(g, o);
+  }
+  function useThing(g, o) {
     const k = kindOf(o.type);
     if (!k) return say(g, `${g.id} cannot think of a use for the ${nice(o.type)}`, false);
     if (k === 'chest') return reach(g, o, () => toggleChest(g, o));
@@ -160,6 +166,16 @@
     const o = find(g, name || 'chest');
     if (!o || kindOf(o.type) !== 'chest') return say(g, `there is no ${name || 'chest'} in sight to close`, false);
     return reach(g, o, () => { const m = meshOf(o); face(g, o); if (!isOpen(m)) return say(g, `the ${nice(o.type)} is already closed`, false); setOpen(m, false); emitBadge(g, 'closes'); return act(g, `${g.id} closes the ${nice(o.type)}`, 'open', 1300, false); });
+  }
+  // walk(bed), walk("-2,-2") onto a bed's or seat's cell: that is getting
+  // on it (small models told to go to bed walk to it and stop beside it)
+  function walkOnto(g, dest) {
+    if (!dest || typeof dest !== 'object' || g.pose || g._usesWalking) return false;
+    let o = null;
+    if (dest.type === 'coord') o = getObjects().find(t => ['bed', 'seat'].includes(kindOf(t.type)) && Math.round(t.x) === Math.round(+dest.x) && Math.round(t.z) === Math.round(+dest.z));
+    else if (dest.type === 'label') { const t = find(g, dest.label); if (t && ['bed', 'seat'].includes(kindOf(t.type)) && String(dest.label).toLowerCase().replace(/_/g, ' ').includes(nice(t.type).split(' ').pop())) o = t; }
+    if (!o) return false;
+    const p = posOf(g); useThing(g, { ...o, d: Math.hypot(o.x - p.x, o.z - p.z) }); return true;
   }
   // emote(sit) / emote(sleep) with a seat or bed a few steps away: use it
   // (small models reach for the emote they know, not use())
@@ -358,7 +374,7 @@
   // ------------------------------------------------------- prompt helpers
   // "use(bed) (2 steps north: lie down and rest)": the nearest few usable
   // things, for senses.js hereLine
-  const WHAT = { chest: o => isOpen(o.mesh) ? 'it is open: take(item, chest) or put(item, chest)' : 'open it, or take(item, chest) / put(item, chest)', bed: () => 'lie down and rest', seat: () => 'sit down', anvil: () => 'hammer', workbench: () => 'work', cauldron: () => 'stir', chop: () => 'chop firewood', mine: () => 'break stone', well: () => 'drink', read: () => 'read', train: () => 'practise', food: o => 'take ' + (FOOD_OF[o.type] === 'apple' ? 'an apple' : 'a ' + FOOD_OF[o.type]) };
+  const WHAT = { chest: o => isOpen(o.mesh) ? 'it is open' : 'open it and look inside', bed: () => 'lie down and rest', seat: () => 'sit down', anvil: () => 'hammer', workbench: () => 'work', cauldron: () => 'stir', chop: () => 'chop firewood', mine: () => 'break stone', well: () => 'drink', read: () => 'read', train: () => 'practise', food: o => 'take ' + (FOOD_OF[o.type] === 'apple' ? 'an apple' : 'a ' + FOOD_OF[o.type]) };
   function nearby(g, radius = 4) {
     const p = posOf(g), seen = new Set(), out = [];
     for (const o of getObjects()) {
@@ -371,7 +387,20 @@
   }
   function menu(g, fmt) {
     if (g.pose) return [`stay ${g.pose.mode === 'lie' ? 'lying' : 'seated'} and talk, or do anything else to get up`];
-    return nearby(g).slice(0, 2).map(o => `use(${o.type}) (${fmt(o)}: ${WHAT[o.k](o)}${o.d > REACH ? '; walks there itself' : ''})`);
+    const out = [];
+    for (const o of nearby(g).slice(0, 2)) {
+      // a chest: the exact lines first (small models copy a concrete example,
+      // and took the first chest line, use(), when asked to store something)
+      if (o.k === 'chest') {
+        // what is inside: known once it has been opened (open now, or seen before)
+        const mm = meta(o.mesh), seen = isOpen(o.mesh) || mm?.opts?.contents && mm.opts.opened;
+        const mine = (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0), c = seen ? contents(o.mesh) : null, inside = c?.items.find(i => (i.qty ?? 1) > 0);
+        if (mine.length) out.push(`put(${mine[0].name}, ${o.type}) (puts your ${mine[0].name} in the ${nice(o.type)})`);
+        if (inside) out.push(`take(${inside.name}, ${o.type}) (takes the ${inside.name} out)`);
+      }
+      out.push(`use(${o.type}) (${fmt(o)}: ${WHAT[o.k](o)}${o.d > REACH ? '; walks there itself' : ''})`);
+    }
+    return out;
   }
   // one prompt line, only with something usable close by
   function exampleLine(g) {
@@ -381,5 +410,5 @@
       (chest ? `; take(item, ${chest.type}) and put(item, ${chest.type}) to take from or store in a chest` : '');
   }
 
-  window.tablefolkUses = { use, put, take, shut, emoteUse, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe };
+  window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe };
 })();

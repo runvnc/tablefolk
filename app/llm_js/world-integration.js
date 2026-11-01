@@ -819,7 +819,8 @@ async function main() {
       // models often answer in plain text ("I am tired. State your
       // business."), which used to fail as an unknown command. (With thinking
       // on, plain lines are leftover reasoning and are dropped below.)
-      const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
+      // (a bare "sit", "sleep", "lie down" is the action: app.js parseCommand)
+      const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l) || /^(sit|sleep|rest|nap|sit down|lie down)\.?$/i.test(l.trim());
       const speakPlain = !quiet && cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
       // ... except plain lines that are the model planning aloud, which small
       // models (LFM3 1.7B) write beside their commands: "Say that she's hungry.
