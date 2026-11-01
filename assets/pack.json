@@ -5,7 +5,7 @@
   "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt. Nature and house models in models/props/gen/ were generated for Tablefolk. Village props in models/props/village/ and characters in models/characters/quaternius/: Quaternius via Poly Pizza (see the LICENSE.txt files there).",
   "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy, or fit: \"height\"/\"footprint\" to size the model to h or w/d), decor (no collision, not on the characters' map), optional aliases and tags.",
   "items": {
-    "chest": {
+    "chest": { "static": true,
       "file": "models/props/Chest_Wood.gltf",
       "w": 1.05,
       "h": 0.75,
@@ -632,7 +632,7 @@
         "village"
       ]
     },
-    "iron_chest": {
+    "iron_chest": { "static": true,
       "file": "models/props/village/iron_chest.glb",
       "w": 1.0,
       "h": 0.75,

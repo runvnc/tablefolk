@@ -71,17 +71,51 @@
     for (const t of getObjects()) if (kindOf(t.type) === k) { const d = Math.hypot(t.x - p.x, t.z - p.z); if (d <= 10 && (!best || d < best.d)) best = { ...t, d }; }
     return best;
   }
-  // walk over first when it is a few steps off, then act on arrival
+  // walk over first when it is a few steps off, then act on arrival: to a
+  // free cell beside it (front first for seats and beds), never into it (a
+  // light chair or chest is a dynamic body the walker's collider would shove)
+  function besideCell(g, o) {
+    const p = posOf(g), ox = Math.round(o.x), oz = Math.round(o.z), front = [Math.round(Math.sin(o.ry || 0)), Math.round(Math.cos(o.ry || 0))];
+    const free = (x, z) => (typeof cellPassable !== 'function' || cellPassable(x, z)) && (typeof hasGroundAt !== 'function' || hasGroundAt(x, z)) &&
+      !getObjects().some(t => t.mesh !== o.mesh && !['tile', 'light', 'note', 'coin_pile'].includes(t.type) && Math.round(t.x) === x && Math.round(t.z) === z);
+    let best = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const x = ox + dx, z = oz + dz; if (!free(x, z)) continue;
+      const score = Math.hypot(x - p.x, z - p.z) - (dx === front[0] && dz === front[1] ? 1.5 : 0) + (dx && dz ? .3 : 0);
+      if (!best || score < best.score) best = { x, z, score };
+    }
+    return best || { x: ox, z: oz };
+  }
   function reach(g, o, then) {
     if (o.d <= REACH) return then();
-    walk(g, { type: 'coord', x: Math.round(o.x), z: Math.round(o.z), label: 'the ' + nice(o.type) });
+    const c = besideCell(g, o);
+    walk(g, { type: 'coord', x: c.x, z: c.z, label: 'the ' + nice(o.type) });
     const ms = (g.turnMove?.dur || 1) * 1000 + 150;
     setTimeout(() => {
       const q = posOf(g);
       if (!o.mesh.isDisposed?.() && Math.hypot(o.x - q.x, o.z - q.z) <= REACH + .1) then();
     }, ms);
   }
+  // a jump, not a sweep: an ANIMATED collider sent somewhere with the usual
+  // ACTION prestep travels there within one physics step, at a speed that
+  // flings any light thing in between (a chair, a stool)
+  function teleport(g, x, z) {
+    setCharacterLogicalPosition(g, new BABYLON.Vector3(x, 0, z));
+    const pb = g.collider?.physicsBody; if (!pb?.setPrestepType) return;
+    try { pb.setPrestepType(BABYLON.PhysicsPrestepType.TELEPORT); } catch {}
+    state.scene.onAfterRenderObservable.addOnce(() => { try { pb.setPrestepType(BABYLON.PhysicsPrestepType.ACTION); } catch {} });
+  }
   function face(g, o) { const p = posOf(g); setCharacterFacing(g, new BABYLON.Vector3(o.x - p.x, 0, o.z - p.z)); }
+
+  // narrate, then the clip: say() turns the speaker to its talk clip, so the
+  // work clip starts after it (and back to idle, or the pose, when done)
+  function act(g, text, mode, ms, loop = true) {
+    const r = say(g, text, false);
+    g.anim = mode; g.speaking = false; g.rigMode = null; playRig(g, mode, loop);
+    if (g._useTimer) clearTimeout(g._useTimer);
+    g._useTimer = setTimeout(() => { if (g.anim === mode) { g.anim = 'idle'; playRig(g, 'idle', true); } }, ms);
+    return r;
+  }
 
   // ------------------------------------------------------------------ use
   function use(g, name) {
@@ -99,9 +133,6 @@
     const w = WORK[k]; face(g, o);
     const food = FOOD_OF[o.type];
     const text = w.did.replace('{t}', nice(o.type)).replace('{a}', food === 'apple' ? 'an apple' : 'a ' + (food || 'thing'));
-    g.anim = w.mode; playRig(g, w.mode, true);
-    if (g._useTimer) clearTimeout(g._useTimer);
-    g._useTimer = setTimeout(() => { if (g.anim === w.mode) { g.anim = 'idle'; playRig(g, 'idle', true); } }, w.ms);
     const item = food || w.gives;
     if (item) {
       if (g === state.playerAvatar) { const have = state.player.items.find(i => i.name === item); if (have) have.qty = (have.qty ?? 1) + 1; else state.player.items.push({ name: item, qty: 1 }); inventoryChanged(); }
@@ -110,7 +141,7 @@
     if (w.heal) window.tablefolkCombat?.heal?.(g, w.heal);
     emitBadge(g, w.mode === 'pickup' ? '+' + item : w.mode);
     toastIfPlayer(g, 'You ' + text.replace(/^(\w+?)s\b/, '$1').replace(/ and drinks$/, ' and drink'));
-    return say(g, `${g.id} ${text}${item && !food ? ' (+1 ' + item + ')' : ''}`, false);
+    return act(g, `${g.id} ${text}${item && !food ? ' (+1 ' + item + ')' : ''}`, w.mode, w.ms);
   }
 
   // ---------------------------------------------------------------- chests
@@ -155,14 +186,12 @@
   function close(m) { if (isOpen(m)) setOpen(m, false); }
   function toggleChest(g, o) {
     const m = meshOf(o); face(g, o);
-    g.anim = 'open'; playRig(g, 'open', false);
-    setTimeout(() => { if (g.anim === 'open') { g.anim = 'idle'; playRig(g, 'idle', true); } }, 1300);
-    if (isOpen(m)) { setOpen(m, false); emitBadge(g, 'closes'); return say(g, `${g.id} closes the ${nice(o.type)}`, false); }
+    if (isOpen(m)) { setOpen(m, false); emitBadge(g, 'closes'); return act(g, `${g.id} closes the ${nice(o.type)}`, 'open', 1300, false); }
     if (meta(m).locked) return say(g, `the ${nice(o.type)} is locked`, false);
     const c = contents(m), what = describe(c);   // before it counts as opened
     setOpen(m, true); emitBadge(g, 'opens');
     toastIfPlayer(g, what ? 'Inside: ' + what : 'It is empty');
-    return say(g, `${g.id} opens the ${nice(o.type)}: ${what ? 'inside are ' + what + ' (take(item, ' + o.type + ') to take one)' : 'it is empty'}`, false);
+    return act(g, `${g.id} opens the ${nice(o.type)}: ${what ? 'inside are ' + what + ' (take(item, ' + o.type + ') to take one)' : 'it is empty'}`, 'open', 1300, false);
   }
   // take(item, chest) / put(item, chest): "item, chest" or "item from/in chest"
   function parse(arg, dflt) {
@@ -198,10 +227,9 @@
       }
       if (!got) return say(g, `take failed: the ${nice(o.type)} ${/gold/i.test(item) ? 'has no gold' : 'is empty'}`, false);
       if (g !== state.playerAvatar) setBrainConfig(g.id, { inventory: mine });
-      g.anim = 'pickup'; playRig(g, 'pickup', false); setTimeout(() => { if (g.anim === 'pickup') { g.anim = 'idle'; playRig(g, 'idle', true); } }, 1300);
       window.tablefolkSfx?.play(/gold/.test(got) ? 'coins' : 'pickup', m.getAbsolutePosition?.() || m.position);
       emitBadge(g, '+' + got); inventoryChanged();
-      return say(g, `${g.id} takes ${got} from the ${nice(o.type)}`, false);
+      return act(g, `${g.id} takes ${got} from the ${nice(o.type)}`, 'pickup', 1300, false);
     });
   }
   function put(g, arg) {
@@ -225,10 +253,9 @@
         addItem(c.items, it.name); put = it.name;
       }
       if (g !== state.playerAvatar) setBrainConfig(g.id, { inventory: mine });
-      g.anim = 'open'; playRig(g, 'open', false); setTimeout(() => { if (g.anim === 'open') { g.anim = 'idle'; playRig(g, 'idle', true); } }, 1300);
       window.tablefolkSfx?.play('pickup', m.getAbsolutePosition?.() || m.position);
       emitBadge(g, 'stores ' + put); inventoryChanged();
-      return say(g, `${g.id} puts ${put} in the ${nice(o.type)}`, false);
+      return act(g, `${g.id} puts ${put} in the ${nice(o.type)}`, 'open', 1300, false);
     });
   }
 
@@ -243,17 +270,17 @@
   function bone(g, re) { return g.rigRoot?.getDescendants?.(false).find(n => re.test(n.name) && !n.getTotalVertices); }
   function settle(g, o, how) {
     standUp(g, true);
+    // a light chair or stool is a dynamic body: held still while someone sits
+    // on it (the character's collider would shove it away)
+    const pb = o.mesh.physicsBody, held = pb?.getMotionType?.() === BABYLON.PhysicsMotionType.DYNAMIC ? pb : null;
+    held?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED);
     const p = { x: o.x, z: o.z }, yaw = (o.ry || 0) + Math.PI;   // things face +z; a seated character faces the way the thing does
-    setCharacterLogicalPosition(g, new BABYLON.Vector3(p.x, 0, p.z));
+    teleport(g, p.x, p.z);
     g.dir = new BABYLON.Vector3(Math.round(-Math.sin(yaw)), 0, Math.round(-Math.cos(yaw)));
     g.root.rotation.y = yaw;
     g._rigBaseY ??= g.rigRoot?.position.y ?? 0;
     g._rigBaseX ??= g.rigRoot?.position.x ?? 0; g._rigBaseZ ??= g.rigRoot?.position.z ?? 0;
-    g.pose = { mode: how, yaw, on: o.mesh, type: o.type, top: surfaceTop(o) };
-    // a light chair or stool is a dynamic body: held still while someone sits
-    // on it (the character's collider would shove it away)
-    const pb = o.mesh.physicsBody;
-    if (pb?.getMotionType?.() === BABYLON.PhysicsMotionType.DYNAMIC) { pb.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); g.pose.held = pb; }
+    g.pose = { mode: how, yaw, on: o.mesh, type: o.type, top: surfaceTop(o), held };
     g.anim = 'idle'; g.rigMode = null; playRig(g, 'idle', true);   // the pose clip (playRig reads g.pose)
     // once the clip has posed the bones: lift onto the seat and centre the hips over it
     state.scene.onAfterRenderObservable.addOnce(() => state.scene.onAfterRenderObservable.addOnce(() => fit(g)));
@@ -286,13 +313,14 @@
   function standUp(g, quiet) {
     if (!g?.pose) return false;
     const pose = g.pose; g.pose = null;
-    if (pose.held && !pose.on?.isDisposed?.()) try { pose.held.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC); } catch {}
     if (g.rigRoot) { g.rigRoot.position.y = g._rigBaseY ?? g.rigRoot.position.y; if (g._rigBaseX != null) { g.rigRoot.position.x = g._rigBaseX; g.rigRoot.position.z = g._rigBaseZ; } }
     // step off in front of it (where it faces), else any free side
     const p = posOf(g), fx = Math.round(-Math.sin(pose.yaw)), fz = Math.round(-Math.cos(pose.yaw));
     const tries = [[fx, fz], [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([x, z]) => x || z);
     const free = (x, z) => typeof cellPassable !== 'function' || cellPassable(x, z);
-    for (const [dx, dz] of tries) { const x = Math.round(p.x + dx), z = Math.round(p.z + dz); if (free(x, z) && (typeof hasGroundAt !== 'function' || hasGroundAt(x, z))) { setCharacterLogicalPosition(g, new BABYLON.Vector3(x, 0, z)); break; } }
+    for (const [dx, dz] of tries) { const x = Math.round(p.x + dx), z = Math.round(p.z + dz); if (free(x, z) && (typeof hasGroundAt !== 'function' || hasGroundAt(x, z))) { teleport(g, x, z); break; } }
+    // the seat moves freely again once its sitter is off it
+    if (pose.held && !pose.on?.isDisposed?.()) setTimeout(() => { try { pose.held.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC); } catch {} }, 250);
     g.rigMode = null; if (!quiet) { g.anim = 'idle'; playRig(g, 'idle', true); }
     return true;
   }

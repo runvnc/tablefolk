@@ -16,8 +16,10 @@
   window.TABLEFOLK_ART_MODE = _q.has('art') || window.TABLEFOLK_TABLETOP;
   window.TABLEFOLK_FORCE_WEBGL = _q.has('webgl');
   // Still mode: no physics stepping, no per-frame CPU vertex animation.
-  // Implied by art review mode; ?still=1 enables it on its own.
-  window.TABLEFOLK_STILL_MODE = _q.has('still') || window.TABLEFOLK_ART_MODE;
+  // Implied by art review mode; ?still=1 enables it on its own, ?still=0
+  // keeps physics running in art mode (tests of things being used: with the
+  // step at 0 a collider moved onto a light chest flings it away).
+  window.TABLEFOLK_STILL_MODE = _q.has('still') ? _q.get('still') !== '0' : window.TABLEFOLK_ART_MODE;
   // Hide the water entirely (?nowater=1) - sanity check for the water pass.
   window.TABLEFOLK_NOWATER = _q.has('nowater');
   if (window.TABLEFOLK_ART_MODE) console.warn('TABLEFOLK: art review mode - LLM and TTS disabled');
@@ -34,7 +36,7 @@
     ['ui-polish.js?v=20261019g'],
     ['tabs.js?v=20261030a'],
     ['library.js?v=20261018a'],
-    ['packs.js?v=20261024a'],
+    ['packs.js?v=20261101a'],
     ['https://cdn.babylonjs.com/babylon.js'],
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
@@ -59,7 +61,7 @@
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261030a'],
     ['mind.js?v=20261101a'],
-    ['uses.js?v=20261101b'],
+    ['uses.js?v=20261101e'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261101a'],
     ['live.js?v=20261025e'],
