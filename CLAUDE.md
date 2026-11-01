@@ -44,8 +44,8 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 
 - Mirror the vision model (`gemma-4-E2B-it.litertlm`) on the R2 bucket:
   waiting for the user's decision.
-- Walk-in buildings: not tested in first person; the watch tower, bell tower
-  and windmill remain closed models.
+- Walk-in buildings: checked in first person 2026-10-31 (roof kept as the
+  ceiling); the watch tower, bell tower and windmill remain closed models.
 - Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR
   HoppouAI/Breeze-TTS-2.cpp#17 open; Windows scripts untested; R2 mirror
   of LFM3 waits for the user).

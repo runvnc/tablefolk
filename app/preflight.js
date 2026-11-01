@@ -49,7 +49,7 @@
     ['scenery.js?v=20261025a'],
     ['combat.js?v=20261024k'],
     ['darkness.js?v=20261030a'],
-    ['roofs.js?v=20261025f'],
+    ['roofs.js?v=20261031a'],
     ['cutaway.js?v=20261030b'],
     ['head-window.js?v=20261030a'],
     ['helpers.js?v=20261031b'],

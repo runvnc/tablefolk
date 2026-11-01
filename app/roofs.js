@@ -13,7 +13,8 @@
  * none. A scenario's "roofs": false or true overrides that.
  *
  * Seeing in: only by going in. The roof of the room the player is in (or
- * whose doorway it stands in) fades away; with the follow camera, a roof
+ * whose doorway it stands in) fades away (except in first person, where it is
+ * the ceiling); with the follow camera, a roof
  * between the camera and the player goes see-through so the player is never
  * lost behind it. The free camera can't peek: roofs stay on. What the
  * characters inside say still shows above the roof (bubbles).
@@ -246,7 +247,8 @@
     for (const r of roofs) {
       const inside = myCell && r.room.here.has(myCell);
       const blocks = ray && r.parts.some(m => ray.intersectsMesh(m, false).hit);
-      r.target = lifted || inside ? 0 : blocks ? .22 : 1;
+      // in first person the roof overhead stays: it is the ceiling
+      r.target = lifted || (inside && !state.firstPerson) ? 0 : blocks ? .22 : 1;
       if (Math.abs(r.alpha - r.target) > .005) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7);
         for (const m of r.mats) { m.alpha = r.alpha; if (m instanceof BABYLON.PBRMaterial) m.transparencyMode = r.alpha < .99 ? BABYLON.PBRMaterial.PBRMATERIAL_ALPHABLEND : BABYLON.PBRMaterial.PBRMATERIAL_OPAQUE; }

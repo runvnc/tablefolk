@@ -7,6 +7,7 @@ skill (internals); `git log` has every commit.
 ## 2026-10-31
 
 - **Find helpers on this computer**: one button (Voice pane, endpoint panel) finds breeze-server and llama.cpp running on your own machine, also from tablefolk.world (the browser asks once for local network access), and offers llama.cpp as the brain.
+- **First person inside a building keeps its roof as the ceiling** (it faded away as it does for the overhead view, leaving the night sky above). Walk-in houses checked in first person: door, furniture and walls look right at `wallHeight` 2; at 1 the lintel sits at eye level.
 - **Confirmation dialogs show above the welcome screen** (they were hidden behind it on a first visit).
 - **Launch scripts**: `tools/llama-server.sh` (Linux, macOS; `.command` to double-click on a Mac) and `.ps1` (Windows) fetch llama.cpp and LFM3-1.7B and start them for the endpoint brain; `tools/breeze-server.ps1` does Breeze on Windows (the Windows scripts are untested).
 - **Small models no longer speak their planning aloud**: lines like "Say that she's hungry. Then offer food." or "As hector, I should question her" written beside the commands are dropped, as is anything before a stray `</think>`. LFM3-1.7B on llama.cpp: 35/36 in the evals (32 before).
