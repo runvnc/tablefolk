@@ -103,6 +103,20 @@ when the follow camera's ray hits it, else 1; never in the free camera.
   both reach with the right arm (`poseReach`, the carry code's two-bone IK);
   it waits while either walks. Universal-rig arms are `UpperArm.R`,
   `LowerArm.R`, `Wrist.R` in `findBones`.
+- Meshy models also carry 42 KayKit clips under their KayKit names
+  (`createFigure` puts every clip in `rigAnims` under its own name; a
+  `FIG_CLIPS` mapping wins only for melee attacks, the model's own `Attack`):
+  sitting, lying, work, running, waving... ([assets.md](assets.md)).
+- Using things (`app/uses.js`): `g.pose` (sitting or lying) makes `playRig`
+  play the pose clip for idle and talk, and anything else stands it up first;
+  `bodyYaw` holds the pose's facing. The model is lifted onto the seat or
+  mattress by moving `rigRoot` (not the root, which the logic places),
+  measured from the thigh or hip bones a frame after the clip starts, and
+  its hips centred over the seat, so any rig fits. Getting onto a seat is a
+  teleport with the TELEPORT prestep: an ANIMATED collider moved with the
+  usual ACTION prestep sweeps there within one physics step and flings any
+  light thing on the way (it threw a chair 3900 units). A light seat is
+  ANIMATED while someone sits on it.
 - Meshy idle clips are calmed in the GLB (`CALM=0.3 tools/finish-monster.sh`:
   keys pulled toward the bone's mean pose, head/neck/hips half again): the
   raw clip turned the head and hips about 90 degrees.

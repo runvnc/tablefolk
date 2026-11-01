@@ -35,21 +35,47 @@ trading, `emote` for flavour.
 | `goal(text)` | set what it is working toward |
 | `remember(text)` | note something important |
 | `eat(food)` | eat food it carries |
+| `use(thing)` | use a thing with an obvious use ([below](#using-things)): open or close a chest, sit on a seat, lie down on a bed, hammer at an anvil, chop a tree... |
+| `take(item, chest)`, `put(item, chest)` | take from or store in an open chest (`take(5 gold, chest)`, `take(all, chest)`) |
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |
 | `spell.push`, `spell.spark`, `spell.fireball` | the old built-in spells; prefer the `magic` skill |
 | `workflow(name, input)` | start a routine ([workflows.md](workflows.md)) |
 
-`goal`, `remember` and `eat` are on for everyone with a mind; a role's and a
+`goal`, `remember`, `eat`, `use`, `take` and `put` are on for everyone with a mind; a role's and a
 skill's commands are added for whoever has them. The list is `COMMANDS` in
 `app/app.js`; what the model is shown is `buildCommandExamples`. Each prompt
 also has a short menu of what it could do right where it stands ("You could,
 right here: carry(note) (2 steps west), dig(north), eat(bun), give(bun,
-pip)").
+pip), use(anvil) (1 step east: hammer)").
 
 Mention commands by name in the personality when the character should use
 them ("If insulted twice, attack(player).", "Only give it with give(silk
 bundle) to someone who says the password.").
+
+## Using things
+
+`use(thing)` does what the thing is for; the character walks over first when
+it is a few steps away (to a free cell beside it), and the prompt names
+`use()` only when such a thing is within a few steps.
+
+| thing | `use()` |
+|---|---|
+| `chest`, `iron_chest` | opens it and tells what is inside, or closes it; while it is open, `take(item, chest)` and `put(item, chest)` (gold too) |
+| `bed`, `double_bed` | lies down on it and rests (tiredness gone) |
+| `bench`, `stool`, `wooden_chair`, `armchair`, `sofa`, `office_chair`, `throne` | sits on it (tiredness down a little) |
+| `anvil`, `workbench`, `cauldron` | hammers, saws, stirs |
+| `tree`, `logs` | chops (takes firewood) |
+| `boulder` | breaks off a stone (takes it) |
+| `well` | drinks (heals 1) |
+| `lectern`, `bookcase` | reads |
+| `target`, `dummy` | practises |
+| `apple_barrel`, `apple_crate`, `carrot_crate` | takes an apple or a carrot (food: `eat` it) |
+
+A sitting or lying character stays so while it talks; anything else gets it
+up, beside the seat. A tired character's want says `use(bed)` when a bed or
+seat is near. What a chest holds is kept with it (saved with the world): put
+a ring in, and the player finds it there. The player does the same with E.
 
 ## Hearing, seeing and talking
 

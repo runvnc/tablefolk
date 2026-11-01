@@ -82,6 +82,26 @@ idle model turned toward the camera.
   from the body so the hands do not touch the skirt, legs apart" and a
   knee-length skirt with leggings (villager_woman, 2026-10-30). Long robes
   and cloaks stretch when walking: ask for a short cape, "no long robe".
+- **KayKit clips on the Meshy rigs** (2026-11-01): `tools/retarget-people.sh
+  ~/.cache/tablefolk-gltf` runs `tools/retarget-kaykit.mjs` on every model in
+  `meshy/` (in place; rerunning replaces the clips it added) and recompresses
+  (`resample`, then `meshopt --level high`: 42 clips add 80-260 KB a model).
+  Each mapped bone takes the KayKit bone's world rotation change, applied
+  after aiming the Meshy bone the way the KayKit one points at rest; the arms
+  are calibrated so KayKit's `Idle_A` maps onto the Meshy A-pose (from rest
+  the chibi's arms came out spread). Hips move by the leg joints' midpoint,
+  scaled by leg length. Grounding (`lift`): standing clips put the lowest foot
+  on the floor; the chair clips seat the feet on the floor (the chibi's chair
+  is level with an adult's hips); lying puts the pelvis 0.13 m up; the way
+  down and back up keeps a foot on the floor. `Sit_Chair_*`, `Sit_Floor_*` and
+  `Lie_*` are anchored: seated or lying, the hips are over the origin (KayKit
+  sits back onto a chair behind it), so the game stands a character on the
+  seat or bed. Clip list: `CLIPS` in the script. `DEBUG=1` prints seat and
+  foot heights. Previews without the game: import a copy without textures
+  (Blender reads neither meshopt nor AVIF) into headless Blender and render
+  each clip with the workbench engine (the maintainer has Blender 5.2). The
+  goblin and troll fold up when seated (hunched rest spines); the people
+  and the king look right.
 - **Voices, acted** (2026-10-26): `tools/elevenlabs-voices.py` (needs `ELEVENLABS_API_KEY`; the maintainer's is in `~/.config/fish/config.fish`) designs a voice with ElevenLabs Voice Design from `tools/voices-eleven.json`, lets Gemini 4 Argon pick the preview nearest the wanted gender and age, saves it in the account (one voice slot each) and records a three-emotion script with `eleven_v4` audio tags into `assets/voices/<id>.mp3` (about 11-15 s). Done for all 22 voices (and `tools/elevenlabs-moods.py` for the mood samples; `--only=seductive` adds one mood). fal's own `eleven-v4` endpoint takes premade voices only (22 names and the default library IDs), no design. After changing samples: `node tools/build-voice-states.mjs`, upload only the changed `work/voice-states/v6/*.bin` files to `pocket-tts/states-v6/` (the client asks for them with `?v=<the voice's v>`, so a re-recorded voice gets past the CDN and browser caches), bump `v6` in `stateKey` (and the folder name) only if the format changes.
 - **Voices** (first set): `tools/fal-voices.py` (Qwen3-TTS Voice Design on fal.ai, a few
   cents a clip) writes `assets/voices/<id>.mp3` and `voices.json` from

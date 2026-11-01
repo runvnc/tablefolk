@@ -60,7 +60,9 @@ their backs to an adjacent wall. Objects keep one size: a carried crate is
 the same crate (notes are the one exception, below).
 
 Characters can carry, drop and throw light things; chests, beds and other
-heavy furniture are too heavy to carry.
+heavy furniture are too heavy to carry. Beds, seats, anvils, trees and other
+things with a use are used with `use(thing)` (characters) or E (the player):
+[characters.md](characters.md#using-things).
 
 ## Walk-in buildings
 
@@ -144,8 +146,11 @@ reads it. Map lines and grid legends take `note "text"`.
 ## Loot and pick-ups
 
 - `chest` and `iron_chest` take `"gold"` and `"items"`; the player opens one
-  with E and takes everything. A chest without either holds a little gold
-  and sometimes a healing potion.
+  with E and takes everything (E again on the open, empty chest closes it).
+  A chest without either holds a little gold and sometimes a healing potion.
+  Characters open and close chests, take from them and store in them
+  (`use`, `take`, `put`: [characters.md](characters.md#using-things)); what
+  a chest holds is kept with it. Chests stay where they are put (static).
 - `coin_pile` takes `"gold"` (default 10-30) and is picked up by walking over
   it.
 - `potion scroll axe pickaxe bag bucket key chalice rope torch` are picked up

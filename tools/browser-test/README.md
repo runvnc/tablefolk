@@ -90,6 +90,12 @@ node eval.mjs "tablefolk.getBrainConfig('mog').messages"
 node eval.mjs "llm('Say hi', {raw:true, silent:true})"
 ```
 
+**Using things** (`node uses-test.mjs [outdir] [base]`): loads
+`<base>/app/?art=1&still=0` (no model; `still=0` keeps physics on, which
+art mode freezes), builds a room with a chest, a bed, seats, an anvil and a
+tree, has two characters `use`, `put` and `take`, prints each step's pose,
+clip, position and inventory, and saves canvas shots of the poses.
+
 ## Notes
 
 - When done, `node close.mjs` closes the test Chrome (it holds GPU memory the

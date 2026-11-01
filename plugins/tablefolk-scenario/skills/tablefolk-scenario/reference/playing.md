@@ -23,7 +23,7 @@ approve the download on a user's behalf.
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
 | mouse wheel | zoom along the view: the middle of the screen stays put, and at the closest the free camera moves on that way |
-| E | use what is in front of you: open a chest, pick up, read a note, search a body, open a locked door with its key, talk |
+| E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
 | C | follow camera / free camera |
