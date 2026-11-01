@@ -35,9 +35,14 @@ approve the download on a user's behalf.
 | Esc | close the panel or a dialog |
 
 Chat commands: `/attack grub`, `/wield sword`, `/cast heal me`, `/steal
-rook` (skills). The 🎤 button talks by voice (`app/speech-input.js`: the
-server's Gemma when it runs `litert-lm serve`, else the browser's speech
-recognition).
+rook` (skills). The 🎤 button talks by voice: click, speak, click again;
+the words are sent like typed chat. By default the speech is turned into
+text in the browser by Underdog Bark 3.0 (English; asked once before its
+download of 0.9-1.3 GB; nothing leaves the computer). It runs on the graphics
+card when there is room beside the characters' model, else on the processor
+(about a second a sentence). The Voice pane's "Speech input" can pick the
+processor, the server's Gemma (`litert-lm serve`) or the browser's own
+recognition (Chrome and Edge send the audio to their makers).
 
 **Cameras.** The free camera (the default with an avatar) orbits (drag) and
 zooms freely and eases after the player; every wall stands at half height

@@ -57,4 +57,8 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
   `evals/uses.json`; fetching from a chest (open, take, give in two turns)
   0/3. A visual day/night cycle is not built: routines follow the
   scenario's static `night` lighting.
+- Speech input (2026-11-01): Underdog Bark in the browser is the default
+  (`vision-speech.md` has the measurements and the ranked options). Not
+  tried yet: Chrome's on-device recognition (installing its language pack
+  wants the user's OK) and LFM3-Audio-2B on llama.cpp (a download).
 - More in `docs/LAUNCH-PLAN.md` ("Left for launch").

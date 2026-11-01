@@ -35,11 +35,12 @@ So on a weak laptop the practical split is a **server on a stronger machine**
 ### Built
 
 - **Speech input** (`app/speech-input.js`): the 🎤 button in the chat box
-  records, converts to 16 kHz mono WAV in the page and posts it to the
-  server's `/api/transcribe`, which asks Gemma 4 (`gemma4-e2b-mm`, set with
-  `LITERT_SPEECH_MODEL`) for an exact transcript; the text is sent like typed
-  chat. Without the server or model it falls back to the browser's
-  `SpeechRecognition` (Chrome/Edge; that one sends audio to Google).
+  records; by default Underdog Bark 3.0 turns it into text in the page
+  (below, "Speech input: measured"). Other choices in the Voice pane: the
+  server's `/api/transcribe` (the page converts to 16 kHz mono WAV, the server
+  asks Gemma 4 `gemma4-e2b-mm`, set with `LITERT_SPEECH_MODEL`, for an exact
+  transcript), or the browser's `SpeechRecognition` (Chrome/Edge; sends the
+  audio to Google or Microsoft).
 - **Vision** (Brain options, "vision"): each turn, the character's own view
   (the main camera posed at its eyes for one frame, a 448x320 JPEG) goes with
   its newest message as an `image_url` part. Works with any endpoint brain
@@ -54,6 +55,77 @@ uv tool install litert-lm
 litert-lm import --from-huggingface-repo litert-community/gemma-4-E2B-it-litert-lm gemma-4-E2B-it.litertlm gemma4-e2b-mm
 bun server/server.js 8000 --litert      # starts litert-lm serve too
 ```
+
+### Speech input: measured (2026-11-01)
+
+`tools/browser-test/asr-test.mjs`, RTX 2060 (6 GB), 12-thread CPU, headless
+Chrome 155. "Laptop" is the same clip at 300-3400 Hz, quieter, with pink
+noise at about 20 dB SNR and a second of noise either side.
+
+| engine | LibriSpeech test-clean (20 clips, 11 speakers) clean / laptop | voice library (147 acted clips) | time per clip (3-14 s) | memory |
+|---|---|---|---|---|
+| Bark 3.0 fp16, WebGPU | 1.3% / 1.8% | 3.4% / 3.5% | 0.4 s | about 1.2 GB of graphics memory; 1.3 GB download |
+| Bark 3.0 int8, WASM (12 threads) | 1.3% / 1.8% | not run | 1.2-1.4 s | about 1 GB of RAM, no graphics memory; 0.9 GB download |
+| Bark 3.0 q4f16, WebGPU | 12.1% / 14.6% | not run | 0.3 s | about 0.95 GB; 0.52 GB download. Usually exact, but one 13 s clip came out as 9 wrong words: tests only |
+| Gemma 4 E2B audio (`litert-lm serve`, audio on the CPU) | 4.0% / 5.2% | 4.0% / 5.0% (main 22) | 3.6-4.8 s | 2.4 GB model on the server |
+
+Bark's errors on the acted clips are mostly right: it leaves out laughs
+("Ha ha!") and writes dialect in standard spelling; its real misses were heavy
+Scots ("cannae" heard as "can he"). Gemma sometimes rewrote the meaning ("I
+was not always this unkind" became "I was not unkind"). The whole microphone
+path (fake mic from a WAV, Bark, the chat box) answered 2.8 s after the second
+click, the model load from the browser's cache included.
+
+**Which build on which machine** (`barkPlan` in `speech-input.js`): fp16 on
+the graphics card when the adapter has shader-f16 and `tablefolkDevice.freeGB`
+(usable graphics memory from `hardware.js` minus the chat model's `needGB`;
+less 3 GB when Breeze speaks) is 1.5 GB or more; otherwise int8 on the
+processor. Without a device estimate (art mode, no brain yet) it assumes
+room. An endpoint or cloud brain leaves the card free, so fp16. The browser
+can't read free graphics memory directly: the table lookup is the estimate.
+A machine with little RAM (`navigator.deviceMemory` under 4) or few cores
+would be better off with Chrome's own on-device recognition (below); not
+built.
+
+### Speech input: other options, ranked (2026-11-01)
+
+1. **Underdog Bark 3.0** (built, the default): Parakeet-TDT 0.6B v3
+   fine-tuned for English (Conway Research, CC-BY-4.0, ONNX in
+   `ai-ecoverse/Underdog-Bark-3.0-ONNX`, October 2026). Best measured, fast
+   on either device, private. English only.
+2. **Chrome's on-device recognition** (`SpeechRecognition` with
+   `processLocally = true`; `SpeechRecognition.available()` said
+   "downloadable" in Chrome 155, `install()` fetches Google's language pack).
+   No download from us and little memory: the right fallback for weak
+   machines and phones. Chrome/Edge only; accuracy not measured (installing
+   the pack in the test profile was left for the maintainer's OK).
+3. **Parakeet-TDT 0.6B v3** itself (25 European languages, same architecture
+   and frontend, so `app/asr/` could load an ONNX export of it with little
+   change): for players who don't speak English.
+4. **LFM3-Audio-2B / LFM3-Omni-2B** (Liquid AI, late October 2026; LFM Open
+   License): audio in, text or speech out, 18 languages, 6.23% WER on the
+   Open ASR set (Bark's base Parakeet v3 is about 6% there), streaming
+   "LiveASR", GGUF for llama.cpp (`--audio`). Fits the llama.cpp helper:
+   one model could hear the player, think and speak. Not in the browser.
+   Worth a test as a helper brain that takes the player's audio directly.
+5. **Moonshine** (Useful Sensors, tiny models down to 27 MB, transformers.js
+   on WebGPU or WASM): for phones and very weak machines; less accurate.
+6. **Gemma 4 E2B/E4B audio input**: measured worse and ten times slower than
+   Bark for transcription, and the web builds still have no audio encoder.
+   Its value is hearing tone (audio straight to a character), not
+   transcription.
+7. **The browser's cloud recognition**: last resort; sends the audio away.
+
+Not usable in the browser yet: Qwen3-ASR 0.6B/1.7B (no ONNX/web export
+found), IBM Granite Speech 5.0 470M TurboCTC (Apache 2.0, CTC, August 2026:
+an ONNX export would be simple and fast; English), NVIDIA Nemotron 3.5 ASR
+Streaming 0.6B (streaming, multilingual, OpenMDW; GGUF and Core ML ports
+exist). Nemotron 3.5 Transcribe (October 2026) leads the Open ASR board but
+is a 30B MoE: server only.
+
+Ideas: push-to-talk on a held key (T); streaming partial text while speaking
+(Bark is not streaming; Nemotron streaming or LFM3 LiveASR would be); a voice
+activity detector to stop recording by itself.
 
 ## 2. Why the ASCII map didn't help E2B
 

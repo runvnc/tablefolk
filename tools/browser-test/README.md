@@ -81,6 +81,10 @@ gold, five turns later), `roles`, `smithy`, `companion`, `uses` (sitting,
 lying down, a chest), and `*-chaos` copies at chaos 50. `micro-eval.sh` runs
 five tactics for a quick look.
 
+`asr-test.mjs` measures speech input (Underdog Bark in the page, the server's
+Gemma) on the voice library's samples or LibriSpeech clips: word error rate
+and seconds per clip; see the maintainer skill's testing chapter.
+
 ## Poking at the page
 
 `node eval.mjs` prints a status summary; `node eval.mjs "<js expression>"`

@@ -49,7 +49,7 @@ python3 tools/docs.py walk-in        # print the sections about a topic
 | [assets.md](reference/assets.md) | which file lists which assets, adding an object or a body, model pipelines (figures, Meshy via fal.ai), hosting |
 | [gotchas.md](reference/gotchas.md) | lessons learned: data flow, small models, rendering, browser, the maintainer's shell |
 | [minds.md](reference/minds.md) | design notes: characters that behave on tiny models (state card, memory, roles, director) |
-| [vision-speech.md](reference/vision-speech.md) | design notes: Gemma's image and audio input, senses in words, ideas not built |
+| [vision-speech.md](reference/vision-speech.md) | design notes: Gemma's image and audio input, speech input measured and the options ranked, senses in words, ideas not built |
 
 Other places:
 

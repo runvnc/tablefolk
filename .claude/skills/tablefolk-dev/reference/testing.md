@@ -56,6 +56,16 @@ node close.mjs                                         # always close it: it hol
 
 ## Evals (`tools/browser-test/evals/`)
 
+Speech input: `asr-test.mjs` runs the voice library's samples (their
+transcripts are in `voices.json`) or any clips (`--clips=list.json`, e.g.
+LibriSpeech) through Bark in the page and the server's Gemma
+(`--engines=bark,gemma`, a server with `--litert`), clean and through a
+laptop-mic filter (`--noisy`), and prints word error rates and times.
+`?asrvariant=q8|fp16|q4` forces a Bark build (`--query=asrvariant=q8`). The
+whole microphone path: `CHROME_EXTRA="--use-fake-ui-for-media-stream
+--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>"`
+for `launch-chrome.sh`, then click `#micBtn` twice.
+
 Scripted (no model): `uses-test.mjs` drives every kind of `use`, `put`, `take`, `close` and the player's E, with shots in `results/uses`.
 
 
