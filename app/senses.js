@@ -132,7 +132,7 @@
   }
 
   // "You could, right here: carry(note) (2 steps west), dig(north) (breaks the
-  // wall), eat(bun)." A short menu of concrete things this character can do
+  // wall), eat(bun), use(anvil) (1 step east: hammer)." A short menu of concrete things this character can do
   // where it stands, with the commands it is allowed: a small model picks
   // from a menu far better than it invents an action from nothing.
   const SMALL = /^(note|potion|scroll|key|bag|bucket|mushroom|pumpkin|chalice|rope|axe|pickaxe|crate|barrel|apple_barrel|vase|pot|candles|torch|coin_pile)$/;
@@ -145,6 +145,8 @@
     if (can.has('carry')) for (const t of near.filter(t => t.kind === 'thing' && SMALL.test(t.id)).slice(0, 2)) out.push(`carry(${t.name}) (${fmt(t)}${t.id === 'note' ? ', and read it' : ''})`);
     const inv = (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0).map(i => String(i.name || i));
     if (can.has('eat')) { const food = inv.find(n => window.tablefolkMind?.isFood?.(n)); if (food) out.push(`eat(${food})`); }
+    // use(bed) (2 steps north: lie down and rest): uses.js
+    if (can.has('use')) out.push(...(window.tablefolkUses?.menu(g, fmt) || []));
     const people = near.filter(t => t.kind !== 'thing' && t.d < 2.5);
     // give(bun, pip): the receiver named (give(bun) alone goes to the player)
     const to = people[0] && (people[0].kind === 'player' ? 'player' : people[0].id);

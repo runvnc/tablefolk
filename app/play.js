@@ -40,18 +40,8 @@
   function note(text) { state.globalHistory = (state.globalHistory || []).concat([`T${state.turn?.index ?? 0} player: ${text}`]).slice(-20); log(text); }
 
   // ---------------------------------------------------------------- loot
-  // Every object remembers its scenario options (makeObject in app.js), so a
-  // chest knows what it holds; opened chests keep "opened" in their opts.
-  function lootOf(m) {
-    const mm = meta(m), o = mm?.opts || {};
-    const items = (Array.isArray(o.items) ? o.items : []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : { name: String(i.name), qty: i.qty ?? 1 });
-    if (o.gold == null && !items.length) {
-      // a little something: seeded by where the chest stands
-      const p = posOf(m), r = Math.abs(Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453) % 1;
-      return { gold: 8 + Math.floor(r * 30), items: r > .55 ? [{ name: 'healing potion', qty: 1 }] : [] };
-    }
-    return { gold: Math.max(0, +o.gold || 0), items };
-  }
+  // What a chest holds: uses.js (contents), from the scenario's opts or a
+  // seeded little something; opened chests keep "opened" in their opts.
   function give(items) { for (const i of items) { const have = state.player.items.find(x => x.name.toLowerCase() === i.name.toLowerCase()); if (have) have.qty = (have.qty ?? 1) + (i.qty ?? 1); else state.player.items.push({ name: i.name, qty: i.qty ?? 1 }); } }
   function describe(gold, items) { return [gold ? gold + ' gold' : '', ...items.map(i => i.name + ((i.qty ?? 1) > 1 ? ' x' + i.qty : ''))].filter(Boolean).join(', '); }
 
@@ -89,34 +79,23 @@
     return true;
   }
 
+  // E on a chest: open it and take everything in it (uses.js keeps what a
+  // chest holds, so what characters put in is found here); E on an open,
+  // empty one closes it.
   function openChest(m) {
-    const mm = meta(m); mm.opts ||= {};
-    if (mm.opts.opened) { toast('the ' + mm.type.replace('_', ' ') + ' is empty'); return false; }
-    const { gold, items } = lootOf(m);
-    mm.opts.opened = true; mm.state = 'open';
-    lidOpen(m);
-    sfx('chestOpen', posOf(m));
+    const mm = meta(m), U = window.tablefolkUses, name = mm.type.replace('_', ' ');
+    if (!U) return false;
+    const c = U.contents(m), gold = Math.max(0, +c.gold || 0), items = c.items.filter(i => (i.qty ?? 1) > 0);
+    if (mm.state === 'open' && !gold && !items.length) { U.close(m); note(`${playerName()} closes the ${name}`); toast('You close the ' + name); return true; }
+    if (mm.state !== 'open') U.setOpen(m, true);
+    c.gold = 0; c.items = [];
     state.player.gold = (state.player.gold || 0) + gold; give(items);
     if (gold) setTimeout(() => sfx('coins', posOf(m)), 350);
     const got = describe(gold, items);
-    note(`${playerName()} opens the ${mm.type.replace('_', ' ')}${got ? ' and takes ' + got : ': it is empty'}`);
-    toast(got ? 'You found ' + got : 'The chest is empty', got ? 'success' : 'info');
+    note(`${playerName()} opens the ${name}${got ? ' and takes ' + got : ': it is empty'}`);
+    toast(got ? 'You found ' + got : 'The ' + name + ' is empty', got ? 'success' : 'info');
     inventoryChanged(); render();
     return true;
-  }
-  // The wooden chest's lid is a bone (Chest_Top): tip it back.
-  function lidOpen(m) {
-    const lid = m.getDescendants?.(false).find(n => /Chest_Top|Lid/i.test(n.name) && !n.getTotalVertices);
-    if (!lid) return;
-    const q0 = lid.rotationQuaternion ? lid.rotationQuaternion.clone() : null, r0 = lid.rotation.clone();
-    let t = 0;
-    const obs = state.scene.onBeforeRenderObservable.add(() => {
-      t = Math.min(1, t + (state.scene.getEngine().getDeltaTime() || 16) / 450);
-      const a = -1.15 * (1 - Math.pow(1 - t, 3));
-      if (q0) lid.rotationQuaternion = q0.multiply(BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, a));
-      else lid.rotation.x = r0.x + a;
-      if (t >= 1 || lid.isDisposed?.()) state.scene.onBeforeRenderObservable.remove(obs);
-    });
   }
   function pickUp(m) {
     const mm = meta(m), name = mm.opts?.name || PICKUPS[mm.type] || mm.type.replace(/_/g, ' ');
@@ -175,6 +154,7 @@
       const t = meta(m)?.type;
       if (window.tablefolkPacks?.items[t]?.use) consider('use', m, posOf(m));   // packages.js
       else if (t === 'chest' || t === 'iron_chest') consider('chest', m, posOf(m));
+      else if (window.tablefolkUses?.kindOf(t)) consider('thing', m, posOf(m));   // beds, seats, an anvil, a tree: uses.js
       else if (PICKUPS[t]) consider('item', m, posOf(m));
       else if (t === 'coin_pile') consider('gold', m, posOf(m));
       else if (t === 'note') consider('note', m, posOf(m));
@@ -186,7 +166,7 @@
   function use() {
     const g = me(); if (!g || g.defeated || state.npcBusy) return;
     const u = usable();
-    if (!u) { toast('Nothing to use here. Walk up to a chest, an item or a person and press E.'); return; }
+    if (!u) { toast('Nothing to use here. Walk up to a chest, a bed, a seat, an item or a person and press E.'); return; }
     if (u.kind === 'person') {
       selectCharacter(u.thing);
       const to = document.getElementById('chatTo'); if (to) to.value = u.thing.id;
@@ -198,6 +178,7 @@
     if (u.kind === 'door') { if (window.tablefolkLocks?.tryOpen(u.thing)) acted('use'); return; }
     if (u.kind === 'body') { if (searchBody(u.thing)) acted('use'); return; }
     if (u.kind === 'note') { takeNote(u.thing); acted('use'); return; }
+    if (u.kind === 'thing') { window.tablefolkUses.use(g, meta(u.thing).type); acted('use'); return; }
     const p = u.kind === 'chest' ? posOf(u.thing) : null;
     if (p) setCharacterFacing(g, new BABYLON.Vector3(p.x - myPos().x, 0, p.z - myPos().z));
     const done = u.kind === 'chest' ? openChest(u.thing) : u.kind === 'gold' ? (takeGold(u.thing), true) : pickUp(u.thing);

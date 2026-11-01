@@ -14,7 +14,7 @@
  *   .5 neutral). Events move them; each of its turns they drift back to its
  *   temperament ("brave" | "timid" | "calm", else guessed from personality).
  * Needs: hunger and tiredness rise with its turns; eat(item) and
- *   emote(sleep) bring them down. Off for the undead, and for every character
+ *   emote(sleep) or use(bed) bring them down (sitting a little: uses.js). Off for the undead, and for every character
  *   with the scenario's "needs": false.
  * Memory: events the game records by itself (attacks, gifts, sales, deaths
  *   seen), what the character notes with remember(text), and facts: the
@@ -246,7 +246,7 @@
     // just attacked: react to it before anything else
     if (fresh) return temperament(getBrainConfig(g.id)) === 'timid' ? `get away from ${threat}, or beg them to stop` : `tell ${threat} what you think of being attacked`;
     if (needsOn(g) && m.hunger >= .55) { const f = food(g); return f ? `eat something: eat(${f})` : 'find something to eat (buy it, or ask for some)'; }
-    if (needsOn(g) && m.tired >= .7) return 'rest: emote(sleep)';
+    if (needsOn(g) && m.tired >= .7) { const bed = window.tablefolkUses?.nearby(g, 8).find(o => o.k === 'bed' || o.k === 'seat'); return bed ? `rest: use(${bed.type})` : 'rest: emote(sleep)'; }
     return '';
   }
   function cardLines(g) {

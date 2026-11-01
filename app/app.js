@@ -26,11 +26,12 @@ function applyWorldDims(cols, rows){
   WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
 }
 if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
-const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat'];
+const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat','use','put','take'];
 // mind.js: every talking character has these, unless the scenario says "mind": false
 // (feel() is there for scenarios that allow it: by default it used up turns
-// that should have been speech)
-const MIND_COMMANDS = ['goal','remember','eat'];
+// that should have been speech). use/put/take (uses.js): things with an
+// obvious use; the prompt names them only with such a thing close by.
+const MIND_COMMANDS = ['goal','remember','eat','use','put','take'];
 const state = {
   scene:null, engine:null, camera:null, shadow:null, materials:{}, characters:[], selected:null, target:null,
   blocks:[], props:[], tiles:[], bubbles:[], badges:[], meta:new WeakMap(), held:new Map(), allowed:new Set(['walk','face']), zoomFocus:null, animSources:null,
@@ -286,6 +287,8 @@ function cloneAnimGroupsForRig(root,id){
 }
 function pickAnim(g,names){ if(!g.rigAnims) return null; for(const n of names){ if(g.rigAnims[n]) return g.rigAnims[n]; } return null; }
 function playRig(g,mode,loop=true){
+  // seated or lying (uses.js): that clip in place of idle and talk; anything else gets up first
+  if(g?.pose){ if(mode==='idle'||mode==='talk'||mode==='sit'||mode==='sleep') { mode='pose_'+g.pose.mode; loop=true; } else if(!/^pose_/.test(mode)) window.tablefolkUses?.standUp(g,true); }
   if(!g?.rigged || g.rigMode===mode) return;
   if(g.activeRigAnim) g.activeRigAnim.stop();
   const choices={
@@ -307,7 +310,11 @@ function playRig(g,mode,loop=true){
     clap:['Cheering'],
     cheer:['Cheering'],
     sleep:['Lie_Idle','Lie_Down'],
-    bow:['Interact','Use_Item']
+    bow:['Interact','Use_Item'],
+    // uses.js: things with a use, sitting and lying
+    hammer:['Hammering','Hammer','Work_A'], saw:['Sawing','Saw','Working_A'], stir:['Working_B','Working_A','Interact'], chop:['Chopping','Chop'],
+    mine:['Pickaxing','Pickaxe','Dig'], drink:['Use_Item','Interact'], read:['Use_Item','Interact'], train:['Melee_1H_Attack_Chop','Melee_Unarmed_Attack_Punch_A'],
+    pickup:['PickUp','Interact'], open:['Interact','PickUp'], pose_sit:['Sit_Chair_Idle','Sit_Floor_Idle'], pose_lie:['Lie_Idle','Sit_Floor_Idle']
   }[g.charModel && mode==='talk' ? 'idle' : mode] || ['Idle_A'];   // people talk without waving
   const ag=pickAnim(g,choices) || pickAnim(g,['Idle_A']);
   if(ag){ ag.start(loop,1.0,ag.from,ag.to,false); g.activeRigAnim=ag; g.rigMode=mode; }
@@ -2658,6 +2665,7 @@ function faceToward(g,other,ms=7000){
   g._faceAt={node:other.root,until:performance.now()+ms};
 }
 function bodyYaw(g,dt){
+  if(g.pose?.yaw!=null){ let d=g.pose.yaw-g.root.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d)); return g.root.rotation.y+d*Math.min(1,dt*9); }   // seated or lying (uses.js)
   let want=yawForDir(g.dir); const f=g._faceAt;
   if(f && !g.turnMove && performance.now()<f.until && !f.node.isDisposed?.()){
     const a=g.root.position, b=f.node.position; if(Math.hypot(b.x-a.x,b.z-a.z)>.3) want=Math.atan2(-(b.x-a.x),-(b.z-a.z));
@@ -2788,7 +2796,7 @@ function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar)
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
 function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
-  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
+  if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(a==='use') return {kind:'use',target:[b,...rest].filter(Boolean).join(' ')}; if(a==='put'||a==='take') return {kind:a,arg:[b,...rest].filter(Boolean).join(' ')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
 function parseWalkDestination(arg){
   arg=String(arg||'').trim();
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1).trim();
@@ -2837,6 +2845,8 @@ function parseLLMCommandLine(line){
   if(name==='remember') return {kind:'remember',text:arg||''};
   if(name==='feel') return {kind:'feel',text:arg||''};
   if(name==='eat') return {kind:'eat',item:arg||''};
+  if(name==='use') return {kind:'use',target:arg.trim()};
+  if(name==='put'||name==='take') return {kind:name,arg:arg.trim()};
   if(name==='give_quest') return {kind:'give_quest',text:arg||''};
   if(name==='give') return {kind:'give',item:arg.trim()};
   if(name==='attack') return {kind:'attack',target:arg.trim()};
@@ -2853,8 +2863,10 @@ function parseLLMCommandLine(line){
   if(window.tablefolkSkills?.isCommand(name)) return {kind:'skill',name,args:arg?arg.split(',').map(x=>x.trim().replace(/^["']|["']$/g,'')).filter(Boolean):[]};
   return null;
 }
-function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
+// what a seated or lying character does without getting up (uses.js)
+const SEATED_OK=new Set(['say','whisper','look','inventory','goal','remember','feel','eat','emote','give_quest','note','workflow']);
+function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); if(g.pose && !SEATED_OK.has(cmd.kind)) window.tablefolkUses?.standUp(g); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -3823,6 +3835,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('remember')) ex.push('remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later');
   if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
   if(allowed.has('eat') && g && (charInventory(g).items||[]).some(i=>window.tablefolkMind?.isFood(i.name))) ex.push('eat(food) e.g. eat(bread) - eat food you carry');
+  if(allowed.has('use') && g){ const u=window.tablefolkUses?.exampleLine(g); if(u) ex.push(u); }
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
@@ -4140,16 +4153,16 @@ const FIGURES={
   peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28},
   // The main people are Meshy models made from JRPG concept art (tools/fal-character.py, 2026-10-25);
   // the old Quaternius ones stay as <name>_classic.
-  swordswoman:{dir:'meshy',h:1.3,v:'20261030a'}, sorceress:{dir:'meshy',h:1.32,v:'20261030a'}, huntress:{dir:'meshy',h:1.3,v:'20261030a'}, villager_woman:{dir:'meshy',h:1.26,v:'20261030a'},
-  swordsman:{dir:'meshy',h:1.36,v:'20261030a'}, wanderer:{dir:'meshy',h:1.36,v:'20261030a'},
+  swordswoman:{dir:'meshy',h:1.3,v:'20261101a'}, sorceress:{dir:'meshy',h:1.32,v:'20261101a'}, huntress:{dir:'meshy',h:1.3,v:'20261101a'}, villager_woman:{dir:'meshy',h:1.26,v:'20261101a'},
+  swordsman:{dir:'meshy',h:1.36,v:'20261101a'}, wanderer:{dir:'meshy',h:1.36,v:'20261101a'},
   // the king (2026-10-30): an older king in red and gold; the Quaternius one stays as king_classic
-  king:{dir:'meshy',h:1.38,v:'20261030a'}, king_classic:{file:'king',h:1.32},
-  adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261030a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261030a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261030a'},
-  villager:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261030a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261030a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261030a'},
+  king:{dir:'meshy',h:1.38,v:'20261101a'}, king_classic:{file:'king',h:1.32},
+  adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261101a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261101a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'},
+  villager:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261101a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261101a'},
   woodsman_classic:{file:'woodsman',h:1.36}, huntress_classic:{file:'huntress',h:1.3}, peasant_woman_classic:{file:'peasant_woman',h:1.28},
   adventurer_classic:{file:'adventurer',h:1.3}, adventurer_woman_classic:{file:'adventurer_woman',h:1.24}, villager_classic:{file:'villager',h:1.22}, witch_classic:{file:'witch',h:1.3},
-  skeleton:{dir:'meshy',h:1.3,v:'20261024a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261024a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261024a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
-  troll:{dir:'meshy',h:2.15,v:'20261024a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261024a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261024a'}, orc_classic:{file:'orc',h:1.45},
+  skeleton:{dir:'meshy',h:1.3,v:'20261101a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261101a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261101a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
+  troll:{dir:'meshy',h:2.15,v:'20261101a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261101a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261101a'}, orc_classic:{file:'orc',h:1.45},
   demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{file:'rat',h:.62,tint:[.62,.6,.62]},   // the wolf file's skinning is broken in Babylon: a big grey rat stands in bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
 };
 const FIG_CLIPS={
@@ -4191,8 +4204,13 @@ async function createFigure(id,pos,model,label){
   // ImportMeshAsync gives every spawn its own copies.
   const clips={};
   for(const ag of res.animationGroups||[]){ ag.stop(); const n=figClipName(ag.name); if(!clips[n]) clips[n]=ag; }
-  const rigAnims={};
-  for(const [want,from] of Object.entries(FIG_CLIPS)){ const hit=from.map(n=>clips[n]).find(Boolean); if(hit) rigAnims[want]=hit; }
+  // every clip under its own name (the Meshy models carry about 40 KayKit
+  // clips under their KayKit names: Sit_Chair_Idle, Lie_Idle, Chopping, ...,
+  // tools/retarget-people.sh), then the figure's own clips under the names
+  // the game asks for (a clip of the very name wins, except attacks: the
+  // model's own Attack suits the weapon it was made with)
+  const rigAnims={...clips};
+  for(const [want,from] of Object.entries(FIG_CLIPS)){ if(clips[want] && !/^Melee_/.test(want)) continue; const hit=from.map(n=>clips[n]).find(Boolean); if(hit) rigAnims[want]=hit; }
   // size to its height in cells
   root.computeWorldMatrix(true);
   const bb=root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0);
