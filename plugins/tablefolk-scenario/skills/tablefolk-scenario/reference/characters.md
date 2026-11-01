@@ -35,8 +35,9 @@ trading, `emote` for flavour.
 | `goal(text)` | set what it is working toward |
 | `remember(text)` | note something important |
 | `eat(food)` | eat food it carries |
-| `use(thing)` | use a thing with an obvious use ([below](#using-things)): open or close a chest, sit on a seat, lie down on a bed, hammer at an anvil, chop a tree... |
+| `use(thing)` | use a thing with an obvious use ([below](#using-things)): open a chest (or say what is in an open one), sit on a seat, lie down on a bed, hammer at an anvil, chop a tree... |
 | `take(item, chest)`, `put(item, chest)` | take from or store in a chest, opening it if closed (`take(5 gold, chest)`, `take(all, chest)`) |
+| `close(chest)` | shut a chest |
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |
 | `spell.push`, `spell.spark`, `spell.fireball` | the old built-in spells; prefer the `magic` skill |
@@ -57,11 +58,11 @@ bundle) to someone who says the password.").
 
 `use(thing)` does what the thing is for; the character walks over first when
 it is a few steps away (to a free cell beside it), and the prompt names
-`use()` only when such a thing is within a few steps.
+`use()` only when such a thing is within a few steps. A thing can be named by its type or its map label (`use(h1 chest)`); `sit`, `sleep` or `emote(sit)` beside a seat or bed, or walking onto one, uses it too.
 
 | thing | `use()` |
 |---|---|
-| `chest`, `iron_chest` | opens it and tells what is inside, or closes it; `take(item, chest)` and `put(item, chest)` (gold too) open it if needed |
+| `chest`, `iron_chest` | opens it and tells what is inside (an open one stays open: `close(chest)` shuts it); `take(item, chest)` and `put(item, chest)` (gold too) open it if needed |
 | `bed`, `double_bed` | lies down on it and rests (tiredness gone) |
 | `bench`, `stool`, `wooden_chair`, `armchair`, `sofa`, `office_chair`, `throne` | sits on it (tiredness down a little) |
 | `anvil`, `workbench`, `cauldron` | hammers, saws, stirs |

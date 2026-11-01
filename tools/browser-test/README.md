@@ -77,7 +77,9 @@ tiles of every object, body and floor in the test Chrome
 about 4 minutes for all of them, or pass a comma list.
 Evals live in `evals/`: `shop` (prices in the personality), `shop-role` (the
 shopkeeper role), `feelings` (does a character remember being hit or given
-gold, five turns later).
+gold, five turns later), `roles`, `smithy`, `companion`, `uses` (sitting,
+lying down, a chest), and `*-chaos` copies at chaos 50. `micro-eval.sh` runs
+five tactics for a quick look.
 
 ## Poking at the page
 

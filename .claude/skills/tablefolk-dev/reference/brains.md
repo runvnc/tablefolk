@@ -136,8 +136,11 @@ lock) builds the prompt and parses the answer:
 
 1. **Stable prefix** (`buildAgentPrompt` in `app/app.js`): who it is (style
    only if set), personality, backstory, the role's duty ("Your job:"), the
-   commands it may use (`buildCommandExamples`), the "You could, right here"
-   menu.
+   commands it may use (`buildCommandExamples`, plus a `use(...)` example
+   when something usable is within 5 cells), the "You could, right here"
+   menu. `senses.js` adds `tablefolkUses.menu`: concrete `put(<own item>,
+   chest)` and `take(<item>, chest)` lines before the `use(...)` ones (Gemma
+   never called `put` from the bare command list).
 2. **What it perceives** (`app/senses.js`): its place and the places it can
    walk to, "Around you" by direction with steps, nearest first, filtered by
    `tablefolkDark.sightFor(g)`; at most 3 of a kind, 16 things.
@@ -158,7 +161,9 @@ lock) builds the prompt and parses the answer:
    ('Ana says: "..."') are dropped unless they hold quoted words, and with
    thinking off everything before a stray `</think>` goes. Keep these
    patterns narrow: real speech like "I'll help you" or "Then come with me"
-   must still pass (the checks were run against both kinds of line).
+   must still pass (the checks were run against both kinds of line). A bare
+   `sit`, `sleep`, `rest`, `lie down` line is the action, not speech
+   (`looksLikeCommand`).
 6. **Guards**: a voiced repeat of one of its last 8 lines is dropped (not
    spoken or logged; the character is told); the echo guard drops lines that
    copy what anyone said lately or the history's "grub says" wording; the

@@ -74,7 +74,7 @@ hostile by default: when the player is near they close in and attack (no
 LLM, no personality needed). Goblins, kobolds and orcs talk unless "hostile":
 true. Loot: {"type": "chest", "x": 2, "z": -1, "gold": 30, "items": ["silver
 key"]} (or "in": "treasure"); the player opens it with E. Coin piles hold
-"gold". Village props: well market_stand market_stalls cart tent logs bed
+"gold". Characters use things: chests (take, put), beds (sleep at night), seats, anvil, workbench, cauldron (the station that fits their role by day): give homes a bed. Village props: well market_stand market_stalls cart tent logs bed
 bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
 fantasy_house stable windmill watch_tower bell_tower. A house, fantasy_house
 or stable (one object at its centre) becomes a building to walk into: 5x5,

@@ -76,6 +76,7 @@ scenario.js, the tests and packages use.
 | `mind.js` | mood, needs, memory, goals, opinions, the state card, who gets a turn |
 | `embed.js`, `embed-worker.js` | EmbeddingGemma 2 recall |
 | `roles.js`, `trade.js`, `skills.js`, `packages.js`, `workflows.js`, `registry.js` | roles, selling rules, skills, packages, workflows, the Library pane's search |
+| `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
 | `speech-input.js` | the 🎤 button |

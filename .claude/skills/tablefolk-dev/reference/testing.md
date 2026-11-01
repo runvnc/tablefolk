@@ -56,9 +56,12 @@ node close.mjs                                         # always close it: it hol
 
 ## Evals (`tools/browser-test/evals/`)
 
+Scripted (no model): `uses-test.mjs` drives every kind of `use`, `put`, `take`, `close` and the player's E, with shots in `results/uses`.
+
+
 `shop` (prices in the personality), `shop-role` (the shopkeeper role),
 `roles`, `smithy` (a package's role and skill), `companion`, `feelings`
-(remembering being hit or given gold five turns later), and `*-chaos`
+(remembering being hit or given gold five turns later), `uses` (sit, lie down, store in and fetch from a chest; Gemma E2B 10/15 on 2026-11-01, fetching 0/3), and `*-chaos`
 copies at chaos 50. Point the test Chrome's output at a file on disk, not
 in /tmp: headless Chrome's log grew to 7 GB in two hours of evals and filled
 the 7.8 GB RAM disk (Claude Code's temp folder is there too). 2026-10-30 (RUNS=2, 36 scenario runs, each model at its
