@@ -40,12 +40,13 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - Record the user's request batches in `docs/REQUESTS.md` when asked; log
   changes in `CHANGELOG.md`, never in the README.
 
-## Open items (2026-10-25)
+## Open items (2026-10-31)
 
 - Mirror the vision model (`gemma-4-E2B-it.litertlm`) on the R2 bucket:
   waiting for the user's decision.
-- The calm-pace living-world test with the real model was not re-run after
-  the pacing change.
 - Walk-in buildings: not tested in first person; the watch tower, bell tower
   and windmill remain closed models.
+- Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR
+  HoppouAI/Breeze-TTS-2.cpp#17 open; Windows scripts untested; R2 mirror
+  of LFM3 waits for the user).
 - More in `docs/LAUNCH-PLAN.md` ("Left for launch").
