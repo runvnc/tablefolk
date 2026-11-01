@@ -151,7 +151,14 @@ lock) builds the prompt and parses the answer:
 5. **Parsing the reply**: plain text without a command is spoken; commands
    embedded in prose are extracted and only quoted words spoken;
    `say(Name, "...")` loses the name; at most 2 lines spoken per turn; speech
-   is cut at a sentence near 260 characters.
+   is cut at a sentence near 260 characters. Except planning written beside
+   the commands (LFM3 1.7B): plain lines matching `planning()` ("Say that
+   she...", "Then offer...", "I should <verb> her", "let me respond",
+   coordinates, "I can see X at", "(4 gold left)") or `echoLine()`
+   ('Ana says: "..."') are dropped unless they hold quoted words, and with
+   thinking off everything before a stray `</think>` goes. Keep these
+   patterns narrow: real speech like "I'll help you" or "Then come with me"
+   must still pass (the checks were run against both kinds of line).
 6. **Guards**: a voiced repeat of one of its last 8 lines is dropped (not
    spoken or logged; the character is told); the echo guard drops lines that
    copy what anyone said lately or the history's "grub says" wording; the

@@ -13,8 +13,8 @@ most of them only work on the maintainer's Linux machine because they live in
 | Breeze memory patch | `tools/breeze-server/te-cpu.patch`: text encoder on the CPU, 3.0 to 2.1 GB of graphics memory | in the repo; built by `tools/breeze-server/build.sh` | only if they can build C++ with Vulkan |
 | Breeze model | `breeze-tts-2-q4_k-dd2.gguf` (2.46 GB), 37 parts, licence and NOTICE | R2 `breeze-tts-2/` | yes (downloaded by the script) |
 | Breeze in the browser | `app/tts/breeze-web/` (WebAssembly + ggml WebGPU), Breeze 87b4366 + current ggml | in the repo | browsers with WebGPU `shader-f16`; Chrome on Linux with NVIDIA needs `--enable-dawn-features=vulkan_enable_f16_on_nvidia`. 0.62x realtime on an RTX 2060 |
-| llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain | official release, downloaded by hand into `~/.cache/tablefolk-llm/` | no script |
-| LFM3-1.7B (server) | `LFM3-1.7B-Q4_K_M.gguf` (1.1 GB) | Hugging Face, downloaded by hand | no script |
+| llama.cpp server | `llama-server` b12015, Vulkan, for the endpoint brain | official release, fetched by `tools/llama-server.sh` / `.ps1` into `~/.cache/tablefolk-llm/` | yes (Linux, macOS; Windows untested) |
+| LFM3-1.7B (server) | `LFM3-1.7B-Q4_K_M.gguf` (1.1 GB) | Hugging Face, fetched by the same scripts | yes |
 | LFM3-1.7B (browser) | `lfm3-1.7b-webgpu`, webml-community runtime from its HF Space (pinned) + the GGUF from HF | code in the repo, hidden model | yes for testers (`?model=lfm3-1.7b-webgpu`); depends on an HF Space staying up |
 | Test-browser log guard | keeps headless Chrome's log from filling `/tmp` | `tools/browser-test/launch-chrome.sh` (headless) | yes |
 
@@ -57,7 +57,14 @@ One step per platform for a player:
 - **In-browser Breeze rebuilt on 87b4366** (done 2026-10-31): the
   convolution patch is gone, and it uses current ggml (v0.28.0).
 
-### 2. Launch scripts per platform (about 2 hours)
+### 2. Launch scripts per platform (scripts written 2026-10-31)
+
+Done: `tools/llama-server.sh` (Linux, macOS), `tools/llama-server.command`
+(macOS double-click), `tools/llama-server.ps1` and `tools/breeze-server.ps1`
+(Windows; untested, no Windows machine here: Breeze from HoppouAI's v0.1.5
+Windows release, `-TeCpu` once a release has #17). Left: Breeze on macOS (no
+build), and the helpers app below.
+
 
 - `tools/breeze-server.sh` (Linux) exists. Add `breeze-server.ps1` (Windows)
   and a macOS `.command` doing the same: download binary and model from R2
@@ -71,7 +78,14 @@ One step per platform for a player:
   a single Go or Rust binary that downloads and supervises the two servers
   (about a day), or a script per platform (above) first and the app later.
 
-### 3. The page finds the helpers (about 2-3 hours)
+### 3. The page finds the helpers (button done 2026-10-31)
+
+Done: `app/helpers.js`, "find helpers on this computer" (Voice pane and
+endpoint panel): probes 127.0.0.1:8137 and :8080 only on a click (then
+quietly on later visits), points Breeze at the direct address when this
+server's proxy cannot reach it, and offers llama.cpp as the brain. Left: the
+auto-pick of the LFM3 brain for small cards without asking.
+
 
 - Today the page reaches Breeze through the Tablefolk server
   (`/api/tts/breeze`), which only works when the player runs the Tablefolk
@@ -84,7 +98,14 @@ One step per platform for a player:
   (`freeGB`, already in the code), the LFM3 endpoint brain when llama.cpp
   answers and the card is small.
 
-### 4. LFM3 as a real option (about 3-4 hours)
+### 4. LFM3 as a real option (narration fixed 2026-10-31)
+
+Done: the narration leak (a parser filter in `world-integration.js` drops
+plain planning lines and anything before a stray `</think>`); evals 35/36
+on llama.cpp, the preset "LFM3 1.7B: llama.cpp on this computer", and
+`tools/llama-server.sh` gives the model the name `LFM3-1.7B`. Left: mirror
+the GGUF and the browser runtime on R2 (needs your yes).
+
 
 - **Fix its narration leak first:** it speaks its own planning aloud ("Say
   that she's hungry... Let me take care of her!") and sometimes acts wrongly.
@@ -141,9 +162,9 @@ One step per platform for a player:
 
 ## Rough order
 
-1. Test-tool log guard (item 6), 30 min.
-2. LFM3 narration fix and evals (item 4), 3-4 h.
-3. Upstream PR + CI builds for Linux/Windows (item 1), 4-6 h.
-4. Launch scripts (item 2), 2 h.
-5. Page finds the helpers (item 3), 2-3 h.
-6. macOS build and in-browser Breeze work (items 1, 5) as machines allow.
+1. ~~Test-tool log guard (item 6)~~ done.
+2. ~~LFM3 narration fix and evals (item 4)~~ done; R2 mirror of LFM3 waits for a yes.
+3. Upstream PR (#17, open) + CI builds for Linux/Windows if it is not merged (item 1).
+4. ~~Launch scripts (item 2)~~ written; Windows untested.
+5. ~~Page finds the helpers (item 3)~~ button done.
+6. macOS Breeze build, a faster ggml-webgpu Q2_K kernel, and in-browser Breeze on a 4090 (items 1, 5).

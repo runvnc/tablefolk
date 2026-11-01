@@ -797,6 +797,9 @@ async function main() {
         console.log('[tablefolk-world] render resumed at', new Date().toISOString());
       }
       console.log('[tablefolk-world] RAW LLM OUTPUT for agent', g.id, 'at', new Date().toISOString(), 'elapsed ms:', Math.round(performance.now() - decideT0), ':', line);
+      // With thinking off, text up to a stray </think> is reasoning (LFM3 and
+      // other small models sometimes reason anyway and close the tag).
+      if (cfg.thinking !== true && /<\/think>/i.test(String(line || ''))) line = String(line).replace(/^[\s\S]*<\/think>/i, '');
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
       // models often answer in plain text ("I am tired. State your
@@ -804,6 +807,18 @@ async function main() {
       // on, plain lines are leftover reasoning and are dropped below.)
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l);
       const speakPlain = !quiet && cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
+      // ... except plain lines that are the model planning aloud, which small
+      // models (LFM3 1.7B) write beside their commands: "Say that she's hungry.
+      // Then offer food.", "As hector, I should question her. Let me respond
+      // naturally.", "I can see Ana at (0,2)...", "You have bowl of stew (4
+      // gold left)...", or the prompt's own 'Ana says: "..."' echoed. Quoted
+      // words in such a line are still spoken.
+      const VERB = '(respond|answer|reply|say|tell|offer|ask|greet|question|acknowledge|give|sell|help)';
+      const planning = l => new RegExp('^(say|respond|reply|answer) (that|to|with)\\b|^then ' + VERB + '\\b', 'i').test(l)
+        || /\b(I should|I need to|I must) (\w+ ){0,2}(her|him|them|the player)\b/i.test(l)
+        || /\b(I'?ll|I will|let me|let'?s) (respond|answer|reply)\b|\blet me think\b|\bmy (response|reply)\b|\brespond naturally\b|\bin character\b/i.test(l)
+        || /\(\s*-?\d+\s*,\s*-?\d+\s*\)/.test(l) || /^I can see \w+ at\b/i.test(l) || /\bgold left\)/i.test(l);
+      const echoLine = l => /^[A-Z][\w' -]{0,24}\s+(says|said|asks|asked|whispers|whispered)\s*:/.test(l.trim());
       let saidPlain = false;
       // Prose with commands in it ('I take the gold. "Fine," I say.
       // sell(healing potion, 8)'): the commands are pulled out and run, and
@@ -817,6 +832,8 @@ async function main() {
           const cmds = [];
           let text = embedded ? l.replace(embedded, m => { cmds.push(m); return ' '; }) : l;
           const quoted = [...text.matchAll(/["\u201c]([^"\u201c\u201d]{2,})["\u201d]/g)].map(m => m[1].trim());
+          if (echoLine(l)) { quoted.length = 0; text = ''; }
+          else if (!quoted.length && planning(text)) text = '';
           text = (quoted.length ? quoted.join(' ') : text).replace(/^["'\u201c]+|["'\u201d]+$/g, '').replace(/\s+/g, ' ').trim();
           const out = [];
           if (text) { saidPlain = true; out.push({ kind: 'say', text }); histParts.push(`say(${JSON.stringify(text)})`); }

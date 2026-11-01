@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261030e" />
+  <link rel="stylesheet" href="style.css?v=20261031a" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -284,6 +284,7 @@
         <label id="ttsLanguageBox">Language <select id="ttsLanguage"><option value="english_2026-04">English</option><option value="german">German</option><option value="italian">Italian</option><option value="portuguese">Portuguese</option><option value="spanish">Spanish</option></select></label>
         <label id="breezeUrlBox" title="Breeze TTS 2 runs in breeze-server on your computer (tools/breeze-server.sh). Blank: through this Tablefolk server; or the server's own address when it was started with --cors">Breeze server <input id="breezeUrl" type="text" placeholder="/api/tts/breeze (via this server)" spellcheck="false" /></label>
         <small id="breezeStatus" class="tts-note"></small>
+        <div class="helpers-row"><button type="button" class="find-helpers" title="Looks for breeze-server (port 8137) and llama.cpp (port 8080) on this computer. The browser may ask to allow local network access.">find helpers on this computer</button> <small class="helpers-status tts-note"></small></div>
         <label>Volume <input id="ttsVolume" type="range" min="0" max="1" step=".05" value=".85" /></label>
         <label>Buffering <input id="ttsBufferMs" type="range" min="150" max="1500" step="50" value="350" title="Lower = speech starts sooner but stutters more easily under load. Higher = more delay before speech starts, but far more resistant to glitches." /></label>
       </div>
@@ -349,8 +350,10 @@
           <option value="http://localhost:11434/v1|hf.co/ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF">Nemotron 3.5 Bolt E4B: Ollama on this machine</option>
           <option value="http://localhost:8080/v1|nemotron-3.5-bolt-e4b">Nemotron 3.5 Bolt E4B: llama.cpp server on this machine (llama-server -hf ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF)</option>
           <option value="/api/llm/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter through this server</option>
+          <option value="http://127.0.0.1:8080/v1|LFM3-1.7B">LFM3 1.7B: llama.cpp on this computer (tools/llama-server.sh)</option>
           <option value="http://localhost:8080/v1|ternary-bonsai-2-4b">Bonsai 2 4B: llama.cpp server on this machine (prism-ml/Ternary-Bonsai-2-4B-gguf)</option>
         </select></label>
+        <div class="helpers-row"><button type="button" class="find-helpers" title="Looks for llama.cpp (port 8080) and breeze-server (port 8137) on this computer. The browser may ask to allow local network access.">find helpers on this computer</button> <small class="helpers-status"></small></div>
         <label>Base URL <input id="llmBaseURL" type="text" placeholder="/api/llm/v1 (this server's default)" spellcheck="false" /></label>
         <label>API key <input id="llmApiKey" type="password" placeholder="blank: the server's key / none" autocomplete="off" /></label>
         <label>Model <input id="llmModel" type="text" list="llmModelList" placeholder="blank: the server's default" spellcheck="false" /></label>
@@ -417,6 +420,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261031e"></script>
+  <script src="preflight.js?v=20261031g"></script>
 </body>
 </html>

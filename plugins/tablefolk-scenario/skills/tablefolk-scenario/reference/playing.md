@@ -74,7 +74,7 @@ command box.
 | Gemma 4 E4B | larger (~3 GB), better at following rules |
 | Gemma 4 E2B with sight | the full multimodal model (~2.6 GB, needs a 6 GB graphics card): characters see when they `look` |
 | Bonsai 2 27B | Prism ML's ternary 27B (~5.9 GB), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
-| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp, Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
+| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp (`tools/llama-server.sh`, `.ps1` on Windows, `.command` on a Mac: LFM3-1.7B on http://127.0.0.1:8080/v1, about 1.3 GB of graphics memory), Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
 
 Hidden test engines (MiniCPM, Transformers.js) are listed in
 `app/llm_js/agent-brain.js`. One model runs for all characters, in one shared
@@ -88,13 +88,21 @@ pane; the server's admin page sets the default): Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
 languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs
 outside the browser in `breeze-server` on your own computer, about 3 GB of
-graphics memory: start it with `tools/breeze-server.sh`, then pick it under
+graphics memory: start it with `tools/breeze-server.sh` (Windows:
+`tools/breeze-server.ps1`; no Mac build yet), then pick it under
 Engine; it is picked by itself when it runs and the card has room beside the
 chat model; its weights are for non-commercial use). **Breeze TTS 2 in this
 browser** is the same model with no server: a 2.5 GB download once (asked
 first), on the graphics card through WebGPU (it needs the `shader-f16`
-feature, which Chrome on Linux with NVIDIA lacks; the option is greyed out
-then). Voices are placed in space. The slider beside the speaker
+feature, which Chrome on Linux with NVIDIA hides unless it is started with
+`--enable-dawn-features=vulkan_enable_f16_on_nvidia`; the option is greyed
+out without it; about 0.6x realtime on an RTX 2060, so best on bigger cards). **Find helpers on this computer** (a button in the Voice pane and in the
+endpoint panel) looks for breeze-server (port 8137) and llama.cpp (port 8080)
+on the player's own machine, which works from tablefolk.world too: the
+browser asks once to allow local network access. Breeze found is used
+directly when this server cannot reach it; llama.cpp found offers itself as
+the brain (the LFM3 preset). After the first time it looks again quietly
+on each visit. Voices are placed in space. The slider beside the speaker
 button in the top bar (and the Voice pane) sets their volume. The Voice pane
 can clone a voice from a sample.
 

@@ -156,6 +156,8 @@ code { color:#ffe0a0; }
 #ttsTelemetry { font:600 10px/1.45 ui-monospace,monospace; color:#b9d8c5; overflow-wrap:anywhere; margin:-2px 3px 8px; }
 #customVoiceName, #customVoiceFile { box-sizing:border-box; width:100%; margin-bottom:7px; border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(0,0,0,.28); border-radius:10px; padding:7px; font-size:11px; }
 .tts-note { display:block; color:#aebead; font:9px/1.35 ui-monospace,monospace; }
+.helpers-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
+.helpers-row .helpers-status { display:inline; color:#aebead; font:9px/1.35 ui-monospace,monospace; }
 
 /* ---- confirm dialog (confirm-dialog.js) ---- */
 .confirm-overlay { position:fixed; z-index:80; display:flex; align-items:center; justify-content:center; padding:14px; border-radius:20px; background:rgba(8,12,10,.55); backdrop-filter:blur(6px) saturate(.9); animation:confirm-fade .16s ease-out both; }

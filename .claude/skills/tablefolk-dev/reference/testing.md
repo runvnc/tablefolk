@@ -70,6 +70,11 @@ temperature 1.0 25/36 (haggle to 45 0/4, potion at list price 0/2, dagger
 0/2, quest giver 0/2), against 31/36 the same day with the bundle's own
 sampler. `agenttest.mjs --model=<key>` picks the brain; `--llm=<url>
 --llm-model=<name>` an endpoint. The full set takes 6-10 minutes a model.
+2026-10-31, after the planning filter: LFM3-1.7B on llama.cpp (temperature
+0.1) 35/36 (32 before; one lowball sale), Gemma E2B 33/36 (the misses were
+all its own command lines, untouched by the filter: a lowball sale, settling
+at 40, not recalling a hit). `EVAL_ARGS` passes flags to agenttest.mjs
+(`--llm=http://127.0.0.1:8080/v1 --llm-model=LFM3-1.7B`).
 Before that (2026-10-24, E2B): shop-role 2/2, roles
 4/4, smithy and companion pass, feelings 'hit' 3/3. Run them after any
 prompt change: the feelings eval fell to 0/2 once just from moving the

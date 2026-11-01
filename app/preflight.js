@@ -52,6 +52,7 @@
     ['roofs.js?v=20261025f'],
     ['cutaway.js?v=20261030b'],
     ['head-window.js?v=20261030a'],
+    ['helpers.js?v=20261031b'],
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261024b'],
     ['senses.js?v=20261030a'],
@@ -72,7 +73,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261025b'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261031a', 'module'],
+    ['llm_js/world-integration.js?v=20261031b', 'module'],
   ];
 
   function browserSummary() {
