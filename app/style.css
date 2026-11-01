@@ -160,7 +160,7 @@ code { color:#ffe0a0; }
 .helpers-row .helpers-status { display:inline; color:#aebead; font:9px/1.35 ui-monospace,monospace; }
 
 /* ---- confirm dialog (confirm-dialog.js) ---- */
-.confirm-overlay { position:fixed; z-index:80; display:flex; align-items:center; justify-content:center; padding:14px; border-radius:20px; background:rgba(8,12,10,.55); backdrop-filter:blur(6px) saturate(.9); animation:confirm-fade .16s ease-out both; }
+.confirm-overlay { position:fixed; z-index:1100; display:flex; align-items:center; justify-content:center; padding:14px; border-radius:20px; background:rgba(8,12,10,.55); backdrop-filter:blur(6px) saturate(.9); animation:confirm-fade .16s ease-out both; }
 .confirm-overlay-full { left:0 !important; top:0 !important; width:100% !important; height:100% !important; border-radius:0; }
 .confirm-overlay.confirm-closing { animation:confirm-fade-out .14s ease-in both; }
 .confirm-card { width:min(282px,100%); background:rgba(18,24,29,.94); border:1px solid rgba(255,255,255,.16); border-radius:16px; padding:15px 14px 12px; box-shadow:0 22px 60px rgba(0,0,0,.5); text-align:center; animation:confirm-pop .18s cubic-bezier(.2,1.4,.4,1) both; }
