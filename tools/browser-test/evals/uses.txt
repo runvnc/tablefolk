@@ -1,0 +1,24 @@
+## sit down
+You look worn out, Mira. Sit down on the bench and rest a while.
+Please, sit on the bench.
+win: {"agent_pose":["mira","sit"]}
+
+## lie down
+You are exhausted. Go and lie down on the bed.
+Please go to bed now, Mira.
+win: {"agent_pose":["mira","lie"]}
+
+## store the ring
+Mira, put your silver ring in the chest for safekeeping.
+Please put the ring in the chest now.
+win: {"chest_has":"silver ring"}
+
+## fetch from the chest
+Mira, could you get the old map out of the chest for me?
+Please take the old map from the chest and give it to me.
+win: {"player_has":"old map"}
+
+## open the chest
+Mira, open the chest so I can see what is inside.
+Please open the chest.
+win: {"prop_state":["chest","open"]}

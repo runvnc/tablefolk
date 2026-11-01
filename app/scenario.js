@@ -563,6 +563,16 @@
       }
       case 'object_count': return cmp(v[1], ctx.objects.filter(o => o.type === singular(String(v[0]).toLowerCase())).length, +v[2]);
       case 'prop_state': return ctx.objects.some(o => o.type === singular(String(v[0]).toLowerCase()) && o.state === v[1]);
+      // chest_has: "silver ring" (any chest), ["iron_chest", "silver ring", 2], ["chest", "gold", 10] (uses.js keeps what a chest holds)
+      case 'chest_has': {
+        const [type, name, n = 1] = Array.isArray(v) ? (v.length >= 2 && /chest/.test(String(v[0])) ? v : ['', ...v]) : ['', v];
+        return ctx.objects.some(o => /chest/.test(o.type) && (!type || o.type === type) && (() => {
+          const c = o.opts?.contents; if (!c) return false;
+          return /^gold$/i.test(name) ? (+c.gold || 0) >= n : itemCount(c.items, name) >= n;
+        })());
+      }
+      // agent_pose: ["mira", "sit"] or ["mira", "lie"] (uses.js: sitting on a seat, lying on a bed)
+      case 'agent_pose': { const g = ctx.agents.get(String(v[0]).toLowerCase()); return !!g?.pose && (!v[1] || g.pose.mode === v[1]); }
       case 'said': {
         const who = String(v[0]).toLowerCase(), needle = String(v[1] || '').toLowerCase();
         // words actually spoken, not action reports ("bram has 12 gold")

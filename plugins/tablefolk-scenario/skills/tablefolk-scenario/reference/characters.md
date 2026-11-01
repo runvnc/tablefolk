@@ -36,7 +36,7 @@ trading, `emote` for flavour.
 | `remember(text)` | note something important |
 | `eat(food)` | eat food it carries |
 | `use(thing)` | use a thing with an obvious use ([below](#using-things)): open or close a chest, sit on a seat, lie down on a bed, hammer at an anvil, chop a tree... |
-| `take(item, chest)`, `put(item, chest)` | take from or store in an open chest (`take(5 gold, chest)`, `take(all, chest)`) |
+| `take(item, chest)`, `put(item, chest)` | take from or store in a chest, opening it if closed (`take(5 gold, chest)`, `take(all, chest)`) |
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |
 | `spell.push`, `spell.spark`, `spell.fireball` | the old built-in spells; prefer the `magic` skill |
@@ -61,7 +61,7 @@ it is a few steps away (to a free cell beside it), and the prompt names
 
 | thing | `use()` |
 |---|---|
-| `chest`, `iron_chest` | opens it and tells what is inside, or closes it; while it is open, `take(item, chest)` and `put(item, chest)` (gold too) |
+| `chest`, `iron_chest` | opens it and tells what is inside, or closes it; `take(item, chest)` and `put(item, chest)` (gold too) open it if needed |
 | `bed`, `double_bed` | lies down on it and rests (tiredness gone) |
 | `bench`, `stool`, `wooden_chair`, `armchair`, `sofa`, `office_chair`, `throne` | sits on it (tiredness down a little) |
 | `anvil`, `workbench`, `cauldron` | hammers, saws, stirs |

@@ -28,6 +28,8 @@ can't run code). `"maxTurns": 12` is short for a `turns_over` lose.
 | `object_near` | `["barrel", "house", 2]`; `["barrel", "campfire", 2, 2]` = at least 2 barrels |
 | `object_count` | `["barrel", "<", 3]` |
 | `prop_state` | `["crate", "burned"]` (any crate) |
+| `chest_has` | `"silver ring"` (in any chest), `["iron_chest", "silver ring"]`, `["chest", "gold", 10]` (what was put in: [characters.md](characters.md#using-things)) |
+| `agent_pose` | `["mira", "sit"]`, `["mira", "lie"]` (sitting on a seat, lying on a bed) |
 | `said` | `["mog", "deal"]` (spoken words, case-insensitive substring; `"any"` for anyone) |
 | `turns_over` | `12` (a turn is one character reply, however many commands it runs) |
 | `agent_defeated` | `"grub"` |

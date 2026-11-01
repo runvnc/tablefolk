@@ -1,0 +1,8 @@
+{"v":1,"title":"Eval: using things","base":"plain","size":[11,9],"lighting":"bright",
+ "player":{"name":"Ana","gold":10,"items":[],"at":[0,2]},
+ "allowed":["say","walk","give","emote"],
+ "agents":[{"id":"mira","model":"villager_woman","at":[0,0],"facing":"s",
+   "personality":"Mira, a kind villager in her cottage. She is tired after a long day. She trusts Ana, her old friend, and does what Ana asks.",
+   "inventory":{"gold":3,"items":["silver ring"]}}],
+ "objects":[{"type":"chest","x":2,"z":-1,"gold":4,"items":["old map"]},{"type":"bench","x":-2,"z":1},{"type":"bed","x":-2,"z":-2},{"type":"anvil","x":3,"z":2}],
+ "goal":{"text":"Help Mira about the house.","maxTurns":6}}
