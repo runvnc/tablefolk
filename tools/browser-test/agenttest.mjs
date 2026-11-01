@@ -4,6 +4,7 @@
 // nothing shows on screen. Never approves a model download.
 //
 //   node agenttest.mjs <scenario.json> <tactics.txt> [runs] [--prompts] [--base=http://localhost:8001]
+//                      [--think] (every character thinks first) [--only=<regex>] (tactics by name)
 //                      [--render[=light|medium|high]] [--fps=10] [--size=640x360]
 //                      [--model=<key>] [--llm=<url> --llm-model=<name>]
 //
@@ -27,6 +28,10 @@ const base = (flag('base')?.split('=')[1]) || process.env.TABLEFOLK_URL || 'http
 const render = flag('render') ? (flag('render').split('=')[1] || 'light') : null;
 const fps = +(flag('fps')?.split('=')[1] || 10), [vw, vh] = (flag('size')?.split('=')[1] || '640x360').split('x').map(Number);
 const scenario = JSON.parse(fs.readFileSync(scnFile, 'utf8')), tacticsText = fs.readFileSync(tacticsFile, 'utf8');
+// --think: every character thinks before it acts (cfg.thinking); --only=<regex>
+// runs only the tactics whose names match (the micro-eval)
+if (flag('think')) for (const a of scenario.agents || []) a.thinking = true;
+const only = flag('only=') ? new RegExp(flag('only=').slice(7), 'i') : null;
 
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
 const ctx = b.contexts()[0], page = ctx.pages()[0] || await ctx.newPage();
@@ -59,14 +64,15 @@ console.log('model:', (await status()).brain, `(${Math.round((Date.now() - t0) /
 if (process.env.NO_EMBED === '1') await page.evaluate(() => window.tablefolkEmbed?.setEnabled(false));
 else console.log('memory model:', await page.evaluate(() => Promise.race([window.tablefolkEmbed?.start().then(() => window.tablefolkEmbed.state + ' ' + window.tablefolkEmbed.device), new Promise(r => setTimeout(() => r('timed out'), 180000))])));
 
-await page.evaluate(({ scenario, tacticsText, runs, withPrompts }) => {
-  const S = window.tablefolkScenario, tactics = S.parseTactics(tacticsText);
+await page.evaluate(({ scenario, tacticsText, runs, withPrompts, only }) => {
+  const S = window.tablefolkScenario, tactics = S.parseTactics(tacticsText).filter(t => !only || new RegExp(only, 'i').test(t.name));
+  window.tablefolkEndpointStats = [];
   window.__at = { status: 'starting', done: false, result: null, error: null };
   S.runTactics({ scenario, tactics, runs, withPrompts,
     onProgress: (t, partial) => { window.__at.status = t; window.__at.partial = partial.map(r => `${r.name.slice(0, 24)} ${r.wins}/${r.runs.length}`).join(' · '); } })
     .then(r => { window.__at.result = r; window.__at.done = true; })
     .catch(e => { window.__at.error = String(e && e.stack || e); window.__at.done = true; });
-}, { scenario, tacticsText, runs, withPrompts });
+}, { scenario, tacticsText, runs, withPrompts, only: only && only.source });
 let last = '';
 for (;;) {
   const s = await page.evaluate(() => window.__at);
@@ -92,6 +98,16 @@ if (result) {
       console.log(`-- run ${run.run}: ${run.won ? 'WON' : run.lost ? 'LOST' : 'no result'}, ${run.turns} turns, player gold ${run.playerGold}`);
       for (const t of run.transcript) console.log(`  > ${t.player}\n  < ${t.said.join(' ') || '…'}${t.commands ? `   [${t.commands}]` : ''}${t.error ? '  ERROR ' + t.error : ''}`);
     }
+  }
+  // endpoint brains: tokens and time per turn (sizing the thinking budget)
+  const stats = await page.evaluate(() => window.tablefolkEndpointStats || []);
+  if (stats.length) {
+    result.endpointStats = stats;
+    const q = (arr, f) => { const v = arr.map(f).filter(x => x != null).sort((a, b) => a - b); return v.length ? [v[0], v[Math.floor(v.length / 2)], v[Math.min(v.length - 1, Math.floor(v.length * .95))], v[v.length - 1]] : null; };
+    console.log(`\nendpoint turns: ${stats.length}, budget ${stats[0].maxTokens}, hit the cap: ${stats.filter(t => t.finish === 'length').length}, empty answers: ${stats.filter(t => !t.answerChars).length}`);
+    console.log('  completion tokens min/median/p95/max:', JSON.stringify(q(stats, t => t.completionTokens)));
+    console.log('  reasoning chars   min/median/p95/max:', JSON.stringify(q(stats, t => t.reasoningChars)));
+    console.log('  seconds           min/median/p95/max:', JSON.stringify(q(stats, t => t.ms / 1000)));
   }
   fs.mkdirSync('results', { recursive: true });
   const out = `results/agent-${path.basename(scnFile, '.json')}-${Date.now()}.json`;

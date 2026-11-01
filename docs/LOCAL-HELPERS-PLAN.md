@@ -103,7 +103,8 @@ auto-pick of the LFM3 brain for small cards without asking.
 Done: the narration leak (a parser filter in `world-integration.js` drops
 plain planning lines and anything before a stray `</think>`); evals 35/36
 on llama.cpp, the preset "LFM3 1.7B: llama.cpp on this computer", and
-`tools/llama-server.sh` gives the model the name `LFM3-1.7B`. Left: mirror
+`tools/llama-server.sh` gives the model the name `LFM3-1.7B`. Thinking on
+tested (micro-eval): same score, 5-10x slower; off by default. Left: mirror
 the GGUF and the browser runtime on R2 (needs your yes).
 
 

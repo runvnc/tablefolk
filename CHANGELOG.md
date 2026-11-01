@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-10-31
 
+- **Thinking characters get 4096 tokens to think** (was 1024) and are told to keep it short; tool calls in a model's own format (`<tool_call><function=say>...`, or JSON) now run as commands. Measured on LFM3-1.7B: thinking gives the same micro-eval score (9/10) at 16-32 s a turn against 0.6-4 s without, so it stays off by default.
 - **Find helpers on this computer**: one button (Voice pane, endpoint panel) finds breeze-server and llama.cpp running on your own machine, also from tablefolk.world (the browser asks once for local network access), and offers llama.cpp as the brain.
 - **First person inside a building keeps its roof as the ceiling** (it faded away as it does for the overhead view, leaving the night sky above). Walk-in houses checked in first person: door, furniture and walls look right at `wallHeight` 2; at 1 the lintel sits at eye level.
 - **Confirmation dialogs show above the welcome screen** (they were hidden behind it on a first visit).

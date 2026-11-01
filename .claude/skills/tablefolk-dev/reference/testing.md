@@ -75,6 +75,19 @@ sampler. `agenttest.mjs --model=<key>` picks the brain; `--llm=<url>
 all its own command lines, untouched by the filter: a lowball sale, settling
 at 40, not recalling a hit). `EVAL_ARGS` passes flags to agenttest.mjs
 (`--llm=http://127.0.0.1:8080/v1 --llm-model=LFM3-1.7B`).
+Micro-eval (`micro-eval.sh`: villager small talk, horseshoe, haggle to 45,
+lowball, remembering a hit; `--think` makes everyone reason first and prints
+tokens and seconds per turn), LFM3-1.7B on llama.cpp, RTX 2060, 2026-10-31:
+thinking off 9/10 at 0.6-4 s a turn (8 of 10 haggling turns still ran to the
+256-token cap writing visible reasoning, which the planning filter strips);
+thinking on with a 2048 budget 9/10 but 7 of 17 hard turns hit the cap with
+no answer; with 4096, hard tests 6/6, 1 of 15 capped, median 1600-1900
+tokens, 16-32 s a turn (up to 41). The capped reasoning goes in circles
+(the reply format, what give and sell do, side issues), so more budget buys
+little. Thinking stays off by default for LFM3; per character it gets 4096.
+With thinking on LFM3 also writes its trained tool-call format
+(`<tool_call><function=say><parameter=text>...`), translated to commands in
+world-integration.js.
 Before that (2026-10-24, E2B): shop-role 2/2, roles
 4/4, smithy and companion pass, feelings 'hit' 3/3. Run them after any
 prompt change: the feelings eval fell to 0/2 once just from moving the

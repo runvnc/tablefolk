@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261031a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261031c';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261031a';
+import { installDevConsole } from './dev-console.js?v=20261031c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030g';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
@@ -786,9 +786,11 @@ async function main() {
           useGrammar: !chatTestMode,
           allowedCommands: allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper')),
           // Per-character (Character setup). Reasoning needs room before the
-          // command lines, so raise the token budget too.
+          // command lines, so raise the token budget too: 2048, LFM3's own
+          // quick-start budget (its agent eval ran at 1024 a turn; at 256 all
+          // of it went into reasoning and no answer came).
           enableThinking: cfg.thinking === true,
-          maxTokens: cfg.thinking === true ? 1024 : undefined,
+          maxTokens: cfg.thinking === true ? 4096 : undefined,
           temperature: cfg.chaos > 70 ? 0.8 : (cfg.chaos > 40 ? 0.5 : 0.3),
         });
       } finally {
@@ -800,6 +802,18 @@ async function main() {
       // With thinking off, text up to a stray </think> is reasoning (LFM3 and
       // other small models sometimes reason anyway and close the tag).
       if (cfg.thinking !== true && /<\/think>/i.test(String(line || ''))) line = String(line).replace(/^[\s\S]*<\/think>/i, '');
+      // Tool calls in the model's own trained format become our command lines:
+      // LFM3 with thinking on writes <tool_call><function=say><parameter=text>
+      // Hello</parameter></function></tool_call> (and some models JSON:
+      // <tool_call>{"name":"say","arguments":{"text":"Hello"}}</tool_call>).
+      if (/<tool_call>|<function=/.test(String(line || ''))) line = String(line).replace(/(?:<tool_call>\s*)?(<function=[\s\S]*?<\/function>|\{[\s\S]*?\}\s*(?=<\/tool_call>))\s*(?:<\/tool_call>)?/g, (m, call) => {
+        let name, args = [];
+        const x = call.match(/^<function=([\w.-]+)>([\s\S]*)<\/function>$/);
+        if (x) { name = x[1]; for (const p of x[2].matchAll(/<parameter=[\w.-]+>([\s\S]*?)<\/parameter>/g)) args.push(p[1].trim()); }
+        else { try { const j = JSON.parse(call); name = j.name; args = Object.values(typeof j.arguments === 'string' ? JSON.parse(j.arguments) : (j.arguments || {})).map(String); } catch { return m; } }
+        if (!name) return m;
+        return '\n' + name + '(' + args.map(a => /^-?\d+(\.\d+)?$/.test(a) ? a : JSON.stringify(a)).join(', ') + ')\n';
+      }).replace(/<\/?tool_call>/g, '');
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
       // models often answer in plain text ("I am tired. State your

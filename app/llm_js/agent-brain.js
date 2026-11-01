@@ -89,9 +89,20 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   // Not sent to others: strict APIs refuse unknown fields.
   if (samplingFor(fresh.model) && !opts.enableThinking) body.chat_template_kwargs = { enable_thinking: false };
   if (opts.dryRun) return '';
+  // token counts in the last chunk (llama.cpp, vLLM, OpenRouter)
+  if (samplingFor(fresh.model)) body.stream_options = { include_usage: true };
   const started = performance.now();
-  const out = await collect(await engine.client.chat.completions.create(body), opts.onToken ? text => opts.onToken(text, true) : null);
-  opts.debugLog?.('endpoint finished', { ms: Math.round(performance.now() - started), finish: out.finish_reason, usage: out.usage });
+  let thought = 0, thoughtTail = '';
+  const out = await collect(await engine.client.chat.completions.create(body), opts.onToken ? text => opts.onToken(text, true) : null, (n, tail) => { thought = n; thoughtTail = tail; });
+  const ms = Math.round(performance.now() - started);
+  opts.debugLog?.('endpoint finished', { ms, finish: out.finish_reason, usage: out.usage });
+  // Per-turn numbers for sizing the thinking budget (evals read these): a turn
+  // that hit max_tokens while thinking may have lost its answer.
+  const stat = { model: fresh.model, thinking: !!opts.enableThinking, maxTokens: body.max_tokens, ms, finish: out.finish_reason,
+    reasoningChars: thought, reasoningTail: thoughtTail, answer: out.text.slice(0, 300), answerChars: out.text.length, completionTokens: out.usage?.completion_tokens ?? null };
+  (window.tablefolkEndpointStats ||= []).push(stat);
+  if (window.tablefolkEndpointStats.length > 500) window.tablefolkEndpointStats.shift();
+  if (out.finish_reason === 'length' && opts.enableThinking) console.warn('[endpoint] thinking turn hit max_tokens', stat);
   return out.text;
 }
 const DEFAULT_MODEL = 'gemma4-e2b-litert';
