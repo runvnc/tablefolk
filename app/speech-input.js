@@ -122,8 +122,15 @@
       setState('busy', 'transcribing…');
       const t0 = performance.now(), took = () => `last one ${((performance.now() - t0) / 1000).toFixed(1)} s`;
       try {
-        if (mode === 'bark') { const text = await barkText(await toPcm16k(new Blob(chunks, { type: rec.mimeType }))); showEngine('Bark ' + (barkVariant === 'q8' ? 'CPU' : 'GPU'), took()); deliver(text); return; }
-        const wav = await toWav16k(new Blob(chunks, { type: rec.mimeType }));
+        const blob = new Blob(chunks, { type: rec.mimeType });
+        // what the microphone gave: kept for tablefolkSpeech.playLast(), and a silent clip
+        // is not sent (the recognisers hear "Yeah" or "Thank you" in silence)
+        const pcm = await toPcm16k(blob), lv = level(pcm);
+        last = { blob, ...lv };
+        console.log(`[speech] ${mode}: ${lv.seconds.toFixed(1)} s, peak ${lv.peak.toFixed(3)}, loud ${Math.round(lv.voiced * 100)}%`);
+        if (lv.peak < .015 || lv.voiced < .02) { window.tablefolkToast?.(`speech: the microphone sent ${lv.peak < .002 ? 'silence' : 'almost nothing'} (peak ${lv.peak.toFixed(3)}); check the input device (tablefolkSpeech.playLast() plays it back)`, { type: 'error' }); return; }
+        if (mode === 'bark') { const text = await barkText(pcm); console.log('[speech] heard:', JSON.stringify(text)); showEngine('Bark ' + (barkVariant === 'q8' ? 'CPU' : 'GPU'), took() + `, mic peak ${lv.peak.toFixed(2)}`); deliver(text); return; }
+        const wav = await toWav16k(blob);
         if (mode === 'llama') { const text = await llamaText(wav); showEngine(null, took()); deliver(text); return; }
         const r = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
         const d = await r.json();
@@ -138,6 +145,16 @@
     };
     rec.start();
     setState('rec', 'listening… click to send');
+  }
+  // peak, length, and the share of 20 ms frames louder than -40 dBFS
+  let last = null;
+  function level(pcm) {
+    let peak = 0, voiced = 0, frames = 0;
+    for (let i = 0; i + 320 <= pcm.length; i += 320) {
+      let e = 0; for (let j = i; j < i + 320; j++) { const v = pcm[j]; e += v * v; if (v > peak) peak = v; else if (-v > peak) peak = -v; }
+      frames++; if (Math.sqrt(e / 320) > .01) voiced++;
+    }
+    return { peak, seconds: pcm.length / 16000, voiced: frames ? voiced / frames : 0 };
   }
   async function toPcm16k(blob) {
     const ctx = new AudioContext();
@@ -252,5 +269,7 @@
 
   const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; showEngine(await guessEngine(m)); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; lastNote = ''; detect().then(async x => { mode = x; showEngine(await guessEngine(x)); }); }, get engine() { return engine; } };
+  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText,
+    get last() { return last && { seconds: last.seconds, peak: last.peak, voiced: last.voiced }; },
+    playLast() { if (!last) return 'nothing recorded yet'; const a = new Audio(URL.createObjectURL(last.blob)); a.play(); return { seconds: last.seconds, peak: last.peak }; }, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; lastNote = ''; detect().then(async x => { mode = x; showEngine(await guessEngine(x)); }); }, get engine() { return engine; } };
 })();

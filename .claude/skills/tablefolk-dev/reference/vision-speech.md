@@ -197,3 +197,15 @@ bigger models and for debugging, so it stays (toggle "ASCII map").
   multimodal character brain the audio itself, so it hears tone. Needs the
   character on `litert-lm serve` with `gemma4-e2b-mm` and `input_audio` in the
   chat path; easy to add to the endpoint brain once wanted.
+
+Silence (2026-11-01): a player saw every recording after the first sent as
+"Yeah" (Bark GPU, Breeze speaking, a real microphone). Not reproduced with a
+fake microphone (five recordings in a row, with speech between) nor with the
+card filled to 5.7 of 6 GB around a loaded Bark. Parakeet-family models
+answer near-silence with filler words, so `speech-input.js` now measures each
+clip (`level`: peak, the share of 20 ms frames above -40 dBFS), logs
+`[speech] <mode>: <s> s, peak <p>, loud <n>%` and what Bark heard, skips
+clips with a peak under 0.015 or under 2% loud frames, and keeps the last
+clip (`tablefolkSpeech.last`, `playLast()`). A fake microphone needs a real
+WAV: Chrome plays a FLAC with a .wav name as silence.
+

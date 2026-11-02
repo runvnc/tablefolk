@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-01
 
+- **A silent microphone is no longer sent**: Bark hears "Yeah" in silence, so a recording whose peak stays under 0.015 (or with almost nothing above -40 dBFS) gives a message instead; the console logs each clip's length and level, the tooltip the peak, and `tablefolkSpeech.playLast()` plays back what the microphone recorded.
 - **Window view feels like a window**: the head now moves the eye behind a fixed screen (an off-axis projection) instead of turning the camera around its target, so the ground stays put while things standing on it slide, and leaning in widens the view rather than magnifying it. A One Euro filter and the face box (not only the eye points) steady the tracking; the effect is stronger (`tablefolkHeadWindow.strength`, default 2.4) and works with the follow camera too.
 - **The wheel zooms towards the pointer** in the free camera, not towards the screen's centre (the selected character).
 - **The 🎤 button names its recogniser** (Bark GPU or CPU, Chrome on-device or cloud, Gemma, the llama.cpp model) in every mode, with the last transcription's time in its tooltip; a fallback says so in a toast.
