@@ -27,7 +27,7 @@ approve the download on a user's behalf.
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
 | C | follow camera / free camera |
-| H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and the board slides behind the frame; lean in to see more, as through a real window, or to bring it closer (the Graphics pane's "leaning in") (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
+| H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and the board slides behind the frame; lean in to bring it closer (or, with the Graphics pane's "leaning in", to see more as through a real window) (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
 | P | let them live (everyone acts on their own) / pause |
 | I | the Adventurer pane |
 | Enter | chat |

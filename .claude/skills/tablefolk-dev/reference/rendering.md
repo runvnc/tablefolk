@@ -173,11 +173,11 @@ textures.
   target's plane never moved and leaning in only widened the edges, which
   read as no response at all. Leaning (the face box's width against the
   neutral one, to the power 1.6 x strength / 2.4, 0.5-2.5; filter 0.6 Hz,
-  beta 4) moves the eye towards the glass: `lean` 'window' (default, the
-  Graphics pane's "leaning in") keeps the glass fixed, so you see more and
-  the board gets smaller on screen, as through a real window; 'magnify'
-  keeps the lens (the off-centre terms scaled by D/D') and the board comes
-  closer. SSAO2 rebuilds positions with a centred lens and painted black
+  beta 4) moves the eye towards the glass: `lean` 'magnify' (default, the
+  Graphics pane's "leaning in") keeps the lens (the off-centre terms scaled
+  by D/D') and the board comes closer; 'window' keeps the glass fixed, so
+  you see more and the board gets smaller on screen, as through a real
+  window (true to life, but the user found it backwards: 2026-11-01). SSAO2 rebuilds positions with a centred lens and painted black
   blocks under the skewed projection: it is detached from the camera while
   the view runs. Picking uses the same matrix. Free and follow cameras; not first person or an orthographic
   camera. The orbit version (alpha/beta offsets, radius for leaning) read

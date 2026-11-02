@@ -4,8 +4,8 @@
  * world (an off-axis projection, the same trick as Johnny Lee's Wii head
  * tracking): move right and you see more of the left side behind the glass,
  * the board slides behind the frame (the glass stands in front of it, like a
- * diorama box's front), and leaning in shows more through the window, or,
- * with the Graphics pane's "leaning in" set to magnify, brings it closer. Off by default; H or the
+ * diorama box's front), and leaning in brings it closer (or, with the
+ * Graphics pane's "leaning in" set to window, shows more as a real window would). Off by default; H or the
  * Graphics pane turns it on, after the browser asks for the camera.
  *
  * Face tracking: MediaPipe's face detector (@mediapipe/tasks-vision, Apache-2.0,
@@ -42,10 +42,11 @@
   // so leaning in brings the board closer and moving shows it sliding behind
   // the frame. At 1 (the board itself) leaning only widened the edges.
   const LEAN = 1.6, DRIFT = .0008, FOLLOW = 14, MAXE = .6;
-  // leaning in: 'window' (the glass stays put, so you see more, and the board
-  // gets smaller on screen, as through a real window) or 'magnify' (the eye
-  // moves in with the lens unchanged: the board comes closer)
-  let lean = localStorage.getItem('tablefolk.headWindowLean') === 'magnify' ? 'magnify' : 'window';
+  // leaning in: 'magnify' (default: the eye moves in with the lens unchanged,
+  // the board comes closer) or 'window' (the glass stays put, so you see more
+  // and the board gets smaller on screen, as through a real window; true to
+  // life, but players read it as backwards)
+  let lean = localStorage.getItem('tablefolk.headWindowLean') === 'window' ? 'window' : 'magnify';
   let glass = Number(localStorage.getItem('tablefolk.headWindowGlass')) || .55;
   let strength = Number(localStorage.getItem('tablefolk.headWindowStrength')) || 2.4;
   const W = { on: false, video: null, detector: null, stream: null, raf: 0, neutral: null, calib: [], sim: null,
@@ -218,7 +219,7 @@
     set strength(v) { strength = Math.max(0, Number(v) || 0); localStorage.setItem('tablefolk.headWindowStrength', String(strength)); },
     get head() { return { ...W.view }; },
     get lean() { return lean; },
-    set lean(v) { lean = v === 'magnify' ? 'magnify' : 'window'; localStorage.setItem('tablefolk.headWindowLean', lean); const sel = document.getElementById('headWindowLean'); if (sel) sel.value = lean; },
+    set lean(v) { lean = v === 'window' ? 'window' : 'magnify'; localStorage.setItem('tablefolk.headWindowLean', lean); const sel = document.getElementById('headWindowLean'); if (sel) sel.value = lean; },
     get glass() { return glass; },
     set glass(v) { glass = Math.max(.1, Math.min(1, Number(v) || .55)); localStorage.setItem('tablefolk.headWindowGlass', String(glass)); },
     // tests: a fake head (x right, y up, as fractions of the frame; near 1 = neutral)
