@@ -53,7 +53,7 @@
     ['darkness.js?v=20261030a'],
     ['roofs.js?v=20261031a'],
     ['cutaway.js?v=20261030b'],
-    ['head-window.js?v=20261101b'],
+    ['head-window.js?v=20261101e'],
     ['helpers.js?v=20261031b'],
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261024b'],

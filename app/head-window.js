@@ -3,8 +3,9 @@
  * eye moves with your head while the screen's rectangle stays put in the
  * world (an off-axis projection, the same trick as Johnny Lee's Wii head
  * tracking): move right and you see more of the left side behind the glass,
- * things that stand up out of the board slide against the ground, and leaning
- * in widens the view rather than magnifying it. Off by default; H or the
+ * the board slides behind the frame (the glass stands in front of it, like a
+ * diorama box's front), and leaning in shows more through the window, or,
+ * with the Graphics pane's "leaning in" set to magnify, brings it closer. Off by default; H or the
  * Graphics pane turns it on, after the browser asks for the camera.
  *
  * Face tracking: MediaPipe's face detector (@mediapipe/tasks-vision, Apache-2.0,
@@ -23,7 +24,8 @@
  * cameras; first person has its own view; an orthographic camera is skipped.
  *
  *   window.tablefolkHeadWindow.toggle() / start() / stop() / recenter()
- *   window.tablefolkHeadWindow.strength = 1.6     how far the eye moves
+ *   window.tablefolkHeadWindow.strength = 2.4     how far the eye moves
+ *   window.tablefolkHeadWindow.glass = .55        the glass's distance (1 = at the target)
  *   window.tablefolkHeadWindow.setHead(x, y, near)   simulate a head (tests)
  * Loaded after app.js; uses its globals (state).
  */
@@ -35,7 +37,16 @@
   // LEAN: how much leaning in brings the eye closer. DRIFT: how fast the
   // neutral pose follows you. FOLLOW: per-second rate the view eases to the
   // filtered head between camera frames.
-  const LEAN = 1, DRIFT = .0008, FOLLOW = 14, MAXE = .6;
+  // GLASS: where the window's glass stands, as a fraction of the distance to
+  // what the camera looks at: in front of the board (a diorama box's front),
+  // so leaning in brings the board closer and moving shows it sliding behind
+  // the frame. At 1 (the board itself) leaning only widened the edges.
+  const LEAN = 1.6, DRIFT = .0008, FOLLOW = 14, MAXE = .6;
+  // leaning in: 'window' (the glass stays put, so you see more, and the board
+  // gets smaller on screen, as through a real window) or 'magnify' (the eye
+  // moves in with the lens unchanged: the board comes closer)
+  let lean = localStorage.getItem('tablefolk.headWindowLean') === 'magnify' ? 'magnify' : 'window';
+  let glass = Number(localStorage.getItem('tablefolk.headWindowGlass')) || .55;
   let strength = Number(localStorage.getItem('tablefolk.headWindowStrength')) || 2.4;
   const W = { on: false, video: null, detector: null, stream: null, raf: 0, neutral: null, calib: [], sim: null,
     head: { x: 0, y: 0, s: 1 }, view: { x: 0, y: 0, s: 1 }, frozen: false, obs: null };
@@ -55,7 +66,7 @@
     };
   }
   let F = null;
-  const resetFilters = () => { F = { x: oneEuro(.5, 3), y: oneEuro(.5, 3), s: oneEuro(.25, 1.5) }; };
+  const resetFilters = () => { F = { x: oneEuro(.5, 3), y: oneEuro(.5, 3), s: oneEuro(.6, 4) }; };
 
   async function start() {
     if (W.on) return;
@@ -151,23 +162,33 @@
     if (W.obs) { state.scene?.onBeforeRenderObservable.remove(W.obs); W.obs = null; }
     release();
   }
-  function release() { if (W.frozen) { try { state.camera?.unfreezeProjectionMatrix(); } catch {} W.frozen = false; } }
+  // SSAO rebuilds positions from depth with a centred lens: under the skewed
+  // projection it paints black blocks, so it is off while the view is
+  function ssao(on) {
+    const mgr = state.scene?.postProcessRenderPipelineManager, c = state.camera;
+    if (!mgr?._renderPipelines?.ssao || !c || on === !W.ssaoOff) return;
+    try { on ? mgr.attachCamerasToRenderPipeline('ssao', c) : mgr.detachCamerasFromRenderPipeline('ssao', c); W.ssaoOff = !on; } catch (e) { console.warn('[head-window] ssao', e); }
+  }
+  function release() { if (W.frozen) { try { state.camera?.unfreezeProjectionMatrix(); } catch {} W.frozen = false; } ssao(true); }
   function project() {
     const c = state.camera;
     const usable = c && state.scene?.activeCamera === c && !state.firstPerson && c.mode !== BABYLON.Camera.ORTHOGRAPHIC_CAMERA && W.neutral;
     if (!usable) return release();
-    if (W.frozen) c.unfreezeProjectionMatrix();
+    if (W.frozen) c.unfreezeProjectionMatrix(); else ssao(false);
     const P = c.getProjectionMatrix(true).clone(), m = P.m;
-    const D = Math.max(.5, c.radius || BABYLON.Vector3.Distance(c.position, c.target || BABYLON.Vector3.Zero()));
+    const D = Math.max(.5, glass * (c.radius || BABYLON.Vector3.Distance(c.position, c.target || BABYLON.Vector3.Zero())));
     const hw = D / m[0], hh = D / m[5];
     const v = W.view, clampE = x => Math.max(-MAXE, Math.min(MAXE, x));
     // head offsets are fractions of the camera frame; the screen's width maps to it
     const ex = clampE(v.x * strength) * 2 * hw, ey = clampE(v.y * strength * .75) * 2 * hw;
-    const near = Math.max(.6, Math.min(1.8, Math.pow(v.s || 1, LEAN * strength / 2)));
+    // the face's width grows as 1/distance: leaning from 60 to 40 cm is 1.5
+    const near = Math.max(.5, Math.min(2.5, Math.pow(v.s || 1, LEAN * strength / 2.4)));
     const Dp = D / near;
     const vals = Array.from(m);
-    vals[0] = m[0] * Dp / D; vals[5] = m[5] * Dp / D;
-    vals[8] = ex / hw; vals[9] = ey / hh;
+    if (lean === 'window') { vals[0] = m[0] * Dp / D; vals[5] = m[5] * Dp / D; }
+    // the glass's centre stays at the screen's centre (the lens is D/Dp narrower when magnifying)
+    const k = lean === 'window' ? 1 : D / Dp;
+    vals[8] = ex / hw * k; vals[9] = ey / hh * k;
     const off = BABYLON.Matrix.FromArray(vals);
     const M = BABYLON.Matrix.Translation(-ex, -ey, -(D - Dp)).multiply(off);
     c.freezeProjectionMatrix(M); W.frozen = true;
@@ -180,6 +201,8 @@
   function init() {
     document.getElementById('headWindow')?.addEventListener('change', e => e.target.checked ? start() : stop());
     document.getElementById('headWindowBtn')?.addEventListener('click', toggle);
+    const sel = document.getElementById('headWindowLean');
+    if (sel) { sel.value = lean; sel.addEventListener('change', () => { window.tablefolkHeadWindow.lean = sel.value; }); }
     window.addEventListener('keydown', e => {
       const tag = (e.target?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -194,6 +217,10 @@
     get strength() { return strength; },
     set strength(v) { strength = Math.max(0, Number(v) || 0); localStorage.setItem('tablefolk.headWindowStrength', String(strength)); },
     get head() { return { ...W.view }; },
+    get lean() { return lean; },
+    set lean(v) { lean = v === 'magnify' ? 'magnify' : 'window'; localStorage.setItem('tablefolk.headWindowLean', lean); const sel = document.getElementById('headWindowLean'); if (sel) sel.value = lean; },
+    get glass() { return glass; },
+    set glass(v) { glass = Math.max(.1, Math.min(1, Number(v) || .55)); localStorage.setItem('tablefolk.headWindowGlass', String(glass)); },
     // tests: a fake head (x right, y up, as fractions of the frame; near 1 = neutral)
     setHead(x, y, near = 1) {
       W.sim = { x: .5 - x, y: .5 - y, s: .2 * near };

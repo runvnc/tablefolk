@@ -167,9 +167,19 @@ textures.
   saved) screen widths per frame width, and the frustum is skewed so the
   screen's rectangle at the target's distance stays fixed (off-axis:
   m[8] = ex/hw, m[9] = ey/hh, the scale by D'/D for leaning, then the eye's
-  translation in front). The ground at the target stays still, things that
-  stand up slide against it, leaning in widens the view. Picking uses the
-  same matrix. Free and follow cameras; not first person or an orthographic
+  translation in front). The glass stands at `glass` (0.55, saved) of the
+  distance to the target, in front of the board like a diorama box's front,
+  so the whole board slides behind the frame; at 1 (the first version) the
+  target's plane never moved and leaning in only widened the edges, which
+  read as no response at all. Leaning (the face box's width against the
+  neutral one, to the power 1.6 x strength / 2.4, 0.5-2.5; filter 0.6 Hz,
+  beta 4) moves the eye towards the glass: `lean` 'window' (default, the
+  Graphics pane's "leaning in") keeps the glass fixed, so you see more and
+  the board gets smaller on screen, as through a real window; 'magnify'
+  keeps the lens (the off-centre terms scaled by D/D') and the board comes
+  closer. SSAO2 rebuilds positions with a centred lens and painted black
+  blocks under the skewed projection: it is detached from the camera while
+  the view runs. Picking uses the same matrix. Free and follow cameras; not first person or an orthographic
   camera. The orbit version (alpha/beta offsets, radius for leaning) read
   as the board turning, not a window, and the face detector's eye points
   jittered. `tablefolkHeadWindow.setHead(x, y, near)` simulates a head for

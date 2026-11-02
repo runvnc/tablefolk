@@ -309,7 +309,8 @@
 
     <section class="pane" id="pane-graphics">
       <h2 class="pane-title">Graphics</h2>
-      <label class="spawn-mode-toggle"><input id="headWindow" type="checkbox" /> window view (<kbd>H</kbd>): the webcam follows your head and the free camera moves with it, like looking into a diorama through a window</label>
+      <label class="spawn-mode-toggle"><input id="headWindow" type="checkbox" /> window view (<kbd>H</kbd>): the webcam follows your head and the screen becomes a window onto the board</label>
+      <label class="spawn-mode-toggle">leaning in <select id="headWindowLean"><option value="window">shows more, like a real window</option><option value="magnify">brings the board closer</option></select></label>
       <small class="pane-note">Face tracking runs in this browser (MediaPipe, about 14 MB once); the video never leaves the page, and a small preview shows while it is on.</small>
       <p class="pane-note">Everything below defaults to the original look. Turning things down trades a little visual fidelity for smoother frames - worth trying if the world feels heavy or you notice audio glitching while things render.</p>
       <div class="section-subtitle">Quality</div>
@@ -424,6 +425,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261101ae"></script>
+  <script src="preflight.js?v=20261101ah"></script>
 </body>
 </html>
