@@ -20,15 +20,30 @@
     'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261031h',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
-  // Breeze is picked by itself (nothing chosen in this browser) when its
-  // server answers and the graphics card has this much room left beside the
-  // chat model (hardware.js: freeGB); a 6 GB card with Gemma E2B keeps Pocket-TTS.
-  const BREEZE_GB=4;
+  // Breeze is picked by itself (nothing chosen in this browser) when it is
+  // running or installed on this machine (the Tablefolk server then starts
+  // it: breeze-client.js start) and the graphics card has room for it beside
+  // the chat model (hardware.js freeGB): its own graphics memory (2.1 GB for
+  // tools/breeze-server/build.sh's build, which keeps the text encoder on the
+  // processor, else 3) plus half a gigabyte. A 6 GB card with Gemma E2B (3 GB
+  // free) takes the 2.1 GB build; Pocket-TTS on the processor is the fallback.
   async function breezeFits(){
-    if(!window.tablefolkBreeze || !await window.tablefolkBreeze.available()) return false;
+    const B=window.tablefolkBreeze; if(!B) return false;
+    const st=await B.status(); if(!st.running && !st.installed) return false;
     for(let i=0;i<40&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
-    return (window.tablefolkDevice?.freeGB??0)>=BREEZE_GB;
+    if((window.tablefolkDevice?.freeGB??0) < (st.vramGB||3)+.5) return false;
+    // measured slower than speech here (an RTX 2060 beside Gemma: 0.4-0.9x) -> Pocket-TTS
+    if((speeds().breeze??1) < .9) return false;
+    return st.running || await B.start();
   }
+  // Each engine's measured speed on this machine (seconds of speech per second
+  // of work, smoothed), kept across visits: it sizes the buffer before a line
+  // starts (an engine slower than speech would stutter) and rules Breeze out.
+  const speeds=()=>{ try{return JSON.parse(localStorage.getItem('tablefolkTtsRtfx')||'{}');}catch{return{};} };
+  function noteSpeed(engine,m){ if(!(m?.rtfx>0) || !(m.audioDuration>1)) return; const all=speeds(); all[engine]=all[engine]?all[engine]*.6+m.rtfx*.4:m.rtfx; try{localStorage.setItem('tablefolkTtsRtfx',JSON.stringify(all));}catch{} }
+  // seconds of audio to hold before playing a line of this length: an engine
+  // making r seconds a second needs (1-r) of the line ahead (at most 8 s)
+  function holdFor(engine,text){ const base=settings().bufferMs/1000, r=speeds()[engine]; if(!r || r>=1.15) return base; return Math.max(base,Math.min(8,(1-r/1.1)*String(text||'').length/14+.3)); }
   let serverEngine=null;
   const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
   async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; if(await breezeFits()) return 'breeze'; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
@@ -96,7 +111,7 @@
       if(m.type==='audio_chunk_meta'){this.receivedSamples++;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(m.metrics?.chunkRtfx)||0;if(!this.telemetry.audioArrivalMs&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;}
       // Legacy fallback path: worker sends audio_chunk with actual audio data
       if(m.type==='audio_chunk')this.streamChunk(new Float32Array(m.data),m.metrics);
-      if(m.type==='generation_metrics')Object.assign(this.telemetry,m.metrics||{});
+      if(m.type==='generation_metrics'){Object.assign(this.telemetry,m.metrics||{});noteSpeed(this.engine,m.metrics);}
       if(m.type==='stream_ended'){if(this.directPort){ if(!this.receivedSamples)this.finishCurrent(false); /* else: worker already told the worklet stream-ended; the worklet 'drained' event finishes this item only after every buffered sample has actually played */ }else if(this.receivedSamples){this.pendingStreamEnd=true;this.flushAudio();}else this.finishCurrent(false);}
       if(m.type==='voice_state') this.saveState(m.id,m.tensors);
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
@@ -111,7 +126,7 @@
       if(!best&&v.moods.seductive){ const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsMood==='seductive'||/\b(seduct\w*|flirt\w*|sultry|alluring|temptress|coquett\w*|smouldering|siren)\b/i.test((cfg.personality||'')+' '+(cfg.style||''))) best='seductive'; }
       return best?voice+'@'+best:voice; }catch{ return voice; } }
     speak(agent,text,voiceId,level=1){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,level:clamp(+level||1,.1,1.5),text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
-    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(item.voice)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
+    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.pcmNode?.port.postMessage({type:'set-min-buffer',samples:Math.floor(this.audioCtx.sampleRate*holdFor(this.engine,item.text))}); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(item.voice)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
     streamChunk(data,metrics={}){if(!this.pcmNode||!data.length)return;if(!this.receivedSamples&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;this.receivedSamples+=data.length;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(metrics?.chunkRtfx)||0;this.pendingAudio.push(data);this.flushAudio();}

@@ -22,12 +22,12 @@ approve the download on a user's behalf.
 |---|---|
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
-| mouse wheel | zoom along the view: the middle of the screen stays put, and at the closest the free camera moves on that way |
+| mouse wheel | zoom towards what the pointer is over (the follow camera zooms on you); at the closest the free camera moves on that way |
 | E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
 | C | follow camera / free camera |
-| H | window view: the webcam follows your head and the free camera moves with it, like looking into the diorama through a window (face tracking in the browser; a small preview shows while it runs) |
+| H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and you see around things, lean in to see more (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
 | P | let them live (everyone acts on their own) / pause |
 | I | the Adventurer pane |
 | Enter | chat |
@@ -40,7 +40,9 @@ the words are sent like typed chat. By default the speech is turned into
 text in the browser by Underdog Bark 3.0 (English; asked once before its
 download of 0.9-1.3 GB; nothing leaves the computer). It runs on the graphics
 card when there is room beside the characters' model, else on the processor
-(about a second a sentence). The Voice pane's "Speech input" can pick the
+(about a second a sentence). The button names the recogniser it is using
+(Bark GPU, Bark CPU, Chrome on-device, Chrome cloud, Gemma, or the llama.cpp
+model), and its tooltip how long the last one took. The Voice pane's "Speech input" can pick the
 processor, the server's Gemma (`litert-lm serve`), llama.cpp with a model
 that hears (`tools/llama-server.sh --omni`), or the browser's own
 recognition: Chrome's on-device one when it has it (it installs a language
@@ -97,10 +99,12 @@ pane; the server's admin page sets the default): Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
 languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs
 outside the browser in `breeze-server` on your own computer, about 3 GB of
-graphics memory: start it with `tools/breeze-server.sh` (Windows:
-`tools/breeze-server.ps1`; no Mac build yet), then pick it under
-Engine; it is picked by itself when it runs and the card has room beside the
-chat model; its weights are for non-commercial use). **Breeze TTS 2 in this
+graphics memory: install it once with `tools/breeze-server.sh` (Windows:
+`tools/breeze-server.ps1`; no Mac build yet); after that the Tablefolk
+server starts it by itself when it is wanted and stops it after half an
+hour of quiet. It is picked by itself when the card has room beside the
+chat model and it speaks faster than real time on this computer; or pick it
+under Engine. Its weights are for non-commercial use). **Breeze TTS 2 in this
 browser** is the same model with no server: a 2.5 GB download once (asked
 first), on the graphics card through WebGPU (it needs the `shader-f16`
 feature, which Chrome on Linux with NVIDIA hides unless it is started with

@@ -22,6 +22,9 @@
  * processor (0.9 GB, no graphics memory, about 1.2 s a sentence). Measured with
  * tools/browser-test/asr-test.mjs (2026-11-01): 1.3% WER on LibriSpeech,
  * against 4.0% for Gemma 4 E2B's audio input at ten times the time.
+ * The button names the recogniser in use (Bark GPU, Bark CPU, Chrome
+ * on-device, Chrome cloud, Gemma (server), the llama.cpp model) and its
+ * tooltip the last transcription's time; a fallback also says so in a toast.
  */
 (function () {
   let mode = null; // 'bark' | 'gemma' | 'llama' | 'browser' | null
@@ -70,13 +73,34 @@
     if (b) return b;
     const send = $('chatSend'); if (!send) return null;
     b = document.createElement('button');
-    b.id = 'micBtn'; b.type = 'button'; b.className = 'mic-btn'; b.textContent = '🎤';
+    b.id = 'micBtn'; b.type = 'button'; b.className = 'mic-btn'; b.innerHTML = '🎤<span class="mic-engine"></span>';
     b.title = 'speak (click to start, click again to send)';
     send.parentNode.insertBefore(b, send);
     b.addEventListener('click', toggle);
     return b;
   }
   const setState = (st, title) => { const b = button(); if (!b) return; b.dataset.state = st; if (title) b.title = title; };
+  // Which recogniser is in use, on the button itself (every mode, not only
+  // dev): Bark GPU / Bark CPU, Chrome on-device / Chrome cloud, Gemma, llama.cpp.
+  let engine = '', lastNote = '';
+  function showEngine(name, note) {
+    if (name != null) engine = name; if (note != null) lastNote = note;
+    const b = button(), tag = b?.querySelector('.mic-engine'); if (!tag) return;
+    tag.textContent = engine;
+    b.setAttribute('aria-label', 'speak' + (engine ? ' (' + engine + ')' : ''));
+    if (b.dataset.state === 'idle') b.title = `speak${engine ? ' with ' + engine : ''}${lastNote ? ' (' + lastNote + ')' : ''}: click to start, click again to send. The Voice pane picks the speech input.`;
+  }
+  async function guessEngine(m) {
+    if (m === 'bark') { const p = await barkPlan(); return 'Bark ' + (p.variant === 'q8' ? 'CPU' : 'GPU'); }
+    if (m === 'gemma') return 'Gemma (server)';
+    if (m === 'llama') return (llama?.model || 'llama.cpp').replace(/\.gguf$/i, '').replace(/-GGUF$/i, '').slice(0, 18);
+    if (m === 'browser') {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let a = null; try { a = await SR?.available?.({ langs: [navigator.language || 'en-US'], processLocally: true }); } catch {}
+      return a === 'available' || a === 'downloadable' || a === 'downloading' ? 'Chrome on-device' : 'Chrome cloud';
+    }
+    return 'off';
+  }
 
   function deliver(text) {
     text = String(text || '').trim();
@@ -96,18 +120,21 @@
     rec.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
       setState('busy', 'transcribing…');
+      const t0 = performance.now(), took = () => `last one ${((performance.now() - t0) / 1000).toFixed(1)} s`;
       try {
-        if (mode === 'bark') { deliver(await barkText(await toPcm16k(new Blob(chunks, { type: rec.mimeType })))); return; }
+        if (mode === 'bark') { const text = await barkText(await toPcm16k(new Blob(chunks, { type: rec.mimeType }))); showEngine('Bark ' + (barkVariant === 'q8' ? 'CPU' : 'GPU'), took()); deliver(text); return; }
         const wav = await toWav16k(new Blob(chunks, { type: rec.mimeType }));
-        if (mode === 'llama') { deliver(await llamaText(wav)); return; }
+        if (mode === 'llama') { const text = await llamaText(wav); showEngine(null, took()); deliver(text); return; }
         const r = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'transcription failed');
-        deliver(d.text);
+        showEngine(null, took()); deliver(d.text);
       } catch (e) {
         window.tablefolkToast?.('speech: ' + e.message, { type: 'error' });
-        if (window.SpeechRecognition || window.webkitSpeechRecognition) mode = 'browser';
-      } finally { setState('idle', 'speak (click to start, click again to send)'); }
+        if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+          mode = 'browser'; guessEngine('browser').then(n => { showEngine(n, 'fell back after an error'); window.tablefolkToast?.('speech input now: ' + n, { type: 'info' }); });
+        }
+      } finally { setState('idle'); showEngine(); }
     };
     rec.start();
     setState('rec', 'listening… click to send');
@@ -126,7 +153,7 @@
     const forced = new URLSearchParams(location.search).get('asrvariant');   // ?asrvariant=q8|fp16|q4 (q4: tests only, garbles some long clips)
     if (forced) return { variant: forced, gb: forced === 'q4' ? 0.5 : forced === 'q8' ? 0.9 : 1.3 };
     let f16 = false; try { f16 = !!(await navigator.gpu?.requestAdapter())?.features.has('shader-f16'); } catch {}
-    const d = window.tablefolkDevice, breeze = /breeze/.test($('ttsEngine')?.value || '');
+    const d = window.tablefolkDevice, breeze = /breeze/.test(window.tablefolkTTS?.engine || $('ttsEngine')?.value || '');
     const roomy = !d || d.freeGB == null || d.freeGB - (breeze ? 3 : 0) >= 1.5;
     return f16 && roomy && pick() !== 'bark-cpu' && !barkCpuOnly ? { variant: 'fp16', gb: 1.3 } : { variant: 'q8', gb: 0.9 };
   }
@@ -139,12 +166,13 @@
     return yes;
   }
   const BARK_URLS = ['https://geebr-models.mindroot.io/underdog-bark-3.0/', 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/'];
-  let barkWorker = null, barkReady = null, barkId = 0; const barkWait = new Map();
+  let barkWorker = null, barkReady = null, barkId = 0, barkVariant = null; const barkWait = new Map();
   function barkLoad() {
     if (barkReady) return barkReady;
     if (barkOk() !== '1') return Promise.reject(new Error('download not approved'));
     const urls = (new URLSearchParams(location.search).get('asr') ? [new URLSearchParams(location.search).get('asr')] : []).concat(BARK_URLS);
     barkReady = barkPlan().then(plan => new Promise((res, rej) => {
+      barkVariant = plan.variant; showEngine('Bark ' + (plan.variant === 'q8' ? 'CPU' : 'GPU'));
       barkWorker = new Worker('/app/asr/worker.js?v=20261101a', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
@@ -169,7 +197,7 @@
     catch (e) {
       if (barkCpuOnly || !/webgpu|OrtRun|GPU/i.test(e.message)) throw e;
       barkCpuOnly = true; barkWorker?.terminate(); barkWorker = null; barkReady = null;
-      window.tablefolkToast?.('speech: the graphics card is full; Underdog Bark moves to the processor', { type: 'info' });
+      window.tablefolkToast?.('speech: the graphics card is full; Underdog Bark moves to the processor', { type: 'info' }); showEngine('Bark CPU');
       await barkLoad(); return once(copy);
     }
   }
@@ -201,7 +229,8 @@
     let latest = '';
     recog.onresult = e => { latest = [...e.results].map(x => x[0].transcript).join(' '); };   // on stop, the latest words (final or not)
     recog.onerror = e => { if (e.error !== 'aborted') window.tablefolkToast?.('speech: ' + e.error, { type: 'error' }); };
-    recog.onend = () => { recog = null; setState('idle'); deliver(latest); };
+    recog.onend = () => { recog = null; setState('idle'); showEngine(); deliver(latest); };
+    showEngine(local ? 'Chrome on-device' : 'Chrome cloud');
     recog.start(); setState('rec', (local ? 'listening (on this device)' : 'listening (the browser\'s cloud recognition)') + '… click to send');
   }
 
@@ -211,7 +240,7 @@
     if (button()?.dataset.state === 'busy') return;
     mode ??= await detect();
     if (mode === 'bark') {
-      if (!(await barkAsk())) { if (pick() === 'auto') { mode = await detect(); } else { window.tablefolkToast?.('speech input: Underdog Bark not downloaded (pick another in the Voice pane)', { type: 'error' }); return; } }
+      if (!(await barkAsk())) { if (pick() === 'auto') { mode = await detect(); showEngine(await guessEngine(mode)); } else { window.tablefolkToast?.('speech input: Underdog Bark not downloaded (pick another in the Voice pane)', { type: 'error' }); return; } }
       else barkLoad().catch(e => window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }));   // downloads while you speak
     }
     try {
@@ -221,7 +250,7 @@
     } catch (e) { window.tablefolkToast?.('microphone: ' + e.message, { type: 'error' }); setState('idle'); }
   }
 
-  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(m => { mode = m; const b = button(); if (b) b.title = (m === 'bark' ? 'speak (Underdog Bark, in this browser)' : m === 'gemma' ? 'speak (Gemma 4 audio on this machine)' : m === 'llama' ? `speak (${llama?.model || 'llama.cpp'} on this computer)` : m === 'browser' ? 'speak (browser speech recognition)' : 'speech input unavailable') + ' - click to start, click again to send'; }); };
+  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; showEngine(await guessEngine(m)); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; detect().then(x => mode = x); } };
+  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; lastNote = ''; detect().then(async x => { mode = x; showEngine(await guessEngine(x)); }); }, get engine() { return engine; } };
 })();

@@ -130,12 +130,26 @@ function setupMouseWheelZoom(camera){
     // usually 100px) so a notch is ~10% and trackpads zoom smoothly.
     const px=ev.deltaY*(ev.deltaMode===1?33:ev.deltaMode===2?400:1);
     const factor=Math.exp(clamp(px,-150,150)*.001);
-    // Zoom along the view: the centre of the screen stays put (it used to
-    // drift towards the last clicked square or the selected character). At
-    // the closest distance the free camera moves on in the direction it
+    // At the closest distance the free camera moves on in the direction it
     // looks instead, over the ground.
-    const radius=camera.radius, want=radius*factor, near=camera.lowerRadiusLimit||3.5;
-    camera.radius=clamp(want,near,60);
+    const radius=camera.radius, want=radius*factor, near=camera.lowerRadiusLimit||3.5, far=camera.upperRadiusLimit||60;
+    // The free camera zooms towards the point under the pointer (where you
+    // look), not the screen's centre: scaling the eye and the target about
+    // that point keeps it under the pointer. The follow camera keeps you centred.
+    const r2=clamp(want,near,far);
+    if(state.cameraMode!=='follow' && r2!==radius){
+      const ray=state.scene.createPickingRay(state.scene.pointerX,state.scene.pointerY,BABYLON.Matrix.Identity(),camera);
+      const ty=camera.target.y, dy=ray.direction.y;
+      const t=Math.abs(dy)>1e-4?(ty-ray.origin.y)/dy:-1;
+      if(t>0){
+        const p=ray.origin.add(ray.direction.scale(t)), k=r2/radius;
+        state.followAvatar=false;
+        camera.setTarget(p.add(camera.target.subtract(p).scale(k)),false,false,true);
+        camera.radius=r2; state.zoomFocus=camera.target.clone();
+        if(want>=near) return;
+      }
+    }
+    camera.radius=r2;
     if(want<near && state.cameraMode!=='follow'){
       const f=camera.target.subtract(camera.position); f.y=0; if(f.lengthSquared()<1e-6) return;
       state.followAvatar=false;

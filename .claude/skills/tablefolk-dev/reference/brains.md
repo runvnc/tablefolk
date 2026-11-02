@@ -236,10 +236,25 @@ with `?trustSkills=1`, or after the player allows that package.
   as `tf_<id>_<mood|main>_<v>` from the sample (decoded to a 24 kHz WAV) and
   its transcript (`text` / `mood_text` in `voices.json`, written by
   `elevenlabs-moods.py` without the [tags]); built-in and recorded voices
-  get a designed voice from their description. Chosen by itself only when
-  nothing is picked in this browser, the server answers and `freeGB`
-  (usable graphics memory minus the chat model's `needGB`) is 4 or more: the
-  RTX 2060 with E2B has 3, so it keeps Pocket-TTS. Tested against a mock
+  get a designed voice from their description. Started on demand
+  (2026-11-01): `/api/tts/breeze/status` says whether Breeze is installed in
+  `~/.cache/tablefolk-breeze` (model and a binary; `vramGB` 2.1 for the
+  te-cpu build, else 3) and running; `/start` runs `tools/breeze-server.sh`
+  (`.ps1` on Windows) when BREEZE_URL is on this machine, waits for
+  `/health` (about 35 s warming up on the RTX 2060), logs to
+  `server.log` there, stops it after `BREEZE_IDLE_MIN` (30) minutes without
+  speech and with the server; `--no-breeze` or `BREEZE_AUTOSTART=0` turns
+  it off. Choosing Breeze in the Voice pane starts it the same way. Chosen
+  by itself when nothing is picked in this browser, it runs or is installed,
+  `freeGB` (usable graphics memory minus the chat model's `needGB`) is at
+  least its `vramGB` + 0.5, and its measured speed here is 0.9x real time or
+  better. Every engine's speed (`generation_metrics` rtfx, smoothed,
+  `localStorage.tablefolkTtsRtfx`) also sizes the audio held before a line
+  plays (`holdFor`: (1 - r/1.1) of the line's estimated length at 14
+  characters a second, at most 8 s), so a slow engine waits instead of
+  stuttering. Breeze's own log on the RTX 2060 beside Gemma E2B and the
+  game: 0.35-0.9x real time over 32 lines (1.0-1.4x measured alone), so it
+  tries Breeze once and goes back to Pocket-TTS. Tested against a mock
   server (registration, streaming, three lines in a row, stop) and against
   the real model on the RTX 2060 (native Vulkan has fp16, so no shader-f16
   problem there; 2026-10-30): about 3 GB of graphics memory, 1.37x realtime

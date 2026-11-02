@@ -155,22 +155,35 @@ textures.
 - Window view (`app/head-window.js`, H, Graphics pane): head-coupled
   perspective from the webcam. MediaPipe's FaceDetector (tasks-vision
   1.2.0, WebAssembly from jsdelivr, CPU delegate; the 230 KB BlazeFace
-  short-range model in `assets/models/mediapipe/`) gives the eyes' midpoint
-  and spacing; against a neutral pose (the first 15 frames, then a slow
-  drift) the free camera's alpha and beta get offsets (up to 0.45 rad;
-  their sign taken from the camera's own right and up vectors) and the
-  radius a factor (leaning in, 0.7-1.3). They are added and taken out every
-  frame, so dragging and the wheel still work; nothing in the follow camera
-  (locked angles) or first person. `tablefolkHeadWindow.setHead(x, y, near)`
-  simulates a head for tests; headless Chrome takes a fake camera with
+  short-range model in `assets/models/mediapipe/`, 640x480 video) gives the
+  face box's centre averaged with the eyes' midpoint, and the box's width
+  for nearness; against a neutral pose (the median of the first 15 frames,
+  then a slow drift) a One Euro filter per axis (x, y: 0.5 Hz, beta 3;
+  nearness 0.25 Hz) steadies it, and the view eases to it between camera
+  frames. Since 2026-11-01 it is a real window, not an orbit: the camera's
+  angles and radius are untouched and the head goes into a projection matrix
+  frozen each frame (`freezeProjectionMatrix`): the eye moves by the head's
+  offset times `strength` (default 2.4, `tablefolkHeadWindow.strength`,
+  saved) screen widths per frame width, and the frustum is skewed so the
+  screen's rectangle at the target's distance stays fixed (off-axis:
+  m[8] = ex/hw, m[9] = ey/hh, the scale by D'/D for leaning, then the eye's
+  translation in front). The ground at the target stays still, things that
+  stand up slide against it, leaning in widens the view. Picking uses the
+  same matrix. Free and follow cameras; not first person or an orthographic
+  camera. The orbit version (alpha/beta offsets, radius for leaning) read
+  as the board turning, not a window, and the face detector's eye points
+  jittered. `tablefolkHeadWindow.setHead(x, y, near)` simulates a head for
+  tests; headless Chrome takes a fake camera with
   `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`.
 - Free camera ('overview', the default with an avatar since 2026-10-30;
   `freeCameraStart`): starts at 19, eases after the avatar, walls at half
   height. Follow camera (C): high and fixed behind the player, starts at 16,
-  zooms out to 30. The wheel (`setupMouseWheelZoom`) only changes the radius
-  (it used to pull the target towards `state.zoomFocus`, the last click);
-  below the minimum radius the free camera's target moves forward along the
-  view. In first person a click never walks.
+  zooms out to 30. The wheel (`setupMouseWheelZoom`): the free camera zooms
+  towards the ground point under the pointer (the target and eye scaled
+  about it, at the target's height; since 2026-11-01, before that the
+  screen's centre, which was the selected character); the follow camera
+  only changes the radius. Below the minimum radius the free camera's
+  target moves forward along the view. In first person a click never walks.
 - Tabletop (`app/tabletop.js`): an orthographic FreeCamera with rotation (π/2,
   π, 0), so screen right is -x and screen down is +z;
   `toPx(v,x,z) = [(hw-(x-cx))/(2hw)*cw, (hh+(z-cz))/(2hh)*ch]`. PNGs come from

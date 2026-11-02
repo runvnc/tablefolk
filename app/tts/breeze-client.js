@@ -1,7 +1,8 @@
 // Breeze TTS 2 (BreezeBlue, 3B, English and Mandarin) as a speech engine,
 // running in breeze-server (HoppouAI/Breeze-TTS-2.cpp, Vulkan; the Q4 model
 // is about 2.5 GB and takes about 3 GB of graphics memory) on the player's own
-// machine: tools/breeze-server.sh starts it. No browser build of the model
+// machine: tools/breeze-server.sh installs and starts it; once installed, the
+// Tablefolk server starts it by itself when the page wants it. No browser build of the model
 // exists (2026-10-30), so this is a client, reached through the Tablefolk
 // server (/api/tts/breeze, server.js) or a URL set in the Voice pane (a
 // breeze-server started with --cors).
@@ -33,6 +34,21 @@
     probe = { ok, at: Date.now() };
     return ok;
   }
+  // The Tablefolk server starts breeze-server itself when Breeze is installed
+  // on that machine (server.js startBreeze): status says whether it is, and
+  // the graphics memory it wants; start waits until it answers (up to a minute).
+  async function status() {
+    if (base() !== DEFAULT_URL) return { installed: false, running: await available(), vramGB: 3 };
+    try { const r = await fetch(base() + '/status', { signal: AbortSignal.timeout(2000) }); if (r.ok) return await r.json(); } catch {}
+    return { installed: false, running: false, vramGB: 3 };
+  }
+  let starting = null;
+  async function start() {
+    if (await available()) return true;
+    if (base() !== DEFAULT_URL) return false;
+    starting ??= fetch(base() + '/start', { method: 'POST', signal: AbortSignal.timeout(70000) }).then(r => r.json()).then(d => !!d.running).catch(() => false).finally(() => { starting = null; });
+    const ok = await starting; probe = { ok, at: Date.now() }; return ok;
+  }
 
   // 16-bit mono WAV at the given rate
   function wav(samples, rate) {
@@ -54,7 +70,11 @@
     async handle({ type, data = {} }) {
       if (type === 'load') {
         this.emit({ type: 'status', data: { text: 'Connecting to Breeze TTS 2…', state: 'loading' } });
-        const r = await fetch(base() + '/health', { signal: AbortSignal.timeout(4000) }).catch(() => null);
+        let r = await fetch(base() + '/health', { signal: AbortSignal.timeout(4000) }).catch(() => null);
+        if (!r?.ok && r?.status !== 403) {
+          this.emit({ type: 'status', data: { text: 'Starting Breeze TTS 2 on this computer…', state: 'loading' } });
+          if (await start()) r = await fetch(base() + '/health', { signal: AbortSignal.timeout(4000) }).catch(() => null);
+        }
         const h = r?.ok ? await r.json().catch(() => ({})) : {};
         if (h.status !== 'ok') throw new Error(`no breeze-server answers at ${base()} (start it with tools/breeze-server.sh${r?.status === 403 ? '; this server only lets its owner use it' : ''})`);
         this.emit({ type: 'runtime_info', data: { backend: 'Breeze TTS 2 (breeze-server, GPU)' } });
@@ -145,5 +165,5 @@
     }
   }
   window.TablefolkBreezeWorker = BreezeWorker;
-  window.tablefolkBreeze = { available, base, DEFAULT_URL, reset() { probe = null; } };
+  window.tablefolkBreeze = { available, status, start, base, DEFAULT_URL, reset() { probe = null; } };
 })();

@@ -391,7 +391,9 @@ code { color:#ffe0a0; }
 .player-hp .hp-weapon { opacity:.85; }
 .player-hp.down .hp-bar span { background:#555; }
 /* speech-input.js */
-.mic-btn { min-width:38px; }
+.mic-btn { min-width:38px; display:inline-flex; align-items:center; gap:4px; }
+.mic-btn .mic-engine { font-size:10px; line-height:1.1; opacity:.75; white-space:nowrap; }
+.mic-btn .mic-engine:empty { display:none; }
 .mic-btn[data-state="rec"] { background:#c0392b; color:#fff; animation:micPulse 1s ease-in-out infinite; }
 .mic-btn[data-state="busy"] { opacity:.6; }
 @keyframes micPulse { 50% { box-shadow:0 0 0 6px rgba(192,57,43,.25); } }
