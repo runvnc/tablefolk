@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-06
 
+- **The wizard has eyes**: the model came with empty sockets, so every world using that body, The Oracle included, now shows eyes on it.
 - **The chaos slider**: its number now follows the character shown (it stayed at the old value), and it works smoothly: 0 to 100 is temperature 0.3 to 1.2, instead of three steps.
 - **The download question no longer appears twice** when a link opens a world: it waits until you press start on the intro card.
 - **The Oracle**: a new world where a very pompous man answers everything on a 490 MB brain ("The capital of the moon is Ia Cardaminaca"). Ask him anything.

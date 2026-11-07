@@ -51,7 +51,7 @@ idle model turned toward the camera.
 
 ## Pipelines
 
-- **The `wizard` body has no eyes**: no eye mesh, and none painted on its one atlas (checked 2026-11-06); skin between the brows and moustache.
+- **The `wizard` body's eyes are added in the game**: its file has sockets (holes in the `Face` mesh) but no eye mesh, and none painted on its atlas. `FIGURE_EYES` in `app.js` (`addFigureEyes`) gives each spawn merged whites and pupils parented to `Face`, in that mesh's axes (x across, -y forward, z up). Another eyeless body takes an entry there. The rendered 2D tiles still come from the file as it was until `render-tiles.mjs` runs.
 - **Quaternius Universal-rig figures** (woodsman, huntress, peasant,
   peasant_woman): `tools/build-figures.sh <kits dir> <gltf-transform dir>`
   with `tools/build-figure.mjs` (gltf-transform 4.5.1 retargeting:

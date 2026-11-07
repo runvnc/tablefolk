@@ -4252,6 +4252,19 @@ function figClipName(n){
   const seg=String(n).split('|').filter(s=>s && !/Armature/.test(s));
   return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime|Skeleton)_/,'');
 }
+// Bodies whose file has eye sockets but no eyes (wizard.glb: holes in its Face
+// mesh, nothing on its atlas). In that mesh's own axes: x across, -y forward, z up.
+const FIGURE_EYES={wizard:{mesh:'Face',at:[.29,-.77,-.13],white:[.2,.07,.14],pupil:[.1,.06,.1],ahead:.025}};
+function addFigureEyes(g,meshes,spec){
+  const face=meshes.find(m=>m.name===spec.mesh), sc=state.scene; if(!face) return;
+  const mat=(key,r,gr,b)=>{ if(!state[key]){ const m=new BABYLON.PBRMaterial(key,sc); m.albedoColor=new BABYLON.Color3(r,gr,b); m.roughness=.5; m.metallic=0; m.maxSimultaneousLights=8; state[key]=m; } return state[key]; };
+  const pair=(name,size,y,material)=>{
+    const parts=[-1,1].map(side=>{ const e=BABYLON.MeshBuilder.CreateSphere(name,{diameter:1,segments:8},sc); e.scaling.set(...size); e.position.set(side*spec.at[0],y,spec.at[2]); return e; });
+    const m=BABYLON.Mesh.MergeMeshes(parts,true,true); m.name=g.id+'_'+name; m.material=material; m.parent=face; m.isPickable=false; m.metadata={ownerId:g.id}; g.owned.meshes.push(m);
+  };
+  pair('eye_whites',spec.white,spec.at[1],mat('eyeWhiteMat',.92,.9,.84));
+  pair('eye_pupils',spec.pupil,spec.at[1]-spec.ahead,mat('eyeDarkMat',.03,.02,.02));
+}
 async function createFigure(id,pos,model,label){
   const F=FIGURES[model], sc=state.scene;
   // dir: another folder under characters/ (meshy: made with Meshy via fal.ai, tools/fal-monster.py)
@@ -4289,6 +4302,7 @@ async function createFigure(id,pos,model,label){
   agg?.body?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
   const g={id,root,collider,agg,selected:false,anim:'idle',t:Math.random()*10,dir:new BABYLON.Vector3(0,0,-1),style:label||model,traits:{fireball:40,obedience:50},rigged:true,rigRoot:importedRoot,rigAnims,
     owned:{meshes:[...res.meshes],skeletons:[...(res.skeletons||[])],groups:[...(res.animationGroups||[])]},rigMode:null,activeRigAnim:null,cosmetic:{},logicalPos:new BABYLON.Vector3(pos.x,0,pos.z),charModel:model,figure:true,height:F.h};
+  if(FIGURE_EYES[model]) addFigureEyes(g,res.meshes,FIGURE_EYES[model]);
   playRig(g,'idle',true);
   state.characters.push(g);
   return g;
