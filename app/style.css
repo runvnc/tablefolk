@@ -251,6 +251,8 @@ code { color:#ffe0a0; }
 #rail { position:fixed; left:10px; top:64px; z-index:60; display:flex; flex-direction:column; gap:6px; }
 #rail .rail-btn { width:44px; height:44px; flex:0 0 44px; padding:0; border-radius:14px; font-size:19px; line-height:1; background:rgba(16,20,25,.62); border:1px solid rgba(255,255,255,.14); backdrop-filter:blur(12px); box-shadow:0 10px 24px rgba(0,0,0,.28); }
 #rail .rail-btn:hover { background:rgba(255,255,255,.16); }
+#rail .dev-toggle { font-size:11px; font-weight:800; letter-spacing:.04em; opacity:.6; margin-top:auto; }
+#rail .dev-toggle[aria-pressed="true"] { opacity:1; color:#ffd479; border-color:rgba(255,212,121,.65); background:rgba(255,212,121,.16); }
 #rail .rail-btn.active { background:rgba(215,255,154,.20); border-color:rgba(215,255,154,.5); box-shadow:0 0 14px rgba(215,255,154,.14); }
 
 #sidePanel { position:fixed; left:62px; top:64px; bottom:16px; width:364px; z-index:59; display:none; overflow-y:auto; box-sizing:border-box; padding:12px; border-radius:20px; background:rgba(16,20,25,.62); border:1px solid rgba(255,255,255,.15); box-shadow:0 18px 48px rgba(0,0,0,.34); backdrop-filter:blur(14px); color:#fff; }

@@ -6,7 +6,8 @@
  * buttons, the turn controls and the command box. ?dev=1 turns dev mode on
  * (remembered in this browser), ?dev=0 turns it off, ?play=1 shows user mode
  * for that page only. Elements with class
- * "dev-only" exist in both modes and are hidden in user mode.
+ * "dev-only" exist in both modes and are hidden in user mode. The DEV button
+ * on the rail switches mode at once, without a reload, and remembers it.
  *
  * The panel: a rail icon opens its pane (clicking the open one, the « button,
  * or Esc collapses it); the » button at the bottom of the rail, or \, brings
@@ -98,16 +99,34 @@
     }
   }
 
-  function init() {
-    if (!document.getElementById('rail')) return;
+  function applyMode() {
+    window.TABLEFOLK_DEV = dev;
     document.body.classList.toggle('dev-mode', dev);
     document.body.classList.toggle('user-mode', !dev);
+    const b = document.getElementById('devToggle'); if (!b) return;
+    b.setAttribute('aria-pressed', String(dev));
+    b.title = 'Developer mode is ' + (dev ? 'on' : 'off') + ': ' + (dev ? 'click for the player\'s view' : 'click for all the panels, the brain loop and the command box');
+    b.setAttribute('aria-label', b.title);
+  }
+  function setDev(on) {
+    dev = !!on;
+    try { if (dev) localStorage.setItem(DEV, '1'); else localStorage.removeItem(DEV); } catch {}
+    // ?dev= and ?play= would overrule the choice at the next reload
+    const url = new URL(location.href); url.searchParams.delete('dev'); url.searchParams.delete('play'); history.replaceState(history.state, '', url);
+    if (current && !allowed(current)) hide();
+    applyMode();
+  }
+
+  function init() {
+    if (!document.getElementById('rail')) return;
+    applyMode();
+    document.getElementById('devToggle')?.addEventListener('click', () => setDev(!dev));
     initRail();
     initResize();
     initTtsToggle();
     // showIfOpen: switch panes without opening a collapsed panel (selecting a
     // character shows its pane only if the panel is already open).
-    window.tablefolkTabs = { show: (n) => show(n, { force: true }), showIfOpen: (n) => { if (current && allowed(n)) show(n, { force: true }); }, hide, toggle, get dev() { return dev; } };
+    window.tablefolkTabs = { show: (n) => show(n, { force: true }), showIfOpen: (n) => { if (current && allowed(n)) show(n, { force: true }); }, hide, toggle, setDev, get dev() { return dev; } };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

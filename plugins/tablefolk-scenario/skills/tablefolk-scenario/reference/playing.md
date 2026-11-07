@@ -72,7 +72,7 @@ back. It speaks softly to someone beside it and louder across a room.
 User mode (the default) shows the player's panes: **Adventurer** (health,
 gold, wielded weapon, goal, items with give / drink / read / wield / drop,
 controls), **Messages** (the last 300 lines), **Voice** and **Graphics**.
-**Dev mode** (`?dev=1`, remembered in the browser; `?dev=0` turns it off,
+**Dev mode** (the DEV button on the left rail, or `?dev=1`, remembered in the browser; `?dev=0` turns it off,
 `?play=1` shows user mode for that page only) adds World, Character,
 Scenario, Library and Debug, the brain loop buttons, turn controls and the
 command box.

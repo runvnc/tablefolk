@@ -51,7 +51,7 @@ idle model turned toward the camera.
 
 ## Pipelines
 
-- **The `wizard` body's eyes are added in the game**: its file has sockets (holes in the `Face` mesh) but no eye mesh, and none painted on its atlas. `FIGURE_EYES` in `app.js` (`addFigureEyes`) gives each spawn merged whites and pupils parented to `Face`, in that mesh's axes (x across, -y forward, z up). Another eyeless body takes an entry there. The rendered 2D tiles still come from the file as it was until `render-tiles.mjs` runs.
+- **`wizard.glb` has a corrected face**: as supplied it had empty eye sockets and a nearly flat nose. `tools/fix-wizard-face.mjs` (gltf-transform, run on the original from commit b8eb3b1; usage in its header) moves the nose's wedge corners forward and adds eyes to the `Face` mesh with the one material (whites and pupils take their colour from a light and a black spot on the atlas), then re-quantizes and meshopt-compresses as the other files are. Blender can read the result only after decoding (no meshopt or AVIF), so the script stays in gltf-transform: a Blender round trip would risk the rig and clips.
 - **Quaternius Universal-rig figures** (woodsman, huntress, peasant,
   peasant_woman): `tools/build-figures.sh <kits dir> <gltf-transform dir>`
   with `tools/build-figure.mjs` (gltf-transform 4.5.1 retargeting:
