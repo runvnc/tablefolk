@@ -50,6 +50,24 @@ Native comparison: build Breeze with `-DGGML_WEBGPU=ON` against Google's
 prebuilt Dawn (`v20260317.182325` matches this ggml; clang, since the Dawn
 headers need C++20 under GCC) and run `breeze-cli` with the same line.
 
+## Cloned voices: the `sum_rows` bug (2026-11-07)
+
+Cloned voices came out with wrong words, shifting speakers and lines of 0 to 39 s, while designed
+voices were fine. ggml's `sum_rows.wgsl` wrote `dst[offset + wid.x]`, but past WebGPU's 65,535 workgroups
+a dimension ggml splits the dispatch over two, so rows overwrote each other and later ones were
+never written. The audio embedding sums one row per codebook embedding, 2048 x frames, so any
+reference clip over about 32 frames went wrong (values over 200x too big) and fed the whole prompt.
+Fixed in `ggml-webgpu-fast.patch`. `cumsum.wgsl` has the same line (Breeze does not use it; not patched).
+
+How it was found: `trace-clone.hpp` runs the same prompt and fixed frames through native and browser builds
+and records every operation of every graph (`breeze-trace.patch` is its hook in `Graph::compute`);
+`compare-trace.py a.tsv b.tsv` names the first operation that disagrees. Native side: `trace_main.cpp`, linked
+against `build-vk`. Browser side: worker message `debug_trace`. An 8-frame stage test could not see this.
+
+Not explained: the voice encoder's codes still match native only about 50-58% (99% in the first codebook, under 30%
+in the last). Clones rate close to native anyway, and using native's codes didn't help before this fix;
+not retested since.
+
 Status and traps: the maintainer skill's brains.md ("Breeze TTS 2 in the
 browser").
 

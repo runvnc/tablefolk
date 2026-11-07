@@ -1,0 +1,40 @@
+diff --git a/include/breeze/common.h b/include/breeze/common.h
+index a68705c..0dd51e9 100644
+--- a/include/breeze/common.h
++++ b/include/breeze/common.h
+@@ -36,6 +36,9 @@ struct KVCache {
+ };
+ 
+ // inputs are uploaded after allocation; prepared graphs own their scratch buffers
++// diagnostics: called with each graph after it runs (tools/breeze-web/trace-clone.hpp)
++extern void (*g_trace)(ggml_cgraph *);
++
+ struct Graph {
+     ggml_context * ctx = nullptr;
+     ggml_cgraph * gf = nullptr;
+diff --git a/src/common.cpp b/src/common.cpp
+index d619f3e..17bcc4e 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -85,10 +85,13 @@ ggml_tensor * Graph::input_f32(const std::vector<float> & data, int ne0, int ne1
+     return t;
+ }
+ 
++void (*g_trace)(ggml_cgraph *) = nullptr;
++
+ void Graph::compute(Backend & be, ggml_tensor * out) {
+     ggml_set_output(out);
+     for (ggml_tensor * r : extra_roots) ggml_build_forward_expand(gf, r);
+     ggml_build_forward_expand(gf, out);
++    if (g_trace) for (int i = 0; i < ggml_graph_n_nodes(gf); i++) ggml_set_output(ggml_graph_node(gf, i));   // trace: keep every result
+     if (!ggml_gallocr_alloc_graph(be.alloc, gf)) {
+         ggml_gallocr_free(be.alloc);
+         be.alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(be.backend));
+@@ -98,6 +101,7 @@ void Graph::compute(Backend & be, ggml_tensor * out) {
+         ggml_backend_tensor_set(pr.first, pr.second.data(), 0, pr.second.size());
+     }
+     replay(be);
++    if (g_trace) g_trace(gf);
+ }
+ 
+ void Graph::prepare(Backend & be, ggml_tensor * out) {

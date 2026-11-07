@@ -355,6 +355,7 @@ with `?trustSkills=1`, or after the player allows that package.
   `breeze-web` speaks (`tablefolkSpeakFps`, Graphics pane, default 15). The README has the
   profile and what did not help. Native `breeze-server` holds 2.3 GB of the card while idle, enough to
   run the browser build or Qwen out of memory.
+  Cloned voices were broken in the browser until 2026-11-07: ggml's `sum_rows` lost rows past 65,535 workgroups, which any reference clip over about 32 frames reaches. The patch fixes it; the README here tells how, and `trace-clone.hpp` is the tool for the next such bug. The manager now resamples references with `OfflineAudioContext` (cache keys gained `:24k`).
   Traps found: pointers above 2 GB come back negative in JS (use `>>> 2`),
   exported HEAP views go stale when memory grows (take fresh views of
   `wasmMemory`), and `bump.py` does not update a worker URL inside a JS

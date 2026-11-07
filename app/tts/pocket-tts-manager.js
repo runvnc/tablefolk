@@ -17,7 +17,7 @@
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
-    'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261106a',languages:false,cloneByText:true,progress:true},
+    'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107a',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
   // Breeze is picked by itself (nothing chosen in this browser) when it is
@@ -242,8 +242,8 @@
         const bFile=(bMood&&bv.moods?.[bMood])||bv.file, bText=(bMood&&bv.mood_text?.[bMood])||bv.text;
         await this.load(); await this.ensureAudio();
         const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+bFile+'?v='+(bv.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
-        const dec=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), audio=this.resample(this.toMono(dec),dec.sampleRate,24000);
-        await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:bk,audio,text:bText,cacheKey:bFile+':'+(bv.v||'')}},[audio.buffer]); });
+        const dec=await new OfflineAudioContext(1,1,24000).decodeAudioData(await r.arrayBuffer()), audio=dec.getChannelData(0).slice();   // the browser's own resampler: resample() is linear, without a filter, and folds high frequencies into the voice
+        await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:bk,audio,text:bText,cacheKey:bFile+':'+(bv.v||'')+':24k'}},[audio.buffer]); });
         this.custom.set(bk,{id:bk,name:bv.name,audio:[],created:Date.now(),pack:true,stateOnly:true}); return 'custom:'+bk;
       }
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;

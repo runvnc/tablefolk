@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-07
+
+- **Cloned voices work in the browser**: Breeze in the browser garbled library voices (wrong words, shifting speakers, lines far too long or cut short) because of a bug in ggml's WebGPU `sum_rows` on long reference clips. In a blind listening test they now rate about the same as native. References are also resampled properly now.
+
 ## 2026-11-06
 
 - **Breeze in the browser reaches real time on an RTX 2060**: it was remaking thousands of GPU objects for every 80 ms of audio; ggml's WebGPU backend now keeps them (`tools/breeze-web/ggml-webgpu-fast.patch`, 0.70x to 1.0-1.1x alone). In the game the picture drops to 15 fps while it speaks (Graphics pane), which took it from under 0.38x to about 1.0x after the first sound, with no stutter.

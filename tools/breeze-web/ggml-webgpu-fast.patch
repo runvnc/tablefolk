@@ -189,3 +189,15 @@ index 65d6d456..031f0e64 100644
          ctx->buffer.Destroy();
          delete ctx;
      }
+diff --git a/src/ggml-webgpu/wgsl-shaders/sum_rows.wgsl b/src/ggml-webgpu/wgsl-shaders/sum_rows.wgsl
+index 1ead3ac3..31b413a6 100644
+--- a/src/ggml-webgpu/wgsl-shaders/sum_rows.wgsl
++++ b/src/ggml-webgpu/wgsl-shaders/sum_rows.wgsl
+@@ -51,6 +51,6 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>,
+     }
+ 
+     if (lid.x == 0) {
+-        dst[params.offset_dst + wid.x] = shared_sum[0];
++        dst[params.offset_dst + wid.x + wid.y * num_wg.x] = shared_sum[0];
+     }
+ }

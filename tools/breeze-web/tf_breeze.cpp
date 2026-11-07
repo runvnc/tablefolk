@@ -9,6 +9,7 @@
 #include "breeze/generation.h"
 #include "breeze/model.h"
 #include "debug-stages.hpp"
+#include "trace-clone.hpp"
 
 #include "ggml-backend.h"
 #include "ggml.h"
@@ -124,6 +125,13 @@ EMSCRIPTEN_KEEPALIVE const char * tf_matvec_check(int repeats) {
             ggml_backend_buffer_free(bc); ggml_backend_buffer_free(bg); ggml_free(cc); ggml_free(gg);
         }
     }
+    return out.c_str();
+}
+
+// diagnostics: trace-clone.hpp, from codes and a transcript (use_ref 0: the same prompt without them)
+EMSCRIPTEN_KEEPALIVE const char * tf_trace(const int * codes, int n_codes, int frames, const char * ref_text, int use_ref, int steps) {
+    static std::string out;
+    try { out = tf_trace_clone(g_model, std::vector<int>(codes, codes + n_codes), frames, ref_text ? ref_text : "", use_ref, steps); } catch (const std::exception & e) { out = std::string("error: ") + e.what(); }
     return out.c_str();
 }
 
