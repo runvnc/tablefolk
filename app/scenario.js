@@ -936,6 +936,10 @@
       // locks.js: locked doors and their keys
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
+      // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
+      defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
+      simple: typeof s.simple === 'boolean' ? s.simple : null,
+      systemPrompt: typeof s.systemPrompt === 'string' && s.systemPrompt.trim() ? s.systemPrompt : null,
       food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length && !s._sub) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
@@ -998,6 +1002,7 @@
     // characters and objects put back from the snapshot taken on leaving
     if (!opts.sub && !opts.restore) frames.length = 0;
     const base = normalizeScenario(input);
+    if (!opts.sub && !opts.restore && !opts.testing) window.tablefolkUseModel?.(base.defaultModel);
     // Extra asset packs first, so their object types exist for the layout.
     for (const r of await Promise.allSettled(base.packs.map(u => window.tablefolkPacks.load(u)))) {
       if (r.status === 'rejected') { console.error(r.reason); window.tablefolkToast?.('asset pack failed: ' + r.reason.message, { type: 'error' }); }
@@ -1023,6 +1028,7 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
+    w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
@@ -1081,7 +1087,7 @@
         temperament: withRole(a).temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
-        quest: a.quest || '', goal: '', messages: [], recent: [], thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
+        quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
         ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
@@ -1337,7 +1343,7 @@
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
         return { id: g.id, ...(g.charModel ? { model: g.charModel } : {}), at: [Math.round(g.root.position.x), Math.round(g.root.position.z)], facing: dirName(g.dir),
-          personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}),
+          personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}), ...(typeof c.simple === 'boolean' ? { simple: c.simple } : {}), ...(c.systemPrompt ? { systemPrompt: c.systemPrompt } : {}),
           ...(c.showThoughts === false ? { showThoughts: false } : {}), ...(c.ttsVoiceId ? { ttsVoiceId: c.ttsVoiceId } : {}),
           ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}) };
       }),

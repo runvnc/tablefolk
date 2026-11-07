@@ -6,8 +6,8 @@ import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from 
 import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030g';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
-import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261030a';
-import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261018a';
+import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106b';
+import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106b';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
@@ -48,6 +48,11 @@ const SUPPORTED_MODELS = {
   'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10 },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
+  // The newest official 0.5B Qwen (Qwen2.5-0.5B-Instruct; Qwen3 starts at 0.6B), Q4_K_M GGUF
+  // on wllama. simple: simple-mode prompts (app.js buildSimplePrompt) unless a
+  // scenario says otherwise. autoLoad: loads like the LiteRT models, with the
+  // download question, though it is a wllama3 engine. builder.js lists it too.
+  'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B (tiny and very silly; simple prompts)', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
   'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },
@@ -336,7 +341,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, hidden: !!cfg.hidden })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

@@ -1,13 +1,13 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261031c';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261106c';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261031c';
+import { installDevConsole } from './dev-console.js?v=20261106b';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030g';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
-import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261030a';
+import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261106b';
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -351,8 +351,54 @@ function overhear(world, g, who, text) {
 }
 
 const HISTORY_KEEP = 12;
+// Simple mode (app.js isSimpleBrain): the last few things said, as plain talk.
+// No seed, no reports of its own actions or corrections: a tiny model repeats
+// those instead of answering. Six messages, and a short prompt: wllama reads a
+// whole prompt again each turn.
+const SIMPLE_HISTORY = 6;
+// Whatever a tiny model wrote becomes one thing to do: an allowed command on a
+// line of its own, else its first line of words. say(...), a speaker's name in
+// front ("[Pilgrim]", "Oracle:"), stray tags and outer quotes all go.
+function simpleReply(world, g, text) {
+  const names = [g.id, world.playerName?.(), ...world.getAgents().map(a => a.id)].filter(Boolean).map(n => n.replace(/[^\w -]/g, '')).join('|');
+  const speaker = new RegExp('^(\\[\\s*(' + names + ')\\s*\\]|(' + names + ')(\\s+says)?\\s*:)\\s*', 'i');
+  const allowed = world.getAllowedCommands(g.id);
+  for (let l of String(text || '').split('\n')) {
+    l = l.trim();
+    const act = l.match(/^(walk|give|sell|attack)\s*\(/i);
+    if (act && allowed.includes(act[1].toLowerCase())) return l;
+    l = l.replace(/^say\s*\(\s*/i, '').replace(/\)\s*$/, m => m && /^say\s*\(/i.test(text.trim()) ? '' : m).replace(/<\/?[a-z_|][^<>]*>/gi, '').trim();
+    l = l.replace(/^["“']+/, '').trim();
+    for (let p = ''; p !== l; ) { p = l; l = l.replace(speaker, '').replace(/^["“]+/, '').trim(); }
+    l = l.replace(/["”]+$/, '').trim();
+    if (/[\p{L}\p{N}]/u.test(l)) return l.replace(/^[a-z_]+\s*\(/i, m => /^say/i.test(m) ? '' : m);
+  }
+  return '';
+}
+function buildSimpleMessages(world, g, cfg, built) {
+  const messages = [{ role: 'system', content: built.systemMessage }];
+  // Alone with one person, no names at all: "[Pilgrim]" was copied into every reply.
+  const crowd = !!built.commandReminder;
+  const words = l => crowd ? String(l).replace(/^\[([^\]]+)\]\s*/, '$1: ') : String(l).replace(/^\[[^\]]+\]\s*/, '');
+  for (const m of (cfg.messages || []).filter(m => m.role === 'assistant' || /^\[[^\]]+\]\s/.test(String(m.content))).slice(-SIMPLE_HISTORY)) {
+    const text = m.role === 'assistant' ? String(m.content) : words(m.content), last = messages[messages.length - 1];
+    if (last.role === m.role) last.content += '\n' + text; else messages.push({ role: m.role, content: text });
+  }
+  if (messages[1]?.role === 'assistant') messages.splice(1, 1);
+  const pending = cfg.pendingChat || [], isEvent = l => /^\s*(\[event\]|\()/.test(String(l));
+  const events = pending.filter(isEvent).map(l => String(l).replace(/^\s*\[event\]\s*/, '').replace(/^\((.*)\)$/, '$1'));
+  const speech = pending.filter(l => !isEvent(l)).map(l => { const x = String(l).match(/^(.+?)\s+says:\s*(.*)$/); return x ? `[${x[1].trim()}] ${x[2]}` : String(l); });
+  const said = speech.map(words).join('\n'), chatSuffix = [...events.map(e => '[happened] ' + e), ...speech].join('\n');
+  cfg.pendingChat = []; world.setBrainConfig(g.id, cfg);
+  const text = [built.commandReminder, ...events, said || (events.length ? 'What do you say?' : 'Say something.')].filter(Boolean).join('\n');
+  const last = messages[messages.length - 1];
+  if (last.role === 'user') last.content += '\n' + text; else messages.push({ role: 'user', content: text });
+  return { messages, chatSuffix: chatSuffix ? '\n\n' + chatSuffix : '' };
+}
 function buildAgentMessages(world, g, cfg) {
-  const { systemMessage, commandReminder } = world.buildAgentPrompt(g, cfg);
+  const built = world.buildAgentPrompt(g, cfg);
+  if (built.simple) return buildSimpleMessages(world, g, cfg, built);
+  const { systemMessage, commandReminder } = built;
   const messages = [{ role: 'system', content: systemMessage }];
   // Seed the conversation with a real example of responding to speech with say()
   // (teaches the small model not to echo the speaker attribution). Only prepend
@@ -410,6 +456,15 @@ function buildAgentMessages(world, g, cfg) {
   return { messages, chatSuffix };
 }
 
+const hasModelParam = () => new URLSearchParams(location.search).has('model');
+// The scenario a link opens (scenario.js openFromUrl reads it too)
+async function linkedScenario(world) {
+  const m = location.hash.match(/(?:^#|&)s(?:cenario)?=([A-Za-z0-9_-]+)/), url = new URLSearchParams(location.search).get('scenario');
+  if (m) return await window.tablefolkScenario?.decodeScenario(m[1]);
+  if (url) return await (await fetch(url)).json();
+  return null;
+}
+
 async function main() {
   const world = await waitForWorld();
   el('dismissModelLoad')?.addEventListener('click', () => {
@@ -440,12 +495,18 @@ async function main() {
     // (otherwise the pending bubble is cleared when the turn finishes).
     if (t && world.getBrainConfig(agentId)?.showThoughts !== false) world.showThought?.(agentId, t);
   });
+  window.tablefolkBrainInfo = () => manager.getSupportedModels().find(m => m.key === manager.getModelKey());
   // Auto-load the brain on startup
   // Populate model selector
   const modelSelect = el('modelSelect');
   // The best model this device's graphics card holds (a first visit starts
   // with it; the picker marks it either way).
   const device = await manager.pickForDevice().catch(() => null);
+  // A world linked with its own "defaultModel" starts on that brain: known
+  // here, so the usual model is not loaded first only to be thrown away.
+  const startKey = manager.getModelKey();   // what this player uses when a world names none
+  const linked = await linkedScenario(world).catch(() => null);
+  if (linked?.defaultModel && !hasModelParam() && manager.getSupportedModels().some(m => m.key === linked.defaultModel)) manager.setModel(linked.defaultModel, false);
   // freeGB: graphics memory left beside the chat model (the Breeze voice wants about 4)
   if (device) { device.freeGB = (usableGB(device.hw) || 0) - (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.needGB || 3); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
   if (modelSelect) {
@@ -460,15 +521,28 @@ async function main() {
       modelSelect.appendChild(opt);
     }
     modelSelect.value = manager.getModelKey();
+    // scenario.js: a world's "defaultModel" (null: the player's usual one). ?model= wins;
+    // not saved as the player's choice. Goes through the picker's load flow.
+    let switchPersist = true;
+    window.tablefolkUseModel = key => {
+      if (hasModelParam() || window.TABLEFOLK_ART_MODE) return false;
+      const want = manager.getSupportedModels().some(m => m.key === key) ? key : usualModel();
+      if (want === manager.getModelKey()) return false;
+      if (![...modelSelect.options].some(o => o.value === want)) { const o = document.createElement('option'); o.value = want; o.textContent = manager.getSupportedModels().find(m => m.key === want).label; modelSelect.appendChild(o); }
+      modelSelect.value = want; switchPersist = false;
+      modelSelect.dispatchEvent(new Event('change'));
+      return true;
+    };
+    function usualModel() { try { const s = localStorage.getItem('tablefolk_model'); if (s && manager.getSupportedModels().some(m => m.key === s && !m.hidden)) return s; } catch {} return startKey; }
     modelSelect.addEventListener('change', async () => {
-      const newKey = modelSelect.value;
+      const newKey = modelSelect.value, persist = switchPersist; switchPersist = true;
       appendLog('switching model to ' + newKey);
       // Stop agents if running
       if (running) {
         running = false;
         el('stopBrains').disabled = true;
       }
-      manager.setModel(newKey);
+      manager.setModel(newKey, persist);
       // Update load button text
       const loadBtn = el('loadBrains');
       if (loadBtn) loadBtn.textContent = 'load ' + (manager.getSupportedModels().find(m => m.key === newKey)?.label || newKey);
@@ -593,7 +667,7 @@ async function main() {
     setStatus('local brain disabled (art review mode)');
     el('modelLoadNotice')?.classList.add('hidden');
     appendLog('art review mode: LLM load skipped');
-  } else if (getActiveEngine(manager) === 'transformers.js' || getActiveEngine(manager) === 'wllama3') {
+  } else if ((getActiveEngine(manager) === 'transformers.js' || getActiveEngine(manager) === 'wllama3') && !window.tablefolkBrainInfo()?.autoLoad) {
     // GPU/WebGPU engines never auto-load, even if cached and even if this model
     // was the last one selected (localStorage remembers it). WebGPU inference
     // competes with the 3D renderer's own WebGPU context for GPU resources and
@@ -716,6 +790,9 @@ async function main() {
       const spokenTo = !!cfg.pendingChat?.length;
       if (spokenTo) cfg.quietTurns = 0;
       const quiet = !spokenTo && cfg.quietTurns > 0;
+      const simple = !chatTestMode && !!world.isSimpleBrain?.(g, cfg);
+      // In simple mode whatever it writes is spoken, so a quiet turn costs no model time.
+      if (simple && quiet) { cfg.quietTurns--; world.setBrainConfig(g.id, cfg); return false; }
       let messages;
      let chatSuffix = '';
       if (chatTestMode) {
@@ -790,7 +867,7 @@ async function main() {
           // quick-start budget (its agent eval ran at 1024 a turn; at 256 all
           // of it went into reasoning and no answer came).
           enableThinking: cfg.thinking === true,
-          maxTokens: cfg.thinking === true ? 4096 : undefined,
+          maxTokens: cfg.thinking === true ? 4096 : simple ? 70 : undefined,
           temperature: cfg.chaos > 70 ? 0.8 : (cfg.chaos > 40 ? 0.5 : 0.3),
         });
       } finally {
@@ -814,6 +891,7 @@ async function main() {
         if (!name) return m;
         return '\n' + name + '(' + args.map(a => /^-?\d+(\.\d+)?$/.test(a) ? a : JSON.stringify(a)).join(', ') + ')\n';
       }).replace(/<\/?tool_call>/g, '');
+      if (simple) line = simpleReply(world, g, line);
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
       // models often answer in plain text ("I am tired. State your
@@ -821,7 +899,7 @@ async function main() {
       // on, plain lines are leftover reasoning and are dropped below.)
       // (a bare "sit", "sleep", "lie down" is the action: app.js parseCommand)
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l) || /^(sit|sleep|rest|nap|sit down|lie down)\.?$/i.test(l.trim());
-      const speakPlain = !quiet && cfg.thinking !== true && world.getAllowedCommands(g.id).includes('say');
+      const speakPlain = !quiet && cfg.thinking !== true && (simple || world.getAllowedCommands(g.id).includes('say'));
       // ... except plain lines that are the model planning aloud, which small
       // models (LFM3 1.7B) write beside their commands: "Say that she's hungry.
       // Then offer food.", "As hector, I should question her. Let me respond
@@ -847,11 +925,12 @@ async function main() {
           const cmds = [];
           let text = embedded ? l.replace(embedded, m => { cmds.push(m); return ' '; }) : l;
           const quoted = [...text.matchAll(/["\u201c]([^"\u201c\u201d]{2,})["\u201d]/g)].map(m => m[1].trim());
-          if (echoLine(l)) { quoted.length = 0; text = ''; }
+          if (simple) { const parts = text.match(/[^.!?]+[.!?]+["')\]]*\s*/g); if (parts) text = parts.slice(0, 2).join(''); quoted.length = 0; }   // a reply cut by the token limit ends on its last whole sentence
+          else if (echoLine(l)) { quoted.length = 0; text = ''; }
           else if (!quoted.length && planning(text)) text = '';
           text = (quoted.length ? quoted.join(' ') : text).replace(/^["'\u201c]+|["'\u201d]+$/g, '').replace(/\s+/g, ' ').trim();
           const out = [];
-          if (text) { saidPlain = true; out.push({ kind: 'say', text }); histParts.push(`say(${JSON.stringify(text)})`); }
+          if (text) { saidPlain = true; out.push({ kind: 'say', text }); histParts.push(simple ? text : `say(${JSON.stringify(text)})`); }
           for (const c of cmds) { const p = world.parseLLMCommandLine(c); if (p) { out.push(p); histParts.push(c); } }
           return out;
         }
@@ -894,7 +973,7 @@ async function main() {
         const copied = quotesHistory || recentOthers.some(o => { let n = 0; for (const w of mine) if (o.has(w)) n++; return n / mine.size >= .7; });
         if (copied) { planCmds.splice(i, 1); echoed = true; }
       }
-      if (echoed) cfg.pendingChat = (cfg.pendingChat || []).concat(['(That line only repeated what was just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
+      if (echoed && !simple) cfg.pendingChat = (cfg.pendingChat || []).concat(['(That line only repeated what was just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
@@ -912,7 +991,7 @@ async function main() {
       // nothing usable: it stands and thinks (a look() here filled turns with looking around)
       // a look() on a later line, too soon after the last one
       if (lookedLately) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'look' && planCmds.length > 1) planCmds.splice(i, 1);
-      if (!planCmds.length) planCmds.push({ kind: 'emote', emote: 'ponders' });
+      if (!planCmds.length && !simple) planCmds.push({ kind: 'emote', emote: 'ponders' });
       // Persist chat messages to history so they're remembered in future turns
       if (chatSuffix) {
         // Only the speech itself goes into the history, never instructions.
@@ -959,7 +1038,7 @@ async function main() {
         cfg.messages = cfg.messages.concat([{ role: 'user', content: `SYSTEM: You said you would hand something over, but nothing changed hands. Saying it does nothing; use ${how} to actually do it.` }]);
       }
       if (droppedSpeech) cfg.messages = cfg.messages.concat([{ role: 'user', content: quiet ? 'SYSTEM: You kept quiet this turn; nobody heard that.' : 'SYSTEM: Only your first two lines were spoken. Say less.' }]);
-      if (saidPlain) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
+      if (saidPlain && !simple) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
       if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);
       world.setBrainConfig(g.id, cfg);

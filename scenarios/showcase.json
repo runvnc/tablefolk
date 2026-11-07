@@ -68,5 +68,17 @@
    "lives on its own",
    "comedy"
   ]
+ },
+ {
+  "file": "the-oracle.json",
+  "title": "The Oracle",
+  "pitch": "He knows everything. He runs on a 490 MB brain. Ask him anything.",
+  "who": [
+   "wizard"
+  ],
+  "tags": [
+   "comedy",
+   "very small brain"
+  ]
  }
 ]

@@ -3881,8 +3881,48 @@ function inCharacter(id, style, personality){
   const traits=sents.slice(1).filter(x=>x.trim().length>25), pick=traits.length?traits[Math.floor(Math.random()*traits.length)]:sents[0];
   return `you are ${id}${style?', '+style:''}. ${pick.trim()}`.slice(0,260);
 }
+// Simple mode, for very small models (Qwen 0.5B): only who it is and what was
+// just said, and whatever it writes is spoken. A character's "simple", else
+// the scenario's, else ?simple=1|0, else what the brain asks for.
+function isSimpleBrain(g, cfg=getBrainConfig(g.id)){
+  if(typeof cfg.simple==='boolean') return cfg.simple;
+  if(typeof state.simple==='boolean') return state.simple;
+  const q=new URLSearchParams(location.search).get('simple');
+  if(q==='1'||q==='0') return q==='1';
+  return !!window.tablefolkBrainInfo?.()?.simple;
+}
+// "systemPrompt" (a character's, else the scenario's) replaces the whole system message.
+function systemOverride(g, cfg, cmds){
+  const text=String(cfg.systemPrompt||state.systemPrompt||'').trim(); if(!text) return '';
+  const v={name:g.id,style:cfg.style||'',personality:cfg.personality||'',backstory:cfg.backstory||'',commands:cmds.join('\n')};
+  return text.replace(/\{(name|style|personality|backstory|commands)\}/g,(_,k)=>v[k]);
+}
+// The few commands a tiny model can manage, each as it would write it.
+function simpleCommands(g){
+  const allowed=commandsFor(g), out=[];
+  if(allowed.has('walk')) out.push('walk(name) to go to someone or something');
+  if(allowed.has('give')) out.push('give(item) to hand something over');
+  if(allowed.has('sell')) out.push('sell(item, price) to sell something');
+  if(allowed.has('attack')) out.push('attack(name) to hit someone next to you');
+  return out;
+}
+function buildSimplePrompt(g, cfg){
+  const clean=s=>String(s||'').replace(/\s+/g,' ').trim(), cmds=simpleCommands(g);
+  const systemMessage=systemOverride(g,cfg,cmds)||[
+    `You are ${g.id}${cfg.style?', '+clean(cfg.style):''}.`,
+    clean(cfg.personality), clean(cfg.backstory),
+    ...(cfg.knows||[]).slice(0,3).map(clean),
+    ...(cfg.quest?['Your quest: '+clean(cfg.quest)]:[]),
+    'Write only the words you say out loud, in one or two short sentences.',
+    ...(cmds.length?['To act instead of talking, write just one of these:',...cmds]:[]),
+  ].filter(Boolean).join('\n');
+  const close=o=>o&&Math.hypot(o.root.position.x-g.root.position.x,o.root.position.z-g.root.position.z)<8;
+  const near=[...state.characters.filter(o=>o!==g&&close(o)&&!getBrainConfig(o.id).defeated).map(o=>o.id), ...(close(state.playerAvatar)?[playerName()]:[])];
+  return { systemMessage, commandReminder: near.length>1?'With you: '+near.slice(0,4).join(', ')+'.':'', simple:true };
+}
 function buildAgentPrompt(g, cfg) {
   if (!g || !cfg) return { systemMessage: '', commandReminder: '' };
+  if (isSimpleBrain(g, cfg)) return buildSimplePrompt(g, cfg);
   const r=document.getElementById('visionRadius')?.value || 5;
   const perception = buildVisiblePerception(g.id, r);
   const style = (cfg.style ?? 'goofy little creature').replace(/\s+/g, ' ').trim();
@@ -3956,7 +3996,7 @@ function buildAgentPrompt(g, cfg) {
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
   ].join('\n');
-  return { systemMessage, commandReminder };
+  return { systemMessage: systemOverride(g, cfg, cmds) || systemMessage, commandReminder };
 }
 function updatePerceptionUI(){
   // The allowed commands (the selected character's own list, else the
@@ -4765,7 +4805,7 @@ function installWorldAPI(){
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,
-    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, saveWorldState, worldStateData, restoreWorldState,
+    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, isSimpleBrain, saveWorldState, worldStateData, restoreWorldState,
   };
 }
 

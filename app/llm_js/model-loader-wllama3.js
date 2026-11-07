@@ -37,6 +37,15 @@ const MODEL_CONFIG = {
     file: 'MiniCPM5-1B-Q8_0.gguf',
     size: 1150 * 1024 * 1024,
   },
+  // Small enough to offload whole; Qwen's own ChatML template (gpt-runner-wllama3.js)
+  'qwen2.5-0.5b': {
+    label: 'Qwen2.5 0.5B (WebGPU, GGUF Q4_K_M)',
+    base: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/',
+    file: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+    size: 491 * 1024 * 1024,
+    gpuLayers: 99,
+    template: 'chatml',
+  },
 };
 
 // MiniCPM5-1B has 24 layers. wllama 3.x defaults n_gpu_layers to 99999 (ALL of
@@ -64,10 +73,10 @@ export async function getCapabilityInfo() {
   return { webgpu: true, shaderF16: false, cpu: true };
 }
 
-function resolveGpuLayers() {
+function resolveGpuLayers(cfg) {
   const raw = new URLSearchParams(location.search).get('gpulayers');
   const n = Number(raw);
-  return raw !== null && Number.isFinite(n) && n >= 0 ? n : DEFAULT_GPU_LAYERS;
+  return raw !== null && Number.isFinite(n) && n >= 0 ? n : (cfg.gpuLayers ?? DEFAULT_GPU_LAYERS);
 }
 
 export async function loadModel(modelKey, onProgress) {
@@ -83,7 +92,7 @@ export async function loadModel(modelKey, onProgress) {
   currentModel = null;
   loading = true;
 
-  const nGpuLayers = resolveGpuLayers();
+  const nGpuLayers = resolveGpuLayers(cfg);
   console.log('[tablefolk-wllama3] loading', cfg.file,
     '| n_gpu_layers=', nGpuLayers, '(0=CPU only, 24+=all layers; override with ?gpulayers=N)',
     '| hardwareConcurrency=', navigator.hardwareConcurrency);
@@ -130,7 +139,7 @@ export async function loadModel(modelKey, onProgress) {
 
   try {
     wllama = new Wllama(WLLAMA3_WASM, { allowOffline: false });
-    await wllama.loadModelFromUrl(HF_BASE + cfg.file, {
+    await wllama.loadModelFromUrl((cfg.base || HF_BASE) + cfg.file, {
       n_ctx: 4096,
       n_gpu_layers: nGpuLayers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
@@ -160,6 +169,7 @@ export async function loadModel(modelKey, onProgress) {
       },
     });
     currentModel = modelKey;
+    wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${nGpuLayers})`);
     return wllama;
@@ -183,11 +193,14 @@ export async function clearModelCache() {
   }
 }
 
-export async function hasModelCached() {
-  // wllama manages its own model cache; there is no cheap standalone check
-  // without an instance. Returning false only means the consent prompt shows,
-  // which is harmless - the download itself is still cache-backed.
-  return false;
+export async function hasModelCached(modelKey) {
+  // A Wllama instance does nothing until a model loads; its cache manager
+  // reads the browser's storage. Unknown means the download question shows.
+  const cfg = MODEL_CONFIG[modelKey]; if (!cfg) return false;
+  try {
+    const cache = wllama?.cacheManager || new Wllama(WLLAMA3_WASM, { allowOffline: false }).cacheManager;
+    return await cache.getSize(await cache.getNameFromURL((cfg.base || HF_BASE) + cfg.file)) > 0;
+  } catch { return false; }
 }
 
 export function getCacheBackend() { return 'wllama3-internal'; }

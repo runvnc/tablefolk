@@ -1,0 +1,60 @@
+{
+ "v": 1,
+ "title": "The Oracle",
+ "subtitle": "He knows everything. He has a very small brain.",
+ "intro": "After a long climb you reach the temple of the Oracle, the wisest man who ever lived. He has the answer to every question, and he will not hesitate. Ask him anything in the chat box: why the sky is blue, how to boil an egg, what seven times eight is, who you should marry. His brain is Qwen 0.5B, a very small model (a 490 MB download), and he has no idea.",
+ "defaultModel": "qwen2.5-0.5b",
+ "simple": true,
+ "base": "plain",
+ "lighting": "night",
+ "walls": "stone",
+ "floor": "stone",
+ "dark": false,
+ "campfire": false,
+ "needs": false,
+ "director": false,
+ "wallHeight": 2,
+ "player": {
+  "name": "Pilgrim",
+  "gold": 3,
+  "items": [],
+  "model": "wanderer"
+ },
+ "allowed": [
+  "say"
+ ],
+ "systemPrompt": "You are {name}, {style}. {personality}\nWrite only the words you say out loud, in one or two short sentences.",
+ "agents": [
+  {
+   "id": "Oracle",
+   "model": "wizard",
+   "style": "the old man who knows everything",
+   "ttsVoiceId": "builtin:wizard_m",
+   "facing": "s",
+   "hostile": false,
+   "chaos": 80,
+   "allowed": [
+    "say"
+   ],
+   "personality": "You are the wisest man who ever lived, and you know the answer to every question. You are very proud of this. You answer at once with total confidence, and every answer has an exact number, a year and a famous person's name. You never say you do not know, you never give balanced opinions, and when someone doubts you, you explain that they are a fool and give even more exact facts."
+  }
+ ],
+ "grid": [
+  "#############",
+  "#K.L.....L.K#",
+  "#K..RRRRR..K#",
+  "#...RROGR...#",
+  "#v..RRRRR..v#",
+  "#....RRR....#",
+  "#L...RRR...L#",
+  "#....RRR....#",
+  "#v...RRR...v#",
+  "######Y######"
+ ],
+ "legend": {
+  "R": "carpet",
+  "G": "Oracle",
+  "O": "cauldron on carpet"
+ },
+ "goal": null
+}

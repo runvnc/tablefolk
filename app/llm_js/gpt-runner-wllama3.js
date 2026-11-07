@@ -14,7 +14,9 @@ import { getCurrentModel } from './model-loader-wllama3.js';
 // must be literal - they were once mangled into the bare words 'thinking' /
 // 'response', which made the model emit stray closing </think> tags and drift
 // out of command syntax.
-function buildPrompt(messages, think) {
+function buildPrompt(messages, think, template) {
+  // Qwen: plain ChatML (its template adds nothing else when a system message is there)
+  if (template === 'chatml') return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n';
   let p = '<s>';
   for (const msg of messages) {
     p += `<|im_start|>${msg.role}\n${msg.content}ٌ\n`;
@@ -23,6 +25,8 @@ function buildPrompt(messages, think) {
   p += think ? '<think>\n' : '<think>\n\n</think>\n\n';
   return p;
 }
+
+const MINICPM_END = 'ٌ';
 
 export function createWllama3Engine(wllamaInstance) {
   return {
@@ -39,7 +43,8 @@ export function createWllama3Engine(wllamaInstance) {
             ? config.responseFormat.grammar
             : null;
 
-          const prompt = buildPrompt(messages, enableThinking);
+          const prompt = buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
+          const stopToken = wllamaInstance.tablefolkTemplate === 'chatml' ? '<|im_end|>' : MINICPM_END;
           const t0 = performance.now();
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
             'prompt chars:', prompt.length, 'maxTokens:', maxTokens,
@@ -80,7 +85,7 @@ export function createWllama3Engine(wllamaInstance) {
                     'renderPaused:', !!window.TABLEFOLK_PAUSE_RENDER);
                 }
                 full += piece;
-                if (full.includes('ٌ') || shouldAbort?.()) { aborter.abort(); return; }
+                if (full.includes(stopToken) || shouldAbort?.()) { aborter.abort(); return; }
                 onToken?.(full, true);
               },
             });
@@ -92,7 +97,7 @@ export function createWllama3Engine(wllamaInstance) {
             clearInterval(poll);
           }
 
-          const text = full.split('ٌ')[0].trim();
+          const text = full.split(stopToken)[0].trim();
           const totalMs = performance.now() - t0;
           const genMs = firstTokenAt !== null ? performance.now() - firstTokenAt : null;
 
