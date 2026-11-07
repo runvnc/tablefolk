@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-06
 
+- **Chaos counts from each model's recommended settings**: 0 and 1 (the default) are the makers' settings, and higher values open up temperature, top-p and top-k from there, on Gemma, LFM3 and MiniCPM too (they used to ignore it). Qwen now starts from its recommended 0.7. A rougher Qwen 0.5B Q2_K is available with `?model=qwen2.5-0.5b-q2`.
 - **A reload opens a scenario file's latest version**: with `?scenario=` in the address, the file now wins over the `#s=` copy the page writes beside it; before, a reload replayed the old copy and ignored changes to the file. Worlds picked from the Worlds screen keep their file in the address too.
 - **A world can skip its intro card** (`showIntro: false`, also on the world builder's Story tab), as The Oracle now does; `?intro=0` or `?intro=1` on a link overrides it.
 - **The wizard's face is corrected in the model**: it came with empty eye sockets and a flat slab of a nose; `wizard.glb` now has eyes and a nose with a ridge and a tip (`tools/fix-wizard-face.mjs`).

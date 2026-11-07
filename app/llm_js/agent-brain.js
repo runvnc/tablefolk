@@ -6,14 +6,14 @@ import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from 
 import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030g';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
-import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106b';
-import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106c';
+import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106c';
+import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106e';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
-import { samplingFor } from './sampling.js?v=20261030b';
+import { samplingFor, withChaos } from './sampling.js?v=20261106a';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
@@ -53,6 +53,7 @@ const SUPPORTED_MODELS = {
   // scenario says otherwise. autoLoad: loads like the LiteRT models, with the
   // download question, though it is a wllama3 engine. builder.js lists it too.
   'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B (tiny and very silly; simple prompts)', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true },
+  'qwen2.5-0.5b-q2': { label: 'Qwen2.5 0.5B Q2_K (rougher still)', engine: 'wllama3', size: '~415 MB', simple: true, autoLoad: true, hidden: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
   'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },
@@ -272,7 +273,9 @@ export function createAgentBrainManager(config = {}) {
     });
     // The makers' recommended sampling for this model (sampling.js) wins over
     // the game's temperature; the endpoint brain is matched by its model name.
-    const rec = samplingFor(getEngineType() === 'openai' ? getEndpointConfig().model : currentModelKey);
+    const made = samplingFor(getEngineType() === 'openai' ? getEndpointConfig().model : currentModelKey);
+    // A character's chaos counts from the model's own settings (console callers pass a temperature instead)
+    const rec = agent.chaos != null ? withChaos(made, agent.chaos) : made;
     let text;
     try {
       text = await generateFn(engine, '', {

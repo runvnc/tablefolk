@@ -57,8 +57,8 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   localStorage flag marks a finished load. Not run on the maintainer's 6 GB
   card; untested in the app with real weights.
 - **Sampling** (`sampling.js`, 2026-10-30): a model with makers' recommended
-  settings is always run with them, not the game's chaos temperature
-  (chaos 0-100 is 0.3-1.2, continuous since 2026-11-06): Gemma 4 temperature 1.0, top-p 0.95, top-k 64; MiniCPM5 1.0,
+  settings is always run with them, and a character's chaos counts from
+  them (`withChaos`, 2026-11-06: 0 and 1 unchanged, then temperature, top-p and top-k open up on a curve): Gemma 4 temperature 1.0, top-p 0.95, top-k 64; MiniCPM5 1.0,
   top-p 0.95, min-p 0; LFM3 0.1, top-k 50, repetition penalty 1.1. The LiteRT
   worker sets them on the conversation (type 2, top-k capped at 64: 256 gave
   random tokens); before, LiteRT text models ran on each bundle's hidden

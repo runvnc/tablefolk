@@ -1,13 +1,13 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261106d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261106g';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261106c';
+import { installDevConsole } from './dev-console.js?v=20261106e';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030g';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
-import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261106b';
+import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261106c';
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -870,7 +870,7 @@ async function main() {
           // of it went into reasoning and no answer came).
           enableThinking: cfg.thinking === true,
           maxTokens: cfg.thinking === true ? 4096 : simple ? 70 : undefined,
-          temperature: 0.3 + 0.9 * Math.min(100, Math.max(0, +cfg.chaos || 0)) / 100,   // chaos 0-100 is temperature 0.3-1.2 (sampling.js's recommended settings win)
+          chaos: cfg.chaos ?? 1,   // sampling.js withChaos: counts from the model's recommended settings
         });
       } finally {
         world.clearPendingThought?.(g.id);

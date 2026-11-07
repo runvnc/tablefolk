@@ -199,7 +199,7 @@
         <label>Mind style <select id="brainStyle"><option selected>helpful character</option><option>builder</option><option>fireball goblin</option><option>coward</option><option>helpful mage</option><option>nervous mushroom</option></select></label>
         <label>Mind enabled <input id="brainEnabled" type="checkbox" checked /></label>
         <label>Fireball temptation <input id="fireballTemptation" type="range" min="0" max="100" value="20" /></label>
-        <label title="How wild the replies are: 0 is temperature 0.3, 100 is 1.2. Models with their makers' recommended settings (Gemma, LFM3, MiniCPM) ignore it.">Chaos <input id="chaosLevel" type="range" min="0" max="100" value="1" /></label>
+        <label title="How wild the replies are, counted from the model's own recommended settings: 0 and 1 are those settings, 100 is very high.">Chaos <input id="chaosLevel" type="range" min="0" max="100" value="1" /></label>
         <label>Quest <input id="agentQuest" type="text" placeholder="medium-term goal set by world/human" /></label>
         <label>Current goal <input id="agentGoal" type="text" placeholder="set by agent via goal()" readonly /></label>
       </div>
@@ -426,6 +426,6 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261106o"></script>
+  <script src="preflight.js?v=20261106q"></script>
 </body>
 </html>

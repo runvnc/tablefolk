@@ -37,6 +37,14 @@ const MODEL_CONFIG = {
     file: 'MiniCPM5-1B-Q8_0.gguf',
     size: 1150 * 1024 * 1024,
   },
+  'qwen2.5-0.5b-q2': {
+    label: 'Qwen2.5 0.5B (WebGPU, GGUF Q2_K)',
+    base: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/',
+    file: 'qwen2.5-0.5b-instruct-q2_k.gguf',
+    size: 415 * 1024 * 1024,
+    gpuLayers: 99,
+    template: 'chatml',
+  },
   // Small enough to offload whole; Qwen's own ChatML template (gpt-runner-wllama3.js)
   'qwen2.5-0.5b': {
     label: 'Qwen2.5 0.5B (WebGPU, GGUF Q4_K_M)',

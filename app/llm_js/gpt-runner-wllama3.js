@@ -47,7 +47,7 @@ export function createWllama3Engine(wllamaInstance) {
           const stopToken = wllamaInstance.tablefolkTemplate === 'chatml' ? '<|im_end|>' : MINICPM_END;
           const t0 = performance.now();
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
-            'prompt chars:', prompt.length, 'maxTokens:', maxTokens,
+            'prompt chars:', prompt.length, 'maxTokens:', maxTokens, 'sampling:', { temperature, top_p: config.top_p, top_k: config.top_k, repeat: config.repetition_penalty },
             'grammar:', grammar ? 'yes' : 'no', 'renderPaused:', !!window.TABLEFOLK_PAUSE_RENDER);
           console.log('[tablefolk-wllama3] PROMPT PREVIEW:', prompt.slice(0, 1500));
 
@@ -68,9 +68,9 @@ export function createWllama3Engine(wllamaInstance) {
               temperature,
               // a new seed each turn: the default repeats a reply word for word when a question comes again
               seed: Math.floor(Math.random() * 2147483647),
-              top_p: 0.95,
-              top_k: 40,
-              penalty_repeat: 1.1,
+              top_p: config.top_p ?? 0.95,
+              top_k: config.top_k ?? 40,
+              penalty_repeat: config.repetition_penalty ?? 1.1,
               timings_per_token: true,
               // GBNF from grammar.js. In 3.x this is a top-level sampling
               // param, not nested under `sampling` like 2.3.7.
@@ -134,6 +134,7 @@ export async function generate(engine, prompt, opts = {}) {
       : [{ role: 'user', content: prompt }],
     max_tokens: opts.maxTokens ?? 100,
     temperature: opts.temperature ?? 0.7,
+    top_p: opts.topP, top_k: opts.topK, repetition_penalty: opts.repetitionPenalty,
     onToken: opts.onToken ?? null,
     extra_body: { enable_thinking: opts.enableThinking ?? false },
     responseFormat: opts.responseFormat ?? null,
