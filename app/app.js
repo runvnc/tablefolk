@@ -3892,6 +3892,15 @@ function isSimpleBrain(g, cfg=getBrainConfig(g.id)){
   if(q==='1'||q==='0') return q==='1';
   return !!window.tablefolkBrainInfo?.()?.simple;
 }
+// A character that takes a turn only when someone speaks to it: "onlySpokenTo" (its own,
+// else the scenario's), else on in simple mode. With nothing said, the only prompt a tiny
+// model gets is "Say something.", and Qwen 0.5B answers "As an AI language model..." to that.
+function onlySpokenTo(g, cfg=getBrainConfig(g.id)){
+  if(typeof cfg.onlySpokenTo==='boolean') return cfg.onlySpokenTo;
+  if(typeof state.onlySpokenTo==='boolean') return state.onlySpokenTo;
+  return isSimpleBrain(g,cfg);
+}
+const heardSpeech=cfg=>(cfg.pendingChat||[]).some(l=>!/^\s*(\[event\]|\()/.test(String(l)));
 // "systemPrompt" (a character's, else the scenario's) replaces the whole system message.
 function systemOverride(g, cfg, cmds){
   const text=String(cfg.systemPrompt||state.systemPrompt||'').trim(); if(!text) return '';
@@ -4806,7 +4815,7 @@ function installWorldAPI(){
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,
-    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, isSimpleBrain, saveWorldState, worldStateData, restoreWorldState,
+    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, isSimpleBrain, onlySpokenTo, heardSpeech, saveWorldState, worldStateData, restoreWorldState,
   };
 }
 

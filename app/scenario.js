@@ -937,6 +937,7 @@
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
       // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
+      onlySpokenTo: typeof s.onlySpokenTo === 'boolean' ? s.onlySpokenTo : null,   // app.js onlySpokenTo
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
       defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
@@ -1029,7 +1030,7 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
-    w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
+    w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
@@ -1088,7 +1089,7 @@
         temperament: withRole(a).temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
-        quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
+        quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, onlySpokenTo: typeof a.onlySpokenTo === 'boolean' ? a.onlySpokenTo : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
         ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
@@ -1351,7 +1352,7 @@
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
         return { id: g.id, ...(g.charModel ? { model: g.charModel } : {}), at: [Math.round(g.root.position.x), Math.round(g.root.position.z)], facing: dirName(g.dir),
-          personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}), ...(typeof c.simple === 'boolean' ? { simple: c.simple } : {}), ...(c.systemPrompt ? { systemPrompt: c.systemPrompt } : {}),
+          personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}), ...(typeof c.simple === 'boolean' ? { simple: c.simple } : {}), ...(typeof c.onlySpokenTo === 'boolean' ? { onlySpokenTo: c.onlySpokenTo } : {}), ...(c.systemPrompt ? { systemPrompt: c.systemPrompt } : {}),
           ...(c.showThoughts === false ? { showThoughts: false } : {}), ...(c.ttsVoiceId ? { ttsVoiceId: c.ttsVoiceId } : {}),
           ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}) };
       }),

@@ -58,6 +58,8 @@
   // The brains a world can start on (the visible ones of SUPPORTED_MODELS in llm_js/agent-brain.js)
   const brainOptions = [['', "(the player's own)"], ['qwen1.5-0.5b', 'Qwen1.5 0.5B (~395 MB, the silliest)'], ['qwen2.5-0.5b', 'Qwen2.5 0.5B (~490 MB, tiny and silly)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (~2 GB)'], ['gemma4-e4b-litert', 'Gemma 4 E4B (~3 GB)'], ['gemma4-e2b-vision', 'Gemma 4 E2B with sight (~2.6 GB)'], ['bonsai2-27b', 'Bonsai 2 27B (~5.9 GB)'], ['endpoint', 'OpenAI-compatible endpoint']];
   const simpleSelect = (path, v) => `<label><span>simple mode (short prompt, replies are spoken)</span><select data-path="${path}" data-type="bool3"><option value=""${v == null ? ' selected' : ''}>auto (very small brains)</option><option value="true"${v === true ? ' selected' : ''}>on</option><option value="false"${v === false ? ' selected' : ''}>off</option></select></label>`;
+  const spokenSelect = (path, v) => `<label><span>speaks only when spoken to</span><select data-path="${path}" data-type="bool3"><option value=""${v == null ? ' selected' : ''}>auto (in simple mode)</option><option value="true"${v === true ? ' selected' : ''}>yes</option><option value="false"${v === false ? ' selected' : ''}>no</option></select></label>`;
+  const directorSelect = v => `<label><span>director (random events in a living world)</span><select data-path="director" data-type="bool3"><option value=""${v == null || Number.isFinite(+v) && v !== false ? ' selected' : ''}>${Number.isFinite(+v) && v != null && v !== false ? 'on: every ' + esc(v) + ' turns' : 'on'}</option><option value="false"${v === false ? ' selected' : ''}>off</option></select></label>`;
   const modelOptions = [['', '(critter)'], ...PEOPLE.map(m => [m, 'person: ' + m]), ...MONSTERS.map(m => [m, 'monster: ' + m]), ...OLDER.filter(m => m !== 'critter').map(m => [m, 'chibi: ' + m])];
   const voiceOptions = () => [['', '(fits the body)'], ...(voices.length ? voices : ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'].map(id => ({ id }))).map(v => ['builtin:' + v.id, v.id + (v.gender || v.description ? ' (' + [v.gender, v.description].filter(Boolean).join(', ') + ')' : '')])];
 
@@ -70,7 +72,7 @@
       ${field('style (a few words)', p + '.style', 'text', { wide: true })}
       ${field('personality / brief', p + '.personality', 'area', { wide: true, rows: 5 })}
       ${field('allowed commands (comma)', p + '.allowed', 'list', { wide: true, ph: 'scenario default' })}
-      ${simpleSelect(p + '.simple', a.simple)}
+      ${simpleSelect(p + '.simple', a.simple)}${spokenSelect(p + '.onlySpokenTo', a.onlySpokenTo)}
       ${field('full system prompt (replaces the built one; {name} {style} {personality} {backstory} {commands})', p + '.systemPrompt', 'area', { wide: true, rows: 3 })}
       ${field('gold', p + '.inventory.gold', 'num')}${field('items (comma)', p + '.inventory.items', 'list')}${scn.generate ? field('in (place)', p + '.in') : field('at [x, z]', p + '.at', 'json', { rows: 1 })}
     </div></fieldset>`;
@@ -98,7 +100,7 @@
       <div data-panel="story" ${tabNow === 'story' ? '' : 'hidden'}><fieldset><legend>Story</legend><div class="cols">${field('title', 'title')}${field('subtitle', 'subtitle')}
         ${field('lighting', 'lighting', 'select', { options: [['', '(default)'], 'bright', 'night', 'dim'] })}${field('walls', 'walls', 'select', { options: [['', '(default)'], 'stone', 'tabletop', 'block', 'modern'] })}
         <label><span>dark (fog of war, torches)</span><select data-path="dark" data-type="bool3"><option value=""${scn.dark == null ? ' selected' : ''}>auto (dungeons: yes)</option><option value="true"${scn.dark === true ? ' selected' : ''}>yes</option><option value="false"${scn.dark === false ? ' selected' : ''}>no</option></select></label>
-        ${field('default brain (model this world starts on)', 'defaultModel', 'select', { options: brainOptions })}${simpleSelect('simple', scn.simple)}
+        ${field('default brain (model this world starts on)', 'defaultModel', 'select', { options: brainOptions })}${simpleSelect('simple', scn.simple)}${spokenSelect('onlySpokenTo', scn.onlySpokenTo)}${directorSelect(scn.director)}
         <label><span>show the intro card</span><select data-path="showIntro" data-type="bool3"><option value=""${scn.showIntro !== false ? ' selected' : ''}>yes</option><option value="false"${scn.showIntro === false ? ' selected' : ''}>no: straight into the world</option></select></label>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
         ${field('win / lose rules (JSON: {"win": ..., "lose": ...})', '__rules', 'json', { wide: true, rows: 3 })}

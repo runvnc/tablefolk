@@ -5,6 +5,7 @@
  "showIntro": false,
  "defaultModel": "qwen1.5-0.5b",
  "simple": true,
+ "onlySpokenTo": true,
  "base": "plain",
  "lighting": "night",
  "walls": "stone",

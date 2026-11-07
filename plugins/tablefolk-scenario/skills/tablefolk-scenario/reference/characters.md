@@ -204,6 +204,11 @@ Three fields, in the JSON and on the world builder's Story and Characters tabs:
   `give`, `sell` and `attack`, when allowed. Automatic means on for brains that ask
   for it (Qwen 0.5B). `?simple=1` or `0` on a link sets it for characters and
   worlds that leave it unset.
+- **`onlySpokenTo`** (scenario or character; `true`, `false`, unset for automatic): it takes
+  a turn only when someone speaks to it, so no idle turns and no reacting to events.
+  Automatic means on in simple mode: with nothing said, a tiny model has nothing to go on
+  (Qwen 0.5B says "As an AI language model..."). The `director` (random events in a living
+  world, on the builder's Story tab too) is a separate switch.
 - **`systemPrompt`** (scenario, or a character's own, which wins): replaces the
   whole system message, in any mode. `{name}`, `{style}`, `{personality}`,
   `{backstory}` and `{commands}` are filled in. What happened, what it perceives

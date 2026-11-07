@@ -791,6 +791,8 @@ async function main() {
       // say/whisper in its command list) unless someone speaks to it.
       const spokenTo = !!cfg.pendingChat?.length;
       if (spokenTo) cfg.quietTurns = 0;
+      // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
+      if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
       const quiet = !spokenTo && cfg.quietTurns > 0;
       const simple = !chatTestMode && !!world.isSimpleBrain?.(g, cfg);
       // In simple mode whatever it writes is spoken, so a quiet turn costs no model time.

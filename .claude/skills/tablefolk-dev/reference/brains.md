@@ -147,7 +147,9 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   speech is cut to its first two sentences. Off in this mode: the seed example, the
   planning filter, the repeat guards in `say()` and the copy guard (they left him
   silent), reports and corrections in the history, the "ponders" fallback. A quiet
-  turn skips the model.
+  turn skips the model. `onlySpokenTo` (on by default here) skips turns with no speech in
+  `pendingChat`, in `mind.wantsTurn` and `runOneAgentTurn`: told only "Say something.",
+  Qwen1.5 gave "As an AI language model..." 7 times in 12.
 - **`systemPrompt` and `defaultModel`**: `systemOverride` in `app.js` replaces the
   system message in both modes. `window.tablefolkUseModel(key)` (scenario start;
   null goes back to the player's model) drives the picker's change handler without

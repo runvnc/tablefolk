@@ -273,6 +273,7 @@
   window.addEventListener('tablefolk-player-turn', () => { round++; });
   function wantsTurn(g) {
     const cfg = getBrainConfig(g.id), m = mindOf(g), since = round - (m.lastRound ?? -99);
+    if (window.tablefolk?.onlySpokenTo?.(g, cfg)) return window.tablefolk.heardSpeech(cfg);
     if (cfg.pendingChat?.length) return true;
     if (window.tablefolkWorkflows?.active(g.id)) return true;
     const w = want(g);
