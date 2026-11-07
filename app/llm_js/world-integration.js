@@ -462,8 +462,8 @@ const hasModelParam = () => new URLSearchParams(location.search).has('model');
 // The scenario a link opens (scenario.js openFromUrl reads it too)
 async function linkedScenario(world) {
   const m = location.hash.match(/(?:^#|&)s(?:cenario)?=([A-Za-z0-9_-]+)/), url = new URLSearchParams(location.search).get('scenario');
+  if (url) return await (await fetch(url, { cache: 'no-cache' })).json();   // the file wins, as in scenario.js openLink
   if (m) return await window.tablefolkScenario?.decodeScenario(m[1]);
-  if (url) return await (await fetch(url)).json();
   return null;
 }
 

@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-06
 
+- **A reload opens a scenario file's latest version**: with `?scenario=` in the address, the file now wins over the `#s=` copy the page writes beside it; before, a reload replayed the old copy and ignored changes to the file. Worlds picked from the Worlds screen keep their file in the address too.
 - **A world can skip its intro card** (`showIntro: false`, also on the world builder's Story tab), as The Oracle now does; `?intro=0` or `?intro=1` on a link overrides it.
 - **The wizard has eyes**: the model came with empty sockets, so every world using that body, The Oracle included, now shows eyes on it.
 - **The chaos slider**: its number now follows the character shown (it stayed at the old value), and it works smoothly: 0 to 100 is temperature 0.3 to 1.2, instead of three steps.

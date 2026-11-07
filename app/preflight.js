@@ -71,12 +71,12 @@
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
     ['procgen.js?v=20261025c'],
-    ['scenario.js?v=20261106d'],
+    ['scenario.js?v=20261106e'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
-    ['welcome.js?v=20261025b'],
+    ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261106h', 'module'],
+    ['llm_js/world-integration.js?v=20261106i', 'module'],
   ];
 
   function browserSummary() {

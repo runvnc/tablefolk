@@ -6,8 +6,8 @@
  * scenarios/showcase.json: [{ "file": "goblin-bakery.json", "title", "pitch",
  * "who": ["goblin", "witch"], "tags": ["lives on its own"] }]; "who" are body
  * names whose tiles (assets/tiles/characters) show on the card.
- * Picking one plays it (tablefolkScenario.playScenario) and puts its link in
- * the address bar, like opening a shared link.
+ * Picking one plays it (tablefolkScenario.playScenario) and puts its file
+ * (?scenario=) and its link (#s=) in the address bar.
  * Loaded after scenario.js.
  */
 (function () {
@@ -53,6 +53,8 @@
     hide();
     try {
       const scn = await (await fetch('/scenarios/' + w.file, { cache: 'no-cache' })).json();
+      // the file stays in the address bar, so a reload opens its latest version (scenario.js openLink)
+      const url = new URL(location.href); url.searchParams.set('scenario', '/scenarios/' + w.file); history.replaceState(history.state, '', url);
       await window.tablefolkScenario.playScenario(scn);
     } catch (e) { console.error('[welcome]', e); window.tablefolkToast?.('could not open that world: ' + e.message, { type: 'error' }); show(); }
     finally { setTimeout(() => document.documentElement.classList.remove('world-loading'), 400); }

@@ -1779,23 +1779,26 @@ turns: 6`;
   }
 
   // ---------- startup: open a scenario link ----------
-  async function openFromUrl() {
-    try { await openLink(); } finally { window.TABLEFOLK_LINK_OPENED = true; }   // the download question waits for this (world-integration.js)
+  // ?scenario= names a file, and it wins over a #s= copy: opening a world writes
+  // that copy into the address bar, so a reload replayed the old world and never
+  // saw the file's changes. A #s= pasted into the tab (hashchange) is opened as asked.
+  async function openFromUrl({ pasted = false } = {}) {
+    try { await openLink(pasted); } finally { window.TABLEFOLK_LINK_OPENED = true; }   // the download question waits for this (world-integration.js)
   }
-  async function openLink() {
+  async function openLink(pasted) {
     linkIntro = location.hash.match(/[#&]intro=([01])/)?.[1] ?? null;
     const h = location.hash.replace(/^#/, ''), q = new URLSearchParams(location.search);
     let scn = null, code = null;
     try {
       const m = h.match(/(?:^|&)s(?:cenario)?=([A-Za-z0-9_-]+)/);
-      if (m) { code = m[1]; scn = await decodeScenario(code); }
-      else if (q.get('scenario')) { const r = await fetch(q.get('scenario')); if (!r.ok) throw new Error('HTTP ' + r.status); scn = await r.json(); }
+      if (q.get('scenario') && !pasted) { const r = await fetch(q.get('scenario'), { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status); scn = await r.json(); }
+      else if (m) { code = m[1]; scn = await decodeScenario(code); }
     } catch (e) { console.error('[scenario] could not open link', e); window.tablefolkToast?.('could not open scenario link: ' + e.message, { type: 'error' }); return; }
     if (!scn) return;
     try { await playScenario(scn, code ? { code } : {}); writeJson(normalizeScenario(scn)); }
     catch (e) { console.error(e); window.tablefolkToast?.('scenario failed: ' + e.message, { type: 'error' }); }
   }
-  window.addEventListener('hashchange', () => { if (/^#s(cenario)?=/.test(location.hash) && location.hash.slice(3) !== active?.code) openFromUrl(); });
+  window.addEventListener('hashchange', () => { if (/^#s(cenario)?=/.test(location.hash) && location.hash.slice(3) !== active?.code) openFromUrl({ pasted: true }); });
   function onReady() { refreshThings(); initPane(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
 

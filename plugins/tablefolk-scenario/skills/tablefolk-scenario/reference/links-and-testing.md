@@ -7,6 +7,7 @@
   a typical scenario is a few hundred characters. Opening the link builds
   the world and starts it.
 - `?intro=0` or `?intro=1`: skip or show the intro card, whatever the world's `showIntro` and the player's "don't show intros" say (`&intro=0` also works after a `#s=` link's code).
+- `?scenario=<url>` wins over a `#s=` code in the same address, so a reload opens the file's latest version; a `#s=` link alone is a copy of the world as it was when the link was made.
 - `?scenario=<url>`: fetch the JSON from a URL (it must allow CORS), for large
   or hosted scenarios.
 - A link works on any host serving the app (`/app/`).
