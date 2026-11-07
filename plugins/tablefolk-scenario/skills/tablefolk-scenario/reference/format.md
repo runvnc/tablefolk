@@ -115,7 +115,7 @@ Without `at` the player starts at the south of the board.
   "ttsVoiceId": "builtin:jean",    // alba azelma cosette eponine fantine javert jean marius
   "thinking": false, "showThoughts": true,
   "simple": true, "systemPrompt": "You are {name}. ...",   // very small brains; also for a whole scenario, with "defaultModel" (characters.md)
-  "chaos": 10,                     // 0-100 randomness (temperature)
+  "chaos": 10,                     // 0-100: temperature 0.3-1.2 (not for models with recommended settings)
   "fireballTemptation": 0          // 0-100, only with spell.fireball allowed
 }
 ```

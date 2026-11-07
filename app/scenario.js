@@ -1772,6 +1772,9 @@ turns: 6`;
 
   // ---------- startup: open a scenario link ----------
   async function openFromUrl() {
+    try { await openLink(); } finally { window.TABLEFOLK_LINK_OPENED = true; }   // the download question waits for this (world-integration.js)
+  }
+  async function openLink() {
     const h = location.hash.replace(/^#/, ''), q = new URLSearchParams(location.search);
     let scn = null, code = null;
     try {

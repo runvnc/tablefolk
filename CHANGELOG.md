@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-06
 
+- **The chaos slider**: its number now follows the character shown (it stayed at the old value), and it works smoothly: 0 to 100 is temperature 0.3 to 1.2, instead of three steps.
+- **The download question no longer appears twice** when a link opens a world: it waits until you press start on the intro card.
 - **The Oracle**: a new world where a very pompous man answers everything on a 490 MB brain ("The capital of the moon is Ia Cardaminaca"). Ask him anything.
 - **Qwen2.5 0.5B as a brain**: the newest official 0.5B Qwen, Q4_K_M GGUF on wllama, every layer on WebGPU; 1-2 s a reply on an RTX 2060.
 - **Simple mode for very small models**: a short prompt, and whatever the model writes is spoken. On by itself for Qwen 0.5B; `simple` in a scenario or on a character, `?simple=` on a link.

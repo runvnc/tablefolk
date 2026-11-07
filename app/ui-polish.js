@@ -25,6 +25,10 @@
       label.insertBefore(head, input);
       const update = () => { val.textContent = input.value; };
       input.addEventListener('input', update);
+      // Code that sets .value (a character's settings shown in the pane) fires no
+      // input event: the number stayed at the old value beside a moved slider.
+      const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      Object.defineProperty(input, 'value', { configurable: true, get() { return native.get.call(this); }, set(v) { native.set.call(this, v); update(); } });
       update();
     }
 

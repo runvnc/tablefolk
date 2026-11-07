@@ -157,7 +157,9 @@ function waitForDownloadConsent(modelLabel, modelSize) {
 }
 // The question ducks while something else has the screen (it may have been
 // asked before the welcome screen came up, and would sit on the intro card).
-const busyScreen = () => !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
+// A link's world is still opening too (scenario.js sets the flag): the question came up, then its intro card hid it, then it came back.
+const linkOpening = () => !window.TABLEFOLK_LINK_OPENED && (/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario'));
+const busyScreen = () => linkOpening() || !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
 function askConsent(modelLabel, modelSize) {
   showDownloadConsent(modelLabel, modelSize);
   const notice = el('modelLoadNotice');
@@ -868,7 +870,7 @@ async function main() {
           // of it went into reasoning and no answer came).
           enableThinking: cfg.thinking === true,
           maxTokens: cfg.thinking === true ? 4096 : simple ? 70 : undefined,
-          temperature: cfg.chaos > 70 ? 0.8 : (cfg.chaos > 40 ? 0.5 : 0.3),
+          temperature: 0.3 + 0.9 * Math.min(100, Math.max(0, +cfg.chaos || 0)) / 100,   // chaos 0-100 is temperature 0.3-1.2 (sampling.js's recommended settings win)
         });
       } finally {
         world.clearPendingThought?.(g.id);

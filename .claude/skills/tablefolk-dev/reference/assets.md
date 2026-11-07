@@ -51,6 +51,7 @@ idle model turned toward the camera.
 
 ## Pipelines
 
+- **The `wizard` body has no eyes**: no eye mesh, and none painted on its one atlas (checked 2026-11-06); skin between the brows and moustache.
 - **Quaternius Universal-rig figures** (woodsman, huntress, peasant,
   peasant_woman): `tools/build-figures.sh <kits dir> <gltf-transform dir>`
   with `tools/build-figure.mjs` (gltf-transform 4.5.1 retargeting:

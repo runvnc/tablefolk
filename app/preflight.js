@@ -33,7 +33,7 @@
     ['confirm-dialog.js?v=20261018a'],
     ['toast.js?v=20261018a'],
     ['sfx.js?v=20261024a'],
-    ['ui-polish.js?v=20261019g'],
+    ['ui-polish.js?v=20261106a'],
     ['tabs.js?v=20261030a'],
     ['library.js?v=20261018a'],
     ['packs.js?v=20261101b'],
@@ -71,12 +71,12 @@
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
     ['procgen.js?v=20261025c'],
-    ['scenario.js?v=20261106a'],
+    ['scenario.js?v=20261106b'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261025b'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261106g', 'module'],
+    ['llm_js/world-integration.js?v=20261106h', 'module'],
   ];
 
   function browserSummary() {
