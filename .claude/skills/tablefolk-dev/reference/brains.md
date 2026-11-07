@@ -127,6 +127,17 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   (`tablefolkTemplate`), because the runner imports the loader without `?v=` and
   so gets another copy of the module (its `getCurrentModel()` is null). Each
   completion gets a random seed; the default repeats replies word for word.
+- **Qwen1.5 0.5B** (`qwen1.5-0.5b`, 2026-11-06): `Qwen/Qwen1.5-0.5B-Chat-GGUF`, Q4_0, the
+  file Ollama's `qwen:0.5b` appears to use (its page lists Q4_0). This, not Qwen2.5,
+  is the model in the "10 + 10 = 11" screenshots; it reproduced that line, "46,942 moons"
+  and "Ed Sheeran" fronting Radiohead, where Qwen2.5 mostly stays sane. llama.cpp warns
+  "missing pre-tokenizer type... GENERATION QUALITY WILL BE DEGRADED" on this old file;
+  leave it, it may be part of the joke. What makes them dumb, measured: model and prompt
+  far more than temperature (Qwen2.5 still said 20 at temperature 2.75). `-q2` is a hidden Q2_K of Qwen2.5.
+- **wllama GPU failure** (`loadAt` in `model-loader-wllama3.js`): with a card too full
+  (seen at 5.4 of 6 GB), the weights' buffer is invalid ("Invalid Buffer tensor_buf0"),
+  ggml's error callback aborts the wasm and every later call is "RuntimeError:
+  unreachable". The load is retried on a new instance with `n_gpu_layers: 0`.
 - **Simple mode** (`isSimpleBrain` and `buildSimplePrompt` in `app.js`,
   `buildSimpleMessages` and `simpleReply` in `world-integration.js`): character's
   `simple`, else the scenario's, else `?simple=`, else the brain's flag. History is

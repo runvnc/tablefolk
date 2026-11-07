@@ -3,7 +3,7 @@
  "title": "The Oracle",
  "intro": "The Oracle. He knows everything (or thinks he does).",
  "showIntro": false,
- "defaultModel": "qwen2.5-0.5b",
+ "defaultModel": "qwen1.5-0.5b",
  "simple": true,
  "base": "plain",
  "lighting": "night",
@@ -31,7 +31,7 @@
    "ttsVoiceId": "pack:wizard_m",
    "facing": "s",
    "hostile": false,
-   "chaos": 100,
+   "chaos": 30,
    "allowed": [
     "say"
    ],

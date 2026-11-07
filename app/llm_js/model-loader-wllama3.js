@@ -37,6 +37,14 @@ const MODEL_CONFIG = {
     file: 'MiniCPM5-1B-Q8_0.gguf',
     size: 1150 * 1024 * 1024,
   },
+  'qwen1.5-0.5b': {
+    label: 'Qwen1.5 0.5B Chat (WebGPU, GGUF Q4_0)',
+    base: 'https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/',
+    file: 'qwen1_5-0_5b-chat-q4_0.gguf',   // the quantization Ollama's qwen:0.5b uses
+    size: 395 * 1024 * 1024,
+    gpuLayers: 99,
+    template: 'chatml',
+  },
   'qwen2.5-0.5b-q2': {
     label: 'Qwen2.5 0.5B (WebGPU, GGUF Q2_K)',
     base: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/',
@@ -146,10 +154,11 @@ export async function loadModel(modelKey, onProgress) {
   onProgress?.(`Loading ${cfg.label} (GPU layers: ${nGpuLayers})...`);
 
   try {
+    const loadAt = async layers => {
     wllama = new Wllama(WLLAMA3_WASM, { allowOffline: false });
     await wllama.loadModelFromUrl((cfg.base || HF_BASE) + cfg.file, {
       n_ctx: 4096,
-      n_gpu_layers: nGpuLayers,
+      n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
       // pthreads do not always coexist (WebGPU objects cannot be shared across
       // worker threads), so if ggml-webgpu registers under ?threads=1 but not
@@ -176,10 +185,24 @@ export async function loadModel(modelKey, onProgress) {
         });
       },
     });
+    };
+    // A card too full for the weights: its buffer comes back invalid and the engine
+    // aborts ("Invalid Buffer tensor_buf0", seen with 5.4 of 6 GB in use). The CPU is
+    // slower (11-13 tok/s against 35-55 for Qwen 0.5B) but it answers.
+    let usedLayers = nGpuLayers;
+    try { await loadAt(nGpuLayers); }
+    catch (e) {
+      if (!(nGpuLayers > 0)) throw e;
+      console.warn('[tablefolk-wllama3] could not load on the graphics card, trying the CPU:', e?.message);
+      onProgress?.('Not enough graphics memory: loading on the CPU...');
+      Promise.resolve().then(() => wllama?.exit()).catch(() => {});
+      usedLayers = 0;
+      await loadAt(0);
+    }
     currentModel = modelKey;
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
     console.log('[tablefolk-wllama3] load complete');
-    onProgress?.(`${cfg.label} ready (GPU layers: ${nGpuLayers})`);
+    onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);
     return wllama;
   } catch (e) {
     wllama = null;

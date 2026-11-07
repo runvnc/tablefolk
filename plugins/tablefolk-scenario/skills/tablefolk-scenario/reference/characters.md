@@ -190,7 +190,7 @@ time); the world generator casts from it by description.
 Three fields, in the JSON and on the world builder's Story and Characters tabs:
 
 - **`defaultModel`** (scenario): the brain this world starts on, by its key:
-  `qwen2.5-0.5b`, `gemma4-e2b-litert`, `gemma4-e4b-litert`, `gemma4-e2b-vision`,
+  `qwen1.5-0.5b`, `qwen2.5-0.5b`, `gemma4-e2b-litert`, `gemma4-e4b-litert`, `gemma4-e2b-vision`,
   `bonsai2-27b`, `endpoint`. It travels in the world's link, wins over the brain
   the player last picked (without replacing it: a world with no default goes back
   to that one), and asks before any download. A `?model=<key>` on the link wins

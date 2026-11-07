@@ -6,14 +6,14 @@ import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from 
 import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030g';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
-import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106c';
+import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106f';
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106e';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
-import { samplingFor, withChaos } from './sampling.js?v=20261106a';
+import { samplingFor, withChaos } from './sampling.js?v=20261106b';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
@@ -53,6 +53,8 @@ const SUPPORTED_MODELS = {
   // scenario says otherwise. autoLoad: loads like the LiteRT models, with the
   // download question, though it is a wllama3 engine. builder.js lists it too.
   'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B (tiny and very silly; simple prompts)', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true },
+  // The older Qwen1.5 0.5B Chat: what people run on Ollama (qwen:0.5b) and laugh at
+  'qwen1.5-0.5b': { label: 'Qwen1.5 0.5B (the silliest: 10 + 10 = 11)', engine: 'wllama3', size: '~395 MB', simple: true, autoLoad: true },
   'qwen2.5-0.5b-q2': { label: 'Qwen2.5 0.5B Q2_K (rougher still)', engine: 'wllama3', size: '~415 MB', simple: true, autoLoad: true, hidden: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
