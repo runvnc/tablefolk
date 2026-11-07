@@ -125,7 +125,10 @@ async function generate({ text, voice, instruction }) {
   const g = gen; gen = null;
   if (rc === 1) throw new Error('Breeze: ' + M.UTF8ToString(M._tf_error()));
   const secs = (performance.now() - g.t0) / 1000;
-  postMessage({ type: 'generation_metrics', metrics: { rtfx: g.samples / 24000 / secs, genTime: secs, totalTime: secs, audioDuration: g.samples / 24000, firstAudioMs: g.first } });
+  // rtfx: speed once audio has started (the wait before it is firstAudioMs). It sets how much is held before playing
+  // (holdFor), and counting the wait as slowness made every line wait seconds longer than it had to.
+  const after = Math.max(.001, secs - (g.first || 0) / 1000);
+  postMessage({ type: 'generation_metrics', metrics: { rtfx: g.samples / 24000 / after, overallRtfx: g.samples / 24000 / secs, genTime: secs, totalTime: secs, audioDuration: g.samples / 24000, firstAudioMs: g.first } });
   if (rc === 0) { port?.postMessage({ type: 'stream-ended' }); postMessage({ type: 'stream_ended' }); }
 }
 
@@ -144,6 +147,8 @@ self.onmessage = e => {
       if (type === 'generate') return await generate(data);
       if (type === 'debug_stages') { const p = await M.ccall('tf_stages', 'number', [], [], { async: true }); postMessage({ type: 'debug_stages', text: M.UTF8ToString(p) }); return; }
       if (type === 'debug_matvec') { const p = await M.ccall('tf_matvec_check', 'number', ['number'], [data.repeats || 20], { async: true }); postMessage({ type: 'debug_matvec', text: M.UTF8ToString(p) }); return; }
+      // codes encoded natively ahead of time (assets/voices/breeze-codes): no encoder, and closer to native
+      if (type === 'voice_codes') { voices.set(data.voiceId, { codes: data.codes, frames: data.frames, text: data.text }); postMessage({ type: 'voice_encoded', voiceId: data.voiceId }); return; }
       if (type === 'debug_trace') { const c = data.codes ? Int32Array.from(data.codes) : new Int32Array(1); const cp = M._malloc(c.length * 4); i32().set(c, cp >>> 2); const p = await M.ccall('tf_trace', 'number', ['number', 'number', 'number', 'string', 'number', 'number'], [cp, c.length, data.frames || 0, data.text || '', data.useRef ? 1 : 0, data.steps || 40], { async: true }); M._free(cp); postMessage({ type: 'debug_trace', text: M.UTF8ToString(p) }); return; }
       if (type === 'debug_hash') { const p = await M.ccall('tf_hash_tensors', 'number', [], [], { async: true }); postMessage({ type: 'debug_hash', text: M.UTF8ToString(p) }); return; }
     } catch (err) { console.error('[breeze]', err?.stack || err); postMessage({ type: 'error', error: String(err?.message || err) }); }

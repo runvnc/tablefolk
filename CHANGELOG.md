@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-07
 
+- **Library voices in Breeze in the browser use natively encoded codes** (`assets/voices/breeze-codes`, `tools/breeze-web/build-voice-codes.mjs`): no encoding step, and closer to native. Its speed figure now leaves out the wait before audio starts, which had added seconds of silence before each line.
 - **Cloned voices work in the browser**: Breeze in the browser garbled library voices (wrong words, shifting speakers, lines far too long or cut short) because of a bug in ggml's WebGPU `sum_rows` on long reference clips. In a blind listening test they now rate about the same as native. References are also resampled properly now.
 
 ## 2026-11-06
