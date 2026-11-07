@@ -71,7 +71,7 @@
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
     ['procgen.js?v=20261025c'],
-    ['scenario.js?v=20261106b'],
+    ['scenario.js?v=20261106d'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261025b'],

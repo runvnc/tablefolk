@@ -6,6 +6,7 @@
   `CompressionStream`, base64url-encoded. The hash is never sent to a server;
   a typical scenario is a few hundred characters. Opening the link builds
   the world and starts it.
+- `?intro=0` or `?intro=1`: skip or show the intro card, whatever the world's `showIntro` and the player's "don't show intros" say (`&intro=0` also works after a `#s=` link's code).
 - `?scenario=<url>`: fetch the JSON from a URL (it must allow CORS), for large
   or hosted scenarios.
 - A link works on any host serving the app (`/app/`).

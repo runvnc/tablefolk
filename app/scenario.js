@@ -937,6 +937,7 @@
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
       // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
+      showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
       defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
       systemPrompt: typeof s.systemPrompt === 'string' && s.systemPrompt.trim() ? s.systemPrompt : null,
@@ -1158,7 +1159,7 @@
     showWarnings(plan.warnings);
     // Art mode (?art=1) is for looking at the world: no intro card over it
     // (the banner's intro button still shows it).
-    if (!opts.testing && !opts.restore && !window.TABLEFOLK_ART_MODE && (scn.intro || scn.goal?.text) && !introsHidden()) showIntro(scn);
+    if (!opts.testing && !opts.restore && !window.TABLEFOLK_ART_MODE && (scn.intro || scn.goal?.text) && wantIntro(scn)) showIntro(scn);
     startChecker();
     return { scenario: base, plan };
   }
@@ -1285,6 +1286,13 @@
   // (remembered) and bring it back with the banner's "intro" button.
   const INTRO_KEY = 'tablefolk.hideIntros';
   const introsHidden = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; } };
+  // ?intro=0|1 (or &intro= in a link's #s= part) wins, then the world's "showIntro": false, then the player's own "don't show intros"
+  let linkIntro = null;   // read in openLink: opening the world rewrites the hash
+  function wantIntro(scn) {
+    const q = new URLSearchParams(location.search).get('intro') ?? linkIntro;
+    if (q === '0' || q === '1') return q === '1';
+    return scn.showIntro !== false && !introsHidden();
+  }
   function showIntro(scn) {
     const el = $('scenarioEnd'); if (!el) return;
     el.hidden = false; el.className = 'scn-overlay intro';
@@ -1775,6 +1783,7 @@ turns: 6`;
     try { await openLink(); } finally { window.TABLEFOLK_LINK_OPENED = true; }   // the download question waits for this (world-integration.js)
   }
   async function openLink() {
+    linkIntro = location.hash.match(/[#&]intro=([01])/)?.[1] ?? null;
     const h = location.hash.replace(/^#/, ''), q = new URLSearchParams(location.search);
     let scn = null, code = null;
     try {

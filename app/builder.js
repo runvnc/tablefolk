@@ -99,6 +99,7 @@
         ${field('lighting', 'lighting', 'select', { options: [['', '(default)'], 'bright', 'night', 'dim'] })}${field('walls', 'walls', 'select', { options: [['', '(default)'], 'stone', 'tabletop', 'block', 'modern'] })}
         <label><span>dark (fog of war, torches)</span><select data-path="dark" data-type="bool3"><option value=""${scn.dark == null ? ' selected' : ''}>auto (dungeons: yes)</option><option value="true"${scn.dark === true ? ' selected' : ''}>yes</option><option value="false"${scn.dark === false ? ' selected' : ''}>no</option></select></label>
         ${field('default brain (model this world starts on)', 'defaultModel', 'select', { options: brainOptions })}${simpleSelect('simple', scn.simple)}
+        <label><span>show the intro card</span><select data-path="showIntro" data-type="bool3"><option value=""${scn.showIntro !== false ? ' selected' : ''}>yes</option><option value="false"${scn.showIntro === false ? ' selected' : ''}>no: straight into the world</option></select></label>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
         ${field('win / lose rules (JSON: {"win": ..., "lose": ...})', '__rules', 'json', { wide: true, rows: 3 })}
         ${field('full system prompt for every character (replaces the built one; {name} {style} {personality} {backstory} {commands})', 'systemPrompt', 'area', { wide: true, rows: 3 })}</div></fieldset></div>

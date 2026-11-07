@@ -17,6 +17,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "title": "The Stubborn Shopkeeper",
   "subtitle": "",                  // banner text when there is no goal
   "intro": "Mog runs the only shop on the island.",   // card shown on load
+  "showIntro": false,                  // no intro card: straight into the world (the link can override: ?intro=1)
   "seed": 7,                       // layout randomness: same JSON + seed = same map
   "base": "plain",                 // plain (default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63
