@@ -63,7 +63,7 @@ async function load(opts = {}) {
   const t0 = performance.now();
   const file = await opfsModel((n, total) => status(`Downloading Breeze TTS 2 ${Math.floor(100 * n / total)}% (${(n / 2 ** 30).toFixed(2)} / ${(total / 2 ** 30).toFixed(2)} GB, once)`));
   status('Breeze TTS 2: loading onto the GPU…');
-  const create = (await import('./breeze-web/breeze.mjs?v=20261031h')).default;
+  const create = (await import('./breeze-web/breeze.mjs?v=20261106a')).default;
   M = await create({ print: s => console.log('[breeze]', s), printErr: s => console.warn('[breeze]', s) });
   M.FS.mkdir('/m'); M.FS.mount(M.WORKERFS || M.FS.filesystems.WORKERFS, { files: [file] }, '/m');
   const rc = await M.ccall('tf_init', 'number', ['string'], ['/m/' + MODEL], { async: true });
@@ -143,6 +143,7 @@ self.onmessage = e => {
       if (type === 'encode_voice' || type === 'load_voice_state' || type === 'load_voice_bin') { if (type === 'encode_voice') await encode(data); postMessage({ type: 'voice_encoded', voiceId: data.voiceId }); return; }
       if (type === 'generate') return await generate(data);
       if (type === 'debug_stages') { const p = await M.ccall('tf_stages', 'number', [], [], { async: true }); postMessage({ type: 'debug_stages', text: M.UTF8ToString(p) }); return; }
+      if (type === 'debug_matvec') { const p = await M.ccall('tf_matvec_check', 'number', ['number'], [data.repeats || 20], { async: true }); postMessage({ type: 'debug_matvec', text: M.UTF8ToString(p) }); return; }
       if (type === 'debug_hash') { const p = await M.ccall('tf_hash_tensors', 'number', [], [], { async: true }); postMessage({ type: 'debug_hash', text: M.UTF8ToString(p) }); return; }
     } catch (err) { console.error('[breeze]', err?.stack || err); postMessage({ type: 'error', error: String(err?.message || err) }); }
   });

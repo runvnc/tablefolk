@@ -4890,6 +4890,8 @@ function setupUI(){
   renderPlayerInventory();
   const thinkSel=document.getElementById('gfxThinkFps');
   if(thinkSel){ try{ const v=localStorage.getItem('tablefolkThinkFps'); if(v!==null) thinkSel.value=v; }catch{} thinkSel.onchange=()=>{ try{ localStorage.setItem('tablefolkThinkFps',thinkSel.value); }catch{} }; }
+  const speakSel=document.getElementById('gfxSpeakFps');
+  if(speakSel){ try{ const v=localStorage.getItem('tablefolkSpeakFps'); if(v!==null) speakSel.value=v; }catch{} speakSel.onchange=()=>{ try{ localStorage.setItem('tablefolkSpeakFps',speakSel.value); }catch{} }; }
   const baseMapSel=document.getElementById('baseMapSelect');
   if(baseMapSel){ baseMapSel.value=state.baseMap||'island'; baseMapSel.onchange=()=>{ setBaseMap(baseMapSel.value); updatePerceptionUI(); saveWorldState(); log('base map: '+baseMapSel.value); }; }
   setupPlayerControls(); setupFirstPersonLook();
@@ -5555,6 +5557,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // GPU). Graphics pane setting (localStorage tablefolkThinkFps): 0 = pause like
   // before, 60 = full speed.
   let lastFrameAt=performance.now(), lastAnimAt=performance.now();
+  const speakFps=()=>{ const v=+localStorage.getItem('tablefolkSpeakFps'); return v>0?v:15; };
   const thinkFps=()=>{ const v=Number(localStorage.getItem('tablefolkThinkFps')); return Number.isFinite(v)&&localStorage.getItem('tablefolkThinkFps')!==null ? v : 60; };
   scene.onBeforeRenderObservable.add(()=>{ if(TABLEFOLK_FORCE_NO_RENDER) return; const now=performance.now(), dt=Math.min(.1,(now-lastAnimAt)/1000); lastAnimAt=now; window.TablefolkPerf?.begin('animate.characters'); animate(dt); window.TablefolkPerf?.end('animate.characters'); }); engine.runRenderLoop(()=>{
     if(TABLEFOLK_FORCE_NO_RENDER) return;
@@ -5566,6 +5569,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     if(gpuFramesInFlight>=2) return;
     if(window.TABLEFOLK_PAUSE_RENDER){ const fps=thinkFps(); if(fps<=0) return; if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     if(TABLEFOLK_FPS_CAP && performance.now()-lastFrameAt<1000/TABLEFOLK_FPS_CAP) return;
+    // Breeze in the browser shares the GPU with the picture, and must keep up with real
+    // time while it speaks: full graphics at 60 fps left it under 0.43x, 15 fps about 1.07x
+    // after the first sound (RTX 2060). Graphics pane, localStorage tablefolkSpeakFps; 60 = no cap.
+    if(window.tablefolkTTS?.running && window.tablefolkTTS.engine==='breeze-web'){ const fps=speakFps(); if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     lastFrameAt=performance.now();
     scene.render(); window.TABLEFOLK_FRAMES=(window.TABLEFOLK_FRAMES||0)+1;
     const dev=engine._device; if(dev?.queue?.onSubmittedWorkDone){ gpuFramesInFlight++; dev.queue.onSubmittedWorkDone().then(()=>gpuFramesInFlight--,()=>gpuFramesInFlight--); }

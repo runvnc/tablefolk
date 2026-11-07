@@ -61,7 +61,7 @@ const log = s => { $('log').textContent += s + '\n'; console.log(s); };
 let worker = null, chunks = [], started = 0, firstAt = 0, done = null;
 function ensureWorker() {
   if (worker) return worker;
-  worker = new Worker('/app/tts/breeze-web-worker.js?v=20261031h', { type: 'module' });
+  worker = new Worker('/app/tts/breeze-web-worker.js?v=20261106a', { type: 'module' });
   worker.onmessage = e => {
     const m = e.data || {};
     if (m.type === 'status') { show('status', m.status); }

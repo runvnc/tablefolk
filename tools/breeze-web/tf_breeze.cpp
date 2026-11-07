@@ -11,10 +11,12 @@
 #include "debug-stages.hpp"
 
 #include "ggml-backend.h"
+#include "ggml.h"
 
 #include <emscripten.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <string>
@@ -72,6 +74,56 @@ EMSCRIPTEN_KEEPALIVE const char * tf_hash_tensors(void) {
 EMSCRIPTEN_KEEPALIVE const char * tf_stages(void) {
     static std::string out;
     try { out = tf_stages(g_model, g_codec); } catch (const std::exception & e) { out = std::string("error: ") + e.what(); }
+    return out.c_str();
+}
+
+// diagnostics: the WebGPU mat-vec kernel against ggml's CPU code, on the model's own
+// quantized weights and fixed vectors: largest error per tensor, and whether repeats agree
+EMSCRIPTEN_KEEPALIVE const char * tf_matvec_check(int repeats) {
+    static std::string out; out.clear();
+    ggml_backend_t gpu = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_GPU, nullptr);
+    ggml_backend_t cpu = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
+    if (!gpu || !cpu) return "no backend";
+    int shown[GGML_TYPE_COUNT] = { 0 };
+    std::vector<std::string> names;
+    for (auto & kv : g_model.gg.tensors) names.push_back(kv.first);
+    std::sort(names.begin(), names.end());
+    for (auto & name : names) {
+        ggml_tensor * A = g_model.gg.tensors[name];
+        if (A->ne[1] < 2 || A->ne[2] != 1 || A->ne[0] < 4 || A->ne[0] % ggml_blck_size(A->type) || shown[A->type] >= 8) continue;
+        if (A->type != GGML_TYPE_F32 && A->type != GGML_TYPE_F16 && !ggml_is_quantized(A->type)) continue;
+        shown[A->type]++;
+        std::vector<unsigned char> raw(ggml_nbytes(A)); ggml_backend_tensor_get(A, raw.data(), 0, raw.size());
+        for (int cols : { 1, 3 }) {
+            std::vector<float> x(A->ne[0] * cols);
+            unsigned r = 12345; for (auto & v : x) { r = r * 1103515245u + 12345u; v = ((r >> 16) & 0x7fff) / 16384.0f - 1.0f; }
+            ggml_init_params pc = { ggml_tensor_overhead() * 8 + ggml_graph_overhead(), nullptr, true };
+            // on the GPU the model's own tensor, where it lies in its shared buffer
+            auto make = [&](ggml_context * c, ggml_backend_t be, ggml_tensor *& X, ggml_tensor *& Y, ggml_cgraph *& G, ggml_backend_buffer_t & buf) {
+                const bool own = be == cpu;
+                ggml_tensor * M = own ? ggml_new_tensor_2d(c, A->type, A->ne[0], A->ne[1]) : A;
+                X = ggml_new_tensor_2d(c, GGML_TYPE_F32, A->ne[0], cols); Y = ggml_mul_mat(c, M, X);
+                G = ggml_new_graph(c); ggml_build_forward_expand(G, Y);
+                buf = ggml_backend_alloc_ctx_tensors(c, be);
+                if (own) ggml_backend_tensor_set(M, raw.data(), 0, raw.size());
+                ggml_backend_tensor_set(X, x.data(), 0, x.size() * 4);
+            };
+            ggml_context * cc = ggml_init(pc), * gg = ggml_init(pc);
+            ggml_tensor * Xc, * Yc, * Xg, * Yg; ggml_cgraph * Gc, * Gg; ggml_backend_buffer_t bc, bg;
+            make(cc, cpu, Xc, Yc, Gc, bc); make(gg, gpu, Xg, Yg, Gg, bg);
+            ggml_backend_graph_compute(cpu, Gc);
+            std::vector<float> want(ggml_nelements(Yc)), got(want.size()), first; ggml_backend_tensor_get(Yc, want.data(), 0, want.size() * 4);
+            double maxerr = 0, scale = 0; int distinct = 0;
+            for (int t = 0; t < repeats; t++) {
+                ggml_backend_graph_compute(gpu, Gg); ggml_backend_tensor_get(Yg, got.data(), 0, got.size() * 4);
+                if (first.empty()) first = got; else if (got != first) distinct++;
+                for (size_t i = 0; i < got.size(); i++) { maxerr = std::max(maxerr, (double) std::abs(got[i] - want[i])); scale = std::max(scale, (double) std::abs(want[i])); }
+            }
+            char line[260]; snprintf(line, sizeof line, "%-30s %-5s %5lldx%-5lld cols %d  max output %8.3f  max error %9.6f (%.3f%%)  differing %d/%d\n", name.substr(0, 30).c_str(), ggml_type_name(A->type), (long long) A->ne[0], (long long) A->ne[1], cols, scale, maxerr, 100 * maxerr / std::max(scale, 1e-9), distinct, repeats - 1);
+            out += line; printf("%s", line); fflush(stdout);
+            ggml_backend_buffer_free(bc); ggml_backend_buffer_free(bg); ggml_free(cc); ggml_free(gg);
+        }
+    }
     return out.c_str();
 }
 

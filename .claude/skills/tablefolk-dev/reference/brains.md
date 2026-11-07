@@ -349,6 +349,12 @@ with `?trustSkills=1`, or after the player allows that package.
   Vulkan does 1.8x: ggml-webgpu's Q2_K matrix-vector kernel in the depth
   decoder is the bottleneck (speed table in `tools/breeze-web/README.md`). `tools/browser-test/breeze-web-test.html`
   (+ `breeze-web-test.mjs` headless) speaks a line and shows those numbers.
+  2026-11-06: `ggml-webgpu-fast.patch` (build.sh applies it) keeps bind groups, writes parameters
+  once a batch and uses mat-vec workgroups of 64: 0.70x to 1.0-1.1x alone. The picture is the other
+  half: default graphics at 60 fps left it under 0.38x, so app.js caps the frame rate while
+  `breeze-web` speaks (`tablefolkSpeakFps`, Graphics pane, default 15). The README has the
+  profile and what did not help. Native `breeze-server` holds 2.3 GB of the card while idle, enough to
+  run the browser build or Qwen out of memory.
   Traps found: pointers above 2 GB come back negative in JS (use `>>> 2`),
   exported HEAP views go stale when memory grows (take fresh views of
   `wasmMemory`), and `bump.py` does not update a worker URL inside a JS

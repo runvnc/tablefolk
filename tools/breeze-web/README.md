@@ -62,11 +62,30 @@ browser").
 | native WebGPU, ggml v0.28.0 | 13 | 63-66 | 7-15 | about 0.8x |
 | Chrome, either ggml | | | | 0.61-0.62x, first sound 2.8-3 s |
 
-GPU-bound (ggml's WebGPU profile: 8.7 s of GPU time for an 11 s run). The
-depth decoder reruns its layers 15 times per frame, and the Q2_K
-matrix-vector kernel (`mul_mat_vec_q2_K_f32_sg_reduce`) is 41% of GPU time,
-quantizing its input to Q8 another 9%; turning that dot4 path off is slower
-(92 ms/frame). ggml's Vulkan kernels do the same work about 2.3x faster. The
-browser build gets no subgroup-matrix kernels (ggml leaves them out under
-Emscripten), which is why native gained a little from the newer ggml and
-Chrome did not. Profiling: build natively with `-DGGML_WEBGPU_GPU_PROFILE=ON`.
+Those are the numbers before `ggml-webgpu-fast.patch`. **In Chrome it was not GPU-bound**,
+whatever the native profile suggested. Profiled 2026-11-06 by wrapping every WebGPU call in the
+worker: a frame (80 ms of audio) makes 6,183 dispatches, and each made its own bind group and
+parameter write. About 115 ms a frame: 44 waiting on the GPU, 37 in WebGPU calls, the rest
+in the browser and wasm (wasm itself about 10).
+
+| RTX 2060, Chrome, nothing else on the card | speed | after first sound |
+|---|---|---|
+| stock | 0.70x | |
+| bind groups kept, one parameter write a batch | 0.88x | same audio, sample for sample |
+| + mat-vec workgroups of 64 (was 256) | 1.0-1.1x | |
+| in the game, default graphics, uncapped frame rate | under 0.38x | |
+| in the game, default graphics, 15 fps while Breeze speaks | 0.77x | about 1.0x, no underruns |
+
+Tried, no real change: `disable_robustness` (none), `skip_validation` (about 5%), `disable_workgroup_init`
+(none), submit batches of 16 to 256 (1024 is worse), `q4_k` (0.85x) and `q8_0-dd4` (0.83x) instead of
+`q4_k-dd2` (0.88x). Workgroups of 128 give 1.0x, 32 give 1.0x. Round trips are not the problem (0.2 ms).
+
+Workgroups of 64 make generation differ from run to run (256 is identical each time) and move
+`bb.step` and later depth codes by up to 1.3%, about as far as native Vulkan is from WebGPU at 256. Not
+explained. `tf_matvec_check` (worker message `debug_matvec`: the kernels against ggml's CPU code on the
+model's own tensors, in place) finds no fault: 64 of 64 cases agree over repeats, same errors as 256.
+
+Not tried: subgroup matrices. The Emscripten port here is Dawn v20260423, and Dawn added them for
+Emscripten on 2026-08-11, but ggml still leaves them out under Emscripten. The first sound with a
+cloned voice (about 3 s, about 1 s for a designed one) is the next thing to shorten.
+Profiling: build natively with `-DGGML_WEBGPU_GPU_PROFILE=ON`.
