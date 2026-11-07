@@ -57,12 +57,14 @@ voices were fine. ggml's `sum_rows.wgsl` wrote `dst[offset + wid.x]`, but past W
 a dimension ggml splits the dispatch over two, so rows overwrote each other and later ones were
 never written. The audio embedding sums one row per codebook embedding, 2048 x frames, so any
 reference clip over about 32 frames went wrong (values over 200x too big) and fed the whole prompt.
-Fixed in `ggml-webgpu-fast.patch`. `cumsum.wgsl` has the same line (Breeze does not use it; not patched).
+Fixed in `ggml-webgpu-fast.patch`. The bug came with llama.cpp ba6439a6 (2D dispatch, 2026-10-09); llama.cpp master has it fixed since 553d2c2e (2026-11-05), so a later ggml can drop that hunk. `cumsum.wgsl` still has the same line there (Breeze does not use it; not patched).
 
 How it was found: `trace-clone.hpp` runs the same prompt and fixed frames through native and browser builds
 and records every operation of every graph (`breeze-trace.patch` is its hook in `Graph::compute`);
 `compare-trace.py a.tsv b.tsv` names the first operation that disagrees. Native side: `trace_main.cpp`, linked
 against `build-vk`. Browser side: worker message `debug_trace`. An 8-frame stage test could not see this.
+
+Library voices skip the browser's encoder: `build-voice-codes.mjs` encodes them natively into `assets/voices/breeze-codes/` (little-endian int16, 16 a frame; rerun it when a sample changes), and `pocket-tts-manager.js` sends them to the worker as `voice_codes`. Other voices still encode in the browser.
 
 Not explained: the voice encoder's codes still match native only about 50-58% (99% in the first codebook, under 30%
 in the last). Clones rate close to native anyway, and using native's codes didn't help before this fix;
