@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261106c';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261106d';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261106b';
+import { installDevConsole } from './dev-console.js?v=20261106c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030g';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
@@ -965,7 +965,7 @@ async function main() {
       // (its own lines too: a catchphrase said three times running)
       const recentOthers = (world.state?.globalHistory || []).slice(-14).map(e => e.match(/^T\d+\s+([^:]+):\s*\S+\s+(?:say|whisper)\s+"(.*?)"(?:\s+->|$)/)).filter(Boolean).map(m => words(m[2]));
       for (let i = planCmds.length - 1; i >= 0; i--) {
-        const c = planCmds[i]; if (c.kind !== 'say' || !recentOthers.length) continue;
+        const c = planCmds[i]; if (simple || c.kind !== 'say' || !recentOthers.length) continue;   // (simple mode: a tiny model's repeat beats saying nothing)
         const mine = words(c.text); if (mine.size < 4) continue;
         // or the history's own wording copied as speech: say("grub says Calm? ...")
         const names = world.getAgents().map(a => a.id.toLowerCase());

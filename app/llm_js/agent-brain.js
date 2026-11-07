@@ -7,7 +7,7 @@ import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversation
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106b';
-import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106b';
+import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106c';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';

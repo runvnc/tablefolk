@@ -49,6 +49,7 @@ Each `.json` (and most have an `.html` page that opens it):
 | file | shows |
 |---|---|
 | `goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`, `haunted-tavern` | showcase living worlds (`showcase.json`) |
+| `the-oracle` | a very small brain (`defaultModel`, `simple`, `systemPrompt`): he knows everything and is wrong |
 | `alchemist` | an ASCII-grid workshop |
 | `low-tide` | earshot, whispers, a password hand-over |
 | `archipelago`, `archipelago-v2` | islets, jetties, an asset pack |

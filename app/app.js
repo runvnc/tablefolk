@@ -2766,7 +2766,8 @@ function say(g,text,voiced=false,{whisper=false}={}){
   // The dead say nothing (a turn that was thinking when it died ends here).
   if(g?.defeated){ clearStreamingBubble(g); return; }
   // A character repeating one of its recent spoken lines: say nothing at all.
-  if(voiced && g && g!==state.playerAvatar){
+  // (in simple mode a tiny model's repeat beats saying nothing: isSimpleBrain)
+  if(voiced && g && g!==state.playerAvatar && !isSimpleBrain(g)){
     const key=String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
     if(key){
       g._said=g._said||[];

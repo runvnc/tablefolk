@@ -4,6 +4,13 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-06
+
+- **The Oracle**: a new world where a very pompous man answers everything on a 490 MB brain ("The capital of the moon is Ia Cardaminaca"). Ask him anything.
+- **Qwen2.5 0.5B as a brain**: the newest official 0.5B Qwen, Q4_K_M GGUF on wllama, every layer on WebGPU; 1-2 s a reply on an RTX 2060.
+- **Simple mode for very small models**: a short prompt, and whatever the model writes is spoken. On by itself for Qwen 0.5B; `simple` in a scenario or on a character, `?simple=` on a link.
+- **A world can name its default brain** (`defaultModel`, in the link and on the world builder's Story tab); it asks before downloading and doesn't replace the player's own choice. **A full system prompt can replace the built one** (`systemPrompt`, for a world or a character, with `{name}`-style fillers).
+
 ## 2026-11-01
 
 - **Window view responds to leaning in**: the glass now stands in front of the board, so moving your head slides the whole board behind the frame, and leaning in (or back) visibly changes the view: by default it brings the board closer; the Graphics pane's "leaning in" can make it show more instead, as a real window does. Ambient occlusion is off while the view runs (it drew black blocks under the skewed lens).

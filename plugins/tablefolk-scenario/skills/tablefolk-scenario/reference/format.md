@@ -114,6 +114,7 @@ Without `at` the player starts at the south of the board.
   "hp": 10, "wield": "club",       // combat.md
   "ttsVoiceId": "builtin:jean",    // alba azelma cosette eponine fantine javert jean marius
   "thinking": false, "showThoughts": true,
+  "simple": true, "systemPrompt": "You are {name}. ...",   // very small brains; also for a whole scenario, with "defaultModel" (characters.md)
   "chaos": 10,                     // 0-100 randomness (temperature)
   "fireballTemptation": 0          // 0-100, only with spell.fireball allowed
 }

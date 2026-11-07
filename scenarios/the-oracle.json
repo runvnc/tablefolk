@@ -29,7 +29,7 @@
    "id": "Oracle",
    "model": "wizard",
    "style": "the old man who knows everything",
-   "ttsVoiceId": "builtin:wizard_m",
+   "ttsVoiceId": "pack:wizard_m",
    "facing": "s",
    "hostile": false,
    "chaos": 80,

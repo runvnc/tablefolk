@@ -66,6 +66,8 @@ export function createWllama3Engine(wllamaInstance) {
               abortSignal: aborter.signal,
               max_tokens: maxTokens,
               temperature,
+              // a new seed each turn: the default repeats a reply word for word when a question comes again
+              seed: Math.floor(Math.random() * 2147483647),
               top_p: 0.95,
               top_k: 40,
               penalty_repeat: 1.1,

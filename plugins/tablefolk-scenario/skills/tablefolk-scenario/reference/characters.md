@@ -184,3 +184,30 @@ huntress_f thief_f knight_m dwarf_m tavern_m wizard_m squire_m rogue_m captain_m
 farmer_m scholar_m villain_m king_m hooded_x`. A character without a
 `ttsVoiceId` gets one of its gender from the library (the same one every
 time); the world generator casts from it by description.
+
+## Very small brains: simple mode, a world's default brain, the whole system prompt
+
+Three fields, in the JSON and on the world builder's Story and Characters tabs:
+
+- **`defaultModel`** (scenario): the brain this world starts on, by its key:
+  `qwen2.5-0.5b`, `gemma4-e2b-litert`, `gemma4-e4b-litert`, `gemma4-e2b-vision`,
+  `bonsai2-27b`, `endpoint`. It travels in the world's link, wins over the brain
+  the player last picked (without replacing it: a world with no default goes back
+  to that one), and asks before any download. A `?model=<key>` on the link wins
+  over everything, and the player can still change brain in the top bar.
+- **`simple`** (scenario or character; `true`, `false`, unset for automatic): for
+  a model too small to follow the usual prompt. The prompt is only who it is, one
+  line asking for the words it says out loud, and what was just said. Whatever it
+  writes is spoken: `say(...)`, names in front and stray tags are taken off, and
+  only the first line counts. No map, state card or command list, and no guards
+  against repeating itself (a repeat beats silence). The only commands are `walk`,
+  `give`, `sell` and `attack`, when allowed. Automatic means on for brains that ask
+  for it (Qwen 0.5B). `?simple=1` or `0` on a link sets it for characters and
+  worlds that leave it unset.
+- **`systemPrompt`** (scenario, or a character's own, which wins): replaces the
+  whole system message, in any mode. `{name}`, `{style}`, `{personality}`,
+  `{backstory}` and `{commands}` are filled in. What happened, what it perceives
+  and what was said still come in the turn's messages (in simple mode that is only
+  the talk).
+
+`scenarios/the-oracle.json` uses all three.

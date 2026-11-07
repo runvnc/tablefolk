@@ -116,6 +116,34 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   Brain options > vision, each turn's newest message carries the character's
   view as an `image_url`. `window.tablefolkLLM` exposes the active brain as
   an OpenAI-style client.
+- **Qwen2.5 0.5B** (`qwen2.5-0.5b`, engine `wllama3`, 2026-11-06):
+  `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, the 491 MB Q4_K_M, the newest official 0.5B
+  (Qwen3 starts at 0.6B, Qwen3.5 at 0.8B). Every layer on the GPU: about 50 tok/s,
+  prefill 180-420 tok/s, a reply in 1-2 s on the RTX 2060, about 1.3 GB of graphics
+  memory with the game. Flags in `SUPPORTED_MODELS`: `simple` (simple mode by
+  default) and `autoLoad` (loads with the download question, unlike the other
+  wllama3 models, which wait for a click; `hasModelCached` now asks wllama's cache).
+  The runner needs ChatML: the template is set on the Wllama instance
+  (`tablefolkTemplate`), because the runner imports the loader without `?v=` and
+  so gets another copy of the module (its `getCurrentModel()` is null). Each
+  completion gets a random seed; the default repeats replies word for word.
+- **Simple mode** (`isSimpleBrain` and `buildSimplePrompt` in `app.js`,
+  `buildSimpleMessages` and `simpleReply` in `world-integration.js`): character's
+  `simple`, else the scenario's, else `?simple=`, else the brain's flag. History is
+  the last 6 lines of talk only, as plain words: `say("...")` in the history taught
+  Qwen to write `say("[Pilgrim] ...`, and `[Pilgrim]` was copied into replies, so
+  names appear only when more than one other person is near. 70 tokens a turn;
+  speech is cut to its first two sentences. Off in this mode: the seed example, the
+  planning filter, the repeat guards in `say()` and the copy guard (they left him
+  silent), reports and corrections in the history, the "ponders" fallback. A quiet
+  turn skips the model.
+- **`systemPrompt` and `defaultModel`**: `systemOverride` in `app.js` replaces the
+  system message in both modes. `window.tablefolkUseModel(key)` (scenario start;
+  null goes back to the player's model) drives the picker's change handler without
+  saving the choice; `main()` also reads a linked scenario before its first load
+  (`linkedScenario`), so the usual model isn't loaded first. Known small race: a
+  scenario started while another load is running can leave the status line naming
+  the old model, though the right one answers.
 - Hidden engines kept for experiments: Transformers.js (`*tjs*`), wllama
   (MiniCPM5), WebLLM (`model-loader.js`, `gpt-runner.js`, `grammar.js`).
 
