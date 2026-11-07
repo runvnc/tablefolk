@@ -24,7 +24,7 @@
  "allowed": [
   "say"
  ],
- "systemPrompt": "You are the Oracle. You are very confident in your answers.",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.",
  "agents": [
   {
    "id": "Oracle",
@@ -36,7 +36,7 @@
    "allowed": [
     "say"
    ],
-   "personality": "You are very confident in your answers."
+   "personality": "You are an old man. You are very confident in your answers."
   }
  ],
  "grid": [
