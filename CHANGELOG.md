@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **Characters cast a soft contact shadow**: light quality has no shadow maps, and without anything under them the Oracle's flat-soled boots looked sunk into his rug (they stood 2 cm above it). A dark blurred patch under every figure's feet (app.js contactShadow) grounds them at every quality.
 - **No foot sinks into the floor**: a figure's lowest point is measured through its idle clip (about two seconds, CPU skinning, hidden bodies too) and the model raised by any dip below its feet. It was the player's wanderer in the Oracle's room, 9 mm into the rug; the Oracle himself already stood clear.
 - **The repetition penalty works on wllama models**: it was sent as `penalty_repeat`, which wllama 3's engine ignores, so no model running in wllama ever had one ("say lilac ten times" said it ten times at 1.8). It goes as `repeat_penalty` now, over the last 256 tokens (the conversation, not 64), so the Oracle stops coming back to one odd word ("lilac"). The Oracle's chaos is 55 (temperature about 1.76, was 2.0).
 - **No memory model for the Oracle**: a world can set `"memory": false`; simple-mode characters skip meaning-based recall (their prompt has none), and the memory model isn't loaded at all in a world where memory is off or every character is in simple mode. Checked: The Oracle leaves it idle, Goblin Bakery loads it.

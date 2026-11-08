@@ -4494,6 +4494,26 @@ function figClipName(n){
 // (the wanderer's sank half a centimetre into the Oracle's rug). A few frames
 // into the idle clip its lowest skinned vertex is measured (CPU skinning) and
 // the model raised that much, never lowered, at most 6 cm.
+// A soft dark patch under a figure's feet: light quality has no shadow maps,
+// and without one boots seemed to stand in the floor (The Oracle's, on his
+// rug). A child of the root, so it follows; drawn just above the floor and
+// its rugs and runes. One shared texture and material.
+function contactShadow(g,h){
+  const sc=state.scene;
+  if(!state.contactShadowMat){
+    const S=128, tex=new BABYLON.DynamicTexture('contact_shadow_tex',S,sc,false), c=tex.getContext(), gr=c.createRadialGradient(S/2,S/2,0,S/2,S/2,S/2);
+    gr.addColorStop(0,'rgba(0,0,0,.82)'); gr.addColorStop(.35,'rgba(0,0,0,.6)'); gr.addColorStop(.7,'rgba(0,0,0,.22)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=gr; c.fillRect(0,0,S,S); tex.hasAlpha=true; tex.update();
+    const m=new BABYLON.StandardMaterial('contact_shadow_mat',sc);
+    m.opacityTexture=tex; m.diffuseColor=BABYLON.Color3.Black(); m.specularColor=BABYLON.Color3.Black(); m.emissiveColor=BABYLON.Color3.Black(); m.disableLighting=true; m.backFaceCulling=false; m.zOffset=-4;
+    m.transparencyMode=BABYLON.Material.MATERIAL_ALPHABLEND; m.needDepthPrePass=false;
+    state.contactShadowMat=m;
+  }
+  const k=g.root.scaling.x||1, d=BABYLON.MeshBuilder.CreateDisc(g.id+'_contact_shadow',{radius:Math.max(.18,h*.24)/k,tessellation:24},sc);
+  d.rotation.x=Math.PI/2; d.parent=g.root; d.position.y=.012/k; d.material=state.contactShadowMat;
+  d.isPickable=false; d.metadata={ownerId:g.id}; d.renderingGroupId=0; d.alphaIndex=1000;   // after floor glows and runes, so it darkens them too
+  g.contactShadow=d;
+}
 function standOnFeet(g,inner){
   // sampled every 8 frames for about two seconds of the idle clip (a foot dips part of the way through)
   let frames=0, lo=Infinity; const V=new BABYLON.Vector3();
@@ -4557,6 +4577,7 @@ async function createFigure(id,pos,model,label){
   if(mouthTargets.length) g.mouth={influence:0,apply(){ for(const t of mouthTargets) t.influence=this.influence; }};
   playRig(g,'idle',true);
   standOnFeet(g,importedRoot);
+  contactShadow(g,F.h);
   state.characters.push(g);
   return g;
 }
