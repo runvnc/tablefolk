@@ -395,7 +395,15 @@ function buildSimpleMessages(world, g, cfg, built) {
   // Alone with one person, no names at all: "[Pilgrim]" was copied into every reply.
   const crowd = !!built.commandReminder;
   const words = l => crowd ? String(l).replace(/^\[([^\]]+)\]\s*/, '$1: ') : String(l).replace(/^\[[^\]]+\]\s*/, '');
-  for (const m of (cfg.messages || []).filter(m => m.role === 'assistant' || /^\[[^\]]+\]\s/.test(String(m.content))).slice(-SIMPLE_HISTORY)) {
+  // A reply that was only a command (fireball(you), spawn(gold)) is left out:
+  // a tiny model copies its own last turns, and one spell became nothing but
+  // spells from then on (The Oracle, 2026-11-08: 7 of 10 provoked replies).
+  // The words that provoked it go too (the spell was the answer): kept, they
+  // ran into the next question and provoked spell after spell.
+  const onlyCommand = m => m.role === 'assistant' && /^\s*([a-z_]+\s*\([^)]*\)\s*)+$/i.test(String(m.content));
+  const kept = [];
+  for (const m of cfg.messages || []) { if (onlyCommand(m)) { while (kept.length && kept[kept.length - 1].role !== 'assistant') kept.pop(); } else kept.push(m); }
+  for (const m of kept.filter(m => m.role === 'assistant' || /^\[[^\]]+\]\s/.test(String(m.content))).slice(-SIMPLE_HISTORY)) {
     const text = m.role === 'assistant' ? String(m.content) : words(m.content), last = messages[messages.length - 1];
     if (last.role === m.role) last.content += '\n' + text; else messages.push({ role: m.role, content: text });
   }

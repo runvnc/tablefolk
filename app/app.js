@@ -4454,7 +4454,7 @@ function defaultVoiceFor(id,model){
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
-  peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28,v:'20261108a'},
+  peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28,lift:.016,v:'20261108a'},
   // The main people are Meshy models made from JRPG concept art (tools/fal-character.py, 2026-10-25);
   // the old Quaternius ones stay as <name>_classic.
   swordswoman:{dir:'meshy',h:1.3,v:'20261101a'}, sorceress:{dir:'meshy',h:1.32,v:'20261101a'}, huntress:{dir:'meshy',h:1.3,v:'20261101a'}, villager_woman:{dir:'meshy',h:1.26,v:'20261101a'},

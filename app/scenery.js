@@ -54,20 +54,21 @@
     const mm = meta(r), prev = mm.cleanup;
     mm.cleanup = () => { try { prev?.(); } catch {} sc.onBeforeRenderObservable.remove(obs); };
   }
-  // The crystal ball's hum: two low sines a fifth apart, a faint high shimmer,
+  // The crystal ball's hum: A3 and E4 (a fifth; laptop speakers lose anything
+  // much under 200 Hz, so it is not lower), a slow beat, an octave and a shimmer,
   // slowly beating and swelling with the glow; 3D at the ball (spells.js's
-  // panner and listener), quiet (heard within a few steps), silent while the
+  // panner and listener), soft but clear across the room (louder after the user's first try, 2026-11-08), silent while the
   // sound effects are off. It starts once the page's audio runs (first click).
   function crystalHum(r, pos, ph) {
     let nodes = null;
     const start = () => {
       const a = window.tablefolkSfx?.context?.(), sp = window.tablefolkSpells?.audio; if (!a || !sp?.place) return;
       const { ctx } = a, out = ctx.createGain(), pan = ctx.createPanner(), lp = ctx.createBiquadFilter();
-      pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.2; pan.rolloffFactor = 1.6; pan.maxDistance = 40; sp.place(pan, pos);
-      lp.type = 'lowpass'; lp.frequency.value = 1100; out.gain.value = 0;
-      const oscs = [[98, .5], [98.7, .35], [147, .28], [392.4, .05]].map(([f, g]) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; gg.gain.value = g; o.connect(gg); gg.connect(lp); o.start(); return o; });
+      pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 2.5; pan.rolloffFactor = 1; pan.maxDistance = 40; sp.place(pan, pos);
+      lp.type = 'lowpass'; lp.frequency.value = 2400; out.gain.value = 0;
+      const oscs = [[220, .42], [221.1, .3], [330, .26], [440.6, .12], [880.4, .05]].map(([f, g]) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; gg.gain.value = g; o.connect(gg); gg.connect(lp); o.start(); return o; });
       lp.connect(out); out.connect(pan); pan.connect(a.master);
-      out.gain.setTargetAtTime(.05, ctx.currentTime, 1.5);   // fades in
+      out.gain.setTargetAtTime(.2, ctx.currentTime, 1.5);   // fades in
       nodes = { ctx, out, oscs, all: [out, pan, lp] };
     };
     r.onDisposeObservable?.add(() => { if (!nodes) return; for (const o of nodes.oscs) try { o.stop(); o.disconnect(); } catch {} for (const n of nodes.all) try { n.disconnect(); } catch {} nodes = null; });
@@ -76,9 +77,9 @@
         if (!nodes) { start(); return; }
         const on = window.tablefolkSfx?.enabled !== false, t = performance.now() * .001;
         // swells with the glow, plus a slow wobble of its own
-        const g = on ? .03 + .03 * p + .012 * Math.sin(t * .37 + ph) : 0;
+        const g = on ? .14 + .1 * p + .04 * Math.sin(t * .37 + ph) : 0;
         nodes.out.gain.setTargetAtTime(g, nodes.ctx.currentTime, .25);
-        nodes.oscs[3].frequency.setTargetAtTime(392.4 + 3 * Math.sin(t * .8 + ph), nodes.ctx.currentTime, .3);
+        nodes.oscs[4].frequency.setTargetAtTime(880.4 + 6 * Math.sin(t * .8 + ph), nodes.ctx.currentTime, .3);
         window.tablefolkSpells?.audio?.listen?.();
       },
     };

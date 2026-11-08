@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **The Oracle answers again after a spell**: in simple mode a reply that was only a command is left out of the model's history, with the words that provoked it, so one spell no longer turns every later reply into spells (an insult then five questions: 10 of 18 replies were spells or blank, now 4 of 18). The crystal ball's hum is louder and an octave higher (laptop speakers lost its 98 Hz), and the wizard stands 1.6 cm higher so no shoe sinks into the rug.
 - **The Oracle a little bigger, his crystal ball smaller, and it hums**: characters take `"scale"` (0.5-2; the Oracle 1.2); the crystal ball is shown at 0.72 (objects take `"scale"` too) and gives off a quiet, slowly swelling 3D hum (two low sines a fifth apart and a faint shimmer, off with the sound effects). The Oracle's chaos is back to 1 (it was 30).
 - **Speech is on by default again**: a saved "off" from before today is dropped once (until yesterday the 🔊 button showed 🔇 at startup while speech was on, so clicking it to unmute turned speech off and saved that); choices made from now on are kept. A world can switch voices off for everyone with `"speech": false`.
 - **Short links to the worlds in `scenarios/`**: `/oracle` opens The Oracle, `/goblin-bakery` Goblin Bakery (a leading "the-" can be left out; the link's own query passes on, e.g. `/oracle?intro=1`). The share button copies the short link for a world straight from its file.
