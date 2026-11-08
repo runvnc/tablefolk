@@ -82,5 +82,6 @@
  ],
  "goal": null,
  "roofs": false,
- "subtitle": "Ask the Oracle anything. He knows everything (or thinks he does)."
+ "subtitle": "Ask the Oracle anything. He knows everything (or thinks he does).",
+ "memory": false
 }

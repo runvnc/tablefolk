@@ -87,5 +87,14 @@
   window.tablefolkEmbed = api;
   // Ready before the first turn: it starts loading shortly after the page
   // opens (it used to wait for a character's first turn and slowed that reply).
-  if (!art && !off()) setTimeout(() => { try { start(); } catch {} }, 1500);
+  // Not in a world that needs no recall: "memory": false, or every character
+  // in simple mode (The Oracle). It waits for a link's world to open to know.
+  async function preload() {
+    for (let i = 0; i < 40 && !window.TABLEFOLK_LINK_OPENED; i++) await new Promise(r => setTimeout(r, 500));
+    const scn = window.tablefolkScenario?.active?.scn, w = window.tablefolk, agents = w?.getAgents?.() || [];
+    if (scn?.memory === false) return;
+    if (agents.length && w?.isSimpleBrain && agents.every(g => w.isSimpleBrain(g, w.getBrainConfig?.(g.id) || {}))) return;
+    try { start(); } catch {}
+  }
+  if (!art && !off()) setTimeout(preload, 1500);
 })();

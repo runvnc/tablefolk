@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **No memory model for the Oracle**: a world can set `"memory": false`; simple-mode characters skip meaning-based recall (their prompt has none), and the memory model isn't loaded at all in a world where memory is off or every character is in simple mode. Checked: The Oracle leaves it idle, Goblin Bakery loads it.
 - **The Oracle's lightning has examples, `lightning(Pilgrim)` or `lightning()`**, and a threatened bolt strikes the one he's talking to unless he names himself; in 20 test replies 4 bolts hit the player and 1 hit him (he had always killed himself). **The memory model (EmbeddingGemma) loads when the page opens** (ready about 13 s in) instead of at the first turn, which delayed that reply; its "downloading" toast shows only when the weights are not already in Cache Storage.
 - **No approach notice for characters who speak only when spoken to** (The Oracle): walking up to them no longer tells them "Pilgrim comes up to you..." or prompts them to greet you, and simple mode leaves such notices out of the prompt; the tiny model answered the notice instead of you.
 - The Oracle at chaos 63 (temperature 2.0): 8 lightning in 20 replies, nearly all at insults and dares, and he still answers the questions after (chaos 50: 2; chaos 30: 1; chaos 1: 0-4 in 30).

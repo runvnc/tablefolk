@@ -941,7 +941,8 @@
       // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
       onlySpokenTo: typeof s.onlySpokenTo === 'boolean' ? s.onlySpokenTo : null,   // app.js onlySpokenTo
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
-      speech: s.speech === false ? false : null,   // false: no character speaks aloud in this world (ttsEnabled on each)
+      speech: s.speech === false ? false : null,
+      memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,

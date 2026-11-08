@@ -98,8 +98,11 @@
   const query = (g, m) => { const cfg = getBrainConfig(g.id); return [m.heard || '', cfg.goal || '', cfg.quest || ''].join(' ').trim(); };
   const ownFacts = g => { const cfg = getBrainConfig(g.id); return (Array.isArray(cfg.knows) ? cfg.knows : []).map(String); };
   const loreFacts = () => (Array.isArray(state.lore) ? state.lore : []).map(String);
+  // Off for worlds with "memory": false and for simple-mode characters (a tiny
+  // model's prompt has no recalled facts, so the embedder would load for nothing).
+  const noRecall = g => window.tablefolkScenario?.active?.scn?.memory === false || !!window.tablefolk?.isSimpleBrain?.(g, getBrainConfig(g.id));
   async function prepare(g) {
-    const E = window.tablefolkEmbed; if (!E || E.state === 'off') return;
+    const E = window.tablefolkEmbed; if (!E || E.state === 'off' || noRecall(g)) return;
     if (E.state !== 'ready') { E.start(); return; }
     const m = mindOf(g), q = query(g, m);
     if (!q) { m.sim = null; return; }

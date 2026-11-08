@@ -19,6 +19,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "intro": "Mog runs the only shop on the island.",   // card shown on load
   "showIntro": false,                  // no intro card: straight into the world (the link can override: ?intro=1)
   "speech": false,                // no character speaks aloud in this world (one character: "ttsEnabled": false on it)
+  "memory": false,                // no meaning-based recall: the memory model (EmbeddingGemma) is not loaded
   "view": "first",                 // the camera at the start: overview (free camera, the default) | follow | first (first person); ?view= overrides
   "seed": 7,                       // layout randomness: same JSON + seed = same map
   "base": "plain",                 // plain (default) | island | clearing | dungeon
