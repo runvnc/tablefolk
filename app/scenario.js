@@ -941,6 +941,7 @@
       // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
       onlySpokenTo: typeof s.onlySpokenTo === 'boolean' ? s.onlySpokenTo : null,   // app.js onlySpokenTo
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
+      speech: s.speech === false ? false : null,   // false: no character speaks aloud in this world (ttsEnabled on each)
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
@@ -1094,7 +1095,7 @@
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, onlySpokenTo: typeof a.onlySpokenTo === 'boolean' ? a.onlySpokenTo : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
-        ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || opts.testing) ? { ttsEnabled: false } : {}),
+        ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || scn.speech === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
         maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), wielding: null, defeated: false,

@@ -26,6 +26,11 @@
 (() => {
   'use strict';
   const KEY = 'character.ui.tab', LAST = 'tablefolk.ui.lastTab', WIDTH = 'tablefolk.ui.panelWidth', DEV = 'tablefolk.dev';
+  // Speech on by default: a saved "off" from before 2026-11-08 is dropped once.
+  // Until 2026-11-07 the 🔊 button showed 🔇 at startup while speech was on, so
+  // clicking it to "unmute" turned speech off and saved that. A choice made
+  // after this runs is kept (tablefolkTtsReset marks the reset as done).
+  try { if (!localStorage.getItem('tablefolkTtsReset')) { if (localStorage.getItem('tablefolkTtsEnabled') === '0') localStorage.removeItem('tablefolkTtsEnabled'); localStorage.setItem('tablefolkTtsReset', '1'); } } catch {}
   const panes = () => Array.from(document.querySelectorAll('#sidePanel .pane'));
   const panel = () => document.getElementById('sidePanel');
   let current = null;

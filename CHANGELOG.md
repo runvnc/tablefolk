@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **Speech is on by default again**: a saved "off" from before today is dropped once (until yesterday the 🔊 button showed 🔇 at startup while speech was on, so clicking it to unmute turned speech off and saved that); choices made from now on are kept. A world can switch voices off for everyone with `"speech": false`.
 - **Short links to the worlds in `scenarios/`**: `/oracle` opens The Oracle, `/goblin-bakery` Goblin Bakery (a leading "the-" can be left out; the link's own query passes on, e.g. `/oracle?intro=1`). The share button copies the short link for a world straight from its file.
 - **One fireball kills the Oracle** (3 hit points). Qwen2.5 0.5B is out of the model menus (still loadable with `?model=qwen2.5-0.5b`).
 - **Oracle-like things at the heart of his chamber**: three new objects built in code, `crystal_ball` (violet light swirling in dark glass on a gilded pedestal), `scrying_pool` (a golden bowl of glowing water with ripples and a faint mist) and `rune_circle` (gold runes and a seven-pointed star inlaid in the floor, turning slowly). The Oracle stands on a rune circle between a crystal ball and a scrying pool, where the plain cauldron was; `spawn()` can conjure them, characters see them, the ball and pool are solid and too heavy to carry.
