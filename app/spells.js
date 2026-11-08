@@ -13,7 +13,8 @@
  * floor a few steps away. A target that can't be found counts as none.
  * spawn(thing, n) makes 1-6 of an object (pack items, crate, barrel, lamp,
  * mushroom, campfire, ...) appear on free cells in front of the caster; an
- * unknown thing does nothing at all (no error is shown or said).
+ * unknown thing (or the placeholder "thing") conjures a random small object
+ * (no error is shown or said).
  *
  * Graphics: Babylon particle systems (GPU particles when supported and the
  * quality is above light; CPU ones, fewer, at light), unlit emissive meshes
@@ -474,7 +475,7 @@
     for (const m of state.props) {
       if (!m || m.isDisposed?.()) continue; const mm = meta(m); if (!mm) continue;
       const names = [mm.type, mm.label, mm.name].filter(Boolean).map(s => String(s).toLowerCase().replace(/_/g, ' '));
-      if (!names.some(n => n === t || n.includes(t) || t.includes(n))) continue;
+      if (!names.some(n => n === t || (t.length > 2 && n.includes(t)) || (n.length > 2 && t.includes(n)))) continue;
       const d = BABYLON.Vector3.Distance(m.position, near); if (d < bd) { bd = d; best = m; }
     }
     return best;
@@ -482,7 +483,7 @@
   // a character (or the player), else a thing, by name; null = none/not found
   function resolveTarget(g, name) {
     const t = String(name || '').trim().replace(/^["']|["']$/g, '');
-    if (!t || /^(none|nothing|sky|air|up|the sky)$/i.test(t)) return null;
+    if (!t || /^(none|nothing|sky|air|up|the sky|name|target|enemy|someone|thing|it)$/i.test(t)) return null;   // (placeholders copied from the prompt)
     const who = window.tablefolkCombat?.resolveTarget(g, t);
     if (who && who !== g && !who.defeated) return { who, pos: () => who.root.position };
     const m = findThing(t, g.root.position);
@@ -614,8 +615,15 @@
     if (lead && (/^\d+$/.test(lead[1]) || NUM[lead[1].toLowerCase()])) { if (!(n > 0)) n = /^\d+$/.test(lead[1]) ? +lead[1] : NUM[lead[1].toLowerCase()]; words = lead[2]; }
     if (!(n > 0)) n = NUM[String(count || '').toLowerCase()] || 1;
     n = Math.max(1, Math.min(6, n));
-    const type = resolveThing(words);
-    if (!type) { if (window.TABLEFOLK_DEV) console.log('[spells] spawn: no such thing', thing); return false; }
+    // A thing we don't have (spawn(ship)), or the prompt's placeholder copied
+    // (spawn(thing)): a random small object instead, so the magic still happens.
+    let type = resolveThing(words);
+    if (!type) {
+      const pool = ['apple_crate', 'coin_pile', 'candles', 'chalice', 'flowers', 'pot', 'bag', 'boulder', 'crate', 'barrel', 'mushroom', 'lantern'].filter(known);
+      if (!pool.length) return false;
+      type = pool[Math.floor(Math.random() * pool.length)];
+      if (window.TABLEFOLK_DEV) console.log('[spells] spawn: no', JSON.stringify(thing), '- conjures', type);
+    }
     // free cells in front of the caster, nearest the spot 1.6 ahead first
     const p = g.root.position, f = fwd(g), aimAt = p.add(f.scale(1.6)), cells = [];
     const busy = (x, z) => state.characters.concat(state.playerAvatar ? [state.playerAvatar] : []).some(c => c?.root && Math.hypot(c.root.position.x - x, c.root.position.z - z) < .8)

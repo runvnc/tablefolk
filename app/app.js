@@ -3983,10 +3983,11 @@ function simpleCommands(g){
   if(allowed.has('give')) out.push('give(item) to hand something over');
   if(allowed.has('sell')) out.push('sell(item, price) to sell something');
   if(allowed.has('attack')) out.push('attack(name) to hit someone next to you');
-  // spells.js: kept rare by saying when (the target is optional)
-  if(allowed.has('spell.fireball')) out.push('fireball(name) to throw fire at an enemy');
-  if(allowed.has('spell.lightning')) out.push('lightning(name) to strike an enemy with lightning');
-  if(allowed.has('spawn')) out.push('spawn(thing) to make a thing appear when asked');
+  // spells.js: bare, so a tiny model has no words to repeat as speech (it did,
+  // "to throw fire at an enemy"); the scenario's prompt says when to use them
+  if(allowed.has('spell.fireball')) out.push('fireball(name)');
+  if(allowed.has('spell.lightning')) out.push('lightning(name)');
+  if(allowed.has('spawn')) out.push('spawn(thing)');
   return out;
 }
 function buildSimplePrompt(g, cfg){

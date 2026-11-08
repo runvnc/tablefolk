@@ -28,7 +28,7 @@
   "spell.lightning",
   "spawn"
  ],
- "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nAnswer with words. Only if you must, write one of these instead:\n{commands}",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic or attacks you, write the spell alone on a line, like spawn(bread):\n{commands}",
  "agents": [
   {
    "id": "Oracle",

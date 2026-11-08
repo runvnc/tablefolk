@@ -376,6 +376,8 @@ function simpleReply(world, g, text) {
     return [said, magic[1].toLowerCase() + '(' + magic[2].trim() + ')'].filter(Boolean).join('\n');
   }
   if (String(text || '').search(MAGIC_ANY) >= 0) text = String(text).replace(MAGIC_ANY, ' ');
+  // a spell's bare name as the whole line ("Fireball!"): the command list read out, not said
+  if (Object.values(MAGIC).some(k => allowed.includes(k))) text = String(text || '').split('\n').filter(l => !/^\W*(fireball|lightning|spawn)\W*$/i.test(l)).join('\n');
   for (let l of String(text || '').split('\n')) {
     l = l.trim();
     const act = l.match(/^(walk|give|sell|attack)\s*\(/i);

@@ -41,7 +41,11 @@ trading, `emote` for flavour.
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |
 | `spell.push`, `spell.spark`, `spell.fireball` | the old built-in spells; prefer the `magic` skill |
+| `fireball(target?)`, `lightning(target?)` (allowed as `spell.fireball`, `spell.lightning`) | a fireball (3 damage, burns things nearby) or a lightning bolt (4) at a character, the player or a thing by name; the caster takes 1 from the backlash. With no target, or one that isn't there, it goes off harmlessly (overhead, or into the floor nearby). Particles, lights and 3D sound (`app/spells.js`) |
+| `spawn(thing[, how many])` (allowed as `spawn`) | conjure 1-6 objects in front of the caster (`spawn(apple, 3)`, `spawn(3 apples)`); something that isn't in the game becomes a random small object |
 | `workflow(name, input)` | start a routine ([workflows.md](workflows.md)) |
+
+A character's command that fails (an unknown command, a wrong argument, one it isn't allowed) is dropped silently: it is neither spoken nor shown (dev mode logs it to the console); the player's own typed commands still say what went wrong.
 
 `goal`, `remember`, `eat`, `use`, `take` and `put` are on for everyone with a mind; a role's and a
 skill's commands are added for whoever has them. The list is `COMMANDS` in
