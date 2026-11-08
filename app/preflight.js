@@ -30,6 +30,7 @@
     ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'],
     ['note-svg.js?v=20261025c'],
     ['recorder.js?v=20261018a'],
+    ['video-recorder.js?v=20261107b'],
     ['confirm-dialog.js?v=20261018a'],
     ['toast.js?v=20261018a'],
     ['sfx.js?v=20261024a'],

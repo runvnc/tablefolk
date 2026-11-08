@@ -152,7 +152,11 @@ can clone a voice from a sample.
 The Graphics pane sets quality, shadows, the sea and "smart memory" (the
 embedding model). Light is the default; every quality uses the simple sea and
 sky (the detailed ocean and island only come with `?island=1`). The 🔊/🔇
-button at the top turns speech on and off. URL flags for weak machines and
+button at the top turns speech on and off. The ⏺ button beside it records a video of the 3D view with
+the voices and sound effects (about 30 fps; MP4 with H.264, or WebM where
+MP4 isn't available); click it again to stop, and the file downloads. Panels
+and the chat box are not in the picture. The Debug pane's APNG recorder is
+the older debugging one (4 fps, no sound, the world's state inside the file). URL flags for weak machines and
 testing:
 
 | flag | effect |

@@ -587,3 +587,11 @@ html:fullscreen #ttBar { display:none; }
 .browser-check tr.bc-no td:first-child, .browser-runs .bc-no { color:#ffc878; }
 .browser-check tr.bc-info td:first-child { color:#8a9a88; }
 .browser-runs { list-style:none; margin:0 0 4px; padding:0 2px; font:10px/1.45 ui-monospace,monospace; }
+
+/* video-recorder.js: the ⏺ button in the top bar */
+#videoRecBtn { flex:0 0 auto; min-width:36px; height:36px; padding:0 10px; border-radius:18px; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:rgba(255,255,255,.10); }
+#videoRecBtn .rec-dot { width:12px; height:12px; border-radius:50%; background:#e0524a; box-shadow:0 0 0 2px rgba(255,255,255,.18); }
+#videoRecBtn .rec-time { font:600 12px ui-monospace,monospace; color:#fff; }
+#videoRecBtn .rec-time:empty { display:none; }
+#videoRecBtn.recording { background:rgba(192,57,43,.85); }
+#videoRecBtn.recording .rec-dot { border-radius:2px; background:#fff; animation:micPulse 1s ease-in-out infinite; }

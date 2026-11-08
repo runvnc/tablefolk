@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261107a" />
+  <link rel="stylesheet" href="style.css?v=20261107b" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -51,6 +51,7 @@
     </div>
     <div class="topbar-spacer"></div>
     <a id="adminLink" class="dev-only top-pill" href="/admin" title="server admin page">admin</a>
+    <button id="videoRecBtn" type="button" title="record a video of the 3D view with sound" aria-label="record a video"><span class="rec-dot"></span><span class="rec-time"></span></button>
     <button id="ttsTopToggle" type="button" title="toggle speech" aria-label="toggle speech">🔇</button>
     <input id="ttsTopVolume" type="range" min="0" max="1" step=".05" value=".85" title="voice volume" aria-label="voice volume" />
   </header>
@@ -429,6 +430,6 @@
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261107b"></script>
-  <script src="preflight.js?v=20261107h"></script>
+  <script src="preflight.js?v=20261107i"></script>
 </body>
 </html>

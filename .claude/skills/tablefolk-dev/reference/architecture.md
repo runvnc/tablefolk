@@ -90,7 +90,7 @@ scenario.js, the tests and packages use.
 | `scenario.js` | the scenario format (`normalizeScenario`), base maps, grid, walk-in buildings, layout engine, goal checker, links, banner, 🎯 pane, tactic tester, `freezeLayout` (`tablefolkScenario`) |
 | `tabletop.js`, `tile-render.js` | `?tabletop=1` view; 2D tile rendering |
 | `welcome.js` | the welcome screen |
-| `tabs.js`, `ui-polish.js`, `toast.js`, `confirm-dialog.js`, `library.js`, `recorder.js`, `perf-monitor.js`, `note-svg.js` | UI shell and helpers |
+| `tabs.js`, `ui-polish.js`, `toast.js`, `confirm-dialog.js`, `library.js`, `recorder.js`, `video-recorder.js` (the ⏺ video button: canvas + mixed voices and sfx), `perf-monitor.js`, `note-svg.js` | UI shell and helpers |
 | `builder.js`, `map-editor.js`, `worldgen-browser.js` | loaded by the world builder page (`server/generate.js`), not by the app |
 | `llm_js/world-integration.js` | the brain loop: runs a character's turn (`world.runAgentTurn`), history, the talk budget, prose-to-command extraction, the echo guard; `window.tablefolkLLM` |
 | `llm_js/agent-brain.js` | model registry (`SUPPORTED_MODELS`) and engine choice |
