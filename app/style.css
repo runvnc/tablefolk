@@ -432,8 +432,8 @@ body.panel-open #rail .rail-toggle svg { transform:rotate(180deg); }
 #advPane .adv-items small { color:#aebead; }
 #advPane .adv-acts { display:flex; gap:4px; }
 #advPane .adv-acts button { padding:3px 8px; font-size:11px; border-radius:8px; }
-#advPane .adv-keys { display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; font-size:11px; color:#c7d4c4; }
-#advPane kbd { display:inline-block; min-width:16px; padding:1px 4px; margin-right:2px; border-radius:5px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); font:10px ui-monospace,monospace; text-align:center; color:#fff; }
+#pane-adventurer .adv-keys { display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; font-size:11px; color:#c7d4c4; }
+#pane-adventurer kbd { display:inline-block; min-width:16px; padding:1px 4px; margin-right:2px; border-radius:5px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); font:10px ui-monospace,monospace; text-align:center; color:#fff; }
 
 /* ---- "skeleton's turn" while nearby characters act (play.js) ---- */
 #npcTurnBanner { position:fixed; left:50%; top:70px; transform:translate(-50%,-8px); z-index:80; padding:8px 16px; border-radius:14px; font-size:13px; color:#f4f0e6;
@@ -595,3 +595,55 @@ html:fullscreen #ttBar { display:none; }
 #videoRecBtn .rec-time:empty { display:none; }
 #videoRecBtn.recording { background:rgba(192,57,43,.85); }
 #videoRecBtn.recording .rec-dot { border-radius:2px; background:#fff; animation:micPulse 1s ease-in-out infinite; }
+
+/* ---- player's view (tabs.js user mode): two rail icons, a chat-only dock ---- */
+body.dev-mode .user-only { display:none !important; }
+body.user-mode #rail .rail-dev { display:none !important; }
+/* Adventurer pane: the view buttons, moved here from the dock in user mode */
+.adv-play:not(:has(#viewBtns:not([hidden]))) { display:none; }
+#advPlaySlot .view-btns { margin-bottom:4px; }
+/* Settings pane (user mode): your name, links to Voice / Graphics / Messages, developer mode */
+#settingsNameSlot .chat-name-label { margin-bottom:4px; }
+#settingsNameSlot .chat-name-label input { font-size:12px; padding:7px 9px; }
+.settings-links { display:flex; flex-direction:column; gap:6px; }
+.settings-links button { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; padding:9px 12px; text-align:left; border-radius:12px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:#eaf2df; position:relative; }
+.settings-links button::after { content:"›"; position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:18px; color:#9fe8c8; }
+.settings-links button:hover { background:rgba(159,232,200,.12); border-color:rgba(159,232,200,.35); }
+.settings-links b { font-size:13px; }
+.settings-links small { font-size:11px; color:#aebead; font-weight:500; padding-right:16px; }
+.settings-dev { width:100%; padding:8px 12px; border-radius:12px; font-size:12px; color:#ffd479; background:rgba(255,212,121,.10); border:1px solid rgba(255,212,121,.35); }
+.settings-dev:hover { background:rgba(255,212,121,.2); }
+.pane-back { display:inline-block; margin:0 0 6px; padding:3px 10px 3px 8px; border-radius:999px; font-size:11px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13); color:#cfe3d6; }
+.pane-back:hover { background:rgba(159,232,200,.16); color:#fff; }
+
+/* chat dock: input, history, mic and send never overlap (the mic's engine label used to run under "send") */
+.chat-send-row { align-items:stretch; min-width:0; }
+.chat-send-row input { min-width:0; }
+.chat-send-row > button { flex:0 0 auto; min-width:0; }
+.chat-send-row > #chatSend { flex:0 0 auto; padding:7px 12px; }
+.chat-send-row > .mic-btn { flex:0 1 auto; min-width:38px; max-width:110px; padding:5px 8px; overflow:hidden; justify-content:center; }
+.chat-send-row > .mic-btn .mic-engine { overflow:hidden; text-overflow:ellipsis; }
+.chat-icon-btn { width:34px; padding:0 !important; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#cfe3d6; }
+.chat-icon-btn svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.chat-icon-btn:hover, .chat-icon-btn.active { color:#9fe8c8; background:rgba(159,232,200,.14); }
+/* user mode: the dock is the conversation; the rest lives in the Adventurer and Settings panes */
+body.user-mode #chatDock { width:380px; gap:6px; padding:8px 10px; }
+body.user-mode #chatDock .avatar-hint, body.user-mode #chatDock .player-items { display:none; }
+body.user-mode #chatDock #chatTarget.single { display:none; }
+body.user-mode #chatDock .chat-send-row input { font-size:13px; padding:9px 10px; }
+/* health in the dock only while it matters (hurt or down); the Adventurer pane always has it */
+body.user-mode #playerHp.full:not(.down) { display:none; }
+body.user-mode #playerHp { font-size:11px; }
+@media (max-width:520px) {
+  #chatDock, body.user-mode #chatDock { left:8px; right:8px; width:auto; bottom:8px; }
+  .chat-send-row > .mic-btn .mic-engine { display:none; }
+}
+/* Voice pane: one column, long engine names and the helpers button stay inside the panel */
+#pane-voice .custom-grid { grid-template-columns:minmax(0,1fr); }
+#pane-voice .custom-grid > * { min-width:0; }
+#pane-voice select, #pane-voice input[type="text"] { width:100%; min-width:0; max-width:100%; box-sizing:border-box; text-overflow:ellipsis; }
+#pane-voice .helpers-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+#pane-voice .helpers-row button { white-space:normal; }
+#pane-voice input[type="text"] { border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(0,0,0,.28); border-radius:10px; padding:6px 8px; font-size:11px; }
+@media (max-width:520px) { #sidePanel { max-width:calc(100vw - 70px); } }

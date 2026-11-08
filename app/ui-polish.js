@@ -71,7 +71,9 @@
 
 /* chat dock: the "to:" picker lists the characters and follows the selected
    one; picking a name selects that character (clicking it in the world works
-   too, and so does starting a message with @name). */
+   too, and so does starting a message with @name). In user mode the picker
+   hides with only one character (class "single") and the box's placeholder
+   names who listens. */
 (() => {
   function ready2(fn) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
@@ -90,6 +92,12 @@
         for (const id of ids) pick.add(new Option(id, id));
       }
       if (document.activeElement !== pick && sel && pick.value !== sel) pick.value = sel;
+      // the player's view: no "to:" with one character to talk to, and the
+      // box says who listens
+      document.getElementById('chatTarget')?.classList.toggle('single', ids.length <= 1);
+      const inp = document.getElementById('chatInput'), to = pick.value || ids[0];
+      const ph = window.TABLEFOLK_DEV ? 'Message (or @name message)...' : to ? `Talk to ${to}…` : 'Message…';
+      if (inp && inp.placeholder !== ph) inp.placeholder = ph;
     };
     pick.addEventListener('change', () => {
       const w = window.tablefolk, g = w?.getAgents?.().find(a => a.id === pick.value);

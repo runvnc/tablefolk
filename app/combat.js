@@ -298,6 +298,7 @@
     el.hidden = false;
     el.innerHTML = `<span class="hp-label">Health</span><span class="hp-bar"><span style="width:${Math.round(100 * hp / max)}%"></span></span><span class="hp-num">${hp}/${max}</span>${w ? `<span class="hp-weapon">⚔ ${String(w).replace(/[<&>]/g, '')}</span>` : ''}`;
     el.classList.toggle('down', !!state.playerAvatar?.defeated);
+    el.classList.toggle('full', hp >= max);   // user mode shows it in the chat dock only when hurt
   }
   // "/attack gob1", "/wield sword", "/unwield" from the chat box.
   function playerCommand(text) {

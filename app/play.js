@@ -10,7 +10,8 @@
  *   give       drag an item (or the gold) from the Adventurer pane onto a
  *              character close by, or press its "give" button (the nearest)
  *   I          the Adventurer pane: health, gold, what you carry (drink a
- *              potion, wield or put away a weapon, drop)
+ *              potion, wield or put away a weapon, drop); in user mode the
+ *              view buttons and pace sit under it (tabs.js moves them)
  *
  * Chest contents come from the scenario object: {"type": "chest", "x": 2,
  * "z": -1, "gold": 30, "items": ["silver key", "healing potion"]}; a chest
@@ -226,14 +227,8 @@
           ${i.text != null ? `<button data-act="read" data-item="${n}">read</button>` : ''}
           ${weapon ? `<button data-act="${held ? 'unwield' : 'wield'}" data-item="${n}">${held ? 'put away' : 'wield'}</button>` : ''}
           <button data-act="drop" data-item="${n}" title="drop">✕</button></span></li>`;
-      }).join('')}</ul>` : '<p class="pane-note">Nothing yet. Open chests (E) and pick things up.</p>'}
-      <div class="section-subtitle">Controls</div>
-      <div class="adv-keys">
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span>click the ground: walk there</span>
-        <span><kbd>E</kbd> open / pick up / talk</span><span><kbd>F</kbd> attack</span>
-        <span><kbd>V</kbd> first person</span><span><kbd>C</kbd> follow / free camera</span><span><kbd>I</kbd> this panel</span>
-        <span><kbd>Enter</kbd> chat</span><span><kbd>Esc</kbd> close panel</span>
-      </div>`;
+      }).join('')}</ul>` : '<p class="pane-note">Nothing yet. Open chests (E) and pick things up.</p>'}`;
+    // the view buttons and the controls follow in index.html (#advPlay, .adv-keys)
   }
   document.addEventListener('click', e => {
     const b = e.target.closest?.('#advPane button[data-act]'); if (!b) return;

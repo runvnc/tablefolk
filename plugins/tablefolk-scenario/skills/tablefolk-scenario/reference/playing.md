@@ -93,15 +93,24 @@ back. It speaks softly to someone beside it and louder across a room.
 
 ## Panes and modes
 
-User mode (the default) shows the player's panes: **Adventurer** (health,
-gold, wielded weapon, goal, items with give / drink / read / wield / drop,
-controls), **Messages** (the last 300 lines), **Voice** and **Graphics**.
+User mode (the default) keeps the screen for the world. The left rail has
+two icons: **Adventurer** (`I`: health, gold, wielded weapon, goal, items
+with give / drink / read / wield / drop, then the view buttons, pace and
+"let them live", then the controls) and **Settings** (your chat name, links
+to the **Voice** and **Graphics** panes and to **Messages**, and the switch
+to developer mode). The chat box at the bottom right is just the
+conversation: the messages button (the last 300 lines), the message, the 🎤
+and send. The "to:" picker shows only when there is more than one character
+to talk to (the box says who listens: "Talk to Oracle…"), and a slim health
+bar only while you are hurt. All the keys work as before.
 Breeze in the browser shares the graphics card with the picture, so the picture drops to 15 fps while it speaks (Graphics pane, "While Breeze speaks").
 
-**Dev mode** (the DEV button on the left rail, or `?dev=1`, remembered in the browser; `?dev=0` turns it off,
-`?play=1` shows user mode for that page only) adds World, Character,
-Scenario, Library and Debug, the brain loop buttons, turn controls and the
-command box.
+**Dev mode** (Settings → "Turn on developer mode", or `?dev=1`, remembered in the browser; the DEV button on the rail turns it off again, as does `?dev=0`;
+`?play=1` shows user mode for that page only) puts every pane on the rail
+(Messages, World, Character, Scenario, Library, Voice, Graphics, Debug) and
+adds the brain loop buttons, turn controls and the command box; the chat
+box keeps the chat name, gold, pace, view buttons and controls line as
+before.
 
 ## Brains (the model menu)
 

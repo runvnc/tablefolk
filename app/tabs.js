@@ -1,12 +1,22 @@
 /* tablefolk.world shell: icon rail + tabbed side panes + top-bar speech toggle.
  *
- * Two modes. User mode (the default) shows the player's panes: Adventurer
- * (health, gold, what you carry, controls), Voice and Graphics. Dev mode
- * adds World, Character, Scenario, Library and Debug, the brain loop
- * buttons, the turn controls and the command box. ?dev=1 turns dev mode on
+ * Two modes. User mode (the default) keeps the screen for the world: the rail
+ * has two icons, Adventurer (health, gold, what you carry, the view buttons
+ * and pace, controls) and Settings (your name, links to the Voice, Graphics
+ * and Messages panes, the developer-mode switch), and the chat dock is just
+ * the conversation (history button, message, 🎤, send; "to:" only with more
+ * than one character; health only while hurt). placeForMode() moves the
+ * chat name and the view buttons between the dock (dev) and those panes
+ * (user): the same nodes, so every id stays unique. Dev mode shows every
+ * pane on the rail (Messages, World, Character, Scenario, Library, Voice,
+ * Graphics, Debug), the DEV and » buttons, the brain loop buttons, the turn
+ * controls and the command box. Rail classes: "dev-only" panes exist only
+ * in dev mode, "rail-dev" ones are reachable in both but on the rail only in
+ * dev mode, "user-only" ones (Settings) only in user mode. ?dev=1 turns dev mode on
  * (remembered in this browser), ?dev=0 turns it off, ?play=1 shows user mode
  * for that page only. Elements with class
- * "dev-only" exist in both modes and are hidden in user mode. The DEV button
+ * "dev-only" exist in both modes and are hidden in user mode ("user-only":
+ * hidden in dev mode). The DEV button
  * on the rail switches mode at once, without a reload, and remembers it.
  *
  * The panel: a rail icon opens its pane (clicking the open one, the « button,
@@ -29,7 +39,9 @@
   // world builder's play links); ?dev=1 still wins
   if (new URLSearchParams(location.search).has('play') && devParam !== '1') dev = false;
   window.TABLEFOLK_DEV = dev;
-  const allowed = name => { const b = document.querySelector(`#rail .rail-btn[data-tab="${name}"]`); return !!b && (dev || !b.classList.contains('dev-only')); };
+  const allowed = name => { const b = document.querySelector(`#rail .rail-btn[data-tab="${name}"]`); return !!b && !b.classList.contains(dev ? 'user-only' : 'dev-only'); };
+  // the rail icon lit for a pane: in user mode Voice and Graphics belong to Settings
+  const railFor = name => !dev && (name === 'voice' || name === 'graphics') ? 'settings' : name;
 
   function show(name, opts = {}) {
     const target = document.getElementById('pane-' + name);
@@ -40,7 +52,8 @@
     for (const p of panes()) p.classList.toggle('active', p === target);
     panel()?.classList.add('open');
     document.body.classList.add('panel-open');
-    for (const b of document.querySelectorAll('#rail .rail-btn')) b.classList.toggle('active', b.dataset.tab === name);
+    for (const b of document.querySelectorAll('#rail .rail-btn')) b.classList.toggle('active', b.dataset.tab === railFor(name));
+    document.getElementById('chatHistoryBtn')?.classList.toggle('active', name === 'messages');
     try { localStorage.setItem(KEY, name); localStorage.setItem(LAST, name); } catch {}
     if (name === 'adventurer') try { window.tablefolkPlay?.render(); } catch {}
     if (name === 'messages') try { window.tablefolkPlay?.renderMessages(); } catch {}
@@ -51,6 +64,7 @@
     panel()?.classList.remove('open');
     document.body.classList.remove('panel-open');
     for (const b of document.querySelectorAll('#rail .rail-btn')) b.classList.remove('active');
+    document.getElementById('chatHistoryBtn')?.classList.remove('active');
     try { localStorage.setItem(KEY, ''); } catch {}
   }
   function lastTab() { let t = ''; try { t = localStorage.getItem(LAST) || ''; } catch {} return allowed(t) ? t : (dev ? 'world' : 'adventurer'); }
@@ -58,6 +72,10 @@
 
   function initRail() {
     for (const b of document.querySelectorAll('#rail .rail-btn[data-tab]')) b.addEventListener('click', () => show(b.dataset.tab));
+    // Settings' links and the panes' "‹ Settings" buttons
+    document.getElementById('sidePanel')?.addEventListener('click', e => { const b = e.target.closest?.('button[data-open]'); if (b) show(b.dataset.open, { force: true }); });
+    // the chat dock's history button: the Messages pane
+    document.getElementById('chatHistoryBtn')?.addEventListener('click', () => show('messages'));
     document.getElementById('railToggle')?.addEventListener('click', () => toggle());
     document.getElementById('panelClose')?.addEventListener('click', hide);
     // The panel starts collapsed so it never covers the world on load; the
@@ -104,8 +122,20 @@
     }
   }
 
+  // The chat name and the view buttons sit in the chat dock in dev mode and
+  // in the Settings / Adventurer panes in user mode. Moved, not copied: lots
+  // of code finds them by id. Comment anchors remember the dock positions.
+  const anchors = new Map();
+  function place(id, slotId) {
+    const el = document.getElementById(id), slot = document.getElementById(slotId); if (!el || !slot) return;
+    if (!anchors.has(id)) { const a = document.createComment(id); el.before(a); anchors.set(id, a); }
+    if (dev) anchors.get(id).after(el); else slot.appendChild(el);
+  }
+  function placeForMode() { place('chatNameLabel', 'settingsNameSlot'); place('viewBtns', 'advPlaySlot'); }
+
   function applyMode() {
     window.TABLEFOLK_DEV = dev;
+    placeForMode();
     document.body.classList.toggle('dev-mode', dev);
     document.body.classList.toggle('user-mode', !dev);
     const b = document.getElementById('devToggle'); if (!b) return;
@@ -126,6 +156,7 @@
     if (!document.getElementById('rail')) return;
     applyMode();
     document.getElementById('devToggle')?.addEventListener('click', () => setDev(!dev));
+    document.getElementById('devSwitch')?.addEventListener('click', () => setDev(true));
     initRail();
     initResize();
     initTtsToggle();
