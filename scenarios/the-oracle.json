@@ -41,7 +41,7 @@
    "ttsVoiceId": "pack:wizard_m",
    "facing": "s",
    "hostile": false,
-   "hp": 9,
+   "hp": 3,
    "chaos": 30,
    "allowed": [
     "say",
@@ -77,7 +77,11 @@
   "}": "vase"
  },
  "objects": [
-  { "type": "rune_circle", "x": 0, "z": -1 }
+  {
+   "type": "rune_circle",
+   "x": 0,
+   "z": -1
+  }
  ],
  "goal": null,
  "roofs": false,
