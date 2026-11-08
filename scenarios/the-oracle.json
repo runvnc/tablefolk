@@ -49,20 +49,28 @@
  ],
  "grid": [
   "#############",
-  "#K.L.....L.K#",
-  "#K..RRRRR..K#",
-  "#...RROGR...#",
-  "#v..RRRRR..v#",
-  "#....RRR....#",
-  "#L...RRR...L#",
-  "#....RRR....#",
-  "#v...RRR...v#",
+  "#K!Q..?..Q!K#",
+  "#K..RRRRR..(#",
+  "#c.LRRGRRL.P#",
+  "#t..RORRR..t#",
+  "#t...RRR...t#",
+  "#!...RRR...!#",
+  "#S..LRRRL..>#",
+  "#}h.jRRRj.h}#",
   "######Y######"
  ],
  "legend": {
   "R": "carpet",
   "G": "Oracle on carpet",
-  "O": "cauldron on carpet"
+  "O": "cauldron on carpet",
+  "!": "candelabra",
+  "Q": "statue",
+  "?": "lectern",
+  "(": "cabinet",
+  "c": "candles",
+  ">": "chalice",
+  "}": "vase"
  },
- "goal": null
+ "goal": null,
+ "roofs": false
 }
