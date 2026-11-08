@@ -40,7 +40,7 @@
    "facing": "s",
    "hostile": false,
    "hp": 3,
-   "chaos": 1,
+   "chaos": 50,
    "allowed": [
     "say",
     "spell.lightning"

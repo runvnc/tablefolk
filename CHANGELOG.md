@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- The Oracle at chaos 50 (temperature about 1.6): in 20 replies 2 lightning and no silent turns (chaos 30: 1 and four silent turns in a row; chaos 1: 0-4 in 30).
 - **The Oracle only has lightning**, with a two-line prompt; a reply that threatens lightning ("I shall strike you with lightning!", not "I cannot...") is cast as well as said, at you when it says "you". Commands are cut from his past replies in the history. The crystal ball's hum is far quieter and heard from where the view seems to be: the camera, nearer when zoomed (first person's narrower view counts), falling with the square of that distance (about -54 dB from the start, -38 zoomed in on it).
 - **The Oracle answers again after a spell**: in simple mode a reply that was only a command is left out of the model's history, with the words that provoked it, so one spell no longer turns every later reply into spells (an insult then five questions: 10 of 18 replies were spells or blank, now 4 of 18). The crystal ball's hum is louder and an octave higher (laptop speakers lost its 98 Hz), and the wizard stands 1.6 cm higher so no shoe sinks into the rug.
 - **The Oracle a little bigger, his crystal ball smaller, and it hums**: characters take `"scale"` (0.5-2; the Oracle 1.2); the crystal ball is shown at 0.72 (objects take `"scale"` too) and gives off a quiet, slowly swelling 3D hum (two low sines a fifth apart and a faint shimmer, off with the sound effects). The Oracle's chaos is back to 1 (it was 30).
