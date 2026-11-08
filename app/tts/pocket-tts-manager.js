@@ -17,7 +17,7 @@
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
-    'breeze-web':{warmup:true,minHold:1.1,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107d',languages:false,cloneByText:true,progress:true},
+    'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107d',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
   // Breeze is picked by itself (nothing chosen in this browser) when it is
@@ -44,9 +44,9 @@
   function noteSpeed(engine,m){ if(!(m?.rtfx>0) || !(m.audioDuration>1)) return; const all=speeds(), k=speedKey(engine); all[k]=all[k]?all[k]*.6+m.rtfx*.4:m.rtfx; try{localStorage.setItem('tablefolkTtsRtfx',JSON.stringify(all));}catch{} }
   // seconds of audio to hold before playing a line of this length: an engine
   // making r seconds a second needs (1-r) of the line ahead (at most 8 s)
-  // minHold (Breeze in the browser): its audio comes in bursts of about 0.8 s at
-  // barely faster than real time, so a smaller head start ran dry a second in (a stutter near the start).
-  function holdFor(engine,text){ const base=Math.max(settings().bufferMs/1000,ENGINES[engine]?.minHold||0), r=speeds()[speedKey(engine)]; if(!r || r>=1.15) return base; return Math.max(base,Math.min(8,(1-r/1.1)*String(text||'').length/14+.3)); }
+  // stream (Breeze in the browser): play the moment the first chunk arrives and
+  // keep playing while it generates; no head start (2026-11-07, the user's call).
+  function holdFor(engine,text){ if(ENGINES[engine]?.stream) return .05; const base=settings().bufferMs/1000, r=speeds()[speedKey(engine)]; if(!r || r>=1.15) return base; return Math.max(base,Math.min(8,(1-r/1.1)*String(text||'').length/14+.3)); }
   let serverEngine=null;
   const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
   async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; if(await breezeFits()) return 'breeze'; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
@@ -71,7 +71,7 @@
       // buffer. 'playback' trades a bit more fixed startup latency for a
       // much more glitch-resistant buffer - the right trade for narration.
       this.audioCtx=new (AudioContext||webkitAudioContext)({sampleRate:24000,latencyHint:'playback'});
-      await this.audioCtx.audioWorklet.addModule('./tts/pcm-worklet.js?v=20261018a');
+      await this.audioCtx.audioWorklet.addModule('./tts/pcm-worklet.js?v=20261107a');
       // targetBufferSamples keeps the ~1.7x ratio the defaults (350ms/600ms) had;
       // it's the throttle-back point the worker watches via the capacity message,
       // not a hard requirement, so it just needs to stay comfortably above min.

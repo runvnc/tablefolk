@@ -42,7 +42,7 @@
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
     ['tts/breeze-client.js?v=20261101b'],
-    ['tts/pocket-tts-manager.js?v=20261107f'],
+    ['tts/pocket-tts-manager.js?v=20261107h'],
     ['tts/tts-ui.js?v=20261107b'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],

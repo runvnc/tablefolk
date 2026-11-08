@@ -25,6 +25,13 @@ class PocketPCMProcessor extends AudioWorkletProcessor {
     this.drainedReported = false;
     this.audioPort = null;  // direct port from worker (bypasses main thread)
     this.throttleCounter = 0;
+    // Keep-alive: instead of exact silence between lines, a faint noise
+    // (about -80 dB, far below hearing). Chrome closes its audio stream when
+    // the output is all zeros, PipeWire then suspends the speaker and the codec
+    // powers down, and waking them swallowed the first part of the next line
+    // (heard on a laptop's built-in speakers, 2026-11-07).
+    this.keepAlive = opts.keepAlive !== false;
+    this.seed = 22222;
 
     this.port.onmessage = (e) => {
       const m = e.data || {};
@@ -42,8 +49,12 @@ class PocketPCMProcessor extends AudioWorkletProcessor {
       else if (m.type === 'reset') this.reset();
       else if (m.type === 'stream-ended') this.streamEnded = true;
       else if (m.type === 'set-min-buffer') this.minBufferSamples = m.samples | 0;
+      else if (m.type === 'keep-alive') this.keepAlive = !!m.on;
     };
   }
+
+  // the keep-alive floor: tiny white noise
+  floor() { if (!this.keepAlive) return 0; this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff; return (this.seed / 0x7fffffff - .5) * 2e-4; }
 
   reset() {
     this.readPos = 0;
@@ -86,7 +97,7 @@ class PocketPCMProcessor extends AudioWorkletProcessor {
         this.started = true;
         this.everStarted = true;
       } else {
-        out.fill(0);
+        for (let i = 0; i < out.length; i++) out[i] = this.floor();
         this.report();
         return true;
       }
@@ -99,7 +110,7 @@ class PocketPCMProcessor extends AudioWorkletProcessor {
         this.buffered--;
         this.samplesPlayed++;
       } else {
-        out[i] = 0;
+        out[i] = this.floor();
         if (!this.streamEnded) this.underruns++;
         this.started = false;
       }
