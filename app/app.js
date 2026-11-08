@@ -4490,6 +4490,30 @@ function figClipName(n){
   const seg=String(n).split('|').filter(s=>s && !/Armature/.test(s));
   return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime|Skeleton)_/,'');
 }
+// A figure is sized from its rest pose, but its idle clip may put a foot lower
+// (the wanderer's sank half a centimetre into the Oracle's rug). A few frames
+// into the idle clip its lowest skinned vertex is measured (CPU skinning) and
+// the model raised that much, never lowered, at most 6 cm.
+function standOnFeet(g,inner){
+  // sampled every 8 frames for about two seconds of the idle clip (a foot dips part of the way through)
+  let frames=0, lo=Infinity; const V=new BABYLON.Vector3();
+  const obs=state.scene.onAfterRenderObservable.add(()=>{
+    frames++;
+    if(!g.root || g.root.isDisposed?.() || g.defeated){ state.scene.onAfterRenderObservable.remove(obs); return; }
+    if(frames%8) return;
+    try{
+      for(const ms of g.root.getChildMeshes(false)){
+        if(!ms.skeleton || !(ms.getTotalVertices?.()>0)) continue;   // hidden ones too: first person hides the player's body
+        const pos=ms.getPositionData(true,true); if(!pos) continue; const W=ms.getWorldMatrix();
+        for(let i=0;i<pos.length;i+=3){ BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(pos[i],pos[i+1],pos[i+2],W,V); const rel=V.y-g.root.position.y; if(rel<lo) lo=rel; }
+      }
+    }catch(e){ console.warn('[figure] stand on feet',e); }
+    if(frames<128) return;
+    state.scene.onAfterRenderObservable.remove(obs);
+    const sink=-lo; g.feetCheck={lowestBelowRoot:+lo.toFixed(4),raised:0};
+    if(Number.isFinite(lo) && sink>.002 && sink<.06){ inner.position.y+=sink/(g.root.scaling.y||1); g.feetCheck.raised=+sink.toFixed(4); }
+  });
+}
 async function createFigure(id,pos,model,label){
   const F=FIGURES[model], sc=state.scene;
   // dir: another folder under characters/ (meshy: made with Meshy via fal.ai, tools/fal-monster.py)
@@ -4532,6 +4556,7 @@ async function createFigure(id,pos,model,label){
   const mouthTargets=res.meshes.flatMap(m=>{ const mtm=m.morphTargetManager; if(!mtm) return []; const out=[]; for(let i=0;i<mtm.numTargets;i++){ const t=mtm.getTarget(i); if(t.name==='mouth_open') out.push(t); } return out; });
   if(mouthTargets.length) g.mouth={influence:0,apply(){ for(const t of mouthTargets) t.influence=this.influence; }};
   playRig(g,'idle',true);
+  standOnFeet(g,importedRoot);
   state.characters.push(g);
   return g;
 }
