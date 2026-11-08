@@ -70,7 +70,14 @@ export function createWllama3Engine(wllamaInstance) {
               seed: Math.floor(Math.random() * 2147483647),
               top_p: config.top_p ?? 0.95,
               top_k: config.top_k ?? 40,
-              penalty_repeat: config.repetition_penalty ?? 1.1,
+              // llama.cpp server names: wllama 3 hands these to its wasm as they are.
+              // It ignores "penalty_repeat", so until 2026-11-08 no repetition penalty
+              // applied at all (checked: "Say lilac ten times" at 1.8 still said it ten
+              // times under that name, and talked about lilacs under this one). Over
+              // the recent conversation, not the last 64 tokens: a word from the
+              // Oracle's last reply ("lilac") came back every turn.
+              repeat_penalty: config.repetition_penalty ?? 1.1,
+              repeat_last_n: config.penalty_last_n ?? 256,
               timings_per_token: true,
               // GBNF from grammar.js. In 3.x this is a top-level sampling
               // param, not nested under `sampling` like 2.3.7.

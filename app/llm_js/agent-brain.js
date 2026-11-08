@@ -7,13 +7,13 @@ import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversation
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106f';
-import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261106e';
+import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261108b';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261030b';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
-import { samplingFor, withChaos } from './sampling.js?v=20261106b';
+import { samplingFor, withChaos } from './sampling.js?v=20261108b';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
