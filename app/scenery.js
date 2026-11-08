@@ -54,33 +54,38 @@
     const mm = meta(r), prev = mm.cleanup;
     mm.cleanup = () => { try { prev?.(); } catch {} sc.onBeforeRenderObservable.remove(obs); };
   }
-  // The crystal ball's hum: A3 and E4 (a fifth; laptop speakers lose anything
-  // much under 200 Hz, so it is not lower), a slow beat, an octave and a shimmer,
-  // slowly beating and swelling with the glow; 3D at the ball (spells.js's
-  // panner and listener), soft but clear across the room (louder after the user's first try, 2026-11-08), silent while the
-  // sound effects are off. It starts once the page's audio runs (first click).
+  // The crystal ball's hum: A3 and E4 (a fifth; laptop speakers lose anything much
+  // under 200 Hz), a slow beat, an octave and a shimmer, swelling with the glow.
   function crystalHum(r, pos, ph) {
-    let nodes = null;
+    // Heard from where the view seems to be: the camera, and nearer still when
+    // it is zoomed (first person narrows its field of view). Loudness falls with
+    // the square of that distance, so it is barely there from across the room
+    // and clear only up close. Its own gain and stereo pan, not the shared
+    // listener (that stays at the player's head for the spells and the voices).
+    let nodes = null; const fov0 = new WeakMap();
     const start = () => {
-      const a = window.tablefolkSfx?.context?.(), sp = window.tablefolkSpells?.audio; if (!a || !sp?.place) return;
-      const { ctx } = a, out = ctx.createGain(), pan = ctx.createPanner(), lp = ctx.createBiquadFilter();
-      pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 2.5; pan.rolloffFactor = 1; pan.maxDistance = 40; sp.place(pan, pos);
+      const a = window.tablefolkSfx?.context?.(); if (!a) return;
+      const { ctx } = a, out = ctx.createGain(), pan = ctx.createStereoPanner(), lp = ctx.createBiquadFilter();
       lp.type = 'lowpass'; lp.frequency.value = 2400; out.gain.value = 0;
       const oscs = [[220, .42], [221.1, .3], [330, .26], [440.6, .12], [880.4, .05]].map(([f, g]) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; gg.gain.value = g; o.connect(gg); gg.connect(lp); o.start(); return o; });
       lp.connect(out); out.connect(pan); pan.connect(a.master);
-      out.gain.setTargetAtTime(.2, ctx.currentTime, 1.5);   // fades in
-      nodes = { ctx, out, oscs, all: [out, pan, lp] };
+      nodes = { ctx, out, pan, oscs, all: [out, pan, lp] };
     };
     r.onDisposeObservable?.add(() => { if (!nodes) return; for (const o of nodes.oscs) try { o.stop(); o.disconnect(); } catch {} for (const n of nodes.all) try { n.disconnect(); } catch {} nodes = null; });
     return {
       tick(p) {
         if (!nodes) { start(); return; }
+        const cam = state.scene?.activeCamera; if (!cam) return;
+        if (!fov0.has(cam)) fov0.set(cam, cam.fov || .8);
+        const cp = cam.globalPosition || cam.position, d = BABYLON.Vector3.Distance(cp, pos);
+        const seem = d * Math.min(1.5, (cam.fov || 1) / fov0.get(cam));   // zoomed in = seems nearer
+        const near = Math.min(1, (1 / Math.max(.3, seem)) ** 2);
         const on = window.tablefolkSfx?.enabled !== false, t = performance.now() * .001;
-        // swells with the glow, plus a slow wobble of its own
-        const g = on ? .14 + .1 * p + .04 * Math.sin(t * .37 + ph) : 0;
-        nodes.out.gain.setTargetAtTime(g, nodes.ctx.currentTime, .25);
+        const g = on ? near * (.05 + .035 * p + .012 * Math.sin(t * .37 + ph)) : 0;
+        nodes.out.gain.setTargetAtTime(g, nodes.ctx.currentTime, .2);
+        const right = cam.getDirection(BABYLON.Axis.X), to = pos.subtract(cp).normalize();
+        nodes.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, BABYLON.Vector3.Dot(to, right))) * .8, nodes.ctx.currentTime, .1);
         nodes.oscs[4].frequency.setTargetAtTime(880.4 + 6 * Math.sin(t * .8 + ph), nodes.ctx.currentTime, .3);
-        window.tablefolkSpells?.audio?.listen?.();
       },
     };
   }

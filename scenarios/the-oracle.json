@@ -29,11 +29,9 @@
  },
  "allowed": [
   "say",
-  "spell.fireball",
-  "spell.lightning",
-  "spawn"
+  "spell.lightning"
  ],
- "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic, insults you or attacks you, write the spell alone on a line, like fireball(you) or spawn(gold):\n{commands}",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast lightning. Only when someone insults you, write the spell alone on a line, like lightning(you)",
  "agents": [
   {
    "id": "Oracle",
@@ -45,9 +43,7 @@
    "chaos": 1,
    "allowed": [
     "say",
-    "spell.fireball",
-    "spell.lightning",
-    "spawn"
+    "spell.lightning"
    ],
    "scale": 1.2
   }
