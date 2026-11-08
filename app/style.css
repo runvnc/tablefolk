@@ -575,3 +575,15 @@ html:fullscreen #ttBar { display:none; }
 /* head-window.js: the webcam preview while the window view runs */
 .head-window-preview { position:fixed; left:16px; bottom:16px; width:120px; height:90px; z-index:65; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,.25); box-shadow:0 4px 14px rgba(0,0,0,.4); opacity:.85; pointer-events:none; }
 .head-window-preview i { position:absolute; left:50%; top:50%; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background:#d7ff9a; box-shadow:0 0 6px #d7ff9a; }
+
+/* ---- "This browser" in the Graphics pane (browser-check.js) ---- */
+.browser-check { width:100%; border-collapse:collapse; font:10px/1.35 ui-monospace,monospace; color:#d8e4d2; margin-bottom:6px; }
+.browser-check td { padding:3px 4px; vertical-align:top; border-top:1px solid rgba(255,255,255,.06); }
+.browser-check td:first-child { width:12px; font-weight:900; }
+.browser-check td:nth-child(2) { font-weight:850; white-space:nowrap; }
+.browser-check td:nth-child(3) { word-break:break-word; }
+.browser-check .bc-enables { color:#8a9a88; font-size:9px; }
+.browser-check tr.bc-ok td:first-child, .browser-runs .bc-ok { color:#8befae; }
+.browser-check tr.bc-no td:first-child, .browser-runs .bc-no { color:#ffc878; }
+.browser-check tr.bc-info td:first-child { color:#8a9a88; }
+.browser-runs { list-style:none; margin:0 0 4px; padding:0 2px; font:10px/1.45 ui-monospace,monospace; }

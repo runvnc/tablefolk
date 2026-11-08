@@ -895,6 +895,7 @@
     return [c, r];
   }
 
+  const VIEWS = ['overview', 'follow', 'first'];   // "view": the camera a world starts in
   function normalizeScenario(s) {
     if (!s || typeof s !== 'object') throw new Error('scenario must be a JSON object');
     if (s.v && s.v !== 1) throw new Error('unsupported scenario version ' + s.v);
@@ -939,6 +940,7 @@
       // the brain this world starts on, simple mode (app.js isSimpleBrain), the whole system prompt for everyone
       onlySpokenTo: typeof s.onlySpokenTo === 'boolean' ? s.onlySpokenTo : null,   // app.js onlySpokenTo
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
+      view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
       systemPrompt: typeof s.systemPrompt === 'string' && s.systemPrompt.trim() ? s.systemPrompt : null,
@@ -1003,6 +1005,7 @@
     // banner stay the parent's); opts.restore: the parent coming back, its
     // characters and objects put back from the snapshot taken on leaving
     if (!opts.sub && !opts.restore) frames.length = 0;
+    const prevView = w.getCameraView?.();   // a door in or out keeps the view you had
     const base = normalizeScenario(input);
     if (!opts.sub && !opts.restore && !opts.testing) window.tablefolkUseModel?.(base.defaultModel);
     // Extra asset packs first, so their object types exist for the layout.
@@ -1143,6 +1146,7 @@
     w.saveWorldState();
     plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...packageWarnings, ...roleWarnings, ...skillWarnings);
     if (opts.restore) await w.restoreWorldState(opts.restore);
+    if (!opts.testing) try { w.setCameraView?.(opts.sub || opts.restore ? prevView : startView(scn)); } catch (e) { console.warn('[view]', e); }
     const code = opts.code || await encodeScenario(base);
     if (opts.sub) world = { base, scn, links: scn.links };
     else {
@@ -1289,6 +1293,12 @@
   const introsHidden = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; } };
   // ?intro=0|1 (or &intro= in a link's #s= part) wins, then the world's "showIntro": false, then the player's own "don't show intros"
   let linkIntro = null;   // read in openLink: opening the world rewrites the hash
+  // ?view=overview|follow|first (or &view= in a link's #s= part) wins over the world's "view"
+  let linkView = null;
+  function startView(scn) {
+    const q = new URLSearchParams(location.search).get('view') ?? linkView;
+    return VIEWS.includes(q) ? q : scn.view || 'overview';
+  }
   function wantIntro(scn) {
     const q = new URLSearchParams(location.search).get('intro') ?? linkIntro;
     if (q === '0' || q === '1') return q === '1';
@@ -1788,6 +1798,7 @@ turns: 6`;
   }
   async function openLink(pasted) {
     linkIntro = location.hash.match(/[#&]intro=([01])/)?.[1] ?? null;
+    linkView = location.hash.match(/[#&]view=(overview|follow|first)/)?.[1] ?? null;
     const h = location.hash.replace(/^#/, ''), q = new URLSearchParams(location.search);
     let scn = null, code = null;
     try {

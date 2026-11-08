@@ -3,7 +3,7 @@
   if(!tts)return;
   let recorder=null, recorded=[], stream=null;
   function refreshVoices(){const sel=$('agentTtsVoice');if(!sel)return;const chosen=window.tablefolk?.getBrainConfig?.(window.tablefolk?.getSelectedAgent?.()?.id)?.ttsVoiceId||sel.value||'builtin:alba';sel.textContent='';for(const v of tts.voices()){const o=document.createElement('option');o.value=v.id;o.textContent=v.name;sel.appendChild(o);}sel.value=[...sel.options].some(o=>o.value===chosen)?chosen:'builtin:alba';}
-  function sync(){const enabled=localStorage.getItem('tablefolkTtsEnabled')!=='0';$('ttsEnabled').checked=enabled;$('ttsLanguage').value=localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04';$('ttsVolume').value=localStorage.getItem('tablefolkTtsVolume')||'.85';$('ttsBufferMs').value=localStorage.getItem('tablefolkTtsBufferMs')||'350';refreshVoices();}
+  function sync(){const enabled=localStorage.getItem('tablefolkTtsEnabled')!=='0';$('ttsEnabled').checked=enabled;$('ttsLanguage').value=localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04';$('ttsVolume').value=localStorage.getItem('tablefolkTtsVolume')||'.85';$('ttsBufferMs').value=localStorage.getItem('tablefolkTtsBufferMs')||'350';refreshVoices();window.tablefolkTtsToggleSync?.();}
   tts.addEventListener('status',e=>{if($('ttsStatus'))$('ttsStatus').textContent=e.detail.text;});
   tts.addEventListener('telemetry',e=>{
     const m=e.detail||{}, node=$('ttsTelemetry'); if(!node)return;
@@ -39,7 +39,8 @@
     if(eng){
       for(const e of tts.engines()){const o=document.createElement('option');o.value=e.id;o.textContent=e.label;eng.appendChild(o);}
       // Breeze in the browser runs on ggml's WebGPU backend, which needs shader-f16 (Chrome on Linux with NVIDIA lacks it)
-      navigator.gpu?.requestAdapter({powerPreference:'high-performance'}).then(a=>{ const o=[...eng.options].find(x=>x.value==='breeze-web'); if(o&&!a?.features?.has('shader-f16')){ o.disabled=true; o.textContent+=' (not on this browser: no WebGPU shader-f16'+(/linux/i.test(navigator.userAgent)&&a?.info?.vendor==='nvidia'?'; start Chrome with --enable-dawn-features=vulkan_enable_f16_on_nvidia':'')+')'; } }).catch(()=>{});
+      // and JSPI (browser-check.js): the option says which is missing
+      navigator.gpu?.requestAdapter({powerPreference:'high-performance'}).then(a=>{ const o=[...eng.options].find(x=>x.value==='breeze-web'); const f16=!!a?.features?.has('shader-f16'); const why=window.tablefolkBrowser?.why?.('breeze-web',{webgpu:!!a,f16})??(f16?'':'no WebGPU shader-f16'+(/linux/i.test(navigator.userAgent)&&a?.info?.vendor==='nvidia'?'; start Chrome with --enable-dawn-features=vulkan_enable_f16_on_nvidia':'')); if(o&&why){ o.disabled=true; o.textContent+=' (not on this browser: '+why+')'; o.title=why; } }).catch(()=>{});
       eng.value=localStorage.getItem('tablefolkTtsEngine')||'';
       const langs=()=>{const id=eng.value||tts.engine;$('ttsLanguageBox').hidden=!tts.engines().find(e=>e.id===id)?.languages;};
       tts.addEventListener('status',langs); langs();

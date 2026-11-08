@@ -3,6 +3,7 @@
  "title": "The Oracle",
  "intro": "The Oracle. He knows everything (or thinks he does).",
  "showIntro": false,
+ "view": "first",
  "defaultModel": "qwen1.5-0.5b",
  "simple": true,
  "onlySpokenTo": true,
@@ -22,9 +23,12 @@
   "model": "wanderer"
  },
  "allowed": [
-  "say"
+  "say",
+  "spell.fireball",
+  "spell.lightning",
+  "spawn"
  ],
- "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nAnswer with words. Only if you must, write one of these instead:\n{commands}",
  "agents": [
   {
    "id": "Oracle",
@@ -34,7 +38,10 @@
    "hostile": false,
    "chaos": 30,
    "allowed": [
-    "say"
+    "say",
+    "spell.fireball",
+    "spell.lightning",
+    "spawn"
    ],
    "personality": "You are an old man. You are very confident in your answers."
   }

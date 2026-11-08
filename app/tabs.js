@@ -89,6 +89,11 @@
     const sync = () => { btn.textContent = box.checked ? '🔊' : '🔇'; btn.classList.toggle('on', box.checked); };
     btn.addEventListener('click', () => { box.click(); sync(); });
     box.addEventListener('change', sync);
+    // tts-ui.js loads later and sets the box from the saved choice without a
+    // change event, so start from that saved choice (speech is on unless
+    // turned off), and tts-ui.js calls tablefolkTtsToggleSync after it.
+    try { box.checked = localStorage.getItem('tablefolkTtsEnabled') !== '0'; } catch {}
+    window.tablefolkTtsToggleSync = sync;
     sync();
     // the voice volume slider beside it, kept in step with the Voice pane's
     const top = document.getElementById('ttsTopVolume'), pane = document.getElementById('ttsVolume');

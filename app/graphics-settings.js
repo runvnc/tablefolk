@@ -17,7 +17,7 @@
     // Light mode (applies on reload): the simple voxel island instead of the
     // HD diorama, and no SSAO / bloom / glow / real-time shadow maps. For when
     // a large model (Gemma 4 E4B) and the scene don't both fit in GPU memory.
-    lite: false,
+    lite: true, quality: 'light',
   };
 
   function load() {
@@ -32,9 +32,13 @@
   // previously saved settings instead of flashing the defaults first.
   const settings = load();
   // Quality: 'high' (full detail), 'medium' (HD look, far less geometry and
-  // 1k textures, no SSAO), 'light' (simple voxel island). The old lite flag
+  // 1k textures, no SSAO), 'light' (no shadow maps or post effects). Every
+  // quality has the simple sea and sky; the HD sea and island are only behind
+  // ?island=1. The old lite flag
   // maps onto it; settings.lite stays in sync for code that reads it.
-  if (!['high', 'medium', 'light'].includes(settings.quality)) settings.quality = settings.lite ? 'light' : 'high';
+  // Light is the default (2026-11-07): the scene shares the graphics card with
+  // the characters' model and the voice.
+  if (!['high', 'medium', 'light'].includes(settings.quality)) settings.quality = 'light';
   settings.lite = settings.quality === 'light';
   // Tabletop view (?tabletop=1): 1k textures, no shadow maps or moving sea,
   // for this page only (nothing is saved).

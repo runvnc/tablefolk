@@ -14,13 +14,14 @@
       <h1>This browser cannot run Tablefolk yet.</h1>
       <p id="compatibilityReason">Tablefolk needs WebGPU for its 3D world and local character brain.</p>
       <div class="compatibility-help">
-        <strong>Try a browser with WebGPU enabled:</strong>
+        <strong>Browsers that run all of Tablefolk:</strong>
         <ul>
-          <li>Safari 26 or newer on a supported Mac</li>
-          <li>A current version of Chrome or Edge</li>
-          <li>A current Firefox build with WebGPU available on your device</li>
+          <li>Chrome or Edge 137 or newer (Windows, macOS, ChromeOS, Android; on Linux from about 144)</li>
+          <li>Safari 27 or newer (Mac, iPhone, iPad). Safari 26 runs the world and the characters, without voices in the browser.</li>
+          <li>Firefox 153 or newer on Windows or an Apple Silicon Mac (not yet on Linux, Android or Intel Macs)</li>
         </ul>
       </div>
+      <p id="compatibilityHint" hidden></p>
       <p class="compatibility-detail" id="compatibilityDetail"></p>
       <div class="compatibility-actions">
         <button id="compatibilityRetry" type="button">Try again</button>
@@ -316,9 +317,9 @@
       <p class="pane-note">Everything below defaults to the original look. Turning things down trades a little visual fidelity for smoother frames - worth trying if the world feels heavy or you notice audio glitching while things render.</p>
       <div class="section-subtitle">Quality</div>
       <div class="custom-grid">
-        <label>Scene <select id="gfxQuality"><option value="high">high (full detail)</option><option value="medium">medium (same look, lighter)</option><option value="light">light (simple island)</option></select></label>
+        <label>Scene <select id="gfxQuality"><option value="light">light (default)</option><option value="medium">medium (detailed models, lighter)</option><option value="high">high (full detail)</option></select></label>
       </div>
-      <small class="pane-note">Medium keeps the detailed island's plastic look and normal maps with far less geometry, 1k textures and no ambient occlusion. Light is a simple voxel island with no shadows or post effects. Use medium or light if the screen goes black or the tab crashes with the larger model (Gemma 4 E4B). Changing this reloads the page.</small>
+      <small class="pane-note">Light (the default) has no shadow maps or post effects, leaving the graphics card to the characters and their voices. Medium adds detail with 1k textures and no ambient occlusion; high is full detail. Every setting uses the simple sea. Changing this reloads the page.</small>
       <div class="section-subtitle">While a character is thinking</div>
       <div class="custom-grid">
         <label>Render <select id="gfxThinkFps"><option value="60" selected>full speed (default)</option><option value="15">15 fps</option><option value="5">5 fps</option><option value="0">paused (fastest replies)</option></select></label>
@@ -427,6 +428,7 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="preflight.js?v=20261107b"></script>
+  <script src="browser-check.js?v=20261107a"></script>
+  <script src="preflight.js?v=20261107c"></script>
 </body>
 </html>

@@ -26,7 +26,7 @@ function applyWorldDims(cols, rows){
   WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
 }
 if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
-const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat','use','put','take','close'];
+const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','spell.lightning','spawn','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat','use','put','take','close'];
 // mind.js: every talking character has these, unless the scenario says "mind": false
 // (feel() is there for scenarios that allow it: by default it used up turns
 // that should have been speech). use/put/take (uses.js): things with an
@@ -118,44 +118,104 @@ window.tablefolkHoldRender=(on,text='')=>{
   if(!el && on){ el=document.createElement('div'); el.id='renderHold'; el.innerHTML='<span class="spin"></span><span class="t"></span>'; document.body.appendChild(el); }
   if(el){ el.querySelector('.t').textContent=text; el.classList.toggle('show',!!on); }
 };
+// The free camera's pivot: the point under the pointer (a pick, or the
+// target's height plane when the pick misses), or null (the sky).
+function pivotUnderPointer(camera,x,y){
+  const sc=state.scene; if(!sc) return null;
+  const hit=sc.pick(x,y,m=>m.isPickable && m.isEnabled() && m.isVisible && m.visibility>0,false,camera);
+  if(hit?.hit && hit.pickedPoint) return hit.pickedPoint.clone();
+  const ray=sc.createPickingRay(x,y,BABYLON.Matrix.Identity(),camera);
+  const dy=ray.direction.y, t=Math.abs(dy)>1e-4?(camera.target.y-ray.origin.y)/dy:-1;
+  return t>0 && t<camera.maxZ ? ray.origin.add(ray.direction.scale(t)) : null;
+}
+// The eye from the angles (camera.position is only updated when a frame is drawn).
+function arcEye(c){ const sb=Math.sin(c.beta); return c.target.add(new BABYLON.Vector3(c.radius*Math.cos(c.alpha)*sb,c.radius*Math.cos(c.beta),c.radius*Math.sin(c.alpha)*sb)); }
+// Move the target along the line of sight to the depth of p: the view does
+// not change at all (same eye, same direction), only the radius, so zooming
+// and orbiting then work about what you look at, not a far-off target.
+function retargetToDepth(c,p){
+  const eye=arcEye(c), dir=c.target.subtract(eye).normalize(), depth=BABYLON.Vector3.Dot(p.subtract(eye),dir);
+  if(!(depth>(c.lowerRadiusLimit||.25))) return false;
+  c.target.copyFrom(eye.add(dir.scale(depth))); c.radius=depth; return true;
+}
+const ZOOM_NEAR=.45;   // the closest the wheel takes the eye to the point under the pointer
 function setupMouseWheelZoom(camera){
   // This handler owns wheel zoom; Babylon's own wheel input would zoom a
   // second time on every notch.
   camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
   canvas.addEventListener('wheel',ev=>{
     ev.preventDefault();
-    // First person: the wheel zooms by narrowing the field of view.
-    if(state.firstPerson && fpCam){ const px0=ev.deltaY*(ev.deltaMode===1?33:ev.deltaMode===2?400:1); fpCam.fov=clamp(fpCam.fov*Math.exp(clamp(px0,-150,150)*.001),.3,1.3); return; }
+    if(state.scene?.activeCamera!==camera && !state.firstPerson) return;   // tabletop has its own wheel
     // Scale by wheel distance (lines/pages normalised to pixels, one notch is
     // usually 100px) so a notch is ~10% and trackpads zoom smoothly.
     const px=ev.deltaY*(ev.deltaMode===1?33:ev.deltaMode===2?400:1);
     const factor=Math.exp(clamp(px,-150,150)*.001);
-    // At the closest distance the free camera moves on in the direction it
-    // looks instead, over the ground.
-    const radius=camera.radius, want=radius*factor, near=camera.lowerRadiusLimit||3.5, far=camera.upperRadiusLimit||60;
-    // The free camera zooms towards the point under the pointer (where you
-    // look), not the screen's centre: scaling the eye and the target about
-    // that point keeps it under the pointer. The follow camera keeps you centred.
-    const r2=clamp(want,near,far);
-    if(state.cameraMode!=='follow' && r2!==radius){
-      const ray=state.scene.createPickingRay(state.scene.pointerX,state.scene.pointerY,BABYLON.Matrix.Identity(),camera);
-      const ty=camera.target.y, dy=ray.direction.y;
-      const t=Math.abs(dy)>1e-4?(ty-ray.origin.y)/dy:-1;
-      if(t>0){
-        const p=ray.origin.add(ray.direction.scale(t)), k=r2/radius;
-        state.followAvatar=false;
-        camera.setTarget(p.add(camera.target.subtract(p).scale(k)),false,false,true);
-        camera.radius=r2; state.zoomFocus=camera.target.clone();
-        if(want>=near) return;
-      }
-    }
-    camera.radius=r2;
-    if(want<near && state.cameraMode!=='follow'){
-      const f=camera.target.subtract(camera.position); f.y=0; if(f.lengthSquared()<1e-6) return;
+    // First person: the wheel zooms by narrowing the field of view.
+    if(state.firstPerson && fpCam){ fpCam.fov=clamp(fpCam.fov*factor,.15,1.3); return; }
+    // The follow camera keeps you centred: only the radius.
+    if(state.cameraMode==='follow'){ camera.radius=clamp(camera.radius*factor,FOLLOW.min,FOLLOW.max); return; }
+    // The free camera zooms about the point under the pointer (a real pick:
+    // a character's head, a wall top, the ground): the target first moves
+    // along the line of sight to that point's depth (no visible change),
+    // then eye and target scale about the point, so it stays exactly under
+    // the pointer down to ZOOM_NEAR from it.
+    const near=camera.lowerRadiusLimit||.25, far=camera.upperRadiusLimit||60;
+    const p=pivotUnderPointer(camera,state.scene.pointerX,state.scene.pointerY);
+    if(p && retargetToDepth(camera,p)){
+      const dist=BABYLON.Vector3.Distance(arcEye(camera),p);
+      let k=clamp(dist*factor,Math.min(ZOOM_NEAR,dist),Infinity)/dist;
+      k=clamp(k,near/camera.radius,far/camera.radius);
+      if(Math.abs(k-1)<1e-4) return;
       state.followAvatar=false;
-      camera.setTarget(camera.target.add(f.normalize().scale(near-want)),false,false,true);
+      camera.target.copyFrom(p.add(camera.target.subtract(p).scale(k)));
+      camera.radius*=k; state.zoomFocus=camera.target.clone();
+      return;
     }
+    camera.radius=clamp(camera.radius*factor,Math.max(near,3.5),far);
   },{passive:false});
+}
+// Left-drag orbits the free camera about the point under the pointer where
+// the drag began (Babylon's own orbit turned about camera.target, which could
+// be far from what you look at). Eye and target turn rigidly about that
+// point, so it stays put on screen; the angles keep their limits. Babylon's
+// pointer input stays attached for pinch zoom, with its turning switched off.
+function setupPivotOrbit(camera){
+  const pin=camera.inputs?.attached?.pointers;
+  if(pin){ pin.buttons=[0]; pin.angularSensibilityX=pin.angularSensibilityY=1e12; }
+  const SPEED=.008, down=new Map();
+  let drag=null;
+  canvas.addEventListener('pointerdown',e=>{
+    down.set(e.pointerId,true);
+    drag=(e.button===0 && down.size===1)?{x:e.clientX,y:e.clientY,pivot:null,started:false}:null;
+  });
+  const end=e=>{ down.delete(e.pointerId); if(!down.size) drag=null; };
+  canvas.addEventListener('pointerup',end); canvas.addEventListener('pointercancel',end);
+  canvas.addEventListener('pointermove',e=>{
+    if(!drag || down.size!==1 || !(e.buttons&1)) return;
+    if(state.firstPerson || state.cameraMode==='follow' || state.scene?.activeCamera!==camera) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(!drag.started){
+      if(Math.abs(dx)+Math.abs(dy)<4) return;   // a click, not a drag
+      drag.started=true;
+      const r=canvas.getBoundingClientRect();   // CSS pixels, like scene.pointerX
+      const p=pivotUnderPointer(camera,drag.x-r.left,drag.y-r.top);
+      drag.pivot=p && retargetToDepth(camera,p) ? p : camera.target.clone();
+      state.followAvatar=false;
+    }
+    drag.x=e.clientX; drag.y=e.clientY;
+    const p=drag.pivot;
+    const lo=camera.lowerBetaLimit??.01, hi=camera.upperBetaLimit??Math.PI-.01;
+    const dA=-dx*SPEED, dB=clamp(camera.beta-dy*SPEED,lo,hi)-camera.beta;
+    // yaw about the vertical through p, then pitch about the horizontal axis
+    // across the view (through p): both are the angles' own directions
+    let v=camera.target.subtract(p);
+    const ca=Math.cos(dA), sa=Math.sin(dA);
+    v=new BABYLON.Vector3(v.x*ca-v.z*sa,v.y,v.z*ca+v.x*sa);
+    const a=camera.alpha+dA, axis=new BABYLON.Vector3(-Math.sin(a),0,Math.cos(a)), th=-dB, c=Math.cos(th), s=Math.sin(th);
+    v=v.scale(c).add(BABYLON.Vector3.Cross(axis,v).scale(s)).add(axis.scale(BABYLON.Vector3.Dot(axis,v)*(1-c)));
+    camera.target.copyFrom(p.add(v)); camera.alpha=a; camera.beta+=dB;
+    state.zoomFocus=camera.target.clone();
+  });
 }
 function hashNoise(x,z){
   const n=Math.sin(x*127.1+z*311.7)*43758.5453123;
@@ -2809,8 +2869,12 @@ function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.a
 // What it may run: its list, plus the mind commands (mind.js) for characters.
 function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
-function denied(g,kind){ say(g,kind+' is disabled in my tiny constitution'); }
-function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark'}; if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
+// A command a character may not run, or one that makes no sense: the player
+// hears it; a model-run character's goes only into its own history (its next
+// prompt learns), never spoken or shown (the dev console logs it).
+function quietFail(g,text){ if(g===state.playerAvatar) return say(g,text,false); if(window.TABLEFOLK_DEV) console.log('[tablefolk] dropped command of',g?.id,':',text); const h=state.globalHistory, last=h?.[h.length-1]; if(last && last.startsWith('T') && last.includes(g?.id+':')) h[h.length-1]=last+' -> '+text; }
+function denied(g,kind){ quietFail(g,kind+' is disabled in my tiny constitution'); }
+function parseCommand(raw){ const [a,b,...rest]=String(raw||'').trim().split(/\s+/); if(!a) return null; if(a==='say') return {kind:'say',text:String(raw).replace(/^say\s*/,'')}; if(a==='whisper') return {kind:'whisper',text:String(raw).replace(/^whisper\s*/,'')}; if(a==='spell') return {kind:'spell',spell:b||'spark',target:rest.join(' ')}; if(a==='fireball'||a==='lightning') return {kind:'spell',spell:a,target:[b,...rest].filter(Boolean).join(' ')}; if(a==='spawn'){ const n=/^\d+$/.test(rest[rest.length-1]||'')?rest.pop():''; return {kind:'spawn',thing:[b,...rest].filter(Boolean).join(' '),count:n}; } if(a==='build'){ const bc=String(raw).match(/\bat\s+(.+)$/); return {kind:'build',thing:b||'wall',at:bc?parseLocationArg(bc[1].trim()):null}; }
   if(a==='face') return {kind:'face',dir:(b||'n').toLowerCase()}; if(a==='goal') return {kind:'goal',text:String(raw).replace(/^goal\s*/,'')}; if(a==='remember'||a==='feel') return {kind:a,text:String(raw).replace(/^\w+\s*/,'')}; if(a==='eat') return {kind:'eat',item:b||''}; if(['sit','sleep','rest','nap','lie'].includes(a.toLowerCase().replace(/\.$/,'')) && (!b || /^down\.?$/i.test(b)) && !rest.length) return {kind:'emote',emote:/^sit/i.test(a)?'sit':'sleep'}; if(a==='use'||a==='close') return {kind:a,target:[b,...rest].filter(Boolean).join(' ')}; if(a==='put'||a==='take') return {kind:a,arg:[b,...rest].filter(Boolean).join(' ')}; if(a==='give_quest') return {kind:'give_quest',text:String(raw).replace(/^give_quest\s*/,'')}; if(a==='give') return {kind:'give',item:String(raw).replace(/^give\s*/,'').trim()}; if(a==='sell') return parseSellArgs(String(raw).replace(/^sell\s*/,'')); if(a==='note') return {kind:'note',html:String(raw).replace(/^note\s*/,'')}; if(a==='walk') return parseWalkDestination(String(raw).replace(/^walk\s*/,'').trim()); if(a==='attack') return {kind:'attack',target:b||''}; if(a==='workflow') return {kind:'workflow',name:b||'',input:rest.join(' ')}; if(window.tablefolkSkills?.isCommand(a)) return {kind:'skill',name:a,args:[b,...rest].filter(Boolean)}; if(a==='wield') return {kind:'wield',item:String(raw).replace(/^wield\s*/,'').trim()}; if(a==='emote') return {kind:'emote',emote:(b||'dance').toLowerCase()}; if(['look','touch','push','pull','carry','drop','throw','dig','repair','panic','inventory'].includes(a)) return {kind:a,targetId:b}; return {kind:'unknown',text:'unknown command: '+raw,raw:String(raw)}; }
 function parseWalkDestination(arg){
   arg=String(arg||'').trim();
@@ -2853,7 +2917,10 @@ function parseLLMCommandLine(line){
   if(name==='say') return {kind:'say',text:arg||'...'};
   if(name==='whisper') return {kind:'whisper',text:arg||'...'};
   if(name==='walk') return parseWalkDestination(arg);
-  if(name==='spell') return {kind:'spell',spell:(arg.split(',')[0]||'spark').trim()||'spark'};
+  if(name==='spell'){ const [sp,...tg]=arg.split(','); return {kind:'spell',spell:(sp||'spark').trim().toLowerCase()||'spark',target:tg.join(',').trim().replace(/^["']|["']$/g,'')}; }
+  // fireball(target?), lightning(target?), spawn(thing[, how many]): spells.js
+  if(name==='fireball'||name==='lightning') return {kind:'spell',spell:name,target:arg.trim().replace(/^["']|["']$/g,'')};
+  if(name==='spawn'){ const [th,n]=arg.split(','); return {kind:'spawn',thing:(th||'').trim().replace(/^["']|["']$/g,''),count:(n||'').trim()}; }
   if(name==='build'){ const ci=arg.indexOf(','); const thing=(ci<0?arg:arg.slice(0,ci)).trim()||'wall'; const at=ci<0?null:parseLocationArg(arg.slice(ci+1)); return {kind:'build',thing,at}; }
   if(name==='face'){ const fd=(arg.split(',')[0]||'n').trim().toLowerCase(); return {kind:'face',dir:fd||'n'}; }
   if(name==='goal') return {kind:'goal',text:arg||''};
@@ -2883,7 +2950,7 @@ function parseLLMCommandLine(line){
 // what a seated or lying character does without getting up (uses.js)
 const SEATED_OK=new Set(['say','whisper','look','inventory','goal','remember','feel','eat','emote','give_quest','note','workflow']);
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); if(g.pose && !SEATED_OK.has(cmd.kind)) window.tablefolkUses?.standUp(g); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark'); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : say(g,`no routine called ${cmd.name}`,false); case 'unknown': return say(g,cmd.text||'unknown command',false); default: return say(g,'unknown command object',false); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark',cmd.target||''); case 'spawn': return window.tablefolkSpells?.spawn(g,cmd.thing||'',cmd.count); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : quietFail(g,`no routine called ${cmd.name}`); case 'unknown': return quietFail(g,cmd.text||'unknown command'); default: return quietFail(g,'unknown command object'); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -3537,12 +3604,12 @@ function giveQuest(g,text){
   if(!targets.length){ return say(g,'no one nearby to quest upon'); }
   const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI();
 }
-function castSpell(g,spell){ g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,`${g.id} casts a spark`); g.anim='idle'; playRig(g,'idle',true); },220); }
+function castSpell(g,spell,target=''){ if((spell==='fireball'||spell==='lightning') && window.tablefolkSpells) return window.tablefolkSpells.cast(g,spell,target); g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,`${g.id} casts a spark`); g.anim='idle'; playRig(g,'idle',true); },220); }
   if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,`${g.id} casts push: everything nearby is shoved away`); g.anim='idle'; },220); return; }
   if(spell==='fireball'){ const target=nearestTarget(g,4.5); const hit=target?.getAbsolutePosition?.() || origin.add(g.dir.scale(3)); fireballVfx(origin.add(new BABYLON.Vector3(0,.85,0)),hit); setTimeout(()=>{ for(const m of state.props.concat(state.blocks)){ if(!m.isDisposed() && BABYLON.Vector3.Distance(hit,m.position)<2.25){ impulse(m,hit.add(new BABYLON.Vector3(0,.1,0)),7.2,.55); damage(m,meta(m)?.flammable?2:1,'fire'); } } for(const other of state.characters){ if(other!==g && BABYLON.Vector3.Distance(hit,other.root.position)<2.4){ other.anim='panic'; say(other,pickRandom(['hot weather attack','the sun is local now','why did you invite fire'])); setTimeout(()=>other.anim='idle',1100); } } say(g,pickRandom(['fireball is basically planning','wood is now bridge ingredients','careful fireball is still careful'])); g.anim='idle'; },420); }
 }
 function makeRing(pos,material){ const ring=BABYLON.MeshBuilder.CreateTorus('spell_ring',{diameter:.2,thickness:.028,tessellation:24},state.scene); ring.position=pos.add(new BABYLON.Vector3(0,.08,0)); ring.material=material; let s=.2; const obs=state.scene.onBeforeRenderObservable.add(()=>{ s+=.075; ring.scaling.set(s,s,s); ring.rotation.x+=.08; if(s>3.4){ ring.dispose(); state.scene.onBeforeRenderObservable.remove(obs); } }); }
-function fireballVfx(from,to){ const ball=BABYLON.MeshBuilder.CreateSphere('fireball',{diameter:.32,segments:10},state.scene); ball.position=from.clone(); ball.material=state.materials.fire; const light=new BABYLON.PointLight('fireball_light',from,state.scene); light.diffuse=new BABYLON.Color3(1,.42,.12); light.intensity=.9; light.range=2.7; let t=0; const obs=state.scene.onBeforeRenderObservable.add(()=>{ t+=state.engine.getDeltaTime()/1000*3.1; const p=BABYLON.Vector3.Lerp(from,to,t); ball.position.copyFrom(p); light.position.copyFrom(p); if(Math.random()<.55){ const ember=BABYLON.MeshBuilder.CreateSphere('ember',{diameter:.055,segments:5},state.scene); ember.position=p.add(new BABYLON.Vector3((Math.random()-.5)*.25,(Math.random()-.5)*.2,(Math.random()-.5)*.25)); ember.material=state.materials.fire; setTimeout(()=>ember.dispose(),360); } if(t>=1){ emitBadge({root:{getAbsolutePosition:()=>to}},'boom'); makeRing(to,state.materials.fire); ball.dispose(); light.dispose(); state.scene.onBeforeRenderObservable.remove(obs); } }); }
+function fireballVfx(from,to){ if(window.tablefolkSpells) return window.tablefolkSpells.fireballVfx(from,to); const ball=BABYLON.MeshBuilder.CreateSphere('fireball',{diameter:.32,segments:10},state.scene); ball.position=from.clone(); ball.material=state.materials.fire; const light=new BABYLON.PointLight('fireball_light',from,state.scene); light.diffuse=new BABYLON.Color3(1,.42,.12); light.intensity=.9; light.range=2.7; let t=0; const obs=state.scene.onBeforeRenderObservable.add(()=>{ t+=state.engine.getDeltaTime()/1000*3.1; const p=BABYLON.Vector3.Lerp(from,to,t); ball.position.copyFrom(p); light.position.copyFrom(p); if(Math.random()<.55){ const ember=BABYLON.MeshBuilder.CreateSphere('ember',{diameter:.055,segments:5},state.scene); ember.position=p.add(new BABYLON.Vector3((Math.random()-.5)*.25,(Math.random()-.5)*.2,(Math.random()-.5)*.25)); ember.material=state.materials.fire; setTimeout(()=>ember.dispose(),360); } if(t>=1){ emitBadge({root:{getAbsolutePosition:()=>to}},'boom'); makeRing(to,state.materials.fire); ball.dispose(); light.dispose(); state.scene.onBeforeRenderObservable.remove(obs); } }); }
 
 function gridKey(x,z){ return Math.round(x)+','+Math.round(z); }
 function tileAtGrid(x,z){
@@ -3914,6 +3981,10 @@ function simpleCommands(g){
   if(allowed.has('give')) out.push('give(item) to hand something over');
   if(allowed.has('sell')) out.push('sell(item, price) to sell something');
   if(allowed.has('attack')) out.push('attack(name) to hit someone next to you');
+  // spells.js: kept rare by saying when (the target is optional)
+  if(allowed.has('spell.fireball')) out.push('fireball(name) to throw fire at an enemy');
+  if(allowed.has('spell.lightning')) out.push('lightning(name) to strike an enemy with lightning');
+  if(allowed.has('spawn')) out.push('spawn(thing) to make a thing appear when asked');
   return out;
 }
 function buildSimplePrompt(g, cfg){
@@ -4546,8 +4617,8 @@ window.addEventListener('tablefolk-player-chat',e=>{
 // 'follow', Diablo-like: high and fixed, looking north from
 // the south at a steep angle, always centred on the avatar; it never turns,
 // so the keys always mean the same screen directions, and walls between it
-// and the avatar drop to a low stub (cutaway.js). The wheel zooms (7-30).
-const FOLLOW={alpha:Math.PI/2,beta:.78,radius:16,min:7,max:30,height:.6};
+// and the avatar drop to a low stub (cutaway.js). The wheel zooms (2.5-30).
+const FOLLOW={alpha:Math.PI/2,beta:.78,radius:16,min:2.5,max:30,height:.6};
 const FREE={lowerBetaLimit:.22,upperBetaLimit:1.42,panningSensibility:60};
 function lockCamera(cam,on){
   if(on){ cam.lowerAlphaLimit=cam.upperAlphaLimit=FOLLOW.alpha; cam.lowerBetaLimit=cam.upperBetaLimit=FOLLOW.beta; cam.panningSensibility=0; }
@@ -4574,8 +4645,21 @@ function toggleCameraMode(){
   updateFirstPersonButton();
   window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
 }
+// The scenario's "view" (scenario.js): 'overview' (the free camera), 'follow' or 'first'.
+function getCameraView(){ return state.firstPerson?'first':state.cameraMode==='follow'?'follow':'overview'; }
+function setCameraView(v){
+  if(!state.playerAvatar || window.TABLEFOLK_TABLETOP || v===getCameraView()) return;
+  if(v==='first') return setFirstPerson(true);
+  if(state.firstPerson) setFirstPerson(false);
+  if(v==='follow') followCameraStart(); else if(state.cameraMode==='follow') freeCameraStart();
+  updateFirstPersonButton();
+}
 function followAvatarCamera(dt){
-  const g=state.playerAvatar, cam=state.camera; if(!g || !cam || state.firstPerson) return;
+  const g=state.playerAvatar, cam=state.camera;
+  // the near clip follows the zoom (0.5 at the usual distances, 0.04 up close);
+  // not while senses.js poses the camera at a character's eyes (it clears the limits)
+  if(cam && !state.firstPerson && cam.lowerRadiusLimit!=null && cam.mode!==BABYLON.Camera.ORTHOGRAPHIC_CAMERA) cam.minZ=clamp(cam.radius*.08,.04,.5);
+  if(!g || !cam || state.firstPerson) return;
   const p=g.root.position;
   if(state.cameraMode==='follow'){
     cam.setTarget(BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*7)),false,false,true);
@@ -4804,7 +4888,7 @@ function installWorldAPI(){
     setAllowed:list=>{ state.allowed=new Set(list||[]); updatePerceptionUI(); },
     setPathfinding:on=>{ state.pathfinding=on!==false; }, findRoute,
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
-    spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
+    spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, getCameraView, setCameraView, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
     setWallHeight:v=>{ state.wallHeightScale=Number.isFinite(+v) && +v>0 ? Math.min(4,Math.max(.25,+v)) : 1; },
     setLighting,
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
@@ -5330,11 +5414,9 @@ function makeSelectionRing(scene){
 }
 async function addTerrainPolish(scene){
   if(!LEGACY_ISLAND){
-    // The board in the sea. Light mode keeps the simple sea and sky.
-    if(window.TABLEFOLK_GFX?.lite){ makeSkyDome(scene); makeSea(scene); state.lite=true; }
-    else try{
-      await window.TablefolkHD.buildSea(scene,{ WORLD:{ get halfW(){ return WORLD.halfW-.5; }, get halfH(){ return WORLD.halfH-.5; } }, state, hashNoise, smoothNoise, proceduralTerrainAt, addShadow });
-    }catch(err){ console.error('HD sea failed, using the simple one',err); makeSkyDome(scene); makeSea(scene); }
+    // The board in the sea: the simple sea and sky at every quality (the HD
+    // ocean was dropped from high on 2026-11-07; TablefolkHD.buildSea is unused).
+    makeSkyDome(scene); makeSea(scene); if(window.TABLEFOLK_GFX?.lite) state.lite=true;
     state.terrainTopY=0;
     rebuildBoard(); rebuildBoardSupport(); fitBoardView();
     makeSelectionRing(scene);
@@ -5369,9 +5451,9 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk)); if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
   // Initial three-quarter composition: house high-right, fire/character left of
   // centre, and the near tree/crates framing the lower-right foreground.
-  const camera=new BABYLON.ArcRotateCamera('camera',-Math.PI*.69+Math.PI,1.16,20.5,new BABYLON.Vector3(.9,.62,-.15),scene); state.camera=camera; camera.fov=.46; camera.lowerRadiusLimit=3.5; camera.upperRadiusLimit=60; camera.panningSensibility=60; camera.minZ=.5; camera.maxZ=600; camera.upperBetaLimit=1.42; camera.lowerBetaLimit=.22; camera.attachControl(canvas,true); setupMouseWheelZoom(camera);
-  // Left-drag = orbit (default Babylon). Left-click (no drag) = center on clicked tile. Right-click = show tile info in history.
-  if(camera.inputs?.attached?.pointers){ camera.inputs.attached.pointers.buttons=[0]; }
+  const camera=new BABYLON.ArcRotateCamera('camera',-Math.PI*.69+Math.PI,1.16,20.5,new BABYLON.Vector3(.9,.62,-.15),scene); state.camera=camera; camera.fov=.46; camera.lowerRadiusLimit=.25; camera.upperRadiusLimit=60; camera.panningSensibility=60; camera.minZ=.5; camera.maxZ=600; camera.upperBetaLimit=1.42; camera.lowerBetaLimit=.22; camera.attachControl(canvas,true); setupMouseWheelZoom(camera);
+  // Left-drag = orbit about the point under the pointer (setupPivotOrbit). Left-click (no drag) = center on clicked tile. Right-click = show tile info in history.
+  setupPivotOrbit(camera);
   let clickStart=null;
   canvas.addEventListener('pointerdown',e=>{ if(e.button===0){ clickStart={x:e.clientX,y:e.clientY}; } });
   canvas.addEventListener('pointerup',e=>{
@@ -5402,7 +5484,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     }
   });
   canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); const pick=scene.pick(scene.pointerX,scene.pointerY); if(pick?.hit && pick.pickedPoint){ const tx=Math.round(pick.pickedPoint.x), tz=Math.round(pick.pickedPoint.z); let info=`tile (${tx},${tz})`; const m=pick.pickedMesh; const mm=meta(m); if(mm?.type && mm.type!=='tile') info+=` - ${mm.type} (${mm.state||'intact'})`; const owner=m?.metadata?.ownerId; if(owner){ const g=state.characters.find(x=>x.id===owner); if(g) info+=` - ${g.id} (${g.anim||'idle'})`; } log(info); } });
-  canvas.addEventListener('pointermove',e=>{ if(e.buttons&2){ e.preventDefault(); const dx=e.movementX*0.02, dy=e.movementY*0.02; const right=camera.getDirection(BABYLON.Vector3.Right()); const up=camera.getDirection(BABYLON.Vector3.Up()); const newTarget=camera.target.add(right.scale(dx)).subtract(up.scale(dy)); newTarget.y=0.6; camera.target.copyFrom(newTarget); state.zoomFocus=camera.target.clone(); } });
+  canvas.addEventListener('pointermove',e=>{ if(e.buttons&2){ e.preventDefault(); const dx=e.movementX*0.02, dy=e.movementY*0.02; const right=camera.getDirection(BABYLON.Vector3.Right()); const up=camera.getDirection(BABYLON.Vector3.Up()); const newTarget=camera.target.add(right.scale(dx)).subtract(up.scale(dy)); newTarget.y=camera.target.y; camera.target.copyFrom(newTarget); state.zoomFocus=camera.target.clone(); } });
   // Diorama lighting: cool moonlit sky dome + a warm angled key so the island
   // reads as a lit model on a dark table, plus a teal rim to separate the
   // silhouette from the water.

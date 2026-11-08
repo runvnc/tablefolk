@@ -23,7 +23,9 @@ cd tablefolk
 bun server/server.js 8000        # http://localhost:8000/
 ```
 
-Desktop Chrome or Edge with WebGPU. The first time a character speaks, the
+A browser with WebGPU: Chrome or Edge 137+, Safari 27+ (Safari 26 without
+voices in the browser), Firefox 153+ on Windows or an Apple Silicon Mac. The
+Graphics pane's "This browser" shows what was detected. The first time a character speaks, the
 page asks before downloading the model (about 2 GB, cached afterwards).
 Settings, the admin page and local models: the scenario skill's
 `reference/server.md`.

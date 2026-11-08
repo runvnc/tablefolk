@@ -1,8 +1,29 @@
 # Playing: the app, controls, brains and voices
 
-The app is `/app/` (`app/index.html`). It needs desktop Chrome or Edge with
-WebGPU. Opened without a scenario it shows the welcome screen (a few worlds
+The app is `/app/` (`app/index.html`). It needs WebGPU (see "Browsers"
+below; desktop Chrome or Edge works best). Opened without a scenario it shows the welcome screen (a few worlds
 and "build your own"); the "worlds" button brings it back.
+
+## Browsers
+
+Everything runs in Chrome or Edge 137 or newer, Safari 27 or newer, and
+Firefox 153 or newer on Windows or an Apple Silicon Mac. The 3D world and the
+characters need only WebGPU (Safari 26 has it; Firefox has none yet on Linux,
+Android or Intel Macs). Two things need more:
+
+| needs | for | without it |
+|---|---|---|
+| WebGPU | the 3D world, the characters (Gemma) | the page stops at a screen that says which browsers work and what it detected |
+| JSPI (`WebAssembly.Suspending`): Chrome/Edge 137, Safari 27, Firefox 153 | Breeze in the browser; Qwen and other wllama models on the GPU | Breeze in the browser is greyed out with the reason; Qwen runs on the CPU |
+| WebGPU `shader-f16` (the graphics card) | Breeze in the browser; speech input on the GPU | Breeze is greyed out; speech input runs on the CPU |
+
+The Graphics pane's **This browser** section shows what was detected (browser,
+operating system, graphics adapter, `shader-f16`, JSPI, threads, buffer
+limits, memory), with ✓/✗ and what each enables, and lists what runs here.
+A browser with WebGPU but no JSPI (Safari 26, older Chrome or Firefox) gets
+one short toast after the world has loaded, once per browser version, with a
+"details" button to that section; start-up is never held up. Scripts and
+tests read the same values from `window.tablefolkBrowser`.
 
 ## First visit
 
@@ -110,10 +131,10 @@ hour of quiet. It is picked by itself when the card has room beside the
 chat model and it speaks faster than real time on this computer; or pick it
 under Engine. Its weights are for non-commercial use). **Breeze TTS 2 in this
 browser** is the same model with no server: a 2.5 GB download once (asked
-first), on the graphics card through WebGPU (it needs the `shader-f16`
+first), on the graphics card through WebGPU (it needs JSPI (see "Browsers") and the `shader-f16`
 feature, which Chrome on Linux with NVIDIA hides unless it is started with
-`--enable-dawn-features=vulkan_enable_f16_on_nvidia`; the option is greyed
-out without it; about 0.6x realtime on an RTX 2060, so best on bigger cards). **Find helpers on this computer** (a button in the Voice pane and in the
+`--enable-dawn-features=vulkan_enable_f16_on_nvidia`; without either the option is greyed
+out and says which is missing, and the worker checks both before the download; about 0.6x realtime on an RTX 2060, so best on bigger cards). **Find helpers on this computer** (a button in the Voice pane and in the
 endpoint panel) looks for breeze-server (port 8137) and llama.cpp (port 8080)
 on the player's own machine, which works from tablefolk.world too: the
 browser asks once to allow local network access. Breeze found is used
@@ -126,7 +147,10 @@ can clone a voice from a sample.
 ## Graphics
 
 The Graphics pane sets quality, shadows, the sea and "smart memory" (the
-embedding model). URL flags for weak machines and testing:
+embedding model). Light is the default; every quality uses the simple sea and
+sky (the detailed ocean and island only come with `?island=1`). The 🔊/🔇
+button at the top turns speech on and off. URL flags for weak machines and
+testing:
 
 | flag | effect |
 |---|---|

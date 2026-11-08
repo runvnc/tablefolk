@@ -6,6 +6,8 @@
  *   pos (optional {x, z}): quieter with distance from the listener (the
  *   player's avatar, else the camera target).
  *   window.tablefolkSfx.enabled           false mutes (saved in localStorage)
+ *   window.tablefolkSfx.context()         { ctx, master, noise } for spells.js's
+ *       positional sounds (null while muted or before the first gesture)
  *
  * The audio context starts on the first click or key press (browsers block
  * sound before a user gesture). Doors and hits play recorded samples
@@ -165,6 +167,9 @@
 
   window.tablefolkSfx = {
     play,
+    // spells.js builds its own 3D (HRTF) sounds on the same context:
+    // { ctx, master, noise } once audio is running, else null.
+    context() { return enabled && audio() && ctx.state === 'running' ? { ctx, master, noise: noiseBuf } : null; },
     get enabled() { return enabled; },
     set enabled(on) { enabled = !!on; try { localStorage.setItem(KEY, enabled ? 'on' : 'off'); } catch {} },
   };

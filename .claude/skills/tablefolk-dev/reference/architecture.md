@@ -30,9 +30,15 @@ read whole.
 
 ## How the page starts
 
-`app/index.html` loads `app/preflight.js` (with its own `?v=`). Preflight
-reads the dev flags (`?art`, `?tabletop`, `?still`, `?webgl`...), checks
-WebGPU, then loads, one after another, the CDN libraries (pako, UPNG,
+`app/index.html` loads `app/browser-check.js` and `app/preflight.js` (each
+with its own `?v=`). Preflight reads the dev flags (`?art`, `?tabletop`,
+`?still`, `?webgl`...), checks WebGPU, hands its adapter to
+`TablefolkBrowserCheck.publish()` (synchronous: browser and OS from the user
+agent, adapter info, `shader-f16`, limits, JSPI, cross-origin isolation, into
+`window.tablefolkBrowser` with `why(feature)` reasons; the Graphics pane's
+"This browser" table; one toast for a WebGPU browser without JSPI after
+`tablefolk-scene-ready`, once per version, key `tablefolk.browserWarned`; the
+compatibility screen's hint and "Detected:" line), then loads, one after another, the CDN libraries (pako, UPNG,
 html2canvas, Babylon.js, its loaders and Havok, unversioned from
 cdn.babylonjs.com) and the app's own scripts, each with a `?v=` version:
 

@@ -34,7 +34,7 @@
     ['toast.js?v=20261018a'],
     ['sfx.js?v=20261024a'],
     ['ui-polish.js?v=20261106a'],
-    ['tabs.js?v=20261106a'],
+    ['tabs.js?v=20261107a'],
     ['library.js?v=20261018a'],
     ['packs.js?v=20261101b'],
     ['https://cdn.babylonjs.com/babylon.js'],
@@ -42,14 +42,15 @@
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
     ['tts/breeze-client.js?v=20261101b'],
     ['tts/pocket-tts-manager.js?v=20261107b'],
-    ['tts/tts-ui.js?v=20261031a'],
+    ['tts/tts-ui.js?v=20261107a'],
     ['look.js?v=20261018b'],
     ['perf-monitor.js?v=20261018a'],
-    ['graphics-settings.js?v=20261031a'],
+    ['graphics-settings.js?v=20261107a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261106j'],
+    ['app.js?v=20261107a'],
     ['scenery.js?v=20261025a'],
     ['combat.js?v=20261024k'],
+    ['spells.js?v=20261107a'],
     ['darkness.js?v=20261030a'],
     ['roofs.js?v=20261031a'],
     ['cutaway.js?v=20261030b'],
@@ -97,7 +98,11 @@
     const reasonNode = document.getElementById('compatibilityReason');
     const detailNode = document.getElementById('compatibilityDetail');
     if (reasonNode) reasonNode.textContent = reason;
-    if (detailNode) detailNode.textContent = `${browserSummary()} · ${detail}`;
+    // what was detected and which browsers work (browser-check.js)
+    const bc = window.TablefolkBrowserCheck, r = bc?.publish(null);
+    const hintNode = document.getElementById('compatibilityHint');
+    if (hintNode && r) { hintNode.textContent = bc.hint(r); hintNode.hidden = false; }
+    if (detailNode) detailNode.textContent = r ? `${bc.line(r)} · ${detail}` : `${browserSummary()} · ${detail}`;
     if (screen) screen.hidden = false;
   }
 
@@ -142,6 +147,9 @@
       }
     }
 
+    // record what this browser can do (window.tablefolkBrowser), from the
+    // adapter above: synchronous, nothing awaited
+    try { window.TablefolkBrowserCheck?.publish(adapter || null); } catch {}
     document.body.classList.remove('tablefolk-preflight-pending');
     document.body.classList.add('tablefolk-compatible');
     try {

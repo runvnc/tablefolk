@@ -59,6 +59,13 @@ async function cachePut(key, v) { try { const d = await db(); d.transaction('cod
 
 async function load(opts = {}) {
   if (M) return;
+  // what it needs, checked before the 2.5 GB download (browser-check.js has the same rules)
+  if (typeof WebAssembly.Suspending !== 'function') throw new Error('Breeze TTS 2 failed: this browser has no JSPI (WebAssembly.Suspending); it needs Chrome or Edge 137+, Safari 27+ or Firefox 153+');
+  if (!opts.allowCpu) {
+    const a = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
+    if (!a) throw new Error('Breeze TTS 2 failed: no WebGPU in this browser\'s workers');
+    if (!a.features.has('shader-f16')) throw new Error('Breeze TTS 2 failed: the graphics card offers no WebGPU shader-f16' + (/linux/i.test(navigator.userAgent) && a.info?.vendor === 'nvidia' ? ' (Chrome on Linux with NVIDIA: start it with --enable-dawn-features=vulkan_enable_f16_on_nvidia)' : ''));
+  }
   status('Breeze TTS 2: checking the model…');
   const t0 = performance.now();
   const file = await opfsModel((n, total) => status(`Downloading Breeze TTS 2 ${Math.floor(100 * n / total)}% (${(n / 2 ** 30).toFixed(2)} / ${(total / 2 ** 30).toFixed(2)} GB, once)`));

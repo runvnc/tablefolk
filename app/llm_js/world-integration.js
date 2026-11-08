@@ -361,10 +361,21 @@ const SIMPLE_HISTORY = 6;
 // Whatever a tiny model wrote becomes one thing to do: an allowed command on a
 // line of its own, else its first line of words. say(...), a speaker's name in
 // front ("[Pilgrim]", "Oracle:"), stray tags and outer quotes all go.
+const MAGIC = { fireball: 'spell.fireball', lightning: 'spell.lightning', spawn: 'spawn' };
+const MAGIC_ANY = /\b(fireball|lightning|spawn)\s*\([^)\n]*\)?/gi;
 function simpleReply(world, g, text) {
   const names = [g.id, world.playerName?.(), ...world.getAgents().map(a => a.id)].filter(Boolean).map(n => n.replace(/[^\w -]/g, '')).join('|');
   const speaker = new RegExp('^(\\[\\s*(' + names + ')\\s*\\]|(' + names + ')(\\s+says)?\\s*:)\\s*', 'i');
   const allowed = world.getAllowedCommands(g.id);
+  // Spells and spawn (spells.js) wherever they are in the reply, with its
+  // first words still said: "Behold! fireball(Pilgrim)". One not allowed, or
+  // half written, is cut out unsaid.
+  const magic = String(text || '').match(/\b(fireball|lightning|spawn)\s*\(([^()\n]*)\)/i);
+  if (magic && allowed.includes(MAGIC[magic[1].toLowerCase()])) {
+    const said = simpleReply(world, g, String(text).replace(magic[0], ' ').replace(MAGIC_ANY, ' '));
+    return [said, magic[1].toLowerCase() + '(' + magic[2].trim() + ')'].filter(Boolean).join('\n');
+  }
+  if (String(text || '').search(MAGIC_ANY) >= 0) text = String(text).replace(MAGIC_ANY, ' ');
   for (let l of String(text || '').split('\n')) {
     l = l.trim();
     const act = l.match(/^(walk|give|sell|attack)\s*\(/i);
@@ -921,7 +932,7 @@ async function main() {
       // sell(healing potion, 8)'): the commands are pulled out and run, and
       // only the quoted words are spoken when there are quotes (the rest is
       // narration). The history keeps the cleaned lines.
-      const others = allowedCmds().filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
+      const others = allowedCmds().map(c => c === 'spell.fireball' ? 'fireball' : c === 'spell.lightning' ? 'lightning' : c).filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
       const embedded = others.length ? new RegExp('\\b(' + others.join('|') + ')\\(([^()]*)\\)', 'gi') : null;
       const histParts = [];
       const planCmds = planLines.flatMap(l => {

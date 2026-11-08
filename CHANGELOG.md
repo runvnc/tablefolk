@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-07
 
+- **What this browser can do, shown**: the Graphics pane's "This browser" lists what was detected (browser, system, graphics adapter, `shader-f16`, JSPI, threads, buffer limits) and what runs here; it is also `window.tablefolkBrowser` (`app/browser-check.js`). Safari 26 and other WebGPU browsers without JSPI get one short toast after the world loads (once per version): voices in the browser and Qwen on the GPU need Safari 27, Chrome/Edge 137 or Firefox 153. Breeze in the browser says which of JSPI or `shader-f16` is missing, and checks both before its download. The no-WebGPU screen names the browsers that work and what it detected.
+- **Light graphics are the default**, and no quality builds the detailed ocean any more: every setting has the simple sea and sky. The speech button at the top no longer shows 🔇 at startup while speech is on.
 - **Library voices in Breeze in the browser use natively encoded codes** (`assets/voices/breeze-codes`, `tools/breeze-web/build-voice-codes.mjs`): no encoding step, and closer to native. Its speed figure now leaves out the wait before audio starts, which had added seconds of silence before each line.
 - **Cloned voices work in the browser**: Breeze in the browser garbled library voices (wrong words, shifting speakers, lines far too long or cut short) because of a bug in ggml's WebGPU `sum_rows` on long reference clips. In a blind listening test they now rate about the same as native. References are also resampled properly now.
 

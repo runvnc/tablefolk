@@ -26,7 +26,9 @@ cd tablefolk
 bun server/server.js 8000               # serves http://localhost:8000/app/
 ```
 
-- Needs desktop Chrome or Edge with WebGPU. The first time a character
+- Needs WebGPU: Chrome or Edge 137+, Safari 27+ (26 without voices in the
+  browser), Firefox 153+ on Windows or Apple Silicon Macs
+  ([reference/playing.md](reference/playing.md), "Browsers"). The first time a character
   speaks, the page asks before downloading the model (Gemma 4 E2B, ~2 GB,
   cached afterwards). Never approve the download on the user's behalf.
 - Open links in the user's own browser (`xdg-open`, `open`, `start`) or just
