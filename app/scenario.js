@@ -1105,6 +1105,8 @@
         inventory: { gold: Math.max(0, +(a.inventory?.gold) || 0), items: (a.inventory?.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : { name: String(i.name), qty: i.qty ?? 1 }) },
       });
     }
+    // voices ready before anyone speaks (pocket-tts-manager.js prepare)
+    if (!opts.testing) try { window.tablefolkTTS?.prepare?.(w.getAgents().map(g => w.getBrainConfig(g.id)?.ttsVoiceId)); } catch {}
     if (withAvatar && w.spawnPlayerAvatar) {
       const pa = Array.isArray(scn.player?.at) ? { x: +scn.player.at[0], z: +scn.player.at[1], facing: scn.player.facing || 'n' } : (plan.agents.player || { x: 0, z: 3, facing: 'n' });
       // Face the first character (who you'll be talking to) unless told otherwise.

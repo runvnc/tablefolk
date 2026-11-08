@@ -17,7 +17,7 @@
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
-    'breeze-web':{label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107c',languages:false,cloneByText:true,progress:true},
+    'breeze-web':{warmup:true,minHold:1.1,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107d',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
   // Breeze is picked by itself (nothing chosen in this browser) when it is
@@ -44,7 +44,9 @@
   function noteSpeed(engine,m){ if(!(m?.rtfx>0) || !(m.audioDuration>1)) return; const all=speeds(), k=speedKey(engine); all[k]=all[k]?all[k]*.6+m.rtfx*.4:m.rtfx; try{localStorage.setItem('tablefolkTtsRtfx',JSON.stringify(all));}catch{} }
   // seconds of audio to hold before playing a line of this length: an engine
   // making r seconds a second needs (1-r) of the line ahead (at most 8 s)
-  function holdFor(engine,text){ const base=settings().bufferMs/1000, r=speeds()[speedKey(engine)]; if(!r || r>=1.15) return base; return Math.max(base,Math.min(8,(1-r/1.1)*String(text||'').length/14+.3)); }
+  // minHold (Breeze in the browser): its audio comes in bursts of about 0.8 s at
+  // barely faster than real time, so a smaller head start ran dry a second in (a stutter near the start).
+  function holdFor(engine,text){ const base=Math.max(settings().bufferMs/1000,ENGINES[engine]?.minHold||0), r=speeds()[speedKey(engine)]; if(!r || r>=1.15) return base; return Math.max(base,Math.min(8,(1-r/1.1)*String(text||'').length/14+.3)); }
   let serverEngine=null;
   const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
   async function chosenEngine(){ const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine])return mine; if(await breezeFits()) return 'breeze'; const def=await serverDefault(); return ENGINES[def]?def:'pocket-18m'; }
@@ -59,7 +61,7 @@
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
     voices(){ const cat=window.TABLEFOLK_VOICES||[]; const packs=(window.TABLEFOLK_PACK_VOICES||[]).map(v=>({id:v.id,name:`${v.name} (${[v.gender,v.description].filter(Boolean).join(', ')})`})); return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat(packs).concat([...this.custom.values()].filter(v=>!v.pack).map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
-    async ensureAudio(){ if(!this.audioCtx){
+    async ensureAudio(early=false){ if(!this.audioCtx){
       // 'interactive' asks Chrome for the smallest possible hardware audio
       // buffer (lowest latency, e.g. for synths/games where every ms
       // matters) - it's also the most prone to glitching whenever the OS
@@ -101,10 +103,23 @@
         if(m.type==='capacity'&&!this.directPort){this.telemetry.bufferedMs=Math.round((m.buffered||0)/this.audioCtx.sampleRate*1000);this.flushAudio();}
       };
       this.audioCtx.onstatechange=()=>{if(this.audioCtx.state==='suspended')this.status('Click anywhere once to enable speech','error');};
-    } if(this.audioCtx.state==='suspended') await this.audioCtx.resume(); this.gain.gain.value=settings().volume; }
+    } if(this.audioCtx.state==='suspended'){ if(early){ this.audioCtx.resume().catch(()=>{}); this.resumeOnGesture(); } else await this.audioCtx.resume(); } this.gain.gain.value=settings().volume; }
+    // The browser starts audio only after a click or key press: the first one resumes it.
+    resumeOnGesture(){ if(this.gestureHooked)return; this.gestureHooked=true; const kick=()=>{ this.audioCtx?.resume?.().catch(()=>{}); for(const t of ['pointerdown','keydown'])removeEventListener(t,kick,true); this.gestureHooked=false; }; for(const t of ['pointerdown','keydown'])addEventListener(t,kick,true); }
+    // Ready before the first line (scenario.js calls it once the characters are
+    // in): the engine, the audio graph (it starts at the first click or key),
+    // each character's voice, and for engines that have it a short silent line,
+    // so the first real line comes as fast as the rest.
+    async prepare(voiceIds=[]){ if(!settings().enabled||window.TABLEFOLK_ART_MODE)return; try{
+      await this.load(); await this.ensureAudio(true);
+      const ready=[]; for(const id of [...new Set(voiceIds.filter(Boolean).map(String))]){ if(id.startsWith('pack:')){ const v=await this.ensurePack(id.split('@')[0]).catch(e=>{console.warn('[tts] voice',id,e);return null;}); if(v)ready.push(v); } else ready.push(id); }
+      if(ENGINES[this.engine]?.warmup && !this.warmed && this.worker){ this.warmed=true; const t0=performance.now(), voice=(ready[0]||'').replace('builtin:','');
+        await new Promise(res=>{ this.pending.set('warmup',{resolve:res,reject:res}); this.worker.postMessage({type:'warmup',data:{text:'Well, well. Here we are again, old friend.',voice}}); setTimeout(res,60000); });
+        console.log(`[tts] warmed up in ${Math.round(performance.now()-t0)} ms`); }
+    }catch(e){ console.warn('[tts] prepare',e); } }
     engines(){return Object.entries(ENGINES).map(([id,e])=>({id,label:e.label,languages:e.languages}));}
     // Switch engines: the running one is dropped and the new one loads now.
-    async setEngine(id){ if(!ENGINES[id])return; localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
+    async setEngine(id){ if(!ENGINES[id])return; localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); this.warmed=false; try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
     async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const engine=this.engine=await chosenEngine(), E=ENGINES[engine]; this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1'}}); }); return this.pendingLoad; }
     async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(this.engine==='breeze-web')localStorage.setItem('tablefolkBreezeWebReady','1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.client||ENGINES[this.engine]?.cloneByText?'':' (CPU)'}`,'ready');resolve?.(); await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
@@ -116,6 +131,7 @@
       if(m.type==='stream_ended'){if(this.directPort){ if(!this.receivedSamples)this.finishCurrent(false); /* else: worker already told the worklet stream-ended; the worklet 'drained' event finishes this item only after every buffered sample has actually played */ }else if(this.receivedSamples){this.pendingStreamEnd=true;this.flushAudio();}else this.finishCurrent(false);}
       if(m.type==='voice_state') this.saveState(m.id,m.tensors);
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
+      if(m.type==='warmed'){ const p=this.pending.get('warmup'); if(p){this.pending.delete('warmup');p.resolve();} }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     // for engines that design a voice from words (Breeze) when there is no sample to clone
     designFor(voice){ const id=String(voice).replace(/^(builtin|custom):/,''), v=(window.TABLEFOLK_VOICES||[]).find(x=>x.id===id); return v?`A ${v.gender||''} voice: ${v.description||'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g,' '):'A warm, natural speaking voice. Speak clearly and naturally.'; }
@@ -223,7 +239,7 @@
           '<span>R</span>'+
         '</div>';
     }    stop(){this.queue=[];try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}
-    unload(){this.stopSpatialTicker();this.stop();try{this.worker?.terminate();}catch{}this.worker=null;this.ready=false;this.loading=false;this.pendingLoad=null;this.pendingAudio=[];this.pending.clear();try{this.pcmNode?.disconnect();}catch{}this.analyser=null;try{this.gain?.disconnect();}catch{}try{this.audioCtx?.close();}catch{}this.pcmNode=null;this.gain=null;this.audioCtx=null;this.directPort=false;}
+    unload(){this.warmed=false;this.stopSpatialTicker();this.stop();try{this.worker?.terminate();}catch{}this.worker=null;this.ready=false;this.loading=false;this.pendingLoad=null;this.pendingAudio=[];this.pending.clear();try{this.pcmNode?.disconnect();}catch{}this.analyser=null;try{this.gain?.disconnect();}catch{}try{this.audioCtx?.close();}catch{}this.pcmNode=null;this.gain=null;this.audioCtx=null;this.directPort=false;}
     async setLanguage(language){localStorage.setItem('tablefolkTtsLanguage',language);if(!this.worker||!ENGINES[this.engine]?.languages)return;this.ready=false;this.status('Loading language…','loading');this.worker.postMessage({type:'set_language',data:{language}});}
     // Drop one character's queued lines and cut it off if it is speaking (it died).
     silence(agent){this.queue=this.queue.filter(i=>i.agent!==agent);if(this.current?.agent===agent){try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}}
@@ -241,7 +257,7 @@
         const bk='bz-'+id.slice(5); if(this.custom.has(bk)) return 'custom:'+bk;
         const [bId,bMood]=id.split('@'), bv=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===bId); if(!bv) throw new Error('unknown voice '+id);
         const bFile=(bMood&&bv.moods?.[bMood])||bv.file, bText=(bMood&&bv.mood_text?.[bMood])||bv.text;
-        await this.load(); await this.ensureAudio();
+        await this.load(); await this.ensureAudio(true);
         // codes encoded natively ahead of time, for the library's voices (tools/breeze-web/build-voice-codes.mjs)
         const cr=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/breeze-codes/'+bFile.split('/').pop().replace(/\.[^.]+$/,'')+'.bin?v='+(bv.v||'')).catch(()=>null), ct=cr?.ok&&!/text\/html/.test(cr.headers.get('content-type')||'')?await cr.arrayBuffer():null;
         if(ct&&ct.byteLength&&ct.byteLength%32===0){ const codes=Int32Array.from(new Int16Array(ct)); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'voice_codes',data:{voiceId:bk,codes,frames:codes.length/16,text:bText}}); }); this.custom.set(bk,{id:bk,name:bv.name,audio:[],created:Date.now(),pack:true,stateOnly:true}); return 'custom:'+bk; }
@@ -257,7 +273,7 @@
       // precomputed on R2 (tools/build-voice-states.mjs): a range of one file, no encoder, no prefill
       const pre=await this.fetchPrecomputed(id);
       if(pre){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_bin',data:{voiceId:key,buf:pre}},[pre]); }); return 'custom:'+key; }
-      await this.ensureAudio(); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
+      await this.ensureAudio(true); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
       const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
       let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }

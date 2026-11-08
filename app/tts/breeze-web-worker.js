@@ -110,17 +110,18 @@ function onAudio(pcm) {
   if (!gen) return;
   if (gen.first == null) gen.first = performance.now() - gen.t0;
   gen.samples += pcm.length;
+  // the warm-up: nothing is played, and a second of audio is enough
+  if (gen.silent) { if (gen.samples > 24000 && stopPtr) i32()[stopPtr >>> 2] = 1; return; }
   const metrics = { chunkRtfx: gen.samples / 24000 / ((performance.now() - gen.t0) / 1000) };
   if (port) { port.postMessage({ type: 'audio', data: pcm }, [pcm.buffer]); postMessage({ type: 'audio_chunk_meta', metrics }); }
   else postMessage({ type: 'audio_chunk', data: pcm.buffer, metrics }, [pcm.buffer]);
 }
 
-async function generate({ text, voice, instruction }) {
-  if (!String(text || '').trim()) { postMessage({ type: 'stream_ended' }); return; }
+async function generate({ text, voice, instruction, silent = false }) {
+  if (!String(text || '').trim()) { if (!silent) postMessage({ type: 'stream_ended' }); return; }
   const v = voices.get(String(voice).replace(/^custom:/, '')) || null;
-  gen = { t0: performance.now(), samples: 0, first: null };
-  port?.postMessage({ type: 'reset' });
-  postMessage({ type: 'generation_started', data: { time: gen.t0, sourceSampleRate: 24000 } });
+  gen = { t0: performance.now(), samples: 0, first: null, silent };
+  if (!silent) { port?.postMessage({ type: 'reset' }); postMessage({ type: 'generation_started', data: { time: gen.t0, sourceSampleRate: 24000 } }); }
   let cp = 0;
   if (v) { cp = M._malloc(v.codes.length * 4); i32().set(v.codes, cp >>> 2); }
   i32()[stopPtr >>> 2] = 0;
@@ -132,6 +133,7 @@ async function generate({ text, voice, instruction }) {
   const g = gen; gen = null;
   if (rc === 1) throw new Error('Breeze: ' + M.UTF8ToString(M._tf_error()));
   const secs = (performance.now() - g.t0) / 1000;
+  if (silent) { console.log(`[breeze] warm-up: first audio ${Math.round(g.first || 0)} ms, ${secs.toFixed(1)} s`); return; }
   // rtfx: speed once audio has started (the wait before it is firstAudioMs). It sets how much is held before playing
   // (holdFor), and counting the wait as slowness made every line wait seconds longer than it had to.
   const after = Math.max(.001, secs - (g.first || 0) / 1000);
@@ -152,6 +154,8 @@ self.onmessage = e => {
       if (type === 'load') return await (loading ||= load(data).catch(err => { loading = null; throw err; }));
       if (type === 'encode_voice' || type === 'load_voice_state' || type === 'load_voice_bin') { if (type === 'encode_voice') await encode(data); postMessage({ type: 'voice_encoded', voiceId: data.voiceId }); return; }
       if (type === 'generate') return await generate(data);
+      // a short line made and thrown away, so the first real one starts at full speed
+      if (type === 'warmup') { await generate({ ...data, silent: true }); postMessage({ type: 'warmed' }); return; }
       if (type === 'debug_stages') { const p = await M.ccall('tf_stages', 'number', [], [], { async: true }); postMessage({ type: 'debug_stages', text: M.UTF8ToString(p) }); return; }
       if (type === 'debug_matvec') { const p = await M.ccall('tf_matvec_check', 'number', ['number'], [data.repeats || 20], { async: true }); postMessage({ type: 'debug_matvec', text: M.UTF8ToString(p) }); return; }
       // codes encoded natively ahead of time (assets/voices/breeze-codes): no encoder, and closer to native
