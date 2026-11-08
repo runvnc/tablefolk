@@ -60,7 +60,7 @@
     ['helpers.js?v=20261031b'],
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261024b'],
-    ['senses.js?v=20261108a'],
+    ['senses.js?v=20261108b'],
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261030a'],
     ['mind.js?v=20261106a'],
