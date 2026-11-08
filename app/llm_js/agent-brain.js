@@ -52,10 +52,10 @@ const SUPPORTED_MODELS = {
   // on wllama. simple: simple-mode prompts (app.js buildSimplePrompt) unless a
   // scenario says otherwise. autoLoad: loads like the LiteRT models, with the
   // download question, though it is a wllama3 engine. builder.js lists it too.
-  'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B (tiny and very silly; simple prompts)', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true },
+  'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true },
   // The older Qwen1.5 0.5B Chat: what people run on Ollama (qwen:0.5b) and laugh at
-  'qwen1.5-0.5b': { label: 'Qwen1.5 0.5B (the silliest: 10 + 10 = 11)', engine: 'wllama3', size: '~395 MB', simple: true, autoLoad: true },
-  'qwen2.5-0.5b-q2': { label: 'Qwen2.5 0.5B Q2_K (rougher still)', engine: 'wllama3', size: '~415 MB', simple: true, autoLoad: true, hidden: true },
+  'qwen1.5-0.5b': { label: 'Qwen1.5 0.5B', engine: 'wllama3', size: '~395 MB', simple: true, autoLoad: true },
+  'qwen2.5-0.5b-q2': { label: 'Qwen2.5 0.5B Q2_K', engine: 'wllama3', size: '~415 MB', simple: true, autoLoad: true, hidden: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
   'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },
