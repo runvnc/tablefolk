@@ -205,6 +205,9 @@
         const isPlayer = m === state.playerAvatar, who = isPlayer ? nameOfPlayer() : m.id;
         const where = compass(Math.round(pm.x) - Math.round(pc.x), Math.round(pm.z) - Math.round(pc.z));
         const cfg = getBrainConfig(c.id);
+        // one who speaks only when spoken to (app.js onlySpokenTo; The Oracle) is neither told nor
+        // prompted to greet: a tiny model answered the notice instead of the player
+        if (typeof onlySpokenTo === 'function' && onlySpokenTo(c, cfg)) continue;
         setBrainConfig(c.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${who} comes up to you (${steps(d)}, ${where}).`]).slice(-5) });
         if (isPlayer && state.approachReplies !== false && now - (lastReply.get(c.id) || 0) > 60000) {
           lastReply.set(c.id, now);

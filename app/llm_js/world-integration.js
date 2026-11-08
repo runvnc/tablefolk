@@ -424,7 +424,9 @@ function buildSimpleMessages(world, g, cfg, built) {
   }
   if (messages[1]?.role === 'assistant') messages.splice(1, 1);
   const pending = cfg.pendingChat || [], isEvent = l => /^\s*(\[event\]|\()/.test(String(l));
-  const events = pending.filter(isEvent).map(l => String(l).replace(/^\s*\[event\]\s*/, '').replace(/^\((.*)\)$/, '$1'));
+  // Approach notices ("Pilgrim comes up to you (2 steps south, ...)", senses.js)
+  // are left out: a tiny model took them as something to answer (The Oracle).
+  const events = pending.filter(isEvent).filter(l => !/\bcomes up to you\b/i.test(String(l))).map(l => String(l).replace(/^\s*\[event\]\s*/, '').replace(/^\((.*)\)$/, '$1'));
   const speech = pending.filter(l => !isEvent(l)).map(l => { const x = String(l).match(/^(.+?)\s+says:\s*(.*)$/); return x ? `[${x[1].trim()}] ${x[2]}` : String(l); });
   const said = speech.map(words).join('\n'), chatSuffix = [...events.map(e => '[happened] ' + e), ...speech].join('\n');
   cfg.pendingChat = []; world.setBrainConfig(g.id, cfg);

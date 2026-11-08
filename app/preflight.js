@@ -60,7 +60,7 @@
     ['helpers.js?v=20261031b'],
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261024b'],
-    ['senses.js?v=20261101a'],
+    ['senses.js?v=20261108a'],
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261030a'],
     ['mind.js?v=20261106a'],
@@ -79,7 +79,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261108f', 'module'],
+    ['llm_js/world-integration.js?v=20261108g', 'module'],
   ];
 
   function browserSummary() {

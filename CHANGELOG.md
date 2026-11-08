@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **No approach notice for characters who speak only when spoken to** (The Oracle): walking up to them no longer tells them "Pilgrim comes up to you..." or prompts them to greet you, and simple mode leaves such notices out of the prompt; the tiny model answered the notice instead of you.
 - The Oracle at chaos 63 (temperature 2.0): 8 lightning in 20 replies, nearly all at insults and dares, and he still answers the questions after (chaos 50: 2; chaos 30: 1; chaos 1: 0-4 in 30).
 - **The Oracle only has lightning**, with a two-line prompt; a reply that threatens lightning ("I shall strike you with lightning!", not "I cannot...") is cast as well as said, at you when it says "you". Commands are cut from his past replies in the history. The crystal ball's hum is far quieter and heard from where the view seems to be: the camera, nearer when zoomed (first person's narrower view counts), falling with the square of that distance (about -54 dB from the start, -38 zoomed in on it).
 - **The Oracle answers again after a spell**: in simple mode a reply that was only a command is left out of the model's history, with the words that provoked it, so one spell no longer turns every later reply into spells (an insult then five questions: 10 of 18 replies were spells or blank, now 4 of 18). The crystal ball's hum is louder and an octave higher (laptop speakers lost its 98 Hz), and the wizard stands 1.6 cm higher so no shoe sinks into the rug.
