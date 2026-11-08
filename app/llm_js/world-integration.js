@@ -378,12 +378,14 @@ function simpleReply(world, g, text, spoken = false) {
   // Lightning by word: a tiny model told "If someone insults you, write
   // lightning(you)" talks well but writes the command badly; it says "I shall
   // strike you with lightning!" instead. A reply that threatens lightning (not
-  // "I cannot...") is said and then cast: at you when it says "you", else the
-  // bolt finds the caster (spells.js). The Oracle, 2026-11-08.
+  // "I cannot...") is said and then cast: at you, unless it names itself
+  // ("me", "myself", its name): then the bolt finds the caster (spells.js). The Oracle, 2026-11-08.
   const NO = /\b(not|never|cannot|can't|won't|unable|no)\b[^.!?\n]{0,40}\blightning\b/i;
   if (!spoken && !magic && allowed.includes('spell.lightning') && /\blightning\b/i.test(String(text || '')) && !NO.test(String(text))) {
     const said = simpleReply(world, g, text, true);
-    return [said, 'lightning(' + (/\byou\b/i.test(String(text)) ? 'you' : '') + ')'].filter(Boolean).join('\n');
+    // at the one he's talking to, unless he names himself (then it is his own head)
+    const self = /\b(me|myself|my own)\b/i.test(String(text)) || new RegExp('\\b' + g.id + '\\b', 'i').test(String(text));
+    return [said, 'lightning(' + (self ? '' : 'you') + ')'].filter(Boolean).join('\n');
   }
   if (String(text || '').search(MAGIC_ANY) >= 0) text = String(text).replace(MAGIC_ANY, ' ');
   // a spell's bare name as the whole line ("Fireball!"): the command list read out, not said

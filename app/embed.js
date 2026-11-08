@@ -6,8 +6,8 @@
  * look?" finds "The wolf den is in the hollow past the north pasture" though
  * they share no words.
  *
- * Runs on WebGPU (?embed=wasm: on the CPU, a 314 MB int8 file). Loads the first time a
- * character takes a turn (not in ?art=1), unless the
+ * Runs on WebGPU (?embed=wasm: on the CPU, a 314 MB int8 file). Loads 1.5 s after the
+ * page opens (not in ?art=1), unless the
  * Graphics pane's "smart memory" box is off (localStorage tablefolkEmbed=off).
  * Until it is ready, recall is keyword-only.
  *
@@ -30,10 +30,13 @@
     api.state = 'loading';
     ready = new Promise(resolve => {
       worker = new Worker(new URL('embed-worker.js?v=20261030a', location.href), { type: 'module' });
+      // the "downloading" toast only for a real download: not when Transformers.js
+      // already has the weights in Cache Storage (they still stream in with progress)
       let toasted = false;
+      caches?.open('transformers-cache').then(c => c.keys()).then(ks => { if (ks.some(r => /embeddinggemma/i.test(r.url) && /model_q4\.onnx_data|model_quantized\.onnx_data/.test(r.url))) toasted = true; }).catch(() => {});
       worker.onmessage = e => {
         const d = e.data;
-        if (d.type === 'progress') { if (!toasted && d.total > 5e6 && d.loaded < d.total * .5) { toasted = true; window.tablefolkToast?.('Downloading the memory model (EmbeddingGemma, 175 MB, once)…'); } api.progress = d.total ? d.loaded / d.total : 0; return; }
+        if (d.type === 'progress') { api.progress = d.total ? d.loaded / d.total : 0; if (!toasted && d.total > 5e6 && d.loaded < d.total * .5) { toasted = true; window.tablefolkToast?.('Downloading the memory model (EmbeddingGemma, 175 MB, once)…'); } api.progress = d.total ? d.loaded / d.total : 0; return; }
         if (d.type === 'ready') { api.state = 'ready'; api.device = device = d.device; console.log('[embed] ready on', d.device); resolve(true); return; }
         if (d.type === 'error') { api.state = 'error'; console.warn('[embed]', d.error); resolve(false); return; }
         const w = waiting.get(d.id); if (w) { waiting.delete(d.id); d.error ? w.reject(new Error(d.error)) : w.resolve(d.vectors); }
@@ -82,4 +85,7 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ui); else ui();
   window.tablefolkEmbed = api;
+  // Ready before the first turn: it starts loading shortly after the page
+  // opens (it used to wait for a character's first turn and slowed that reply).
+  if (!art && !off()) setTimeout(() => { try { start(); } catch {} }, 1500);
 })();

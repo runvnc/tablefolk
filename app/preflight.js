@@ -62,7 +62,7 @@
     ['fp-hands.js?v=20261024b'],
     ['senses.js?v=20261108b'],
     ['packages.js?v=20261024a'],
-    ['embed.js?v=20261030a'],
+    ['embed.js?v=20261108b'],
     ['mind.js?v=20261106a'],
     ['uses.js?v=20261101n'],
     ['roles.js?v=20261024a'],
@@ -79,7 +79,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261108g', 'module'],
+    ['llm_js/world-integration.js?v=20261108h', 'module'],
   ];
 
   function browserSummary() {

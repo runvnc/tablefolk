@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **The Oracle's lightning has examples, `lightning(Pilgrim)` or `lightning()`**, and a threatened bolt strikes the one he's talking to unless he names himself; in 20 test replies 4 bolts hit the player and 1 hit him (he had always killed himself). **The memory model (EmbeddingGemma) loads when the page opens** (ready about 13 s in) instead of at the first turn, which delayed that reply; its "downloading" toast shows only when the weights are not already in Cache Storage.
 - **No approach notice for characters who speak only when spoken to** (The Oracle): walking up to them no longer tells them "Pilgrim comes up to you..." or prompts them to greet you, and simple mode leaves such notices out of the prompt; the tiny model answered the notice instead of you.
 - The Oracle at chaos 63 (temperature 2.0): 8 lightning in 20 replies, nearly all at insults and dares, and he still answers the questions after (chaos 50: 2; chaos 30: 1; chaos 1: 0-4 in 30).
 - **The Oracle only has lightning**, with a two-line prompt; a reply that threatens lightning ("I shall strike you with lightning!", not "I cannot...") is cast as well as said, at you when it says "you". Commands are cut from his past replies in the history. The crystal ball's hum is far quieter and heard from where the view seems to be: the camera, nearer when zoomed (first person's narrower view counts), falling with the square of that distance (about -54 dB from the start, -38 zoomed in on it).
