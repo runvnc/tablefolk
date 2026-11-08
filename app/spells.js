@@ -8,9 +8,10 @@
  * {kind:'spell', spell, target} and spawn(x, n) into {kind:'spawn'}).
  * With a target (a character, the player, or a thing by name) the spell hits
  * it (fireball 3 damage and burns things nearby, lightning 4) and the caster
- * takes 1 from the backlash (combat.js hurt). Without one it goes off
- * harmlessly: a fireball bursts in the air overhead, lightning strikes the
- * floor a few steps away. A target that can't be found counts as none.
+ * takes 1 from the backlash (combat.js hurt). Without one (or naming himself,
+ * or a target that can't be found) it comes back on the caster: the fireball
+ * goes up and falls on him (3), the lightning strikes him (4). On purpose: a
+ * tiny model that forgets the target hurts itself.
  * spawn(thing, n) makes 1-6 of an object (pack items, crate, barrel, lamp,
  * mushroom, campfire, ...) appear on free cells in front of the caster; an
  * unknown thing (or the placeholder "thing") conjures a random small object
@@ -485,7 +486,8 @@
     const t = String(name || '').trim().replace(/^["']|["']$/g, '');
     if (!t || /^(none|nothing|sky|air|up|the sky|name|target|enemy|someone|thing|it)$/i.test(t)) return null;   // (placeholders copied from the prompt)
     const who = window.tablefolkCombat?.resolveTarget(g, t);
-    if (who && who !== g && !who.defeated) return { who, pos: () => who.root.position };
+    if (who === g) return null;   // naming himself: the same as no target (it comes back on him)
+    if (who && !who.defeated) return { who, pos: () => who.root.position };
     const m = findThing(t, g.root.position);
     if (m) return { thing: m, pos: () => m.getAbsolutePosition() };
     return null;
@@ -540,9 +542,18 @@
           // no target: up into the air, a burst overhead (under the ceiling indoors), embers raining down
           const ceil = sc().pickWithRay(new BABYLON.Ray(from, V3(0, 1, 0), 8), m => m.isEnabled() && m.isVisible && !m.name.startsWith('spell_') && m.getTotalVertices() > 0 && !/sky/i.test(m.name), true);
           const up = ceil?.hit ? Math.max(.8, ceil.distance - .9) : 3.6;
-          const to = from.add(fwd(g).scale(1.8)).add(V3(rnd(-.3, .3), up, rnd(-.3, .3)));
-          flyFireball(from, to, { arc: 0, speed: 7, ground: false, size: .9 });
-          report(g, `${g.id} throws a fireball into the air; it bursts overhead`);
+          // ... and, with nobody named, it falls back on the caster (on purpose:
+          // a tiny model forgetting the target hurts itself, which is funny)
+          const top = from.add(fwd(g).scale(.6)).add(V3(rnd(-.2, .2), up, rnd(-.2, .2)));
+          flyFireball(from, top, { arc: 0, speed: 7, ground: false, size: .5 }, () => {
+            later(250, () => {
+              const head = g.root.position.add(V3(0, heightOf(g) * .8, 0));
+              flyFireball(top, head, { arc: 0, speed: 6, size: 1 }, () => {
+                window.tablefolkCombat?.hurt(g, 3, g.id, 'his own fireball');
+                report(g, `${g.id} throws a fireball at nobody; it comes straight back down on ${g.id} (3 damage)`);
+              });
+            });
+          });
         }
       });
       return true;
@@ -551,23 +562,12 @@
       arcs(hand, .28, 520); SOUND.zapCharge(hand);
       const cl = light(hand, C3(.6, .75, 1), 0, 3); tween(520, u => { cl.intensity = 2.5 * u * (.5 + Math.random()); }, () => kill(cl));
       later(520, () => {
-        let at;
-        if (tgt) at = tgt.pos().clone();
-        else {
-          // a free spot two or three steps away, not on the player
-          const f = fwd(g), p = g.root.position, cands = [];
-          for (const [dx, dz] of [[0, 2.5], [1.6, 2], [-1.6, 2], [2.4, .5], [-2.4, .5], [0, 1.6]]) {
-            const side = V3(f.z, 0, -f.x), q = p.add(f.scale(dz)).add(side.scale(dx));
-            const pl = state.playerAvatar?.root?.position;
-            if (pl && Math.hypot(pl.x - q.x, pl.z - q.z) < 1.2) continue;
-            if (typeof cellPassable === 'function' && !cellPassable(Math.round(q.x), Math.round(q.z))) continue;
-            cands.push(q);
-          }
-          at = cands[0] || p.add(f.scale(2));
-        }
+        // with nobody named, the bolt finds the caster himself
+        const victim = tgt?.who || (tgt ? null : g);
+        let at = (tgt ? tgt.pos() : g.root.position).clone();
         at.y = groundY();
         const inside = roofed(at);
-        if (tgt?.who && inside) at.y += heightOf(tgt.who) * (isPlayer(tgt.who) && state.firstPerson ? .35 : .55);
+        if (victim && inside) at.y += heightOf(victim) * (isPlayer(victim) && state.firstPerson ? .35 : .55);
         else if (tgt?.thing && inside) at.y = Math.max(groundY() + .2, tgt.pos().y);
         if (!inside) {
           // a thin arc from the raised hand into the sky: the call
@@ -575,12 +575,13 @@
           const call = boltMeshes(handPos(g), callTop, { branches: 1, width: .45, mats });
           later(90, () => { kill(...call); for (const m of Object.values(mats)) m.dispose(); });
         }
-        later(inside ? 0 : 110, () => strike(at, inside ? { from: handPos(g, at) } : {}));
+        // inside, the bolt leaps from the hand; on himself it comes down from the ceiling
+        later(inside ? 0 : 110, () => strike(at, inside && tgt ? { from: handPos(g, at) } : {}));
         later(170, () => {
-          if (tgt?.who) window.tablefolkCombat?.hurt(tgt.who, 4, g.id, 'a bolt of lightning');
-          else if (tgt?.thing) damage(tgt.thing, 2, 'fire');
-          if (tgt) { report(g, `${g.id} calls lightning down on ${tgt.who ? nameOf(tgt.who) + ' (4 damage)' : 'the ' + (meta(tgt.thing)?.type || 'thing')}; the backlash shocks ${g.id} for 1`); backlash(g, 'lightning'); }
-          else report(g, `${g.id} calls down a bolt of lightning; it strikes the floor nearby`);
+          if (!tgt) { window.tablefolkCombat?.hurt(g, 4, g.id, 'his own lightning'); report(g, `${g.id} calls lightning down on nobody; it strikes ${g.id} (4 damage)`); return; }
+          if (tgt.who) window.tablefolkCombat?.hurt(tgt.who, 4, g.id, 'a bolt of lightning');
+          else if (tgt.thing) damage(tgt.thing, 2, 'fire');
+          report(g, `${g.id} calls lightning down on ${tgt.who ? nameOf(tgt.who) + ' (4 damage)' : 'the ' + (meta(tgt.thing)?.type || 'thing')}; the backlash shocks ${g.id} for 1`); backlash(g, 'lightning');
         });
       });
       return true;

@@ -4671,7 +4671,10 @@ function followAvatarCamera(dt){
     return;
   }
   window.tablefolkCutaway?.half();
-  if(!state.followAvatar) return;
+  // The free camera stays where you put it (2026-11-07: following is off by
+  // default; C is the follow camera). window.TABLEFOLK_FREE_FOLLOW=true brings
+  // back the old glide after the avatar when it walks.
+  if(!state.followAvatar || !window.TABLEFOLK_FREE_FOLLOW){ state.followAvatar=false; return; }
   const want=new BABYLON.Vector3(p.x,.6,p.z);
   cam.setTarget(BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*3)),false,false,true);
   if(BABYLON.Vector3.Distance(cam.target,want)<.02 && !g.turnMove) state.followAvatar=false;
