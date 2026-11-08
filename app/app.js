@@ -119,13 +119,15 @@ window.tablefolkHoldRender=(on,text='')=>{
   if(el){ el.querySelector('.t').textContent=text; el.classList.toggle('show',!!on); }
 };
 // The free camera's pivot: the point under the pointer (a pick, or the
-// target's height plane when the pick misses), or null (the sky).
+// ground's plane when the pick misses: the sea), or null (the sky). Not the
+// target's height: the target moves with each zoom, and the plane with it
+// drifted up into the air over many notches.
 function pivotUnderPointer(camera,x,y){
   const sc=state.scene; if(!sc) return null;
   const hit=sc.pick(x,y,m=>m.isPickable && m.isEnabled() && m.isVisible && m.visibility>0,false,camera);
   if(hit?.hit && hit.pickedPoint) return hit.pickedPoint.clone();
   const ray=sc.createPickingRay(x,y,BABYLON.Matrix.Identity(),camera);
-  const dy=ray.direction.y, t=Math.abs(dy)>1e-4?(camera.target.y-ray.origin.y)/dy:-1;
+  const dy=ray.direction.y, t=Math.abs(dy)>1e-4?((state.terrainTopY??0)-ray.origin.y)/dy:-1;
   return t>0 && t<camera.maxZ ? ray.origin.add(ray.direction.scale(t)) : null;
 }
 // The eye from the angles (camera.position is only updated when a frame is drawn).

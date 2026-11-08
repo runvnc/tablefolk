@@ -43,7 +43,8 @@ approve the download on a user's behalf.
 |---|---|
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
-| mouse wheel | zoom towards what the pointer is over (the follow camera zooms on you); at the closest the free camera moves on that way |
+| mouse wheel | zoom towards what the pointer is over, close enough to read a face (the follow camera zooms on you; in first person it narrows the view) |
+| drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it) |
 | E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
@@ -76,7 +77,9 @@ zooms freely and eases after the player; every wall stands at half height
 there, so no one is hidden behind one. The follow camera (C) is a high,
 fixed Diablo-style view behind the player; walls between it and the player
 drop to a stub, and a roof in the way turns see-through. First person (V)
-looks through the avatar's eyes, with walls at full height.
+looks through the avatar's eyes, with walls at full height. A world can start
+in any of them (`"view"`: `overview`, `follow` or `first`); a door into a
+subworld and back keeps the view you had.
 
 **Giving.** Drag an item (or the gold) from the Adventurer pane onto a
 character close by, or press its "give" button (the nearest one). The

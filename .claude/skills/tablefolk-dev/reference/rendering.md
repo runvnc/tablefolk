@@ -188,12 +188,29 @@ textures.
 - Free camera ('overview', the default with an avatar since 2026-10-30;
   `freeCameraStart`): starts at 19, eases after the avatar, walls at half
   height. Follow camera (C): high and fixed behind the player, starts at 16,
-  zooms out to 30. The wheel (`setupMouseWheelZoom`): the free camera zooms
-  towards the ground point under the pointer (the target and eye scaled
-  about it, at the target's height; since 2026-11-01, before that the
-  screen's centre, which was the selected character); the follow camera
-  only changes the radius. Below the minimum radius the free camera's
-  target moves forward along the view. In first person a click never walks.
+  zooms 2.5-30. The wheel (`setupMouseWheelZoom`, 2026-11-07): the free
+  camera zooms about the point under the pointer, a real pick
+  (`pivotUnderPointer`: a head, a wall top, the ground; the ground's plane
+  where nothing is hit, never the target's height, which drifted up into
+  the air notch by notch and made the zoom slip). First the target moves
+  along the line of sight to that point's depth (`retargetToDepth`: same
+  eye, same direction, only the radius changes), then eye and target scale
+  about the point, so it stays under the pointer to within a pixel, down to
+  0.45 from it (`ZOOM_NEAR`; `lowerRadiusLimit` 0.25, since Babylon clamps
+  the radius each frame and a clamp there is a slip). The near clip follows
+  the radius (`minZ` = radius x 0.08 in 0.04-0.5, in `followAvatarCamera`;
+  skipped while senses.js poses the camera, which clears the limits). The
+  follow camera only changes the radius; first person narrows the field of
+  view (0.15-1.3). Left-drag (`setupPivotOrbit`) orbits about the point
+  under the pointer where the drag began: the target first moves along the
+  view to its depth, then eye and target turn rigidly about it (yaw about
+  the vertical, pitch about the horizontal across the view), so the point
+  stays put on screen; beta keeps its limits. Babylon's pointer input stays
+  attached for pinch zoom, its turning switched off (angular sensibility
+  1e12). Right-drag pans and keeps the target's height. The scenario's
+  `"view"` (`overview` | `follow` | `first`, `?view=` / `&view=` win) is
+  applied after the avatar spawns (`setCameraView`; subworlds keep the view
+  you had). In first person a click never walks.
 - Tabletop (`app/tabletop.js`): an orthographic FreeCamera with rotation (π/2,
   π, 0), so screen right is -x and screen down is +z;
   `toPx(v,x,z) = [(hw-(x-cx))/(2hw)*cw, (hh+(z-cz))/(2hh)*ch]`. PNGs come from
