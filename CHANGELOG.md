@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **The Oracle, after a critique**: you start three squares from him (he was a speck from the door), the banner says to ask him anything, the room is dim so the lamps glow, his example spell is `spawn(gold)` (bread doesn't exist, so it made a random thing), and the unused gold and the personality his prompt never read are gone.
 - **The Oracle looks the part**: wizard.glb has a tall, bent oracle's hat (navy, gold band and stars, the spiky hair pressed under it) on the head bone and a glowing blue orb on the staff (`tools/wizard-extras.mjs`; every world's wizard gets them). His chamber is open to the night sky, with stag statues on plinths, candelabras, a lectern, bookcases, a cabinet, tables, crystal lamps along the rug, chests, vases, candles, potions, a scroll and a chalice.
 - **Loose things rest on rugs and raised floors**: rugs, planks, tiles and slabs have a collision surface now (app.js floorCollider), so a crate dropped on the Oracle's rug no longer sinks 3 cm into it.
 - See the entries below: the camera, the Oracle's rug and glossy characters, hit reactions and the Oracle's spells were finished on the 8th.

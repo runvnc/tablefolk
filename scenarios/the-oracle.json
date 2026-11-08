@@ -8,7 +8,7 @@
  "simple": true,
  "onlySpokenTo": true,
  "base": "plain",
- "lighting": "night",
+ "lighting": "dim",
  "walls": "stone",
  "floor": "stone",
  "dark": false,
@@ -18,9 +18,14 @@
  "wallHeight": 2,
  "player": {
   "name": "Pilgrim",
-  "gold": 3,
+  "gold": 0,
   "items": [],
-  "model": "wanderer"
+  "model": "wanderer",
+  "at": [
+   0,
+   2
+  ],
+  "facing": "n"
  },
  "allowed": [
   "say",
@@ -28,7 +33,7 @@
   "spell.lightning",
   "spawn"
  ],
- "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic, insults you or attacks you, write the spell alone on a line, like fireball(you) or spawn(bread):\n{commands}",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic, insults you or attacks you, write the spell alone on a line, like fireball(you) or spawn(gold):\n{commands}",
  "agents": [
   {
    "id": "Oracle",
@@ -43,8 +48,7 @@
     "spell.fireball",
     "spell.lightning",
     "spawn"
-   ],
-   "personality": "You are an old man. You are very confident in your answers."
+   ]
   }
  ],
  "grid": [
@@ -56,8 +60,8 @@
   "#t...RRR...t#",
   "#!...RRR...!#",
   "#S..LRRRL..>#",
-  "#}h.jRRRj.h}#",
-  "######Y######"
+  "#}h.!RRR!.h}#",
+  "######+######"
  ],
  "legend": {
   "R": "carpet",
@@ -72,5 +76,6 @@
   "}": "vase"
  },
  "goal": null,
- "roofs": false
+ "roofs": false,
+ "subtitle": "Ask the Oracle anything. He knows everything (or thinks he does)."
 }
