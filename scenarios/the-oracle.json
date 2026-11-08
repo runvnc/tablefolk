@@ -42,13 +42,14 @@
    "facing": "s",
    "hostile": false,
    "hp": 3,
-   "chaos": 30,
+   "chaos": 1,
    "allowed": [
     "say",
     "spell.fireball",
     "spell.lightning",
     "spawn"
-   ]
+   ],
+   "scale": 1.2
   }
  ],
  "grid": [

@@ -1086,6 +1086,9 @@
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
       const g = await w.spawnAgent(a.id, pos.x, pos.z, a.facing || pos.facing, a.model);
+      // "scale": bigger or smaller than its model's usual height (0.5-2)
+      const sz = Math.max(.5, Math.min(2, +a.scale || 1));
+      if (g?.root && sz !== 1) { g.root.scaling.scaleInPlace(sz); if (g.height) g.height *= sz; }
       first = first || g;
       w.setBrainConfig(a.id, {
         enabled: true, style: a.style || '', personality: [a.personality, a.prompt].filter(Boolean).join(' ') || 'helpful and friendly',

@@ -54,6 +54,35 @@
     const mm = meta(r), prev = mm.cleanup;
     mm.cleanup = () => { try { prev?.(); } catch {} sc.onBeforeRenderObservable.remove(obs); };
   }
+  // The crystal ball's hum: two low sines a fifth apart, a faint high shimmer,
+  // slowly beating and swelling with the glow; 3D at the ball (spells.js's
+  // panner and listener), quiet (heard within a few steps), silent while the
+  // sound effects are off. It starts once the page's audio runs (first click).
+  function crystalHum(r, pos, ph) {
+    let nodes = null;
+    const start = () => {
+      const a = window.tablefolkSfx?.context?.(), sp = window.tablefolkSpells?.audio; if (!a || !sp?.place) return;
+      const { ctx } = a, out = ctx.createGain(), pan = ctx.createPanner(), lp = ctx.createBiquadFilter();
+      pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.2; pan.rolloffFactor = 1.6; pan.maxDistance = 40; sp.place(pan, pos);
+      lp.type = 'lowpass'; lp.frequency.value = 1100; out.gain.value = 0;
+      const oscs = [[98, .5], [98.7, .35], [147, .28], [392.4, .05]].map(([f, g]) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; gg.gain.value = g; o.connect(gg); gg.connect(lp); o.start(); return o; });
+      lp.connect(out); out.connect(pan); pan.connect(a.master);
+      out.gain.setTargetAtTime(.05, ctx.currentTime, 1.5);   // fades in
+      nodes = { ctx, out, oscs, all: [out, pan, lp] };
+    };
+    r.onDisposeObservable?.add(() => { if (!nodes) return; for (const o of nodes.oscs) try { o.stop(); o.disconnect(); } catch {} for (const n of nodes.all) try { n.disconnect(); } catch {} nodes = null; });
+    return {
+      tick(p) {
+        if (!nodes) { start(); return; }
+        const on = window.tablefolkSfx?.enabled !== false, t = performance.now() * .001;
+        // swells with the glow, plus a slow wobble of its own
+        const g = on ? .03 + .03 * p + .012 * Math.sin(t * .37 + ph) : 0;
+        nodes.out.gain.setTargetAtTime(g, nodes.ctx.currentTime, .25);
+        nodes.oscs[3].frequency.setTargetAtTime(392.4 + 3 * Math.sin(t * .8 + ph), nodes.ctx.currentTime, .3);
+        window.tablefolkSpells?.audio?.listen?.();
+      },
+    };
+  }
   function finish(r, type, fields, opts) {
     tag(r, type, { health: 3, material: 'wood', ...fields });
     meta(r).opts = keepOpts(opts);
@@ -63,7 +92,7 @@
   // Options that make this object what it is, saved and exported with it.
   function keepOpts(opts) {
     const out = {};
-    for (const k of ['color', 'intensity', 'range', 'y']) if (opts[k] != null) out[k] = opts[k];
+    for (const k of ['color', 'intensity', 'range', 'y', 'scale']) if (opts[k] != null) out[k] = opts[k];
     return out;
   }
 
@@ -298,6 +327,8 @@
     },
     crystal_ball(sc, x, z, opts) {
       const r = rootAt('crystal_ball', x, z, opts, floorY(x, z)), H = .9, cy = H + .165, tint = hexColor(opts.color, C3(.62, .42, 1));
+      // built at full size, shown at 0.72 (beside a person it read too big); "scale" sets it
+      const S = Math.max(.3, Math.min(2, +opts.scale || .72)); r.scaling.setAll(S);
       finish(r, 'crystal_ball', { health: 6, material: 'stone', flammable: false }, opts);
       const parts = pedestal(sc, H, 'crystal_ball'), au = arcaneGold();
       // four gilded claws hold the ball (none straight behind it from the sides)
@@ -325,14 +356,16 @@
       own(r, [glass, swirlA, swirlB], { shadow: false }); glass.receiveShadows = false;
       floorGlow(r, 'crystal_ball', tint, 1.4, .5);
       // motes drifting in the glass
-      const motes = cpuParticles(r, 'crystal_motes', 14, V3(x, r.position.y + cy, z), TX.glow());
-      Object.assign(motes, { minSize: .012, maxSize: .028, minLifeTime: 1.2, maxLifeTime: 2.2, emitRate: 8, minEmitPower: .01, maxEmitPower: .04, gravity: V3(0, .01, 0), blendMode: BABYLON.ParticleSystem.BLENDMODE_ADD });
-      motes.createSphereEmitter(.1, 1); motes.color1 = new BABYLON.Color4(.85, .75, 1, 1); motes.color2 = new BABYLON.Color4(.6, .95, 1, 1); motes.colorDead = new BABYLON.Color4(.4, .2, 1, 0);
+      const motes = cpuParticles(r, 'crystal_motes', 14, V3(x, r.position.y + cy * S, z), TX.glow());
+      Object.assign(motes, { minSize: .012 * S, maxSize: .028 * S, minLifeTime: 1.2, maxLifeTime: 2.2, emitRate: 8, minEmitPower: .01, maxEmitPower: .04, gravity: V3(0, .01, 0), blendMode: BABYLON.ParticleSystem.BLENDMODE_ADD });
+      motes.createSphereEmitter(.1 * S, 1); motes.color1 = new BABYLON.Color4(.85, .75, 1, 1); motes.color2 = new BABYLON.Color4(.6, .95, 1, 1); motes.colorDead = new BABYLON.Color4(.4, .2, 1, 0);
       if (!still()) motes.start();
       const L = pointLight(r, 'crystal_ball_light', { y: cy + .3, color: tint, intensity: +opts.intensity || 1.2, range: +opts.range || 3.6 }), base = L.intensity;
       const ph = x * 1.7 + z;
+      const hum = still() ? null : crystalHum(r, V3(x, r.position.y + cy * S, z), ph);
       if (!still()) animate(r, () => {
         const t = performance.now() * .001, p = .5 + .5 * Math.sin(t * 1.3 + ph);
+        hum?.tick(p);
         swirlA.rotation.y = t * .55; swirlA.rotation.x = Math.sin(t * .23) * .5; swirlB.rotation.y = -t * .9; swirlB.rotation.z = .5 + Math.sin(t * .31) * .6;
         core.scaling.setAll(.8 + .35 * p); halo.material.alpha = .2 + .14 * p; core.material.alpha = .35 + .25 * p;
         L.intensity = base * (.8 + .35 * p);

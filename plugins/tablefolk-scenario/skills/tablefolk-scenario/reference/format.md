@@ -119,6 +119,7 @@ Without `at` the player starts at the south of the board.
   "thinking": false, "showThoughts": true,
   "simple": true, "systemPrompt": "You are {name}. ...",   // very small brains; also for a whole scenario, with "defaultModel" (characters.md)
   "chaos": 10,                     // 0-100, counted from the model's recommended settings: 0 and 1 are those settings, 100 is very high (0.7 reaches 2.75)
+  "scale": 1.2,                    // bigger or smaller than the model's usual height (0.5-2)
   "fireballTemptation": 0          // 0-100, only with spell.fireball allowed
 }
 ```

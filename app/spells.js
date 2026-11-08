@@ -727,5 +727,5 @@
     });
   }
 
-  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, sound: SOUND, audio: { source, noise, tone } };
+  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, sound: SOUND, audio: { source, noise, tone, listen: updateListener, place: setPos } };
 })();
