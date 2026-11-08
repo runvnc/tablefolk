@@ -24,6 +24,13 @@ player's `"player": {"hp": 20}` (default 20).
 - Blows go turn about: after the player attacks, the next swing waits until
   everyone in the fight has had a turn, characters with a mind included (so a
   caster gets its spell in). No F-spamming.
+- Every blow that lands shows: the character flinches (its rig's hit clip,
+  else a jolt backwards), flashes red for a moment and cries out, a short
+  grunt in its own voice (a man's, a woman's, a goblin's, a troll's growl;
+  rats squeak, wolves yelp, spiders hiss, skeletons rattle, slimes squelch,
+  ghosts wail), louder and longer when it falls. The cries are synthesized on
+  the spot, positioned in 3D and muted with the sound effects
+  (`app/reactions.js`); not the voice engine, which is too slow for a blow.
 - The player fights with F (the nearest foe), `/attack grub` and `/wield
   sword` in the chat box, or the Adventurer pane. The player gets a red flash
   when hit, and a defeat card ("try again", "look around").

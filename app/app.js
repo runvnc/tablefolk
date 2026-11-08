@@ -177,7 +177,9 @@ function setupMouseWheelZoom(camera){
   },{passive:false});
 }
 // Left-drag orbits the free camera about the point under the pointer where
-// the drag began (Babylon's own orbit turned about camera.target, which could
+// the drag began; it turns the follow camera about the avatar instead
+// (alpha and beta only: followAvatarCamera keeps the target on the avatar).
+// (Babylon's own orbit turned about camera.target, which could
 // be far from what you look at). Eye and target turn rigidly about that
 // point, so it stays put on screen; the angles keep their limits. Babylon's
 // pointer input stays attached for pinch zoom, with its turning switched off.
@@ -194,10 +196,19 @@ function setupPivotOrbit(camera){
   canvas.addEventListener('pointerup',end); canvas.addEventListener('pointercancel',end);
   canvas.addEventListener('pointermove',e=>{
     if(!drag || down.size!==1 || !(e.buttons&1)) return;
-    if(state.firstPerson || state.cameraMode==='follow' || state.scene?.activeCamera!==camera) return;
+    if(state.firstPerson || state.scene?.activeCamera!==camera) return;
     const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(!drag.started && Math.abs(dx)+Math.abs(dy)<4) return;   // a click, not a drag
+    // The follow camera turns about the avatar (its target): the angle you
+    // choose stays while it follows (followAvatarCamera moves only the target).
+    if(state.cameraMode==='follow'){
+      drag.started=true; drag.x=e.clientX; drag.y=e.clientY;
+      const lo=camera.lowerBetaLimit??.01, hi=camera.upperBetaLimit??Math.PI-.01;
+      camera.alpha-=dx*SPEED; camera.beta=clamp(camera.beta-dy*SPEED,lo,hi);
+      state.followAlpha=camera.alpha; state.followBeta=camera.beta;
+      return;
+    }
     if(!drag.started){
-      if(Math.abs(dx)+Math.abs(dy)<4) return;   // a click, not a drag
       drag.started=true;
       const r=canvas.getBoundingClientRect();   // CSS pixels, like scene.pointerX
       const p=pivotUnderPointer(camera,drag.x-r.left,drag.y-r.top);
@@ -919,7 +930,7 @@ function forceBodyTransform(mesh,pos){
 function setCharacterLogicalPosition(g,pos){
   if(!g) return;
   g.logicalPos = new BABYLON.Vector3(pos.x, 0, pos.z);
-  if(g.root){ g.root.position.x=g.logicalPos.x; g.root.position.z=g.logicalPos.z; g.root.position.y=state.terrainTopY??0; }
+  if(g.root){ g.root.position.x=g.logicalPos.x; g.root.position.z=g.logicalPos.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(g.logicalPos.x,g.logicalPos.z); }
   if(g.collider){
     const cpos=new BABYLON.Vector3(g.logicalPos.x,(state.terrainTopY??0)+.74,g.logicalPos.z);
     forceBodyTransform(g.collider,cpos);
@@ -2057,7 +2068,7 @@ function paintMaterial(mat,tint){
 const SOLID_FLOORS={
   wood:{color:[.40,.25,.13],layout:'planks',finish:'gloss'}, oak:{color:[.60,.43,.26],layout:'planks',finish:'gloss'},
   tile:{color:[.78,.77,.74],layout:'squares',finish:'glaze'}, concrete:{color:[.50,.50,.49],layout:'slab',finish:'satin'},
-  carpet:{color:[.28,.33,.40],layout:'pile',finish:'fabric'},
+  carpet:{color:[.12,.17,.42],layout:'pile',finish:'fabric'},   // a royal-blue rug (buildRug)
 };
 const FLOOR_FINISH={ gloss:{rough:.34,coat:.6}, glaze:{rough:.16,coat:.85}, satin:{rough:.55,coat:.2}, fabric:{rough:.95,coat:0,fabric:true}, rock:{rough:.7,coat:.15} };
 function fabricNormal(sc){
@@ -2080,7 +2091,122 @@ function floorMaterial(finish){
   state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
   return state.floorMats[finish]=m;
 }
+// Carpet is a woven rug (2026-11-07; it was a grey slab with a random-noise
+// normal that read as gravel in concrete): a thin slab per cell whose top
+// shows a painted design from an atlas, one variant per edge mask, so every
+// connected patch gets its own frame. The border (binding, gold lines, a
+// band of a contrasting colour with gold dots) runs along every side that
+// meets bare floor and turns inner corners; the field is a two-tone diamond
+// lattice with a medallion per cell and rosettes where cells meet. A fine
+// basket weave (second UV set, world-tiled) and a light clear coat give the
+// same glossy-miniature finish as the other floors. A paint tint changes the
+// field colour (the band picks a contrasting crimson or navy).
+const RUG_H=.03;
+function rugWeaveTexture(sc){
+  if(state.rugWeave && !state.rugWeave.isDisposed?.() && state.rugWeave.getScene?.()===sc) return state.rugWeave;
+  const N=128, P=8, h=new Float32Array(N*N);
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    const along=((x/P|0)+(y/P|0))%2===0, a=along?x:y, c=along?y:x;
+    const across=Math.cos(Math.PI*((c%P)-(P-1)/2)/P);          // round thread profile
+    const lift=.75+.25*Math.cos(2*Math.PI*((a%(P*2))/(P*2)));  // dips where it passes under
+    h[y*N+x]=across*lift;
+  }
+  const cv=document.createElement('canvas'); cv.width=cv.height=N;
+  const g=cv.getContext('2d'), img=g.createImageData(N,N), at=(x,y)=>h[((y+N)%N)*N+((x+N)%N)], s=1.6;
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    const nx=-(at(x+1,y)-at(x-1,y))*s, ny=(at(x,y+1)-at(x,y-1))*s, l=Math.hypot(nx,ny,1), i=(y*N+x)*4;
+    img.data[i]=(nx/l*.5+.5)*255; img.data[i+1]=(ny/l*.5+.5)*255; img.data[i+2]=(1/l*.5+.5)*255; img.data[i+3]=255;
+  }
+  g.putImageData(img,0,0);
+  const t=new BABYLON.DynamicTexture('rug_weave_n',cv,sc,true); t.update(); t.wrapU=t.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel=8;
+  t.coordinatesIndex=1; t.level=.55;
+  return state.rugWeave=t;
+}
+// mask bits: 1 lowU (x-1) 2 highU (x+1) 4 lowV (z-1) 8 highV (z+1) edges;
+// 16/32/64/128 inner corners (lowU-lowV, highU-lowV, lowU-highV, highU-highV).
+function drawRugCell(data,stride,ox,oy,S,G,mask,F){
+  const field=F, band=F[2]>F[0] ? [.50,.07,.09] : [.08,.11,.32], gold=[.86,.64,.24], bind=F.map(c=>c*.38), px=1/S;
+  const sm=(d,w)=>Math.max(0,Math.min(1,(w-d)/px+.5));        // coverage of "d < w"
+  const mix=(a,b,k)=>[a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k,a[2]+(b[2]-a[2])*k];
+  for(let py=0;py<S+2*G;py++) for(let pxi=0;pxi<S+2*G;pxi++){
+    const u=Math.min(1-px/2,Math.max(px/2,(pxi-G+.5)/S)), v=1-Math.min(1-px/2,Math.max(px/2,(py-G+.5)/S));
+    // field: diamond lattice through the edge midpoints, medallion, corner rosettes
+    const dia=Math.abs(u-.5)+Math.abs(v-.5), r=Math.hypot(u-.5,v-.5), th=Math.atan2(v-.5,u-.5);
+    let c=mix(F.map(k=>k*.86),F.map(k=>Math.min(1,k*1.1)),sm(dia,.5));
+    c=mix(c,gold,sm(Math.abs(dia-.5),.006));
+    c=mix(c,F.map(k=>k*.62),sm(Math.abs(dia-.43),.004));
+    c=mix(c,band,sm(r,.13)); c=mix(c,gold,sm(Math.abs(r-.137),.008));
+    c=mix(c,gold,sm(r,.1*(.55+.45*Math.abs(Math.cos(4*th))))); c=mix(c,band,sm(r,.035)); c=mix(c,gold,sm(r,.016));
+    const rc=Math.hypot(Math.min(u,1-u),Math.min(v,1-v));
+    c=mix(c,band,sm(rc,.075)); c=mix(c,gold,sm(Math.abs(rc-.078),.008)); c=mix(c,gold,sm(rc,.02));
+    // border: distance to the nearest framed side or inner corner
+    let d=9, along=0;
+    if(mask&1 && u<d){ d=u; along=v; } if(mask&2 && 1-u<d){ d=1-u; along=v; }
+    if(mask&4 && v<d){ d=v; along=u; } if(mask&8 && 1-v<d){ d=1-v; along=u; }
+    for(const [bit,cu,cv2] of [[16,0,0],[32,1,0],[64,0,1],[128,1,1]]) if(mask&bit){ const du=Math.abs(u-cu), dv=Math.abs(v-cv2), e=Math.max(du,dv); if(e<d){ d=e; along=du>dv?v:u; } }
+    if(d<.2){
+      let b=mix(F.map(k=>k*.5),c,1-sm(d,.172));                  // thin dark line inside the frame
+      b=mix(b,gold,sm(d,.158)); b=mix(b,band,sm(d,.143));
+      const ph=((along*6)%1)-.5, dot=Math.hypot(ph/6,d-.094);       // dots down the band, 6 a cell
+      b=mix(b,gold,sm(dot,.019)); b=mix(b,band,sm(dot,.008));
+      b=mix(b,gold,sm(d,.047)); b=mix(b,bind,sm(d,.032));
+      c=b;
+    }
+    const n=.94+Math.random()*.08, i=((oy+py)*stride+ox+pxi)*4;
+    data[i]=Math.min(255,c[0]*n*255); data[i+1]=Math.min(255,c[1]*n*255); data[i+2]=Math.min(255,c[2]*n*255); data[i+3]=255;
+  }
+}
+function buildRug(cells){
+  const sc=state.scene, top=state.terrainTopY??0, def=SOLID_FLOORS.carpet, out=[];
+  const byColor=new Map();
+  for(const [x,z,tint] of cells){ const col=tint||def.color, key=col.map(c=>c.toFixed(3)).join(','); if(!byColor.has(key)) byColor.set(key,{col,cells:[]}); byColor.get(key).cells.push([x,z]); }
+  for(const [key,{col,cells:list}] of byColor){
+    const has=new Set(list.map(([x,z])=>x+','+z)), on=(x,z)=>has.has(x+','+z);
+    const masks=list.map(([x,z])=>{
+      let m=(on(x-1,z)?0:1)|(on(x+1,z)?0:2)|(on(x,z-1)?0:4)|(on(x,z+1)?0:8);
+      if(!(m&1)&&!(m&4)&&!on(x-1,z-1)) m|=16; if(!(m&2)&&!(m&4)&&!on(x+1,z-1)) m|=32;
+      if(!(m&1)&&!(m&8)&&!on(x-1,z+1)) m|=64; if(!(m&2)&&!(m&8)&&!on(x+1,z+1)) m|=128;
+      return m;
+    });
+    const kinds=[...new Set(masks)], S=256, G=8, P=S+2*G, cols=Math.ceil(Math.sqrt(kinds.length)), rows=Math.ceil(kinds.length/cols);
+    const cv=document.createElement('canvas'); cv.width=cols*P; cv.height=rows*P;
+    const g2=cv.getContext('2d'), img=g2.createImageData(cv.width,cv.height);
+    kinds.forEach((m,i)=>drawRugCell(img.data,cv.width,(i%cols)*P,(i/cols|0)*P,S,G,m,col));
+    g2.putImageData(img,0,0);
+    const atlas=new BABYLON.DynamicTexture('rug_atlas_'+key,cv,sc,true); atlas.update(); atlas.anisotropicFilteringLevel=8;
+    atlas.wrapU=atlas.wrapV=BABYLON.Texture.CLAMP_ADDRESSMODE;
+    // atlas UV of a cell-local (u,v); the canvas is uploaded with invertY, so v counts up from its bottom
+    const uvOf=(slot,u,v)=>{ const cx=slot%cols, cy=slot/cols|0; return [(cx*P+G+u*S)/cv.width, 1-(cy*P+G+(1-v)*S)/cv.height]; };
+    const Pp=[],N=[],U=[],U2=[],I=[], y1=top+RUG_H, y0=top-.004, W=3;
+    const quad=(pts,n,uvs)=>{ const b=Pp.length/3; pts.forEach((p,k)=>{ Pp.push(...p); N.push(...n); U.push(...uvs[k]); U2.push((p[0]+p[1])*W,(p[2]+p[1])*W); }); I.push(b,b+1,b+2,b,b+2,b+3); };
+    list.forEach(([x,z],i)=>{
+      const m=masks[i], slot=kinds.indexOf(m), x0=x-.5, x1=x+.5, z0=z-.5, z1=z+.5;
+      quad([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],[0,1,0],[uvOf(slot,0,0),uvOf(slot,1,0),uvOf(slot,1,1),uvOf(slot,0,1)]);
+      const e=.015;   // sides show the binding colour
+      if(m&1) quad([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],[-1,0,0],[uvOf(slot,e,1),uvOf(slot,e,0),uvOf(slot,e,0),uvOf(slot,e,1)]);
+      if(m&2) quad([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],[1,0,0],[uvOf(slot,1-e,0),uvOf(slot,1-e,1),uvOf(slot,1-e,1),uvOf(slot,1-e,0)]);
+      if(m&4) quad([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],[0,0,-1],[uvOf(slot,0,e),uvOf(slot,1,e),uvOf(slot,1,e),uvOf(slot,0,e)]);
+      if(m&8) quad([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],[0,0,1],[uvOf(slot,1,1-e),uvOf(slot,0,1-e),uvOf(slot,0,1-e),uvOf(slot,1,1-e)]);
+    });
+    const mesh=new BABYLON.Mesh('floor_carpet',sc), vd=new BABYLON.VertexData();
+    vd.positions=Pp; vd.normals=N; vd.uvs=U; vd.uvs2=U2; vd.indices=I; vd.applyToMesh(mesh);
+    const mt=new BABYLON.PBRMaterial('rug_mat_'+key,sc);
+    mt.albedoTexture=atlas; mt.albedoColor=new BABYLON.Color3(1,1,1); mt.metallic=0; mt.roughness=.46; mt.environmentIntensity=.85; mt.specularIntensity=.6; mt.maxSimultaneousLights=8;
+    plasticFinish(mt,{coat:.42,coatRough:.2});
+    mt.bumpTexture=rugWeaveTexture(sc);
+    mt.sheen.isEnabled=true; mt.sheen.intensity=.25; mt.sheen.color=new BABYLON.Color3(1,.92,.8);
+    mesh.material=mt; mesh.isPickable=false; mesh.receiveShadows=true;
+    mesh.onDisposeObservable.add(()=>{ try{ mt.dispose(false,false); atlas.dispose(); }catch{} });
+    out.push(mesh);
+  }
+  return out;
+}
+// Height of the solid floor (planks, tiles, slabs, rug) on a cell, so feet
+// stand on it instead of sinking into it.
+const FLOOR_LIFT={ planks:.048, squares:.034, slab:.045, crust:.07, pile:RUG_H };
+function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d && !d.overlay ? (FLOOR_LIFT[d.layout]||0) : 0; }
 function buildFloor(type,cells){
+  if(SOLID_FLOORS[type]?.layout==='pile') return buildRug(cells);
   const def=SOLID_FLOORS[type], b=boxBatch(), top=state.terrainTopY??0;
   const hash=(a,c,k)=>{ let h=Math.imul(a*73856093^c*19349663^k*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
   for(const [x,z,tint] of cells){
@@ -2143,7 +2269,7 @@ function rebuildPaint(){
     base.thinInstanceSetBuffer('matrix',buf,16,true);
     state.paintMeshes.push(base);
   }
-  for(const [mat,cells] of planks){ const m=buildFloor(mat,cells); if(m) state.paintMeshes.push(m); }
+  for(const [mat,cells] of planks){ const m=buildFloor(mat,cells); if(m) state.paintMeshes.push(...[m].flat()); }
   rebuildLavaLights();
 }
 // Every connected patch of lava lights its surroundings: a red-orange point
@@ -2563,14 +2689,14 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   const entry=ITEM_CATALOG[type]; if(!entry) return null;
   const [file,base]=entry;
   if(base.modern){
-    const proxy=makePropProxy(scene,type,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+base.h/2});
+    const proxy=makePropProxy(scene,type,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2});
     try{ buildModernItem(scene,type,proxy,base.h); }catch(e){ console.warn('modern item failed',type,e); proxy.isVisible=true; }
     return proxy;
   }
   // importPropAsset() is async (GLB load) but registers its physics proxy
   // synchronously, so callers get a usable object right away.
   let proxy=null;
-  const p=importPropAsset(scene,file,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+base.h/2,onProxy:m=>{ proxy=m; }});
+  const p=importPropAsset(scene,file,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
   if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});
   return proxy;
@@ -4245,6 +4371,21 @@ function plasticFinish(m,{coat=.6,coatRough=.1,rough=null}={}){
   m.environmentIntensity=Math.max(m.environmentIntensity||0,.85);
   return m;
 }
+// Characters get the same toy-plastic finish as the tiles and props
+// (2026-11-07; they were matte, roughness 1): one gloss for the whole
+// figure (the baked roughness and metalness maps are ignored, their AO
+// stays), a clear coat for the sharp highlight, and the environment
+// reflection, which is what reads as glossy on light quality (no SSR, no
+// post effects there).
+function toyFinish(m){
+  if(!(m instanceof BABYLON.PBRMaterial) || m._tfToy) return m;
+  m._tfToy=true; m.maxSimultaneousLights=8;
+  m.metallic=0; m.useMetallnessFromMetallicTextureBlue=false;
+  m.useRoughnessFromMetallicTextureGreen=false; m.useRoughnessFromMetallicTextureAlpha=false;
+  m.roughness=.4; m.specularIntensity=.8;
+  plasticFinish(m,{coat:.6,coatRough:.12}); m.environmentIntensity=1;
+  return m;
+}
 // Dispose a material and its own textures, but not textures shared across
 // materials: look.js gives every clay material the same detail-normal
 // texture, and disposing it with one object stripped it from all the others.
@@ -4346,7 +4487,7 @@ async function createFigure(id,pos,model,label){
   for(const mesh of res.meshes){
     mesh.receiveShadows=true; mesh.isPickable=true; mesh.metadata={ownerId:id}; addShadow(mesh);
     const m=mesh.material; if(!m) continue;
-    if(m instanceof BABYLON.PBRMaterial){ m.maxSimultaneousLights=8; m.roughness=Math.max(.55,m.roughness??.7); m.metallic=Math.min(.2,m.metallic??0); }
+    toyFinish(m);
     if(F.tint && m.albedoColor && !m._tfTinted){ m._tfTinted=true; m.albedoColor=m.albedoColor.multiply(new BABYLON.Color3(...F.tint)); }
   }
   // F.tint changes the shared materials of this file only for this spawn:
@@ -4396,6 +4537,7 @@ async function createPerson(id,pos,model,label){
   g.root.computeWorldMatrix(true);
   const bb=g.root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0 && !/collider/.test(m.name));
   g.root.scaling.scaleInPlace(PERSON_H/Math.max(.2,bb.max.y-g.root.position.y));
+  for(const m of meshes) toyFinish(m.material);
   g.charModel=model;
   state.scene.onAfterRenderObservable.addOnce(()=>{ try{ if(!g.root.isDisposed()) addPersonMouth(g); }catch(e){ console.warn('mouth failed',e); } });
   return g;
@@ -4601,7 +4743,7 @@ function updateFirstPersonButton(){
   const row=document.getElementById('viewBtns'); if(row) row.hidden=!state.playerAvatar;
   b.classList.toggle('active',!!state.firstPerson);
   const c=document.getElementById('cameraModeBtn');
-  if(c){ const free=state.cameraMode!=='follow' && !state.firstPerson; c.classList.toggle('active',free); c.querySelector('span').textContent=free?'follow camera':'free camera'; c.title=free?'camera follows you again (C)':'free camera: drag to turn, wheel to zoom (C)'; }
+  if(c){ const free=state.cameraMode!=='follow' && !state.firstPerson; c.classList.toggle('active',free); c.querySelector('span').textContent=free?'follow camera':'free camera'; c.title=free?'follow camera: centred on you, drag to turn it (C)':'free camera: drag to orbit, wheel to zoom (C)'; }
   b.title=state.firstPerson?'back to the overview (V)':'see through your avatar\'s eyes (V)';
   b.querySelector('span')&&(b.querySelector('span').textContent=state.firstPerson?'overview':'first person');
 }
@@ -4617,21 +4759,24 @@ window.addEventListener('tablefolk-player-chat',e=>{
 // 'overview' (the default), the free camera over the board (drag to orbit),
 // easing after the avatar when it moves; every wall stands at half height
 // there (cutaway.js), so no one is hidden behind one.
-// 'follow', Diablo-like: high and fixed, looking north from
-// the south at a steep angle, always centred on the avatar; it never turns,
-// so the keys always mean the same screen directions, and walls between it
-// and the avatar drop to a low stub (cutaway.js). The wheel zooms (2.5-30).
+// 'follow', Diablo-like: it starts high, looking north from the south at a
+// steep angle, and stays centred on the avatar; left-drag turns it about the
+// avatar (any heading, the free camera's tilt limits) and the angle you choose
+// stays while it follows, and the next time you come back to it. The keys
+// walk along the view (cameraCardinal). Walls between it and the avatar drop
+// to a low stub (cutaway.js) while it looks from the south; turned elsewhere,
+// every wall stands at half height, as with the free camera. The wheel zooms (2.5-30).
 const FOLLOW={alpha:Math.PI/2,beta:.78,radius:16,min:2.5,max:30,height:.6};
 const FREE={lowerBetaLimit:.22,upperBetaLimit:1.42,panningSensibility:60};
 function lockCamera(cam,on){
-  if(on){ cam.lowerAlphaLimit=cam.upperAlphaLimit=FOLLOW.alpha; cam.lowerBetaLimit=cam.upperBetaLimit=FOLLOW.beta; cam.panningSensibility=0; }
-  else { cam.lowerAlphaLimit=cam.upperAlphaLimit=null; Object.assign(cam,FREE); }
+  cam.lowerAlphaLimit=cam.upperAlphaLimit=null; Object.assign(cam,FREE);
+  if(on) cam.panningSensibility=0;   // the target is the avatar's
 }
 function followCameraStart(){
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam) return;
   state.cameraMode='follow';
   const p=g.root.position;
-  lockCamera(cam,true); cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z),false,false,true); cam.alpha=FOLLOW.alpha; cam.beta=FOLLOW.beta; cam.radius=state.followRadius||FOLLOW.radius;
+  lockCamera(cam,true); cam.setTarget(new BABYLON.Vector3(p.x,FOLLOW.height,p.z),false,false,true); cam.alpha=state.followAlpha??FOLLOW.alpha; cam.beta=state.followBeta??FOLLOW.beta; cam.radius=state.followRadius||FOLLOW.radius;
   updateFirstPersonButton();
 }
 function freeCameraStart(){
@@ -4641,12 +4786,14 @@ function freeCameraStart(){
   cam.radius=Math.min(cam.upperRadiusLimit,19); cam.beta=.95; state.followAvatar=!!state.playerAvatar;
   updateFirstPersonButton();
 }
+// C and the camera button: first person -> free, free -> follow, follow -> free.
 function toggleCameraMode(){
-  if(state.firstPerson) setFirstPerson(false);
-  if(state.cameraMode==='follow') freeCameraStart();
+  const fromFirst=state.firstPerson;
+  if(fromFirst) setFirstPerson(false);
+  if(fromFirst || state.cameraMode==='follow') freeCameraStart();
   else followCameraStart();
   updateFirstPersonButton();
-  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you (C for the free camera)':'camera: free, drag to turn (C to follow)');
+  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you, drag to turn (C for the free camera)':'camera: free, drag to turn (C to follow)');
 }
 // The scenario's "view" (scenario.js): 'overview' (the free camera), 'follow' or 'first'.
 function getCameraView(){ return state.firstPerson?'first':state.cameraMode==='follow'?'follow':'overview'; }
@@ -4667,7 +4814,9 @@ function followAvatarCamera(dt){
   if(state.cameraMode==='follow'){
     cam.setTarget(BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*7)),false,false,true);
     cam.radius=clamp(cam.radius,FOLLOW.min,FOLLOW.max); state.followRadius=cam.radius;
-    const lp=g.logicalPos||p; window.tablefolkCutaway?.update(lp.x,lp.z);
+    // the cut is shaped for a view from the south; turned away, half walls
+    const lp=g.logicalPos||p, off=Math.abs(Math.atan2(Math.sin(cam.alpha-FOLLOW.alpha),Math.cos(cam.alpha-FOLLOW.alpha)));
+    if(off<.5) window.tablefolkCutaway?.update(lp.x,lp.z); else window.tablefolkCutaway?.half();
     return;
   }
   window.tablefolkCutaway?.half();
@@ -5072,7 +5221,7 @@ function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); updateH
       if(g.turnMove.path){ const pp=pathPoint(g.turnMove,k); p=pp.p; if(pp.dir.lengthSquared()>1e-6) setCharacterFacing(g,legFacing(pp.dir)); } else p=BABYLON.Vector3.Lerp(g.turnMove.start,g.turnMove.end,k);
       // Walked off the island: fall instead of hovering over the sea.
       if(!hasGroundAt(p.x,p.z)){ const tm=g.turnMove, len=BABYLON.Vector3.Distance(tm.start,tm.end)||1; g.lastSafePos=tm.start.clone(); startFall(g,tm.end.subtract(tm.start).scale(clamp(len/tm.dur,1.4,3.4)/len)); continue; }
-      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=state.terrainTopY??0; if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
+      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
     const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=bodyYaw(g,dt); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
     else if(g.anim==='panic'){ g.root.rotation.y+=Math.sin(g.t*28)*.055; g.arms[0].rotation.z=.92+Math.sin(g.t*21)*.5; g.arms[1].rotation.z=-.92-Math.sin(g.t*19)*.5; g.head.scaling.x=1.06; }
     else if(g.anim==='talk'){ g.head.scaling.y=1+Math.sin(g.t*24)*.065; g.arms[0].rotation.z=.44; g.arms[1].rotation.z=-.44; }

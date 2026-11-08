@@ -41,7 +41,7 @@ trading, `emote` for flavour.
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |
 | `spell.push`, `spell.spark`, `spell.fireball` | the old built-in spells; prefer the `magic` skill |
-| `fireball(target?)`, `lightning(target?)` (allowed as `spell.fireball`, `spell.lightning`) | a fireball (3 damage, burns things nearby) or a lightning bolt (4) at a character, the player or a thing by name; the caster takes 1 from the backlash. With no target (or itself, or one that isn't there) the spell comes back on the caster: the fireball falls on it (3), the lightning strikes it (4). A small model that forgets the target can kill itself, on purpose. Particles, lights and 3D sound (`app/spells.js`) |
+| `fireball(target?)`, `lightning(target?)` (allowed as `spell.fireball`, `spell.lightning`) | a fireball (3 damage, burns things nearby) or a lightning bolt (4) at a character, the player or a thing by name; the caster takes 1 from the backlash. With no target (or itself, or one that isn't there) the spell comes back on the caster: the fireball falls on it (3), the lightning strikes it (4). A small model that forgets the target can kill itself, on purpose (the Oracle has 9 hp: three fireballs). The caster raises its arms and thrusts at the target (the rig's cast clip, held for the spell; a procedural arm raise on rigs without one). Particles, lights and 3D sound (`app/spells.js`) |
 | `spawn(thing[, how many])` (allowed as `spawn`) | conjure 1-6 objects in front of the caster (`spawn(apple, 3)`, `spawn(3 apples)`); something that isn't in the game becomes a random small object |
 | `workflow(name, input)` | start a routine ([workflows.md](workflows.md)) |
 

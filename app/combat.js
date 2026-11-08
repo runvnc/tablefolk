@@ -12,6 +12,8 @@
  * when the brains are loaded). The player fights from the chat box:
  * "/attack gob1", "/wield sword", or F for the nearest foe in reach.
  *
+ * Every blow that lands plays the Hit clip and reactions.js's flinch, red
+ * flash and cry (a louder one at 0).
  * Loaded after app.js; uses its helpers (state, meta, getBrainConfig, ...).
  * Goal predicates in scenario.js: agent_defeated, agent_hp, player_hp,
  * player_defeated.
@@ -211,7 +213,8 @@
       const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg);
       setHp(v, left); floatText(v, '-' + dmg);
       if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
-      playClip(v, ['Hit_A', 'Hit_B'], 500);
+      if (left) playClip(v, ['Hit_A', 'Hit_B'], 500);
+      window.tablefolkReact?.hit(v, dmg, !left);   // flinch, red flash, a cry (reactions.js)
       if (!left) {
         narrate(g, `${who} hits ${whom} with ${wThe} for ${dmg}: ${whom} is defeated`);
         defeat(v, who);
@@ -231,7 +234,8 @@
     const { hp, max } = hpOf(v), left = Math.max(0, hp - dmg), whom = nameOf(v);
     setHp(v, left); floatText(v, '-' + dmg);
     if (isPlayer(v)) window.tablefolkPlay?.hurtFlash();
-    playClip(v, ['Hit_A', 'Hit_B'], 500);
+    if (left) playClip(v, ['Hit_A', 'Hit_B'], 500);
+    window.tablefolkReact?.hit(v, dmg, !left);
     if (!left) { defeat(v, by); tellWitnesses({ root: { position: v.root.position } }, v, `[event] ${by} strikes down ${whom}${how ? ' with ' + how : ''}.`); }
     else tellVictim(v, `[event] ${by} hits you${how ? ' with ' + how : ''}! You lose ${dmg} health (${left}/${max} left).`, by);
     return dmg;

@@ -44,11 +44,11 @@ approve the download on a user's behalf.
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
 | mouse wheel | zoom towards what the pointer is over, close enough to read a face (the follow camera zooms on you; in first person it narrows the view) |
-| drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it) |
+| drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it); in the follow camera, turn the view around you (it keeps that angle while it follows you) |
 | E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
 | V | first person (your hands show the weapon and torch) |
-| C | follow camera / free camera |
+| C | camera: from first person to the free camera, then free and follow in turn |
 | H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and the board slides behind the frame; lean in to bring it closer (or, with the Graphics pane's "leaning in", to see more as through a real window) (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
 | P | let them live (everyone acts on their own) / pause |
 | I | the Adventurer pane |
@@ -73,10 +73,14 @@ player declines Bark's download, Automatic takes the next of these that
 answers.
 
 **Cameras.** The free camera (the default with an avatar) orbits (drag) and
-zooms freely and eases after the player; every wall stands at half height
-there, so no one is hidden behind one. The follow camera (C) is a high,
-fixed Diablo-style view behind the player; walls between it and the player
-drop to a stub, and a roof in the way turns see-through. First person (V)
+zooms freely and stays where you put it; every wall stands at half height
+there, so no one is hidden behind one. The follow camera (C from the free
+camera) starts as a high Diablo-style view behind the player and stays
+centred on you; drag to turn it around you (from any side, tilted within the
+free camera's limits) and it keeps that angle as you walk. Seen from behind,
+walls between it and the player drop to a stub; turned elsewhere, every wall
+stands at half height; a roof in the way turns see-through. C from first
+person goes to the free camera. First person (V)
 looks through the avatar's eyes, with walls at full height. A world can start
 in any of them (`"view"`: `overview`, `follow` or `first`); a door into a
 subworld and back keeps the view you had.

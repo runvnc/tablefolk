@@ -32,7 +32,9 @@
  * sound effects (sfx.js enabled).
  *
  *   window.tablefolkSpells = { cast(g, spell, target), spawn(g, thing, n),
- *     fireballVfx(from, to), resolveThing(name) }
+ *     fireballVfx(from, to), resolveThing(name), sound, audio: { source, noise,
+ *     tone } (the 3D sound helpers, also used by reactions.js's cries) }
+ * The caster's arms: reactions.js gesture() plays and holds the cast clip.
  *
  * Loaded after app.js and combat.js; uses app.js globals (state, meta,
  * playRig, faceToward, cellPassable, makeCatalogItem, ITEM_CATALOG, ...).
@@ -512,13 +514,15 @@
     });
   }
   function settle(g, ms) { later(ms, () => { if (g.anim === 'cast' && !g.defeated) { g.anim = 'idle'; playRig(g, 'idle', true); } }); }
+  // the casting gesture, held for the spell (reactions.js; the old loop without it)
+  function castPose(g, ms) { if (window.tablefolkReact) window.tablefolkReact.gesture(g, 'cast', ms); else { g.anim = 'cast'; playRig(g, 'cast', true); settle(g, ms); } }
 
   // ------------------------------------------------------------ cast
   function cast(g, spell, targetName) {
     if (!g?.root || g.defeated) return false;
     const tgt = resolveTarget(g, targetName);
     if (tgt?.who) faceToward(g, tgt.who, 4000);
-    g.anim = 'cast'; playRig(g, 'cast', true); settle(g, 1700);
+    castPose(g, 1500);
     const aim = tgt ? tgt.pos() : null, hand = handPos(g, aim);
     if (spell === 'fireball') {
       chargeAt(hand, C3(1, .55, .15), 480, 'fire'); SOUND.fireCharge(hand);
@@ -640,7 +644,7 @@
     }
     cells.sort((a, b) => a.s - b.s);
     if (!cells.length) return false;
-    g.anim = 'cast'; playRig(g, 'cast', true); settle(g, 1300);
+    castPose(g, 1300);
     const made = Math.min(n, cells.length);
     for (let i = 0; i < made; i++) {
       const { x, z } = cells[i];
@@ -680,5 +684,5 @@
     });
   }
 
-  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, sound: SOUND };
+  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, sound: SOUND, audio: { source, noise, tone } };
 })();

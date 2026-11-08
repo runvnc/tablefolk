@@ -73,6 +73,8 @@ scenario.js, the tests and packages use.
 | `graphics-settings.js` | the Graphics pane and `?gfx=` |
 | `scenery.js` | campfire, lantern, light, fence, signpost, lily pad; the local-lights budget |
 | `combat.js` | hit points, weapons, attack, defeat (`tablefolkCombat`) |
+| `spells.js` | fireball, lightning, spawn: effects and 3D sound (`tablefolkSpells`) |
+| `reactions.js` | the held cast gesture (wraps `playRig`: idle/talk wait until it ends), hit flinch and red flash, synthesized cries (`tablefolkReact`) |
 | `darkness.js` | fog of war, sight (`sightFor`), carried torches (`tablefolkDark`) |
 | `roofs.js` | thatched roofs found from the walls (`tablefolkRoofs`) |
 | `cutaway.js` | per-pixel wall cut between the follow camera and the player |

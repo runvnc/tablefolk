@@ -28,7 +28,7 @@
   "spell.lightning",
   "spawn"
  ],
- "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic or attacks you, write the spell alone on a line, like spawn(bread):\n{commands}",
+ "systemPrompt": "You are the Oracle. You are an old man. You are very confident in your answers.\nYou can cast real spells. Only when someone asks for magic, insults you or attacks you, write the spell alone on a line, like fireball(you) or spawn(bread):\n{commands}",
  "agents": [
   {
    "id": "Oracle",
@@ -36,6 +36,7 @@
    "ttsVoiceId": "pack:wizard_m",
    "facing": "s",
    "hostile": false,
+   "hp": 9,
    "chaos": 30,
    "allowed": [
     "say",
@@ -60,7 +61,7 @@
  ],
  "legend": {
   "R": "carpet",
-  "G": "Oracle",
+  "G": "Oracle on carpet",
   "O": "cauldron on carpet"
  },
  "goal": null

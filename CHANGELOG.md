@@ -4,8 +4,15 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-08
+
+- See the entries below: the camera, the Oracle's rug and glossy characters, hit reactions and the Oracle's spells were finished on the 8th.
+
 ## 2026-11-07
 
+- **Casters move their arms, hits show and are heard**: a spell plays the caster's cast clip (the Oracle raises his staff and thrusts it at the target) and holds it for the whole spell; the end of the turn used to cut it back to idle within 0.1 s, so the arms hardly moved. Rigs without a cast clip raise the arm procedurally. Every hit makes the character flinch (its hit clip, or a jolt backwards), flash red and cry out: a synthesized grunt pitched for the character (and squeaks, yelps, hisses, rattles for creatures), a louder cry when it falls, in 3D (`app/reactions.js`). **The Oracle has 9 hp** (three fireballs) and casts when insulted: his prompt says "asks for magic, insults you or attacks you" and shows `fireball(you)`; Qwen1.5 0.5B cast in 10 of 12 replies to insults (0 of 12 before).
+- **Rugs instead of grey gravel, glossy figures, feet on the floor**: carpet is now a woven rug (royal blue by default, or the paint tint) with a gold-and-crimson border that frames each patch and turns its corners, a diamond lattice with medallions, a fine weave and the glossy miniature finish (`buildRug`). Every character has the toy-plastic finish of the tiles and props (`toyFinish`). Characters and objects stand on rugs, planks and tiles instead of sinking into them (`floorLiftAt`); the Oracle stands on his rug.
+- **Turn the follow camera with the mouse**: drag in the follow camera to look at you from any side and tilt; it keeps that angle while it follows you (and when you come back to it), the wheel still zooms, and a click still walks or selects. **C from first person goes to the free camera** (it went straight to the follow camera, so The Oracle's first C skipped the free view); then C switches free and follow.
 - **Voices are ready before anyone speaks**: when a world loads, the voice engine, the audio graph (it starts at your first click or key) and each character's voice are prepared, and Breeze in the browser speaks one silent warm-up line. The first line started 8.3 s after it was asked for; now about 3.9 s, like the rest. Breeze in the browser plays the moment its first audio arrives (within about 15 ms) and streams while it generates.
 - **The start of each line is no longer lost**: between lines the voice player sends a faint, inaudible noise instead of exact silence. Chrome closed its audio stream when the output was all zeros, the system then suspended the speaker (PipeWire after 5 s, the laptop's codec after 10 s), and waking it swallowed the first part of the next line.
 - **A spell cast at nobody comes back on the caster** (fireball 3, lightning 4), so the Oracle can forget the target and finish himself off. **The free camera no longer glides after you** when you walk; C is the follow camera.

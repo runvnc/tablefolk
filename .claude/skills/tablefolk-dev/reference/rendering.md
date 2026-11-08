@@ -19,6 +19,19 @@ post-processing).
   lava is animated with a crust and lights its surroundings.
 - Nothing is flat: every surface has a normal map (generated from the texture
   by Sobel when it has none).
+- Carpet is a woven rug, `buildRug()` (2026-11-07): a 3 cm slab per cell
+  (sides only where the rug ends) whose top samples an atlas painted per
+  edge mask (`drawRugCell`: 4 edge bits plus 4 inner-corner bits, Chebyshev
+  distance so the frame turns concave corners; 256 px per variant with an
+  8 px gutter). Field colour = the carpet colour or the paint tint (default
+  royal blue); the band picks crimson or navy against it. The weave is a
+  128 px basket-weave normal on UV2 (world-tiled, 3 per cell), finish
+  roughness .46 + clear coat .42 + light sheen. One mesh, material and atlas
+  per colour; the material and atlas go with the mesh.
+- `floorLiftAt(x,z)` is the height of the solid floor on a cell (planks .048,
+  tiles .034, slab .045, rug .03): characters (`setCharacterLogicalPosition`,
+  the walk in `animate`) and catalogue props stand on it, so feet no longer
+  sink into rugs and planks.
 
 ## Instances and lights
 
@@ -82,6 +95,11 @@ when the follow camera's ray hits it, else 1; never in the free camera.
 
 ## Characters
 
+- Finish: every person (`createFigure`, `createPerson`) gets `toyFinish()`,
+  the toy-plastic look of the tiles and props: metallic 0, baked
+  roughness/metalness maps ignored (AO kept), roughness .4, clear coat .6
+  (rough .12), environment 1. The environment reflection carries the gloss
+  on light quality, which has no post effects.
 - Bodies are in `FIGURES` (`app/app.js`): KayKit chibi people with the 8
   KayKit animation packs, Quaternius models with their own clips mapped to
   the game's names (`FIG_CLIPS`, `figClipName`), Universal-rig figures, Meshy
@@ -186,9 +204,23 @@ textures.
   tests; headless Chrome takes a fake camera with
   `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`.
 - Free camera ('overview', the default with an avatar since 2026-10-30;
-  `freeCameraStart`): starts at 19, eases after the avatar, walls at half
-  height. Follow camera (C): high and fixed behind the player, starts at 16,
-  zooms 2.5-30. The wheel (`setupMouseWheelZoom`, 2026-11-07): the free
+  `freeCameraStart`): starts at 19, stays where you put it
+  (`TABLEFOLK_FREE_FOLLOW` brings back the glide after the avatar), walls at
+  half height. Follow camera: starts high behind the player (alpha π/2, beta
+  0.78, radius 16), zooms 2.5-30, and keeps its target eased onto the avatar
+  (`followAvatarCamera` moves only the target). Since 2026-11-07 left-drag
+  turns it about the avatar (alpha free, beta in the free camera's
+  0.22-1.42; `lockCamera(cam,true)` only switches panning off): the angle
+  stays while it follows and is restored the next time you come back to it
+  (`state.followAlpha/followBeta`, like `followRadius`). The keys walk along
+  the view (`cameraCardinal`). cutaway.js's cut is shaped for a view from the
+  south, so it is used only within 0.5 rad of that heading; turned further,
+  every wall stands at half height (`half()`), and roofs.js's see-through
+  roof works from any side (a ray from the eye to the head). A drag under
+  4 px is a click (walk, select). C / the camera button
+  (`toggleCameraMode`): first person -> free, free -> follow, follow -> free
+  (the first C from The Oracle's first person went straight to follow before);
+  the button names where it goes. The wheel (`setupMouseWheelZoom`, 2026-11-07): the free
   camera zooms about the point under the pointer, a real pick
   (`pivotUnderPointer`: a head, a wall top, the ground; the ground's plane
   where nothing is hit, never the target's height, which drifted up into
@@ -201,7 +233,8 @@ textures.
   the radius (`minZ` = radius x 0.08 in 0.04-0.5, in `followAvatarCamera`;
   skipped while senses.js poses the camera, which clears the limits). The
   follow camera only changes the radius; first person narrows the field of
-  view (0.15-1.3). Left-drag (`setupPivotOrbit`) orbits about the point
+  view (0.15-1.3). Left-drag (`setupPivotOrbit`; the follow camera: above)
+  orbits the free camera about the point
   under the pointer where the drag began: the target first moves along the
   view to its depth, then eye and target turn rigidly about it (yaw about
   the vertical, pitch about the horizontal across the view), so the point
