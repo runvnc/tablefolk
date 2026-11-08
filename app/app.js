@@ -2156,6 +2156,18 @@ function drawRugCell(data,stride,ox,oy,S,G,mask,F){
     data[i]=Math.min(255,c[0]*n*255); data[i+1]=Math.min(255,c[1]*n*255); data[i+2]=Math.min(255,c[2]*n*255); data[i+3]=255;
   }
 }
+// A static collision surface matching a floor mesh (rug, planks, tiles,
+// slabs): loose things rest on the floor's top instead of settling through to
+// the physics ground under it. Disposed with the mesh.
+function floorCollider(mesh){
+  const sc=state.scene; if(!mesh || !sc?.getPhysicsEngine?.()) return;
+  try{
+    const agg=new BABYLON.PhysicsAggregate(mesh,BABYLON.PhysicsShapeType.MESH,{mass:0,friction:.9,restitution:.02},sc);
+    agg.body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+    try{ agg.shape.filterMembershipMask=GROUND_FILTER; }catch{}
+    mesh.onDisposeObservable.add(()=>{ try{ agg.dispose(); }catch{} });
+  }catch(e){ console.warn('floor collider',e); }
+}
 function buildRug(cells){
   const sc=state.scene, top=state.terrainTopY??0, def=SOLID_FLOORS.carpet, out=[];
   const byColor=new Map();
@@ -2196,6 +2208,7 @@ function buildRug(cells){
     mt.bumpTexture=rugWeaveTexture(sc);
     mt.sheen.isEnabled=true; mt.sheen.intensity=.25; mt.sheen.color=new BABYLON.Color3(1,.92,.8);
     mesh.material=mt; mesh.isPickable=false; mesh.receiveShadows=true;
+    floorCollider(mesh);
     mesh.onDisposeObservable.add(()=>{ try{ mt.dispose(false,false); atlas.dispose(); }catch{} });
     out.push(mesh);
   }
@@ -2228,6 +2241,7 @@ function buildFloor(type,cells){
   }
   const m=b.mesh('floor_'+type,state.scene); if(!m) return null;
   m.material=floorMaterial(def.finish); m.isPickable=false; m.receiveShadows=true;
+  floorCollider(m);
   return m;
 }
 // Water and lava ripple: their relief scrolls (one shared observer).

@@ -28,7 +28,7 @@ post-processing).
   128 px basket-weave normal on UV2 (world-tiled, 3 per cell), finish
   roughness .46 + clear coat .42 + light sheen. One mesh, material and atlas
   per colour; the material and atlas go with the mesh.
-- `floorLiftAt(x,z)` is the height of the solid floor on a cell (planks .048,
+- `floorLiftAt (and `floorCollider`, a static Havok mesh shape on each floor mesh so physics props rest on its top)(x,z)` is the height of the solid floor on a cell (planks .048,
   tiles .034, slab .045, rug .03): characters (`setCharacterLogicalPosition`,
   the walk in `animate`) and catalogue props stand on it, so feet no longer
   sink into rugs and planks.

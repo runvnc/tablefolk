@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **Loose things rest on rugs and raised floors**: rugs, planks, tiles and slabs have a collision surface now (app.js floorCollider), so a crate dropped on the Oracle's rug no longer sinks 3 cm into it.
 - See the entries below: the camera, the Oracle's rug and glossy characters, hit reactions and the Oracle's spells were finished on the 8th.
 
 ## 2026-11-07
