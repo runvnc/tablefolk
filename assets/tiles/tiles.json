@@ -710,6 +710,33 @@
     66,
     130.7
    ]
+  },
+  "crystal_ball": {
+   "file": "objects/crystal_ball.png",
+   "w": 363,
+   "h": 392,
+   "anchor": [
+    181.2,
+    238
+   ]
+  },
+  "scrying_pool": {
+   "file": "objects/scrying_pool.png",
+   "w": 363,
+   "h": 372,
+   "anchor": [
+    181.2,
+    218
+   ]
+  },
+  "rune_circle": {
+   "file": "objects/rune_circle.png",
+   "w": 299,
+   "h": 254,
+   "anchor": [
+    149.2,
+    127.7
+   ]
   }
  },
  "characters": {

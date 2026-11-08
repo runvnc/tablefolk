@@ -71,7 +71,7 @@ scenario.js, the tests and packages use.
 | `look.js` | the shared "painted clay" materials and post-processing (`TABLEFOLK_LOOK`) |
 | `terrain-hd.js` | floor tiles, water, lava, the shelved HD island (`TablefolkHD`) |
 | `graphics-settings.js` | the Graphics pane and `?gfx=` |
-| `scenery.js` | campfire, lantern, light, fence, signpost, lily pad; the local-lights budget |
+| `scenery.js` | campfire, lantern, light, fence, signpost, lily pad, crystal ball, scrying pool, rune circle; the local-lights budget |
 | `combat.js` | hit points, weapons, attack, defeat (`tablefolkCombat`) |
 | `spells.js` | fireball, lightning, spawn: effects and 3D sound (`tablefolkSpells`) |
 | `reactions.js` | the held cast gesture (wraps `playRig`: idle/talk wait until it ends), hit flinch and red flash, synthesized cries (`tablefolkReact`) |

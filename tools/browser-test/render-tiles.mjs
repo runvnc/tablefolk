@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const base = process.argv[2] || 'http://localhost:8001';
 const only = process.argv[3] || '', ppu = +(process.argv[4] || 128);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));   // CDP_PORT: another test Chrome
 const ctx = b.contexts()[0], page = await ctx.newPage();
 page.on('console', m => { if (/\[tiles\]/.test(m.text())) console.log(m.text()); });
 await page.goto(`${base}/app/?tabletop=1&tiles=1&ppu=${ppu}${only ? '&only=' + only : ''}&t=${Date.now()}`);

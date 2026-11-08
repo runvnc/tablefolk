@@ -27,7 +27,7 @@
 (function () {
   const FLAT_H = 2.5, FOG_H = 2.7, DIM_H = .04, VIEW = 13, NEAR = 1.5, TORCH_R = 5;
   // light radius (cells) of objects that light a room, by type
-  const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8 };
+  const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8, crystal_ball: 2.2, scrying_pool: 2.2, rune_circle: 1.2 };
   const OPAQUE = new Set(['wall', 'door']);
   let dark = false, fogOn = !new URLSearchParams(location.search).has('nofog');
   let explored = new Set(), seen = new Set(), sig = '', black = null, dim = null, flat = null, timer = setInterval(() => tick(), 250);

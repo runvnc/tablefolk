@@ -56,7 +56,7 @@
   "#K!Q..?..Q!K#",
   "#K..RRRRR..(#",
   "#c.LRRGRRL.P#",
-  "#t..RORRR..t#",
+  "#t..RORVR..t#",
   "#t...RRR...t#",
   "#!...RRR...!#",
   "#S..LRRRL..>#",
@@ -66,7 +66,8 @@
  "legend": {
   "R": "carpet",
   "G": "Oracle on carpet",
-  "O": "cauldron on carpet",
+  "O": "crystal_ball on carpet",
+  "V": "scrying_pool on carpet",
   "!": "candelabra",
   "Q": "statue",
   "?": "lectern",
@@ -75,6 +76,9 @@
   ">": "chalice",
   "}": "vase"
  },
+ "objects": [
+  { "type": "rune_circle", "x": 0, "z": -1 }
+ ],
  "goal": null,
  "roofs": false,
  "subtitle": "Ask the Oracle anything. He knows everything (or thinks he does)."

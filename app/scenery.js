@@ -7,7 +7,18 @@
  *   fence     one 1-cell fence section along x ("ry" turns it)
  *   signpost  a post with two arms
  *   lily_pad  a pad floating on the sea (or a pond)
+ *   crystal_ball  a scrying crystal on a gilded pedestal: violet light
+ *             swirling inside the glass ("color" tints it)
+ *   scrying_pool  a shallow golden bowl of glowing water on a pedestal:
+ *             ripples and a rising mist ("color" tints it)
+ *   rune_circle   a ring of glowing runes inlaid in the floor (~2.3 m),
+ *             turning slowly, walked over ("color" tints it)
  *
+ * The arcane pieces are lit from within: unlit additive layers (no glow
+ * layer at light quality), one small point light each in the local-lights
+ * budget below, a coloured glow decal on the floor (floors take no local
+ * lights) and a few CPU particles; their animation is one observer each,
+ * removed with the object.
  * Trees, houses, boulders, flowers and grass tufts are models in the core
  * pack (assets/pack.json). Loaded after app.js and uses its helpers (state,
  * tag, meta, addShadow, addLampPool). makeObject() calls
@@ -94,6 +105,129 @@
   }
   function hexColor(v, fallback) { try { return v ? BABYLON.Color3.FromHexString(String(v)) : fallback; } catch { return fallback; } }
 
+  // ---------- arcane pieces: shared textures, materials, parts ----------
+  const texs = new Map();
+  function canvasTex(name, size, draw) {
+    const old = texs.get(name); if (old && old.getScene() === state.scene && old.getInternalTexture()) return old;
+    const t = new BABYLON.DynamicTexture('arcane_' + name, { width: size, height: size }, state.scene, true);
+    const c = t.getContext(); c.clearRect(0, 0, size, size); draw(c, size); t.update(); t.hasAlpha = true;
+    texs.set(name, t); return t;
+  }
+  const blob = (c, x, y, r, stops) => { const g = c.createRadialGradient(x, y, 0, x, y, r); for (const [o, col] of stops) g.addColorStop(o, col); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
+  let seed = 7; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const TX = {
+    glow: () => canvasTex('glow', 64, (c, s) => blob(c, s / 2, s / 2, s / 2, [[0, 'rgba(255,255,255,1)'], [.25, 'rgba(255,255,255,.7)'], [.6, 'rgba(255,255,255,.15)'], [1, 'rgba(255,255,255,0)']])),
+    pool: () => canvasTex('pool', 128, (c, s) => blob(c, s / 2, s / 2, s / 2, [[0, 'rgba(255,255,255,.55)'], [.4, 'rgba(255,255,255,.22)'], [1, 'rgba(255,255,255,0)']])),
+    mist: () => canvasTex('mist', 64, (c, s) => { seed = 11; for (let i = 0; i < 9; i++) blob(c, s / 2 + (rand() - .5) * s * .3, s / 2 + (rand() - .5) * s * .3, s * (.2 + rand() * .15), [[0, 'rgba(255,255,255,.35)'], [1, 'rgba(255,255,255,0)']]); }),
+    // wisps that wrap around a sphere (whole periods across u), drawn in colour
+    nebula: () => canvasTex('nebula', 256, (c, s) => {
+      seed = 3; c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        const k = 1 + Math.floor(rand() * 2), ph = rand() * 6.28, y0 = s * (.22 + rand() * .56), a = s * (.06 + rand() * .12), w = 3 + rand() * 9;
+        const hue = rand() < .3 ? 190 + rand() * 20 : 255 + rand() * 50;
+        c.strokeStyle = `hsla(${hue},100%,${45 + rand() * 15}%,${.3 + rand() * .3})`; c.lineWidth = w; c.shadowColor = c.strokeStyle; c.shadowBlur = 10;
+        c.beginPath(); for (let x = -4; x <= s + 4; x += 4) { const y = y0 + a * Math.sin(x / s * 6.283 * k + ph) + a * .4 * Math.sin(x / s * 6.283 * (k + 2) + ph * 2); x < 0 ? c.moveTo(x, y) : c.lineTo(x, y); } c.stroke();
+      }
+      c.shadowBlur = 0; for (let i = 0; i < 40; i++) blob(c, rand() * s, s * (.15 + rand() * .7), 1 + rand() * 2.5, [[0, 'rgba(255,255,255,.9)'], [1, 'rgba(255,255,255,0)']]);
+    }),
+    ripple: () => canvasTex('ripple', 256, (c, s) => {
+      const m = s / 2; for (let i = 0; i < 2; i++) { const r = m * (.8 + i * .12), a = .7 - i * .35; c.strokeStyle = `rgba(255,255,255,${a})`; c.lineWidth = 3 - i; c.shadowColor = 'white'; c.shadowBlur = 6; c.beginPath(); c.arc(m, m, r, 0, 6.283); c.stroke(); }
+    }),
+    // water: soft glints that drift over it
+    caustic: () => canvasTex('caustic', 256, (c, s) => {
+      seed = 5; for (let i = 0; i < 30; i++) { const x = s * (.1 + rand() * .8), y = s * (.1 + rand() * .8), r = s * (.02 + rand() * .05); c.save(); c.translate(x, y); c.scale(1.8, .7); c.rotate(rand() * .4); blob(c, 0, 0, r, [[0, `rgba(255,255,255,${.5 + rand() * .4})`], [1, 'rgba(255,255,255,0)']]); c.restore(); }
+    }),
+    // the runes' ring and the inner star, separate so they turn opposite ways
+    runes: () => canvasTex('runes', 512, (c, s) => {
+      const m = s / 2; c.strokeStyle = 'white'; c.fillStyle = 'white'; c.shadowColor = 'white'; c.shadowBlur = 10; c.lineCap = 'round'; c.lineJoin = 'round';
+      const ring = (r, w) => { c.lineWidth = w; c.beginPath(); c.arc(m, m, r, 0, 6.283); c.stroke(); };
+      ring(m * .96, 5); ring(m * .9, 2.5); ring(m * .7, 3); ring(m * .65, 1.5);
+      seed = 19; const N = 18;
+      for (let i = 0; i < N; i++) {
+        const a = i / N * 6.283, rr = m * .8, h = m * .075;
+        c.save(); c.translate(m + Math.cos(a) * rr, m + Math.sin(a) * rr); c.rotate(a + Math.PI / 2); c.lineWidth = 3.2;
+        c.beginPath(); c.moveTo(0, -h); c.lineTo(0, h);   // the stave
+        for (let k = 0; k < 2 + Math.floor(rand() * 2); k++) { const y0 = (rand() - .5) * h * 1.4, side = rand() < .5 ? -1 : 1, kind = rand();
+          if (kind < .4) { c.moveTo(0, y0); c.lineTo(side * h * .6, y0 + h * .5); }
+          else if (kind < .7) { c.moveTo(0, y0); c.lineTo(side * h * .55, y0 - h * .35); c.lineTo(0, y0 - h * .7); }
+          else { c.moveTo(-h * .45, y0); c.lineTo(h * .45, y0 + h * .3); } }
+        c.stroke(); c.restore();
+        const b = a + Math.PI / N; c.beginPath(); c.arc(m + Math.cos(b) * rr, m + Math.sin(b) * rr, 3, 0, 6.283); c.fill();
+      }
+      for (let i = 0; i < 72; i++) { const a = i / 72 * 6.283, r0 = m * .9, r1 = m * (i % 6 ? .925 : .955); c.lineWidth = 1.6; c.beginPath(); c.moveTo(m + Math.cos(a) * r0, m + Math.sin(a) * r0); c.lineTo(m + Math.cos(a) * r1, m + Math.sin(a) * r1); c.stroke(); }
+    }),
+    star: () => canvasTex('star', 512, (c, s) => {
+      const m = s / 2; c.strokeStyle = 'white'; c.shadowColor = 'white'; c.shadowBlur = 10; c.lineJoin = 'round';
+      const poly = (n, step, r, w) => { c.lineWidth = w; c.beginPath(); for (let i = 0; i <= n; i++) { const a = i * step * 6.283 / n - Math.PI / 2, x = m + Math.cos(a) * r, y = m + Math.sin(a) * r; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); };
+      poly(7, 3, m * .62, 3); poly(7, 1, m * .62, 1.5); poly(7, 2, m * .36, 2);
+      c.lineWidth = 2.5; c.beginPath(); c.arc(m, m, m * .2, 0, 6.283); c.stroke(); c.beginPath(); c.arc(m, m, m * .27, 0, 6.283); c.stroke();
+      c.fillStyle = 'white'; for (let i = 0; i < 7; i++) { const a = i * 6.283 / 7 - Math.PI / 2; c.beginPath(); c.arc(m + Math.cos(a) * m * .62, m + Math.sin(a) * m * .62, 6, 0, 6.283); c.fill(); }
+    }),
+  };
+  // Unlit additive material on a shared texture, one per object part (each
+  // is tinted and animated on its own); disposed with the object, the
+  // texture stays.
+  function ownGlowMat(r, name, tex, color, alpha = 1, colored = false) {
+    const m = new BABYLON.StandardMaterial('arcane_' + name, state.scene);
+    // The texture is the shape (opacity) and the colour is emissiveColor;
+    // Babylon adds an emissive texture to emissiveColor rather than tinting
+    // it, so only a texture drawn in colour (colored: the nebula) is one.
+    m.disableLighting = true; m.diffuseColor = C3(0, 0, 0); m.specularColor = C3(0, 0, 0); m.emissiveColor = colored ? C3(0, 0, 0) : color;
+    if (colored) m.emissiveTexture = tex;
+    m.opacityTexture = tex; m.alpha = alpha; m.alphaMode = BABYLON.Engine.ALPHA_ADD;
+    m.disableDepthWrite = true; m.backFaceCulling = false; m.fogEnabled = false;
+    // listed as shared so disposeWorldObject leaves it (it would take the
+    // texture too); disposed here after the object is gone
+    state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
+    const mm = meta(r), prev = mm.cleanup; mm.cleanup = () => { try { prev?.(); } catch {} queueMicrotask(() => { state.sharedAssetMats.delete(m); m.dispose(false, false); }); };
+    return m;
+  }
+  function plastic(name, color, { rough = .3, metallic = 0, coat = .7, emissive = null } = {}) {
+    const fresh = !mats.has(name), m = mat(name, color, { rough, metallic, emissive });
+    if (fresh) { window.plasticFinish?.(m, { coat, coatRough: .08 }); m.environmentIntensity = Math.max(m.environmentIntensity, .9); }
+    return m;
+  }
+  const arcaneGold = () => plastic('arcane_gold', C3(.86, .62, .24), { rough: .26, metallic: .85, coat: .5 });
+  const arcaneStone = () => plastic('arcane_stone', C3(.085, .07, .13), { rough: .22, coat: .85 });
+  const floorY = (x, z) => (state.terrainTopY ?? 0) + (typeof floorLiftAt === 'function' ? floorLiftAt(x, z) : 0);
+  function lathe(name, shape, sc, tess = 20) {
+    return BABYLON.MeshBuilder.CreateLathe(name, { shape: shape.map(([r, y]) => V3(r, y, 0)), tessellation: tess, sideOrientation: BABYLON.Mesh.DOUBLESIDE }, sc);
+  }
+  // A dark glossy baluster on an octagonal foot with gilded bands, top at h.
+  function pedestal(sc, h, name) {
+    const st = arcaneStone(), au = arcaneGold(), parts = [];
+    const foot = BABYLON.MeshBuilder.CreateCylinder(name + '_foot', { diameter: .5, height: .08, tessellation: 8 }, sc); foot.position.y = .04; foot.material = st;
+    const band = BABYLON.MeshBuilder.CreateCylinder(name + '_band', { diameterTop: .36, diameterBottom: .42, height: .05, tessellation: 8 }, sc); band.position.y = .105; band.material = au;
+    const col = lathe(name + '_column', [[0, .13], [.12, .13], [.09, .18], [.075, .26], [.1, .36], [.12, .44], [.1, .52], [.065, .6], [.055, h - .2], [.07, h - .13], [.06, h - .1], [0, h - .1]].map(([r, y]) => [r, Math.min(y, h - .1)]), sc);
+    col.material = st;
+    const ring = BABYLON.MeshBuilder.CreateTorus(name + '_ring', { diameter: .2, thickness: .025, tessellation: 20 }, sc); ring.position.y = .44; ring.material = au;
+    const cap = BABYLON.MeshBuilder.CreateCylinder(name + '_cap', { diameterTop: .3, diameterBottom: .16, height: .07, tessellation: 16 }, sc); cap.position.y = h - .065; cap.material = au;
+    const top = BABYLON.MeshBuilder.CreateCylinder(name + '_top', { diameter: .3, height: .03, tessellation: 16 }, sc); top.position.y = h - .015; top.material = st;
+    parts.push(foot, band, col, ring, cap, top);
+    return parts;
+  }
+  // A coloured glow on the floor around a light (floors take no local lights).
+  function floorGlow(r, name, color, radius, alpha) {
+    const d = BABYLON.MeshBuilder.CreateGround(name + '_floorglow', { width: radius * 2, height: radius * 2 }, state.scene);
+    d.parent = r; d.position.y = .012; d.material = ownGlowMat(r, name + '_floor', TX.pool(), color, alpha);
+    d.isPickable = false; d.alphaIndex = 5; d.metadata = { proxy: r };
+    state.glowLayer?.addExcludedMesh(d);   // floor light, not a lamp (medium/high bloomed it)
+    return d;
+  }
+  function sprite(r, name, size, color, alpha) {
+    const p = BABYLON.MeshBuilder.CreatePlane(name, { size }, state.scene);
+    p.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; p.parent = r; p.isPickable = false; p.metadata = { proxy: r };
+    p.material = ownGlowMat(r, name, TX.glow(), color, alpha);
+    return p;
+  }
+  function cpuParticles(r, name, cap, emitter, tex) {
+    const ps = new BABYLON.ParticleSystem('arcane_' + name, cap, state.scene);
+    ps.particleTexture = tex; ps.emitter = emitter; ps.updateSpeed = 1 / 60;
+    const mm = meta(r), prev = mm.cleanup; mm.cleanup = () => { try { prev?.(); } catch {} ps.stop(); ps.dispose(false); };
+    return ps;
+  }
+  const still = () => !!window.TABLEFOLK_STILL_MODE;
+
   const makers = {
     campfire(sc, x, z, opts) {
       const r = rootAt('campfire', x, z, opts), parts = [];
@@ -161,6 +295,106 @@
       }
       own(r, parts);
       return finish(r, 'signpost', { health: 2, material: 'wood', flammable: true }, opts);
+    },
+    crystal_ball(sc, x, z, opts) {
+      const r = rootAt('crystal_ball', x, z, opts, floorY(x, z)), H = .9, cy = H + .165, tint = hexColor(opts.color, C3(.62, .42, 1));
+      finish(r, 'crystal_ball', { health: 6, material: 'stone', flammable: false }, opts);
+      const parts = pedestal(sc, H, 'crystal_ball'), au = arcaneGold();
+      // four gilded claws hold the ball (none straight behind it from the sides)
+      for (let i = 0; i < 4; i++) {
+        const a = i / 4 * Math.PI * 2 + Math.PI / 4, path = [V3(Math.cos(a) * .05, H, Math.sin(a) * .05)];
+        for (let k = 0; k <= 10; k++) { const th = .35 + k * .1, d = .178 * Math.sin(th); path.push(V3(Math.cos(a) * d, cy - .178 * Math.cos(th), Math.sin(a) * d)); }
+        const claw = BABYLON.MeshBuilder.CreateTube('crystal_ball_claw', { path, radiusFunction: (k, dist) => .017 - .01 * Math.min(1, dist / .4), tessellation: 8, cap: BABYLON.Mesh.CAP_ALL }, sc); claw.material = au; parts.push(claw);
+      }
+      own(r, parts);
+      // the glass: dark, clear, glossy; the light inside it is additive layers
+      const glass = BABYLON.MeshBuilder.CreateSphere('crystal_ball_glass', { diameter: .32, segments: 20 }, sc);
+      glass.position.y = cy;
+      if (!mats.has('crystal_glass')) {
+        const g = mat('crystal_glass', C3(.04, .04, .1), { rough: .03, emissive: C3(.05, .03, .12) });
+        window.plasticFinish?.(g, { coat: 1, coatRough: .02 }); g.alpha = .42; g.transparencyMode = BABYLON.PBRMaterial.PBRMATERIAL_ALPHABLEND; g.environmentIntensity = 1.3; g.specularIntensity = 1.5;
+      }
+      glass.material = mats.get('crystal_glass');
+      const swirlA = BABYLON.MeshBuilder.CreateSphere('crystal_ball_swirl', { diameter: .27, segments: 14 }, sc), swirlB = BABYLON.MeshBuilder.CreateSphere('crystal_ball_swirl', { diameter: .2, segments: 12 }, sc);
+      swirlA.material = ownGlowMat(r, 'crystal_swirl_a', TX.nebula(), null, .7, true); swirlB.material = ownGlowMat(r, 'crystal_swirl_b', TX.nebula(), null, .45, true);
+      swirlB.material.backFaceCulling = true;
+      swirlB.rotation.set(.9, 0, .5);
+      for (const m of [swirlA, swirlB]) m.position.y = cy;
+      const core = sprite(r, 'crystal_ball_core', .11, tint.add(C3(.2, .2, .1)), .5); core.position.y = cy;
+      const halo = sprite(r, 'crystal_ball_halo', .6, tint.scale(.4), .3); halo.position.y = cy;
+      own(r, [glass, swirlA, swirlB], { shadow: false }); glass.receiveShadows = false;
+      floorGlow(r, 'crystal_ball', tint, 1.4, .5);
+      // motes drifting in the glass
+      const motes = cpuParticles(r, 'crystal_motes', 14, V3(x, r.position.y + cy, z), TX.glow());
+      Object.assign(motes, { minSize: .012, maxSize: .028, minLifeTime: 1.2, maxLifeTime: 2.2, emitRate: 8, minEmitPower: .01, maxEmitPower: .04, gravity: V3(0, .01, 0), blendMode: BABYLON.ParticleSystem.BLENDMODE_ADD });
+      motes.createSphereEmitter(.1, 1); motes.color1 = new BABYLON.Color4(.85, .75, 1, 1); motes.color2 = new BABYLON.Color4(.6, .95, 1, 1); motes.colorDead = new BABYLON.Color4(.4, .2, 1, 0);
+      if (!still()) motes.start();
+      const L = pointLight(r, 'crystal_ball_light', { y: cy + .3, color: tint, intensity: +opts.intensity || 1.2, range: +opts.range || 3.6 }), base = L.intensity;
+      const ph = x * 1.7 + z;
+      if (!still()) animate(r, () => {
+        const t = performance.now() * .001, p = .5 + .5 * Math.sin(t * 1.3 + ph);
+        swirlA.rotation.y = t * .55; swirlA.rotation.x = Math.sin(t * .23) * .5; swirlB.rotation.y = -t * .9; swirlB.rotation.z = .5 + Math.sin(t * .31) * .6;
+        core.scaling.setAll(.8 + .35 * p); halo.material.alpha = .2 + .14 * p; core.material.alpha = .35 + .25 * p;
+        L.intensity = base * (.8 + .35 * p);
+      });
+      return r;
+    },
+    scrying_pool(sc, x, z, opts) {
+      const r = rootAt('scrying_pool', x, z, opts, floorY(x, z)), H = .78, tint = hexColor(opts.color, C3(.3, .9, 1));
+      finish(r, 'scrying_pool', { health: 6, material: 'metal', flammable: false }, opts);
+      const parts = pedestal(sc, H, 'scrying_pool');
+      // a wide shallow golden bowl (a closed profile: outside, rim, inside)
+      const bowl = lathe('scrying_pool_bowl', [[0, 0], [.09, 0], [.2, .025], [.29, .07], [.345, .125], [.35, .14], [.33, .142], [.29, .1], [.2, .06], [0, .05]].map(([r0, y]) => [r0, H + y]), sc, 28);
+      bowl.material = arcaneGold(); parts.push(bowl);
+      const lip = BABYLON.MeshBuilder.CreateTorus('scrying_pool_lip', { diameter: .68, thickness: .025, tessellation: 32 }, sc); lip.position.y = H + .14; lip.material = arcaneGold(); parts.push(lip);
+      own(r, parts);
+      const wy = H + .108;
+      const water = BABYLON.MeshBuilder.CreateDisc('scrying_pool_water', { radius: .3, tessellation: 32 }, sc);
+      water.rotation.x = Math.PI / 2; water.position.y = wy;
+      if (!mats.has('scry_water')) { const w = mat('scry_water', C3(.01, .05, .08), { rough: .03, emissive: C3(.01, .1, .14) }); window.plasticFinish?.(w, { coat: 1, coatRough: .02 }); w.environmentIntensity = 1.2; }
+      water.material = mats.get('scry_water');
+      const glowW = BABYLON.MeshBuilder.CreateDisc('scrying_pool_glow', { radius: .3, tessellation: 32 }, sc); glowW.rotation.x = Math.PI / 2; glowW.position.y = wy + .002;
+      glowW.material = ownGlowMat(r, 'scry_glow', TX.pool(), tint.scale(.55), .6);
+      const caus = BABYLON.MeshBuilder.CreateDisc('scrying_pool_caustic', { radius: .29, tessellation: 32 }, sc); caus.rotation.x = Math.PI / 2; caus.position.y = wy + .004;
+      caus.material = ownGlowMat(r, 'scry_caustic', TX.caustic(), tint.scale(.4), .25);
+      const ripples = [0, 1].map(i => { const d = BABYLON.MeshBuilder.CreateDisc('scrying_pool_ripple', { radius: .29, tessellation: 32 }, sc); d.rotation.x = Math.PI / 2; d.position.y = wy + .006; d.material = ownGlowMat(r, 'scry_ripple' + i, TX.ripple(), tint.scale(.7), .4); return d; });
+      own(r, [water, glowW, caus, ...ripples], { shadow: false });
+      for (const m of [glowW, caus, ...ripples]) m.isPickable = false;
+      floorGlow(r, 'scrying_pool', tint, 1.4, .45);
+      const mist = cpuParticles(r, 'scry_mist', 26, V3(x, r.position.y + wy, z), TX.mist());
+      Object.assign(mist, { minSize: .12, maxSize: .22, minLifeTime: 2.2, maxLifeTime: 3.4, emitRate: 5, minEmitPower: .06, maxEmitPower: .13, gravity: V3(0, .03, 0), blendMode: BABYLON.ParticleSystem.BLENDMODE_ADD,
+        minAngularSpeed: -.3, maxAngularSpeed: .3, minInitialRotation: 0, maxInitialRotation: 6.28 });
+      mist.createDirectedCylinderEmitter(.2, .01, 1, V3(-.15, 1, -.15), V3(.15, 1, .15));
+      mist.addColorGradient(0, new BABYLON.Color4(tint.r, tint.g, tint.b, 0)); mist.addColorGradient(.25, new BABYLON.Color4(tint.r * .5, tint.g * .5, tint.b * .5, .16)); mist.addColorGradient(1, new BABYLON.Color4(tint.r * .2, tint.g * .2, tint.b * .3, 0));
+      mist.addSizeGradient(0, .5); mist.addSizeGradient(1, 1.6);
+      if (!still()) mist.start();
+      const L = pointLight(r, 'scrying_pool_light', { y: wy + .25, color: tint, intensity: +opts.intensity || 1, range: +opts.range || 3.4 }), base = L.intensity;
+      const ph = x * 1.3 + z * .7;
+      if (!still()) animate(r, () => {
+        const t = performance.now() * .001;
+        caus.rotation.y = t * .12; caus.material.alpha = .2 + .08 * Math.sin(t * 1.7 + ph);
+        ripples.forEach((d, i) => { const u = (t * .45 + i * .5 + ph) % 1; d.scaling.set(.15 + .85 * u, .15 + .85 * u, 1); d.material.alpha = .45 * Math.sin(Math.PI * u) * (1 - u * .5); });
+        glowW.material.alpha = .55 + .1 * Math.sin(t * 1.1 + ph); L.intensity = base * (.88 + .12 * Math.sin(t * 1.1 + ph));
+      });
+      return r;
+    },
+    rune_circle(sc, x, z, opts) {
+      const r = rootAt('rune_circle', x, z, opts, floorY(x, z)), tint = hexColor(opts.color, C3(1, .58, .18)), D = 2.3;
+      finish(r, 'rune_circle', { health: 99, material: 'stone', flammable: false }, opts);
+      const ring = BABYLON.MeshBuilder.CreateGround('rune_circle_ring', { width: D, height: D }, sc), star = BABYLON.MeshBuilder.CreateGround('rune_circle_star', { width: D, height: D }, sc);
+      ring.position.y = .008; star.position.y = .01;
+      // dimmer above light quality, where bloom spreads it over the floor
+      const k = window.TABLEFOLK_GFX?.lite ? 1 : .55;
+      ring.material = ownGlowMat(r, 'rune_ring', TX.runes(), tint.scale(k), .9); star.material = ownGlowMat(r, 'rune_star', TX.star(), tint.scale(.9 * k), .7);
+      // inlaid gold: alpha-blended, so it stays gold over a coloured rug (additive turned it white on blue)
+      for (const m of [ring, star]) { m.material.alphaMode = BABYLON.Engine.ALPHA_COMBINE; m.material.zOffset = -2; m.parent = r; m.metadata = { proxy: r }; m.isPickable = false; m.alphaIndex = 6; state.glowLayer?.addExcludedMesh(m); }
+      const ph = x + z * 2.1;
+      if (!still()) animate(r, () => {
+        const t = performance.now() * .001, p = .5 + .5 * Math.sin(t * .9 + ph);
+        ring.rotation.y = t * .06; star.rotation.y = -t * .1;
+        ring.material.alpha = .72 + .25 * p; star.material.alpha = .5 + .3 * (1 - p);
+      });
+      return r;
     },
     lily_pad(sc, x, z, opts) {
       const onSea = !window.tablefolk?.hasGroundAt?.(x, z), y = onSea ? (state.seaLevel ?? -1.42) + .05 : (state.terrainTopY ?? 0) + .03;

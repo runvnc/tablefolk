@@ -22,7 +22,7 @@ truth is in files:
 | what | file |
 |---|---|
 | model-based object types (sizes, aliases, tags, physics) | `assets/pack.json` (the core asset pack) |
-| scenery built in code (campfire, lantern, light, fence, signpost, lily pad) | `app/scenery.js` |
+| scenery built in code (campfire, lantern, light, fence, signpost, lily pad, crystal ball, scrying pool, rune circle) | `app/scenery.js` |
 | props built in code (crate, barrel, mushroom, lamp, wall, door, note, counter) | `app/app.js` (`makeObject`) |
 | bodies | `FIGURES` in `app/app.js` ([format.md](format.md)) |
 | walk-in buildings and their furniture | `WALK_IN`, `WALK_IN_THINGS` in `app/procgen.js` |
@@ -53,6 +53,18 @@ truth is in files:
   don't see them; lily pads float on sea cells). `fence` is one cell along x
   (`ry` 1.5708 turns it north-south).
 - `light`: an invisible point light ([board.md](board.md)).
+- **Arcane** (built in code, they glow and move): `crystal_ball` (a scrying
+  crystal on a gilded pedestal, violet light swirling inside the glass),
+  `scrying_pool` (a shallow golden bowl of glowing water on a pedestal,
+  ripples and a faint rising mist), `rune_circle` (a ring of gold runes and a
+  seven-pointed star inlaid in the floor, about 2.3 m across, turning slowly;
+  characters stand and walk on it, so it can sit under someone). Each lights
+  its surroundings a little; `"color": "#rrggbb"` tints one (the crystal's
+  wisps keep their colours). The ball and the pool are solid and too heavy to
+  carry; characters see all three ("crystal ball next to you"). Map words:
+  `crystal ball`, `orb`, `scrying pool`/`scrying bowl`, `rune circle`/`magic
+  circle`; `spawn()` can conjure them. The Oracle stands on a rune circle
+  between a crystal ball and a scrying pool.
 
 Wide items (`table bench workbench desk sofa`, and pack items 1.3 or more
 wide) take two cells. Bookcases, wall banners, cabinets and nightstands turn

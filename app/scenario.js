@@ -43,13 +43,13 @@
   // refreshThings() rebuilds the lists whenever a pack loads.
   const MODERN = ['desk', 'office_chair', 'armchair', 'sofa', 'coffee_table', 'floor_lamp', 'plant', 'bookshelf'];
   // Procedural objects (app.js, scenery.js); models come from the packs.
-  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad'];
+  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad', 'crystal_ball', 'scrying_pool', 'rune_circle'];
   let ITEMS = [], THINGS = [], WIDE_ITEMS = new Set();
   const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
     sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rocks: 'boulder',
     shroom: 'mushroom', toadstool: 'mushroom', stall: 'counter', bar: 'counter',
     chair: 'office_chair', couch: 'sofa', settee: 'sofa', floorlamp: 'floor_lamp', houseplant: 'plant', fern: 'plant', shelf: 'bookshelf', bookshelves: 'bookcase',
-    fire: 'campfire', fireplace: 'campfire', home: 'house', cottage: 'house', hut: 'house', building: 'house' };
+    fire: 'campfire', fireplace: 'campfire', orb: 'crystal_ball', crystal: 'crystal_ball', scrying_bowl: 'scrying_pool', scrying_basin: 'scrying_pool', runes: 'rune_circle', magic_circle: 'rune_circle', summoning_circle: 'rune_circle', home: 'house', cottage: 'house', hut: 'house', building: 'house' };
   const AREA_DIRS = { north: [0, -1], south: [0, 1], east: [-1, 0], west: [1, 0],
     northeast: [-1, -1], northwest: [1, -1], southeast: [-1, 1], southwest: [1, 1] };
   const AREAS = new Set([...Object.keys(AREA_DIRS), 'center', 'random']);
@@ -98,7 +98,8 @@
       .replace(/in front of/g, 'in_front_of').replace(/next to/g, 'beside').replace(/close to/g, 'near')
       .replace(/north[ -]east/g, 'northeast').replace(/north[ -]west/g, 'northwest').replace(/south[ -]east/g, 'southeast').replace(/south[ -]west/g, 'southwest')
       .replace(/(north|south|east|west)_(wall|edge)/g, '$1 wall')
-      .replace(/weapon[ -]stand/g, 'weapon_stand').replace(/coin[ -]pile/g, 'coin_pile').replace(/(apple|carrot)[ -]crate/g, '$1_crate');
+      .replace(/weapon[ -]stand/g, 'weapon_stand').replace(/coin[ -]pile/g, 'coin_pile').replace(/(apple|carrot)[ -]crate/g, '$1_crate')
+      .replace(/(crystal|scrying|rune|magic|summoning)[ -](ball|pool|bowl|basin|circle)/g, '$1_$2');
     const ids = agentIds.map(a => a.toLowerCase());
     const words = s.replace(/[^a-z0-9_ ]/g, ' ').split(/\s+/).filter(w => w && !['the', 'of', 'and', 'with', 'to_the'].includes(w));
     const known = w => ids.includes(w) || THINGS.includes(singular(w)) || ['house', 'campfire'].includes(singular(w)) || PAINT_MATS.includes(w) || ['pond', 'river', 'pool'].includes(w);

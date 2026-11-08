@@ -19,7 +19,9 @@
  *
  * Graphics: Babylon particle systems (GPU particles when supported and the
  * quality is above light; CPU ones, fewer, at light), unlit emissive meshes
- * with additive blending (light quality has no glow layer), flickering point
+ * with additive blending (light quality has no glow layer; coloured by
+ * emissiveColor, the texture only as opacity), fire as alpha-blended tongues
+ * so it stays orange where it piles up, flickering point
  * lights joined to scenery.js's light budget, a branching bolt rebuilt for
  * each flash, a sky flash (the global lights and a faint screen flash),
  * shockwave rings, scorch marks that fade, a small camera shake. Everything
@@ -62,6 +64,11 @@
   const radial = (c, x, y, r, stops) => { const g = c.createRadialGradient(x, y, 0, x, y, r); for (const [o, col] of stops) g.addColorStop(o, col); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
   const T = {
     flare: () => canvasTex('flare', 64, (c, s) => radial(c, s / 2, s / 2, s / 2, [[0, 'rgba(255,255,255,1)'], [.2, 'rgba(255,255,255,.85)'], [.45, 'rgba(255,255,255,.3)'], [1, 'rgba(255,255,255,0)']])),
+    // a ragged tongue of flame: soft blobs, densest low, thinning to a tip
+    fire: () => canvasTex('fire', 128, (c, s) => {
+      for (let i = 0; i < 22; i++) { const k = i / 22, y = s * (.72 - k * .5), x = s / 2 + (Math.random() - .5) * s * .22 * (1 - k * .5), r = s * (.26 - k * .17);
+        radial(c, x, y, r, [[0, `rgba(255,${235 - k * 60 | 0},${170 - k * 90 | 0},${.5 - k * .3})`], [.6, `rgba(255,${150 - k * 40 | 0},70,${.22 - k * .12})`], [1, 'rgba(255,110,50,0)']]); }
+    }),
     smoke: () => canvasTex('smoke', 128, (c, s) => {
       for (let i = 0; i < 16; i++) { const a = Math.random() * 6.28, d = Math.random() * s * .2; radial(c, s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, s * rnd(.16, .3), [[0, 'rgba(255,255,255,.32)'], [1, 'rgba(255,255,255,0)']]); }
     }),
@@ -93,7 +100,11 @@
     const m = new BABYLON.StandardMaterial('spell_' + name, sc());
     m.disableLighting = true; m.emissiveColor = color; m.diffuseColor = C3(0, 0, 0); m.specularColor = C3(0, 0, 0);
     m.alpha = alpha; if (add) m.alphaMode = BABYLON.Engine.ALPHA_ADD;
-    if (texture) { m.emissiveTexture = texture; m.opacityTexture = texture; }
+    // The texture is only the shape (opacity), the colour is emissiveColor. As
+    // an emissive texture too it was added to the colour (Babylon adds an
+    // emissive texture to emissiveColor), so every textured glow was white
+    // (the fireball's white blob over the caster).
+    if (texture) m.opacityTexture = texture;
     m.backFaceCulling = false; m.fogEnabled = false;
     return m;
   }
@@ -289,49 +300,67 @@
   }
 
   // ------------------------------------------------------------ fireball
+  // Fire reads as fire when it stays orange: additive glow saturates to white
+  // where many sprites overlap (the old 1 m shell and 240 flare particles a
+  // second made a white-yellow egg over the caster), so the body of the flame
+  // is alpha-blended tongues (never brighter than their colour) and only a
+  // small core and a few hot flecks are additive, with little green in them.
   function fireBall(at) {
-    const core = sprite('fireball', .42, C3(1, .72, .35), .85);
-    const shell = sprite('fireball_shell', 1, C3(1, .33, .04), .6); shell.parent = core;
+    const core = sprite('fireball', .22, C3(1, .68, .28), .85);
+    const shell = sprite('fireball_shell', .46, C3(.95, .36, .04), .36); shell.parent = core;
     core.position.copyFrom(at);
     // flames trailing behind it (world-space particles from a moving emitter)
-    const flame = particles('flame', 300, core, T.flare());
-    Object.assign(flame, { minSize: .16, maxSize: .34, minLifeTime: .2, maxLifeTime: .45, emitRate: 240, minEmitPower: .05, maxEmitPower: .35, gravity: V3(0, 1.4, 0) });
-    flame.createSphereEmitter(.09, 1);
-    grad(flame, [[0, C4(1, .55, .15, .5)], [.25, C4(1, .32, .04, .42)], [.6, C4(.6, .09, .01, .28)], [1, C4(.2, .03, .01, 0)]]);
-    flame.addSizeGradient(0, .9); flame.addSizeGradient(1, .25);
+    const flame = particles('flame', 160, core, T.fire(), { blend: 'std' });
+    Object.assign(flame, { minSize: .1, maxSize: .22, minLifeTime: .1, maxLifeTime: .22, emitRate: 120, minEmitPower: .05, maxEmitPower: .3, gravity: V3(0, 1.6, 0) });
+    flame.createSphereEmitter(.08, 1);
+    grad(flame, [[0, C4(1, .78, .32, .55)], [.2, C4(1, .56, .12, .65)], [.55, C4(.92, .28, .05, .42)], [1, C4(.2, .06, .03, 0)]]);
+    flame.addSizeGradient(0, .8); flame.addSizeGradient(.5, 1); flame.addSizeGradient(1, .35);
+    const hot = particles('flame_hot', 90, core, T.flare());
+    Object.assign(hot, { minSize: .07, maxSize: .15, minLifeTime: .08, maxLifeTime: .18, emitRate: 70, minEmitPower: .02, maxEmitPower: .2, gravity: V3(0, 1.2, 0) });
+    hot.createSphereEmitter(.05, 1);
+    grad(hot, [[0, C4(1, .45, .08, .45)], [.5, C4(.8, .16, .02, .25)], [1, C4(.3, .04, 0, 0)]]);
     const smoke = particles('trail_smoke', 120, core, T.smoke(), { blend: 'std' });
     Object.assign(smoke, { minSize: .18, maxSize: .34, minLifeTime: .7, maxLifeTime: 1.2, emitRate: 70, minEmitPower: .02, maxEmitPower: .15, gravity: V3(0, .5, 0) });
-    smoke.createSphereEmitter(.08, 1); grad(smoke, [[0, C4(.12, .1, .09, 0)], [.15, C4(.14, .12, .1, .45)], [1, C4(.3, .29, .28, 0)]]);
+    // (thin and late: seen end-on, coming at you, a dense trail was a dark disc over the ball)
+    smoke.createSphereEmitter(.08, 1); grad(smoke, [[0, C4(.12, .1, .09, 0)], [.3, C4(.16, .13, .11, 0)], [.5, C4(.2, .17, .15, .28)], [1, C4(.3, .29, .28, 0)]]);
     smoke.addSizeGradient(0, .5); smoke.addSizeGradient(1, 2.2);
     const embers = particles('embers', 160, core, T.flare());
     Object.assign(embers, { minSize: .025, maxSize: .055, minLifeTime: .4, maxLifeTime: .9, emitRate: 90, minEmitPower: .3, maxEmitPower: 1.1, gravity: V3(0, -2.5, 0) });
     embers.createSphereEmitter(.12, 1); embers.billboardMode = BABYLON.ParticleSystem.BILLBOARDMODE_STRETCHED;
     embers.color1 = C4(1, .8, .3, 1); embers.color2 = C4(1, .5, .1, 1); embers.colorDead = C4(.6, .1, 0, 0);
-    flame.start(); smoke.start(); embers.start();
-    const L = light(at, C3(1, .5, .16), 0, 4.5);
+    flame.start(); hot.start(); smoke.start(); embers.start();
+    const L = light(at, C3(1, .42, .12), 0, 4.5);
     let alive = true, lastTrack = 0;
     const stopPulse = tween(60000, () => { if (!alive) return; const t = performance.now() / 1000; shell.scaling.setAll(1 + Math.sin(t * 31) * .1 + Math.sin(t * 17) * .08); L.position.copyFrom(core.position); L.intensity = L._base * (.82 + Math.random() * .36); if (performance.now() - lastTrack > 200) { lastTrack = performance.now(); window.tablefolkScenery?.trackLight(L); } });
     L._base = 0;
     return {
       core, light: L,
       // (a mesh's dispose takes the particle systems it emits, textures and all)
-      end() { alive = false; stopPulse(); for (const s of [flame, smoke, embers]) { s.emitter = core.position.clone(); retire(s, 0); } kill(shell, core, L); },
+      end() { alive = false; stopPulse(); for (const s of [flame, hot, smoke, embers]) { s.emitter = core.position.clone(); retire(s, 0); } kill(shell, core, L); },
     };
   }
   function explode(at, { ground = true, size = 1 } = {}) {
     const lt = light(at.add(V3(0, .4, 0)), C3(1, .55, .2), 7 * size, 7 * size); flicker(lt, 7 * size, 750);
-    const flash = sprite('flash', 1, C3(1, .7, .35), .75), bloom = sprite('bloom', 1, C3(.9, .3, .04), .6);
+    const flash = sprite('flash', 1, C3(1, .85, .55), .7), bloom = sprite('bloom', 1, C3(.9, .3, .04), .6);
     flash.position.copyFrom(at); bloom.position.copyFrom(at);
-    tween(260, u => { flash.scaling.setAll((.6 + 2.2 * Math.sqrt(u)) * size); flash.material.alpha = .8 * (1 - u) * (1 - u); flash.material.emissiveColor.set(1, .7 - .35 * u, .35 - .3 * u); }, () => kill(flash));
+    tween(260, u => { flash.scaling.setAll((.6 + 2.2 * Math.sqrt(u)) * size); flash.material.alpha = .7 * (1 - u) * (1 - u); flash.material.emissiveColor.set(1, .85 - .45 * u, .55 - .5 * u); }, () => kill(flash));
     tween(650, u => { bloom.scaling.setAll((1.2 + 2 * Math.sqrt(u)) * size); bloom.material.alpha = .65 * Math.pow(1 - u, 1.6); }, () => kill(bloom));
     if (ground) floorGlow(at, 5 * size, C3(1, .5, .15), .9, 900);
-    const fire = particles('burst_fire', 260, at.clone(), T.flare());
-    Object.assign(fire, { minSize: .4 * size, maxSize: 1 * size, minLifeTime: .45, maxLifeTime: 1, minEmitPower: 1.2 * size, maxEmitPower: 3.6 * size, gravity: V3(0, 2.2, 0) });
+    // the fireball: tongues of flame (alpha-blended, so it stays orange where
+    // they pile up) and a hotter additive heart
+    const fire = particles('burst_fire', 200, at.clone(), T.fire(), { blend: 'std' });
+    Object.assign(fire, { minSize: .45 * size, maxSize: 1.05 * size, minLifeTime: .4, maxLifeTime: .95, minEmitPower: 1.2 * size, maxEmitPower: 3.4 * size, gravity: V3(0, 2.2, 0) });
     fire.createSphereEmitter(.25 * size, 1);
-    grad(fire, [[0, C4(1, .62, .25, .65)], [.2, C4(.95, .36, .05, .55)], [.55, C4(.6, .13, .02, .38)], [1, C4(.15, .02, 0, 0)]]);
-    fire.addSizeGradient(0, .6); fire.addSizeGradient(.4, 1.1); fire.addSizeGradient(1, .5);
+    grad(fire, [[0, C4(1, .8, .4, .9)], [.15, C4(1, .56, .12, .85)], [.5, C4(.9, .26, .04, .6)], [.8, C4(.3, .08, .03, .35)], [1, C4(.12, .05, .04, 0)]]);
+    fire.addSizeGradient(0, .6); fire.addSizeGradient(.4, 1.1); fire.addSizeGradient(1, .7);
     if (fire.addDragGradient) try { fire.addDragGradient(0, .1); fire.addDragGradient(1, .85); } catch {}
-    burst(fire, 220);
+    burst(fire, 170);
+    const heat = particles('burst_heat', 90, at.clone(), T.flare());
+    Object.assign(heat, { minSize: .35 * size, maxSize: .8 * size, minLifeTime: .2, maxLifeTime: .5, minEmitPower: .8 * size, maxEmitPower: 2.4 * size, gravity: V3(0, 1.5, 0) });
+    heat.createSphereEmitter(.2 * size, 1);
+    grad(heat, [[0, C4(1, .5, .12, .45)], [.4, C4(.9, .22, .03, .3)], [1, C4(.2, .03, 0, 0)]]);
+    if (heat.addDragGradient) try { heat.addDragGradient(0, .1); heat.addDragGradient(1, .85); } catch {}
+    burst(heat, 70);
     const smoke = particles('burst_smoke', 60, at.add(V3(0, .1, 0)), T.smoke(), { blend: 'std' });
     Object.assign(smoke, { minSize: .7 * size, maxSize: 1.3 * size, minLifeTime: 1.4, maxLifeTime: 2.4, minEmitPower: .5, maxEmitPower: 1.4 * size, gravity: V3(0, .7, 0) });
     smoke.createSphereEmitter(.35 * size, 1); grad(smoke, [[0, C4(.16, .13, .11, 0)], [.1, C4(.2, .17, .15, .6)], [.6, C4(.3, .29, .28, .35)], [1, C4(.4, .4, .4, 0)]]);
@@ -348,7 +377,7 @@
   }
   // Fly a fireball from -> to (arc), then explode; done(at) after the blast.
   function flyFireball(from, to, { arc = .5, speed = 8, ground = true, size = 1, charge = null } = {}, done) {
-    const ball = fireBall(from); ball.light._base = 2.2;
+    const ball = fireBall(from); ball.light._base = 1.6;
     const dist = BABYLON.Vector3.Distance(from, to), dur = Math.max(.22, dist / speed);
     const roar = SOUND.fireRoar(from, dur);
     const mid = BABYLON.Vector3.Lerp(from, to, .5).add(V3(0, dist * .12 * arc, 0));
@@ -358,16 +387,29 @@
     }, () => { ball.end(); explode(to, { ground, size }); done?.(to); });
     void charge;
   }
-  // The charge in the hands before a throw.
-  function chargeAt(pos, color, ms, kind) {
-    const orb = sprite('charge', .5, color, .8); orb.position.copyFrom(pos);
-    const swirl = particles('charge', 120, pos.clone(), T.flare());
-    Object.assign(swirl, { minSize: .04, maxSize: .1, minLifeTime: .25, maxLifeTime: .4, emitRate: 220, minEmitPower: -1.4, maxEmitPower: -.8, gravity: V3(0, 0, 0) });
-    swirl.createSphereEmitter(.45, 0);
-    swirl.color1 = C4(color.r, color.g, color.b, 1); swirl.color2 = C4(1, 1, 1, 1); swirl.colorDead = C4(color.r, color.g, color.b, 0);
-    swirl.start(); retire(swirl, ms);
-    const L = light(pos, color, 0, 3);
-    tween(ms, u => { orb.scaling.setAll(.2 + u * (kind === 'fire' ? 1.1 : .8) + Math.sin(u * 60) * .05); orb.material.alpha = .5 + .4 * u; L.intensity = 2.2 * u * (.8 + Math.random() * .4); }, () => kill(orb, L));
+  // The charge in the hands before a throw: flame gathering in the palm (a
+  // small orange core, tongues of fire licking up, sparks drawn in), small
+  // enough that the caster stays visible behind it.
+  function chargeAt(pos, color, ms) {
+    const core = sprite('charge', .2, C3(1, .62, .22), .85); core.position.copyFrom(pos);
+    const halo = sprite('charge_halo', .38, C3(.85, .32, .04), .3); halo.position.copyFrom(pos);
+    const lick = particles('charge_flame', 70, pos.clone(), T.fire(), { blend: 'std' });
+    Object.assign(lick, { minSize: .07, maxSize: .16, minLifeTime: .2, maxLifeTime: .38, emitRate: 30, minEmitPower: .05, maxEmitPower: .2, gravity: V3(0, 1.3, 0) });
+    lick.createSphereEmitter(.06, 1);
+    grad(lick, [[0, C4(1, .78, .3, .75)], [.3, C4(1, .52, .1, .72)], [.7, C4(.85, .24, .04, .45)], [1, C4(.18, .05, .03, 0)]]);
+    lick.addSizeGradient(0, .6); lick.addSizeGradient(.4, 1); lick.addSizeGradient(1, .3);
+    const swirl = particles('charge', 80, pos.clone(), T.flare());
+    Object.assign(swirl, { minSize: .025, maxSize: .06, minLifeTime: .25, maxLifeTime: .4, emitRate: 140, minEmitPower: -1.3, maxEmitPower: -.8, gravity: V3(0, 0, 0) });
+    swirl.createSphereEmitter(.4, 0);
+    swirl.color1 = C4(1, .5, .12, 1); swirl.color2 = C4(1, .32, .05, 1); swirl.colorDead = C4(.6, .1, .02, 0);
+    lick.start(); swirl.start(); retire(lick, ms); retire(swirl, ms);
+    const L = light(pos, color, 0, 2.6);
+    tween(ms, u => {
+      const k = Math.sqrt(u), f = .9 + Math.sin(u * 55) * .06 + Math.random() * .06;
+      core.scaling.setAll((.3 + .7 * k) * f); core.material.alpha = .55 + .35 * u;
+      halo.scaling.setAll(.4 + .6 * k); halo.material.alpha = .3 * u;
+      lick.emitRate = 30 + 90 * u; L.intensity = 1.1 * u * (.8 + Math.random() * .4);
+    }, () => kill(core, halo, L));
   }
 
   // ------------------------------------------------------------ lightning
@@ -525,14 +567,14 @@
     castPose(g, 1500);
     const aim = tgt ? tgt.pos() : null, hand = handPos(g, aim);
     if (spell === 'fireball') {
-      chargeAt(hand, C3(1, .55, .15), 480, 'fire'); SOUND.fireCharge(hand);
+      chargeAt(hand, C3(1, .42, .12), 480); SOUND.fireCharge(hand);
       later(480, () => {
         const from = handPos(g, aim);
         if (tgt) {
           // it bursts on the target's near side (in front of the eyes when it is you, in first person)
           let to = tgt.pos().add(V3(0, tgt.who ? heightOf(tgt.who) * .5 : .35, 0));
           const fp = isPlayer(tgt.who) && state.firstPerson, back = from.subtract(to); back.y = 0; back.normalize();
-          to = to.add(back.scale(fp ? 1.1 : tgt.who ? .3 : .25)); if (fp) to.y -= .2;
+          to = to.add(back.scale(fp ? 1.1 : tgt.who ? .3 : .25)); if (fp) to.y = (sc().activeCamera?.globalPosition?.y ?? to.y + .4) - .3;
           flyFireball(from, to, { arc: .6, speed: 8, size: fp ? .75 : 1 }, at => {
             if (tgt.who) window.tablefolkCombat?.hurt(tgt.who, 3, g.id, 'a fireball');
             for (const m of state.props.concat(state.blocks)) {
@@ -598,10 +640,11 @@
 
   // ------------------------------------------------------------ spawn
   const BUILTIN = { crate: 'makeCrate', barrel: 'makeBarrel', mushroom: 'makeMushroom', lamp: 'makeLamp' };
-  const SCENERY = ['campfire', 'lantern', 'fence', 'signpost', 'light'];
+  const SCENERY = ['campfire', 'lantern', 'fence', 'signpost', 'light', 'crystal_ball', 'scrying_pool', 'rune_circle'];
   const EXTRA = { box: 'crate', boxes: 'crate', keg: 'barrel', chair: 'wooden_chair', seat: 'stool', apple: 'apple_crate', apples: 'apple_crate', carrot: 'carrot_crate',
     gold: 'coin_pile', coins: 'coin_pile', coin: 'coin_pile', money: 'coin_pile', fire: 'campfire', candle: 'candles', book: 'bookcase', books: 'bookcase',
-    rock: 'boulder', stone: 'boulder', sack: 'bag', jar: 'pot', cup: 'chalice', goblet: 'chalice', flower: 'flowers', light: 'lantern', lamp_post: 'lantern' };
+    rock: 'boulder', stone: 'boulder', sack: 'bag', jar: 'pot', cup: 'chalice', goblet: 'chalice', flower: 'flowers', light: 'lantern', lamp_post: 'lantern',
+    orb: 'crystal_ball', crystal: 'crystal_ball', scrying_bowl: 'scrying_pool', basin: 'scrying_pool', runes: 'rune_circle', rune: 'rune_circle', magic_circle: 'rune_circle' };
   function known(t) { return !!(ITEM_CATALOG[t] || BUILTIN[t] || SCENERY.includes(t)); }
   function resolveThing(name) {
     let w = String(name || '').toLowerCase().replace(/["'.!]/g, '').replace(/^(a|an|the|some)\s+/, '').trim().replace(/\s+/g, '_');

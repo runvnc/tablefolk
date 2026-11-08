@@ -1,7 +1,10 @@
 // Adds The Oracle's look to wizard.glb (Quaternius): a tall, bent oracle's
-// hat on the head bone and a glowing orb with a gold collar on the staff's
-// knob, each its own mesh and material (the body keeps its one atlas). Run it
-// on the face-corrected file (tools/fix-wizard-face.mjs first):
+// hat on the head bone, a glowing orb with a gold collar on the staff's
+// knob, each its own mesh and material (the body keeps its one atlas), the
+// staff held upright and longer (Idle takes Walk's right arm), and a talking
+// mouth (a Mouth mesh and a beard "jaw", morph targets named mouth_open that
+// app.js drives from the voice). Run it on the face-corrected file
+// (tools/fix-wizard-face.mjs first), then bump the wizard's v in FIGURES:
 //
 //   cp tools/wizard-extras.mjs ~/.cache/tablefolk-gltf/   (beside gltf-transform's node_modules)
 //   git show 4214518:assets/models/characters/quaternius/wizard.glb > face.glb
@@ -54,6 +57,42 @@ function primitive(b, material) {
 }
 const lin = h => { const s = parseInt(h.slice(1), 16); return [s >> 16, s >> 8 & 255, s & 255].map(x => (x / 255) ** 2.2); };
 const NAVY = lin('#1f3a8f'), NAVY_D = lin('#152a6b'), GOLD = lin('#e0b040'), GOLD_D = lin('#a8781e');
+
+// ---- the staff held upright. Quaternius' Idle lowers the right arm and the
+// staff lies almost flat (orb at the hip, "a lollipop"); its Walk carries it
+// upright. Idle takes Walk's right-arm pose (first frame, held still), the
+// staff turns a little in the hand (STAFF_FIX, measured in the game so it
+// stands vertical in Idle) and grows: the hand slides down the shaft
+// (STAFF_SHIFT, mesh units: the mesh is 2 long, .36 m in the game) and the
+// shaft below it lengthens (STAFF_GROW) so the foot still reaches the floor.
+const ARM_R = /^(Shoulder|UpperArm|LowerArm|Fist|Fist1|Fist2|Thumb1|Thumb2|Weapon)\.R$/;
+const STAFF_SHIFT = .75, STAFF_GROW = .85, STAFF_FIX = [0, .071, .0967, .9927];   // FIX: turns the staff's axis (-x in Weapon.R) onto Idle's up there, (-.971, -.192, .141)
+{
+  const anim = n => root.listAnimations().find(a => a.getName().endsWith('|' + n));
+  const idle = anim('Idle'), walk = anim('Walk');
+  const dur = Math.max(...idle.listSamplers().map(s => s.getInput().getMax([])[0]));
+  for (const ch of walk.listChannels()) {
+    const tn = ch.getTargetNode(), path = ch.getTargetPath(); if (!tn || !ARM_R.test(tn.getName())) continue;
+    const s = ch.getSampler(), out = s.getOutput(), v = out.getElement(s.getInterpolation() === 'CUBICSPLINE' ? 1 : 0, []);
+    for (const old of idle.listChannels()) if (old.getTargetNode() === tn && old.getTargetPath() === path) { const os = old.getSampler(); idle.removeChannel(old); old.dispose(); idle.removeSampler(os); os.dispose(); }
+    const smp = doc.createAnimationSampler().setInterpolation('LINEAR')
+      .setInput(doc.createAccessor().setType('SCALAR').setArray(new Float32Array([0, dur])).setBuffer(buf))
+      .setOutput(doc.createAccessor().setType(out.getType()).setArray(new Float32Array([...v, ...v])).setBuffer(buf));
+    idle.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(tn).setTargetPath(path).setSampler(smp));
+  }
+  const st = node('Wizard_Staff'), sp = st.getMesh().listPrimitives()[0], a = sp.getAttribute('POSITION');
+  const P = Array.from({ length: a.getCount() }, (_, i) => a.getElement(i, []));
+  for (const p of P) p[1] += (p[1] > .25 ? STAFF_GROW : 0) - STAFF_SHIFT;   // no vertices between y .05 and .45: the plain shaft
+  sp.setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(Float32Array.from(P.flat())).setBuffer(buf));
+  // turn about the grip
+  const q = st.getRotation(), t = st.getTranslation(), sc = st.getScale()[0];
+  const qm = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  const rot = (q, v) => { const r = qm(qm(q, [...v, 0]), [-q[0], -q[1], -q[2], q[3]]); return r.slice(0, 3); };
+  const gripMesh = [.033, -.206, .047];   // Weapon.R's origin in the mesh
+  const grip = rot(q, gripMesh).map((x, k) => x * sc + t[k]);
+  const q2 = qm(STAFF_FIX, q), g2 = rot(q2, gripMesh).map(x => x * sc);
+  st.setRotation(q2).setTranslation(grip.map((x, k) => x - g2[k]));
+}
 
 // ---- the hat: a brim, then a cone that leans back and bends over near the tip
 const hat = builder(), SEG = 28;
@@ -121,7 +160,7 @@ const hatNode = doc.createNode('Hat').setMesh(doc.createMesh('Hat').addPrimitive
 node('Head').addChild(hatNode);
 
 // ---- the orb: a glowing sphere in a gold collar on the staff's knob
-const orb = builder(), ORB_C = [0, -1.16, 0], ORB_R = .15, LAT = 14, LON = 22;
+const orb = builder(), ORB_C = [0, -1.16 - STAFF_SHIFT, 0], ORB_R = .15, LAT = 14, LON = 22;
 const sphere = (b, c, r, col, lat, lon) => {
   const rows = [];
   for (let i = 0; i <= lat; i++) { const th = i / lat * Math.PI, row = []; for (let j = 0; j < lon; j++) { const ph = j / lon * Math.PI * 2; row.push(b.v([c[0] + r * Math.sin(th) * Math.cos(ph), c[1] + r * Math.cos(th), c[2] + r * Math.sin(th) * Math.sin(ph)], col)); } rows.push(row); }
@@ -144,6 +183,51 @@ const metal = doc.createMaterial('Oracle_Gold').setBaseColorFactor([1, 1, 1, 1])
 const staff = node('Wizard_Staff');
 const orbMesh = doc.createMesh('Staff_Orb').addPrimitive(primitive(orb, glow)).addPrimitive(primitive(collar, metal));
 node('Weapon.R').addChild(doc.createNode('Staff_Orb').setMesh(orbMesh).setTranslation(staff.getTranslation()).setRotation(staff.getRotation()).setScale(staff.getScale()));
+
+// ---- the mouth: under the moustache, above the beard (Quaternius left no
+// mouth: the skull's chin hides behind them). One mesh, its own node on the
+// Head with the Face node's transform (Face space: x across, -y forward, z
+// up): an upper lip, upper teeth, a dark cavity and a lower lip. Its morph
+// target "mouth_open" drops the lower lip (most in the middle, none at the
+// corners) and stretches the cavity after it; the Face mesh gets a target of
+// the same name that drops the beard with it, like a jaw. The game drives
+// both from the voice's level (app.js, updateMouth); at 0 the lips meet.
+{
+  const MX = .11, ZT = -.552, RY = -.875, OPEN = .085, BEARD = .045, N = 16;   // RY: in front of the skull's flat face (y -.83 in the middle)
+  const top = t => ZT - .012 * t * t, ry = t => RY + .03 * t * t;     // the lip line, and the face's curve
+  const drop = t => OPEN * Math.max(0, 1 - t * t) ** .8;
+  const mouth = builder(), D = [];
+  const v = (p, c, d = [0, 0, 0]) => { D.push(d); return mouth.v(p, c); };
+  const grid = (rows, cols) => { for (let r = 0; r < rows.length - 1; r++) for (let i = 0; i < cols - 1; i++) mouth.quad(rows[r][i], rows[r][i + 1], rows[r + 1][i + 1], rows[r + 1][i]); };
+  const LIP = lin('#7e3e30'), LIP_D = lin('#4e221a'), TEETH = lin('#ece2c6'), DARK = lin('#2a0a0a'), DEEP = lin('#120303');
+  const ts = n => Array.from({ length: n }, (_, i) => -1 + 2 * i / (n - 1));
+  // upper lip: a short band from under the moustache down to the lip line
+  grid([[.022, -.004, LIP_D], [.008, -.012, LIP], [0, -.008, LIP]].map(([dz, dy, c]) => ts(N).map(t => v([t * MX * 1.08, ry(t) + dy * (1 - .5 * t * t), top(t) + dz], c))), N);
+  // the cavity: from the lip line down to behind the lower lip, recessed; opens with the lip
+  const R = 5;
+  grid(Array.from({ length: R + 1 }, (_, r) => ts(N).map(t => { const f = r / R, k = Math.max(0, 1 - t * t);
+    return v([t * MX, ry(t) + .012 * Math.sin(Math.PI * f) * k, top(t) - .012 * f * k], f > .2 && f < .8 ? DEEP : DARK, [0, 0, -drop(t) * f]); })), N);   // (a deeper recess goes behind the skull)
+  // upper teeth, just behind the lips
+  grid([[-.001, TEETH], [-.022, TEETH]].map(([dz, c]) => ts(10).map(t => v([t * MX * .62, ry(t * .62) + .004, top(t * .62) + dz * (1 - .35 * t * t)], c))), 10);
+  // lower lip: a soft roll whose top meets the upper lip when closed
+  grid([[.002, -.006, LIP], [-.012, -.02, LIP], [-.03, -.008, LIP_D]].map(([dz, dy, c]) => ts(N).map(t => { const k = .35 + .65 * Math.sqrt(Math.max(0, 1 - t * t));
+    return v([t * MX * 1.04, ry(t) + dy * k, top(t) + dz * k], c, [0, .1 * drop(t), -drop(t)]); })), N);
+  const lips = doc.createMaterial('Oracle_Mouth').setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(.55).setMetallicFactor(0).setDoubleSided(true);
+  const prim = primitive(mouth, lips);
+  prim.addTarget(doc.createPrimitiveTarget('mouth_open').setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(Float32Array.from(D.flat())).setBuffer(buf)));
+  const mesh = doc.createMesh('Mouth').addPrimitive(prim).setWeights([0]).setExtras({ targetNames: ['mouth_open'] });
+  node('Head').addChild(doc.createNode('Mouth').setMesh(mesh).setTranslation(face.getTranslation()).setRotation(face.getRotation()).setScale(face.getScale()));
+  // the beard drops with the lower lip (a jaw): everything below the lip line in front, fading out by the sideburns
+  const fp = face.getMesh().listPrimitives()[0], a = fp.getAttribute('POSITION'), FD = [];
+  const ss = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  let moved = 0;
+  for (let i = 0; i < a.getCount(); i++) { const p = a.getElement(i, []);
+    const w = ss(-.555, -.6, p[2]) * ss(.44, .28, Math.abs(p[0])) * ss(-.4, -.5, p[1]);
+    if (w > 0) moved++; FD.push(0, .25 * BEARD * w, -BEARD * w); }
+  fp.addTarget(doc.createPrimitiveTarget('mouth_open').setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(Float32Array.from(FD)).setBuffer(buf)));
+  face.getMesh().setWeights([0]).setExtras({ targetNames: ['mouth_open'] });
+  console.log('mouth', mouth.P.length, 'vertices; beard vertices that move:', moved);
+}
 
 await doc.transform(reorder({ encoder: MeshoptEncoder }), quantize());
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });

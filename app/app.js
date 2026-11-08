@@ -3114,7 +3114,7 @@ function installDirectControlHandlers(){
 // Solid things nobody walks through (characters and the player alike).
 // Small loose items (tools, potions, scrolls, coins, notes, bags, buckets,
 // mushrooms) can be stepped over; a carried item never blocks its carrier.
-const BLOCKING_TYPES=new Set(['wall','rock','boulder','tree','house','campfire','lantern','signpost','bakery','fence','bridge','crate','barrel','chest','table','bench','stool','workbench','cauldron','anvil','weapon_stand','apple_crate','carrot_crate','lamp','desk','office_chair','armchair','sofa','coffee_table','floor_lamp','plant','bookshelf']);
+const BLOCKING_TYPES=new Set(['wall','rock','boulder','tree','house','campfire','lantern','signpost','bakery','fence','bridge','crate','barrel','chest','table','bench','stool','workbench','cauldron','anvil','weapon_stand','apple_crate','carrot_crate','lamp','crystal_ball','scrying_pool','desk','office_chair','armchair','sofa','coffee_table','floor_lamp','plant','bookshelf']);
 function isBlocked(x, z) {
   // painted water/lava can't be walked through
   const pt = paintAt(x, z); if (pt && PAINT_MATERIALS[pt.mat]?.blocks) return true;
@@ -3389,7 +3389,7 @@ function carry(g,name=''){
   }
   return carryMesh(g,nearestTarget(g,1.8));
 }
-function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
+function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','crystal_ball','scrying_pool','rune_circle','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot
@@ -3862,7 +3862,7 @@ function isWithinFacingVision(g,cx,cz,x,z,radius){
 }
 function typeGlyph(type){
   const map={
-    wall:'#', door:'+', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K', bookcase:'K'
+    wall:'#', door:'+', bridge:'=', rock:'r', boulder:'r', tree:'%', house:'H', campfire:'X', signpost:'I', rubble:'x', crate:'C', apple_crate:'C', carrot_crate:'C', barrel:'B', mushroom:'M', lamp:'L', lantern:'L', crystal:'*', crystal_ball:'*', scrying_pool:'*', rune_circle:'*', bakery:'H', fence:'f', chest:'h', workbench:'w', table:'t', bench:'n', stool:'s', cauldron:'o', anvil:'a', weapon_stand:'W', axe:'/', pickaxe:'p', bucket:'u', bag:'b', potion:'P', scroll:'S', coin_pile:'$', desk:'D', office_chair:'c', armchair:'A', sofa:'F', coffee_table:'T', floor_lamp:'l', plant:'v', bookshelf:'K', bookcase:'K'
   };
   return map[type] || (type ? type[0].toUpperCase() : '?');
 }
@@ -4454,7 +4454,7 @@ function defaultVoiceFor(id,model){
 const FIG_ASSET=ASSET_BASE+'models/characters/quaternius/';
 const FIGURES={
   // Universal rig (tools/build-figures.sh): realistic proportions, a little taller
-  peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28},
+  peasant:{h:1.34}, hooded:{h:1.3}, farmer:{h:1.28}, wizard:{h:1.28,v:'20261108a'},
   // The main people are Meshy models made from JRPG concept art (tools/fal-character.py, 2026-10-25);
   // the old Quaternius ones stay as <name>_classic.
   swordswoman:{dir:'meshy',h:1.3,v:'20261101a'}, sorceress:{dir:'meshy',h:1.32,v:'20261101a'}, huntress:{dir:'meshy',h:1.3,v:'20261101a'}, villager_woman:{dir:'meshy',h:1.26,v:'20261101a'},
@@ -4527,6 +4527,10 @@ async function createFigure(id,pos,model,label){
   agg?.body?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
   const g={id,root,collider,agg,selected:false,anim:'idle',t:Math.random()*10,dir:new BABYLON.Vector3(0,0,-1),style:label||model,traits:{fireball:40,obedience:50},rigged:true,rigRoot:importedRoot,rigAnims,
     owned:{meshes:[...res.meshes],skeletons:[...(res.skeletons||[])],groups:[...(res.animationGroups||[])]},rigMode:null,activeRigAnim:null,cosmetic:{},logicalPos:new BABYLON.Vector3(pos.x,0,pos.z),charModel:model,figure:true,height:F.h};
+  // a model with a "mouth_open" morph target talks with it (wizard.glb: its
+  // mouth and beard, tools/wizard-extras.mjs); updateMouth drives it
+  const mouthTargets=res.meshes.flatMap(m=>{ const mtm=m.morphTargetManager; if(!mtm) return []; const out=[]; for(let i=0;i<mtm.numTargets;i++){ const t=mtm.getTarget(i); if(t.name==='mouth_open') out.push(t); } return out; });
+  if(mouthTargets.length) g.mouth={influence:0,apply(){ for(const t of mouthTargets) t.influence=this.influence; }};
   playRig(g,'idle',true);
   state.characters.push(g);
   return g;

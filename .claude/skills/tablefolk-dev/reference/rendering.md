@@ -47,6 +47,32 @@ post-processing).
   once took the first 8 lights in scene order and lava's light vanished: that
   is why the nearest-4 rule exists. Hidden meshes keep their nearby lights.
 
+## Glows and magic
+
+- Unlit glows are `StandardMaterial` with `disableLighting`, the colour in
+  `emissiveColor` and the shape in `opacityTexture` (additive). Never put the
+  texture in `emissiveTexture` to tint it: Babylon *adds* an emissive texture
+  to `emissiveColor`, so a white flare came out white whatever the colour
+  (that was the fireball's white blob over the caster). Only a texture drawn
+  in colour (the crystal ball's nebula) is an emissive texture, with a black
+  `emissiveColor`.
+- Additive layers saturate to white where many overlap. Fire that must stay
+  orange is alpha-blended tongues (`spells.js` `T.fire`, `blend: 'std'`) with
+  a small additive core; the explosion is the same plus a short additive flash.
+- Gold or coloured inlays over a coloured floor are alpha-blended
+  (`ALPHA_COMBINE`), not additive: additive gold over the blue rug turned white.
+- Floor decals and glow pools are excluded from the glow layer
+  (`state.glowLayer.addExcludedMesh`); the rune circle is dimmer above light
+  quality, where bloom spreads it.
+- Arcane scenery (`scenery.js`: `crystal_ball`, `scrying_pool`, `rune_circle`):
+  a glossy pedestal (lathe column, `plasticFinish`) and unlit additive layers
+  with one small point light each (in the nearest-4 budget), a glow decal on
+  the floor (floors take no local lights), up to ~25 CPU particles, one
+  `onBeforeRender` observer each. Per-object materials are listed in
+  `state.sharedAssetMats` so `disposeWorldObject` doesn't dispose their shared
+  canvas textures, and are disposed by the object's `cleanup` a microtask later.
+  `?art=1` is still mode (no animation, no particles): add `&still=0` to see them move.
+
 ## Walls and doors
 
 - Styles: `tabletop` (joined stone-block sections), `stone` (dry-stone: flat
@@ -139,7 +165,19 @@ when the follow camera's ray hits it, else 1; never in the free camera.
   keys pulled toward the bone's mean pose, head/neck/hips half again): the
   raw clip turned the head and hips about 90 degrees.
 - Speech bubbles sit a fixed 42 px above the projected head. The head bone's
-  Y scale flaps while TTS speaks (`speechstart` / `speechend`).
+  Y scale flaps while TTS speaks (`speechstart` / `speechend`) for rigs
+  without a mouth.
+- Talking mouths: `g.mouth = {influence, apply()}` is driven each frame by
+  `updateMouth` from `tablefolkTTS.level()` (the playing voice's RMS, x7)
+  when that voice is the character's, else a procedural chatter while an
+  unvoiced bubble shows; 0 when silent or with TTS off. Three sources: the
+  critter's runtime morph (`addMouthMorph`), KayKit people's dark sphere on
+  the head bone scaled open (`addPersonMouth`), and any figure whose GLB has
+  morph targets named `mouth_open` (`createFigure` collects them all):
+  wizard.glb's `Mouth` mesh (lips, teeth, cavity; built in the file by
+  `tools/wizard-extras.mjs`) and its beard on the `Face` mesh, which drops
+  with the lower lip like a jaw. The mouth sits in front of the skull's flat
+  face (Face space y -.875; deeper and the body mesh hides it).
 - First person hides the avatar and draws forearms in rendering group 1
   (`app/fp-hands.js`); post-process pipelines move to the first-person
   camera.

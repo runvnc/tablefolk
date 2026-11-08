@@ -46,7 +46,7 @@
   const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll']);
   const OBJECT_GROUPS = [
     ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note']],
-    ['Light', ['torch', 'candelabra', 'candles', 'lantern', 'lamp', 'campfire', 'floor_lamp']],
+    ['Light', ['torch', 'candelabra', 'candles', 'lantern', 'lamp', 'campfire', 'floor_lamp', 'crystal_ball', 'scrying_pool', 'rune_circle']],
     ['Furniture', ['table', 'bench', 'stool', 'wooden_chair', 'bed', 'double_bed', 'bookcase', 'bookshelf', 'cabinet', 'nightstand', 'desk', 'lectern', 'armchair', 'sofa', 'coffee_table', 'office_chair', 'plant']],
     ['Storage', ['barrel', 'crate', 'iron_crate', 'apple_barrel', 'apple_crate', 'carrot_crate', 'bucket', 'pot', 'vase', 'broken_pot', 'cauldron']],
     ['Work', ['anvil', 'workbench', 'weapon_stand', 'axe', 'pickaxe', 'rope', 'logs', 'dummy', 'target', 'cage', 'chains', 'wall_banner', 'banner']],
