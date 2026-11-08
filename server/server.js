@@ -49,7 +49,24 @@ function headersFor(path) {
 
 const TYPES = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.glb': 'model/gltf-binary', '.litertlm': 'application/octet-stream', '.md': 'text/markdown; charset=utf-8' };
 
+// Short links to the worlds in scenarios/: /oracle, /goblin-bakery. A single
+// path word that is no file or folder here, matching scenarios/<word>.json or
+// scenarios/the-<word>.json, redirects to the app with that world (with the
+// link's own query, e.g. /oracle?intro=1). 302: the names may change.
+function scenarioShortLink(url) {
+  const m = url.pathname.match(/^\/([a-z0-9][a-z0-9-]{1,60})\/?$/i);
+  if (!m || existsSync(join(ROOT, m[1]))) return null;
+  const word = m[1].toLowerCase();
+  for (const name of [word, 'the-' + word]) {
+    if (!existsSync(join(ROOT, 'scenarios', name + '.json'))) continue;
+    const q = new URLSearchParams(url.search); q.set('scenario', '../scenarios/' + name + '.json');
+    return Response.redirect('/app/?' + q.toString().replace(/%2F/g, '/'), 302);
+  }
+  return null;
+}
+
 async function serveStatic(req, url) {
+  const short = scenarioShortLink(url); if (short) return short;
   let rel = decodeURIComponent(url.pathname);
   const file0 = normalize(join(ROOT, rel));
   if (!file0.startsWith(ROOT) || /(^|\/)\.(env|git|admin)(\/|$)/.test(rel)) return new Response('forbidden', { status: 403 });

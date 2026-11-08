@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-08
 
+- **Short links to the worlds in `scenarios/`**: `/oracle` opens The Oracle, `/goblin-bakery` Goblin Bakery (a leading "the-" can be left out; the link's own query passes on, e.g. `/oracle?intro=1`). The share button copies the short link for a world straight from its file.
 - **One fireball kills the Oracle** (3 hit points). Qwen2.5 0.5B is out of the model menus (still loadable with `?model=qwen2.5-0.5b`).
 - **Oracle-like things at the heart of his chamber**: three new objects built in code, `crystal_ball` (violet light swirling in dark glass on a gilded pedestal), `scrying_pool` (a golden bowl of glowing water with ripples and a faint mist) and `rune_circle` (gold runes and a seven-pointed star inlaid in the floor, turning slowly). The Oracle stands on a rune circle between a crystal ball and a scrying pool, where the plain cauldron was; `spawn()` can conjure them, characters see them, the ball and pool are solid and too heavy to carry.
 - **The fireball looks like fire**: the charge in his hands is a small orange core with tongues of flame and sparks drawn in, the ball and its explosion are orange flame (alpha-blended tongues, a small additive core) instead of a white-yellow blob that hid the caster. Every textured spell glow was white because its texture was added to its colour; it is tinted now.

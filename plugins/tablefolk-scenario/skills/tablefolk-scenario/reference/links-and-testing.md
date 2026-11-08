@@ -102,3 +102,7 @@ lose: {"player_has": "magic sword"}
 
 The same format runs headless from the command line:
 `tools/browser-test/agenttest.mjs` (see `tools/browser-test/README.md`).
+
+## Short links
+
+Every world in `scenarios/` has a short link: its file name without `.json`, and without a leading `the-` (`/oracle` for `scenarios/the-oracle.json`, `/goblin-bakery`). The server redirects it to `/app/?scenario=../scenarios/<file>.json`, keeping the link's own query (`/oracle?intro=1&view=follow`). Names that are real files or folders (`/app`, `/world`, `/admin`...) are never short links. The scenario banner's **share link** copies the short link while the world is unchanged from its file, else a `#s=` link with the world inside.

@@ -55,3 +55,5 @@ no forwarding headers; anything through a reverse proxy or tunnel is a
 visitor, identified by its real address (`requestIps`). Visitors get the
 admin page's guest rights and `overLimit(req, name, n, ms)` per address
 (numbers in the scenario skill's `server.md`).
+
+- **Short links** (`scenarioShortLink` in `server/server.js`, before static files): `/<word>` matching `scenarios/<word>.json` or `scenarios/the-<word>.json`, when no file or folder has that name, redirects (302) to the app with that world. `scenario.js` (`fileLink`) shares the short form.

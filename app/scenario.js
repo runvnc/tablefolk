@@ -1295,6 +1295,7 @@
   const INTRO_KEY = 'tablefolk.hideIntros';
   const introsHidden = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; } };
   // ?intro=0|1 (or &intro= in a link's #s= part) wins, then the world's "showIntro": false, then the player's own "don't show intros"
+  let fileLink = null;   // { slug, code } when the world came from a scenarios/ file (its short link)
   let linkIntro = null;   // read in openLink: opening the world rewrites the hash
   // ?view=overview|follow|first (or &view= in a link's #s= part) wins over the world's "view"
   let linkView = null;
@@ -1349,7 +1350,8 @@
     if (act === 'exit') exitScenario();
     if (act === 'leave') leaveWorld();
     if (act === 'restart' && active) playScenario(active.scn, { code: active.code });
-    if (act === 'share' && active) copy(linkFor(active.code), 'scenario link');
+    // a world straight from scenarios/ (unchanged since) shares as its short link: /oracle (server.js scenarioShortLink)
+    if (act === 'share' && active) copy(fileLink && fileLink.code === active.code ? location.origin + '/' + fileLink.slug : linkFor(active.code), 'scenario link');
     if (act === 'copyresult') copy($('scenarioEnd')?.dataset.share || '', 'result');
   });
 
@@ -1810,7 +1812,11 @@ turns: 6`;
       else if (m) { code = m[1]; scn = await decodeScenario(code); }
     } catch (e) { console.error('[scenario] could not open link', e); window.tablefolkToast?.('could not open scenario link: ' + e.message, { type: 'error' }); return; }
     if (!scn) return;
-    try { await playScenario(scn, code ? { code } : {}); writeJson(normalizeScenario(scn)); }
+    try {
+      await playScenario(scn, code ? { code } : {}); writeJson(normalizeScenario(scn));
+      const f = !code && String(q.get('scenario') || '').match(/(?:^|\/)scenarios\/(?:the-)?([a-z0-9][a-z0-9-]*)\.json$/i);
+      fileLink = f && active ? { slug: f[1].toLowerCase(), code: active.code } : null;
+    }
     catch (e) { console.error(e); window.tablefolkToast?.('scenario failed: ' + e.message, { type: 'error' }); }
   }
   window.addEventListener('hashchange', () => { if (/^#s(cenario)?=/.test(location.hash) && location.hash.slice(3) !== active?.code) openFromUrl({ pasted: true }); });
