@@ -34,8 +34,10 @@
  * sound effects (sfx.js enabled).
  *
  *   window.tablefolkSpells = { cast(g, spell, target), spawn(g, thing, n),
- *     fireballVfx(from, to), resolveThing(name), sound, audio: { source, noise,
- *     tone } (the 3D sound helpers, also used by reactions.js's cries) }
+ *     fireballVfx(from, to), resolveThing(name), prewarm() (run 1.5 s after
+ *     each world starts: draws every glow and particle kind once, invisibly, so
+ *     the first spell doesn't stall on GPU pipelines), sound, audio: { source,
+ *     noise, tone } (the 3D sound helpers, also used by reactions.js's cries) }
  * The caster's arms: reactions.js gesture() plays and holds the cast clip.
  *
  * Loaded after app.js and combat.js; uses app.js globals (state, meta,
@@ -123,6 +125,10 @@
   }
   const kill = (...xs) => { for (const x of xs) try { if (x?.material && !x.material._spellShared) x.material.dispose(false, false); x?.dispose?.(); } catch {} };
   function light(pos, color, intensity, range) {
+    // Light quality: no real light (a new light recompiles the shaders of
+    // everything it reaches, and each costs every pixel); the glows, sprites,
+    // floor pools and sky flash carry the spell. A stand-in takes the calls.
+    if (lite()) return { position: pos.clone(), intensity, diffuse: color, range, isDisposed: () => true, dispose() {}, getAbsolutePosition() { return this.position; } };
     const L = new BABYLON.PointLight('spell_light', pos.clone(), sc());
     L.diffuse = color; L.specular = color.scale(.5); L.intensity = intensity; L.range = range;
     window.tablefolkScenery?.trackLight(L);   // into the nearest-lights budget
@@ -727,5 +733,46 @@
     });
   }
 
-  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, sound: SOUND, audio: { source, noise, tone, listen: updateListener, place: setPos } };
+  // Compile what a first spell needs before anyone casts: the first lightning
+  // froze the picture ~200 ms (measured 2026-11-08), most of it WebGPU making
+  // render pipelines at the first draw. So each kind of glow material and both
+  // kinds of particle system are drawn for a few frames just in front of the
+  // camera, all of them black or clear (nothing shows), then dropped.
+  function prewarm() {
+    const s = sc(), cam = s?.activeCamera; if (!s || !cam || prewarm.done) return; prewarm.done = true;
+    const at = cam.globalPosition.add(cam.getForwardRay(1).direction.scale(1.5)), made = [];
+    try {
+      for (const k of ['flare', 'fire', 'smoke', 'ring', 'scorch']) T[k]();
+      const black = C3(0, 0, 0);
+      const scorchMat = new BABYLON.StandardMaterial('spell_warm_scorch', s); scorchMat.diffuseTexture = T.scorch(); scorchMat.useAlphaFromDiffuseTexture = true; scorchMat.disableLighting = true; scorchMat.emissiveColor = black; scorchMat.diffuseColor = black; scorchMat.specularColor = black; scorchMat.zOffset = -2; scorchMat.alpha = .001;
+      const mats = [glowMat('warm_add', black, { alpha: .001 }), glowMat('warm_tex', black, { texture: T.flare(), alpha: .001 }), glowMat('warm_std', black, { add: false, texture: T.smoke(), alpha: .001 }), scorchMat];
+      mats.forEach((m, i) => {
+        const q = fx(BABYLON.MeshBuilder.CreateTube('spell_warm', { path: [at, at.add(V3(0, .05, 0))], radius: .005, tessellation: 4, cap: 0 }, s));
+        q.position.x = i * .001; q.material = m; made.push(q, m);
+      });
+      const clear = C4(0, 0, 0, 0);
+      const spark = particles('warm_spark', 8, at.clone(), T.flare()); spark.billboardMode = BABYLON.ParticleSystem.BILLBOARDMODE_STRETCHED;
+      const puff = particles('warm_puff', 8, at.clone(), T.smoke(), { blend: 'std' }); grad(puff, [[0, clear], [1, clear]]); puff.addSizeGradient(0, .01); puff.addSizeGradient(1, .01);
+      for (const p of [spark, puff]) { p.color1 = p.color2 = p.colorDead = clear; p.minSize = p.maxSize = .01; p.emitRate = 30; p.start(); made.push(p); }
+    } catch (e) { console.warn('[spells] prewarm', e); }
+    // dropped after three frames with everything ready (drawn), 10 s at most:
+    // a fixed wait missed it while the world's own shaders were still compiling
+    const meshes = made.filter(x => x instanceof BABYLON.AbstractMesh), systems = made.filter(x => x.getActiveCount), t0 = performance.now(); let drawn = 0;
+    const obs = s.onAfterRenderObservable.add(() => {
+      if (meshes.every(m => m.isReady(true)) && systems.every(p => p.isReady() && p.getActiveCount() > 0)) drawn++;
+      if (drawn < 3 && performance.now() - t0 < 10000) return;
+      s.onAfterRenderObservable.remove(obs); prewarm.drawn = drawn >= 3;
+      // the particle systems stay, stopped (disposing one let its compiled
+      // effect go, and the first spell compiled it again)
+      for (const x of made) try { if (x.getActiveCount) { x.stop(); x.emitRate = 0; } else x.dispose(); } catch {}
+    });
+  }
+  // once a world is up and drawing (rendering is held while a scenario loads,
+  // and nothing drawn then warms anything); a page without one: a while after
+  // the scene is ready
+  window.addEventListener('tablefolk-scenario-started', () => setTimeout(prewarm, 1500));
+  const fallback = () => setTimeout(prewarm, 8000);
+  if (window.TABLEFOLK_SCENE_READY) fallback(); else window.addEventListener('tablefolk-scene-ready', fallback, { once: true });
+
+  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, prewarm, sound: SOUND, audio: { source, noise, tone, listen: updateListener, place: setPos } };
 })();

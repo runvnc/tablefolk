@@ -1800,7 +1800,7 @@ function setLighting(mode='night'){
   }
   state.lighting=mode;
 }
-function makeLamp(scene,x,z){ const root=new BABYLON.TransformNode('lamp_root',scene); root.position.set(x,state.terrainTopY??0,z); const pole=BABYLON.MeshBuilder.CreateCylinder('lamp_pole',{height:.85,diameter:.07,tessellation:6},scene); pole.parent=root; pole.position.y=.46; pole.material=state.materials.darkwood; addShadow(pole); const c=createCrystal('lamp_crystal',scene,.38,.14); c.parent=root; c.position.y=.98; c.material=state.materials.magic; addShadow(c); const light=new BABYLON.PointLight('lamp_light',new BABYLON.Vector3(0,.96,0),scene); light.parent=root; light.diffuse=new BABYLON.Color3(.37,.78,.72); light.intensity=.34; light.range=3.1; tag(root,'lamp',{health:1,material:'crystal'}); pole.metadata={proxy:root}; c.metadata={proxy:root}; addLampPool(scene,root); state.props.push(root); return root; }
+function makeLamp(scene,x,z){ const root=new BABYLON.TransformNode('lamp_root',scene); root.position.set(x,state.terrainTopY??0,z); const pole=BABYLON.MeshBuilder.CreateCylinder('lamp_pole',{height:.85,diameter:.07,tessellation:6},scene); pole.parent=root; pole.position.y=.46; pole.material=state.materials.darkwood; addShadow(pole); const c=createCrystal('lamp_crystal',scene,.38,.14); c.parent=root; c.position.y=.98; c.material=state.materials.magic; addShadow(c); const light=new BABYLON.PointLight('lamp_light',new BABYLON.Vector3(0,.96,0),scene); light.parent=root; light.diffuse=new BABYLON.Color3(.37,.78,.72); light.intensity=.34; light.range=3.1; if(window.TABLEFOLK_GFX?.lite) window.tablefolkScenery?.trackLight(light); tag(root,'lamp',{health:1,material:'crystal'}); pole.metadata={proxy:root}; c.metadata={proxy:root}; addLampPool(scene,root); state.props.push(root); return root; }
 function makeBakery(scene){ const x=-7,z=-4.5; const base=BABYLON.MeshBuilder.CreateBox('mushroom_bakery_base',{width:2.15,height:1.25,depth:1.75},scene); base.position.set(x,.62,z); addToScene(base,state.materials.stone,{motion:'static',shape:'BOX',mass:0}); tag(base,'bakery',{health:6,material:'stone'}); const cap=BABYLON.MeshBuilder.CreateSphere('mushroom_bakery_cap',{diameter:2.8,segments:14},scene); cap.position.set(x,1.62,z); cap.scaling.set(1.15,.38,1); cap.material=state.materials.mushroom; addShadow(cap); const door=BABYLON.MeshBuilder.CreateBox('tiny_round_door',{width:.50,height:.72,depth:.06},scene); door.position.set(x,.42,z-.91); door.material=state.materials.wood; const chimney=BABYLON.MeshBuilder.CreateCylinder('chimney',{diameter:.28,height:.72,tessellation:6},scene); chimney.position.set(x+.82,1.95,z+.22); chimney.material=state.materials.stone; addShadow(chimney); makeLamp(scene,x-1.8,z-.2); }
 function makeFence(scene,x0,z0,count,dir='x'){ for(let i=0;i<count;i++){ const x=x0+(dir==='x'?i*.52:0),z=z0+(dir==='z'?i*.52:0); const post=BABYLON.MeshBuilder.CreateCylinder('fence_post',{height:.52,diameter:.09,tessellation:5},scene); post.position.set(x,.33,z); addToScene(post,state.materials.wood,{motion:'static',shape:'CYLINDER',mass:0}); tag(post,'fence',{health:1,material:'wood',flammable:true}); } for(const y of [.32,.53]){ const rail=BABYLON.MeshBuilder.CreateBox('fence_rail',{width:dir==='x'?count*.52:.08,height:.07,depth:dir==='x'?.08:count*.52},scene); rail.position.set(x0+(dir==='x'?(count-1)*.26:0),y,z0+(dir==='z'?(count-1)*.26:0)); rail.material=state.materials.wood; addShadow(rail); } }
 
@@ -2351,10 +2351,33 @@ const TILE_COLORS={ board:[.46,.44,.41], stone:[.40,.39,.37], flagstone:[.33,.33
 const TILE_FLOORS=new Set(['grass','stone','flagstone','dirt','sand']);
 const BOARD_MODEL_H=.84;
 const boardTileReady=new Map(), boardTileLoads=new Map();
-// Light quality: the simplified tile on every board (2.2x fewer vertices),
-// boxes past 900 cells.
-function boardTileFile(n){ const lite=window.TABLEFOLK_GFX?.lite; return n>(lite?900:2500) ? null : (lite || n>900) ? 'grass_v7_orm.med2.glb' : 'grass_v7_orm.1k.glb'; }
+// Light quality and boards past 2500 cells: the baked tile, a box wearing the
+// sculpted tile seen from above (colour, occlusion/roughness and its surface
+// normals baked by tools/bake-tile-top.mjs into assets/textures/tile_top_*),
+// so the stones and cracks stay at 12 triangles a cell instead of ~1,800.
+// Measured 2026-11-08 (the Oracle, 1080p, RTX 2060): the sculpted tiles were
+// 4.7 ms of a 9 ms GPU frame. Medium/high: the simplified sculpt past 900 cells.
+const BAKED_TILE='baked';
+function boardTileFile(n){ const lite=window.TABLEFOLK_GFX?.lite; return (lite || n>2500) ? BAKED_TILE : n>900 ? 'grass_v7_orm.med2.glb' : 'grass_v7_orm.1k.glb'; }
+function loadBakedTile(){
+  // the sculpted tile's material (and its clay look) with the baked maps in its place
+  return loadBoardTile('grass_v7_orm.med2.glb').then(()=>{
+    const sc=state.scene, m=boardTileReady.get('grass_v7_orm.med2.glb');
+    const tex=(f,srgb)=>{ const t=new BABYLON.Texture(ASSET+f,sc,false,true,BABYLON.Texture.TRILINEAR_SAMPLINGMODE); t.gammaSpace=srgb; return t; };
+    // the top face shows the whole bake; the sides a thin strip of its rim
+    const rim=new BABYLON.Vector4(0,0,1,.015), top=new BABYLON.Vector4(0,0,1,1);
+    const src=BABYLON.MeshBuilder.CreateBox('board_tile_src',{width:.9958,height:BOARD_MODEL_H,depth:1,faceUV:[rim,rim,rim,rim,top,rim]},sc);
+    src.setEnabled(false); src.isPickable=false;
+    const grass=m.grass.clone('board_tile_baked');
+    grass.albedoTexture=tex('tile_top_color.png',true); grass.bumpTexture=tex('tile_top_n.png',false); grass.bumpTexture.level=1.35; grass.metallicTexture=tex('tile_top_orm.png',false);
+    grass.invertNormalMapX=false; grass.invertNormalMapY=false;
+    const plain=grass.clone('board_tile_baked_plain'); plain.albedoTexture=null; plain.albedoColor=new BABYLON.Color3(1,1,1);
+    state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(grass); state.sharedAssetMats.add(plain);
+    boardTileReady.set(BAKED_TILE,{src,grass,plain,top:BOARD_MODEL_H/2});
+  });
+}
 function loadBoardTile(file){
+  if(file===BAKED_TILE){ if(!boardTileLoads.has(file)) boardTileLoads.set(file,loadBakedTile()); return boardTileLoads.get(file); }
   if(!boardTileLoads.has(file)) boardTileLoads.set(file, BABYLON.SceneLoader.ImportMeshAsync('',TILE_ASSET,file,state.scene).then(r=>{
     const src=r.meshes.find(m=>m.getTotalVertices?.()>0);
     if(!src) throw new Error(file+' has no mesh');
@@ -2417,8 +2440,13 @@ function rebuildBoard(){
     meshes.push(place(BABYLON.MeshBuilder.CreateBox('board_tile',{width:.965,height:BOARD_TILE_H,depth:.965},sc),cells,-BOARD_TILE_H/2));
     meshes[0].material=top;
   }
+  // Columns only under cells on an edge (of the board or a hole): the others
+  // are never seen, but were drawn and shaded under the tiles (3.4 ms of the
+  // Oracle's 9 ms GPU frame).
+  const cellSet=new Set(cells.map(([x,z])=>x+','+z));
+  const edge=cells.filter(([x,z])=>[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>!cellSet.has((x+dx)+','+(z+dz))));
   const col=BABYLON.MeshBuilder.CreateBox('board_column',{width:1,height:BOARD_COLUMN_H,depth:1},sc); col.material=side;
-  meshes.push(place(col,cells,-tileH-BOARD_COLUMN_H/2+.02));
+  meshes.push(place(col,edge,-tileH-BOARD_COLUMN_H/2+.02));
   state.boardMeshes=meshes; state.boardModel=!!model;
   state.boardCells=new Set(cells.map(([x,z])=>x+','+z));
   state.terrainTopY=0;
@@ -4514,18 +4542,46 @@ function contactShadow(g,h){
   d.isPickable=false; d.metadata={ownerId:g.id}; d.renderingGroupId=0; d.alphaIndex=1000;   // after floor glows and runes, so it darkens them too
   g.contactShadow=d;
 }
+// The skinned position of a few vertices (what getPositionData(true) does for
+// all of them): the feet check follows a mesh's lowest vertices only. Skinning
+// a whole figure on the CPU took ~2.3 ms, every 8th frame for two seconds.
+const skinM=new BABYLON.Matrix(), skinT=new BABYLON.Matrix(), skinV=new BABYLON.Vector3();
+function lowestSkinnedY(ms,c){
+  const VB=BABYLON.VertexBuffer;
+  c.p ||= ms.getVerticesData(VB.PositionKind); c.mi ||= ms.getVerticesData(VB.MatricesIndicesKind); c.mw ||= ms.getVerticesData(VB.MatricesWeightsKind);
+  if(c.mie===undefined){ c.mie=ms.getVerticesData(VB.MatricesIndicesExtraKind)||null; c.mwe=ms.getVerticesData(VB.MatricesWeightsExtraKind)||null; }
+  const bones=ms.skeleton.getTransformMatrices(ms), W=ms.getWorldMatrix(); let lo=Infinity;
+  for(const v of c.idx){
+    skinM.reset();
+    for(let k=0;k<4;k++){ const w=c.mw[v*4+k]; if(w>0){ BABYLON.Matrix.FromFloat32ArrayToRefScaled(bones,Math.floor(c.mi[v*4+k]*16),w,skinT); skinM.addToSelf(skinT); } }
+    if(c.mwe) for(let k=0;k<4;k++){ const w=c.mwe[v*4+k]; if(w>0){ BABYLON.Matrix.FromFloat32ArrayToRefScaled(bones,Math.floor(c.mie[v*4+k]*16),w,skinT); skinM.addToSelf(skinT); } }
+    BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(c.p[v*3],c.p[v*3+1],c.p[v*3+2],skinM,skinV);
+    BABYLON.Vector3.TransformCoordinatesToRef(skinV,W,skinV); if(skinV.y<lo) lo=skinV.y;
+  }
+  return lo;
+}
+let feetChecks=0;
 function standOnFeet(g,inner){
-  // sampled every 8 frames for about two seconds of the idle clip (a foot dips part of the way through)
-  let frames=0, lo=Infinity; const V=new BABYLON.Vector3();
+  // sampled every 8 frames for about two seconds of the idle clip (a foot dips
+  // part of the way through). The first sample skins every vertex and keeps
+  // each mesh's lowest ones (within 12 cm); the rest skin only those. Figures
+  // take turns (a different frame of the 8 each).
+  let frames=0, lo=Infinity; const V=new BABYLON.Vector3(), turn=feetChecks++%8, cache=new Map();
   const obs=state.scene.onAfterRenderObservable.add(()=>{
     frames++;
     if(!g.root || g.root.isDisposed?.() || g.defeated){ state.scene.onAfterRenderObservable.remove(obs); return; }
-    if(frames%8) return;
+    if((frames+turn)%8) return;
     try{
       for(const ms of g.root.getChildMeshes(false)){
         if(!ms.skeleton || !(ms.getTotalVertices?.()>0)) continue;   // hidden ones too: first person hides the player's body
-        const pos=ms.getPositionData(true,true); if(!pos) continue; const W=ms.getWorldMatrix();
-        for(let i=0;i<pos.length;i+=3){ BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(pos[i],pos[i+1],pos[i+2],W,V); const rel=V.y-g.root.position.y; if(rel<lo) lo=rel; }
+        const c=cache.get(ms);
+        if(c?.idx){ const y=lowestSkinnedY(ms,c)-g.root.position.y; if(y<lo) lo=y; continue; }
+        const pos=ms.getPositionData(true,true); if(!pos) continue; const W=ms.getWorldMatrix(), ys=new Float32Array(pos.length/3);
+        let mlo=Infinity;
+        for(let i=0;i<pos.length;i+=3){ BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(pos[i],pos[i+1],pos[i+2],W,V); const rel=V.y-g.root.position.y; ys[i/3]=rel; if(rel<mlo) mlo=rel; }
+        if(mlo<lo) lo=mlo;
+        const idx=[]; for(let v=0;v<ys.length;v++) if(ys[v]<mlo+.12) idx.push(v);
+        idx.sort((a,b)=>ys[a]-ys[b]); cache.set(ms,{idx:idx.slice(0,400)});
       }
     }catch(e){ console.warn('[figure] stand on feet',e); }
     if(frames<128) return;
@@ -5666,7 +5722,14 @@ async function addTerrainPolish(scene){
   try{ groundBody.shape.filterMembershipMask=GROUND_FILTER; }catch{}
 }
 
-async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; addEventListener('pagehide',()=>{ try{ engine.dispose(); }catch{} }); const scene=new BABYLON.Scene(engine); state.scene=scene; scene.onNewMaterialAddedObservable.add(m=>{ if('maxSimultaneousLights' in m) m.maxSimultaneousLights=8; }); scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
+async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks?.ready.catch(e=>console.error('[packs] core pack failed to load',e)); const engine=await createEngine(); state.engine=engine; addEventListener('pagehide',()=>{ try{ engine.dispose(); }catch{} }); const scene=new BABYLON.Scene(engine); state.scene=scene; scene.onNewMaterialAddedObservable.add(m=>{ if('maxSimultaneousLights' in m) m.maxSimultaneousLights=8; });
+  // Bones as shader uniforms, not a texture: on WebGPU every animated
+  // skeleton's bone texture went up through a new staging buffer each frame
+  // (14 a frame in the market village); uniforms took the village's CPU frame
+  // from 9.4 to 6.3 ms (p95 20 -> 9 ms), 2026-11-08. Our rigs have 23-24
+  // bones; WebGPU's uniform room (16384 vectors) holds thousands.
+  scene.onNewSkeletonAddedObservable.add(sk=>{ sk.useTextureToStoreBoneMatrices=false; });
+  scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
   scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk)); if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
   // Initial three-quarter composition: house high-right, fire/character left of
   // centre, and the near tree/crates framing the lower-right foreground.

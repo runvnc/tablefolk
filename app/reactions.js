@@ -289,5 +289,23 @@
     if (!hasClip) try { procFlinch(g); } catch {}
   }
 
+  // The flash's overlay pass gets its GPU pipelines made at its first draw,
+  // which stalled the picture ~200 ms at the first hit (2026-11-08): draw it
+  // once, clear, on everyone soon after each world starts.
+  function warm() {
+    const all = [...(state.characters || []), state.playerAvatar].filter(g => g?.root && !g.root.isDisposed?.());
+    const meshes = all.flatMap(g => g.root.getChildMeshes(false).filter(m => m.isVisible && m.getTotalVertices?.() > 0 && !/collider/.test(m.name) && !m.renderOverlay));
+    for (const m of meshes) { m.overlayAlpha = 0; m.renderOverlay = true; }
+    // off again after three frames with them all ready (drawn), 10 s at most
+    const sc = state.scene, t0 = now(); let drawn = 0;
+    const o = sc.onAfterRenderObservable.add(() => {
+      if (meshes.every(m => m.isReady(true))) drawn++;
+      if (drawn < 3 && now() - t0 < 10000) return;
+      sc.onAfterRenderObservable.remove(o); warm.drawn = meshes.length;
+      for (const m of meshes) if (m.overlayAlpha === 0) m.renderOverlay = false;
+    });
+  }
+  window.addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { warm(); } catch (e) { console.warn('[react] warm', e); } }, 2000));
+
   window.tablefolkReact = { gesture, hit, voice, render, profile };
 })();

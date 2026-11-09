@@ -9,10 +9,18 @@ post-processing).
 ## Board and floors
 
 - `rebuildBoard()` (`app/app.js`) draws a sculpted grass tile model for every
-  cell (`grass_v7_orm`, 1k textures; a medium version above 900 cells, plain
-  boxes above 2500), with per-cell quarter turns so it doesn't repeat.
-  Columns stand below the tiles; `rebuildBoardSupport()` builds the physics
-  ground and the pick plane.
+  cell (`grass_v7_orm`, 1k textures; a medium version above 900 cells), with
+  per-cell quarter turns so it doesn't repeat. Light quality and boards past
+  2500 cells use the baked tile (`BAKED_TILE`, `loadBakedTile`): a box per
+  cell wearing the sculpted tile seen from above, its colour, occlusion/
+  roughness and surface normals baked into `assets/textures/tile_top_*`
+  (`tools/bake-tile-top.mjs`; normal map level 1.35, a darkened rim standing
+  in for the gap between sculpted tiles). Its material is the sculpted
+  tile's (clay look and all) with the baked maps in place, so grass/plain
+  cells, tints and the paint-overlay skipping work as for the model.
+  Columns stand only below cells on an edge (of the board or a hole): the
+  hidden ones were shaded under the tiles, 3.4 ms of a 9 ms GPU frame.
+  `rebuildBoardSupport()` builds the physics ground and the pick plane.
 - Painted floors are real geometry with relief (bevelled planks, tiles,
   carpet, lava), built by `boxBatch()` (merged positions, uvs, uv2, colours)
   with `bevelNormalTexture` on UV2 for rounded edges. Water flows one way;
@@ -28,7 +36,7 @@ post-processing).
   128 px basket-weave normal on UV2 (world-tiled, 3 per cell), finish
   roughness .46 + clear coat .42 + light sheen. One mesh, material and atlas
   per colour; the material and atlas go with the mesh.
-- `floorLiftAt (and `standOnFeet` in app.js; `contactShadow` puts a soft dark patch under every figure, since light quality has no shadow maps: a figure is raised by whatever its idle clip dips below its feet) (and `floorCollider`, a static Havok mesh shape on each floor mesh so physics props rest on its top)(x,z)` is the height of the solid floor on a cell (planks .048,
+- `floorLiftAt (and `standOnFeet` in app.js: one full CPU skinning picks each mesh's lowest vertices, later samples skin only those, figures on different frames; `contactShadow` puts a soft dark patch under every figure, since light quality has no shadow maps: a figure is raised by whatever its idle clip dips below its feet) (and `floorCollider`, a static Havok mesh shape on each floor mesh so physics props rest on its top)(x,z)` is the height of the solid floor on a cell (planks .048,
   tiles .034, slab .045, rug .03): characters (`setCharacterLogicalPosition`,
   the walk in `animate`) and catalogue props stand on it, so feet no longer
   sink into rugs and planks.
@@ -41,9 +49,15 @@ post-processing).
   or one mesh's colour buffer leaks into the other and the frame goes black.
 - Every model file loads once; placed copies share geometry, materials and
   textures.
-- A material takes at most 8 lights. There are 4 global lights; local lights (`scenery.js` `trackLight`) are restricted with
-  `includedOnlyMeshes`, each mesh getting its nearest 4 (refreshed every
-  second). Board meshes (`board_*`) get a glow decal instead. A merged floor
+- A material takes at most 8 lights (6 at light quality: `graphics-settings.js`
+  clamps the `maxSimultaneousLights` setter of StandardMaterial and
+  PBRMaterial, `window.TABLEFOLK_MAX_LIGHTS`; every light is computed for
+  every pixel, and 8 -> 4 saved 5.4 ms of the Oracle's 9 ms GPU frame). There
+  are 4 global lights; local lights (`scenery.js` `trackLight`; at light
+  quality also the crystal lamps' `lamp_light`) are restricted with
+  `includedOnlyMeshes`, each mesh getting the nearest that fit under the cap
+  (refreshed every second, assigned only when a light's list changed:
+  assigning marks every mesh's lighting dirty). Board meshes (`board_*`) get a glow decal instead. A merged floor
   once took the first 8 lights in scene order and lava's light vanished: that
   is why the nearest-4 rule exists. Hidden meshes keep their nearby lights.
 
@@ -198,13 +212,50 @@ light's 1024 and the campfire's 512 cubemaps were still allocated, 32 MB,
 when only switched off); `adaptToDeviceRatio` off (one pixel per screen
 point); fieldstone wall stones from an icosphere of subdivision 2, not 3
 (2.25x fewer vertices; at 1 they became pointed lenses with gaps); the
-simplified board tile (`grass_v7_orm.med2.glb`) on every board and boxes past
-900 cells; the `.1k` copies (`critter_rigged.1k.glb` made with
+baked board tile (box tiles wearing the sculpted tile's look, see Board and
+floors) on every board; at most 6 lights per material; spells add no point
+light (their glows, sprites, floor pools and sky flash carry them); the `.1k` copies (`critter_rigged.1k.glb` made with
 `tools/shrink-textures.mjs`, textures only, so the mouth morph's vertex
 layout is untouched). Every quality now drops the critter walking clip's
 materials and textures after its animation is taken (2 x 21 MB a critter).
 The tavern went from 1.95 M to 1.02 M vertices and from 272 to 166 MB of
 textures.
+
+### Profile (2026-11-08, RTX 2060, 1080p, headless Chrome with timestamp queries)
+
+How to measure: `tools/browser-test/gpu-profile/profile.mjs` (render-pass GPU time
+from WebGPU timestamp queries patched into `beginRenderPass`/`queue.submit`,
+Babylon's own counter stalls; per-phase CPU time from the scene observables;
+ablations, each against a fresh baseline). Babylon draws everything in one
+4x MSAA main pass.
+
+- The Oracle, light: GPU 8.8 -> about 5 ms a frame. The sculpted tiles were
+  4.7 ms (466k triangles), the hidden columns 3.4, lights 4.6 (8 per
+  material), MSAA 4x 2.7, walls 1.3 (1547 rock instances 0.9), the Oracle
+  0.7, the rug 0.6; everything else under 0.3. CPU `scene.render` about 3 ms
+  (draw phase 2.1 for 94 draw calls, active-mesh evaluation 0.7, the sea's
+  vertex wave 0.17).
+- Market village, light: CPU-bound. `scene.render` 8-11 ms (draw phase 5 ms
+  for 156 draw calls, active-mesh evaluation 2.3 ms over 709 meshes); bone
+  textures re-uploaded through a new staging buffer per skeleton per frame
+  (bones are uniforms now, `onNewSkeletonAddedObservable`); the feet check
+  skinned whole figures every 8th frame (11.6 ms spikes for two seconds; now
+  only each mesh's lowest vertices, `lowestSkinnedY`). Untried: freezing the
+  world matrices of static props (0.6 ms), fewer draw calls (merging static
+  props per material), WebGPU snapshot rendering.
+- First spell: Dawn creates Vulkan render pipelines synchronously in the GPU
+  process, ~30 ms each, the first time a material/blend/vertex layout is
+  drawn; the page's calls return at once, so it shows only as missing frames
+  (a Chrome trace: `DeviceBase::APICreateRenderPipeline` on CrGpuMain). The
+  first lightning lost 194 ms; `spells.js` `prewarm()` draws each glow kind
+  and both particle kinds once in front of the camera (black/clear) after a
+  world starts, keeping the particle systems (disposing them let their
+  effects go), and `reactions.js` draws the hit flash's overlay once, clear:
+  60-80 ms left. Adding or removing a light recompiles every material it
+  reaches (2-7 s stalls when toggled scene-wide).
+- Frame pacing: at most 2 frames in flight, and Chrome reports a frame done
+  ~17 ms late, so uncapped frame rates stop near 100 fps whatever the scene
+  costs; the timestamps, not fps, measure it.
 
 ## Cameras and views
 

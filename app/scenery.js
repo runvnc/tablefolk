@@ -112,7 +112,7 @@
   // hides): left out, they came back unlit by these lights, grey, until the
   // next check. The budget is what the 8 a material holds leaves after the
   // scene's other lights (carried torches come and go).
-  const localLights = new Set(), MAX_LIGHTS = 8;
+  const localLights = new Set(), MAX_LIGHTS = window.TABLEFOLK_MAX_LIGHTS || 8;
   function refreshLocalLights() {
     if (!localLights.size || !state.scene) return;
     for (const L of localLights) if (L.isDisposed()) localLights.delete(L);
@@ -126,7 +126,8 @@
       near.sort((a, b) => a[0] - b[0]);
       for (const [, L] of near.slice(0, PER_MESH)) per.get(L).push(m);
     }
-    for (const [L, list] of per) L.includedOnlyMeshes = list;
+    // only when a light's list changed: assigning marks every mesh's lighting dirty
+    for (const [L, list] of per) { const was = L.includedOnlyMeshes; if (!L._budgeted || was.length !== list.length || list.some((m, i) => was[i] !== m)) { L.includedOnlyMeshes = list; L._budgeted = true; } }
   }
   setInterval(refreshLocalLights, 1000);
   function pointLight(r, name, { y, color, intensity, range }) {

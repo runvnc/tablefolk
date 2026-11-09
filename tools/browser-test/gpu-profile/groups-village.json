@@ -1,0 +1,22 @@
+{
+ "trees": "/^real_tree/",
+ "bookcases": "/^real_bookcase/",
+ "flowers": "/^real_flowers/",
+ "characters (5)": "/^(player|rosa|pell|brann|elder)$/",
+ "doors": "/^door/",
+ "ripple": "/^ripple/",
+ "boulders": "/^real_boulder/",
+ "board tiles": "/^board_tile$/",
+ "board columns": "/^board_column/",
+ "paint overlays": "/^paint_/",
+ "wall rocks": "/^stone_walls_rocks/",
+ "walls+core": "/^(wall|stone_walls_core)/",
+ "roofs": "/^roof/",
+ "floors (wood/oak)": "/^floor_/",
+ "sea": "/^sea$/",
+ "sky dome": "/^sky_dome/",
+ "all PBR max 4 lights": "JS:for (const mt of sc.materials) if (mt.maxSimultaneousLights > 4) { const o=mt.maxSimultaneousLights; mt.maxSimultaneousLights=4; __undo.push(() => { mt.maxSimultaneousLights=o; }); }",
+ "columns: unlit": "JS:const m=sc.meshes.find(m=>m.name==='board_column'); const o=m.material; const u=new BABYLON.StandardMaterial('u',sc); u.disableLighting=true; u.emissiveColor=new BABYLON.Color3(.2,.2,.2); m.material=u; __undo.push(() => { m.material=o; })",
+ "half resolution": "JS:const e=sc.getEngine(); const h=e.getHardwareScalingLevel(); e.setHardwareScalingLevel(h*2); __undo.push(() => e.setHardwareScalingLevel(h))",
+ "everything": "/./"
+}

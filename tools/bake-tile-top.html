@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- Bakes the sculpted floor tile (assets/models/tiles/grass_v7_orm.glb) seen
+     from straight above into flat textures for a cheap box tile:
+       tile_top_color  the colour texture as seen from above
+       tile_top_orm    its occlusion / roughness / metal texture, same view
+       tile_top_n      the surface normal (sculpted shape + its normal map),
+                       tangent space for a horizontal face (OpenGL, +Y = +v)
+     Driven by tools/bake-tile-top.mjs; open by hand to look at the results. -->
+<meta charset="utf-8">
+<title>Tile top bake</title>
+<style>body{background:#222;color:#ddd;font:13px sans-serif} img{width:256px;margin:4px;background:#000}</style>
+<canvas id="c" width="512" height="512" style="display:none"></canvas>
+<div id="out"></div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script>
+const SIZE = +(new URLSearchParams(location.search).get('size') || 1024);
+const stage = s => { window.__stage = s; };
+async function finish(url, size, fill, rim = false) {
+  const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = url; });
+  const a = document.createElement('canvas'); a.width = a.height = img.width; const ax = a.getContext('2d'); ax.drawImage(img, 0, 0);
+  const d = ax.getImageData(0, 0, a.width, a.height), p = d.data;
+  const W = a.width;
+  for (let i = 0; i < p.length; i += 4) {
+    const k = p[i + 3] / 255; for (let c = 0; c < 3; c++) p[i + c] = Math.round(p[i + c] * k + fill[c] * (1 - k)); p[i + 3] = 255;
+    // occlusion darkening toward the rim: the gap between sculpted tiles, which a box has not
+    if (rim) { const x = (i / 4) % W, y = Math.floor(i / 4 / W), e = Math.min(x, y, W - 1 - x, W - 1 - y) / W, t = Math.min(1, e / .045); p[i] = Math.round(p[i] * (.5 + .5 * t * t * (3 - 2 * t))); }
+  }
+  ax.putImageData(d, 0, 0);
+  const b = document.createElement('canvas'); b.width = b.height = size; const bx = b.getContext('2d'); bx.imageSmoothingQuality = 'high'; bx.drawImage(a, 0, 0, size, size);
+  return b.toDataURL('image/png');
+}
+async function bake() {
+  stage('engine');
+  const canvas = document.getElementById('c');
+  const engine = new BABYLON.Engine(canvas, false, { preserveDrawingBuffer: true });
+  const sc = new BABYLON.Scene(engine);
+  sc.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+  const r = await BABYLON.SceneLoader.ImportMeshAsync('', '/assets/models/tiles/', 'grass_v7_orm.glb', sc);
+  const src = r.meshes.find(m => m.getTotalVertices?.() > 0);
+  src.setParent(null); src.bakeCurrentTransformIntoVertices(); src.refreshBoundingInfo();
+  for (const m of r.meshes) if (m !== src) m.dispose();
+  stage('loaded');
+  const bb = src.getBoundingInfo().boundingBox, mn = bb.minimum, mx = bb.maximum;
+  const cam = new BABYLON.FreeCamera('top', new BABYLON.Vector3((mn.x + mx.x) / 2, mx.y + 5, (mn.z + mx.z) / 2), sc);
+  cam.rotation.set(Math.PI / 2, 0, 0);   // looking down: screen right = +x, screen up = +z
+  cam.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+  const hw = (mx.x - mn.x) / 2, hd = (mx.z - mn.z) / 2;
+  cam.orthoLeft = -hw; cam.orthoRight = hw; cam.orthoTop = hd; cam.orthoBottom = -hd;
+  cam.minZ = .1; cam.maxZ = 20;
+  const orig = src.material;
+  const shot = () => BABYLON.Tools.CreateScreenshotUsingRenderTargetAsync(engine, cam, { width: SIZE, height: SIZE }, 'image/png', 1, false);
+  const unlit = tex => { const m = new BABYLON.StandardMaterial('u', sc); m.disableLighting = true; m.emissiveTexture = tex; m.backFaceCulling = false; return m; };
+  engine.runRenderLoop(() => sc.render());
+  const ready = () => new Promise(res => { sc.render(); sc.executeWhenReady(res); });
+  const out = {};
+  src.material = orig; orig.debugMode = 20; await ready(); stage('color'); out.color = await shot();
+  orig.debugMode = 0; src.material = unlit(orig.metallicTexture); await ready(); stage('orm'); out.orm = await shot();
+  src.material = orig; orig.debugMode = 5; await ready(); stage('normal'); const world = await shot();
+  // world normal (x, y, z) -> tangent space of a face lying flat: u = +x, v = +z, N = +y
+  const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = world; });
+  const cv = document.createElement('canvas'); cv.width = cv.height = SIZE; const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0); const d = cx.getImageData(0, 0, SIZE, SIZE), p = d.data;
+  let flat = 0;
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] < 128) { p[i] = 128; p[i + 1] = 128; p[i + 2] = 255; p[i + 3] = 255; flat++; continue; }
+    let x = p[i] / 127.5 - 1, y = p[i + 1] / 127.5 - 1, z = p[i + 2] / 127.5 - 1;
+    const l = Math.hypot(x, y, z) || 1; x /= l; y /= l; z /= l;
+    p[i] = Math.round((x * .5 + .5) * 255); p[i + 1] = Math.round((z * .5 + .5) * 255); p[i + 2] = Math.round((Math.max(0, y) * .5 + .5) * 255);
+  }
+  cx.putImageData(d, 0, 0); out.normal = cv.toDataURL('image/png');
+  // corners outside the tile: dark grout, shaded (the column top shows there in the model)
+  out.color = await finish(out.color, 256, [58, 54, 48]);
+  out.orm = await finish(out.orm, 512, [110, 235, 0], true);
+  out.info = { size: SIZE, bounds: [mn.x, mn.y, mn.z, mx.x, mx.y, mx.z].map(v => +v.toFixed(4)), background: flat };
+  for (const k of ['color', 'orm', 'normal']) { const i = document.createElement('img'); i.src = out[k]; i.title = k; document.getElementById('out').appendChild(i); }
+  return out;
+}
+window.bakeResult = bake().catch(e => ({ error: String(e?.stack || e) }));
+</script>

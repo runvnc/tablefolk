@@ -53,6 +53,20 @@
     window.TABLEFOLK_GFX_NOSAVE = true;
   }
   window.TABLEFOLK_GFX = settings;
+  // Light quality: at most 6 lights per material. Every light is computed for
+  // every pixel a material covers; capping all materials at 4 saved 5.4 ms of
+  // the Oracle's 9 ms GPU frame (1080p, RTX 2060, 2026-11-08). Six = the
+  // scene's four (key, rim, sky, fill) plus the two nearest lamps, lanterns or
+  // spell lights (scenery.js budgets those per mesh, by distance). Code that
+  // asks for 8 gets 6: the setter is clamped once here.
+  window.TABLEFOLK_MAX_LIGHTS = settings.lite ? 6 : 8;
+  if (settings.lite && window.BABYLON) for (const C of [BABYLON.StandardMaterial, BABYLON.PBRMaterial]) {
+    let p = C?.prototype, d = null;
+    while (p && !(d = Object.getOwnPropertyDescriptor(p, 'maxSimultaneousLights'))) p = Object.getPrototypeOf(p);
+    if (!d?.set || d.set.__capped) continue;
+    const set = function (v) { d.set.call(this, Math.min(v, window.TABLEFOLK_MAX_LIGHTS)); }; set.__capped = true;
+    Object.defineProperty(p, 'maxSimultaneousLights', { ...d, set });
+  }
   // Generated models ship with four 4096px textures each (~360 MB of GPU
   // memory per model with mipmaps). Medium/light load the .1k.glb copies
   // (textures 1024px; geometry and materials identical).

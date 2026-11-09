@@ -46,6 +46,7 @@ node close.mjs                                         # always close it: it hol
 | `editor-test.mjs` | the world builder's map editor: every tool against the scenario it writes (18 checks) |
 | `render-tiles.mjs [base] [only=a,b] [ppu]` | render the 2D tiles into `assets/tiles/` (about 4 minutes) |
 | `jank.mjs [url] [seconds]` | frame gaps, GPU frame time and input delay during start-up |
+| `gpu-profile/profile.mjs <url> <out.json>` | graphics profile: GPU time per frame (timestamp queries), CPU phases, per-callback cost, JS profile, ablations (usage in its header; findings in rendering.md, Light quality) |
 | `worldgen-test.html?prompt=` | the in-browser world builder run on its own |
 | `vision/index.html` | the in-browser vision model on its own |
 | `tts-engine-test.html` | the speech engines |

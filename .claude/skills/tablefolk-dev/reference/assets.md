@@ -11,7 +11,7 @@
 | pick-ups, body loot | `PICKUPS`, `BODY_LOOT` in `app/play.js` |
 | walk-in buildings, generated furnishing, glyphs | `WALK_IN`, `ROOM_FURNISH`, `BUILDING_FURNISH`, `GEN_LEGEND` in `app/procgen.js`; `GRID_GLYPHS` in `app/scenario.js` |
 | 2D tiles | `assets/tiles/tiles.json` (+ `objects/`, `characters/`, `floors/`) |
-| floor and other textures | `assets/textures/`, `assets/models/tiles/` |
+| floor and other textures | `assets/textures/`, `assets/models/tiles/`; `tile_top_{color,orm,n}.png` are the sculpted board tile baked from above (`node tools/bake-tile-top.mjs`, test Chrome and :8000 running; rerun when `grass_v7_orm.glb` changes) |
 | sounds | `assets/sounds/kenney-rpg/`, `assets/sounds/kenney-impact/`; `SAMPLES` in `app/sfx.js` |
 | voices | `app/tts/` (built-in Pocket-TTS voices); descriptions in `.admin/settings.json` via the admin page |
 | skills, roles, packages | `skills/*/skill.json`, `roles/*/role.json`, `packages/*/tablefolk.json`; `registry/index.json` |
