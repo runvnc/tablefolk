@@ -346,8 +346,11 @@ code { color:#ffe0a0; }
 #scenarioBanner { text-align:left; padding-right:30px; }
 #scenarioBanner .scn-actions { justify-content:flex-start; }
 #scenarioBanner .scn-collapse { position:absolute; top:6px; right:8px; width:20px; height:20px; padding:0; line-height:18px; border-radius:50%; border:1px solid rgba(159,232,200,.4); background:rgba(159,232,200,.1); color:inherit; cursor:pointer; }
-#scenarioBanner.collapsed { width:auto; padding:6px 12px; }
-#scenarioBanner .scn-expand { background:none; border:0; color:inherit; font:inherit; font-weight:900; cursor:pointer; padding:0; }
+#scenarioBanner.collapsed { width:auto; max-width:min(260px,calc(100vw - 32px)); padding:3px 4px 3px 10px; border-radius:999px; font-size:.82em; }
+#scenarioBanner .scn-expand { display:flex; align-items:center; gap:7px; background:none; border:0; color:inherit; font:inherit; cursor:pointer; padding:0; max-width:100%; }
+#scenarioBanner .scn-name { font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#scenarioBanner .scn-q { flex:none; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:.85em; background:rgba(159,232,200,.2); border:1px solid rgba(159,232,200,.5); }
+#scenarioBanner .scn-expand:hover .scn-q { background:rgba(159,232,200,.38); }
 @media (max-width:700px){ #scenarioBanner { top:auto; bottom:170px; } }
 
 /* ---- monochrome rail icons ---- */

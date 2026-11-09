@@ -2,7 +2,9 @@
 
 `goal` is optional: without one the scenario is **open** (it never ends; the
 banner shows `subtitle` and the turn count). With one, the game state decides
-the outcome, never the model.
+the outcome, never the model. The banner starts small, just the world's
+title and a "?": clicking it shows the goal (or `subtitle`), the turn count
+and the intro, restart, share and exit buttons; "–" makes it small again.
 
 ```json
 "goal": {

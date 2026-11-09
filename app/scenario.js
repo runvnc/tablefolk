@@ -1288,8 +1288,11 @@
     if (!active) { el.hidden = true; return; }
     const g = active.scn.goal, turns = ctx ? ctx.turns : 0, max = g?.maxTurns;
     el.hidden = false;
-    el.classList.toggle('collapsed', !!active.collapsed);
-    if (active.collapsed) { el.innerHTML = `<button type="button" class="scn-title scn-expand" data-scn="expand" title="show scenario">🎯 ${esc(active.scn.title)} ▸</button>`; return; }
+    // Small by default: the world's name and a "?" that opens the goal, turn
+    // count and buttons ("–" closes them again).
+    const shut = active.collapsed !== false;
+    el.classList.toggle('collapsed', shut);
+    if (shut) { el.innerHTML = `<button type="button" class="scn-expand" data-scn="expand" title="the goal, turns and options"><span class="scn-name">${esc(active.scn.title)}</span><span class="scn-q" aria-hidden="true">?</span></button>`; return; }
     el.innerHTML = `<button type="button" class="scn-collapse" data-scn="collapse" title="hide">–</button><div class="scn-title">🎯 ${esc(active.scn.title)}</div>`
       + (g?.text ? `<div class="scn-goal">${esc(g.text)}</div>` : (active.scn.subtitle ? `<div class="scn-goal">${esc(active.scn.subtitle)}</div>` : ''))
       + `<div class="scn-meta">turn ${turns}${max ? ' / ' + max : ''} · you have ${W().getPlayer().gold || 0} gold</div>`
