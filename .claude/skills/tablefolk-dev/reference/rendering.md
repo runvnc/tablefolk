@@ -48,7 +48,25 @@ post-processing).
   must call `makeGeometryUnique()` before getting their own instance buffers,
   or one mesh's colour buffer leaks into the other and the frame goes black.
 - Every model file loads once; placed copies share geometry, materials and
-  textures.
+  textures. Each model's pieces are merged by finish when it loads
+  (`mergeContainerLooks`, in `loadModelInstance`): pieces whose PBR
+  materials differ only in plain colour become one mesh with the colours in
+  vertex colours and a white copy of the material (`lookKey`: the material's
+  serialization without its `albedo`); textured or transparent pieces merge
+  only with pieces of the same material; skinned, animated and morphing
+  models are left alone. A bookcase went from 14 draw calls to 1. The merged
+  meshes are the object's children like the pieces were (proxy, picking,
+  physics unchanged). New meshes must copy `sideOrientation` from glTF
+  pieces: the default showed a merged body's insides.
+- Code-built things merge same-material parts with `mergeUnder(node,
+  meshes)` (relative transforms baked; missing vertex colours white, missing
+  UV2 the bevel map's flat centre): a door's iron leaf and rings, a
+  lantern's post and arm (parent them first: their positions are local).
+- Static scenery (roots matching `STATIC_ROOTS`: walls, board, paint,
+  floors, rugs, roofs, door frames, fences; not props, not moving bodies)
+  has its world matrix frozen 1 s and 4 s after a world starts
+  (`freezeStaticScenery`). A mesh moved after that would not move: unfreeze
+  it first.
 - A material takes at most 8 lights (6 at light quality: `graphics-settings.js`
   clamps the `maxSimultaneousLights` setter of StandardMaterial and
   PBRMaterial, `window.TABLEFOLK_MAX_LIGHTS`; every light is computed for
@@ -134,6 +152,14 @@ is inside (or roofs are lifted by `tablefolkRoofs.toggle()` in tests), .22
 when the follow camera's ray hits it, else 1; never in the free camera.
 
 ## Characters
+
+- KayKit people's body parts (one material) are merged into one skinned mesh
+  after the mouth is placed (`mergePersonParts`): each part comes with its
+  own copy of the skeleton and its own bind pose; a part joins the first
+  part's skeleton when its inverse bind matrices are the first's times one
+  fixed offset (checked on every bone) and its vertices are moved by that
+  offset. 7-9 draw calls and skeletons a person became 1; the spare
+  skeletons are disposed. The `_Head` mesh is gone after the first frame.
 
 - Finish: every person (`createFigure`, `createPerson`) gets `toyFinish()`,
   the toy-plastic look of the tiles and props: metallic 0, baked
@@ -240,9 +266,13 @@ ablations, each against a fresh baseline). Babylon draws everything in one
   textures re-uploaded through a new staging buffer per skeleton per frame
   (bones are uniforms now, `onNewSkeletonAddedObservable`); the feet check
   skinned whole figures every 8th frame (11.6 ms spikes for two seconds; now
-  only each mesh's lowest vertices, `lowestSkinnedY`). Untried: freezing the
-  world matrices of static props (0.6 ms), fewer draw calls (merging static
-  props per material), WebGPU snapshot rendering.
+  only each mesh's lowest vertices, `lowestSkinnedY`). Then merges: draw
+  calls 156 -> 91 (the Oracle 94 -> 72), CPU 7.4-8.9 -> 5.8-6.2 ms in an A/B
+  on the same (down-clocked) machine: props by finish, people's parts,
+  doors, lanterns, plus frozen static scenery. Untried: WebGPU snapshot
+  rendering (render bundles; needs a reset whenever meshes, materials or the
+  visible set change, which this game does constantly), roofs (already about
+  one mesh per material per building), trees (one mesh each, already).
 - First spell: Dawn creates Vulkan render pipelines synchronously in the GPU
   process, ~30 ms each, the first time a material/blend/vertex layout is
   drawn; the page's calls return at once, so it shows only as missing frames

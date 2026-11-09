@@ -297,7 +297,9 @@
       cage.position.set(.32, 1.1, 0); cage.material = mat('lantern_metal', C3(.14, .13, .12), { rough: .42, metallic: .55 });
       const bulb = BABYLON.MeshBuilder.CreateSphere('lantern_bulb', { diameter: .11, segments: 7 }, sc);
       bulb.position.set(.32, 1.1, 0); bulb.material = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
-      own(r, [post, arm, cage]); own(r, [bulb], { shadow: false });
+      post.parent = arm.parent = r;   // (their positions are the lantern's own)
+      const pole = window.mergeUnder?.(r, [post, arm], 'lantern_post') || post;   // post and arm: one draw call
+      own(r, pole === post ? [post, arm, cage] : [pole, cage]); own(r, [bulb], { shadow: false });
       finish(r, 'lantern', { material: 'wood' }, opts);
       addLampPool(sc, r, { warm: true });
       pointLight(r, 'lantern_light', { y: 1.1, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 1.35, range: +opts.range || 6 });

@@ -569,6 +569,97 @@ function updateMouth(g,dt){
 // itself, after the first frame (skinned positions need a posed skeleton):
 // the eyes are the vertices on the black palette swatch, the mouth sits
 // below them on the front of the skin.
+// Scenery that never moves (walls, the board, painted floors, rugs, roofs,
+// door frames, fences) gets its world matrix frozen once a world is up: each
+// frame Babylon otherwise checks ~700 meshes' transforms (the market village;
+// 0.6 ms of CPU a frame, 2026-11-08). Objects (props), characters, doors and
+// anything with a moving physics body are left alone. Walls are only ever
+// removed, never moved; a rebuilt mesh is a new one, frozen at the next world.
+const STATIC_ROOTS=/^(wall|stone_walls|board_|paint_|floor_|fence|roof|door_frames|rug|carpet)/;
+function freezeStaticScenery(){
+  const props=new Set(state.props||[]); let n=0;
+  for(const m of state.scene?.meshes||[]){
+    if(m.isWorldMatrixFrozen || m.isDisposed()) continue;
+    let r=m; while(r.parent) r=r.parent;
+    if(!STATIC_ROOTS.test(r.name) || props.has(r) || props.has(m)) continue;
+    const body=m.physicsBody||r.physicsBody; if(body && body.getMotionType?.()!==BABYLON.PhysicsMotionType.STATIC) continue;
+    m.freezeWorldMatrix(); n++;
+  }
+  return n;
+}
+addEventListener('tablefolk-scenario-started',()=>{ for(const ms of [1000,4000]) setTimeout(()=>{ try{ freezeStaticScenery(); }catch(e){ console.warn('[freeze]',e); } },ms); });
+// Meshes of one material merged into one child of `node`, their transforms
+// relative to it baked into the vertices (a door's iron leaf and its rings, a
+// lantern's post and arm): one draw call where there were several, and still
+// moving with the node. A piece without vertex colours gets white (the
+// material's colour, as before), without UV2 the flat centre of a bevel map.
+function mergeUnder(node,meshes,name){
+  meshes=meshes.filter(m=>m && !m.isDisposed() && m.getTotalVertices?.()>0 && !m.skeleton && (m.subMeshes?.length||1)===1);
+  if(meshes.length<2) return meshes[0]||null;
+  node.computeWorldMatrix(true); const inv=node.getWorldMatrix().clone().invert();
+  const parts=meshes.map(m=>{
+    const vd=BABYLON.VertexData.ExtractFromMesh(m,true,true), M=m.computeWorldMatrix(true).multiply(inv), n=vd.positions.length/3;
+    vd.transform(M); if(M.determinant()<0) for(let i=0;i<vd.indices.length;i+=3){ const t=vd.indices[i+1]; vd.indices[i+1]=vd.indices[i+2]; vd.indices[i+2]=t; }
+    if(!vd.normals){ vd.normals=[]; BABYLON.VertexData.ComputeNormals(vd.positions,vd.indices,vd.normals); }
+    for(const k of ['uvs3','uvs4','uvs5','uvs6','tangents','matricesIndices','matricesWeights','matricesIndicesExtra','matricesWeightsExtra']) vd[k]=null;
+    vd._n=n; return vd;
+  });
+  const fill=(k,w,v)=>{ if(parts.some(vd=>vd[k])) for(const vd of parts) if(!vd[k]) vd[k]=new Float32Array(vd._n*w).fill(v); };
+  fill('colors',4,1); fill('uvs',2,0); fill('uvs2',2,.5);
+  const all=parts[0]; try{ all.merge(parts.slice(1),true); }catch(e){ console.warn('[merge]',name,e); return null; }
+  const a=meshes[0], mesh=new BABYLON.Mesh(name||a.name,a.getScene()); all.applyToMesh(mesh,false); mesh.sideOrientation=a.sideOrientation;
+  mesh.parent=node; mesh.material=a.material; mesh.metadata=a.metadata; mesh.isPickable=meshes.some(m=>m.isPickable); mesh.receiveShadows=a.receiveShadows; mesh.isVisible=meshes.some(m=>m.isVisible);
+  addShadow(mesh); for(const m of meshes) m.dispose(false,false);
+  return mesh;
+}
+// A person's body parts (arms, legs, body, head, hat, cape: one material)
+// merged into one skinned mesh, after the mouth has been placed from the head:
+// 7-9 draw calls a person became 1, and 7-9 skeletons to pose each frame 1
+// (2026-11-08). Each part comes with its own copy of the skeleton, all driven
+// by the same bone nodes; parts whose bones are the same nodes in the same
+// order and whose bind poses differ from the first's by one fixed offset
+// (their vertices moved by it) share the first copy. Only parts that are on, share parent, transform
+// and material, and have no morph targets; the originals and the spare
+// skeletons are disposed, the merged mesh joins g.owned.
+function mergePersonParts(g){
+  const groups=new Map();
+  for(const m of g.rigRoot?.getChildMeshes(false)||[]){
+    if(!m.skeleton || !m.material || !m.isEnabled() || m.morphTargetManager || (m.subMeshes?.length||1)!==1 || m instanceof BABYLON.InstancedMesh || !(m.getTotalVertices()>0)) continue;
+    // each part has its own copy of the skeleton, driven by the same bone nodes: same nodes in the same order = one skeleton
+    const bones=m.skeleton.bones.map(b=>b.getTransformNode()?.uniqueId??('b'+b.name)).join(',');
+    const k=m.material.uniqueId+'|'+bones+'|'+(m.parent?.uniqueId??-1)+'|'+m.position.asArray()+'|'+(m.rotationQuaternion?.asArray()||m.rotation.asArray())+'|'+m.scaling.asArray();
+    if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(m);
+  }
+  for(let list of groups.values()){
+    if(list.length<2) continue;
+    // Each part's copy has its own bind pose: a part joins the first one's
+    // skeleton when its inverse bind matrices are the first's times one
+    // fixed offset D (checked on every bone); its vertices are moved by D.
+    const A=list[0].skeleton.bones.map(b=>b.getInvertedAbsoluteTransform()), Ainv0=A[0].clone().invert(), D=new Map();
+    list=list.filter((m,j)=>{
+      if(!j){ D.set(m,null); return true; }
+      const B=m.skeleton.bones.map(b=>b.getInvertedAbsoluteTransform()); if(B.length!==A.length) return false;
+      const d=B[0].multiply(Ainv0);
+      for(let i=0;i<A.length;i++){ const t=d.multiply(A[i]).m, b=B[i].m; for(let k=0;k<16;k++) if(Math.abs(t[k]-b[k])>2e-3) return false; }
+      D.set(m,d); return true;
+    });
+    if(list.length<2) continue;
+    const parts=list.map(m=>{ const vd=BABYLON.VertexData.ExtractFromMesh(m,true,true); for(const k of ['uvs2','uvs3','uvs4','uvs5','uvs6','tangents']) vd[k]=null; const d=D.get(m); if(d){ vd.transform(d); if(d.determinant()<0) for(let i=0;i<vd.indices.length;i+=3){ const t=vd.indices[i+1]; vd.indices[i+1]=vd.indices[i+2]; vd.indices[i+2]=t; } } return vd; });
+    const kinds=['normals','uvs','colors','matricesIndicesExtra','matricesWeightsExtra'];
+    for(const k of kinds) if(!parts.every(vd=>vd[k])) for(const vd of parts) vd[k]=null;
+    const all=parts[0]; try{ all.merge(parts.slice(1),true); }catch(e){ console.warn('[merge] person parts',g.id,e); continue; }
+    const a=list[0], mesh=new BABYLON.Mesh(g.id+'_body',state.scene);
+    all.applyToMesh(mesh,false); mesh.sideOrientation=a.sideOrientation;   // glTF meshes carry their own winding (a new mesh's default showed the insides)
+    mesh.parent=a.parent; mesh.position.copyFrom(a.position); if(a.rotationQuaternion) mesh.rotationQuaternion=a.rotationQuaternion.clone(); else mesh.rotation.copyFrom(a.rotation); mesh.scaling.copyFrom(a.scaling);
+    mesh.skeleton=a.skeleton; mesh.numBoneInfluencers=Math.max(...list.map(m=>m.numBoneInfluencers||4)); mesh.material=a.material;
+    mesh.metadata=a.metadata; mesh.isPickable=list.some(m=>m.isPickable); mesh.receiveShadows=a.receiveShadows; mesh.isVisible=list.some(m=>m.isVisible);
+    addShadow(mesh); g.owned?.meshes.push(mesh);
+    const spare=new Set(list.map(m=>m.skeleton).filter(sk=>sk!==a.skeleton));
+    for(const m of list) m.dispose(false,false);
+    // the other parts' skeleton copies are no longer drawn: one skeleton to update a frame, not eight
+    for(const sk of spare) if(!state.scene.meshes.some(m=>m.skeleton===sk)){ sk.dispose(); if(g.owned?.skeletons) g.owned.skeletons=g.owned.skeletons.filter(x=>x!==sk); }
+  }
+}
 function addPersonMouth(g){
   const sc=state.scene;
   const head=g.rigRoot?.getChildMeshes(false).find(m=>/_Head$/.test(m.name) && m.skeleton);
@@ -1599,14 +1690,18 @@ function buildDoorLeaf(sc,x,z,alongX,top,DH){
   const pivot=new BABYLON.TransformNode('door_pivot',sc);
   const base=alongX?0:-Math.PI/2;
   pivot.position.set(alongX?x-W/2:x, top, alongX?z:z-W/2); pivot.rotation.y=base;
+  const ironParts=[];
   for(const [batch,mat,name] of [[wood,mats.doorWood,'door_leaf_wood'],[iron,mats.doorIron,'door_leaf_iron']]){
     const m=batch.mesh(name,sc); if(!m) continue;
     m.material=mat; m.parent=pivot; m.receiveShadows=true; addShadow(m);
+    if(mat===mats.doorIron) ironParts.push(m);
   }
   for(const s of [1,-1]){                                                       // ring handles
     const ring=BABYLON.MeshBuilder.CreateTorus('door_ring',{diameter:.125,thickness:.02,tessellation:20},sc);
     ring.material=mats.doorIron; ring.parent=pivot; ring.position.set(W-.1,DH*.44,s*.095); ring.rotation.x=Math.PI/2+(s>0?.3:-.3)*s; addShadow(ring);
+    ironParts.push(ring);
   }
+  mergeUnder(pivot,ironParts,'door_leaf_iron');   // the rings into the iron leaf: one draw call
   return {pivot,x,z,alongX,base,angle:0};
 }
 // Frames (shared batch) plus a swinging leaf per door cell. Called by every
@@ -1667,6 +1762,7 @@ function loadModelInstance(scene,dir,name,prepare){
       state.sharedAssetMats ||= new Set();
       for(const m of c.materials) state.sharedAssetMats.add(m);
       try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
+      try{ const n=mergeContainerLooks(c); if(n && window.TABLEFOLK_DEV) console.log('[merge]',name,'-'+n,'draw calls'); }catch(e){ console.warn('[merge] failed',name,e); }
       return c;
     });
     p.catch(()=>modelContainers.delete(url));
@@ -1678,6 +1774,57 @@ function loadModelInstance(scene,dir,name,prepare){
     for(const r of inst.rootNodes){ if(r instanceof BABYLON.AbstractMesh) meshes.push(r); meshes.push(...r.getChildMeshes(false)); }
     return { meshes, rootNodes:inst.rootNodes, animationGroups:inst.animationGroups||[], skeletons:inst.skeletons||[] };
   });
+}
+// A model's pieces merged by finish, once per model file (its AssetContainer),
+// so a placed copy is drawn in a few calls instead of one per piece: a
+// bookcase was 14 draw calls (one per colour), the market village ~155 calls
+// for ~8-10 ms of CPU a frame (2026-11-08). Pieces whose materials differ
+// only in plain colour (no texture) become one mesh with the colours in its
+// vertex colours and a white copy of the material; textured pieces merge only
+// with pieces of the same material. Skinned, animated or morphing models are
+// left alone (a chest's lid). The copy stays one object: the merged meshes
+// are its children like the pieces were (picking, carrying, physics and
+// breaking all go through the object's proxy).
+function lookKey(m){
+  if(!m) return 'none';
+  if(m.getClassName()!=='PBRMaterial' || m.albedoTexture || m.opacityTexture || m.needAlphaBlending?.()) return 'mat:'+m.uniqueId;
+  const o=m.serialize(); for(const k of ['name','id','uniqueId','albedo','albedoColor','tags','metadata','reservedDataStore']) delete o[k];   // (albedoColor serializes as 'albedo')
+  return 'pbr:'+JSON.stringify(o);
+}
+function mergeContainerLooks(c){
+  if(c.skeletons?.length || c.animationGroups?.length) return 0;
+  const scene=c.scene||state.scene, pieces=c.meshes.filter(m=>m.getTotalVertices?.()>0 && m.getTotalIndices?.()>0 && m.material && !m.morphTargetManager && !(m instanceof BABYLON.InstancedMesh) && (m.subMeshes?.length||1)===1);
+  if(pieces.length<2) return 0;
+  const groups=new Map();
+  for(const m of pieces){ const k=lookKey(m.material); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(m); }
+  let merged=0;
+  for(const [k,list] of groups){
+    if(list.length<2) continue;
+    const plain=k.startsWith('pbr:'), VB=BABYLON.VertexBuffer, parts=[];
+    const allUV=list.every(m=>m.isVerticesDataPresent(VB.UVKind));
+    for(const m of list){
+      const W=m.computeWorldMatrix(true), vd=BABYLON.VertexData.ExtractFromMesh(m,true,true), n=vd.positions.length/3;
+      vd.transform(W); if(W.determinant()<0) for(let i=0;i<vd.indices.length;i+=3){ const t=vd.indices[i+1]; vd.indices[i+1]=vd.indices[i+2]; vd.indices[i+2]=t; }
+      if(!vd.normals){ vd.normals=[]; BABYLON.VertexData.ComputeNormals(vd.positions,vd.indices,vd.normals); }
+      if(!allUV) vd.uvs=null;
+      for(const kind of ['uvs2','uvs3','uvs4','uvs5','uvs6','tangents','matricesIndices','matricesWeights','matricesIndicesExtra','matricesWeightsExtra']) vd[kind]=null;
+      if(plain){
+        const a=m.material.albedoColor||BABYLON.Color3.White(), col=new Float32Array(n*4), old=vd.colors;
+        for(let i=0;i<n;i++){ col[i*4]=a.r*(old?old[i*4]:1); col[i*4+1]=a.g*(old?old[i*4+1]:1); col[i*4+2]=a.b*(old?old[i*4+2]:1); col[i*4+3]=1; }
+        vd.colors=col;
+      } else if(!list.every(q=>q.isVerticesDataPresent(VB.ColorKind))) vd.colors=null;
+      parts.push(vd);
+    }
+    const all=parts[0]; try{ all.merge(parts.slice(1),true); }catch(e){ console.warn('[merge] skipped',k.slice(0,40),e); continue; }
+    const mesh=new BABYLON.Mesh('merged_'+list[0].name,scene); all.applyToMesh(mesh,false); mesh.sideOrientation=list[0].sideOrientation;   // (glTF meshes carry their own winding)
+    scene.removeMesh(mesh); c.meshes.push(mesh);
+    if(plain){ const mt=list[0].material.clone(list[0].material.name+'_merged'); mt.albedoColor=new BABYLON.Color3(1,1,1); scene.removeMaterial(mt); c.materials.push(mt); state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(mt); mesh.material=mt; }
+    else mesh.material=list[0].material;
+    mesh.isPickable=list.some(m=>m.isPickable); mesh.receiveShadows=true;
+    for(const m of list){ c.meshes.splice(c.meshes.indexOf(m),1); m.dispose(false,false); }
+    merged+=list.length-1;
+  }
+  return merged;
 }
 // Bounds of loaded meshes in world space.
 function meshBounds(meshes){
@@ -4659,7 +4806,7 @@ async function createPerson(id,pos,model,label){
   g.root.scaling.scaleInPlace(PERSON_H/Math.max(.2,bb.max.y-g.root.position.y));
   for(const m of meshes) toyFinish(m.material);
   g.charModel=model;
-  state.scene.onAfterRenderObservable.addOnce(()=>{ try{ if(!g.root.isDisposed()) addPersonMouth(g); }catch(e){ console.warn('mouth failed',e); } });
+  state.scene.onAfterRenderObservable.addOnce(()=>{ try{ if(!g.root.isDisposed()) addPersonMouth(g); }catch(e){ console.warn('mouth failed',e); } try{ if(!g.root.isDisposed()) mergePersonParts(g); }catch(e){ console.warn('[merge] person',e); } });
   return g;
 }
 async function spawnPlayerAvatar(x=0,z=3,facing='n',model){
