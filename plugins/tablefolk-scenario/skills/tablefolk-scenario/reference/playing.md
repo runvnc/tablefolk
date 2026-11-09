@@ -43,7 +43,7 @@ approve the download on a user's behalf.
 |---|---|
 | W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
-| mouse wheel | zoom towards what the pointer is over, close enough to read a face (the follow camera zooms on you; in first person it narrows the view) |
+| mouse wheel | zoom towards what the pointer is over, close enough to read a face (the follow camera zooms on you; in first person it narrows the view towards what the pointer is on: point and scroll, no dragging) |
 | drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it); in the follow camera, turn the view around you (it keeps that angle while it follows you) |
 | E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |

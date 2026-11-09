@@ -140,6 +140,26 @@ function retargetToDepth(c,p){
   if(!(depth>(c.lowerRadiusLimit||.25))) return false;
   c.target.copyFrom(eye.add(dir.scale(depth))); c.radius=depth; return true;
 }
+// First-person zoom about the pointer: the field of view changes and the
+// view turns (yaw and pitch, set at once, not eased) until the world
+// direction that was under the pointer is under it again; a few corrections
+// with the real picking ray converge (off-centre yaw and pitch interact).
+function fpZoomAt(fov,x,y){
+  const sc=state.scene, ray=()=>{ fpCam.getViewMatrix(true); return sc.createPickingRay(x,y,BABYLON.Matrix.Identity(),fpCam).direction.normalize(); };
+  const inside=x>=0 && y>=0 && x<=canvas.clientWidth && y<=canvas.clientHeight;
+  const want=inside ? ray() : null;
+  fpCam.fov=fov;
+  if(!want) return;
+  let yaw=state.fpYaw??fpCam.rotation.y, pitch=state.fpPitch??fpCam.rotation.x;
+  for(let i=0;i<4;i++){
+    fpCam.rotation.set(pitch,yaw,0);
+    const got=ray();
+    yaw+=Math.atan2(want.x,want.z)-Math.atan2(got.x,got.z);
+    pitch=clamp(pitch+Math.asin(clamp(got.y,-1,1))-Math.asin(clamp(want.y,-1,1)),-1.25,1.25);
+  }
+  yaw=Math.atan2(Math.sin(yaw),Math.cos(yaw));
+  fpCam.rotation.set(pitch,yaw,0); state.fpYaw=yaw; state.fpPitch=pitch;
+}
 const ZOOM_NEAR=.45;   // the closest the wheel takes the eye to the point under the pointer
 function setupMouseWheelZoom(camera){
   // This handler owns wheel zoom; Babylon's own wheel input would zoom a
@@ -152,8 +172,10 @@ function setupMouseWheelZoom(camera){
     // usually 100px) so a notch is ~10% and trackpads zoom smoothly.
     const px=ev.deltaY*(ev.deltaMode===1?33:ev.deltaMode===2?400:1);
     const factor=Math.exp(clamp(px,-150,150)*.001);
-    // First person: the wheel zooms by narrowing the field of view.
-    if(state.firstPerson && fpCam){ fpCam.fov=clamp(fpCam.fov*factor,.15,1.3); return; }
+    // First person: the wheel zooms by narrowing the field of view, towards
+    // what the pointer is on: the view turns so the direction under the
+    // pointer stays under it (no drag needed to aim; zooming out undoes it).
+    if(state.firstPerson && fpCam){ fpZoomAt(clamp(fpCam.fov*factor,.15,1.3),state.scene.pointerX,state.scene.pointerY); return; }
     // The follow camera keeps you centred: only the radius.
     if(state.cameraMode==='follow'){ camera.radius=clamp(camera.radius*factor,FOLLOW.min,FOLLOW.max); return; }
     // The free camera zooms about the point under the pointer (a real pick:

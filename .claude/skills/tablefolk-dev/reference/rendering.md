@@ -348,7 +348,11 @@ ablations, each against a fresh baseline). Babylon draws everything in one
   eye, same direction, only the radius changes), then eye and target scale
   about the point, so it stays under the pointer to within a pixel, down to
   0.45 from it (`ZOOM_NEAR`; `lowerRadiusLimit` 0.25, since Babylon clamps
-  the radius each frame and a clamp there is a slip). The near clip follows
+  the radius each frame and a clamp there is a slip). First person
+  (`fpZoomAt`, 2026-11-08): the field of view narrows (0.15-1.3) and the
+  view turns at once (yaw and pitch, a few corrections with the real
+  picking ray) so the direction under the pointer stays under it: moving
+  the mouse aims the zoom, no drag; zooming out undoes it. The near clip follows
   the radius (`minZ` = radius x 0.08 in 0.04-0.5, in `followAvatarCamera`;
   skipped while senses.js poses the camera, which clears the limits). The
   follow camera only changes the radius; first person narrows the field of
