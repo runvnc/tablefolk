@@ -842,10 +842,10 @@
   "wizard": {
    "file": "characters/wizard.png",
    "w": 267,
-   "h": 324,
+   "h": 325,
    "anchor": [
     133.1,
-    210.8
+    211.8
    ]
   },
   "skeleton": {

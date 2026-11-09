@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-09
 
+- **The Oracle's head no longer shows through his hat**: the hat's lower part is fitted to his head (tools/wizard-extras.mjs measures the face's and the body's vertices, the ears included, at each height and widens the cone to clear them by 15%), the hair is pressed flatter, and the low stars moved up the cone.
 - **The models load on the public site**: Hugging Face refuses requests from pages on `*.workers.dev` (a 404 without CORS, so the characters' model and the voice "failed to fetch" there); the site now sends no Referer. Checked on tablefolk.world: the Oracle's model downloads and loads, the voice loads, and he answers.
 - **tablefolk.world is on Cloudflare**: the game, the worlds and the world builder as a Cloudflare Worker with static files (`cloud/`, `bun cloud/build.mjs` then `wrangler deploy`), live at tablefolk.runvnc.workers.dev and at tablefolk.world once its nameservers move. It runs no AI of its own: visitors build and play with a model in their browser or their own key or server. The builder's checks, prompts and page moved to `server/worldgen-core.js`, shared by the Bun server and the Worker.
 
