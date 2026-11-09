@@ -79,7 +79,7 @@
     b.addEventListener('click', toggle);
     return b;
   }
-  const setState = (st, title) => { const b = button(); if (!b) return; b.dataset.state = st; if (title) b.title = title; };
+  const setState = (st, title) => { const b = button(); if (!b) return; b.dataset.state = st; b.disabled = st === 'loading'; if (title) b.title = title; };
   // Which recogniser is in use, on the button itself (every mode, not only
   // dev): Bark GPU / Bark CPU, Chrome on-device / Chrome cloud, Gemma, llama.cpp.
   let engine = '', lastNote = '';
@@ -172,6 +172,7 @@
     let f16 = false; try { f16 = !!(await navigator.gpu?.requestAdapter())?.features.has('shader-f16'); } catch {}
     const d = window.tablefolkDevice, breeze = /breeze/.test(window.tablefolkTTS?.engine || $('ttsEngine')?.value || '');
     const roomy = !d || d.freeGB == null || d.freeGB - (breeze ? 3 : 0) >= 1.5;
+    barkWhy = pick() === 'bark-cpu' ? 'the processor was chosen in the Voice pane' : barkCpuOnly ? 'the graphics card ran out of memory before' : !f16 ? 'no shader-f16 on this graphics card: the processor' : !roomy ? `${Math.round((d.freeGB - (breeze ? 3 : 0)) * 10) / 10} GB of graphics memory left (Bark wants 1.5): the processor` : 'the graphics card has room';
     return f16 && roomy && pick() !== 'bark-cpu' && !barkCpuOnly ? { variant: 'fp16', gb: 1.3 } : { variant: 'q8', gb: 0.9 };
   }
   // asked before recording (not after): yes keeps it, no falls back for good (the pane can pick it again)
@@ -183,7 +184,7 @@
     return yes;
   }
   const BARK_URLS = ['https://geebr-models.mindroot.io/underdog-bark-3.0/', 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/'];
-  let barkWorker = null, barkReady = null, barkId = 0, barkVariant = null; const barkWait = new Map();
+  let barkWorker = null, barkReady = null, barkId = 0, barkVariant = null, barkIsReady = false, loadPct = 0, loadNote = '', barkWhy = ''; const barkWait = new Map();
   function barkLoad() {
     if (barkReady) return barkReady;
     if (barkOk() !== '1') return Promise.reject(new Error('download not approved'));
@@ -193,8 +194,8 @@
       barkWorker = new Worker('/app/asr/worker.js?v=20261101a', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
-        if (m.type === 'progress') { const b = button(); if (b) b.title = `speech model: ${m.note} ${Math.round(m.fraction * 100)}%`; }   // the title only: it loads while you speak
-        else if (m.type === 'ready') res();
+        if (m.type === 'progress') { loadPct = Math.round(m.fraction * 100); loadNote = m.note || ''; const b = button(); if (b) { b.title = `speech model: ${m.note} ${loadPct}% (the 🎤 works once it is loaded)`; const tag = b.querySelector('.mic-engine'); if (tag) tag.textContent = loadPct + '%'; } }
+        else if (m.type === 'ready') { barkIsReady = true; window.tablefolkDiag?.note('speech', `Underdog Bark ready on the ${plan.variant === 'q8' ? 'processor' : 'graphics card'}`); res(); }
         else if (m.type === 'text') barkWait.get(m.id)?.resolve(m.text), barkWait.delete(m.id);
         else if (m.type === 'error') { if (m.id != null) barkWait.get(m.id)?.reject(new Error(m.message)), barkWait.delete(m.id); else { barkReady = null; rej(new Error(m.message)); } }
       };
@@ -214,7 +215,7 @@
     catch (e) {
       if (barkCpuOnly || !/webgpu|OrtRun|GPU/i.test(e.message)) throw e;
       barkCpuOnly = true; barkWorker?.terminate(); barkWorker = null; barkReady = null;
-      window.tablefolkToast?.('speech: the graphics card is full; Underdog Bark moves to the processor', { type: 'info' }); showEngine('Bark CPU');
+      window.tablefolkToast?.('speech: the graphics card is full; Underdog Bark moves to the processor', { type: 'info' }); window.tablefolkDiag?.note('speech', 'the graphics card was full: Underdog Bark moved to the processor'); showEngine('Bark CPU');
       await barkLoad(); return once(copy);
     }
   }
@@ -254,11 +255,16 @@
   async function toggle() {
     if (rec?.state === 'recording') { rec.stop(); return; }
     if (recog) { recog.stop(); return; }
-    if (button()?.dataset.state === 'busy') return;
+    if (button()?.dataset.state === 'busy' || button()?.dataset.state === 'loading') return;
     mode ??= await detect();
     if (mode === 'bark') {
       if (!(await barkAsk())) { if (pick() === 'auto') { mode = await detect(); showEngine(await guessEngine(mode)); } else { window.tablefolkToast?.('speech input: Underdog Bark not downloaded (pick another in the Voice pane)', { type: 'error' }); return; } }
-      else barkLoad().catch(e => window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }));   // downloads while you speak
+      else if (!barkIsReady) {
+        // the model first: the button waits (disabled, with its progress) instead of recording into a long delay
+        setState('loading', 'loading the speech model…');
+        try { await barkLoad(); } catch (e) { setState('idle'); window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }); return; }
+        setState('idle'); showEngine(); window.tablefolkToast?.('speech input ready: click 🎤 to speak', { type: 'info' }); return;
+      }
     }
     try {
       if (mode === 'gemma' || mode === 'bark' || mode === 'llama') await startRecording();
@@ -267,9 +273,27 @@
     } catch (e) { window.tablefolkToast?.('microphone: ' + e.message, { type: 'error' }); setState('idle'); }
   }
 
-  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; showEngine(await guessEngine(m)); }); };
+  // Preloaded when it was approved before (Underdog Bark), once the characters'
+  // model is ready (no contest for the graphics card): the 🎤 stays disabled
+  // with its progress until then. First time: the first click asks, then loads.
+  async function preload() {
+    if (mode !== 'bark' || barkOk() !== '1' || barkIsReady) return;
+    setState('loading', 'the speech model loads after the characters\' model…');
+    for (let i = 0; i < 240 && !/ready|fail|error|skipped/i.test($('brainStatus')?.textContent || ''); i++) await new Promise(r => setTimeout(r, 500));
+    try { await barkLoad(); } catch (e) { window.tablefolkDiag?.note('speech', 'Underdog Bark failed: ' + e.message); }
+    setState('idle'); showEngine();
+  }
+  const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; const e = await guessEngine(m); showEngine(e);
+    const why = { bark: barkOk() === '1' ? 'in this browser (downloaded before or approved): ' + barkWhy : 'in this browser; asks before its download on the first 🎤 click', gemma: 'this server\'s Gemma', llama: 'a llama.cpp model with audio on this computer', browser: barkOk() === '0' ? 'the browser\'s own (Underdog Bark was declined)' : 'the browser\'s own' }[m] || 'none available';
+    window.tablefolkDiag?.note('speech', `${e}: ${why}`); preload(); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText,
+  function state() {
+    const st = button()?.dataset.state;
+    return { engine, ready: mode === 'bark' ? barkIsReady : !!mode, error: false,
+      status: st === 'loading' ? `loading ${loadPct ? loadPct + '%' : ''} ${loadNote}`.trim() : st === 'rec' ? 'listening' : mode === 'bark' && !barkIsReady ? (barkOk() === '1' ? 'not loaded yet' : 'downloads on the first 🎤 click (asks first)') : 'ready',
+      why: mode === 'bark' ? barkWhy : '' };
+  }
+  window.tablefolkSpeech = { toggle, toWav16k, toPcm16k, detect, barkText, state,
     get last() { return last && { seconds: last.seconds, peak: last.peak, voiced: last.voiced }; },
     playLast() { if (!last) return 'nothing recorded yet'; const a = new Audio(URL.createObjectURL(last.blob)); a.play(); return { seconds: last.seconds, peak: last.peak }; }, setMode: m => { try { localStorage.setItem('tablefolk.speech', m); } catch {} mode = null; lastNote = ''; detect().then(async x => { mode = x; showEngine(await guessEngine(x)); }); }, get engine() { return engine; } };
 })();

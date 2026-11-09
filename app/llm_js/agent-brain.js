@@ -6,7 +6,7 @@ import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from 
 import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from './gpt-runner-litert.js?v=20261030g';
 import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
-import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261106f';
+import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from './model-loader-wllama3.js?v=20261109a';
 import { generate as generateWllama3, createWllama3Engine } from './gpt-runner-wllama3.js?v=20261108b';
 import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
@@ -54,7 +54,7 @@ const SUPPORTED_MODELS = {
   // download question, though it is a wllama3 engine. builder.js lists it too.
   'qwen2.5-0.5b': { label: 'Qwen2.5 0.5B', engine: 'wllama3', size: '~490 MB', simple: true, autoLoad: true, hidden: true },
   // The older Qwen1.5 0.5B Chat: what people run on Ollama (qwen:0.5b) and laugh at
-  'qwen1.5-0.5b': { label: 'Qwen1.5 0.5B', engine: 'wllama3', size: '~395 MB', simple: true, autoLoad: true },
+  'qwen1.5-0.5b': { label: 'Qwen1.5 0.5B', engine: 'wllama3', size: '~395 MB', simple: true, autoLoad: true, memGB: 1 },   // memGB: graphics memory it takes (for what is left beside it: the voice); needGB stays unset so it is never picked for a device
   'qwen2.5-0.5b-q2': { label: 'Qwen2.5 0.5B Q2_K', engine: 'wllama3', size: '~415 MB', simple: true, autoLoad: true, hidden: true },
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
@@ -346,7 +346,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, memGB: cfg.memGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

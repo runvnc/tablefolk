@@ -194,12 +194,14 @@ export async function loadModel(modelKey, onProgress) {
     catch (e) {
       if (!(nGpuLayers > 0)) throw e;
       console.warn('[tablefolk-wllama3] could not load on the graphics card, trying the CPU:', e?.message);
+      globalThis.tablefolkDiag?.note('brain', 'not on the graphics card (' + (e?.message || 'error') + '): trying the processor');
       onProgress?.('Not enough graphics memory: loading on the CPU...');
       Promise.resolve().then(() => wllama?.exit()).catch(() => {});
       usedLayers = 0;
       await loadAt(0);
     }
     currentModel = modelKey;
+    globalThis.tablefolkDiag?.note('brain', `${cfg.label} loaded on the ${usedLayers > 0 ? 'graphics card' : 'processor'} (${usedLayers > 0 ? usedLayers + ' layers on the GPU' : 'no WebGPU for it here'})`);
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);

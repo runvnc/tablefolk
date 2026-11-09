@@ -46,7 +46,7 @@
   window.TABLEFOLK_DEV = dev;
   const allowed = name => { const b = document.querySelector(`#rail .rail-btn[data-tab="${name}"]`); return !!b && !b.classList.contains(dev ? 'user-only' : 'dev-only'); };
   // the rail icon lit for a pane: in user mode Voice and Graphics belong to Settings
-  const railFor = name => !dev && (name === 'voice' || name === 'graphics') ? 'settings' : name;
+  const railFor = name => !dev && (name === 'voice' || name === 'graphics' || name === 'device') ? 'settings' : name;
 
   function show(name, opts = {}) {
     const target = document.getElementById('pane-' + name);
@@ -109,7 +109,11 @@
     const btn = document.getElementById('ttsTopToggle');
     const box = document.getElementById('ttsEnabled');
     if (!btn || !box) return;
-    const sync = () => { btn.textContent = box.checked ? '🔊' : '🔇'; btn.classList.toggle('on', box.checked); };
+    // the tooltip names the voice engine in use and its state (Settings, "Running now", says why)
+    const sync = () => { btn.textContent = box.checked ? '🔊' : '🔇'; btn.classList.toggle('on', box.checked);
+      const t = window.tablefolkTTS, e = t?.engineLabel?.();
+      btn.title = (box.checked ? 'speech on' : 'speech off') + (e ? ` · voice: ${e}${t.ready ? '' : ' (' + (t.lastStatus || 'loading') + ')'}` : '') + ' · click to turn ' + (box.checked ? 'off' : 'on'); };
+    const hook = () => { const t = window.tablefolkTTS; if (!t) return setTimeout(hook, 500); t.addEventListener('status', sync); sync(); }; hook();
     btn.addEventListener('click', () => { box.click(); sync(); });
     box.addEventListener('change', sync);
     // tts-ui.js loads later and sets the box from the saved choice without a

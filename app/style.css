@@ -401,6 +401,7 @@ code { color:#ffe0a0; }
 .mic-btn .mic-engine:empty { display:none; }
 .mic-btn[data-state="rec"] { background:#c0392b; color:#fff; animation:micPulse 1s ease-in-out infinite; }
 .mic-btn[data-state="busy"] { opacity:.6; }
+.mic-btn[data-state="loading"] { opacity:.55; cursor:wait; }
 @keyframes micPulse { 50% { box-shadow:0 0 0 6px rgba(192,57,43,.25); } }
 
 /* ---- user / dev mode (tabs.js): dev-only things hide in user mode ---- */
@@ -650,3 +651,19 @@ body.user-mode #playerHp { font-size:11px; }
 #pane-voice .helpers-row button { white-space:normal; }
 #pane-voice input[type="text"] { border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(0,0,0,.28); border-radius:10px; padding:6px 8px; font-size:11px; }
 @media (max-width:520px) { #sidePanel { max-width:calc(100vw - 70px); } }
+
+/* ---- Settings: running now; This device (diagnostics.js) ---- */
+.running-now { display:grid; gap:6px; margin:4px 0 8px; }
+.diag-row { display:grid; grid-template-columns:96px 1fr; gap:0 8px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.04); border-left:3px solid rgba(255,255,255,.2); font-size:.86em; }
+.diag-row b { font-weight:700; opacity:.85; }
+.diag-row small { grid-column:2; opacity:.72; line-height:1.3; }
+.diag-row small i { font-style:normal; opacity:.9; }
+.diag-row.ok { border-left-color:#5cc98a; } .diag-row.busy { border-left-color:#e2b65a; } .diag-row.bad { border-left-color:#e0705a; }
+.diag-offer, .diag-copy { margin-top:6px; width:100%; padding:7px 10px; border-radius:9px; border:1px solid rgba(159,232,200,.45); background:rgba(159,232,200,.12); color:inherit; cursor:pointer; font-size:.86em; text-align:left; }
+.diag-offer:hover, .diag-copy:hover { background:rgba(159,232,200,.24); }
+.diag-table { width:100%; border-collapse:collapse; font-size:.84em; margin-bottom:6px; }
+.diag-table th { text-align:left; font-weight:500; opacity:.7; padding:3px 8px 3px 0; vertical-align:top; width:45%; }
+.diag-table td { padding:3px 0; word-break:break-word; }
+.diag-log { margin:0; padding:0 0 0 2px; list-style:none; font-size:.8em; display:grid; gap:3px; }
+.diag-log li { display:grid; grid-template-columns:44px 58px 1fr; gap:4px; }
+.diag-log li span { opacity:.55; font-variant-numeric:tabular-nums; } .diag-log li b { opacity:.8; }

@@ -1,13 +1,13 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261108d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261109b';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261108d';
+import { installDevConsole } from './dev-console.js?v=20261109a';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261030g';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261030b';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB } from './hardware.js?v=20261030e';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
-import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261106f';
+import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261109a';
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -549,8 +549,19 @@ async function main() {
   const startKey = manager.getModelKey();   // what this player uses when a world names none
   const linked = await linkedScenario(world).catch(() => null);
   if (linked?.defaultModel && !hasModelParam() && manager.getSupportedModels().some(m => m.key === linked.defaultModel)) manager.setModel(linked.defaultModel, false);
+  // why this brain (for Settings, "Running now", and the This device pane)
+  {
+    let saved = null; try { saved = localStorage.getItem('tablefolk_model'); } catch {}
+    const key = manager.getModelKey();
+    window.tablefolkBrainWhy = hasModelParam() ? 'set by the link (?model=)'
+      : linked?.defaultModel === key ? 'this world\'s own model'
+      : saved === key ? 'your choice, remembered'
+      : device?.key === key ? 'the best this graphics card holds' : 'the default';
+    window.tablefolkDiag?.note('brain', (manager.getSupportedModels().find(m => m.key === key)?.label || key) + ': ' + window.tablefolkBrainWhy);
+  }
   // freeGB: graphics memory left beside the chat model (the Breeze voice wants about 4)
-  if (device) { device.freeGB = (usableGB(device.hw) || 0) - (manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.needGB || 3); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
+  // (a getter: the brain may change after this, a world's own model or the player's pick)
+  if (device) { Object.defineProperty(device, 'freeGB', { configurable: true, enumerable: true, get: () => { const m = manager.getSupportedModels().find(m => m.key === manager.getModelKey()); return (usableGB(device.hw) || 0) - (m?.memGB ?? m?.needGB ?? 3); } }); window.tablefolkDiag?.note('device', describeHardware(device.hw) + '; ' + Math.round(device.freeGB * 10) / 10 + ' GB left beside the characters\' model'); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
   if (modelSelect) {
     modelSelect.textContent = '';
     if (device?.hw) modelSelect.title = 'Brain model. This device: ' + describeHardware(device.hw);
@@ -749,6 +760,7 @@ async function main() {
     setStatus(modelLabel + ' ready', 'ready');
   } catch (err) {
     console.error('[character] auto-load FAILED:', err);
+    window.tablefolkDiag?.note('brain', 'failed to load: ' + err.message);
     setStatus('Auto-load failed: ' + err.message + ' Open Agent brains to retry.', 'error');
     el('loadBrains').disabled = false;
     appendLog('auto-load failed: ' + err.message);

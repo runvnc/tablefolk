@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261108a" />
+  <link rel="stylesheet" href="style.css?v=20261109a" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -93,6 +93,7 @@
     <button class="rail-btn dev-only" data-tab="library" type="button" title="Library" aria-label="Library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/></svg></button>
     <button class="rail-btn rail-dev" data-tab="voice" type="button" title="Voice" aria-label="Voice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.2 5.8a9 9 0 0 1 0 12.4"/></svg></button>
     <button class="rail-btn rail-dev" data-tab="graphics" type="button" title="Graphics" aria-label="Graphics"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
+    <button class="rail-btn rail-dev" data-tab="device" type="button" title="This device" aria-label="This device"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg></button>
     <button class="rail-btn dev-only" data-tab="debug" type="button" title="Debug" aria-label="Debug"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="8" height="12" rx="4"/><path d="M12 7V4.5M9.5 4l1.2 2.2M14.5 4l-1.2 2.2M4 13h4M16 13h4M5 8l3 2M19 8l-3 2M5 19l3-2.2M19 19l-3-2.2"/></svg></button>
     <button id="devToggle" class="rail-btn dev-toggle dev-only" type="button" aria-pressed="false">DEV</button>
     <button id="railToggle" class="rail-btn rail-toggle dev-only" type="button" title="Show / hide the panel (\)" aria-label="Show or hide the panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -124,15 +125,23 @@
       <h2 class="pane-title">Settings</h2>
       <div class="section-subtitle">You</div>
       <div id="settingsNameSlot"></div>
+      <div class="section-subtitle">Running now</div>
+      <div id="runningNow" class="running-now"></div>
       <div class="section-subtitle">More</div>
       <nav class="settings-links" aria-label="settings">
         <button type="button" data-open="voice"><b>Voice and speech</b><small>speech on or off, voices, the 🎤 microphone</small></button>
         <button type="button" data-open="graphics"><b>Graphics</b><small>quality, window view, what this browser supports</small></button>
+        <button type="button" data-open="device"><b>This device</b><small>graphics card, memory, browser, and every choice of model and fallback</small></button>
         <button type="button" data-open="messages"><b>Messages</b><small>everything said and done so far</small></button>
       </nav>
       <div class="section-subtitle">Developer mode</div>
       <button id="devSwitch" type="button" class="settings-dev">Turn on developer mode</button>
       <small class="pane-note">All the panels: world, characters, scenario editor, library and debug, the brain loop and the command box.</small>
+    </section>
+    <section class="pane" id="pane-device">
+      <button type="button" class="pane-back user-only" data-open="settings" aria-label="back to Settings">‹ Settings</button>
+      <h2 class="pane-title">This device</h2>
+      <div id="deviceReport"></div>
     </section>
     <section class="pane" id="pane-messages">
       <button type="button" class="pane-back user-only" data-open="settings" aria-label="back to Settings">‹ Settings</button>
@@ -464,6 +473,7 @@
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261107b"></script>
-  <script src="preflight.js?v=20261109g"></script>
+  <script src="diagnostics.js?v=20261109b"></script>
+  <script src="preflight.js?v=20261109h"></script>
 </body>
 </html>
