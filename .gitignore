@@ -23,3 +23,9 @@ tools/browser-test/work/
 docs/node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+# Cloudflare build output (cloud/build.mjs)
+cloud/public/
+cloud/data.js
+cloud/.wrangler/
+.wrangler/

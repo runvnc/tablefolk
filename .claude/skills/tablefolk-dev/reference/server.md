@@ -81,3 +81,42 @@ admin page's guest rights and `overLimit(req, name, n, ms)` per address
   that should not spend the owner's credit.
 
 - **Short links** (`scenarioShortLink` in `server/server.js`, before static files): `/<word>` matching `scenarios/<word>.json` or `scenarios/the-<word>.json`, when no file or folder has that name, redirects (302) to the app with that world. `scenario.js` (`fileLink`) shares the short form.
+
+## The public site on Cloudflare (tablefolk.world)
+
+`cloud/`: a Cloudflare Worker (`tablefolk`) with static assets, deployed
+with the maintainer's `wrangler` login. Nothing there holds a key or runs a
+model: it is the "visitors bring their own model" server.
+
+```bash
+bun cloud/build.mjs            # stage cloud/public/ + write cloud/data.js (both git-ignored)
+cd cloud && wrangler deploy    # or: bun cloud/build.mjs --deploy
+```
+
+- `build.mjs` copies git-tracked files only (no `.env`, `.admin`, ignored
+  files) from the public folders (`app`, `assets`, `scenarios`, `llm_js`,
+  `pocket_tts_min`, `packages`, `skills`, `roles`, `plugins`, the landing
+  page); a tracked link to a folder (`app/assets -> ../assets`) is copied
+  again under its own path, so `/app/assets/...` is a file too (served by
+  Cloudflare, not the Worker). `_headers` gives every file the server's
+  cross-origin isolation (COOP/COEP) and CORS. `data.js` snapshots what the
+  Worker needs from the server: `fast-skill.md`, the voices (admin page
+  settings), the world names, the skills and roles. Rebuild before every
+  deploy, or the site serves the last build.
+- Files are served first; the Worker (`worker.js`) gets only what no file
+  matches: `/world/` (`worldPage` from `server/worldgen-core.js`, the code
+  the Bun server uses), `/api/worldgen/options` (browser and own key),
+  `/api/worldgen/messages`, `/api/finish` (checks, saves nothing),
+  `/api/voices|status|skills|roles` from `data.js`, the short links, and
+  refusals for the server's AI (`/api/generate` as a "failed" stream event,
+  `/api/revise`, `/api/llm`, `/api/local`), speech and `/admin`.
+- `server/worldgen-core.js` is the builder's portable part (checks, prompts,
+  the page): no file system or settings, so the Worker can bundle it
+  (`nodejs_compat` for `node:zlib`). Change the builder there.
+- Addresses: `tablefolk.runvnc.workers.dev`, and the custom domains
+  `tablefolk.world` and `www.tablefolk.world` (redirects to the bare name),
+  once the domain's nameservers point at Cloudflare (set at Namecheap,
+  2026-11-09).
+- Free plan limits: 100k Worker requests a day (only the dynamic routes
+  count; files are free), 20,000 files and 25 MiB each (1573 files, 149 MB
+  at first deploy).

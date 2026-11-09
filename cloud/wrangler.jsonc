@@ -1,0 +1,20 @@
+// tablefolk.world on Cloudflare Workers: `bun cloud/build.mjs` first (stages
+// public/ and data.js), then `wrangler deploy` from this folder.
+{
+  "name": "tablefolk",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "tablefolk.world", "custom_domain": true },
+    { "pattern": "www.tablefolk.world", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}

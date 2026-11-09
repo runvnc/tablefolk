@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-09
+
+- **tablefolk.world is on Cloudflare**: the game, the worlds and the world builder as a Cloudflare Worker with static files (`cloud/`, `bun cloud/build.mjs` then `wrangler deploy`), live at tablefolk.runvnc.workers.dev and at tablefolk.world once its nameservers move. It runs no AI of its own: visitors build and play with a model in their browser or their own key or server. The builder's checks, prompts and page moved to `server/worldgen-core.js`, shared by the Bun server and the Worker.
+
 ## 2026-11-08
 
 - **Build worlds with your own key**: the world builder's "Your own key" runs the generator on your OpenRouter account (one click: **Sign in with OpenRouter**, or paste a key) or on any OpenAI-compatible server, a local one too (with a note on CORS for llama.cpp, Ollama and LM Studio). Your browser calls the model itself and keeps the key; the server only gives out the prompt and checks the result (`POST /api/worldgen/messages`, `/api/finish`), repairs and "ask the AI for changes" included. "Also for the characters" points the game's characters at the same key, and the game's Brain options gained OpenRouter presets that use it. **"Visitors bring their own model"** (admin page, `BYO_MODEL=1` or `--byo-model`): visitors may then only build and play with a model in their browser or their own key or server, never this server's key or GPU. The builder's in-browser models are Gemma 4 E4B, E2B and Bonsai 2 27B, downloaded on first use (they had to be loaded in the game first).
