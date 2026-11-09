@@ -36,11 +36,14 @@ for (const f of files) {
   copy(src, join(OUT, f));
 }
 // Static files get the same headers as the Bun server's (server.js headersFor):
-// cross-origin isolation (the models' threads need it) and open CORS.
+// cross-origin isolation (the models' threads need it) and open CORS. No
+// Referer: Hugging Face answers a request from a *.workers.dev page with a 404
+// and no CORS header (the models "failed to fetch" there, 2026-11-09).
 writeFileSync(join(OUT, '_headers'), `/*
   Access-Control-Allow-Origin: *
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+  Referrer-Policy: no-referrer
 `);
 
 // The Worker's data. settings.js reads .admin/settings.json (voice

@@ -117,6 +117,10 @@ cd cloud && wrangler deploy    # or: bun cloud/build.mjs --deploy
   `tablefolk.world` and `www.tablefolk.world` (redirects to the bare name),
   once the domain's nameservers point at Cloudflare (set at Namecheap,
   2026-11-09).
+- Every page goes out with `Referrer-Policy: no-referrer`: Hugging Face
+  answers a request whose Referer is a `*.workers.dev` page with a 404 and no
+  CORS header, so every model "failed to fetch" there (2026-11-09; from
+  tablefolk.world it worked).
 - Free plan limits: 100k Worker requests a day (only the dynamic routes
   count; files are free), 20,000 files and 25 MiB each (1573 files, 149 MB
   at first deploy).

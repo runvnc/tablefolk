@@ -17,7 +17,7 @@
 import { worldPage, finishScenario, systemPrompt, generateUser, reviseRequest, BROWSER_MODELS, OWN_MODELS } from '../server/worldgen-core.js';
 import DATA from './data.js';
 
-const ISOLATE = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' };
+const ISOLATE = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Referrer-Policy': 'no-referrer' };   // (no Referer: see build.mjs)
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
 const json = (data, status = 200) => Response.json(data, { status, headers: { ...CORS, 'Cache-Control': 'no-store' } });
 const NO_SERVER_AI = 'this site does not run AI models: build in your browser or with your own key (OpenRouter or your own server)';
