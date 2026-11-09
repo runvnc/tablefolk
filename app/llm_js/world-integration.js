@@ -653,6 +653,8 @@ async function main() {
     el('llmPreset')?.addEventListener('change', e => {
       const [url, model] = String(e.target.value || '').split('|'); if (!url) return;
       if (f.baseURL) f.baseURL.value = url === '/api/llm/v1' ? '' : url; if (f.model) f.model.value = model || '';
+      // OpenRouter with your own key: the one signed in with on the world builder (worldgen-own.js), when the field is empty
+      if (/openrouter\.ai/.test(url) && f.apiKey && !f.apiKey.value.trim()) { try { const own = JSON.parse(localStorage.getItem('tablefolk_own_model') || '{}'); if (own.provider !== 'custom' && own.apiKey) f.apiKey.value = own.apiKey; } catch {} }
       setEndpointConfig({ baseURL: f.baseURL?.value.trim(), apiKey: f.apiKey?.value.trim(), model: f.model?.value.trim() });
       appendLog('endpoint preset: ' + getEndpointConfig().baseURL + ' ' + (model || ''));
       listModels();

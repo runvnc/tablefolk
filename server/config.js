@@ -65,4 +65,7 @@ export const config = {
   // What /world/<prompt> shows while it builds: "builder" (the prompt form and
   // live progress) or "loading" (a plain progress bar for players).
   worldView: env('WORLD_VIEW', 'builder') === 'loading' ? 'loading' : 'builder',
+  // Visitors bring their own model (BYO_MODEL=1 or --byo-model; the admin
+  // page can change it): see settings.js guestMay.
+  byoModel: env('BYO_MODEL') === '1',
 };

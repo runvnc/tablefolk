@@ -1,6 +1,6 @@
 /* worldgen-browser.js -- the world builder's "step by step, in this browser"
- * run: the scenario is written by the local Gemma (LiteRT, the model this
- * browser loaded last) in small steps, each checked and put together by code,
+ * run: the scenario is written by a model in this browser (Gemma 4 E4B or
+ * E2B on LiteRT-LM, or Bonsai 2 27B: the builder's menu picks) in small steps, each checked and put together by code,
  * instead of one big JSON answer from the server's model.
  *
  *   1. plan        plain text: title, kind (dungeon, village, outdoor), the
@@ -34,17 +34,30 @@
   const COMMANDS = 'say whisper walk face emote give sell inventory look carry drop attack wield'.split(' ');
 
   // ---- the model ----
+  // Gemma 4 E2B/E4B on LiteRT-LM, or Bonsai 2 27B on its WebGPU kernels
+  // (bonsai2-engine.js; a 10 GB+ card): the one the builder's menu chose
+  // (stored as 'tablefolk_model'), downloaded now if this browser has not got
+  // it yet (the menu says how big; it is kept for the game too).
+  const BONSAI2 = '/app/llm_js/bonsai2-engine.js?v=20261030b';
   let L = null, modelKey = '';
   async function model(emit) {
     if (L) return L;
     emit('progress', { stage: 'loading', label: 'loading the model in this browser…' });
-    const mod = await import(LOADER);
-    let key = 'gemma4-e2b-litert';
-    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '')) key = k; } catch {}
-    const has = await mod.hasModelCached?.(key).catch(() => false);
-    if (has === false) throw new Error(`${key} is not downloaded in this browser yet: open the game once and load it there, then come back`);
-    await mod.loadModel(key, p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' }));
-    modelKey = key; L = mod;
+    let key = 'gemma4-e4b-litert';
+    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || k === 'bonsai2-27b') key = k; } catch {}
+    const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
+    if (key === 'bonsai2-27b') {
+      if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
+      const b = await import(BONSAI2), engine = await b.loadBonsai2(status);
+      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, onToken }), clear: () => {} };
+    } else {
+      const mod = await import(LOADER);
+      const has = await mod.hasModelCached?.(key).catch(() => null);
+      if (has === false) status(`downloading ${key.replace(/-litert$/, '')} (once; kept for the game too)…`);
+      await mod.loadModel(key, status);
+      L = { generate: (messages, opts, onToken) => mod.litertClient.generate(messages, opts, onToken), clear: id => mod.litertClient.clearConversations(id).catch(() => {}) };
+    }
+    modelKey = key;
     return L;
   }
   let n = 0; const log = [];
@@ -52,10 +65,10 @@
     const agentId = 'worldgen-' + stage + '-' + (++n) + '-' + Date.now();
     emit('progress', { stage, label, chars: 0 });
     let last = 0;
-    const text = await L.litertClient.generate([{ role: 'system', content: system }, { role: 'user', content: user }], { agentId, temperature: stage === 'plan' ? .85 : .5 }, t => {
+    const text = await L.generate([{ role: 'system', content: system }, { role: 'user', content: user }], { agentId, temperature: stage === 'plan' ? .85 : .5 }, t => {
       if (t.length - last > 24) { last = t.length; emit('progress', { stage, label, chars: t.length, preview: t.slice(-220) }); }
     });
-    L.litertClient.clearConversations(agentId).catch(() => {});
+    L.clear(agentId);
     log.push({ stage, text });   // window.tfWorldgen.log: every answer, for tests
     emit('progress', { stage, label, chars: text.length, preview: text.slice(-220) });
     return text;

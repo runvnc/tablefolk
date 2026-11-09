@@ -10,7 +10,10 @@
 //   ttsEngine                the players' default speech engine (TTS_ENGINES)
 //   voices                   { alba: { gender, description }, ... }
 //   worldgen                 the world builder's model choices:
-//                            { cloudModels: [...], guest: { browser, server, cloud, cloudModels: [...] } }
+//                            { cloudModels: [...], guest: { browser, own, server, cloud, cloudModels: [...] } }
+//                            (own: the visitor's own OpenRouter key or OpenAI-compatible server, called from their browser)
+//   byoModel                 visitors bring their own model: they build and play only with a model in their browser
+//                            or their own key/endpoint, never this server's key or GPU (default: BYO_MODEL=1 or --byo-model)
 //                            (an admin may use any; guests what "guest" allows)
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,13 +31,13 @@ export const TTS_ENGINES = ['pocket-18m', 'pocket-100m'];
 // server (litert-lm serve), "browser" Gemma in the visitor's own browser.
 export const DEFAULT_WORLDGEN = {
   cloudModels: ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it'],
-  guest: { browser: true, server: false, cloud: true, cloudModels: ['deepseek/deepseek-v4.1-flash-1017'] },
+  guest: { browser: true, own: true, server: false, cloud: true, cloudModels: ['deepseek/deepseek-v4.1-flash-1017'] },
 };
 function cleanWorldgen(w = {}) {
   const list = v => Array.isArray(v) ? [...new Set(v.map(m => String(m).trim()).filter(m => /^[\w.:\/@,+-]{1,120}$/.test(m)))].slice(0, 40) : null;
   const cloudModels = list(w.cloudModels) || DEFAULT_WORLDGEN.cloudModels;
   const g = { ...DEFAULT_WORLDGEN.guest, ...(w.guest || {}) };
-  return { cloudModels, guest: { browser: !!g.browser, server: !!g.server, cloud: !!g.cloud, cloudModels: (list(g.cloudModels) || []).filter(m => cloudModels.includes(m)) } };
+  return { cloudModels, guest: { browser: !!g.browser, own: g.own !== false, server: !!g.server, cloud: !!g.cloud, cloudModels: (list(g.cloudModels) || []).filter(m => cloudModels.includes(m)) } };
 }
 export const VOICE_IDS = ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'];
 const DEFAULT_GENDER = { alba: 'female', azelma: 'female', cosette: 'female', eponine: 'female', fantine: 'female', javert: 'male', jean: 'male', marius: 'male' };
@@ -44,6 +47,7 @@ const ENV = {
   characters: { ...config.characters, raw: { baseURL: process.env.LLM_BASE_URL || '', model: process.env.LLM_MODEL || '', apiKey: process.env.LLM_API_KEY || '' } },
   generator: { ...config.generator, raw: { baseURL: process.env.GEN_BASE_URL || '', model: process.env.GEN_MODEL || '', apiKey: process.env.GEN_API_KEY || '' } },
   worldView: config.worldView,
+  get byoModel() { return process.env.BYO_MODEL === '1' || process.argv.includes('--byo-model'); },
 };
 
 let saved = {};
@@ -62,7 +66,16 @@ function apply() {
   // the characters' brain through this server, for visitors who are not the
   // admin: the endpoint (spends the key) and the local model server (its GPU)
   config.guestBrain = { cloud: saved.guestBrain?.cloud !== false, local: saved.guestBrain?.local === true };
+  config.byoModel = typeof saved.byoModel === 'boolean' ? saved.byoModel : !!ENV.byoModel;
 }
+// What a visitor (not the admin, not this machine) may use, with "bring your
+// own model" on top of the saved choices (which stay as they are, so turning
+// it off brings them back): the builder's "server" and "cloud", and the
+// characters' brain through this server ("cloud": its key, "local": its GPU).
+export const guestMay = {
+  build: id => id === 'browser' ? !!config.worldgen.guest.browser : id === 'own' ? !!config.worldgen.guest.own : !config.byoModel && !!config.worldgen.guest[id],
+  brain: which => !config.byoModel && !!config.guestBrain?.[which],
+};
 apply();
 
 export function voices() {
@@ -85,7 +98,7 @@ export function publicSettings() {
     effective: { baseURL: config[k].baseURL, model: config[k].model, key: !!config[k].apiKey, provider: config[k].provider } });
   const env = { openrouter: !!process.env.OPENROUTER_API_KEY, openai: !!process.env.OPENAI_API_KEY };
   const keys = Object.fromEntries(['openrouter', 'openai'].map(p => [p, { saved: !!saved.keys?.[p], env: env[p] }]));
-  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), packVoices: packVoices(), worldgen: config.worldgen, guestBrain: config.guestBrain };
+  return { characters: ep('characters'), generator: ep('generator'), keys, defaults: DEFAULT_MODELS, worldView: config.worldView, ttsEngine: config.ttsEngine, voices: voices(), packVoices: packVoices(), worldgen: config.worldgen, guestBrain: config.guestBrain, byoModel: config.byoModel };
 }
 
 // patch: { characters: {baseURL, model, apiKey, clearKey}, generator: ..., worldView, voices: [{id, gender, description}] }
@@ -109,6 +122,7 @@ export function updateSettings(patch = {}) {
   }
   if (patch.worldView === 'builder' || patch.worldView === 'loading' || patch.worldView === '') saved.worldView = patch.worldView || undefined;
   if (TTS_ENGINES.includes(patch.ttsEngine)) saved.ttsEngine = patch.ttsEngine;
+  if (typeof patch.byoModel === 'boolean') saved.byoModel = patch.byoModel;
   if (patch.guestBrain && typeof patch.guestBrain === 'object') saved.guestBrain = { cloud: patch.guestBrain.cloud !== false, local: patch.guestBrain.local === true };
   if (patch.worldgen && typeof patch.worldgen === 'object') saved.worldgen = cleanWorldgen({ ...config.worldgen, ...patch.worldgen, guest: { ...config.worldgen.guest, ...(patch.worldgen.guest || {}) } });
   if (Array.isArray(patch.voices)) {

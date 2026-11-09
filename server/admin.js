@@ -246,7 +246,9 @@ td .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.voices td
 <select id="worldView"><option value="builder">the world builder: prompt, progress, map editor</option><option value="loading">a plain loading screen with a progress bar, then the game</option></select></div>
 <div class="card2"><h3>Guests may use</h3>
 <div class="checks" style="flex-direction:column">
-<label class="check"><input type="checkbox" id="gBrowser"> In their own browser <small>free for you: Gemma runs on their GPU</small></label>
+<label class="check"><input type="checkbox" id="byoModel"> <b>Visitors bring their own model</b> <small>they build and play only with a model in their browser or their own key / OpenAI-compatible server; this server's key and GPU are not open to them, whatever is ticked below or under Language models (also <code>BYO_MODEL=1</code> or <code>--byo-model</code>)</small></label>
+<label class="check"><input type="checkbox" id="gBrowser"> In their own browser <small>free for you: Gemma or Bonsai runs on their GPU</small></label>
+<label class="check"><input type="checkbox" id="gOwn"> Their own key or server <small>free for you: their OpenRouter key or an OpenAI-compatible URL, called from their browser</small></label>
 <label class="check"><input type="checkbox" id="gServer"> This server's local model <small>uses this machine's GPU</small></label>
 <label class="check"><input type="checkbox" id="gCloud"> Cloud models <small>spends your API credit</small></label></div>
 <div id="gModelsBox"><label>Cloud models guests may pick</label><div class="checks" id="gModels"></div></div></div></div>
@@ -303,7 +305,7 @@ function render(){
   $('keys').innerHTML=kb('openrouter','OpenRouter')+kb('openai','OpenAI');
   const wg=se.worldgen||{cloudModels:[],guest:{}};
   $('cloudModels').value=wg.cloudModels.join('\\n'); $('worldView').value=se.worldView;
-  $('gBrowser').checked=!!wg.guest.browser; $('gServer').checked=!!wg.guest.server; $('gCloud').checked=!!wg.guest.cloud;
+  $('gBrowser').checked=!!wg.guest.browser; $('gOwn').checked=wg.guest.own!==false; $('byoModel').checked=!!se.byoModel; $('gServer').checked=!!wg.guest.server; $('gCloud').checked=!!wg.guest.cloud;
   const all=[...new Set([se.generator.effective.model,...wg.cloudModels].filter(Boolean))];
   $('gModels').innerHTML=all.map(m=>'<label class="check"><input type="checkbox" value="'+esc(m)+'"'+(wg.guest.cloudModels.includes(m)?' checked':'')+'> '+esc(m)+'</label>').join('');
   $('gModelsBox').hidden=!wg.guest.cloud;
@@ -332,8 +334,8 @@ document.addEventListener('click',async e=>{
   if(del){ if(!confirm('Delete '+del+'? This cannot be undone.')) return; const r=await post('/api/admin/generated',{remove:del}); if(r.ok){ toast('Deleted'); load(); } else toast('Could not delete',true); }
 });
 $('saveBuilder').onclick=async()=>{ const cloudModels=$('cloudModels').value.split('\\n').map(s=>s.trim()).filter(Boolean);
-  const guest={browser:$('gBrowser').checked,server:$('gServer').checked,cloud:$('gCloud').checked,cloudModels:[...$('gModels').querySelectorAll('input:checked')].map(i=>i.value)};
-  saved(await post('/api/admin/settings',{worldgen:{cloudModels,guest},worldView:$('worldView').value}),'World builder settings'); };
+  const guest={browser:$('gBrowser').checked,own:$('gOwn').checked,server:$('gServer').checked,cloud:$('gCloud').checked,cloudModels:[...$('gModels').querySelectorAll('input:checked')].map(i=>i.value)};
+  saved(await post('/api/admin/settings',{worldgen:{cloudModels,guest},worldView:$('worldView').value,byoModel:$('byoModel').checked}),'World builder settings'); };
 $('saveGuestBrain').onclick=async()=>saved(await post('/api/admin/settings',{guestBrain:{cloud:$('gbCloud').checked,local:$('gbLocal').checked}}),'Visitor brain settings');
 let tryPending=null; const trySend=m=>$('tryFrame').contentWindow.postMessage({type:'try',...m},location.origin);
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-try]'); if(!b) return; const m={voice:b.dataset.try,text:$('tryText').value}, f=$('tryFrame'); if(!f.getAttribute('src')){ tryPending=m; $('tryState').textContent='loading the speech engine (first time: about 40 MB)…'; f.src='/app/voice-try.html'; } else trySend(m); });

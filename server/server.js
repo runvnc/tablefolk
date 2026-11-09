@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Tablefolk server (Bun).
 //
-//   bun server/server.js [port] [--litert] [--no-breeze] [--world-loading]
+//   bun server/server.js [port] [--litert] [--no-breeze] [--world-loading] [--byo-model]
 //
 // Serves the project's static files (the app at /app/), and:
 //   /api/llm/v1/...     OpenAI-compatible proxy for the characters' "endpoint"
@@ -12,6 +12,9 @@
 //                       a plain loading screen; ?view= overrides per link)
 //   /api/generate       the generator itself (JSON or a server-sent-event stream)
 //   /api/revise         POST {scenario, request}: the generator changes a scenario
+//   /api/worldgen/messages  POST: the generator's prompt, for a visitor's own model
+//                       (their browser calls it; /api/finish checks the answer)
+//   --byo-model / BYO_MODEL=1: visitors bring their own model (settings.js guestMay)
 //   /api/status         what is configured (never keys)
 //   /admin              the admin page (password set on first start;
 //                       delete .admin/password.json or pass --reset-admin to reset)
@@ -23,7 +26,8 @@
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync, readdirSync, openSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL, BREEZE_URL } from './config.js';
-import { handleWorld, handleGenerate, handleRevise, handleFinish, worldgenOptions } from './generate.js';
+import { handleWorld, handleGenerate, handleRevise, handleFinish, handleWorldgenMessages, worldgenOptions } from './generate.js';
+import { guestMay } from './settings.js';
 import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
 
 const args = process.argv.slice(2);
@@ -31,6 +35,7 @@ const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
 if (args.includes('--litert')) config.startLitert = true;
 if (args.includes('--no-breeze')) config.noBreeze = true;
 if (args.includes('--world-loading')) config.worldView = 'loading';
+if (args.includes('--byo-model')) config.byoModel = true;
 config.port = port;
 await setupAdmin({ reset: args.includes('--reset-admin') });
 
@@ -99,7 +104,7 @@ async function proxy(req, url, prefix, ep, ip = '', which = 'cloud', local = fal
   if (!['/models', '/chat/completions'].includes(sub)) return Response.json({ error: { message: 'only /models and /chat/completions are proxied' } }, { status: 404 });
   // the admin, or anyone on this machine itself (the owner), is not a visitor
   const guest = !isAdmin(req) && !local;
-  if (guest && !config.guestBrain?.[which]) return Response.json({ error: { message: which === 'local' ? 'this server\'s local model is not open to visitors' : 'the server\'s AI is not open to visitors: use the brain in your browser' } }, { status: 403 });
+  if (guest && !guestMay.brain(which)) return Response.json({ error: { message: which === 'local' ? 'this server\'s local model is not open to visitors' : 'the server\'s AI is not open to visitors: use a model in your browser, or your own key or server (Brain options)' } }, { status: 403 });
   if (guest && req.method === 'POST' && limited(ip)) return Response.json({ error: { message: 'too many requests: wait a few minutes' } }, { status: 429 });
   let body;
   if (req.method === 'POST') {
@@ -260,6 +265,7 @@ const server = Bun.serve({
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
     if (p === '/api/revise') return handleRevise(req, url);
     if (p === '/api/finish') return handleFinish(req);
+    if (p === '/api/worldgen/messages') return handleWorldgenMessages(req);
     if (p === '/api/transcribe' && req.method === 'POST') {
       if (!isAdmin(req) && !config.guestBrain?.local) return Response.json({ error: 'speech input through this server is not open to visitors' }, { status: 403 });
       if (overLimit(req, 'transcribe', 60, 600e3)) return Response.json({ error: 'too many requests: wait a few minutes' }, { status: 429 });

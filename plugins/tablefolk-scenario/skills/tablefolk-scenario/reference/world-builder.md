@@ -20,14 +20,29 @@ walls.
 
 **Where the model runs** (the form's menus; `GET /api/worldgen/options`):
 
-- *in this browser*: the local Gemma this browser last loaded (LiteRT, it
-  must already be downloaded) writes it in small steps
+- *in this browser*: Gemma 4 E4B (about 3 GB), E2B (2 GB, quicker, simpler
+  worlds) or Bonsai 2 27B (6 GB, a 10 GB+ graphics card), downloaded the first
+  time and kept (the game uses the same copy), writes it in small steps
   (`app/worldgen-browser.js`): a plan (text), the map (a little JSON; code
   builds it with `procgen.js`, or layout lines outdoors), a review of the map
   that was built (its rooms and contents as text; it may add things), the
   characters, then the server's checks (`POST /api/finish`) with up to two
   fix rounds. 20-45 s with E2B on an RTX 2060.
   `tools/browser-test/worldgen-test.html?prompt=...` runs it on its own.
+- *your own key*: your OpenRouter account (the **Sign in with OpenRouter**
+  button makes a key for this site and brings you back; or paste one from
+  openrouter.ai/keys) or any OpenAI-compatible server, a local one too
+  (llama.cpp's `llama-server`, Ollama, LM Studio, vLLM). Your browser calls
+  it directly and the key is kept only in this browser; the server only
+  hands out the same prompt its own model would get and checks the answer.
+  A server on your own computer must allow the page's requests (CORS):
+  `llama-server` does already, Ollama needs `OLLAMA_ORIGINS=*`, LM Studio
+  has an "Enable CORS" switch; the browser may ask to reach the local
+  network. Type any model the provider has (presets for OpenRouter); a
+  reasoning model like DeepSeek V4.1 Flash writes the best worlds. Tick
+  "also for the characters when I play" to have the game's characters use
+  the same key (with Gemma 4 26B, quick and cheap). The game's Brain options
+  have OpenRouter presets that use this key too.
 - *on this server*: the local model server (`litert-lm serve`, Gemma 4 E4B;
   ~22 s on an RTX 2060).
 - *cloud*: the generator endpoint (OpenRouter by default, model
@@ -35,7 +50,10 @@ walls.
   Replies may run to 17000 tokens for models that think at length.
 
 An admin can use all of them and type any model; guests get what the admin
-page allows, and the server refuses the rest. Other URL options: `?model=`,
+page allows, and the server refuses the rest. A server run with "visitors
+bring their own model" (admin page, `BYO_MODEL=1` or `--byo-model`) offers
+visitors only *in this browser* and *your own key*, and its characters'
+brain is closed to them too: nobody spends the owner's credit. Other URL options: `?model=`,
 `?endpoint=local`, `?art=1` and `?brain=endpoint` (passed on to the app),
 `?go` (open the world as soon as it is ready), `?view=builder|loading`.
 

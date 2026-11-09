@@ -392,6 +392,8 @@
         <summary>OpenAI-compatible endpoint (for the "endpoint" brain)</summary>
         <label>Preset <select id="llmPreset"><option value="">(choose one to fill the fields)</option>
           <option value="/api/llm/v1|">This server's default</option>
+          <option value="https://openrouter.ai/api/v1|google/gemma-4-26b-a4b-it">Gemma 4 26B: OpenRouter with your own key</option>
+          <option value="https://openrouter.ai/api/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter with your own key</option>
           <option value="http://localhost:11434/v1|hf.co/ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF">Nemotron 3.5 Bolt E4B: Ollama on this machine</option>
           <option value="http://localhost:8080/v1|nemotron-3.5-bolt-e4b">Nemotron 3.5 Bolt E4B: llama.cpp server on this machine (llama-server -hf ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF)</option>
           <option value="/api/llm/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter through this server</option>
@@ -406,7 +408,7 @@
         <datalist id="llmModelList"></datalist>
         <div id="llmModelStatus" class="llm-endpoint-note"></div>
         <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model with image input: gemma4-e2b-mm on litert-lm serve, Gemma 4 / GPT on OpenRouter; slower)</label>
-        <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama. The key stays in this browser.</div>
+        <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama (a server on your own computer must allow this page's requests: CORS). The key stays in this browser; an OpenRouter preset uses the key you signed in with on the world builder.</div>
       </details>
       <label class="spawn-mode-toggle"><input id="chatTestMode" type="checkbox" /> chat test mode (bare conversation, no perception)</label>
       <label class="spawn-mode-toggle"><input id="antiEcho" type="checkbox" /> anti-echo instructions (off by default - small models can confuse negative prompts)</label>
@@ -462,6 +464,6 @@
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261107b"></script>
-  <script src="preflight.js?v=20261108az"></script>
+  <script src="preflight.js?v=20261108ba"></script>
 </body>
 </html>

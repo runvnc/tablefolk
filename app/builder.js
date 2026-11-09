@@ -205,6 +205,16 @@
     const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
     asking = true; say('asking…');
     try {
+      // the visitor's own key or server: this page calls it (app/worldgen-own.js)
+      if (revise.where === 'own' && window.tfOwnModel) {
+        const done = await new Promise((res, rej) => window.tfOwnModel.revise(scn, req, (ev, d) => {
+          if (ev === 'progress') say(d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`);
+          else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error));
+        }));
+        remember(); scn = done.scenario; render(); loadMap();
+        $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s`);
+        return;
+      }
       const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
       const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: scn, request: req }) });
       if (!r.ok || !r.body) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);

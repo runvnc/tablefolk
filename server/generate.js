@@ -22,7 +22,7 @@ import { deflateRawSync } from 'node:zlib';
 import { OpenAI, collect } from '../app/llm_js/openai-client.js';
 import { config, ROOT, endpoint, LITERT_URL } from './config.js';
 import { isAdmin, overLimit } from './admin.js';
-import { voicesText, packVoices } from './settings.js';
+import { voicesText, packVoices, guestMay } from './settings.js';
 
 // The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
 export const recent = [];
@@ -131,7 +131,10 @@ export function checkScenario(s) {
 // Where the builder may run a model, and which: an admin anything, a guest
 // what the admin page allows (config.worldgen.guest). "browser" runs in the
 // page itself (app/worldgen-browser.js), so it only needs listing here.
-const BROWSER_MODELS = [['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster)'], ['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB, better)']];
+const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-27b', 'Bonsai 2 27B (about 6 GB; needs a 10 GB+ graphics card)']];
+// The visitor's own model ("own"): presets for the builder's form; the page
+// calls the provider itself, so the key never reaches this server.
+const OWN_MODELS = ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it', 'openai/gpt-6-luna', 'anthropic/claude-sonnet-5-5'];
 async function localModels() {
   try { const r = await fetch(LITERT_URL + '/models', { signal: AbortSignal.timeout(1200) }); const d = await r.json(); return (d.data || []).map(m => m.id).filter(Boolean); } catch { return null; }
 }
@@ -139,14 +142,15 @@ export async function worldgenOptions(req) {
   const admin = isAdmin(req), wg = config.worldgen, g = wg.guest;
   const cloudAll = [...new Set([config.generator.model, ...wg.cloudModels].filter(Boolean))];
   const local = await localModels();
-  const where = [];
-  if (admin || g.browser) where.push({ id: 'browser', label: 'In this browser', note: 'free and private: Gemma runs on your own GPU (the game downloads it once)', models: BROWSER_MODELS.map(([id, label]) => ({ id, label })) });
-  if ((admin || g.server) && (local?.length || admin)) where.push({ id: 'server', label: 'On this server', note: local ? 'the local model server' : 'the local model server is not running', models: (local?.length ? local : [endpoint('local', '', '', '').model]).map(id => ({ id, label: id })), down: !local });
-  if (admin || g.cloud) {
+  const where = [], may = id => admin || guestMay.build(id);
+  if (may('browser')) where.push({ id: 'browser', label: 'In this browser', note: 'free and private: the model runs on your own graphics card (downloaded once, then kept)', models: BROWSER_MODELS.map(([id, label]) => ({ id, label })) });
+  if (may('own')) where.push({ id: 'own', label: 'Your own key', note: 'your OpenRouter key, or any OpenAI-compatible server (a local one too); your browser calls it directly, the key never reaches this server', models: OWN_MODELS.map(id => ({ id, label: id })) });
+  if (may('server') && (local?.length || admin)) where.push({ id: 'server', label: 'On this server', note: local ? 'the local model server' : 'the local model server is not running', models: (local?.length ? local : [endpoint('local', '', '', '').model]).map(id => ({ id, label: id })), down: !local });
+  if (may('cloud')) {
     const models = admin ? cloudAll : g.cloudModels.length ? g.cloudModels : [config.generator.model];
     where.push({ id: 'cloud', label: config.generator.provider === 'openrouter' ? 'Cloud (OpenRouter)' : config.generator.provider === 'openai' ? 'Cloud (OpenAI)' : 'Cloud', note: 'fast, thinks longest', models: models.map(id => ({ id, label: id.replace(/^[\w-]+\//, '') + (id === config.generator.model ? ' (default)' : '') })) });
   }
-  return { admin, where, default: where.find(w => w.id === 'cloud') ? 'cloud' : where[0]?.id || null, custom: admin };
+  return { admin, byo: !!config.byoModel, where, default: where.find(w => w.id === 'cloud') ? 'cloud' : where.find(w => w.id === 'own') && config.byoModel ? 'own' : where[0]?.id || null, custom: admin };
 }
 // The endpoint for ?where=server|cloud&model= (older links: ?endpoint=local),
 // or an error when this visitor may not use it.
@@ -154,10 +158,10 @@ function pickEndpoint(url, req) {
   const q = url.searchParams, admin = isAdmin(req), g = config.worldgen.guest;
   const where = q.get('where') || (q.get('endpoint') === 'local' ? 'server' : 'cloud'), model = (q.get('model') || '').trim();
   if (where === 'server') {
-    if (!admin && !g.server) return { error: 'running models on this server is not open to guests' };
+    if (!admin && !guestMay.build('server')) return { error: 'running models on this server is not open to guests: build in your browser or with your own key' };
     return endpoint('local', '', model, '');
   }
-  if (!admin && !g.cloud) return { error: 'cloud models are not open to guests' };
+  if (!admin && !guestMay.build('cloud')) return { error: 'this server\'s cloud models are not open to guests: build in your browser or with your own key' };
   if (model && !admin) {
     const ok = g.cloudModels.length ? g.cloudModels : [config.generator.model];
     if (!ok.includes(model)) return { error: `the model ${model} is not open to guests` };
@@ -165,17 +169,21 @@ function pickEndpoint(url, req) {
   return { ...config.generator, model: model || config.generator.model };
 }
 
+// The generator's system prompt: the fast skill and the voices.
+const systemPrompt = () => SKILL + `\n\nVoices (ttsVoiceId as written here; match the character's age, gender and manner, and give different characters different voices): ${voicesText()}.`;
+function generateUser(prompt, mode) {
+  const how = MODES[mode] ? `Use map method ${MODES[mode]}.` : 'Choose the map method that fits best.';
+  return `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.`;
+}
 // Run the generator; `emit(event, data)` reports progress.
 export async function generateScenario({ prompt, mode = 'auto', ep, emit = () => {} }) {
-  const how = MODES[mode] ? `Use map method ${MODES[mode]}.` : 'Choose the map method that fits best.';
   // reasoning models (deepseek) think at length before the JSON: room for both
-  return runModel({ label: prompt, mode, ep, emit, maxTokens: 17000,
-    user: `Scenario request: ${prompt}\n\n${how} Reply with the JSON object only.` });
+  return runModel({ label: prompt, mode, ep, emit, maxTokens: 17000, user: generateUser(prompt, mode) });
 }
 
 // Change an existing scenario as asked ("make the goblin a shopkeeper",
 // "add a second treasure room"); the whole updated JSON comes back.
-export async function reviseScenario({ scenario, request, ep, emit = () => {} }) {
+function reviseRequest(scenario, request) {
   // A frozen layout (moved in the tabletop view) lists every wall and floor
   // tile: those stay here, and the model sees the rest plus a way to add or
   // remove objects by square, instead of rewriting hundreds of lines.
@@ -189,10 +197,12 @@ export async function reviseScenario({ scenario, request, ep, emit = () => {} })
     + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.` : '';
   const json = JSON.stringify(shown);
   const maxTokens = Math.min(24000, Math.max(17000, Math.ceil(json.length / 2.5) + 8000));
-  const r = await runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens,
-    user: `Here is a scenario:\n\n${json}${note}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.`,
-    merge: big ? out => mergeKept(out, kept) : null });
-  return r;
+  return { kept, maxTokens,
+    user: `Here is a scenario:\n\n${json}${note}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.` };
+}
+export async function reviseScenario({ scenario, request, ep, emit = () => {} }) {
+  const { kept, maxTokens, user } = reviseRequest(scenario, request);
+  return runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens, user, merge: kept ? out => mergeKept(out, kept) : null });
 }
 function mergeKept(s, kept) {
   const rm = Array.isArray(s.remove_objects) ? s.remove_objects.filter(Array.isArray) : [];
@@ -207,7 +217,7 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
   const t0 = Date.now(), prompt = label;
   const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 600000 });   // long thinking: up to 10 minutes
   const messages = [
-    { role: 'system', content: SKILL + `\n\nVoices (ttsVoiceId as written here; match the character's age, gender and manner, and give different characters different voices): ${voicesText()}.` },
+    { role: 'system', content: systemPrompt() },
     { role: 'user', content: user },
   ];
   let scenario = null, problems = [], raw = '';
@@ -292,7 +302,29 @@ export async function handleGenerate(req, url) {
   return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' } });
 }
 
-// POST /api/finish {scenario, prompt, model, ms}: a scenario made elsewhere
+// POST /api/worldgen/messages {prompt, mode} or {scenario, request}: the
+// messages this server would send its own model, for the visitor's own key or
+// server ("Your own key" in the builder): the page calls the model itself and
+// sends the answer to /api/finish (with "kept" for a big map's revision),
+// which checks it like a generated one; its problems go back to the model.
+export async function handleWorldgenMessages(req) {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (req.method !== 'POST') return Response.json({ error: 'POST {prompt, mode} or {scenario, request}' }, { status: 405, headers: cors });
+  const text = await req.text().catch(() => '');
+  if (text.length > 400000) return Response.json({ error: 'scenario too large' }, { status: 413, headers: cors });
+  if (!isAdmin(req) && !guestMay.build('own')) return Response.json({ error: 'building with your own key is not open here' }, { status: 403, headers: cors });
+  let b = {}; try { b = JSON.parse(text) || {}; } catch {}
+  const system = { role: 'system', content: systemPrompt() };
+  if (b.scenario && typeof b.scenario === 'object') {
+    const request = String(b.request || '').trim().slice(0, 2000); if (!request) return Response.json({ error: 'request required' }, { status: 400, headers: cors });
+    const { kept, maxTokens, user } = reviseRequest(b.scenario, request);
+    return Response.json({ messages: [system, { role: 'user', content: user }], maxTokens, temperature: 0.7, kept }, { headers: cors });
+  }
+  const prompt = String(b.prompt || '').trim().slice(0, 2000); if (!prompt) return Response.json({ error: 'prompt required' }, { status: 400, headers: cors });
+  return Response.json({ messages: [system, { role: 'user', content: generateUser(prompt, String(b.mode || 'auto')) }], maxTokens: 17000, temperature: 0.7 }, { headers: cors });
+}
+
+// POST /api/finish {scenario, prompt, model, ms[, kept]}: a scenario made elsewhere
 // (the world builder's step-by-step run with the model in the browser,
 // app/worldgen-browser.js) checked like a generated one; problems come back
 // for the model to fix, else it is saved and its link returned.
@@ -303,15 +335,18 @@ export async function handleFinish(req) {
   if (text.length > 400000) return Response.json({ error: 'scenario too large' }, { status: 413, headers: cors0 });
   if (overLimit(req, 'finish', 30, 3600e3)) return Response.json({ error: 'too many worlds saved this hour' }, { status: 429, headers: cors0 });
   let parsed = {}; try { parsed = JSON.parse(text); } catch {}
-  const { scenario, prompt = '', model = 'browser', ms = 0 } = parsed || {};
+  let { scenario, prompt = '', model = 'browser', ms = 0, kept = null } = parsed || {};
   let problems;
-  try { problems = checkScenario(scenario); } catch (e) { problems = [e.message]; }
+  try {
+    if (kept && scenario && typeof scenario === 'object' && Array.isArray(kept.objects) && Array.isArray(kept.paint)) scenario = mergeKept(scenario, kept);
+    problems = checkScenario(scenario);
+  } catch (e) { problems = [e.message]; }
   const cors = { 'Access-Control-Allow-Origin': '*' };   // tools/browser-test/worldgen-test.html runs on another port
   if (problems.length) return Response.json({ problems }, { headers: cors });
   const code = encodeScenario(scenario);
   recent.push({ at: Date.now(), prompt: String(prompt).slice(0, 300), model, ms, ok: true, title: scenario.title || '' }); if (recent.length > 50) recent.shift();
   const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
-  try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: 'browser', model, ...scenario }, null, 2) + '\n'); } catch {}
+  try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: String(parsed.mode || 'browser').slice(0, 20), model: String(model).slice(0, 120), ...scenario }, null, 2) + '\n'); } catch {}
   return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [] }, { headers: cors });
 }
 
@@ -339,6 +374,26 @@ export async function handleWorld(req, url, { saved = null } = {}) {
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
   <p class="note" id="whereNote"></p>
+  <p id="byoNote" hidden>This site does not pay for the AI that writes worlds: use a model that runs in your browser (free, once downloaded), or your own key (an <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a> account, or your own OpenAI-compatible server).</p>
+  <div id="ownBox" class="own" hidden>
+    <div class="seg" id="ownProv" role="radiogroup" aria-label="whose model"><button type="button" role="radio" data-p="openrouter">OpenRouter</button><button type="button" role="radio" data-p="custom">OpenAI-compatible server</button></div>
+    <div id="ownOR" class="ownrow">
+      <span id="ownSigned" class="muted"></span>
+      <button type="button" class="primary small2" id="ownSignIn">Sign in with OpenRouter</button>
+      <label class="field grow"><span class="lbl">or paste a key</span><input type="password" id="ownKeyOR" placeholder="sk-or-…" autocomplete="off" spellcheck="false"></label>
+      <a class="muted" href="https://openrouter.ai/keys" target="_blank" rel="noopener">get a key</a>
+    </div>
+    <div id="ownCustom" class="ownrow" hidden>
+      <label class="field grow"><span class="lbl">Server address</span><input id="ownURL" placeholder="http://localhost:8080/v1" spellcheck="false"></label>
+      <label class="field"><span class="lbl">Key (if it needs one)</span><input type="password" id="ownKeyC" autocomplete="off" spellcheck="false"></label>
+      <p class="muted wide">Any OpenAI-compatible server works, a local one too, as long as it lets this page call it (CORS): llama.cpp's <code>llama-server</code> does already; Ollama needs <code>OLLAMA_ORIGINS=*</code>; LM Studio: turn on “Enable CORS” in its server settings. Your browser may ask to reach your local network.</p>
+    </div>
+    <div class="ownrow">
+      <label class="field grow"><span class="lbl">Model</span><input id="ownModel" list="ownModels" spellcheck="false" placeholder="deepseek/deepseek-v4.1-flash-1017"><datalist id="ownModels"></datalist></label>
+      <label class="check"><input type="checkbox" id="ownPlay"> also for the characters when I play</label>
+    </div>
+    <p class="muted wide">Kept in this browser only, and sent only to the provider you chose: never to this site's server.</p>
+  </div>
 </form></section>
 <div class="card progress" id="card" ${words ? '' : 'hidden'}><div class="row1"><span class="spin" id="spin"></span><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span><span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
 <div id="workspace" hidden>
@@ -370,7 +425,9 @@ button.primary{display:inline-flex;align-items:center;gap:7px;background:var(--a
 .field select{padding:.45rem .6rem;border-radius:10px;border:1px solid var(--line);background:var(--bg);max-width:340px}
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
 .seg button{border:0;background:none;padding:.38rem .8rem;border-radius:8px;cursor:pointer;font-weight:600;font-size:.88rem;color:var(--muted)}.seg button[aria-checked=true]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}.seg button:disabled{opacity:.45;cursor:not-allowed}
-.note{margin:8px 0 0;color:var(--muted);font-size:.85rem;min-height:1.3em}.muted{color:var(--muted);font-size:.86rem}
+.note{margin:8px 0 0;color:var(--muted);font-size:.85rem;min-height:1.3em}
+.field[hidden]{display:none}#byoNote{margin:10px 0 0;font-size:.88rem}
+.own{margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);display:grid;gap:10px}.own[hidden]{display:none}.ownrow{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}.ownrow[hidden]{display:none}.own .grow{flex:1;min-width:200px}.own input:not([type=checkbox]){padding:.45rem .6rem;border-radius:10px;border:1px solid var(--line);background:var(--card);width:100%}.own .wide{margin:0;flex-basis:100%}.own .check{display:flex;gap:6px;align-items:center;font-size:.88rem}button.small2{padding:.45rem .9rem;font-size:.9rem}.own code{font-size:.85em}.muted{color:var(--muted);font-size:.86rem}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:18px}
 .progress .row1{display:flex;align-items:center;gap:10px}#stage{font-weight:600}#clock{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
 .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--track);border-top-color:var(--accent);animation:sp 1s linear infinite;flex:none}.spin.stop{animation:none;border-color:var(--ok)}.spin.fail{animation:none;border-color:var(--bad)}@keyframes sp{to{transform:rotate(1turn)}}
@@ -399,7 +456,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025c"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261108b"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025c"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261108d"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -418,9 +475,32 @@ if(f){
     $('whereNote').textContent=w.note+(w.id==='browser'?' · writes the world step by step: plan, map, review, characters':'');
     // the browser's step by step run picks its own kind of map
     $('modeBox').hidden=w.id==='browser';
+    // your own key: its own panel (the model is typed there)
+    $('model').closest('.field').hidden=w.id==='own'; $('ownBox').hidden=w.id!=='own';
+    if(w.id==='own') ownShow(w);
     f.dataset.where=w.id;
   };
-  fetch('/api/worldgen/options').then(r=>r.json()).then(o=>{ OPTS=o;
+  // ---- your own key (app/worldgen-own.js keeps it in this browser) ----
+  const own=()=>window.tfOwnModel;
+  const ownShow=w=>{ const c=own().get();
+    for(const b of $('ownProv').querySelectorAll('button')) b.setAttribute('aria-checked',String(b.dataset.p===c.provider));
+    $('ownOR').hidden=c.provider!=='openrouter'; $('ownCustom').hidden=c.provider!=='custom';
+    $('ownSigned').textContent=c.provider==='openrouter'&&c.apiKey?'✓ key …'+c.apiKey.slice(-4):''; $('ownSignIn').textContent=c.apiKey?'Sign in again':'Sign in with OpenRouter';
+    $('ownKeyOR').value=''; $('ownURL').value=c.provider==='custom'?c.baseURL:''; $('ownKeyC').value=c.provider==='custom'?c.apiKey:'';
+    $('ownModels').innerHTML=(c.provider==='openrouter'?(w||OPTS.where.find(x=>x.id==='own')).models:[]).map(m=>'<option value="'+m.id+'">').join('');
+    $('ownModel').value=c.model||(c.provider==='openrouter'?(w||OPTS.where.find(x=>x.id==='own')).models[0]?.id||'':'');
+    $('ownModel').placeholder=c.provider==='openrouter'?'deepseek/deepseek-v4.1-flash-1017':'the server’s model name';
+    $('ownPlay').checked=!!c.useForPlay; };
+  const ownSave=()=>{ const c=own().get(), p=$('ownProv').querySelector('[aria-checked=true]')?.dataset.p||c.provider;
+    const key=p==='openrouter'?($('ownKeyOR').value.trim()||(c.provider==='openrouter'?c.apiKey:'')):$('ownKeyC').value.trim();
+    return own().set({provider:p,baseURL:p==='custom'?$('ownURL').value.trim().replace(/[/]+$/,''):'',apiKey:key,model:$('ownModel').value.trim(),useForPlay:$('ownPlay').checked}); };
+  $('ownProv').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const c=own().get(); own().set({provider:b.dataset.p,apiKey:b.dataset.p===c.provider?c.apiKey:'',model:b.dataset.p===c.provider?c.model:''}); ownShow(); };
+  $('ownSignIn').onclick=()=>{ ownSave(); own().signIn(); };
+  for(const id of ['ownKeyOR','ownURL','ownKeyC','ownModel','ownPlay']) $(id).onchange=()=>{ ownSave(); if(id==='ownKeyOR') ownShow(); };
+  // back from OpenRouter's sign-in with ?code=: trade it for a key, then the panel shows it
+  const signedIn=window.tfOwnModel?.finishSignIn().then(ok=>{ if(ok){ want.where='own'; $('whereNote').textContent='Signed in with OpenRouter: your key is kept in this browser.'; } }).catch(e=>{ want.where='own'; setTimeout(()=>{ $('whereNote').textContent=e.message; },50); });
+  Promise.resolve(signedIn).then(()=>fetch('/api/worldgen/options')).then(r=>r.json()).then(o=>{ OPTS=o;
+    $('byoNote').hidden=!(o.byo&&!o.admin);
     if(!o.where.length){ $('where').innerHTML='<span class="muted">No model is open to visitors right now.</span>'; f.querySelector('button.primary').disabled=true; return; }
     $('where').innerHTML=o.where.map(w=>'<button type="button" role="radio" data-w="'+w.id+'" title="'+w.note+'"'+(w.down?' disabled':'')+'>'+w.label+'</button>').join('');
     $('where').onclick=e=>{ const b=e.target.closest('button'); if(b&&!b.disabled){ want.model=null; setWhere(b.dataset.w); } };
@@ -429,7 +509,9 @@ if(f){
   $('model').onchange=()=>{ if($('model').value==='__custom'){ const m=prompt('Model id (as the provider names it, e.g. vendor/model-name):'); if(m){ $('model').insertAdjacentHTML('afterbegin','<option value="'+m.replace(/"/g,'')+'">'+m.replace(/</g,'')+'</option>'); $('model').value=m.replace(/"/g,''); } else $('model').selectedIndex=0; } };
   f.p.addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey||!e.shiftKey)){ e.preventDefault(); f.requestSubmit(); } });
   f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); if(!p) return;
-    const where=f.dataset.where||'cloud', model=$('model').value;
+    const where=f.dataset.where||'cloud';
+    if(where==='own'){ const c=ownSave(); const miss=c.provider==='openrouter'&&!c.apiKey?'Sign in with OpenRouter or paste a key first.':c.provider==='custom'&&!/^https?:[/][/]/.test(c.baseURL)?'Type your server’s address first (e.g. http://localhost:8080/v1).':!c.model?'Choose a model first.':''; if(miss){ $('whereNote').textContent=miss; return; } }
+    const model=where==='own'?own().get().model:$('model').value;
     try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model})); }catch{}
     const q=new URLSearchParams(); for(const k of ['art','brain','llm','view','go']) if(qs.has(k)) q.set(k,qs.get(k));
     q.set('where',where); if(model) q.set('model',model); if(where!=='browser') q.set('mode',f.mode.value);
@@ -437,7 +519,7 @@ if(f){
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
 const appLink=l=>{const a=new URLSearchParams(); a.set('play','1'); if(qs.has('art')) a.set('art','1'); if(qs.get('brain')) a.set('model',qs.get('brain')); if(qs.get('llm')) a.set('llm',qs.get('llm')); const s=a.toString(); return s? l.replace('/app/#','/app/?'+s+'#') : l;};
-const reviseWith=()=>{ const w=qs.get('where')||(qs.get('how')==='browser'?'browser':'cloud'); return w==='browser'?{}:{where:w,model:qs.get('model')||''}; };
+const reviseWith=()=>{ const w=qs.get('where')||(qs.get('how')==='browser'?'browser':'cloud'); return w==='browser'?{}:w==='own'?{where:'own'}:{where:w,model:qs.get('model')||''}; };
 if(SAVED && window.tfBuilder) window.tfBuilder.show(SAVED,{appLink,revise:reviseWith()});
 if(words){
   const q=new URLSearchParams(qs); q.set('prompt',words); q.set('stream','1'); q.delete('view');
@@ -493,7 +575,11 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261025c').then(()=>load('/app/worldgen-browser.js?v=20261030f')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261025c').then(()=>load('/app/worldgen-browser.js?v=20261108b')).then(()=>window.tfWorldgen.run(words,(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+  } else if(qs.get('where')==='own'){
+    // the visitor's own key or server, called from this page (app/worldgen-own.js)
+    (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261108b'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))
+      .then(()=>window.tfOwnModel.run(words,qs.get('mode')||'auto',(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
   const es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));
