@@ -60,7 +60,9 @@ Chat commands: `/attack grub`, `/wield sword`, `/cast heal me`, `/steal
 rook` (skills). The 🎤 button talks by voice: click, speak, click again;
 the words are sent like typed chat. By default the speech is turned into
 text in the browser by Underdog Bark 3.0 (English; asked once before its
-download of 0.9-1.3 GB; nothing leaves the computer). It runs on the graphics
+download of 0.9-1.3 GB; nothing leaves the computer). Once approved it loads
+by itself after the characters' model on later visits; while it loads the 🎤
+is greyed out and shows its progress, so a click never waits on it. It runs on the graphics
 card when there is room beside the characters' model, else on the processor
 (about a second a sentence). The button names the recogniser it is using
 (Bark GPU, Bark CPU, Chrome on-device, Chrome cloud, Gemma, or the llama.cpp
@@ -100,9 +102,14 @@ back. It speaks softly to someone beside it and louder across a room.
 User mode (the default) keeps the screen for the world. The left rail has
 two icons: **Adventurer** (`I`: health, gold, wielded weapon, goal, items
 with give / drink / read / wield / drop, then the view buttons, pace and
-"let them live", then the controls) and **Settings** (your chat name, links
-to the **Voice** and **Graphics** panes and to **Messages**, and the switch
-to developer mode). The chat box at the bottom right is just the
+"let them live", then the controls) and **Settings** (your chat name;
+**Running now**: the characters' model, the voice, the speech input and the
+graphics, each with its state and why it was chosen; links to the **Voice**
+and **Graphics** panes, **This device** and **Messages**; and the switch to
+developer mode). **This device** shows what was detected (the graphics card
+and its memory, what is left beside the characters' model, the browser's
+abilities, storage), what runs now, and every choice of model and every
+fallback with its time; "copy this report" puts it on the clipboard. The chat box at the bottom right is just the
 conversation: the messages button (the last 300 lines), the message, the 🎤
 and send. The "to:" picker shows only when there is more than one character
 to talk to (the box says who listens: "Talk to Oracle…"), and a slim health
@@ -165,7 +172,14 @@ can clone a voice from a sample.
 The Graphics pane sets quality, shadows, the sea and "smart memory" (the
 embedding model). Light is the default; every quality uses the simple sea and
 sky (the detailed ocean and island only come with `?island=1`). The 🔊/🔇
-button at the top turns speech on and off. The ⏺ button beside it records a video of the 3D view with
+button at the top turns speech on and off; its tooltip names the voice in
+use. The voice is the one picked in the Voice pane, else Breeze running on
+this computer, else **Breeze TTS 2 in the browser** when it was downloaded
+and the graphics card has room beside the characters' model (3.5 GB), else
+the site's default (Pocket-TTS). When Breeze would fit but isn't downloaded,
+the game offers it once (twice at most) after the characters' model is
+ready, also from Settings; it downloads (2.5 GB) and starts in the
+background while the current voice keeps talking, then takes over. The ⏺ button beside it records a video of the 3D view with
 the voices and sound effects (about 30 fps; MP4 with H.264, or WebM where
 MP4 isn't available); click it again to stop, and the file downloads. Panels
 and the chat box are not in the picture. The Debug pane's APNG recorder is

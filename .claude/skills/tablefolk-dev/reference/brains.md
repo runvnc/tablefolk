@@ -377,3 +377,21 @@ with `?trustSkills=1`, or after the player allows that package.
 - Voices: Pocket-TTS clones samples; the designed library
   (`assets/voices/`, `tools/fal-voices.py`, `tools/voices.json`) is
   `pack:<id>` (`ensurePack` in `pocket-tts-manager.js`).
+
+## What runs and why (diagnostics.js)
+
+`window.tablefolkDiag.note(area, text)` records a decision or fallback
+(areas `device`, `brain`, `voice`, `speech`): world-integration.js (the
+hardware line, the brain and `window.tablefolkBrainWhy`: link, world's own,
+remembered, best for the card, default; a failed load),
+model-loader-wllama3.js (GPU or processor, the GPU-to-CPU fallback),
+pocket-tts-manager.js (`chooseEngine` returns `{id, why}`; `breezeWebWhyNot`
+checks browser-check.js's needs, `tablefolkDevice.freeGB` >= 3.5 and the
+measured speed; `maybeOfferBreeze` once the brain is ready, at most twice per
+browser; `upgradeToBreezeWeb` loads breeze-web in its own worker, then
+`switchEngine('breeze-web', false)`, not saved as a choice, so the automatic
+rule keeps it), speech-input.js (`state()`, `barkWhy`, the preload, the GPU
+full fallback). Settings' **Running now** and the **This device** pane render
+them (refreshed every 1.5 s while open). `tablefolkDevice.freeGB` is a getter
+on the current brain's `memGB` (Qwen 0.5B: 1; never used to pick a model)
+or `needGB` (else 3).
