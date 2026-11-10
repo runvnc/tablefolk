@@ -40,6 +40,21 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - Record the user's request batches in `docs/REQUESTS.md` when asked; log
   changes in `CHANGELOG.md`, never in the README.
 
+## Public site (2026-11-09)
+
+- tablefolk.world is a Cloudflare Worker with static files (`cloud/`):
+  `bun cloud/build.mjs --deploy` after changes (only git-tracked files ship:
+  commit new files first). It runs no AI: visitors use in-browser models or
+  their own key/server. Details: the maintainer skill's `server.md`, "The
+  public site on Cloudflare".
+- The world builder's portable code is `server/worldgen-core.js` (shared by
+  the Bun server and the Worker); "your own key" is `app/worldgen-own.js`;
+  `--byo-model` / `BYO_MODEL=1` closes the server's AI to visitors.
+- Players see what runs and why in Settings ("Running now") and the "This
+  device" pane (`app/diagnostics.js`, `tablefolkDiag.note`).
+- This laptop's USB Ethernet adapter drops its link every few minutes
+  (2026-11-09): long downloads in tests can fail with ERR_NETWORK_CHANGED.
+
 ## Open items (2026-11-01)
 
 - Mirror the vision model (`gemma-4-E2B-it.litertlm`) on the R2 bucket:
