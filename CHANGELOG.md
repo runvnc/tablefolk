@@ -10,6 +10,7 @@ skill (internals); `git log` has every commit.
 - **C cycles all three views**: free camera, follow camera, first person, and round again (V still goes straight to first person).
 - **Longer speech bubbles that wait for the voice**: up to 256 characters, wrapped, instead of one line of 86; a voiced line's bubble stays until its voice has finished.
 - **What they said before**: a 💬 floats over a character for 45 s after it speaks; hovering the character or the 💬 shows a card with its recent lines (how long ago, ▶ to hear one again), and tapping the 💬 keeps it open.
+- **The history card opens only from the 💬**: hovering a character just shows its 💬 (it opened the card too, too easily); the card opens on the 💬 or within a few pixels of it.
 - **Hold-to-talk**: the 🎤 records while held (mouse, touch, or Space on the button) and sends on release; a very short tap is dropped with a hint.
 
 ## 2026-11-09

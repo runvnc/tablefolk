@@ -220,7 +220,8 @@ when the follow camera's ray hits it, else 1; never in the free camera.
   testing the pointer against that box (no ray pick; `pointermove` on the
   canvas, ignored while a button is held, so orbiting opens nothing). A 💬
   chip (`g._chip`, removed in `disposeCharacter`) floats over a character for
-  45 s after its last line when no bubble is up. The card (`.speech-history`)
+  45 s after its last line when no bubble is up, and while the character is
+  hovered; only the chip (with an 8 px `::before` margin) opens the card. The card (`.speech-history`)
   hides that character's live bubbles while open (it lists them) and is
   clamped to the screen; ▶ calls `tablefolkTTS.speak` again.
 - Talking mouths: `g.mouth = {influence, apply()}` is driven each frame by

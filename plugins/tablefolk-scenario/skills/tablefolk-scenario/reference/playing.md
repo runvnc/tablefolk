@@ -126,8 +126,8 @@ Voice pane has the details.
 voiced line's bubble stays until its voice has finished (it waits its turn
 while others speak); an unvoiced one stays for a reading time by its length.
 **What they said before**: for 45 seconds after a character speaks, a small
-💬 floats over its head. Hover the character (or the 💬) and a card above
-its head lists its last lines (newest at the bottom, with how long ago, and
+💬 floats over its head (hovering the character shows it again later).
+Hover the 💬 itself and a card above its head lists its last lines (newest at the bottom, with how long ago, and
 ▶ to hear one again); tap the 💬 to keep the card open (tap again, Esc or a
 click elsewhere closes it). The messages button has the whole conversation.
 Breeze in the browser shares the graphics card with the picture, so the picture drops to 15 fps while it speaks (Graphics pane, "While Breeze speaks").
