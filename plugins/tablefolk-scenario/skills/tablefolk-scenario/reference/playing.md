@@ -47,8 +47,8 @@ approve the download on a user's behalf.
 | drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it); in the follow camera, turn the view around you (it keeps that angle while it follows you) |
 | E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
 | F | attack the nearest foe |
-| V | first person (your hands show the weapon and torch) |
-| C | camera: from first person to the free camera, then free and follow in turn |
+| C | camera: the free camera, the follow camera and first person in turn (in first person your hands show the weapon and torch) |
+| V | first person and back (C reaches it too) |
 | H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and the board slides behind the frame; lean in to bring it closer (or, with the Graphics pane's "leaning in", to see more as through a real window) (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
 | P | let them live (everyone acts on their own) / pause |
 | I | the Adventurer pane |
@@ -57,12 +57,13 @@ approve the download on a user's behalf.
 | Esc | close the panel or a dialog |
 
 Chat commands: `/attack grub`, `/wield sword`, `/cast heal me`, `/steal
-rook` (skills). The 🎤 button talks by voice: click, speak, click again;
-the words are sent like typed chat. By default the speech is turned into
+rook` (skills). The 🎤 button is hold-to-talk: hold it down (mouse, finger, or
+Space on the focused button) while you speak and let go to send; the words
+go like typed chat (a tap under a third of a second is dropped with a hint). By default the speech is turned into
 text in the browser by Underdog Bark 3.0 (English; asked once before its
 download of 0.9-1.3 GB; nothing leaves the computer). Once approved it loads
 by itself after the characters' model on later visits; while it loads the 🎤
-is greyed out and shows its progress, so a click never waits on it. It runs on the graphics
+is greyed out and shows its progress, so a press never waits on it. It runs on the graphics
 card when there is room beside the characters' model, else on the processor
 (about a second a sentence). The button names the recogniser it is using
 (Bark GPU, Bark CPU, Chrome on-device, Chrome cloud, Gemma, or the llama.cpp
@@ -82,7 +83,7 @@ centred on you; drag to turn it around you (from any side, tilted within the
 free camera's limits) and it keeps that angle as you walk. Seen from behind,
 walls between it and the player drop to a stub; turned elsewhere, every wall
 stands at half height; a roof in the way turns see-through. C from first
-person goes to the free camera. First person (V)
+person goes to the free camera. First person (C from the follow camera, or V)
 looks through the avatar's eyes, with walls at full height. A world can start
 in any of them (`"view"`: `overview`, `follow` or `first`); a door into a
 subworld and back keeps the view you had.
@@ -114,6 +115,21 @@ conversation: the messages button (the last 300 lines), the message, the 🎤
 and send. The "to:" picker shows only when there is more than one character
 to talk to (the box says who listens: "Talk to Oracle…"), and a slim health
 bar only while you are hurt. All the keys work as before.
+
+**Downloads on screen.** While Breeze TTS 2 (the voice) or Underdog Bark
+(speech input) downloads or loads, a small card under the top bar on the
+right shows what it is doing with a progress bar; it says "ready" for a few
+seconds and goes (an error stays a little longer; click to dismiss). The
+Voice pane has the details.
+
+**Speech bubbles.** A line shows in full up to 256 characters, wrapped. A
+voiced line's bubble stays until its voice has finished (it waits its turn
+while others speak); an unvoiced one stays for a reading time by its length.
+**What they said before**: for 45 seconds after a character speaks, a small
+💬 floats over its head. Hover the character (or the 💬) and a card above
+its head lists its last lines (newest at the bottom, with how long ago, and
+▶ to hear one again); tap the 💬 to keep the card open (tap again, Esc or a
+click elsewhere closes it). The messages button has the whole conversation.
 Breeze in the browser shares the graphics card with the picture, so the picture drops to 15 fps while it speaks (Graphics pane, "While Breeze speaks").
 
 **Dev mode** (Settings → "Turn on developer mode", or `?dev=1`, remembered in the browser; the DEV button on the rail turns it off again, as does `?dev=0`;

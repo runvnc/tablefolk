@@ -3128,7 +3128,7 @@ function showStreamingBubble(g, text) {
     g.anim = 'talk';
     playRig(g, 'talk', true);
   }
-  b.div.textContent = (text || '...').slice(0, 120);
+  b.div.textContent = clipBubble(text || '...');
   b.ttl = 999;
 }
 
@@ -3159,6 +3159,25 @@ function clearPendingThought(g){
   const b=state.bubbles.find(x=>x.thought && x.node===g?.root);
   if(b && b.div.classList.contains('pending')) b.ttl=0;
 }
+// Speech bubbles: up to 256 characters, wrapped. A voiced line's bubble stays
+// until its voice has finished (the 'speechend' below; at most a minute while
+// it waits its turn in the voice queue), else for a reading time by length.
+// Every line also goes into the speaker's history (g._lines), which the
+// history card shows (setupSpeechHistory).
+const BUBBLE_MAX=256;
+function clipBubble(t){ t=String(t||'').replace(/\s+/g,' ').trim(); return t.length>BUBBLE_MAX ? t.slice(0,BUBBLE_MAX-1).trimEnd()+'…' : t; }
+const readingTime=t=>clamp(2.6+String(t||'').length/16,2.8,16);
+function showSpeechBubble(g,text,{whisper=false,waitVoice=false,cls=''}={}){
+  const shown=clipBubble((whisper?'(whispers) ':'')+(text||'...'));
+  const div=document.createElement('div'); div.className='bubble'+(whisper?' whisper':'')+(shown.length>90?' long':'')+(cls?' '+cls:''); div.textContent=shown;
+  document.body.appendChild(div);
+  state.bubbles.push({div,node:g.root,ttl:waitVoice?60:readingTime(shown),waitVoice,said:String(text||''),agent:g});
+  (g._lines||=[]).push({text:shown,at:Date.now(),whisper}); if(g._lines.length>20) g._lines.shift();
+  g._lastLineAt=performance.now();
+}
+function voiceBubble(e,fn){ const g=e.detail?.agent; if(!g?.root) return; const mine=state.bubbles.filter(b=>b.waitVoice && b.node===g.root); const b=mine.find(x=>x.said===e.detail.text)||mine[0]; if(b) fn(b); }
+window.tablefolkTTS?.addEventListener('speechstart',e=>voiceBubble(e,b=>b.div.classList.add('talking')));
+window.tablefolkTTS?.addEventListener('speechend',e=>voiceBubble(e,b=>{ b.waitVoice=false; b.div.classList.remove('talking'); b.ttl=e.detail.ok===false?readingTime(b.div.textContent):1.4; }));
 // whisper: speech only the player hears (other characters never get it); a
 // smaller, dimmer bubble.
 function say(g,text,voiced=false,{whisper=false}={}){
@@ -3188,9 +3207,8 @@ function say(g,text,voiced=false,{whisper=false}={}){
   if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId,level); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
   log(g.id+': '+text);
   try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced}})); }catch{}
-  const div=document.createElement('div'); div.className=whisper?'bubble whisper':'bubble'; div.textContent=(whisper?'(whispers) ':'')+(text||'...').slice(0,86);
-  document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:2.8});
   const speechRequested=localStorage.getItem('tablefolkTtsEnabled')!=='0' && getBrainConfig(g.id).ttsEnabled!==false;
+  showSpeechBubble(g,text,{whisper,waitVoice:voiced && speechRequested && !!window.tablefolkTTS?.ready});
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
   if(voiced && g!==state.playerAvatar){
     if(to){ faceToward(g,to); if(to!==state.playerAvatar && !to.turnMove && !to.speaking) faceToward(to,g); }
@@ -5032,8 +5050,8 @@ function updateFirstPersonButton(){
   const row=document.getElementById('viewBtns'); if(row) row.hidden=!state.playerAvatar;
   b.classList.toggle('active',!!state.firstPerson);
   const c=document.getElementById('cameraModeBtn');
-  if(c){ const free=state.cameraMode!=='follow' && !state.firstPerson; c.classList.toggle('active',free); c.querySelector('span').textContent=free?'follow camera':'free camera'; c.title=free?'follow camera: centred on you, drag to turn it (C)':'free camera: drag to orbit, wheel to zoom (C)'; }
-  b.title=state.firstPerson?'back to the overview (V)':'see through your avatar\'s eyes (V)';
+  if(c){ const free=state.cameraMode!=='follow' && !state.firstPerson, next=nextCameraView(); c.classList.toggle('active',free); c.querySelector('span').textContent={follow:'follow camera',first:'first person',overview:'free camera'}[next]; c.title={follow:'follow camera: centred on you, drag to turn it',first:'first person: through your avatar\'s eyes',overview:'free camera: drag to orbit, wheel to zoom'}[next]+' (C cycles free, follow, first person)'; }
+  b.title=state.firstPerson?'back to the overview (C or V)':'see through your avatar\'s eyes (C cycles to it; V too)';
   b.querySelector('span')&&(b.querySelector('span').textContent=state.firstPerson?'overview':'first person');
 }
 // Player chat appears as a bubble over the avatar (no voice, no history).
@@ -5041,8 +5059,7 @@ window.addEventListener('tablefolk-player-chat',e=>{
   const g=state.playerAvatar, to=state.characters.find(c=>c.id===e.detail?.agentId);
   if(to && g){ to._heard={who:g,at:performance.now()}; if(!to.turnMove) faceToward(to,g); faceToward(g,to,4000); }
   if(!g) return;
-  const div=document.createElement('div'); div.className='bubble player-bubble'; div.textContent=String(e.detail?.text||'').slice(0,86);
-  document.body.appendChild(div); state.bubbles.push({div,node:g.root,ttl:3.2});
+  showSpeechBubble(g,String(e.detail?.text||''),{cls:'player-bubble'});
 });
 // Two cameras with an avatar (C switches; V is first person):
 // 'overview' (the default), the free camera over the board (drag to orbit),
@@ -5076,13 +5093,15 @@ function freeCameraStart(){
   updateFirstPersonButton();
 }
 // C and the camera button: first person -> free, free -> follow, follow -> free.
+// C cycles the three views: free -> follow -> first person -> free.
+function nextCameraView(){ return state.firstPerson?'overview':state.cameraMode==='follow'?'first':'follow'; }
 function toggleCameraMode(){
-  const fromFirst=state.firstPerson;
-  if(fromFirst) setFirstPerson(false);
-  if(fromFirst || state.cameraMode==='follow') freeCameraStart();
-  else followCameraStart();
+  const next=nextCameraView();
+  if(next==='first'){ setFirstPerson(true); window.tablefolkToast?.('camera: first person, drag to look (C for the free camera)'); return; }
+  if(state.firstPerson) setFirstPerson(false);
+  if(next==='overview') freeCameraStart(); else followCameraStart();
   updateFirstPersonButton();
-  window.tablefolkToast?.(state.cameraMode==='follow'?'camera: following you, drag to turn (C for the free camera)':'camera: free, drag to turn (C to follow)');
+  window.tablefolkToast?.(next==='follow'?'camera: following you, drag to turn (C for first person)':'camera: free, drag to turn (C to follow)');
 }
 // The scenario's "view" (scenario.js): 'overview' (the free camera), 'follow' or 'first'.
 function getCameraView(){ return state.firstPerson?'first':state.cameraMode==='follow'?'follow':'overview'; }
@@ -5120,6 +5139,7 @@ function followAvatarCamera(dt){
 // Free a character and everything it imported (meshes, their own materials
 // and textures, skeletons, animation groups, the kept walk-clip source).
 function disposeCharacter(g){
+  try{ g._chip?.remove(); g._chip=null; if(HIST.who===g) closeHistory(); }catch{}
   try { if (g.collider) g.collider.dispose(); } catch {}
   const o=g.owned;
   for (const ag of o?.groups||[]) { try{ ag.stop(); ag.dispose(); }catch{} }
@@ -5422,7 +5442,7 @@ function setupUI(){
   if(speakSel){ try{ const v=localStorage.getItem('tablefolkSpeakFps'); if(v!==null) speakSel.value=v; }catch{} speakSel.onchange=()=>{ try{ localStorage.setItem('tablefolkSpeakFps',speakSel.value); }catch{} }; }
   const baseMapSel=document.getElementById('baseMapSelect');
   if(baseMapSel){ baseMapSel.value=state.baseMap||'island'; baseMapSel.onchange=()=>{ setBaseMap(baseMapSel.value); updatePerceptionUI(); saveWorldState(); log('base map: '+baseMapSel.value); }; }
-  setupPlayerControls(); setupFirstPersonLook();
+  setupPlayerControls(); setupFirstPersonLook(); setupSpeechHistory();
   const avCb=document.getElementById('avatarToggle');
   if(avCb){ avCb.checked=!!state.playerAvatar; avCb.onchange=async()=>{ if(avCb.checked){ const c=state.camera.target; await spawnPlayerAvatar(Math.round(c.x),Math.round(c.z)+1); } else removePlayerAvatar(); saveWorldState(); }; }
   const fpBtn=document.getElementById('firstPersonBtn'); if(fpBtn) fpBtn.onclick=()=>setFirstPerson(!state.firstPerson);
@@ -5453,6 +5473,89 @@ function setupUI(){
   updatePerceptionUI(); updateTurnUI();
 }
 
+// ---- what they said before: the speech history card ----
+// Each character keeps its last lines (g._lines). For 45 s after it last
+// spoke a small 💬 tab floats over its head. Hovering the character itself
+// (its body on screen) or the tab opens a card above its head with its recent
+// lines, newest at the bottom, each with ▶ to hear it again; tapping the tab
+// pins the card (tap again, Escape or a click elsewhere closes it). The card
+// stays open while the pointer is on it, so it can be scrolled.
+const HIST={card:null,who:null,pinned:false,over:false,hoverAt:0,leaveAt:0,px:-1,py:-1,inCanvas:false};
+function setupSpeechHistory(){
+  const card=HIST.card=document.createElement('div'); card.className='speech-history'; card.hidden=true;
+  card.addEventListener('pointerenter',()=>{ HIST.over=true; });
+  card.addEventListener('pointerleave',()=>{ HIST.over=false; HIST.leaveAt=performance.now(); });
+  card.addEventListener('click',e=>{ const btn=e.target.closest('[data-line]'); if(!btn || !HIST.who) return; e.stopPropagation(); const l=HIST.who._lines?.[+btn.dataset.line]; if(l && HIST.who!==state.playerAvatar) window.tablefolkTTS?.speak(HIST.who,l.text.replace(/^\(whispers\) /,''),getBrainConfig(HIST.who.id).ttsVoiceId,l.whisper?.35:1); });
+  document.body.appendChild(card);
+  canvas.addEventListener('pointermove',e=>{ HIST.px=e.clientX; HIST.py=e.clientY; HIST.inCanvas=!e.buttons; });
+  canvas.addEventListener('pointerleave',()=>{ HIST.inCanvas=false; });
+  window.addEventListener('pointerdown',e=>{ if(HIST.pinned && !card.contains(e.target) && !e.target.closest?.('.speech-chip')) closeHistory(); },true);
+  window.addEventListener('keydown',e=>{ if(e.key==='Escape' && HIST.who) closeHistory(); });
+}
+function chipFor(g){
+  if(g._chip) return g._chip;
+  const c=g._chip=document.createElement('div'); c.className='speech-chip'; c.textContent='💬'; c.title='what '+(g===state.playerAvatar?'you':g.id)+' said (hover, or tap to keep it open)';
+  c.addEventListener('pointerenter',()=>{ if(!HIST.pinned) openHistory(g); });
+  c.addEventListener('pointerleave',()=>{ HIST.leaveAt=performance.now(); });
+  c.addEventListener('click',e=>{ e.stopPropagation(); if(HIST.pinned && HIST.who===g) closeHistory(); else { openHistory(g); HIST.pinned=true; } });
+  document.body.appendChild(c); return c;
+}
+function openHistory(g){
+  const card=HIST.card; if(!card || !g?._lines?.length) return;
+  if(HIST.who!==g || card.hidden){
+    HIST.who=g; HIST.pinned=false; card.textContent='';
+    const head=document.createElement('div'); head.className='sh-head'; head.textContent=g===state.playerAvatar?'you said':g.id+' said'; card.appendChild(head);
+    const list=document.createElement('div'); list.className='sh-list';
+    const now=Date.now(), ago=t=>{ const s=Math.round((now-t)/1000); return s<60?'just now':s<3600?Math.round(s/60)+' min ago':Math.round(s/3600)+' h ago'; };
+    g._lines.forEach((l,i)=>{
+      const row=document.createElement('div'); row.className='sh-line'+(l.whisper?' whisper':'');
+      const t=document.createElement('span'); t.textContent=l.text; const when=document.createElement('small'); when.textContent=ago(l.at);
+      row.append(t,when);
+      if(g!==state.playerAvatar && window.tablefolkTTS?.ready){ const b=document.createElement('button'); b.type='button'; b.dataset.line=i; b.title='hear it again'; b.textContent='▶'; row.appendChild(b); }
+      list.appendChild(row);
+    });
+    card.appendChild(list); card.hidden=false; list.scrollTop=list.scrollHeight;
+  }
+  HIST.leaveAt=0;
+}
+function closeHistory(){ if(HIST.card) HIST.card.hidden=true; HIST.who=null; HIST.pinned=false; HIST.over=false; }
+// the character under the pointer, by its projected body (no ray pick)
+function hoveredSpeaker(project){
+  if(!HIST.inCanvas || HIST.px<0) return null;
+  let best=null,bz=Infinity;
+  for(const g of state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters){
+    if(!g._lines?.length || !g.root || (g===state.playerAvatar && state.firstPerson)) continue;
+    const foot=project(g.root,0), head=project(g.root,g.height||PERSON_H);
+    if(foot.z<0 || foot.z>1) continue;
+    const h=Math.max(16,foot.y-head.y), w=Math.max(14,h*.32);
+    if(Math.abs(HIST.px-foot.x)<=w && HIST.py>=head.y-10 && HIST.py<=foot.y+4 && foot.z<bz){ bz=foot.z; best=g; }
+  }
+  return best;
+}
+function updateSpeechHistory(project,stack){
+  if(!HIST.card) return;
+  const now=performance.now(), hov=hoveredSpeaker(project);
+  if(hov){ if(HIST.hoverWho!==hov){ HIST.hoverWho=hov; HIST.hoverAt=now; } else if(now-HIST.hoverAt>220 && !HIST.pinned) openHistory(hov); }
+  else HIST.hoverWho=null;
+  // close once the pointer has left the character, its tab and the card for a moment
+  const chipHover=HIST.who?._chip?.matches(':hover');
+  if(HIST.who && !HIST.pinned && hov!==HIST.who && !HIST.over && !chipHover){ HIST.leaveAt||=now; if(now-HIST.leaveAt>350) closeHistory(); }
+  else if(HIST.who) HIST.leaveAt=0;
+  for(const g of state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters){
+    const c=g._chip, recent=g._lastLineAt && now-g._lastLineAt<45000, talking=stack.has(g.root) && HIST.who!==g;
+    const show=g._lines?.length && (recent || HIST.hoverWho===g) && !talking && HIST.who!==g && !(g===state.playerAvatar && state.firstPerson);
+    if(!show){ if(c) c.hidden=true; continue; }
+    const p=project(g.root,1.0); if(p.z<0 || p.z>1){ if(c) c.hidden=true; continue; }
+    const el=chipFor(g); el.hidden=false; el.style.left=p.x+'px'; el.style.top=(p.y-34)+'px';
+  }
+  if(HIST.who){
+    const g=HIST.who; if(!g.root || g.root.isDisposed?.() || !state.characters.concat(state.playerAvatar||[]).includes(g)) return closeHistory();
+    // above the head and its bubbles, kept on screen (it covers the bubbles when there is no room)
+    const p=project(g.root,1.0), c=HIST.card, hw=c.offsetWidth/2, vw=window.innerWidth;
+    c.style.left=clamp(p.x,hw+8,Math.max(hw+8,vw-hw-8))+'px'; c.style.top=clamp(p.y-42-(stack.get(g.root)||0),c.offsetHeight+60,window.innerHeight-8)+'px';
+  }
+}
+
 let _hudFrame=0;
 function updateBubbles(dt){
   const camera=state.camera, scene=state.scene, engine=state.engine;
@@ -5472,9 +5575,12 @@ function updateBubbles(dt){
   const stack=new Map();
   for(const b of [...state.bubbles].sort((a,c)=>(a.thought?1:0)-(c.thought?1:0))){
     const p=project(b.node,1.0), up=stack.get(b.node)||0;
+    // the history card lists these lines too, in their place
+    const inCard=HIST.who?.root===b.node && !b.thought; b.div.style.visibility=inCard?'hidden':''; if(inCard) continue;
     b.div.style.left=p.x+'px'; b.div.style.top=(p.y-42-up)+'px';
     stack.set(b.node,up+b.div.offsetHeight+6);
   }
+  updateSpeechHistory(project,stack);
   for(const b of [...state.badges]){ b.ttl-=dt; const node=b.node.root||b.node; const p=project(node,.8); b.div.style.left=p.x+'px'; b.div.style.top=(p.y+b.vy*(1-b.ttl))+'px'; b.div.style.opacity=Math.max(0,b.ttl); if(b.ttl<=0){ b.div.remove(); state.badges=state.badges.filter(x=>x!==b); } }
 }
 function updateCompassHUD(){

@@ -82,7 +82,9 @@ select, input[type="range"] { accent-color:#d7ff9a; border:1px solid rgba(255,25
 
 #hint { position:fixed; right:20px; bottom:18px; max-width:520px; color:#e8f1e4; background:rgba(16,20,25,.58); border:1px solid rgba(255,255,255,.14); border-radius:17px; padding:11px 15px; font-size:13px; backdrop-filter: blur(10px); box-shadow:0 10px 28px rgba(0,0,0,.25); }
 code { color:#ffe0a0; }
-.bubble { position:absolute; transform:translate(-50%, -100%); background:#fff6dc; color:#2a241c; border:2px solid rgba(40,30,20,.24); border-radius:16px; padding:7px 10px; font-weight:950; pointer-events:none; white-space:nowrap; box-shadow:0 10px 18px rgba(0,0,0,.25); }
+.bubble { position:absolute; transform:translate(-50%, -100%); background:#fff6dc; color:#2a241c; border:2px solid rgba(40,30,20,.24); border-radius:16px; padding:7px 10px; font-weight:850; line-height:1.3; pointer-events:none; white-space:normal; width:max-content; max-width:min(320px, 70vw); overflow-wrap:break-word; box-shadow:0 10px 18px rgba(0,0,0,.25); }
+.bubble.talking { border-color:rgba(200,140,40,.6); }
+.bubble.long { font-weight:750; font-size:.9em; max-width:min(340px, 72vw); }
 .bubble.thought { background:rgba(232,240,255,.94); color:#3d4a66; border:2px dashed rgba(90,110,160,.45); border-radius:22px; font-weight:600; font-style:italic; font-size:.86em; white-space:normal; width:max-content; max-width:280px; line-height:1.3; }
 .bubble.thought::before { content:'💭 '; font-style:normal; }
 .bubble.thought.pending { opacity:.8; animation:thought-pulse 1.2s ease-in-out infinite; }
@@ -667,3 +669,33 @@ body.user-mode #playerHp { font-size:11px; }
 .diag-log { margin:0; padding:0 0 0 2px; list-style:none; font-size:.8em; display:grid; gap:3px; }
 .diag-log li { display:grid; grid-template-columns:44px 58px 1fr; gap:4px; }
 .diag-log li span { opacity:.55; font-variant-numeric:tabular-nums; } .diag-log li b { opacity:.8; }
+
+/* ---- what is downloading or loading (load-status.js) ---- */
+#loadStatus { position:fixed; top:62px; right:14px; z-index:65; width:280px; max-width:calc(100vw - 32px); display:flex; flex-direction:column; gap:6px; }
+#loadStatus[hidden] { display:none; }
+.load-card { padding:8px 11px 9px; border-radius:12px; background:rgba(14,19,23,.88); border:1px solid rgba(215,255,154,.25); box-shadow:0 8px 22px rgba(0,0,0,.35); backdrop-filter:blur(10px); color:#e6f0dd; font-size:11px; line-height:1.35; }
+.load-card.ready { border-color:rgba(139,239,174,.55); cursor:pointer; }
+.load-card.error { border-color:rgba(255,120,110,.6); cursor:pointer; }
+.load-head { display:flex; gap:7px; align-items:baseline; }
+.load-head strong { flex:0 0 auto; color:#d7ff9a; font-size:11px; }
+.load-head span { flex:1; min-width:0; overflow-wrap:anywhere; opacity:.9; }
+.load-bar { margin-top:6px; height:4px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; }
+.load-bar i { display:block; height:100%; width:0; background:linear-gradient(90deg,#d7ff9a,#78dbad); transition:width .4s ease; }
+.load-bar.busy i { width:30%; animation:load-busy 1.3s ease-in-out infinite; }
+@keyframes load-busy { 0% { transform:translateX(-100%); } 100% { transform:translateX(340%); } }
+
+/* ---- what they said before (app.js setupSpeechHistory) ---- */
+.speech-chip { position:absolute; transform:translate(-50%, -100%); z-index:5; padding:2px 6px; border-radius:10px; background:rgba(255,246,220,.72); border:1px solid rgba(40,30,20,.2); font-size:12px; line-height:1.2; cursor:pointer; user-select:none; box-shadow:0 4px 10px rgba(0,0,0,.2); transition:background .15s; }
+.speech-chip:hover { background:#fff6dc; }
+.speech-chip[hidden] { display:none; }
+.speech-history { position:absolute; transform:translate(-50%, -100%); z-index:40; width:300px; max-width:80vw; padding:8px 10px 6px; border-radius:14px; background:rgba(255,246,220,.97); color:#2a241c; border:2px solid rgba(40,30,20,.24); box-shadow:0 12px 26px rgba(0,0,0,.32); font-size:12.5px; line-height:1.35; }
+.speech-history[hidden] { display:none; }
+.speech-history .sh-head { font-weight:900; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.6; margin-bottom:4px; }
+.speech-history .sh-list { max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; }
+.speech-history .sh-line { display:flex; gap:6px; align-items:baseline; padding:4px 0; border-top:1px solid rgba(40,30,20,.1); }
+.speech-history .sh-line:first-child { border-top:0; }
+.speech-history .sh-line > span { flex:1; min-width:0; font-weight:700; overflow-wrap:break-word; }
+.speech-history .sh-line.whisper > span { font-style:italic; opacity:.8; }
+.speech-history .sh-line small { flex:0 0 auto; font-size:10px; opacity:.55; white-space:nowrap; }
+.speech-history .sh-line button { flex:0 0 auto; padding:1px 6px; font-size:10px; border-radius:6px; min-width:0; background:rgba(40,30,20,.1); color:#2a241c; border:0; cursor:pointer; }
+.speech-history .sh-line button:hover { background:rgba(40,30,20,.2); }

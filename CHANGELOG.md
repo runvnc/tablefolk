@@ -4,6 +4,14 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-11
+
+- **Downloads show on screen**: while Breeze TTS 2 or Underdog Bark (speech input) downloads or loads, a card under the top bar shows what it is doing with a progress bar, without opening the Voice pane (`app/load-status.js`).
+- **C cycles all three views**: free camera, follow camera, first person, and round again (V still goes straight to first person).
+- **Longer speech bubbles that wait for the voice**: up to 256 characters, wrapped, instead of one line of 86; a voiced line's bubble stays until its voice has finished.
+- **What they said before**: a 💬 floats over a character for 45 s after it speaks; hovering the character or the 💬 shows a card with its recent lines (how long ago, ▶ to hear one again), and tapping the 💬 keeps it open.
+- **Hold-to-talk**: the 🎤 records while held (mouse, touch, or Space on the button) and sends on release; a very short tap is dropped with a hint.
+
 ## 2026-11-09
 
 - **See what runs and why**: Settings shows **Running now** (the characters' model, the voice, the speech input, the graphics, each with its state and the reason it was chosen) and links a new **This device** pane: the graphics card and its memory, what is left beside the characters' model, the browser's abilities, storage, and every decision and fallback with its time ("copy this report"). The 🔊 button's tooltip names the voice.

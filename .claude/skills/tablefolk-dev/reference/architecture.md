@@ -87,7 +87,8 @@ scenario.js, the tests and packages use.
 | `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
-| `speech-input.js` | the 🎤 button |
+| `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |
+| `load-status.js` | the download cards under the top bar (`tablefolkLoad.set/clear`): Breeze engines' TTS `status` and `upgrade` events, and `tablefolk-load` events (speech input) |
 | `procgen.js` | dungeon and village generator, walk-in building templates (also imported by the server) |
 | `scenario.js` | the scenario format (`normalizeScenario`), base maps, grid, walk-in buildings, layout engine, goal checker, links, banner, 🎯 pane, tactic tester, `freezeLayout` (`tablefolkScenario`) |
 | `tabletop.js`, `tile-render.js` | `?tabletop=1` view; 2D tile rendering |

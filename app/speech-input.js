@@ -1,7 +1,8 @@
 /* speech-input.js -- talk to characters with your voice.
  *
- * The 🎤 button in the chat box records while pressed-on (click to start,
- * click again to send). Speech becomes text by:
+ * The 🎤 button in the chat box is hold-to-talk: it records while held down
+ * (mouse, touch, or Space/Enter on the focused button) and sends on release;
+ * a tap shorter than 0.35 s is dropped with a hint. Speech becomes text by:
  *   1. Gemma 4's own audio input on this machine: the Tablefolk server's
  *      /api/transcribe, which runs `litert-lm serve` with a multimodal Gemma 4
  *      (gemma4-e2b-mm). The in-browser LiteRT-LM model is text-only for now,
@@ -74,9 +75,13 @@
     const send = $('chatSend'); if (!send) return null;
     b = document.createElement('button');
     b.id = 'micBtn'; b.type = 'button'; b.className = 'mic-btn'; b.innerHTML = '🎤<span class="mic-engine"></span>';
-    b.title = 'speak (click to start, click again to send)';
+    b.title = 'hold to talk, release to send';
     send.parentNode.insertBefore(b, send);
-    b.addEventListener('click', toggle);
+    b.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch {} press(); });
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, release);
+    b.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); press(); } });
+    b.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); release(); } });
+    b.addEventListener('contextmenu', e => e.preventDefault());   // a long touch is not a menu
     return b;
   }
   const setState = (st, title) => { const b = button(); if (!b) return; b.dataset.state = st; b.disabled = st === 'loading'; if (title) b.title = title; };
@@ -88,7 +93,7 @@
     const b = button(), tag = b?.querySelector('.mic-engine'); if (!tag) return;
     tag.textContent = engine;
     b.setAttribute('aria-label', 'speak' + (engine ? ' (' + engine + ')' : ''));
-    if (b.dataset.state === 'idle') b.title = `speak${engine ? ' with ' + engine : ''}${lastNote ? ' (' + lastNote + ')' : ''}: click to start, click again to send. The Voice pane picks the speech input.`;
+    if (b.dataset.state === 'idle') b.title = `speak${engine ? ' with ' + engine : ''}${lastNote ? ' (' + lastNote + ')' : ''}: hold to talk, release to send. The Voice pane picks the speech input.`;
   }
   async function guessEngine(m) {
     if (m === 'bark') { const p = await barkPlan(); return 'Bark ' + (p.variant === 'q8' ? 'CPU' : 'GPU'); }
@@ -119,6 +124,7 @@
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
+      if (discard) { discard = false; setState('idle'); showEngine(); return; }
       setState('busy', 'transcribing…');
       const t0 = performance.now(), took = () => `last one ${((performance.now() - t0) / 1000).toFixed(1)} s`;
       try {
@@ -144,7 +150,7 @@
       } finally { setState('idle'); showEngine(); }
     };
     rec.start();
-    setState('rec', 'listening… click to send');
+    setState('rec', 'listening… release to send');
   }
   // peak, length, and the share of 20 ms frames louder than -40 dBFS
   let last = null;
@@ -184,6 +190,8 @@
     return yes;
   }
   const BARK_URLS = ['https://geebr-models.mindroot.io/underdog-bark-3.0/', 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/'];
+  // the on-screen readout of downloads (load-status.js)
+  const loadEvent = d => window.dispatchEvent(new CustomEvent('tablefolk-load', { detail: { key: 'speech', label: '🎤 Speech input', state: 'loading', ...d } }));
   let barkWorker = null, barkReady = null, barkId = 0, barkVariant = null, barkIsReady = false, loadPct = 0, loadNote = '', barkWhy = ''; const barkWait = new Map();
   function barkLoad() {
     if (barkReady) return barkReady;
@@ -194,12 +202,13 @@
       barkWorker = new Worker('/app/asr/worker.js?v=20261101a', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
-        if (m.type === 'progress') { loadPct = Math.round(m.fraction * 100); loadNote = m.note || ''; const b = button(); if (b) { b.title = `speech model: ${m.note} ${loadPct}% (the 🎤 works once it is loaded)`; const tag = b.querySelector('.mic-engine'); if (tag) tag.textContent = loadPct + '%'; } }
-        else if (m.type === 'ready') { barkIsReady = true; window.tablefolkDiag?.note('speech', `Underdog Bark ready on the ${plan.variant === 'q8' ? 'processor' : 'graphics card'}`); res(); }
+        if (m.type === 'progress') { loadPct = Math.round(m.fraction * 100); loadNote = m.note || ''; loadEvent({ text: `${loadNote} ${loadPct}%`.trim() }); const b = button(); if (b) { b.title = `speech model: ${m.note} ${loadPct}% (the 🎤 works once it is loaded)`; const tag = b.querySelector('.mic-engine'); if (tag) tag.textContent = loadPct + '%'; } }
+        else if (m.type === 'ready') { barkIsReady = true; loadEvent({ text: 'ready: hold 🎤 to talk', state: 'ready' }); window.tablefolkDiag?.note('speech', `Underdog Bark ready on the ${plan.variant === 'q8' ? 'processor' : 'graphics card'}`); res(); }
         else if (m.type === 'text') barkWait.get(m.id)?.resolve(m.text), barkWait.delete(m.id);
-        else if (m.type === 'error') { if (m.id != null) barkWait.get(m.id)?.reject(new Error(m.message)), barkWait.delete(m.id); else { barkReady = null; rej(new Error(m.message)); } }
+        else if (m.type === 'error') { if (m.id != null) barkWait.get(m.id)?.reject(new Error(m.message)), barkWait.delete(m.id); else { barkReady = null; loadEvent({ text: m.message, state: 'error' }); rej(new Error(m.message)); } }
       };
-      barkWorker.onerror = e => { barkReady = null; rej(new Error(e.message || 'speech worker failed')); };
+      barkWorker.onerror = e => { barkReady = null; loadEvent({ text: e.message || 'speech worker failed', state: 'error' }); rej(new Error(e.message || 'speech worker failed')); };
+      loadEvent({ text: 'starting' });
       barkWorker.postMessage({ type: 'load', urls, variant: plan.variant });
     }));
     return barkReady;
@@ -247,25 +256,44 @@
     let latest = '';
     recog.onresult = e => { latest = [...e.results].map(x => x[0].transcript).join(' '); };   // on stop, the latest words (final or not)
     recog.onerror = e => { if (e.error !== 'aborted') window.tablefolkToast?.('speech: ' + e.error, { type: 'error' }); };
-    recog.onend = () => { recog = null; setState('idle'); showEngine(); deliver(latest); };
+    recog.onend = () => { recog = null; setState('idle'); showEngine(); if (discard) { discard = false; return; } deliver(latest); };
     showEngine(local ? 'Chrome on-device' : 'Chrome cloud');
-    recog.start(); setState('rec', (local ? 'listening (on this device)' : 'listening (the browser\'s cloud recognition)') + '… click to send');
+    recog.start(); setState('rec', (local ? 'listening (on this device)' : 'listening (the browser\'s cloud recognition)') + '… release to send');
   }
 
+  // Hold to talk: press starts (after any first-time approval or model load,
+  // which end the press), release sends. Starting is async (the microphone
+  // permission, the recogniser), so a release that comes first stops it as
+  // soon as it has started.
+  let held = false, pressAt = 0, discard = false;
+  function press() { if (held) return; held = true; pressAt = performance.now(); start(false).finally(() => { if (!held) stopNow(); }); }
+  function release() { if (!held) return; held = false; stopNow(); }
+  function stopNow() {
+    if (rec?.state !== 'recording' && !recog) return;
+    if (performance.now() - pressAt < 350) { discard = true; window.tablefolkToast?.('hold 🎤 while you talk, let go to send', { type: 'info' }); }
+    if (rec?.state === 'recording') rec.stop(); else if (discard) recog.abort(); else recog.stop();
+  }
+  // click-style toggle for scripts and tests: start, or stop and send
   async function toggle() {
     if (rec?.state === 'recording') { rec.stop(); return; }
     if (recog) { recog.stop(); return; }
+    return start(true);
+  }
+  async function start(toggled) {
+    if (rec?.state === 'recording' || recog) return;
     if (button()?.dataset.state === 'busy' || button()?.dataset.state === 'loading') return;
     mode ??= await detect();
     if (mode === 'bark') {
+      if (barkOk() !== '1') held = false;   // the question ends the press
       if (!(await barkAsk())) { if (pick() === 'auto') { mode = await detect(); showEngine(await guessEngine(mode)); } else { window.tablefolkToast?.('speech input: Underdog Bark not downloaded (pick another in the Voice pane)', { type: 'error' }); return; } }
       else if (!barkIsReady) {
         // the model first: the button waits (disabled, with its progress) instead of recording into a long delay
-        setState('loading', 'loading the speech model…');
+        held = false; setState('loading', 'loading the speech model…');
         try { await barkLoad(); } catch (e) { setState('idle'); window.tablefolkToast?.('speech model: ' + e.message, { type: 'error' }); return; }
-        setState('idle'); showEngine(); window.tablefolkToast?.('speech input ready: click 🎤 to speak', { type: 'info' }); return;
+        setState('idle'); showEngine(); window.tablefolkToast?.('speech input ready: hold 🎤 while you talk', { type: 'info' }); return;
       }
     }
+    if (!held && !toggled) return;   // let go before it could start
     try {
       if (mode === 'gemma' || mode === 'bark' || mode === 'llama') await startRecording();
       else if (mode === 'browser') await startBrowser();

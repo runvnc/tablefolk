@@ -207,6 +207,22 @@ when the follow camera's ray hits it, else 1; never in the free camera.
 - Speech bubbles sit a fixed 42 px above the projected head. The head bone's
   Y scale flaps while TTS speaks (`speechstart` / `speechend`) for rigs
   without a mouth.
+- `showSpeechBubble` (app.js) makes every speech bubble (say, whisper, the
+  player's chat): up to 256 characters (`clipBubble`), wrapped (`.bubble` is
+  `white-space:normal`, `width:max-content`, 320 px at most; `.long` over 90
+  characters is lighter). A voiced line's bubble has `waitVoice` (only when
+  `tablefolkTTS.ready`: a voice still downloading would hold it a minute) and
+  a 60 s ttl until the TTS `speechend` whose `text` matches (else the
+  speaker's oldest waiting bubble) sets 1.4 s; `ok:false` gives the reading
+  time instead. Each line also goes to `g._lines` (20 kept).
+- The history card (`setupSpeechHistory`, state in `HIST`): the hovered
+  character is found by projecting its feet and head to the screen and
+  testing the pointer against that box (no ray pick; `pointermove` on the
+  canvas, ignored while a button is held, so orbiting opens nothing). A 💬
+  chip (`g._chip`, removed in `disposeCharacter`) floats over a character for
+  45 s after its last line when no bubble is up. The card (`.speech-history`)
+  hides that character's live bubbles while open (it lists them) and is
+  clamped to the screen; ▶ calls `tablefolkTTS.speak` again.
 - Talking mouths: `g.mouth = {influence, apply()}` is driven each frame by
   `updateMouth` from `tablefolkTTS.level()` (the playing voice's RMS, x7)
   when that voice is the character's, else a procedural chatter while an
