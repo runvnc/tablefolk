@@ -5475,10 +5475,11 @@ function setupUI(){
 
 // ---- what they said before: the speech history card ----
 // Each character keeps its last lines (g._lines). For 45 s after it last
-// spoke a small 💬 tab floats over its head. Hovering the character itself
-// (its body on screen) or the tab opens a card above its head with its recent
-// lines, newest at the bottom, each with ▶ to hear it again; tapping the tab
-// pins the card (tap again, Escape or a click elsewhere closes it). The card
+// spoke a small 💬 tab floats over its head; hovering the character (its body
+// on screen) shows the tab too, for older lines. Only hovering the tab (or
+// within 8 px of it) opens a card above its head with its recent lines,
+// newest at the bottom, each with ▶ to hear it again; tapping the tab pins
+// the card (tap again, Escape or a click elsewhere closes it). The card
 // stays open while the pointer is on it, so it can be scrolled.
 const HIST={card:null,who:null,pinned:false,over:false,hoverAt:0,leaveAt:0,px:-1,py:-1,inCanvas:false};
 function setupSpeechHistory(){
@@ -5535,11 +5536,12 @@ function hoveredSpeaker(project){
 function updateSpeechHistory(project,stack){
   if(!HIST.card) return;
   const now=performance.now(), hov=hoveredSpeaker(project);
-  if(hov){ if(HIST.hoverWho!==hov){ HIST.hoverWho=hov; HIST.hoverAt=now; } else if(now-HIST.hoverAt>220 && !HIST.pinned) openHistory(hov); }
-  else HIST.hoverWho=null;
+  // hovering the character only brings up its 💬; the card opens on (or right by) the 💬
+  // (the tab stays while the pointer moves from the character onto it)
+  if(hov) HIST.hoverWho=hov; else if(!HIST.hoverWho?._chip?.matches(':hover')) HIST.hoverWho=null;
   // close once the pointer has left the character, its tab and the card for a moment
   const chipHover=HIST.who?._chip?.matches(':hover');
-  if(HIST.who && !HIST.pinned && hov!==HIST.who && !HIST.over && !chipHover){ HIST.leaveAt||=now; if(now-HIST.leaveAt>350) closeHistory(); }
+  if(HIST.who && !HIST.pinned && !HIST.over && !chipHover){ HIST.leaveAt||=now; if(now-HIST.leaveAt>350) closeHistory(); }
   else if(HIST.who) HIST.leaveAt=0;
   for(const g of state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters){
     const c=g._chip, recent=g._lastLineAt && now-g._lastLineAt<45000, talking=stack.has(g.root) && HIST.who!==g;

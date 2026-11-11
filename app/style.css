@@ -687,6 +687,7 @@ body.user-mode #playerHp { font-size:11px; }
 /* ---- what they said before (app.js setupSpeechHistory) ---- */
 .speech-chip { position:absolute; transform:translate(-50%, -100%); z-index:5; padding:2px 6px; border-radius:10px; background:rgba(255,246,220,.72); border:1px solid rgba(40,30,20,.2); font-size:12px; line-height:1.2; cursor:pointer; user-select:none; box-shadow:0 4px 10px rgba(0,0,0,.2); transition:background .15s; }
 .speech-chip:hover { background:#fff6dc; }
+.speech-chip::before { content:''; position:absolute; inset:-8px; }   /* a little room round the tab counts as on it */
 .speech-chip[hidden] { display:none; }
 .speech-history { position:absolute; transform:translate(-50%, -100%); z-index:40; width:300px; max-width:80vw; padding:8px 10px 6px; border-radius:14px; background:rgba(255,246,220,.97); color:#2a241c; border:2px solid rgba(40,30,20,.24); box-shadow:0 12px 26px rgba(0,0,0,.32); font-size:12.5px; line-height:1.35; }
 .speech-history[hidden] { display:none; }
