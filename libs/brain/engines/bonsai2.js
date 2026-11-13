@@ -111,6 +111,8 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
       if (i >= 0) messages[i] = { role: 'user', content: sys + '\n\n' + messages[i].content };
       else messages.push({ role: 'user', content: sys });
     }
+    // thinking per call (the engine renders its chat template with these)
+    engine.model.chatTemplateArgs = { ...engine.model.chatTemplateArgs, enable_thinking: !!opts.enableThinking };
     let text = '';
     for await (const c of engine.model.generate(messages, { maxNewTokens: opts.maxTokens || 256 })) {
       if (c.delta) { text += c.delta; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart()); }

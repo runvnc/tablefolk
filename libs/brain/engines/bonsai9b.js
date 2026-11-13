@@ -62,10 +62,13 @@ export async function loadBonsai9b(onStatus = () => {}, { mirror = mirrorAllowed
   return { T, tok, model, queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
-// Transformers.js reads the whole prompt in one pass; on a 12 GB card a prompt of
-// 4,500 tokens ran the card out of memory and lost the device (3,000 took 44 s).
-// Refusing first keeps the device (and the rest of the page) alive.
-export const MAX_PROMPT = 3500;
+// Transformers.js reads the whole prompt in one pass, and this model's attention
+// needs memory growing with its square: on a 12 GB card a prompt of 4,500 tokens
+// ran out and lost the device. So a long prompt is read in pieces of CHUNK tokens,
+// each continuing the cache of the last (generate with max_new_tokens 1 keeps the
+// cache of exactly the tokens it read; the next call reads only the new ones).
+export const CHUNK = 1024;
+export const MAX_PROMPT = 32768;
 
 const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
 
@@ -77,14 +80,24 @@ export function generateBonsai9b(engine, _prompt, opts = {}) {
     const messages = (opts.messages || []).map(m => ({ role: m.role, content: plain(m.content) }));
     const inputs = tok.apply_chat_template(messages, { add_generation_prompt: true, return_dict: true, enable_thinking: !!opts.enableThinking });
     const n = inputs.input_ids.dims[1];
-    if (n > MAX_PROMPT) throw new Error(`Bonsai 2 9B reads at most ${MAX_PROMPT} tokens at once here (this prompt has ${n})`);
+    if (n > MAX_PROMPT) throw new Error(`Bonsai 2 9B reads at most ${MAX_PROMPT} tokens (this prompt has ${n})`);
     let text = '';
     const streamer = new T.TextStreamer(tok, { skip_prompt: true, skip_special_tokens: true, callback_function: t => {
       text += t; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart());
     } });
     const t = opts.temperature ?? 0.7;
-    await model.generate({ ...inputs, max_new_tokens: opts.maxTokens || 256, streamer,
-      ...(t > 0 ? { do_sample: true, temperature: t, top_p: opts.topP ?? 0.95, top_k: opts.topK ?? 20 } : { do_sample: false }) });
+    const chunk = opts.chunk ?? CHUNK;
+    let past = null;
+    try {
+      for (let end = chunk; chunk > 0 && end < n; end += chunk) {
+        const r = await model.generate({ input_ids: inputs.input_ids.slice(null, [0, end]), attention_mask: inputs.attention_mask.slice(null, [0, end]),
+          ...(past ? { past_key_values: past } : {}), max_new_tokens: 1, do_sample: false, return_dict_in_generate: true });
+        past = r.past_key_values;
+      }
+      const r = await model.generate({ ...inputs, ...(past ? { past_key_values: past } : {}), max_new_tokens: opts.maxTokens || 256, streamer, return_dict_in_generate: true,
+        ...(t > 0 ? { do_sample: true, temperature: t, top_p: opts.topP ?? 0.95, top_k: opts.topK ?? 20 } : { do_sample: false }) });
+      past = r.past_key_values;
+    } finally { try { await past?.dispose?.(); } catch {} }
     return text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
   };
   const p = engine.queue.then(run, run); engine.queue = p.catch(() => {});
