@@ -700,3 +700,11 @@ body.user-mode #playerHp { font-size:11px; }
 .speech-history .sh-line small { flex:0 0 auto; font-size:10px; opacity:.55; white-space:nowrap; }
 .speech-history .sh-line button { flex:0 0 auto; padding:1px 6px; font-size:10px; border-radius:6px; min-width:0; background:rgba(40,30,20,.1); color:#2a241c; border:0; cursor:pointer; }
 .speech-history .sh-line button:hover { background:rgba(40,30,20,.2); }
+
+/* Settings: the characters' brain on OpenRouter (online-brain.js) */
+.online-brain .online-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+.online-brain .online-row input, .online-brain .online-model input { flex:1; min-width:0; padding:7px 9px; border-radius:9px; border:1px solid rgba(255,255,255,.18); background:rgba(0,0,0,.25); color:inherit; font:inherit; }
+.online-brain .online-model { display:flex; gap:8px; align-items:center; margin:6px 0; font-size:12px; color:#bcd; }
+.online-brain .online-row input, .online-brain .online-model input { font-size:12px; }
+.online-brain .online-row input + button { flex:0 0 auto; width:auto; }
+.online-brain button { padding:6px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }

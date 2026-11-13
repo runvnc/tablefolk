@@ -107,7 +107,7 @@ two icons: **Adventurer** (`I`: health, gold, wielded weapon, goal, items
 with give / drink / read / wield / drop, then the view buttons, pace and
 "let them live", then the controls) and **Settings** (your chat name;
 **Running now**: the characters' model, the voice, the speech input and the
-graphics, each with its state and why it was chosen; links to the **Voice**
+graphics, each with its state and why it was chosen; **Characters' brain online**: sign in with OpenRouter (or paste an OpenRouter key) and the characters think there, on your own account, when this device can't run their model or you want a bigger one; offered by itself when the model fails to load; links to the **Voice**
 and **Graphics** panes, **This device** and **Messages**; and the switch to
 developer mode). **This device** shows what was detected (the graphics card
 and its memory, what is left beside the characters' model, the browser's

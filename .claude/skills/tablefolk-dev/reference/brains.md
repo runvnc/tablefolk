@@ -149,6 +149,17 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   Brain options > vision, each turn's newest message carries the character's
   view as an `image_url`. `window.tablefolkLLM` exposes the active brain as
   an OpenAI-style client.
+  - **For players: Settings > "Characters' brain online"** (`online-brain.js`,
+    2026-11-12): "sign in with OpenRouter" (OAuth PKCE through
+    `worldgen-own.js`, the world builder's own sign-in: OpenRouter returns
+    to the page with `?code=`, traded for a key of the player's) or a pasted
+    key; then `tablefolk_model` = `endpoint` and `tablefolk_llm_endpoint` =
+    OpenRouter, the key and `PLAY_MODEL` (Gemma 4 26B A4B, editable there),
+    and the page reloads. "back to the in-browser model" clears both (the
+    device's pick again); "forget the key" also drops the key. When
+    `#brainStatus` shows a failure (no WebGPU, a load error), a toast offers
+    it once a session. The key is in localStorage and goes only to
+    OpenRouter.
 - **Qwen2.5 0.5B** (`qwen2.5-0.5b`, engine `wllama3`, 2026-11-06):
   `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, the 491 MB Q4_K_M, the newest official 0.5B
   (Qwen3 starts at 0.6B, Qwen3.5 at 0.8B). Every layer on the GPU: about 50 tok/s,

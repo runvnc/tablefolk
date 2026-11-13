@@ -71,6 +71,8 @@
     ['live.js?v=20261101a'],
     ['director.js?v=20261025zc'],
     ['speech-input.js?v=20261112a'],
+    ['worldgen-own.js?v=20261112a'],
+    ['online-brain.js?v=20261112b'],
     ['workflows.js?v=20261024a'],
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
