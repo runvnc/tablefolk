@@ -161,7 +161,11 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   ones are `orc_classic goblin_classic skeleton_classic
   skeleton_warrior_classic`. More monsters (Quaternius, CC0): `wyrmling`
   (a young red dragon), `imp`, `mushroom_warrior`, `bunny` (a rabbit with a
-  sword), `snake`, `wasp` (a giant one), `frog` (a giant one).
+  sword), `snake`, `wasp` (a giant one), `frog` (a giant one). Made for the
+  game like the Meshy people: `minotaur`, `lizardman`, `werewolf`, `mummy`.
+- **More people** (made for the game, 2026-11-13; they sit, sleep and work
+  like the others): `dwarf` (a red-bearded miner), `elf` (a silver-haired
+  ranger), `priest`, `guard` (a town guard in a tabard), `merchant`.
 - Mindless monsters (skeletons, zombie, rat, spider, wolf, bat, slime,
   ghost, giant, demon, dragon and the ones above) are hostile by default and
   never talk.

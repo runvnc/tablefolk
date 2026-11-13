@@ -18,8 +18,8 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "allowed": ["say", "walk", "face", "emote"],   // default commands for every character
   "agents": [ {
     "id": "vexa",                    // 1-24 chars [A-Za-z0-9_-], unique
-    "model": "wizard",               // people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard
-                                     // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog
+    "model": "wizard",               // people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman dwarf elf priest guard merchant
+                                     // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog minotaur lizardman werewolf mummy
                                      // animals (never hostile unless "hostile": true; they don't talk unless "talks": true): cow bull horse white_horse donkey deer stag fox dog husky alpaca pig sheep
                                      // (older chibi bodies: critter woman rogue knight mage ranger barbarian)
     "hostile": true,                 // optional: fights the player with a built-in routine (default true for mindless monsters); with a real personality it still talks when spoken to and as the fight starts. Set it on the story's enemies (a necromancer, a bandit chief), or they only talk

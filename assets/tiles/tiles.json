@@ -1927,6 +1927,15 @@
     135.1,
     214.1
    ]
+  },
+  "minotaur": {
+   "file": "characters/minotaur.png",
+   "w": 394,
+   "h": 479,
+   "anchor": [
+    196.6,
+    312
+   ]
   }
  },
  "floors": {
