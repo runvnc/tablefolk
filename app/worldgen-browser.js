@@ -49,7 +49,7 @@
     if (key === 'bonsai2-27b' || key === 'bonsai2-9b') {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
       const b = await import(BONSAI2), engine = await b.loadBonsai2(status, { size: key === 'bonsai2-9b' ? '9B' : '27B', ...(context ? { context } : {}) });
-      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, onToken }), clear: () => {}, context: context || 8192 };
+      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, enableThinking: !!opts.enableThinking, onToken }), clear: () => {}, context: context || 8192 };
     } else {
       const mod = await import(LOADER);
       const has = await mod.hasModelCached?.(key).catch(() => null);
@@ -60,12 +60,15 @@
     modelKey = key;
     return L;
   }
+  // ?think=1 (the builder's "think first" box): the model reasons before each
+  // answer; slower, better plans. Off by default.
+  const THINK = (() => { try { return new URLSearchParams(location.search).has('think') || !!window.TF_WORLDGEN_THINK; } catch { return false; } })();
   let n = 0; const log = [];
   async function ask(emit, stage, label, system, user) {
     const agentId = 'worldgen-' + stage + '-' + (++n) + '-' + Date.now();
     emit('progress', { stage, label, chars: 0 });
     let last = 0;
-    const text = await L.generate([{ role: 'system', content: system }, { role: 'user', content: user }], { agentId, temperature: stage === 'plan' ? .85 : .5 }, t => {
+    const text = await L.generate([{ role: 'system', content: system }, { role: 'user', content: user }], { agentId, temperature: stage === 'plan' ? .85 : .5, ...(THINK ? { enableThinking: true, maxTokens: 6144 } : {}) }, t => {
       if (t.length - last > 24) { last = t.length; emit('progress', { stage, label, chars: t.length, preview: t.slice(-220) }); }
     });
     L.clear(agentId);
@@ -329,7 +332,7 @@
         const agentId = 'worldgen-one-' + round + '-' + Date.now();
         emit('progress', { stage: round ? 'repairing' : 'writing', label: round ? 'fixing the problems the checks found…' : 'writing the whole world…', chars: 0 });
         let last = 0;
-        const text = await L.generate(messages, { agentId, temperature: spec.temperature ?? 0.7, maxTokens: 4096 }, t => {
+        const text = await L.generate(messages, { agentId, temperature: spec.temperature ?? 0.7, maxTokens: THINK ? 10240 : 4096, ...(THINK ? { enableThinking: true } : {}) }, t => {
           if (t.length - last > 120) { last = t.length; emit('progress', { stage: round ? 'repairing' : 'writing', chars: t.length, preview: t.slice(-200) }); }
         });
         L.clear(agentId);

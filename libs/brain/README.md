@@ -4,7 +4,7 @@ A language model in the browser with one call. It picks what this device can
 run, downloads and caches it, and gives you plain methods:
 
 - **Gemma 4 E2B/E4B** on WebGPU (LiteRT-LM, in a worker, cached in OPFS);
-- **Bonsai 2 27B** for 10 GB+ cards;
+- **Bonsai 2 9B** for 6 GB+ cards (fast; best with thinking on), **Bonsai 2 27B** and **Gemma 4 12B** for 10 GB+ cards;
 - a **tiny Qwen** where there is no GPU;
 - **Chrome's built-in model**;
 - any **OpenAI-compatible server**.
@@ -29,7 +29,7 @@ Options:
 
 | option | what it does |
 |---|---|
-| `model` | `'auto'`, `'gemma4-e2b'`, `'gemma4-e4b'`, `'bonsai2-27b'`, `'qwen1.5-0.5b'`, `'chrome'` or `'endpoint'` |
+| `model` | `'auto'`, `'gemma4-e2b'`, `'gemma4-e4b'`, `'bonsai2-9b'`, `'gemma4-12b'`, `'bonsai2-27b'`, `'qwen1.5-0.5b'`, `'chrome'` or `'endpoint'` |
 | `endpoint` | `{ baseURL, apiKey, model }` |
 | `fallback` | the order tried when loading fails: `['chrome', 'endpoint', 'qwen1.5-0.5b']` by default |
 | `ask` | `async model => true`: approve a download |

@@ -21,8 +21,15 @@ walls.
 **Where the model runs** (the form's menus; `GET /api/worldgen/options`):
 
 - *in this browser*: Gemma 4 E4B (about 3 GB), E2B (2 GB, quicker, simpler
-  worlds) or Bonsai 2 27B (6 GB, a 10 GB+ graphics card), downloaded the first
-  time and kept (the game uses the same copy), writes it in small steps
+  worlds), Bonsai 2 9B (1.9 GB, fast, a 6 GB+ graphics card), Gemma 4 12B
+  (5.6 GB) or Bonsai 2 27B (6 GB, the smartest; both 10 GB+ cards),
+  downloaded the first time and kept (the game uses the same copy). **How**:
+  *step by step* (the default, for every model) or *whole world at once*
+  (`?oneanswer=1`: the generator's whole guide in one prompt and the world as
+  one JSON answer, checked and fixed up to twice; for Bonsai 2 and Gemma 4
+  12B). **Think first** (`?think=1`, off by default): the model reasons
+  before each answer; slower, better plans (Bonsai 2 9B gains the most).
+  Step by step writes it in small steps
   (`app/worldgen-browser.js`): a plan (text), the map (a little JSON; code
   builds it with `procgen.js`, or layout lines outdoors), a review of the map
   that was built (its rooms and contents as text; it may add things), the

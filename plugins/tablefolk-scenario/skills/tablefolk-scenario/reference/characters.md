@@ -274,7 +274,7 @@ Three fields, in the JSON and on the world builder's Story and Characters tabs:
 
 - **`defaultModel`** (scenario): the brain this world starts on, by its key:
   `qwen1.5-0.5b`, `qwen2.5-0.5b`, `gemma4-e2b-litert`, `gemma4-e4b-litert`, `gemma4-e2b-vision`,
-  `bonsai2-27b`, `endpoint`. It travels in the world's link, wins over the brain
+  `bonsai2-9b`, `gemma4-12b-litert`, `bonsai2-27b`, `endpoint`. It travels in the world's link, wins over the brain
   the player last picked (without replacing it: a world with no default goes back
   to that one), and asks before any download. A `?model=<key>` on the link wins
   over everything, and the player can still change brain in the top bar.

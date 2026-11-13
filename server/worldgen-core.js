@@ -129,7 +129,7 @@ export function checkScenario(s, packVoices = []) {
 }
 
 
-export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-27b', 'Bonsai 2 27B (about 6 GB; needs a 10 GB+ graphics card)']];
+export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-9b', 'Bonsai 2 9B (about 2 GB; fast, needs a 6 GB+ graphics card; best with "think first")'], ['gemma4-12b-litert', 'Gemma 4 12B (about 5.6 GB; needs a 10 GB+ graphics card)'], ['bonsai2-27b', 'Bonsai 2 27B (about 6 GB; the smartest; needs a 10 GB+ graphics card)']];
 // The visitor's own model ("own"): presets for the builder's form; the page
 // calls the provider itself, so the key never reaches this server.
 export const OWN_MODELS = ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it', 'openai/gpt-6-luna', 'anthropic/claude-sonnet-5-5'];
@@ -187,6 +187,8 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
   <div class="opts">
     <div class="field"><span class="lbl">Where the model runs</span><div class="seg" id="where" role="radiogroup" aria-label="where the model runs"><span class="muted">loading…</span></div></div>
     <label class="field"><span class="lbl">Model</span><select name="model" id="model"></select></label>
+    <label class="field" id="styleBox" hidden><span class="lbl">How</span><select name="style"><option value="steps">step by step</option><option value="one">whole world at once</option></select></label>
+    <label class="field" id="thinkBox" hidden><span class="lbl">Think first</span><input type="checkbox" name="think"></label>
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
   <p class="note" id="whereNote"></p>
@@ -272,7 +274,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025c"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261108d"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261025c"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261114a"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -282,15 +284,19 @@ if(f){
   const remembered=(()=>{ try{ return JSON.parse(localStorage.getItem('tablefolk.worldgen')||'{}'); }catch{ return {}; } })();
   const want={ where: qs.get('where')||(qs.get('how')==='browser'?'browser':null)||remembered.where, model: qs.get('model')||remembered.model };
   f.mode.value=qs.get('mode')||'auto';
+  f.style.value=qs.has('oneanswer')?'one':(remembered.style||'steps'); f.think.checked=qs.has('think')||!!remembered.think;
   const setWhere=id=>{
     const w=OPTS.where.find(x=>x.id===id)||OPTS.where[0]; if(!w) return;
     for(const b of $('where').querySelectorAll('button')) b.setAttribute('aria-checked',String(b.dataset.w===w.id));
     $('model').innerHTML=w.models.map(m=>'<option value="'+m.id+'">'+m.label+'</option>').join('')+(OPTS.custom&&w.id==='cloud'?'<option value="__custom">another model…</option>':'');
     if(want.model && w.models.some(m=>m.id===want.model)) $('model').value=want.model;
     else if(want.model && OPTS.custom && w.id==='cloud'){ $('model').insertAdjacentHTML('afterbegin','<option value="'+want.model+'">'+want.model+'</option>'); $('model').value=want.model; }
-    $('whereNote').textContent=w.note+(w.id==='browser'?' · writes the world step by step: plan, map, review, characters':'');
+    $('whereNote').textContent=w.note+(w.id==='browser'?' · step by step suits the small models; Bonsai 2 and Gemma 4 12B can write the whole world at once':'');
     // the browser's step by step run picks its own kind of map
     $('modeBox').hidden=w.id==='browser';
+    // in this browser: step by step (small models) or the whole world in one answer
+    // (the larger ones), and reasoning before each answer (slower, better)
+    $('styleBox').hidden=$('thinkBox').hidden=w.id!=='browser';
     // your own key: its own panel (the model is typed there)
     $('model').closest('.field').hidden=w.id==='own'; $('ownBox').hidden=w.id!=='own';
     if(w.id==='own') ownShow(w);
@@ -328,9 +334,10 @@ if(f){
     const where=f.dataset.where||'cloud';
     if(where==='own'){ const c=ownSave(); const miss=c.provider==='openrouter'&&!c.apiKey?'Sign in with OpenRouter or paste a key first.':c.provider==='custom'&&!/^https?:[/][/]/.test(c.baseURL)?'Type your server’s address first (e.g. http://localhost:8080/v1).':!c.model?'Choose a model first.':''; if(miss){ $('whereNote').textContent=miss; return; } }
     const model=where==='own'?own().get().model:$('model').value;
-    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model})); }catch{}
+    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked})); }catch{}
     const q=new URLSearchParams(); for(const k of ['art','brain','llm','view','go']) if(qs.has(k)) q.set(k,qs.get(k));
     q.set('where',where); if(model) q.set('model',model); if(where!=='browser') q.set('mode',f.mode.value);
+    if(where==='browser'){ if(f.style.value==='one') q.set('oneanswer','1'); if(f.think.checked) q.set('think','1'); }
     location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
@@ -391,7 +398,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261025c').then(()=>load('/app/worldgen-browser.js?v=20261113e')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261025c').then(()=>load('/app/worldgen-browser.js?v=20261113f')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261108b'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))

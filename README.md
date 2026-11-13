@@ -62,7 +62,8 @@ input about 1 GB.
 | part | model | runs | licence |
 |---|---|---|---|
 | characters (default) | Gemma 4 E2B / E4B, E2B with sight | browser (WebGPU) | Apache-2.0 |
-| characters (10 GB+ cards) | Ternary Bonsai 2 27B | browser (WebGPU) | Apache-2.0 |
+| characters (6 GB+ cards) | Ternary Bonsai 2 9B | browser (WebGPU) | Apache-2.0 |
+| characters (10 GB+ cards) | Ternary Bonsai 2 27B, Gemma 4 12B | browser (WebGPU) | Apache-2.0 |
 | characters (tiny) | Qwen1.5 0.5B Chat | browser (WebGPU or CPU) | **Tongyi Qianwen research licence: not for commercial use** |
 | characters (online) | any model on OpenRouter or your own server | their servers | the provider's terms |
 | meaning (menus, memory) | EmbeddingGemma | browser | Apache-2.0 |
