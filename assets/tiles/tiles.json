@@ -1891,6 +1891,42 @@
     109.5,
     173.8
    ]
+  },
+  "elf": {
+   "file": "characters/elf.png",
+   "w": 283,
+   "h": 344,
+   "anchor": [
+    141.3,
+    223.9
+   ]
+  },
+  "priest": {
+   "file": "characters/priest.png",
+   "w": 275,
+   "h": 334,
+   "anchor": [
+    137.2,
+    217.4
+   ]
+  },
+  "guard": {
+   "file": "characters/guard.png",
+   "w": 287,
+   "h": 349,
+   "anchor": [
+    143.3,
+    227.2
+   ]
+  },
+  "merchant": {
+   "file": "characters/merchant.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
   }
  },
  "floors": {

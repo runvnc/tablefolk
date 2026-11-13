@@ -1,0 +1,11 @@
+{ "v": 1, "title": "New folk", "seed": 1, "size": [13, 9], "base": "plain", "lighting": "bright", "floor": "grass",
+  "player": { "name": "T", "at": [0, 3], "facing": "n" },
+  "agents": [
+    { "id": "dwarf", "model": "dwarf", "at": [4, 0], "facing": "s" }, { "id": "elf", "model": "elf", "at": [3, 0], "facing": "s" },
+    { "id": "priest", "model": "priest", "at": [2, 0], "facing": "s" }, { "id": "guard", "model": "guard", "at": [1, 0], "facing": "s" },
+    { "id": "merchant", "model": "merchant", "at": [0, 0], "facing": "s" }, { "id": "minotaur", "model": "minotaur", "at": [-1, 0], "facing": "s", "hostile": false },
+    { "id": "lizardman", "model": "lizardman", "at": [-2, 0], "facing": "s", "hostile": false }, { "id": "werewolf", "model": "werewolf", "at": [-3, 0], "facing": "s", "hostile": false },
+    { "id": "mummy", "model": "mummy", "at": [-4, 0], "facing": "s", "hostile": false },
+    { "id": "cow", "model": "cow", "at": [4, -3], "facing": "s" }, { "id": "horse", "model": "horse", "at": [2, -3], "facing": "s" }, { "id": "wolf", "model": "wolf", "at": [0, -3], "facing": "s", "hostile": false },
+    { "id": "stag", "model": "stag", "at": [-2, -3], "facing": "s" }, { "id": "dog", "model": "dog", "at": [-4, -3], "facing": "s" }
+  ] }
