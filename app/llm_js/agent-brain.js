@@ -12,11 +12,13 @@ import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261112a';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
-import { detectHardware, recommendModel } from './hardware.js?v=20261030e';
+import { detectHardware, recommendModel, noteBrainSpeed } from './hardware.js?v=20261112c';
 import { samplingFor, withChaos } from './sampling.js?v=20261108b';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
+// readGB: weights read for each token (with the measured bandwidth, how fast it
+// would write here: hardware.js predictedToks).
 // needGB: graphics memory it wants with the game drawing beside it; a first
 // visit starts with the biggest one that fits (hardware.js).
 const SUPPORTED_MODELS = {
@@ -25,8 +27,8 @@ const SUPPORTED_MODELS = {
   'minicpm5-1b-wgpu': { label: 'MiniCPM5-1B (WebGPU GGUF)', engine: 'wllama3', size: '~690 MB', hidden: true },
   'minicpm5-1b-wgpu-q8': { label: 'MiniCPM5-1B (WebGPU GGUF Q8_0)', engine: 'wllama3', size: '~1.15 GB', hidden: true },
   'minicpm5-1b-gpu': { label: 'MiniCPM5-1B (GPU/WebGPU)', engine: 'transformers.js', size: '~1.4 GB', hidden: true },
-  'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB', needGB: 3 },
-  'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', needGB: 6 },
+  'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)', engine: 'litert-lm', size: '~2 GB', needGB: 3, readGB: 1.3 },
+  'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', needGB: 6, readGB: 2.3 },
   // NVIDIA's post-trained Gemma 4 E4B: takes the E4B's place once its
   // .litertlm is on R2 (tools/convert-litertlm.sh); hidden until then.
   'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', hidden: true },
@@ -45,7 +47,7 @@ const SUPPORTED_MODELS = {
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
   // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
   // (bonsai2-engine.js): far smarter, for cards with 10 GB or more
-  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10 },
+  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9 },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // The newest official 0.5B Qwen (Qwen2.5-0.5B-Instruct; Qwen3 starts at 0.6B), Q4_K_M GGUF
@@ -155,6 +157,7 @@ function commandLines(text) {
 export function createAgentBrainManager(config = {}) {
   let engine = null;
   let loaded = false;
+  let warmTurns = 0;   // turns since the model loaded (the first is not timed)
   let currentModelKey = config.modelKey || resolveDefaultModel();
   const onStatus = config.onStatus || (() => {});
   const onDebug = config.onDebug || (() => {});
@@ -165,6 +168,7 @@ export function createAgentBrainManager(config = {}) {
 
   async function load() {
     if (loaded && engine) return engine;
+    warmTurns = 0;
     if (getEngineType() === 'lfm3') {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
       engine = await loadLfm3(status => onStatus(status));
@@ -279,6 +283,7 @@ export function createAgentBrainManager(config = {}) {
     // A character's chaos counts from the model's own settings (console callers pass a temperature instead)
     const rec = agent.chaos != null ? withChaos(made, agent.chaos) : made;
     let text;
+    const turnStart = performance.now();
     try {
       text = await generateFn(engine, '', {
         maxTokens: agent.maxTokens || 256, // room for long multi-line plans/poems
@@ -300,6 +305,11 @@ export function createAgentBrainManager(config = {}) {
       throw err;
     }
     console.log('[tablefolk-brain] RAW LLM OUTPUT:', text);
+    // how fast this model runs here (hardware.js: a model too slow is not picked
+    // by itself again); not the endpoint, nor the first turn (kernels compiling)
+    if (getEngineType() !== 'openai' && !agent.dryRun) {
+      if (warmTurns++ > 0) noteBrainSpeed(currentModelKey, String(text || '').length, (performance.now() - turnStart) / 1000);
+    }
     // Ad-hoc console callers (llm()/genmap()) want the model's exact text back
     // (e.g. a fixed-width ASCII grid), not the command-line normalization that
     // strips lines looking like pure markdown artifacts (a wall row of all
@@ -346,7 +356,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, memGB: cfg.memGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, memGB: cfg.memGB, readGB: cfg.readGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

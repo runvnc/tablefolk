@@ -81,19 +81,52 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   num_logits_to_keep, the export wants logits_to_keep; renamed, it then died
   with "divide by zero"). Eval scores: testing.md.
 - **Choosing for the device** (`hardware.js`, `pickForDevice` in the
-  manager): the WebGL renderer string (fast GPU and default, the discrete one
-  preferred) is parsed and looked up in `gpu-memory.json` (1546 cards: VRAM
-  in GB, 0 for shared memory), ported from onepunk/llmsizer (MIT; data from
-  onepunk/open-gpu-db, Apache-2.0). The table ends at the M5 and has no RTX
-  Spark, so shared-memory chips are also known by name (`sharedChipGB`, the
-  smallest memory each ships with; deviceMemory stops at 8): RTX Spark / N1X
-  24 GB, DGX Spark (GB10) 128, Apple M<n> Ultra 64, Max 32, Pro 16, plain 16
-  from the M4 (8 before), so an M6 or M7 needs no entry. The renderer string
-  of an RTX Spark is assumed to contain "RTX Spark" or "N1X" (not seen yet).
-  Safari says only "Apple GPU" (E2B). A shared GPU may use two thirds.
+  manager; 2026-11-12). New devices come out all the time, so it leans on
+  what can be measured, with name tables only as hints:
+  - **Class** (`deviceClass`): phone, tablet, computer or headset, from the
+    user agent (phone and tablet signs first) and the Client Hints'
+    `formFactors`. Client Hints also give the processor architecture
+    (`arm` on Windows on Arm), the OS and a phone's model name.
+  - **Graphics card by name**: the WebGL renderer string (fast GPU and
+    default, the discrete one preferred) looked up in `gpu-memory.json`
+    (1546 cards: VRAM in GB, 0 for shared memory), ported from
+    onepunk/llmsizer (MIT; data from onepunk/open-gpu-db, Apache-2.0).
+  - **Bandwidth, measured** (`measureBandwidth`): ten copies of a 256 MB
+    buffer (128 on a phone), best of three, about 0.1 s, kept 30 days per
+    device in `tablefolkGpuBandwidth`. A copy sees about 60% of the rated
+    figure (RTX 2060: 138-200 of 336 GB/s). Each token reads a model's
+    weights (`readGB` in `SUPPORTED_MODELS`: E2B 1.3, E4B 2.3, Bonsai 2
+    5.9), so `predictedToks` = bandwidth x 0.5 / readGB; under 8 tokens/s
+    a model is not picked by itself.
+  - **Shared memory** (`memoryEstimate`, each sign a lower bound, the
+    highest wins, its reason in `memWhy`): `navigator.deviceMemory`
+    (Chrome 155 reports 16 here, older ones stopped at 8; Safari none);
+    chips by name (`sharedChipGB`: RTX Spark/N1X 24, DGX Spark 128, Radeon
+    8060S/8050S 32, Arc 130V/140V 16, Apple M<n> Ultra 64, Max 32, Pro 16,
+    plain 16 from the M4, 8 before); **NVIDIA graphics on a Windows or
+    Linux Arm computer** is taken for a Spark (24) whatever its name says,
+    so the RTX Spark is found even if its renderer string names neither;
+    measured bandwidth 180+ GB/s on a computer means a wide unified-memory
+    chip (16), 400+ a Max/Ultra/DGX (32); the adapter's largest buffer.
+    A phone's or tablet's GPU always counts as shared.
+  - **Usable** (`usableGB`): the card's own memory; shared: two thirds on a
+    Mac, half elsewhere (Windows' shared graphics memory), 40% on a phone or
+    tablet. A dedicated card missing from the table gets a lower bound from
+    its bandwidth (`vramFromBandwidth`: rated 650+ GB/s 10 GB, 250+ 6, else 4).
+  - **Measured speed** (`noteBrainSpeed`, every turn but the first after
+    loading, not the endpoint): reply characters per second of the whole
+    turn, smoothed, in `tablefolkBrainSpeed`. After 3 turns under 12 chars/s
+    a model is no longer picked by itself (Gemma E2B on the RTX 2060: ~266).
   `needGB` in `SUPPORTED_MODELS` (E2B 3, E4B 6, Bonsai 2 10); a first visit
-  (no `?model=`, nothing saved) gets the biggest that fits, not saved as a
-  choice; an unknown card gets E2B. The RTX 2060 reads as 6 GB (E4B).
+  (no `?model=`, nothing saved) gets the biggest that fits and is fast
+  enough, not saved as a choice, so a later visit can step down; an unknown
+  card (no WebGPU measurement either) gets E2B, as does a device where
+  nothing fits. `hw.choiceWhy` says why; the This device pane shows the
+  class, memory with its reason, bandwidth, the choice and measured speeds.
+  Simulated (2026-11-12): Pixel 9a (8 GB, ~45 GB/s) E2B; Intel UHD laptop
+  E2B (E4B ~8 tok/s); M4 Air 16 GB E4B; RTX Spark of unknown name, Strix
+  Halo, an unknown 330 GB/s Mac and an unknown 600 GB/s card Bonsai 2 27B.
+  The RTX 2060 reads as 6 GB (E4B).
   The larger Bonsai also run through an endpoint (llama.cpp, or OpenRouter
   `prism-ml/ternary-bonsai-2-27b`).
   - **Nemotron 3.5 Bolt E4B** (NVIDIA, Gemma 4 E4B post-trained; HF

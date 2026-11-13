@@ -1,11 +1,11 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261112a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261112d';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261112a';
+import { installDevConsole } from './dev-console.js?v=20261112c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261112a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261112a';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
-import { describeHardware, usableGB } from './hardware.js?v=20261030e';
+import { describeHardware, usableGB } from './hardware.js?v=20261112c';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261112a';
 
@@ -561,7 +561,7 @@ async function main() {
   }
   // freeGB: graphics memory left beside the chat model (the Breeze voice wants about 4)
   // (a getter: the brain may change after this, a world's own model or the player's pick)
-  if (device) { Object.defineProperty(device, 'freeGB', { configurable: true, enumerable: true, get: () => { const m = manager.getSupportedModels().find(m => m.key === manager.getModelKey()); return (usableGB(device.hw) || 0) - (m?.memGB ?? m?.needGB ?? 3); } }); window.tablefolkDiag?.note('device', describeHardware(device.hw) + '; ' + Math.round(device.freeGB * 10) / 10 + ' GB left beside the characters\' model'); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
+  if (device) { Object.defineProperty(device, 'freeGB', { configurable: true, enumerable: true, get: () => { const m = manager.getSupportedModels().find(m => m.key === manager.getModelKey()); return (usableGB(device.hw) || 0) - (m?.memGB ?? m?.needGB ?? 3); } }); window.tablefolkDiag?.note('device', describeHardware(device.hw) + (device.hw?.memWhy ? ' (memory: ' + device.hw.memWhy + ')' : '') + '; ' + Math.round(device.freeGB * 10) / 10 + ' GB left beside the characters\' model' + (device.hw?.choiceWhy ? '; model choice: ' + device.hw.choiceWhy : '')); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
   if (modelSelect) {
     modelSelect.textContent = '';
     if (device?.hw) modelSelect.title = 'Brain model. This device: ' + describeHardware(device.hw);
