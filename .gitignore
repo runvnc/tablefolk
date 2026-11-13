@@ -29,3 +29,6 @@ cloud/public/
 cloud/data.js
 cloud/.wrangler/
 .wrangler/
+
+# npm packages of libs/ (tools/libs.mjs build)
+/dist/

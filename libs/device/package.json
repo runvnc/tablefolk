@@ -1,0 +1,30 @@
+{
+  "name": "@tablefolk/device",
+  "version": "0.1.0",
+  "description": "What a browser device can run: GPU, memory estimate with reasons, measured bandwidth, phone/tablet/computer, and the biggest model that fits and runs fast enough.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/device"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/device",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "webgpu",
+    "gpu",
+    "device-detection",
+    "llm"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@tablefolk/models": "^0.1.0"
+  }
+}

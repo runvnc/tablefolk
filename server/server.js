@@ -47,8 +47,9 @@ function headersFor(path) {
   };
   // Entry points must be revalidated or browsers keep running an old build:
   // preflight.js carries every other file's ?v= version string. Assets too:
-  // they have no version strings and get replaced in place.
-  if (path.endsWith('.html') || path.endsWith('/') || path.endsWith('preflight.js') || path.includes('/assets/')) h['Cache-Control'] = 'no-cache';
+  // they have no version strings and get replaced in place. The libraries in
+  // libs/ too: they import each other without version strings (libs/README.md).
+  if (path.endsWith('.html') || path.endsWith('/') || path.endsWith('preflight.js') || path.includes('/assets/') || path.startsWith('/libs/')) h['Cache-Control'] = 'no-cache';
   return h;
 }
 

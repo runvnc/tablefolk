@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'cloud/public');
 // what the site serves (top-level folders and files); everything else stays home
-const PUBLIC = /^(app|assets|scenarios|llm_js|pocket_tts_min|packages|skills|roles|plugins)\/|^(index\.html|home\.css|home\.js|llm\.html|LICENSE)$/;
+const PUBLIC = /^(app|assets|scenarios|llm_js|pocket_tts_min|packages|libs|skills|roles|plugins)\/|^(index\.html|home\.css|home\.js|llm\.html|LICENSE)$/;
 
 const files = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT }).toString().split('\0').filter(f => f && PUBLIC.test(f));
 rmSync(OUT, { recursive: true, force: true });
@@ -44,6 +44,8 @@ writeFileSync(join(OUT, '_headers'), `/*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
   Referrer-Policy: no-referrer
+/libs/*
+  Cache-Control: no-cache
 `);
 
 // The Worker's data. settings.js reads .admin/settings.json (voice

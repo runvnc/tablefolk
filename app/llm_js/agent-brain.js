@@ -12,7 +12,7 @@ import { OpenAI, collect } from './openai-client.js?v=20261024a';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from './bonsai2-engine.js?v=20261112a';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
-import { detectHardware, recommendModel, noteBrainSpeed } from './hardware.js?v=20261112c';
+import { detectHardware, recommendModel, noteBrainSpeed } from '../../libs/device/index.js';
 import { samplingFor, withChaos } from './sampling.js?v=20261108b';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired

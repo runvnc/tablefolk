@@ -1,5 +1,6 @@
-// What this device can run, so the model picker (and the voice and speech
-// input beside it) can start with the best that fits and runs fast enough.
+// @tablefolk/device -- what this device can run, so a model picker (and the
+// voice and speech input beside it) can start with the best that fits and
+// runs fast enough. Used by Tablefolk's picker; works on any page.
 //
 // No browser reports free graphics memory, and new devices come out all the
 // time, so this leans on what can be measured and on broad signs, with the
@@ -24,10 +25,16 @@
 //   - how fast each model really ran here (noteBrainSpeed, from agent-brain):
 //     a model measured too slow is not picked by itself again.
 //
+//   import { detectHardware, recommendModel, usableGB, describeHardware } from '@tablefolk/device';
 //   const hw = await detectHardware();   // { gpu, cls, arch, vramGB, shared, sharedGB, memWhy, bwGBs, ... }
-//   recommendModel(hw, models)           // the biggest model that fits and is fast enough
+//   recommendModel(hw, [{ key: 'small', needGB: 2, readGB: 1 }, { key: 'big', needGB: 6, readGB: 2.3 }], 'small')
+//                                        // the biggest model that fits and is fast enough; hw.choiceWhy says why
+//   noteBrainSpeed(key, chars, seconds)  // after a reply: a model measured too slow is not picked again
+// Kept in localStorage (prefix from @tablefolk/models configure(), 'tablefolk'
+// by default): GpuBandwidth (30 days) and BrainSpeed.
+import { local } from '../models/index.js';
 let tablePromise = null;
-const table = () => tablePromise ||= fetch(new URL('./gpu-memory.json?v=20261030a', import.meta.url)).then(r => r.json()).catch(() => ({ vram: {}, aliases: {}, integrated: [] }));
+const table = () => tablePromise ||= fetch(new URL('./gpu-memory.json', import.meta.url)).then(r => r.json()).catch(() => ({ vram: {}, aliases: {}, integrated: [] }));
 
 function probeRenderer(attrs) {
   try {
@@ -101,9 +108,9 @@ export function deviceClass(ch, ua = '', touch = 0) {
 // The graphics memory's bandwidth in GB/s as a buffer copy sees it (about 60%
 // of the card's rated figure: an RTX 2060 measures ~200 of its 336), best of
 // three runs of ten copies. Kept per device and browser for 30 days.
-const BW_KEY = 'tablefolkGpuBandwidth';
+const BW_KEY = 'GpuBandwidth';
 export async function measureBandwidth(adapter, sig, maxMB = 256) {
-  try { const c = JSON.parse(localStorage.getItem(BW_KEY) || 'null'); if (c?.sig === sig && Date.now() - c.at < 30 * 864e5 && c.gbs > 0) return c.gbs; } catch {}
+  try { const c = local.json(BW_KEY); if (c?.sig === sig && Date.now() - c.at < 30 * 864e5 && c.gbs > 0) return c.gbs; } catch {}
   let dev = null;
   try {
     const size = Math.min(maxMB * 2 ** 20, Math.floor(adapter.limits.maxBufferSize / 2 / 4) * 4);
@@ -116,7 +123,7 @@ export async function measureBandwidth(adapter, sig, maxMB = 256) {
     for (let k = 0; k < 3; k++) { const t = performance.now(); await run(10); best = Math.min(best, performance.now() - t); }
     x.destroy(); y.destroy();
     const gbs = Math.round(2 * 10 * size / (best / 1000) / 1e9);
-    try { localStorage.setItem(BW_KEY, JSON.stringify({ sig, gbs, at: Date.now() })); } catch {}
+    local.setJson(BW_KEY, { sig, gbs, at: Date.now() });
     return gbs;
   } catch (e) { console.warn('[hardware] bandwidth not measured:', e?.message); return null; }
   finally { try { dev?.destroy(); } catch {} }
@@ -207,15 +214,15 @@ export function usableGB(hw) {
 }
 
 // ---- how fast each model really ran here (agent-brain notes every turn)
-const SPEED_KEY = 'tablefolkBrainSpeed';
-export function brainSpeeds() { try { return JSON.parse(localStorage.getItem(SPEED_KEY) || '{}'); } catch { return {}; } }
+const SPEED_KEY = 'BrainSpeed';
+export function brainSpeeds() { return local.json(SPEED_KEY, {}) || {}; }
 // chars of reply per second of the whole turn (reading the prompt included);
 // the first turn after loading (kernels compiling) is not counted
 export function noteBrainSpeed(key, chars, seconds) {
   if (!key || !(seconds > 0) || chars < 20) return;
   const all = brainSpeeds(), r = all[key] || { cps: 0, turns: 0 }, cps = chars / seconds;
   r.cps = r.turns ? r.cps * .7 + cps * .3 : cps; r.turns++; all[key] = r;
-  try { localStorage.setItem(SPEED_KEY, JSON.stringify(all)); } catch {}
+  local.setJson(SPEED_KEY, all);
 }
 // Slower than this a character's turn drags (a 120-character reply in 10+ s).
 export const MIN_CPS = 12;

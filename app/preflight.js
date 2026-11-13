@@ -73,7 +73,7 @@
     ['speech-input.js?v=20261112a'],
     ['worldgen-own.js?v=20261112a'],
     ['online-brain.js?v=20261112b'],
-    ['menus.js?v=20261112f'],
+    ['menus.js?v=20261113a', 'module'],
     ['workflows.js?v=20261024a'],
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],

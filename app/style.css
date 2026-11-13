@@ -709,20 +709,4 @@ body.user-mode #playerHp { font-size:11px; }
 .online-brain .online-row input + button { flex:0 0 auto; width:auto; }
 .online-brain button { padding:6px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
 
-/* menus.js: JRPG-style choices */
-.menu-box { position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:60; width:min(440px, calc(100vw - 32px));
-  background:linear-gradient(180deg, rgba(22,26,44,.97), rgba(12,14,26,.97)); border:2px solid #d9c27a; border-radius:12px;
-  box-shadow:0 0 0 3px rgba(0,0,0,.55), 0 14px 40px rgba(0,0,0,.6); color:#f3ecd6; padding:10px 12px 8px; font-size:15px; }
-.menu-box[hidden] { display:none; }
-.menu-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.menu-head b { flex:1; color:#f2d27c; font-size:15px; letter-spacing:.02em; }
-.menu-x { flex:0 0 auto; width:auto; background:none; border:0; color:#cbbf9a; font-size:15px; cursor:pointer; padding:2px 6px; }
-.menu-text { margin:6px 0 4px; line-height:1.35; }
-.menu-items { list-style:none; margin:6px 0 4px; padding:0; display:flex; flex-direction:column; gap:3px; max-height:46vh; overflow:auto; }
-.menu-items button { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; border:1px solid transparent; border-radius:8px;
-  color:inherit; font:inherit; padding:7px 10px 7px 26px; cursor:pointer; position:relative; }
-.menu-items button.sel { background:rgba(217,194,122,.14); border-color:rgba(217,194,122,.45); }
-.menu-items button.sel::before { content:"▶"; position:absolute; left:8px; color:#f2d27c; font-size:11px; }
-.menu-num { min-width:18px; color:#9fb3d9; font-size:12px; font-variant-numeric:tabular-nums; }
-.menu-hint { font-size:11.5px; color:#a8a08a; margin-top:4px; }
-@media (max-width: 600px) { .menu-box { bottom:76px; font-size:14px; } .menu-items button { padding:9px 10px 9px 26px; } }
+/* menus.js: the menu box's look comes from libs/menus/box.js (MENU_CSS) */

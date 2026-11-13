@@ -1,0 +1,28 @@
+{
+  "name": "@tablefolk/menus",
+  "version": "0.1.0",
+  "description": "JRPG-style menus: click, press a number, type or say a choice; words matched by number, label, keywords, meaning (embeddings) or a language model.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/menus"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/menus",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "menu",
+    "game",
+    "rpg",
+    "speech",
+    "llm"
+  ],
+  "sideEffects": false
+}
