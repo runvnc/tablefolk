@@ -146,6 +146,47 @@ the scenario's `menus`:
 - A character's `menu` can also be a whole menu object instead of an id.
   At most 24 choices; 1-9 have keys.
 
+### Scripted choices, conditions and world flags
+
+A choice can also do things itself, with no model involved:
+
+| field | what it does |
+|---|---|
+| `reply` | the character says this line back |
+| `act` | command lines the character runs (a string or a list): `"give(silver locket)"`, `"sell(\"lost cat\", 5)"` (picking it is the player agreeing to the price), `"walk(well)"`, `"emote(dance)"` |
+| `set` | world flags: `{"cat_found": true, "favours": "+1"}` ([story.md](story.md)) |
+| `take` | the player hands this item to the character; the choice only shows while the player carries it |
+| `workflow` | starts one of the scenario's workflows on the character, run until it waits ([workflows.md](workflows.md)) |
+| `if` | the choice only shows when this holds: `"world.cat_found"`, `"player has lost cat"`, `"player.gold >= 5"`, `"me has blackberry pie"`, `"not world.paid"`, `"... and ..."`, `"... or ..."` |
+
+A choice with `reply`, `act`, `set`, `take` or `workflow` is scripted: the
+player's `say` line is shown, but the model is not asked. They run in this
+order: `take`, `set`, `say`, `reply`, `act`, `workflow`, then the next
+`menu`. Texts (titles, labels, replies, act lines) take `{{player}}`,
+`{{me}}`, `{{world.cat_found}}`, `{{player.gold}}`.
+
+A character's `menu` can be a list: the first entry whose `if` holds is
+used, so a neighbour can change once a flag is set:
+
+```json
+"menu": [ { "if": "world.cat_found", "menu": "hobb-friendly" }, { "menu": "hobb" } ]
+```
+
+When the meaning of the player's words fits two or three choices about
+equally and there is no model to decide, the menu asks "did you mean 1 or
+2?". Give choices `keywords` for what players are likely to say.
+
+### Worlds with no language model
+
+`"brain": "none"` at the top makes a world that runs without a model (no
+download, any device): the menus, scripted choices and workflows are the
+whole story. Typed and spoken words are still matched by meaning
+(EmbeddingGemma, ~175 MB). Characters take no turns of their own; give every
+choice a `reply` or `act`, and use workflows (`await`, `if`, `set`, `take`,
+`command` steps) for anything with steps. `scenarios/willow-lane.json` is a
+complete example (a lost cat, a sale, a reward, a neighbour who warms to
+you, a riddle).
+
 ## Trading
 
 `give(item)` hands over an item the character has; `sell(item, price)` sells

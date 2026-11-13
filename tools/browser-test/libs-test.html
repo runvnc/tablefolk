@@ -28,6 +28,8 @@ try {
   ok('menus: keyword', r2.item?.id === 'fix' && r2.by === 'keyword');
   ok('menus: words', r3.item?.id === 'fix' && r3.by === 'words');
   ok('menus: none without a model', r4.none === true);
+  const r6 = await Mn.match(menu, 'something vague', { embed: async () => [0.80, 0.78, 0.5] });
+  ok('menus: close meaning is unsure', r6.none && r6.by === 'unsure' && r6.unsure.map(i => i.id).join() === 'buy,fix');
   const chooser = Mn.modelChooser(async () => '3');
   const r5 = await Mn.match(menu, 'I am off now', { choose: chooser });
   ok('menus: model chooser', r5.item?.id === 'bye' && r5.by === 'model');

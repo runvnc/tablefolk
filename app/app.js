@@ -5220,7 +5220,7 @@ function worldStateData() {
         return { type: mm?.type || 'wall', x: m.position.x, z: m.position.z, state: mm?.state || 'intact', health: mm?.health ?? 3, ...(mm?.rim ? {rim:true} : {}), ...(mm?.locked ? {locked:mm.locked} : {}) };
       }),
       brainConfigs: Array.from(state.brainConfigs.entries()),
-      player: state.player,
+      player: state.player, flags: state.flags || {},
       playerAvatar: state.playerAvatar ? { model: state.playerAvatar.avatarModel, x: state.playerAvatar.logicalPos?.x ?? state.playerAvatar.root.position.x, z: state.playerAvatar.logicalPos?.z ?? state.playerAvatar.root.position.z, dx: state.playerAvatar.dir.x, dz: state.playerAvatar.dir.z } : null,
       paint: state.paint ? [...state.paint].map(([k,v])=>[...k.split(',').map(Number),v.mat,v.tint||null]) : [],
       baseMap: state.baseMap||'island', campfire: state.campfire!==false, worldSize: [WORLD.cols, WORLD.rows],
@@ -5269,6 +5269,7 @@ async function restoreWorldState(input) {
   setCampfire(data.campfire!==false);
   setPaint((data.paint||[]).map(([x,z,mat,tint])=>({x,z,mat,tint})),{replace:true});
   if(data.player) state.player={gold:Number(data.player.gold)||0,items:Array.isArray(data.player.items)?data.player.items:[]};
+  if(data.flags && typeof data.flags==='object') state.flags={...data.flags};   // story.js
   for(const p of (data.props||[])){
       let obj;
       if (p.type === 'barrel') obj = makeBarrel(state.scene, p.x, p.z);
@@ -5359,7 +5360,7 @@ function installWorldAPI(){
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),
     executeAgentCommand:(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'),
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),
-    stepAgentTurn:beginTurnForAgent,
+    stepAgentTurn:beginTurnForAgent, renderPlayerInventory:()=>renderPlayerInventory(),
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,

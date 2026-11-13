@@ -61,6 +61,9 @@ const SUPPORTED_MODELS = {
   // Any OpenAI-compatible server (settings: Brain options > endpoint). No
   // download; by default this Tablefolk server's /api/llm proxy.
   'endpoint': { label: 'OpenAI-compatible endpoint', engine: 'openai', size: 'remote' },
+  // No model: a scripted world ("brain": "none"): menus, workflows and scripted
+  // replies only; characters take no turns of their own (world-integration.js)
+  'none': { label: 'No model (a scripted world)', engine: 'none', size: 'none', hidden: true, autoLoad: true },
 };
 
 // The endpoint brain's settings: ?llm=<baseURL>&llmModel=<model> override,
@@ -183,6 +186,12 @@ export function createAgentBrainManager(config = {}) {
       onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
       return engine;
     }
+    if (getEngineType() === 'none') {
+      engine = { none: true, unload() {} };
+      loaded = true;
+      onStatus('no model: a scripted world ready');
+      return engine;
+    }
     if (getEngineType() === 'openai') {
       engine = createEndpointEngine();
       loaded = true;
@@ -257,6 +266,7 @@ export function createAgentBrainManager(config = {}) {
       constraintInstruction = dyn.instruction;
     }
 
+    if (getEngineType() === 'none') return '';
     const generateFn = getEngineType() === 'openai' ? generateEndpoint
       : getEngineType() === 'bonsai2' ? generateBonsai2
       : getEngineType() === 'lfm3' ? generateLfm3

@@ -926,6 +926,11 @@
       skills: Array.isArray(s.skills) ? s.skills.map(String).slice(0, 16) : [],
       // menus.js: menus by id (a character's "menu" may name one)
       menus: s.menus && typeof s.menus === 'object' && !Array.isArray(s.menus) ? s.menus : {},
+      // story.js: flags (their starting values) and the facts everyone knows while one holds
+      flags: s.flags && typeof s.flags === 'object' && !Array.isArray(s.flags) ? s.flags : {},
+      facts: s.facts && typeof s.facts === 'object' && !Array.isArray(s.facts) ? s.facts : {},
+      // "none": no language model (menus, workflows and scripted replies only)
+      brain: s.brain === 'none' ? 'none' : null,
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       // packages.js: tablefolk.json packages (items, skills, roles, workflows, code)
@@ -946,7 +951,7 @@
       speech: s.speech === false ? false : null,
       memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
-      defaultModel: typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
+      defaultModel: s.brain === 'none' ? 'none' : typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
       systemPrompt: typeof s.systemPrompt === 'string' && s.systemPrompt.trim() ? s.systemPrompt : null,
       food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
@@ -1038,6 +1043,7 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
+    window.tablefolkStory?.reset(scn.flags, scn.facts);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
@@ -1377,6 +1383,9 @@
         ...(st.playerAvatar ? { at: [Math.round(st.playerAvatar.root.position.x), Math.round(st.playerAvatar.root.position.z)] } : {}) },
       allowed: [...st.allowed],
       ...(active?.scn?.menus && Object.keys(active.scn.menus).length ? { menus: active.scn.menus } : {}),
+      ...(active?.scn?.flags && Object.keys(active.scn.flags).length ? { flags: active.scn.flags } : {}),
+      ...(active?.scn?.facts && Object.keys(active.scn.facts).length ? { facts: active.scn.facts } : {}),
+      ...(active?.scn?.brain ? { brain: active.scn.brain } : {}),
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
         return { id: g.id, ...(g.charModel ? { model: g.charModel } : {}), at: [Math.round(g.root.position.x), Math.round(g.root.position.z)], facing: dirName(g.dir),

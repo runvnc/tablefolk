@@ -93,6 +93,28 @@ for fighters and say in the personality when they attack. The player can
 always fight (/attack, /wield). Goals: {"agent_defeated": "id"},
 {"player_defeated": true} (use as "lose").
 
+Menus (JRPG-style choices; use them when the request asks for menus, a
+shop, a quest giver, or "no AI"): an agent's "menu" names one of the
+top-level "menus" (or is a list, the first whose "if" holds:
+[{"if": "world.cat_found", "menu": "pell-happy"}, {"menu": "pell"}]). E on the
+character opens it; the player clicks, presses a number, or types or says it.
+"menus": {"pell": {"title": "Mrs. Pell", "text": "Have you seen my cat?",
+"items": [{"id": "cat", "label": "Here she is!", "take": "lost cat", "set":
+{"cat_found": true}, "reply": "Whiskers! Thank you!", "act": ["give(silver
+locket)"]}, {"id": "ask", "label": "Any news?", "keywords": ["news"], "say":
+"Any news?"}, {"id": "bye", "label": "Goodbye"}]}}
+Item fields: label; say (the player's line: without reply/act it goes to the
+character's model); reply (the character's scripted line); act (command
+lines it runs: give(x), sell("x", 5), walk(well), emote(dance)); set (world
+flags; "+1" adds); take (the player hands it over; shown only when carried);
+if (shown only when it holds: "world.flag", "player has x", "player.gold >= 5",
+"me has x", "not ...", "... and ..."); menu (opens next); workflow (starts one);
+keywords. "flags": {"cat_found": false} sets starting values; "facts":
+{"cat_found": "The player found Mrs. Pell's cat."} is known to every character
+while the flag holds. "brain": "none" makes a world with no language model:
+then every choice needs reply/act, and characters act only through menus
+and workflows (await, if, set, take, command steps).
+
 Skills: "skills": ["magic"] at the top, then on an agent "skills": ["magic"],
 "skillParams": {"magic": {"spells": ["spark", "fireball", "heal"]}}. Built in:
 magic (cast(spell, target); spells spark fireball heal light push frost),

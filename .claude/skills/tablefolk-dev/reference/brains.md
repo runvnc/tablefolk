@@ -468,3 +468,13 @@ full fallback). Settings' **Running now** and the **This device** pane render
 them (refreshed every 1.5 s while open). `tablefolkDevice.freeGB` is a getter
 on the current brain's `memGB` (Qwen 0.5B: 1; never used to pick a model)
 or `needGB` (else 3).
+
+## No model (`"brain": "none"`)
+
+A scenario's `"brain": "none"` sets `defaultModel` to `none`: an engine in
+`agent-brain.js` that loads at once (no download question: also for a
+linked world, `world-integration.js`) and writes nothing. `runOneAgentTurn`
+skips characters (it drops their pending chat) unless a workflow is active;
+`replyNow` drives an active workflow with `world.driveWorkflow` until it
+waits. Menus (`menus.js`) do not ask the model in such a world;
+EmbeddingGemma still matches by meaning. Test: `willow-lane-test.mjs`.

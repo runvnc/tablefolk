@@ -20,6 +20,7 @@
 //     embed: async (query, texts) => texts.map(t => cosine(...)),     // optional
 //     choose: modelChooser(async (messages, opts) => text),           // optional: any chat model
 //   })  -> { item, by: 'number'|'label'|'keyword'|'words'|'meaning'|'model', score } | { none: true, by }
+//          (none with unsure: [items]: meaning found a few close choices and nothing decided between them)
 
 export const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const STOP = new Set('a an the to of and or i im me my you your we us it is are be do can could would will want like please some about for with on in at this that these those what whats one just get got let lets go ok okay yes no have need'.split(' '));
@@ -59,6 +60,7 @@ export async function match(menuIn, text, { embed = null, choose = null, embedMi
   const best = Math.max(...overlap), at = overlap.indexOf(best);
   if (best >= 0.6 && overlap.filter(v => v === best).length === 1) return { item: items[at], by: 'words', score: best };
   // meaning: an embedding model, when its pick is clear
+  let unsure = null;
   if (embed) {
     try {
       const texts = items.map(itemText), r = await embed(text, texts);
@@ -68,6 +70,8 @@ export async function match(menuIn, text, { embed = null, choose = null, embedMi
         const [s1, n1] = scored[0], s2 = scored[1]?.[0] ?? 0;
         log?.('meaning', text, scored.map(([s, n]) => items[n].id + ' ' + s.toFixed(2)).join(', '));
         if (s1 >= embedMin && s1 - s2 >= embedGap) return { item: items[n1], by: 'meaning', score: +s1.toFixed(3) };
+        // close between the best few: the model decides, or (without one) the player is asked
+        if (s1 >= embedMin) unsure = scored.filter(([s]) => s >= embedMin && s1 - s < embedGap).slice(0, 3).map(([, n]) => items[n]);
       }
     } catch (e) { log?.('embedding failed', e); }
   }
@@ -75,9 +79,9 @@ export async function match(menuIn, text, { embed = null, choose = null, embedMi
   if (choose) {
     const p = await choose(menu.text || menu.title || 'Which choice?', items.map(i => i.label), { context: 'The player said: "' + String(text).slice(0, 300) + '"' });
     if (p && p.index >= 0) return { item: items[p.index], by: p.by || 'model', score: p.confidence ?? null };
-    return { none: true, by: p ? p.by || 'model' : 'no match' };
+    return { none: true, by: p ? p.by || 'model' : 'no match', ...(unsure && !p ? { unsure } : {}) };
   }
-  return { none: true, by: 'no match' };
+  return unsure ? { none: true, by: 'unsure', unsure } : { none: true, by: 'no match' };
 }
 
 // A chooser from any chat model: generate(messages, { maxTokens, temperature })

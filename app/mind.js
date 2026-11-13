@@ -126,7 +126,9 @@
   // then world lore that fits what was said, or, when none does, one piece
   // in turn so it has something true to talk about (an innkeeper asked for
   // news made up gossip while the village lore went unused).
-  function facts(g, n = 4) {
+  // story.js: facts that hold now (a flag set: "the player found the cat") come first, always
+  function facts(g, n = 4) { const story = window.tablefolkStory?.factsFor(g) || []; return [...story, ...baseFacts(g, n)]; }
+  function baseFacts(g, n = 4) {
     const m = mindOf(g), ctx = context(g), rel = t => overlap(t, ctx) * 2 + simOf(m, t);
     const own = ownFacts(g).map(t => ({ t, s: rel(t) })).sort((a, b) => b.s - a.s).slice(0, 3).map(x => x.t);
     const lore = loreFacts().filter(t => !own.includes(t)), room = Math.max(1, n - own.length);

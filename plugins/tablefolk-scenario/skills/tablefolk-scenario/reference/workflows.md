@@ -38,10 +38,50 @@ character can start one itself (`workflow(haggle, 30)`; `"workflows":
 | `if` | `==` `!=` `>=` `<=` `>` `<` `contains`, with `then` / `else` |
 | `command` | any command line; takes the character's turn |
 | `await` | `"speech"` (the next words or event addressed to it) or `"turns"` with `"turns": N` |
-| `set` | `{"set": {"tries": "{{tries}}+1"}}` |
+| `set` | `{"set": {"tries": "{{tries}}+1"}}`; `"world.<flag>"` sets a world flag: `{"set": {"world.riddle_solved": true}}` |
+| `take` | `{"take": "lost cat"}`: the player hands it over; `"else": "step"` when they don't carry it; `save` gets yes/no |
+
+`if` takes the run's own variables and every world condition
+([story.md](story.md)): `"world.cat_found"`, `"player has lost cat"`,
+`"player.gold >= 10"`, `"me has rusty key"`, `"not ..."`, `"... and ..."`.
 
 Any step can have `id`, `goto`, `end`, and `max` + `exit` (leave after N
-passes). Templates: `{{var}}`, `{{me}}`, `{{player}}`, `{{input}}`.
+passes). Templates: `{{var}}`, `{{me}}`, `{{player}}`, `{{input}}`,
+`{{world.<flag>}}`, `{{player.gold}}`, `{{player.items}}`.
+
+## Starting and running
+
+- On an agent: `"workflow": "haggle"` (runs from the start).
+- The `workflow` command: the character starts one itself.
+- A menu choice: `"workflow": "riddle"` ([characters.md](characters.md)).
+
+A workflow started from a menu, or spoken to while it waits for speech,
+goes on until it waits again (an `await`, or its end). Otherwise each
+`command` step takes one of the character's turns.
+
+## Without a model
+
+In a world with `"brain": "none"` (characters.md), a workflow made of
+`await`, `if`, `set`, `take` and `command` steps runs as it is: the player's
+typed or spoken words are what `await` hears. `prompt` steps need the model,
+and `choose` takes its `"default"` without one. A riddle gate with no model:
+
+```json
+"riddle": { "steps": [
+  { "if": "world.riddle_solved", "then": "again" },
+  { "command": "say(\"What has a spout, a lid and a whistle?\")" },
+  { "id": "wait", "await": "speech", "save": "answer" },
+  { "if": "answer contains kettle", "then": "right" },
+  { "command": "say(\"No. Think again.\")", "goto": "wait", "max": 3, "exit": "giveup" },
+  { "id": "right", "set": { "world.riddle_solved": true } },
+  { "command": "say(\"A kettle! Clever, {{player}}.\")", "end": true },
+  { "id": "giveup", "command": "say(\"A kettle! Ha.\")", "end": true },
+  { "id": "again", "command": "say(\"You've solved my riddle already.\")", "end": true } ] }
+```
+
+Tested (2026-11-13, `tools/browser-test/willow-lane-test.mjs`): a wrong
+answer, the right one setting the flag, and the flag checked on the next
+run.
 
 Tested with Gemma 4 E4B: greets, counters a low offer, sells at 42
 (`scenarios/haggle-workflow.json`). For plain selling, the `trade` skill or a

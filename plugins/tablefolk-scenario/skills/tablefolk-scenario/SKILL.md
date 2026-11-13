@@ -88,11 +88,12 @@ lines (`map`, quick natural scenes), explicit `objects` / `paint`, and
 | [map-lines.md](reference/map-lines.md) | the `place` / `paint` / `path` language and how the layout engine places things |
 | [generated.md](reference/generated.md) | `generate`: dungeons and villages, room and building kinds, `in`, auto-placement by role, fixed layouts |
 | [things.md](reference/things.md) | the object catalogue and where the lists live, walk-in buildings, notes, loot, locked doors, asset packs |
-| [characters.md](reference/characters.md) | commands (`allowed`), menus (choices the player clicks, types or says), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
+| [characters.md](reference/characters.md) | commands (`allowed`), menus (choices the player clicks, types or says; scripted replies and actions; worlds with no model), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
 | [combat.md](reference/combat.md) | hit points, weapons, hostile monsters and talking enemies, looting bodies |
 | [living.md](reference/living.md) | worlds that live on their own: `live`, `pace`, the director and `events`, writing personalities for it, showcase worlds |
 | [goals.md](reference/goals.md) | win / lose predicates and scores |
-| [workflows.md](reference/workflows.md) | step-by-step routines that keep small models on track |
+| [workflows.md](reference/workflows.md) | step-by-step routines that keep small models on track, or run with no model at all |
+| [story.md](reference/story.md) | world flags, facts characters know once a flag is set, conditions on flags, inventory and gold |
 | [skills-and-roles.md](reference/skills-and-roles.md) | skills (magic, trade...) and roles (shopkeeper, guard...): using and writing them |
 | [packages.md](reference/packages.md) | `tablefolk.json` packages (items, skills, roles, workflows, code), finding and publishing them |
 | [links-and-testing.md](reference/links-and-testing.md) | links, the Scenario pane, the example scenarios, testing tactics |

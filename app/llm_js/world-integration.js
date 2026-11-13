@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113b';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113c';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261113b';
+import { installDevConsole } from './dev-console.js?v=20261113c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -279,7 +279,7 @@ function getActiveEngine(manager) {
 
 async function clearActiveModelCache(manager) {
   const engine = getActiveEngine(manager);
-  if (engine === 'openai') return;
+  if (engine === 'openai' || engine === 'none') return;
   if (engine === 'bonsai2') return clearBonsai2Cache();
   if (engine === 'litert-lm') return clearLiteRTCache(manager.getModelKey());
   if (engine === 'wllama') return clearWllamaCache(manager.getModelKey());
@@ -289,7 +289,7 @@ async function clearActiveModelCache(manager) {
 
 async function hasActiveModelCached(manager) {
   const engine = getActiveEngine(manager);
-  if (engine === 'openai') return true; // nothing to download
+  if (engine === 'openai' || engine === 'none') return true; // nothing to download
   if (engine === 'bonsai2') return hasBonsai2Cached();
   if (engine === 'lfm3') return hasLfm3Cached();
   if (engine === 'litert-lm') return hasLiteRTCached(manager.getModelKey());
@@ -558,6 +558,8 @@ async function main() {
   // here, so the usual model is not loaded first only to be thrown away.
   const startKey = manager.getModelKey();   // what this player uses when a world names none
   const linked = await linkedScenario(world).catch(() => null);
+  // a scripted world ("brain": "none") starts with no model: no download question
+  if (linked?.brain === 'none') linked.defaultModel = 'none';
   if (linked?.defaultModel && !hasModelParam() && manager.getSupportedModels().some(m => m.key === linked.defaultModel)) manager.setModel(linked.defaultModel, false);
   // why this brain (for Settings, "Running now", and the This device pane)
   {
@@ -846,6 +848,8 @@ async function main() {
       if (acted) { const c2 = world.getBrainConfig(g.id); c2.messages = (c2.messages || []).concat([{ role: 'assistant', content: '(routine) ' + (world.state?.globalHistory?.slice(-1)?.[0] || '') }]).slice(-30); world.setBrainConfig(g.id, c2); }
       return acted;
     }
+    // a scripted world ("brain": "none"): characters act only through menus and workflows
+    if (getActiveEngine(manager) === 'none') { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
     try {
       world.state.nextAgentId = g.id;
       updatePerceptionUI();
@@ -1244,7 +1248,9 @@ async function main() {
     replying = true;
     try {
       while (!world.isTurnReady()) await sleep(100);
-      if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g);
+      // inside a workflow: it goes on until it waits again (workflows.js)
+      if (window.tablefolkWorkflows?.active(g.id)) await world.driveWorkflow(g.id);
+      else if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g);
     } finally { replying = false; }
   }
   // Programmatic chat for the scenario tactic tester (scenario.js): queue a
@@ -1280,6 +1286,28 @@ async function main() {
     finally { replying = false; }
   };
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };
+  // A command line run as a character now (menus.js "act", "reply"): the same
+  // path as a model's command; waits for the turn (and any walking) to settle.
+  world.runAs = async (agentId, line, source = 'menu') => {
+    const g = world.getAgents().find(a => a.id === agentId); if (!g) return false;
+    const cmd = world.parseLLMCommandLine(line); if (!cmd) { appendLog(`${agentId}: not a command: ${line}`); return false; }
+    while (!world.isTurnReady()) await sleep(100);
+    await world.stepAgentTurn(g.id, cmd, source);
+    while (!world.isTurnReady()) await sleep(100);
+    try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line } })); } catch {}
+    return true;
+  };
+  // Run a character's workflow until it waits (for speech, for turns) or ends:
+  // a workflow started from a menu goes on at once, with or without a model.
+  world.driveWorkflow = async (agentId, maxSteps = 24) => {
+    const g = world.getAgents().find(a => a.id === agentId); if (!g) return;
+    for (let i = 0; i < maxSteps && window.tablefolkWorkflows?.active(g.id); i++) {
+      while (!world.isTurnReady()) await sleep(100);
+      if (!(await runOneAgentTurn(g))) break;
+    }
+    while (!world.isTurnReady()) await sleep(100);
+  };
+  world.appendLog = appendLog;
   // ---- sight: look() with a brain that can see (senses.js calls lookFor) ----
   // The character's own view (senses.snapshot) goes to the vision model: in
   // the browser, Gemma 4 E2B with sight (libs/brain/engines/litert-worker.js "see"); or the

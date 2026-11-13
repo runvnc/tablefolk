@@ -31,9 +31,21 @@
  *            it takes the character's turn, the workflow continues next turn
  *   await    "speech": wait for the next words or event addressed to the
  *            character (saved in "save"); "turns": N waits N turns
- *   set      {"set": {"tries": "{{tries}}+1"}} (simple + and - on numbers)
+ *   set      {"set": {"tries": "{{tries}}+1"}} (simple + and - on numbers);
+ *            "world.<flag>" sets a world flag (story.js): {"set": {"world.cat_found": true}}
+ *   take     {"take": "lost cat"}: the player hands it over (story.js take);
+ *            "else": a step to go to when they don't carry it
+ *   if       also takes story.js conditions: "player has lost cat",
+ *            "player.gold >= 10", "world.cat_found", "me has rusty key",
+ *            "not ...", "... and ...", "... or ..." 
  *   goto/end "goto": "stepId", "end": true; "max": N visits, then "exit"
- * Templates: {{var}}, plus {{me}}, {{player}}, {{input}} (what started it).
+ * Templates: {{var}}, plus {{me}}, {{player}}, {{input}} (what started it),
+ * {{world.<flag>}}, {{player.gold}}, {{player.items}}, {{me.gold}}.
+ *
+ * Without a model ("brain": "none" worlds) a workflow of await, set, if, take
+ * and command steps runs as it is; prompt and choose steps need the model
+ * (choose takes its "default" without one). A workflow started from a menu
+ * (menus.js "workflow"), or spoken to while in one, goes on until it waits.
  *
  * Starting: the command workflow(name) / workflow(name, input) (allow
  * "workflow"), an agent's "workflow": "name" (runs from the start), or the
@@ -52,6 +64,7 @@
   const playerName = () => document.getElementById('chatName')?.value.trim() || 'the player';
 
   function render(tpl, vars, g) {
+    if (window.tablefolkStory) return window.tablefolkStory.render(tpl, { me: g, vars });
     return String(tpl ?? '').replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k) => {
       if (k === 'me') return g.id;
       if (k === 'player') return playerName();
@@ -156,20 +169,30 @@
         }
         if (s.set) {
           for (const [k, v] of Object.entries(s.set)) {
+            // world flags (story.js): shared with menus, the other characters and later workflows
+            if (/^world\./.test(k)) { window.tablefolkStory?.set(k, typeof v === 'string' ? render(v, wf.vars, g) : v); continue; }
             const expr = render(v, wf.vars, g), m = expr.match(/^\s*(-?\d+(?:\.\d+)?)\s*([+-])\s*(-?\d+(?:\.\d+)?)\s*$/);
             wf.vars[k] = m ? (m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]) : expr;
           }
           next(); continue;
         }
+        if (s.take != null) {
+          const ok = !!window.tablefolkStory?.take(g, render(s.take, wf.vars, g));
+          if (s.save) wf.vars[s.save] = ok ? 'yes' : 'no';
+          if (!ok && s.else != null) { wf.at = stepIndex(def, s.else); continue; }
+          next(); continue;
+        }
         if (s.if != null) {
-          const ok = test(render(s.if, wf.vars, g), wf.vars);
+          // story.js conditions (world flags, what people carry), and this run's own variables
+          const ok = window.tablefolkStory ? window.tablefolkStory.check(render(s.if, wf.vars, g), { me: g, vars: wf.vars }) : test(render(s.if, wf.vars, g), wf.vars);
           const to = ok ? s.then : s.else;
           wf.at = to != null ? stepIndex(def, to) : wf.at + 1;
           continue;
         }
         if (s.choose != null) {
           const options = Object.keys(s.options || {});
-          const pickd = parse(await ask(g, render(s.choose, wf.vars, g), 'choice', options), 'choice', options) || s.default || options[0];
+          const noModel = window.tablefolkBrainInfo?.()?.engine === 'none';
+          const pickd = (noModel ? null : parse(await ask(g, render(s.choose, wf.vars, g), 'choice', options), 'choice', options)) || s.default || options[0];
           if (s.save) wf.vars[s.save] = pickd;
           wf.at = stepIndex(def, s.options[pickd]);
           continue;

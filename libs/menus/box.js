@@ -98,6 +98,12 @@ export function createMenuBox({ parent = null, id = 'menuBox', matchOptions = ()
     if (cur !== c) return true;
     if (r.item) { log?.('matched', JSON.stringify(text), '->', r.item.id, 'by', r.by, r.score ?? ''); choose(c.menu.items.findIndex(i => i.id === r.item.id), 'words', text); return true; }
     if (c.menu.other) { finish({ other: true, text }); onOther?.(text, c.menu, c.ctx); return true; }
+    if (r.unsure?.length > 1) {
+      const nums = r.unsure.map(i => c.menu.items.findIndex(x => x.id === i.id) + 1);
+      c.sel = nums[0] - 1; mark();
+      hint(`did you mean ${r.unsure.map((i, k) => `${nums[k]}. "${i.label}"`).join(' or ')}? Press its number, or say it another way`);
+      return true;
+    }
     hint(`"${String(text).slice(0, 50)}" isn't one of these: pick one, or say it another way`);
     return true;
   }

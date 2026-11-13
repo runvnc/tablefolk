@@ -44,6 +44,8 @@ not listed there is dropped (agents and objects keep all their own fields).
   "generate": null,                // procedural dungeon or village (generated.md)
   "locked": [],                    // locked doors (things.md)
   "packs": [], "packages": [], "skills": [], "workflows": {},
+  "menus": {}, "flags": {}, "facts": {},   // characters.md (menus), story.md
+  "brain": "none",                         // optional: no language model (characters.md)
   "lore": [], "needs": true, "mind": true, "food": [],
   "live": false, "pace": "calm", "director": 5, "events": [],
   "goal": { "text": "Get the magic sword.", "win": { "player_has": "magic sword" } }
