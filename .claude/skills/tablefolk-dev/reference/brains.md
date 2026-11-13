@@ -626,6 +626,46 @@ With thinking the 27B split "60 for all three" into potions at 8 + 8 and
 the sword at 44. On the easier deciding tasks (haggle to 45, store the ring,
 fetch from the chest) with thinking: 27B 6/6 (run before the leak was fixed), E4B 5/6.
 
+**Round 2: Bonsai 2 on the newer engine, and Gemma 4 12B** (same day).
+The 9B's slowness was the engine: webml-community's newer kernel engine (the
+`qwen35-vision` module of the "Ternary Bonsai 2 Hermes WebGPU" Space,
+2026-10-15) runs Prism's own 9B GGUF (`Ternary-Bonsai-2-9B-PTQ1_0.gguf`,
+1.86 GB) at **107 tokens/s** writing and ~620 reading (7,705 tokens in 12 s,
+right answer), in 3.4 GB. The older engine our 27B used refused the 9B
+("com.xenova.BlockHadamard has no runnable variant"). `bonsai2.js` now runs
+both sizes on the new engine: real system messages, sampling, reasoning and
+answer as separate events; the 27B there: 37 tokens/s, 9.1 GB. The ONNX
+route (`bonsai9b.js`) is kept but no longer used.
+
+Wins of 12 (`evals/hard.txt` 8 + store the ring and fetch from the chest 4;
+chaos 50, so sampled, 2 runs each):
+
+| | no thinking | thinking |
+|---|---|---|
+| Gemma 4 E4B (round 1) | 7 | 8 |
+| Bonsai 2 9B | 5 | 9 |
+| Gemma 4 12B (LiteRT-LM web, 5.57 GB) | 7 | 9 |
+| Bonsai 2 27B | 8 | **12** |
+
+Without thinking the 9B talks well but forgets to act: it agrees and never
+calls `sell()`, takes 38 under a floor of 40, once wrote a broken command.
+Thinking fixes most of it. (The 27B's 7/8 on the hard set in round 1 was
+greedy; sampled at chaos 50 it dropped to 5/8 without thinking.)
+
+Everything at once (The Studio, light graphics, Breeze, Bark,
+EmbeddingGemma, the painter):
+
+| | Bonsai 2 9B | Gemma 4 12B | Bonsai 2 27B (round 1) |
+|---|---|---|---|
+| graphics memory, peak | **8.1 GB** | 11.7 GB | 11.4 GB |
+| where the rest runs | all on the GPU (Breeze first audio 0.2 s, Bark 0.8 s) | Bark and the painter on the processor | Breeze's encoder, Bark, the painter on the processor |
+| a turn with the voice | 2.5-3 s | 5-6.5 s | 8.5-9.5 s |
+| asked to paint | talked about it | painted (walk, face, paint) | painted |
+
+For 12 GB cards: the 9B with thinking is the easy fit (everything on the GPU,
+fast); the 27B is the smartest and still fits; Gemma 4 12B sits between them
+and leaves the least room.
+
 Ideas, next:
 - **The 9B's speed**: a 4-bit export, or newer ONNX Runtime WebGPU kernels
   for 2-bit `MatMulNBits` and `LinearAttention`.
