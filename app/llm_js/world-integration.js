@@ -1,9 +1,10 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113e';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261113d';
+import { installDevConsole } from './dev-console.js?v=20261113e';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
+import { hasBonsai9bCached, clearBonsai9bCache } from '../../libs/brain/engines/bonsai9b.js';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB } from '../../libs/device/index.js';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
@@ -281,6 +282,7 @@ async function clearActiveModelCache(manager) {
   const engine = getActiveEngine(manager);
   if (engine === 'openai' || engine === 'none') return;
   if (engine === 'bonsai2') return clearBonsai2Cache();
+  if (engine === 'bonsai9b') return clearBonsai9bCache();
   if (engine === 'litert-lm') return clearLiteRTCache(manager.getModelKey());
   if (engine === 'wllama') return clearWllamaCache(manager.getModelKey());
   if (engine === 'wllama3') return clearWllama3Cache(manager.getModelKey());
@@ -291,6 +293,7 @@ async function hasActiveModelCached(manager) {
   const engine = getActiveEngine(manager);
   if (engine === 'openai' || engine === 'none') return true; // nothing to download
   if (engine === 'bonsai2') return hasBonsai2Cached();
+  if (engine === 'bonsai9b') return hasBonsai9bCached();
   if (engine === 'lfm3') return hasLfm3Cached();
   if (engine === 'litert-lm') return hasLiteRTCached(manager.getModelKey());
   if (engine === 'wllama') return hasWllamaCached(manager.getModelKey());
