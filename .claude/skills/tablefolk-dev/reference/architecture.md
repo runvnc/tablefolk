@@ -40,7 +40,10 @@ agent, adapter info, `shader-f16`, limits, JSPI, cross-origin isolation, into
 `tablefolk-scene-ready`, once per version, key `tablefolk.browserWarned`; the
 compatibility screen's hint and "Detected:" line), then loads, one after another, the CDN libraries (pako, UPNG,
 html2canvas, Babylon.js, its loaders and Havok, unversioned from
-cdn.babylonjs.com) and the app's own scripts, each with a `?v=` version:
+cdn.babylonjs.com; local copies in `app/vendor/` first when
+`app/vendor/manifest.json` lists them, written by `tools/vendor-fetch.sh`,
+the CDN as fallback; `window.tablefolkVendorUrl(url)` maps a URL for later
+scripts, e.g. the `studio.env` environment texture) and the app's own scripts, each with a `?v=` version:
 
 ```
 note-svg recorder confirm-dialog toast sfx ui-polish tabs library packs

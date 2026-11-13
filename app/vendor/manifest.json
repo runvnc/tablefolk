@@ -1,0 +1,7 @@
+{
+  "fetched": "2026-11-13",
+  "babylon": "not vendored yet: run tools/vendor-fetch.sh",
+  "files": {
+    "https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako_deflate.min.js": "pako_deflate.min.js"
+  }
+}

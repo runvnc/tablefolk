@@ -49,7 +49,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261108a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261111d'],
+    ['app.js?v=20261112a'],
     ['scenery.js?v=20261108h'],
     ['combat.js?v=20261108a'],
     ['spells.js?v=20261108k'],
@@ -109,7 +109,28 @@
     if (screen) screen.hidden = false;
   }
 
-  function loadScript(src, type) {
+  // Local copies of the CDN libraries (tools/vendor-fetch.sh writes them and
+  // vendor/manifest.json, CDN URL -> file). A listed URL loads from vendor/
+  // first and falls back to the CDN; with no manifest everything comes from
+  // the CDN as before. window.tablefolkVendorUrl(url) gives the same mapping
+  // to later scripts (app.js's environment texture).
+  let vendorFiles = {};
+  window.tablefolkVendorUrl = url => vendorFiles[url] ? new URL('vendor/' + vendorFiles[url], location.href).href : url;
+  async function loadVendorManifest() {
+    try {
+      const r = await fetch('vendor/manifest.json', { cache: 'no-cache' });
+      if (r.ok) vendorFiles = (await r.json()).files || {};
+    } catch {}
+  }
+
+  async function loadScript(src, type) {
+    const local = window.tablefolkVendorUrl(src);
+    if (local === src) return loadScriptOnce(src, type);
+    try { return await loadScriptOnce(local, type); }
+    catch (e) { console.warn('[preflight] local copy failed, using the CDN:', local); return loadScriptOnce(src, type); }
+  }
+
+  function loadScriptOnce(src, type) {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
@@ -156,6 +177,7 @@
     document.body.classList.remove('tablefolk-preflight-pending');
     document.body.classList.add('tablefolk-compatible');
     try {
+      await loadVendorManifest();
       for (const [src, type] of scripts) await loadScript(src, type);
     } catch (error) {
       console.error('[character preflight] startup resource failed', error);

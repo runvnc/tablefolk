@@ -6089,7 +6089,7 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // spend a shadow map on a zero-intensity source.
   state.shadow=cornerShadow;
   // Neutral environment reflections give PBR clay broad shape cues without making it glossy.
-  const envTexture=BABYLON.CubeTexture.CreateFromPrefilteredData('https://assets.babylonjs.com/environments/studio.env',scene);
+  const envTexture=BABYLON.CubeTexture.CreateFromPrefilteredData((window.tablefolkVendorUrl||(u=>u))('https://assets.babylonjs.com/environments/studio.env'),scene);
   scene.environmentTexture=envTexture;
   scene.environmentIntensity=.10;
   // Tonemap + diorama grade (teal-lifted shadows, warm highlights). The old

@@ -53,6 +53,7 @@ node close.mjs                                         # always close it: it hol
 | `viewer.html`, `vshot.mjs` | look at one model file, screenshot it |
 | `itchdl.mjs` | download from itch.io through Chrome (the HTTP flow says "invalid key") |
 | `test-pack/` | a minimal asset pack and test scenarios (bodies, props, dungeon, village, two rooms) |
+| `cloud-shot.py <url> <out.png> [s]`, `cloud-gpucap.js` | screenshot on a machine with no GPU or display (a cloud VM): Playwright's Chromium on Mesa lavapipe, the 3D frame read from the GPU; needs `app/vendor/` when the CDNs are blocked (details in its header) |
 | `_*.mjs` | one-off scratch scripts from past sessions; not maintained |
 
 ## Evals (`tools/browser-test/evals/`)
@@ -124,6 +125,10 @@ per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
   `/app/?art=1#s=...` URL directly. Changing only the hash doesn't reload.
 - Headless page screenshots of the WebGPU canvas are black: read the canvas
   (`SHOT_CANVAS=1`, `agenttest --render`).
+- With no GPU (cloud VMs): Google Chrome and SwiftShader lose the WebGPU
+  device right after the adapter; Playwright's Chromium with lavapipe
+  works, and the canvas never reaches the page, so `cloud-shot.py` copies
+  the frame out after the app's submit.
 - After many reloads the test Chrome's GPU state can go bad: `<pad>` output,
   `QueueWorkDoneStatus` errors, or `Failed to send
   GpuControl.CreateCommandBuffer` and a hung page. Restart Chrome.

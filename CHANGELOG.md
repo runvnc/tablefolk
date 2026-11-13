@@ -4,6 +4,11 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-12
+
+- **Libraries from our own server**: `tools/vendor-fetch.sh` downloads Babylon.js, its loaders, Havok (and its wasm), the `studio.env` environment texture, pako, UPNG and html2canvas into `app/vendor/` with a manifest; the app loads those copies first and falls back to the CDNs. The app then runs where only our own server is reachable (cloud test machines), and the public site stops depending on Babylon's CDN. pako is vendored already; run the script once and commit `app/vendor/` for the rest.
+- **Screenshots with no GPU**: `tools/browser-test/cloud-shot.py` renders the app on a cloud VM (Playwright's Chromium on Mesa lavapipe) and reads the 3D frame from the GPU.
+
 ## 2026-11-11
 
 - **Downloads show on screen**: while Breeze TTS 2 or Underdog Bark (speech input) downloads or loads, a card under the top bar shows what it is doing with a progress bar, without opening the Voice pane (`app/load-status.js`).
