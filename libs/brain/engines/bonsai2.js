@@ -56,7 +56,16 @@ function patchMirrorHead() {
   };
 }
 
-export async function loadBonsai2(onStatus = () => {}, { context = CONTEXT } = {}) {
+// The window can also come from the page: ?bonsaictx=4096 (or localStorage
+// tablefolk_bonsai2_context): its KV cache is most of the memory beyond the 5.95 GB
+// of weights, so a smaller window leaves room for a voice beside it.
+const pageContext = () => {
+  let v = null;
+  try { v = new URLSearchParams(globalThis.location?.search || '').get('bonsaictx') || globalThis.localStorage?.getItem('tablefolk_bonsai2_context'); } catch {}
+  const n = Math.round(Number(v));
+  return n >= 1024 && n <= 32768 ? n : null;
+};
+export async function loadBonsai2(onStatus = () => {}, { context = pageContext() ?? CONTEXT } = {}) {
   patchMirrorHead();
   const { TernaryBonsai2 } = await bonsai2Module();
   // The engine caches by URL: a copy cached from Hugging Face stays there.
