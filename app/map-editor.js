@@ -46,13 +46,15 @@
   const PEOPLE = ['villager', 'peasant', 'peasant_woman', 'farmer', 'woodsman', 'huntress', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman', 'dwarf', 'elf', 'priest', 'guard', 'merchant'];
   const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy']);
   const OBJECT_GROUPS = [
-    ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note']],
+    ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note', 'gold_bars', 'crown', 'necklace', 'coin_pouch', 'crystals', 'book', 'open_book']],
+    ['Arms', ['sword', 'greatsword', 'dagger', 'spear', 'war_hammer', 'hunting_bow', 'shield', 'round_shield', 'leather_armor', 'plate_armor']],
     ['Light', ['torch', 'candelabra', 'candles', 'lantern', 'lamp', 'campfire', 'floor_lamp', 'crystal_ball', 'scrying_pool', 'rune_circle']],
     ['Furniture', ['table', 'bench', 'stool', 'wooden_chair', 'bed', 'double_bed', 'bookcase', 'bookshelf', 'cabinet', 'nightstand', 'desk', 'lectern', 'armchair', 'sofa', 'coffee_table', 'office_chair', 'plant']],
     ['Storage', ['barrel', 'crate', 'iron_crate', 'apple_barrel', 'apple_crate', 'carrot_crate', 'bucket', 'pot', 'vase', 'broken_pot', 'cauldron']],
     ['Work', ['anvil', 'workbench', 'weapon_stand', 'axe', 'pickaxe', 'rope', 'logs', 'dummy', 'target', 'cage', 'chains', 'wall_banner', 'banner']],
-    ['Outdoors', ['tree', 'boulder', 'flowers', 'grass_tuft', 'mushroom', 'pumpkin', 'fence', 'signpost', 'well', 'cart', 'broken_cart', 'tent', 'market_stand', 'market_stalls', 'statue', 'lily_pad']],
-    ['Buildings', ['house', 'fantasy_house', 'stable', 'windmill', 'bell_tower', 'watch_tower']],
+    ['Outdoors', ['tree', 'boulder', 'flowers', 'grass_tuft', 'mushroom', 'pumpkin', 'fence', 'signpost', 'well', 'cart', 'broken_cart', 'tent', 'market_stand', 'market_stalls', 'statue', 'lily_pad', 'fire_pit', 'log', 'hay', 'sacks', 'fence_section', 'farm_fence', 'backpack', 'shovel', 'scythe', 'frying_pan', 'bear_trap', 'skull', 'bone']],
+    ['Nature', ['pine_tree', 'tall_pine', 'oak_tree', 'tall_tree', 'autumn_tree', 'dead_tree', 'red_bush', 'flower_bush', 'fern', 'mushroom_cluster', 'shelf_fungus', 'mossy_rock', 'tall_grass', 'heather', 'flower_patch']],
+    ['Buildings', ['house', 'fantasy_house', 'stable', 'windmill', 'bell_tower', 'watch_tower', 'inn', 'stone_house', 'tall_house', 'mill_house', 'sawmill', 'blacksmith', 'barracks', 'gazebo', 'barn', 'big_barn', 'small_barn', 'open_barn', 'silo', 'silo_barn', 'chicken_coop', 'stone_windmill']],
   ];
   const GLYPHS = { '#': 'wall', '+': 'door', '~': 'water', ',': 'grass', ':': 'dirt', '^': 'stone', '&': 'lava', '=': 'wood', '_': 'oak',
     C: 'crate', B: 'barrel', M: 'mushroom', L: 'lamp', N: 'note', h: 'chest', w: 'workbench', t: 'table', n: 'bench', s: 'stool',
@@ -317,8 +319,9 @@
       edit(() => {
         if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z, ...(window.TablefolkProcgen?.WALK_IN?.[name] && keepModels() ? { keep: true } : {}) }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
         else {
-          const monster = kind === 'monsters' || MONSTERS.includes(name);
-          const a = { id: uniqueId(name.replace(/_(classic|warrior|farmer|woman)$/, '').replace(/_/g, '')), model: name, at: [x, z], ...(monster ? { hostile: true, style: nice(name) } : { style: nice(name), personality: '' }) };
+          // animals are peaceful and need no personality (play.js ANIMALS)
+          const animal = ANIMALS.includes(name), monster = !animal && (MONSTERS.includes(name) || (kind === 'monsters' && !PEOPLE.includes(name)));
+          const a = { id: uniqueId(name.replace(/_(classic|warrior|farmer|woman)$/, '').replace(/_/g, '')), model: name, at: [x, z], ...(monster ? { hostile: true, style: nice(name) } : animal ? { style: nice(name) } : { style: nice(name), personality: '' }) };
           L.agents.push(a); sel = { kind: 'agent', ref: a };
         }
         L.cells.delete(x + ',' + z);
@@ -353,8 +356,10 @@
         const extra = Object.keys(m.objects).filter(k => !known.has(k)).sort();
         return [...OBJECT_GROUPS, ...(extra.length ? [['More', extra]] : [])].map(([g, list]) => [g, list.filter(n => !query || n.includes(query))]).filter(g => g[1].length);
       }
-      const list = (tab === 'monsters' ? MONSTERS : PEOPLE).concat(tab === 'people' ? [] : Object.keys(m.characters).filter(k => !MONSTERS.includes(k) && !PEOPLE.includes(k)));
-      return [[tab === 'monsters' ? 'Monsters' : 'People', list.filter(n => !query || n.includes(query))]];
+      const match = n => !query || n.includes(query);
+      if (tab === 'people') return [['People', PEOPLE.filter(match)]];
+      const rest = Object.keys(m.characters).filter(k => !MONSTERS.includes(k) && !PEOPLE.includes(k) && !ANIMALS.includes(k));
+      return [['Monsters', MONSTERS.concat(rest).filter(match)], ['Animals', ANIMALS.filter(match)]].filter(g => g[1].length);
     }
     function renderPalette() {
       const box = $('.tfme-items'); if (!box) return;
@@ -366,7 +371,7 @@
     }
 
     // ---- inspector ----
-    const BODIES = () => [...MONSTERS, ...PEOPLE];
+    const BODIES = () => [...MONSTERS, ...PEOPLE, ...ANIMALS];
     function field(label, key, val, type = 'text', extra = '') {
       if (type === 'area') return `<label class="wide"><span>${label}</span><textarea data-k="${key}" rows="4">${esc(val)}</textarea></label>`;
       return `<label><span>${label}</span><input data-k="${key}" type="${type}" value="${esc(val ?? '')}" ${extra}></label>`;
