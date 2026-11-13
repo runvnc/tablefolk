@@ -94,6 +94,17 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
   return { model, queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
+// The answer without its reasoning. With thinking on, the chat template opens
+// <think> in the prompt, so the reply has only the closing tag: everything up to
+// the last </think> is reasoning, and without one (still thinking, or out of
+// tokens) there is no answer yet.
+export function answerOf(text, thinking) {
+  const t = String(text || '');
+  if (/<\/think>/.test(t)) return t.replace(/^[\s\S]*<\/think>/, '').trim();
+  if (thinking) return '';
+  return t.replace(/<think>[\s\S]*$/, '').trim();
+}
+
 const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
 
 // One turn at a time (the engine leases its single cache); it reuses the
@@ -113,11 +124,15 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
     }
     // thinking per call (the engine renders its chat template with these)
     engine.model.chatTemplateArgs = { ...engine.model.chatTemplateArgs, enable_thinking: !!opts.enableThinking };
-    let text = '';
+    // With thinking on, the engine's text leaves out the special </think> token:
+    // the reasoning ends at that token's id (as its demo page does).
+    const close = engine.model.thinkCloseTokenId;
+    let thinking = !!opts.enableThinking && close != null, text = '';
     for await (const c of engine.model.generate(messages, { maxNewTokens: opts.maxTokens || 256 })) {
-      if (c.delta) { text += c.delta; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart()); }
+      if (thinking) { if (c.token === close) thinking = false; continue; }
+      if (c.delta) { text += c.delta; opts.onToken?.(answerOf(text, false)); }
     }
-    return text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+    return answerOf(text, false);
   };
   const p = engine.queue.then(run, run); engine.queue = p.catch(() => {});
   return p;

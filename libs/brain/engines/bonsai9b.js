@@ -16,6 +16,7 @@
 //   const engine = await loadBonsai9b(status => ...);
 //   const text = await generateBonsai9b(engine, '', { messages, maxTokens, temperature, onToken });
 import { mirrorAllowed } from '../../models/index.js';
+import { answerOf } from './bonsai2.js';
 
 const TJS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1';
 const HF_ID = 'flackzz/Ternary-Bonsai-2-9B-ONNX-WebGPU', REV = 'f345d741d69a11b00b5bd7984d1954b36708d756';
@@ -82,8 +83,8 @@ export function generateBonsai9b(engine, _prompt, opts = {}) {
     const n = inputs.input_ids.dims[1];
     if (n > MAX_PROMPT) throw new Error(`Bonsai 2 9B reads at most ${MAX_PROMPT} tokens (this prompt has ${n})`);
     let text = '';
-    const streamer = new T.TextStreamer(tok, { skip_prompt: true, skip_special_tokens: true, callback_function: t => {
-      text += t; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart());
+    const streamer = new T.TextStreamer(tok, { skip_prompt: true, skip_special_tokens: false, callback_function: t => {
+      text += t.replace(/<\|[^|]*\|>/g, '');   // keeps </think>, drops <|im_end|> and the like opts.onToken?.(answerOf(text, opts.enableThinking));
     } });
     const t = opts.temperature ?? 0.7;
     const chunk = opts.chunk ?? CHUNK;
@@ -98,7 +99,7 @@ export function generateBonsai9b(engine, _prompt, opts = {}) {
         ...(t > 0 ? { do_sample: true, temperature: t, top_p: opts.topP ?? 0.95, top_k: opts.topK ?? 20 } : { do_sample: false }) });
       past = r.past_key_values;
     } finally { try { await past?.dispose?.(); } catch {} }
-    return text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+    return answerOf(text, opts.enableThinking);
   };
   const p = engine.queue.then(run, run); engine.queue = p.catch(() => {});
   return p;
