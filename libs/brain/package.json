@@ -1,6 +1,6 @@
 {
   "name": "@tablefolk/brain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A language model in the browser with one call: picks Gemma 4 (WebGPU), a tiny Qwen, Chrome's built-in model or an OpenAI-compatible server (OpenRouter sign-in included) for this device; chat, stream, pick, yes/no, JSON and a Prompt-API-shaped session.",
   "type": "module",
   "main": "index.js",
