@@ -98,7 +98,7 @@ programming: the same rules for everyone, worded by role and mood.
 
 ### 7. Where workflows fit
 
-Workflows (`app/workflows.js`) are the rails: a 2B model answers one narrow
+Workflows (`libs/script` run.js, through `app/story.js`) are the rails: a 2B model answers one narrow
 question at a time and code decides what happens next. They suit anything
 transactional with steps and rules (haggling, a quest hand-in, a riddle
 gate). Roles start them on cue, so an author gets reliable selling by

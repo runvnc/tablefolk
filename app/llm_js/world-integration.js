@@ -1300,11 +1300,9 @@ async function main() {
   // Run a character's workflow until it waits (for speech, for turns) or ends:
   // a workflow started from a menu goes on at once, with or without a model.
   world.driveWorkflow = async (agentId, maxSteps = 24) => {
-    const g = world.getAgents().find(a => a.id === agentId); if (!g) return;
-    for (let i = 0; i < maxSteps && window.tablefolkWorkflows?.active(g.id); i++) {
-      while (!world.isTurnReady()) await sleep(100);
-      if (!(await runOneAgentTurn(g))) break;
-    }
+    const g = world.getAgents().find(a => a.id === agentId); if (!g || !window.tablefolkWorkflows?.active(g.id)) return;
+    while (!world.isTurnReady()) await sleep(100);
+    await window.tablefolkWorkflows.drive(g.id);   // story.js: @tablefolk/script runs it until it waits
     while (!world.isTurnReady()) await sleep(100);
   };
   world.appendLog = appendLog;

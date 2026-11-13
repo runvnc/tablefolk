@@ -5,67 +5,364 @@
   "intro": "Mrs. Pell's grey cat Whiskers is missing. Walk up to a neighbour and press E: click a choice, press its number, or type or say what you mean. Hobb the baker keeps his pies for people the lane trusts.",
   "brain": "none",
   "seed": 3,
-  "size": [15, 11],
+  "size": [
+    15,
+    11
+  ],
   "floor": "grass",
-  "player": { "name": "Traveller", "gold": 10, "items": [], "at": [0, 3] },
-  "allowed": ["say", "give", "sell", "emote", "walk"],
-  "flags": { "cat_found": false, "riddle_solved": false },
+  "player": {
+    "name": "Traveller",
+    "gold": 10,
+    "items": [],
+    "at": [
+      0,
+      3
+    ]
+  },
+  "allowed": [
+    "say",
+    "give",
+    "sell",
+    "emote",
+    "walk"
+  ],
+  "flags": {
+    "cat_found": false,
+    "riddle_solved": false
+  },
   "facts": {
     "cat_found": "{{player}} found Mrs. Pell's lost cat Whiskers and brought her home: everyone on Willow Lane thinks well of {{player}} now.",
-    "riddle_solved": { "text": "{{player}} solved Hobb's kettle riddle.", "for": ["hobb"] }
+    "riddle_solved": {
+      "text": "{{player}} solved Hobb's kettle riddle.",
+      "for": [
+        "hobb"
+      ]
+    }
   },
   "agents": [
-    { "id": "pell", "style": "worried old lady", "at": [-5, -1],
+    {
+      "id": "pell",
+      "style": "worried old lady",
+      "at": [
+        -5,
+        -1
+      ],
       "personality": "Mrs. Pell, who has lost her grey cat Whiskers.",
-      "inventory": { "gold": 0, "items": ["silver locket"] },
-      "menu": [ { "if": "world.cat_found", "menu": "pell-happy" }, { "menu": "pell" } ] },
-    { "id": "bert", "style": "gruff gardener", "at": [5, -1],
+      "inventory": {
+        "gold": 0,
+        "items": [
+          "silver locket"
+        ]
+      },
+      "menu": [
+        {
+          "if": "world.cat_found",
+          "menu": "pell-happy"
+        },
+        {
+          "menu": "pell"
+        }
+      ]
+    },
+    {
+      "id": "bert",
+      "style": "gruff gardener",
+      "at": [
+        5,
+        -1
+      ],
       "personality": "Bert, a gardener who found a grey cat in his shed.",
-      "inventory": { "gold": 0, "items": ["lost cat"] },
-      "menu": "bert" },
-    { "id": "hobb", "style": "proud baker", "at": [0, -3],
+      "inventory": {
+        "gold": 0,
+        "items": [
+          "lost cat"
+        ]
+      },
+      "menu": "bert"
+    },
+    {
+      "id": "hobb",
+      "style": "proud baker",
+      "at": [
+        0,
+        -3
+      ],
       "personality": "Hobb the baker, who only sells to people the lane trusts.",
-      "inventory": { "gold": 0, "items": ["blackberry pie"] },
-      "menu": [ { "if": "world.cat_found", "menu": "hobb-friendly" }, { "menu": "hobb" } ] }
+      "inventory": {
+        "gold": 0,
+        "items": [
+          "blackberry pie"
+        ]
+      },
+      "menu": [
+        {
+          "if": "world.cat_found",
+          "menu": "hobb-friendly"
+        },
+        {
+          "menu": "hobb"
+        }
+      ]
+    }
   ],
   "menus": {
-    "pell": { "title": "Mrs. Pell", "text": "Oh dear, have you seen my Whiskers? A little grey cat.", "items": [
-      { "id": "cat", "label": "Here she is: I found Whiskers!", "say": "Here she is, I found Whiskers!", "take": "lost cat", "keywords": ["found", "here she is", "brought", "your cat"],
-        "set": { "cat_found": true }, "reply": "Whiskers! Oh, thank you, {{player}}! Please, take this.", "act": ["give(silver locket)"] },
-      { "id": "help", "label": "I'll look for her", "keywords": ["look", "search", "find her"], "reply": "Bless you. She likes sheds and warm places." },
-      { "id": "bye", "label": "Goodbye" } ] },
-    "pell-happy": { "title": "Mrs. Pell", "text": "Whiskers is purring by the fire, thanks to you.", "items": [
-      { "id": "how", "label": "How is Whiskers?", "reply": "Asleep in her basket. You're a dear, {{player}}." },
-      { "id": "bye", "label": "Goodbye" } ] },
-    "bert": { "title": "Bert", "text": "Hm? Mind the carrots.", "items": [
-      { "id": "cat", "label": "Have you seen a grey cat?", "keywords": ["cat", "whiskers"], "if": "bert has lost cat",
-        "reply": "Grey thing in my shed, eating my mice. Five gold and she's yours: I've been feeding her.", "menu": "bert-sell" },
-      { "id": "carrots", "label": "Nice carrots", "reply": "Best on the lane." },
-      { "id": "bye", "label": "Goodbye" } ] },
-    "bert-sell": { "title": "Bert", "text": "Five gold. Take it or leave it.", "items": [
-      { "id": "pay", "label": "Pay 5 gold for the cat", "if": "player.gold >= 5", "act": ["sell(\"lost cat\", 5)"] },
-      { "id": "broke", "label": "I don't have 5 gold", "if": "player.gold < 5", "reply": "Then she stays in the shed." },
-      { "id": "no", "label": "No deal", "reply": "Suit yourself." } ] },
-    "hobb": { "title": "Hobb the baker", "text": "Bakery's closed to strangers.", "items": [
-      { "id": "pie", "label": "Could I buy a pie?", "keywords": ["pie", "buy"], "reply": "Not to strangers. Folk on this lane look after each other." },
-      { "id": "riddle", "label": "Ask for a riddle", "workflow": "riddle" },
-      { "id": "bye", "label": "Goodbye" } ] },
-    "hobb-friendly": { "title": "Hobb the baker", "text": "You're the one who found Whiskers! Come in, come in.", "items": [
-      { "id": "pie", "label": "Could I have a pie?", "keywords": ["pie"], "if": "hobb has blackberry pie", "reply": "For you? On the house.", "act": ["give(blackberry pie)"] },
-      { "id": "riddle", "label": "Ask for a riddle", "workflow": "riddle" },
-      { "id": "bye", "label": "Goodbye" } ] }
+    "pell": {
+      "title": "Mrs. Pell",
+      "text": "Oh dear, have you seen my Whiskers? A little grey cat.",
+      "items": [
+        {
+          "id": "cat",
+          "label": "Here she is: I found Whiskers!",
+          "say": "Here she is, I found Whiskers!",
+          "take": "lost cat",
+          "keywords": [
+            "found",
+            "here she is",
+            "brought",
+            "your cat"
+          ],
+          "set": {
+            "cat_found": true
+          },
+          "reply": "Whiskers! Oh, thank you, {{player}}! Please, take this.",
+          "act": [
+            "give(silver locket)"
+          ]
+        },
+        {
+          "id": "help",
+          "label": "I'll look for her",
+          "keywords": [
+            "look",
+            "search",
+            "find her"
+          ],
+          "reply": "Bless you. She likes sheds and warm places."
+        },
+        {
+          "id": "bye",
+          "label": "Goodbye"
+        }
+      ]
+    },
+    "pell-happy": {
+      "title": "Mrs. Pell",
+      "text": "Whiskers is purring by the fire, thanks to you.",
+      "items": [
+        {
+          "id": "how",
+          "label": "How is Whiskers?",
+          "reply": "Asleep in her basket. You're a dear, {{player}}."
+        },
+        {
+          "id": "bye",
+          "label": "Goodbye"
+        }
+      ]
+    },
+    "bert": {
+      "title": "Bert",
+      "text": "Hm? Mind the carrots.",
+      "items": [
+        {
+          "id": "cat",
+          "label": "Have you seen a grey cat?",
+          "keywords": [
+            "cat",
+            "whiskers"
+          ],
+          "if": "bert has lost cat",
+          "reply": "Grey thing in my shed, eating my mice. Five gold and she's yours: I've been feeding her.",
+          "menu": "bert-sell"
+        },
+        {
+          "id": "carrots",
+          "label": "Nice carrots",
+          "reply": "Best on the lane."
+        },
+        {
+          "id": "bye",
+          "label": "Goodbye"
+        }
+      ]
+    },
+    "bert-sell": {
+      "title": "Bert",
+      "text": "Five gold. Take it or leave it.",
+      "items": [
+        {
+          "id": "pay",
+          "label": "Pay 5 gold for the cat",
+          "if": "player.gold >= 5",
+          "act": [
+            "sell(\"lost cat\", 5)"
+          ]
+        },
+        {
+          "id": "broke",
+          "label": "I don't have 5 gold",
+          "if": "player.gold < 5",
+          "reply": "Then she stays in the shed."
+        },
+        {
+          "id": "no",
+          "label": "No deal",
+          "reply": "Suit yourself."
+        }
+      ]
+    },
+    "hobb": {
+      "title": "Hobb the baker",
+      "text": "Bakery's closed to strangers.",
+      "items": [
+        {
+          "id": "pie",
+          "label": "Could I buy a pie?",
+          "keywords": [
+            "pie",
+            "buy"
+          ],
+          "reply": "Not to strangers. Folk on this lane look after each other."
+        },
+        {
+          "id": "riddle",
+          "label": "Ask for a riddle",
+          "workflow": "riddle"
+        },
+        {
+          "id": "bye",
+          "label": "Goodbye"
+        }
+      ]
+    },
+    "hobb-friendly": {
+      "title": "Hobb the baker",
+      "text": "You're the one who found Whiskers! Come in, come in.",
+      "items": [
+        {
+          "id": "pie",
+          "label": "Could I have a pie?",
+          "keywords": [
+            "pie"
+          ],
+          "if": "hobb has blackberry pie",
+          "reply": "For you? On the house.",
+          "act": [
+            "give(blackberry pie)"
+          ]
+        },
+        {
+          "id": "cake",
+          "label": "Order a cake",
+          "keywords": [
+            "cake",
+            "order"
+          ],
+          "start": "order"
+        },
+        {
+          "id": "riddle",
+          "label": "Ask for a riddle",
+          "workflow": "riddle"
+        },
+        {
+          "id": "bye",
+          "label": "Goodbye"
+        }
+      ]
+    },
+    "hobb-cakes": {
+      "title": "Hobb the baker",
+      "text": "Which cake? Plum or honey; say it however you like.",
+      "items": [
+        {
+          "id": "plum",
+          "label": "Plum cake"
+        },
+        {
+          "id": "honey",
+          "label": "Honey cake"
+        }
+      ]
+    }
   },
   "workflows": {
-    "riddle": { "description": "Hobb's riddle: three tries", "steps": [
-      { "if": "world.riddle_solved", "then": "again" },
-      { "command": "say(\"What has a spout, a lid and a whistle, and sings when it's hot?\")" },
-      { "id": "wait", "await": "speech", "save": "answer" },
-      { "if": "answer contains kettle", "then": "right" },
-      { "id": "wrong", "command": "say(\"No. Think again.\")", "goto": "wait", "max": 3, "exit": "giveup" },
-      { "id": "right", "set": { "world.riddle_solved": true } },
-      { "command": "say(\"A kettle! Clever, {{player}}.\")", "end": true },
-      { "id": "giveup", "command": "say(\"A kettle! Ha, got you.\")", "end": true },
-      { "id": "again", "command": "say(\"You've solved my riddle already.\")", "end": true } ] }
+    "riddle": {
+      "description": "Hobb's riddle: three tries",
+      "steps": [
+        {
+          "if": "world.riddle_solved",
+          "then": "again"
+        },
+        {
+          "command": "say(\"What has a spout, a lid and a whistle, and sings when it's hot?\")"
+        },
+        {
+          "id": "wait",
+          "await": "speech",
+          "save": "answer"
+        },
+        {
+          "if": "answer contains kettle",
+          "then": "right"
+        },
+        {
+          "id": "wrong",
+          "command": "say(\"No. Think again.\")",
+          "goto": "wait",
+          "max": 3,
+          "exit": "giveup"
+        },
+        {
+          "id": "right",
+          "set": {
+            "world.riddle_solved": true
+          }
+        },
+        {
+          "command": "say(\"A kettle! Clever, {{player}}.\")",
+          "end": true
+        },
+        {
+          "id": "giveup",
+          "command": "say(\"A kettle! Ha, got you.\")",
+          "end": true
+        },
+        {
+          "id": "again",
+          "command": "say(\"You've solved my riddle already.\")",
+          "end": true
+        }
+      ]
+    },
+    "order": {
+      "description": "take a cake order",
+      "steps": [
+        {
+          "id": "ask",
+          "menu": "hobb-cakes",
+          "save": "cake",
+          "other": "odd",
+          "closed": "nevermind"
+        },
+        {
+          "command": "say(\"One {{cake}} cake, ready by sundown.\")",
+          "end": true
+        },
+        {
+          "id": "odd",
+          "command": "say(\"{{cake}}? I only bake plum and honey.\")",
+          "goto": "ask",
+          "max": 2,
+          "exit": "nevermind"
+        },
+        {
+          "id": "nevermind",
+          "command": "say(\"Another time, then.\")",
+          "end": true
+        }
+      ]
+    }
   },
   "map": [
     "place house at northwest",
@@ -76,5 +373,22 @@
     "place lamp near hobb",
     "stone path from player to north"
   ],
-  "goal": { "text": "Get one of Hobb's blackberry pies.", "win": { "player_has": "blackberry pie" } }
+  "goal": {
+    "text": "Get one of Hobb's blackberry pies.",
+    "win": {
+      "player_has": "blackberry pie"
+    }
+  },
+  "triggers": [
+    {
+      "on": "flag",
+      "flag": "cat_found",
+      "to": true,
+      "as": "bert",
+      "once": true,
+      "do": {
+        "reply": "Heard Whiskers is home. Good. Mice were winning."
+      }
+    }
+  ]
 }

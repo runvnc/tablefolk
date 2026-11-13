@@ -552,6 +552,7 @@
       case 'all': return (v || []).every(x => evalCond(x, ctx));
       case 'any': return (v || []).some(x => evalCond(x, ctx));
       case 'not': return !evalCond(v, ctx);
+      case 'if': return !!window.tablefolkStory?.check(v);   // story.js conditions: { "if": "world.cat_found" }
       case 'player_has': { const [name, n = 1] = Array.isArray(v) ? v : [v]; return itemCount(ctx.player.items, name) >= n; }
       case 'player_gold': return cmp(v[0], ctx.player.gold || 0, +v[1]);
       case 'agent_has': { const cfg = ctx.w.getBrainConfig(v[0]); return itemCount(cfg.inventory?.items, v[1]) >= (v[2] ?? 1); }
@@ -929,6 +930,7 @@
       // story.js: flags (their starting values) and the facts everyone knows while one holds
       flags: s.flags && typeof s.flags === 'object' && !Array.isArray(s.flags) ? s.flags : {},
       facts: s.facts && typeof s.facts === 'object' && !Array.isArray(s.facts) ? s.facts : {},
+      triggers: Array.isArray(s.triggers) ? s.triggers.filter(t => t && t.on).slice(0, 64) : [],
       // "none": no language model (menus, workflows and scripted replies only)
       brain: s.brain === 'none' ? 'none' : null,
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
@@ -1043,7 +1045,7 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
-    window.tablefolkStory?.reset(scn.flags, scn.facts);   // story.js
+    window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
@@ -1163,7 +1165,11 @@
     w.inventoryChanged();
     w.saveWorldState();
     plan.warnings.unshift(...(scn.genWarnings || []), ...scn.gridWarnings, ...packageWarnings, ...roleWarnings, ...skillWarnings);
+    // the scripted parts checked (@tablefolk/script validate: bad conditions, missing steps and menus)
+    try { for (const x of window.tablefolkStory?.validate(scn) || []) plan.warnings.push(`${x.level}: ${x.where}: ${x.message}`); } catch (e) { console.warn('[script] validate', e); }
     if (opts.restore) await w.restoreWorldState(opts.restore);
+    // triggers "on": "start" (story.js), once the world stands
+    else if (!opts.sub && !opts.testing) setTimeout(() => window.tablefolkStory?.fire('start', {}), 0);
     if (!opts.testing) try { w.setCameraView?.(opts.sub || opts.restore ? prevView : startView(scn)); } catch (e) { console.warn('[view]', e); }
     const code = opts.code || await encodeScenario(base);
     if (opts.sub) world = { base, scn, links: scn.links };
@@ -1385,6 +1391,7 @@
       ...(active?.scn?.menus && Object.keys(active.scn.menus).length ? { menus: active.scn.menus } : {}),
       ...(active?.scn?.flags && Object.keys(active.scn.flags).length ? { flags: active.scn.flags } : {}),
       ...(active?.scn?.facts && Object.keys(active.scn.facts).length ? { facts: active.scn.facts } : {}),
+      ...(active?.scn?.triggers?.length ? { triggers: active.scn.triggers } : {}),
       ...(active?.scn?.brain ? { brain: active.scn.brain } : {}),
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);

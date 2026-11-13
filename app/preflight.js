@@ -73,18 +73,17 @@
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261113a'],
     ['online-brain.js?v=20261112b'],
-    ['menus.js?v=20261113e', 'module'],
-    ['story.js?v=20261113c'],
-    ['workflows.js?v=20261113b'],
+    ['menus.js?v=20261113h', 'module'],
+    ['story.js?v=20261113e', 'module'],
     ['skills.js?v=20261025a'],
     ['trade.js?v=20261024c'],
     ['procgen.js?v=20261025c'],
-    ['scenario.js?v=20261113a'],
+    ['scenario.js?v=20261113b'],
     ['registry.js?v=20261024a'],
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261113g', 'module'],
+    ['llm_js/world-integration.js?v=20261113h', 'module'],
   ];
 
   function browserSummary() {

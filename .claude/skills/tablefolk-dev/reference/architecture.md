@@ -43,6 +43,7 @@ use, the rules and publishing, and each folder has its own README.
 | `decider` | the Strands Decider (was `app/llm_js/decider.js`) | not used by the game yet |
 | `voice` | the speech workers (Pocket 18M, Pocket 100M, Breeze web + its wasm, the PCM worklet; were in `app/tts/`), `createVoice()`, `chooseEngine()` | `app/tts/pocket-tts-manager.js` starts the workers from `/libs/voice/` and sends `mirror` in `load` |
 | `hear` | the Bark worker and `mel.js` (were `app/asr/`), `createListener()` | `app/speech-input.js` starts `/libs/hear/bark-worker.js` |
+| `script` | conditions (a tokenizer), state, actions, the workflow runner (menu steps, choosers, pause, step-id saves), triggers, `validate`; `test.mjs` runs headless in Node | `app/story.js` (host and `tablefolkStory`/`tablefolkWorkflows`), `app/menus.js` (choices), `scenario.js` (goals `if`, load warnings), `server/worldgen-core.js` (generator checks) |
 | `menus` | `match()`, `modelChooser()`, `createMenuBox()` and its look | `app/menus.js` (now a module): scenario menus by id, say/do/menu, `window.tablefolkMenu` |
 
 Libraries are imported without `?v=` (served with `Cache-Control: no-cache`)
@@ -107,10 +108,10 @@ scenario.js, the tests and packages use.
 | `senses.js` | what characters perceive, in words ("Around you", places, `look()`) |
 | `mind.js` | mood, needs, memory, goals, opinions, the state card, who gets a turn |
 | `embed.js`, `embed-worker.js` | EmbeddingGemma 2 recall |
-| `roles.js`, `trade.js`, `skills.js`, `packages.js`, `workflows.js`, `registry.js` | roles, selling rules, skills, packages, workflows, the Library pane's search |
+| `roles.js`, `trade.js`, `skills.js`, `packages.js`, `registry.js` | roles, selling rules, skills, packages, the Library pane's search |
 | `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
 | `menus.js` | JRPG-style menus (`tablefolkMenu`): a character's `menu` on E, the scenario's `menus`; words from the chat box or the 🎤 matched to a choice (number, label, keyword, shared words, EmbeddingGemma when its best is 0.74+ and 0.06 ahead, then the brain picks a number greedily: 12/12 paraphrase and none-of-these cases with Gemma E2B, 2026-11-12); `pick()` lets the brain choose from any list; scripted choices (`reply`, `act` through `world.runAs`, `set`, `take`, `workflow` through `world.driveWorkflow`), `if` conditions and lists of menus (2026-11-13) |
-| `story.js` | world flags (`state.flags`, saved), `facts` known while a flag holds (mind.js puts them first in "You know:"), conditions (`world.x`, `player has x`, `player.gold >= n`, `me has x`, and/or/not) for menus and workflows, `take()` from the player (`tablefolkStory`) |
+| `story.js` | the game's host for `@tablefolk/script` (libs/script), a module: flags in `state.flags` (saved), runs in each brain config's `wf` (by step id, version 2), facts for mind.js, conditions, actions, the workflow runner (`tablefolkWorkflows`: start, turn, drive, pause, resume), triggers (`start` fired by scenario.js), `validate` (load warnings; the world generator's checks). A menu choice's sale counts as the player's agreement; a workflow's does not. Replaces `workflows.js` (2026-11-13) |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
 | `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |

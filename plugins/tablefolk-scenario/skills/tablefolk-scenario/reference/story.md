@@ -1,6 +1,6 @@
 # Story state: flags, facts, inventory checks
 
-`app/story.js`. A world keeps **flags**, small named values (found the cat,
+`app/story.js` (the game's host for `@tablefolk/script`, `libs/script`). A world keeps **flags**, small named values (found the cat,
 paid the toll, favours done) that menus, workflows and the characters share.
 They are saved with the world.
 
@@ -41,9 +41,36 @@ Used by a choice's `if`, a character's list of menus, and a workflow's `if`:
 | `player.gold >= 10` | the player's gold |
 | `me has rusty key`, `me.gold > 5` | the character the menu or workflow belongs to |
 | `bert has lost cat` | any character, by id |
-| `... and ...`, `... or ...` | both / either (`and` binds first) |
+| `... and ...`, `... or ...` | both / either (`and` binds first); brackets group: `(a or b) and c` |
+| `player has "bread and butter"` | quote a name that contains and/or |
 
-Items match loosely: `player has cat` finds "lost cat".
+Items match whole words: `player has cat` finds "lost cat", but `player has
+key` does not find "keyring". A condition that doesn't parse is reported when
+the world loads (and the world builder sends it back to its model to fix).
+Goals take conditions too: `"win": { "if": "world.cat_found and player has silver locket" }`.
+
+## Triggers
+
+Things that happen by themselves when the story moves:
+
+```json
+"triggers": [
+  { "on": "flag", "flag": "cat_found", "to": true, "as": "bert", "once": true, "do": { "reply": "Heard Whiskers is home." } },
+  { "on": "given", "who": "pell", "item": "lost cat", "do": { "set": { "cat_found": true } } },
+  { "on": "start", "as": "hobb", "do": { "start": "open_shop" } }
+]
+```
+
+| `on` | when |
+|---|---|
+| `flag` | a flag changed (`"to"`: only to that value) |
+| `given` | the player handed a character an item (`"who"`, `"item"` narrow it) |
+| `start` | the world began |
+
+`"as"` is the character the actions run as, `"if"` a condition, `"once"`
+at most once per world. `"do"` takes the same actions as a menu choice
+(characters.md), `start` included. A trigger set off while another runs is
+skipped, so triggers can't loop.
 
 ## Moving things
 

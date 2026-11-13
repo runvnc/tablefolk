@@ -13,6 +13,7 @@
 //   worldPage(url, opts)           the /world/ page (builder or loading view), HTML
 import { deflateRawSync } from 'node:zlib';
 import '../app/procgen.js';
+import { validate as validateScript } from '../libs/script/validate.js';
 const Procgen = globalThis.TablefolkProcgen;
 
 export function encodeScenario(obj) {
@@ -102,6 +103,8 @@ export function checkScenario(s, packVoices = []) {
     for (const d of digits) if (+d > ids.length && !(s.legend || {})[d]) problems.push(`"grid": digit ${d} but only ${ids.length} agents (digits are agents in order)`);
   }
   if (s.map && !Array.isArray(s.map)) problems.push('"map" must be a list of lines');
+  // menus, workflows, triggers, conditions (@tablefolk/script): errors go back to the model to fix
+  try { for (const x of validateScript(s)) if (x.level === 'error') problems.push(`${x.where}: ${x.message}`); } catch (e) { problems.push('scripted parts: ' + e.message); }
   // goal ids
   const walk = n => {
     if (Array.isArray(n)) return n.forEach(walk);

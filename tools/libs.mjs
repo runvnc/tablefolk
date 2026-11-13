@@ -37,7 +37,8 @@ function check() {
   for (const n of names()) {
     const p = pkg(n), mine = new Set(deps(n));
     if (p.name !== SCOPE + n) say(join(LIBS, n, 'package.json'), `name should be ${SCOPE}${n}`);
-    for (const f of walk(join(LIBS, n)).filter(f => /\.m?js$/.test(f))) {
+    // test.mjs runs in Node (node:fs, the repository's scenarios): not checked, not published
+    for (const f of walk(join(LIBS, n)).filter(f => /\.m?js$/.test(f) && !/(^|\/)test\.mjs$/.test(f))) {
       // without comments (their examples import the packages by name)
       const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
       for (let s of specs(src)) {
@@ -71,7 +72,7 @@ function build(list) {
   for (const n of list) {
     const src = join(LIBS, n), out = join(DIST, n), p = pkg(n);
     rmSync(out, { recursive: true, force: true });
-    for (const f of walk(src)) {
+    for (const f of walk(src).filter(f => !/(^|\/)test\.mjs$/.test(f))) {
       const rel = relative(src, f), dest = join(out, rel);
       mkdirSync(dirname(dest), { recursive: true });
       if (/\.m?js$/.test(f)) {

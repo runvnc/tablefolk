@@ -156,7 +156,8 @@ A choice can also do things itself, with no model involved:
 | `act` | command lines the character runs (a string or a list): `"give(silver locket)"`, `"sell(\"lost cat\", 5)"` (picking it is the player agreeing to the price), `"walk(well)"`, `"emote(dance)"` |
 | `set` | world flags: `{"cat_found": true, "favours": "+1"}` ([story.md](story.md)) |
 | `take` | the player hands this item to the character; the choice only shows while the player carries it |
-| `workflow` | starts one of the scenario's workflows on the character, run until it waits ([workflows.md](workflows.md)) |
+| `give` | the character hands the player this item |
+| `start` (or `workflow`) | starts one of the scenario's workflows on the character, run until it waits ([workflows.md](workflows.md)); `stop: true` ends its workflow |
 | `if` | the choice only shows when this holds: `"world.cat_found"`, `"player has lost cat"`, `"player.gold >= 5"`, `"me has blackberry pie"`, `"not world.paid"`, `"... and ..."`, `"... or ..."` |
 
 A choice with `reply`, `act`, `set`, `take` or `workflow` is scripted: the

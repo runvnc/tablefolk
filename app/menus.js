@@ -30,7 +30,8 @@
  *   item.act       command lines the character runs: "give(rusty key)",
  *                  "sell(\"bread\", 3)", "walk(well)", "emote(dance)" (a string or a list)
  *   item.workflow  starts one of the scenario's workflows on the character
- *                  (workflows.js), run until it waits
+ *                  (story.js, @tablefolk/script), run until it waits (also "start");
+ *                  item.give: the character hands the player an item; item.stop: ends its workflow
  *   With reply/act/set/take/workflow the choice is scripted: the player's
  *   line (item.say) is shown but the model is not asked; without them it is
  *   sent to the character as before. Order: take, set, say, reply, act,
@@ -61,21 +62,16 @@ import { match as libMatch, modelChooser, createMenuBox } from '../libs/menus/in
 const $ = id => document.getElementById(id);
 const log = (...a) => console.info('[menu]', ...a);
 
-// a scenario's menus by id; a list: the first whose "if" holds (story.js);
-// items whose "if" fails (or that take what the player lacks) are left out
+// a scenario's menus by id; a list: the first whose "if" holds; choices whose
+// "if" fails (or that take what the player lacks) are left out
+// (@tablefolk/script pickMenu / visibleMenu through story.js)
 const scnMenus = () => window.tablefolkScenario?.active?.scn?.menus || {};
 const S = () => window.tablefolkStory;
-const holds = (cond, me) => !S() || S().check(cond, { me });
-const tpl = (t, me) => S() ? S().render(t, { me }) : String(t ?? '');
 function resolve(menu, me = null) {
-  if (Array.isArray(menu)) { const hit = menu.find(m => m && holds(m.if, me)); return hit ? resolve(hit.menu ?? hit, me) : null; }
-  if (typeof menu === 'string') menu = scnMenus()[menu] && { id: menu, ...scnMenus()[menu] };
-  if (!menu || !Array.isArray(menu.items)) return menu || null;
-  const items = menu.items.filter(i => i && holds(i.if, me) && (!i.take || S()?.hasItem('player', i.take, me) !== false))
-    .map(i => ({ ...i, label: tpl(i.label || i.say, me), ...(i.say ? { say: tpl(i.say, me) } : {}) }));
-  return { ...menu, title: menu.title && tpl(menu.title, me), text: menu.text && tpl(menu.text, me), items };
+  if (!S()) return typeof menu === 'string' ? (scnMenus()[menu] && { id: menu, ...scnMenus()[menu] }) : menu;
+  return S().visibleMenu(S().pickMenu(menu, me), me);
 }
-const scripted = i => i.reply != null || i.act != null || i.set != null || i.take != null || i.workflow != null;
+const scripted = i => i.reply != null || i.act != null || i.set != null || i.take != null || i.workflow != null || i.start != null || i.give != null || i.stop != null;
 
 // the characters' model, when it is loaded
 const brainReady = () => /ready/i.test($('brainStatus')?.textContent || '') && !!window.tablefolkLLM && window.tablefolkBrainInfo?.()?.engine !== 'none';
@@ -100,49 +96,51 @@ const fire = detail => { try { window.dispatchEvent(new CustomEvent('tablefolk-m
 const box = createMenuBox({
   styles: true, log, matchOptions,
   onOpen: (menu) => window.tablefolkDiag?.note?.('menu', `opened ${menu.id || menu.title || 'a menu'} (${menu.items.length} choices)`),
-  onChoose(item, { menu, how, text, agentId }) {
+  onChoose(item, { menu, how, text, agentId, flow }) {
     fire({ menu, item, agentId, how, text });
     window.tablefolkDiag?.note?.('menu', `${menu.id || 'menu'}: ${item.id} (${how}${text ? ': "' + String(text).slice(0, 60) + '"' : ''})`);
+    // a workflow's menu step: the workflow does the choice's actions and branches
+    if (flow) return;
     perform(item, agentId).catch(e => console.warn('[menu] choice failed', e));
   },
-  onOther(text, menu, { agentId }) {
+  onOther(text, menu, { agentId, flow }) {
     fire({ menu, item: null, agentId, how: 'other', text });
-    sendLine((agentId ? '@' + agentId + ' ' : '') + text);
+    if (!flow) sendLine((agentId ? '@' + agentId + ' ' : '') + text);
   },
 });
 
-// what a choice does (the order is in the header)
+// what a choice does (the order is in the header; @tablefolk/script perform)
 async function perform(item, agentId) {
-  const W = window.tablefolk, player = $('chatName')?.value.trim() || 'the player';
   const leaving = /^(bye|leave|close|exit|goodbye)$/i.test(item.id) && !item.say && !item.do && !item.menu && !scripted(item);
-  if (item.do) sendLine(String(item.do));
-  else if (scripted(item)) {
-    if (item.take && !S()?.take(agentId, item.take)) { window.tablefolkToast?.(`you don't have ${item.take}`, { type: 'error' }); return; }
-    for (const [k, v] of Object.entries(item.set || {})) S()?.set(k, typeof v === 'string' ? tpl(v, agentId) : v);
-    if (item.say) W?.appendLog?.(`${player} -> ${agentId || 'everyone'}: ${item.say}`);
-    const lines = [...(item.reply != null ? [`say("${tpl(item.reply, agentId).replace(/"/g, "'")}")`] : []), ...[].concat(item.act ?? []).map(l => tpl(l, agentId))];
-    for (const line of lines) {
-      if (!agentId || !W?.runAs) break;
-      // picking a choice that sells is the player agreeing to that price (trade.js consent)
-      const c = W.parseLLMCommandLine?.(line), g = W.getAgents?.().find(a => a.id === agentId);
-      if (c?.kind === 'sell' && g) {
-        const inv = W.getBrainConfig(agentId).inventory || {}, want = String(c.item || '').toLowerCase();
-        const stock = (inv.items || []).map(i => typeof i === 'string' ? i : i.name).find(n => n.toLowerCase() === want || n.toLowerCase().includes(want) || want.includes(n.toLowerCase()));
-        (g._shop ||= {}).accept = { item: stock || c.item, price: Math.round(Number(c.price)) };
-      }
-      await W.runAs(agentId, line);
-    }
-    if (item.workflow && agentId && window.tablefolkWorkflows?.start(agentId, String(item.workflow), item.say || item.label)) await W?.driveWorkflow?.(agentId);
+  if (item.do && typeof item.do === 'string') sendLine(String(item.do));
+  else if (scripted(item) && S()) {
+    const r = await S().perform(item, agentId);
+    if (r?.ok === false && r.missing) { window.tablefolkToast?.(`you don't have ${r.missing}`, { type: 'error' }); return; }
+    if (r?.started && agentId) await window.tablefolkWorkflows?.drive(agentId);
   }
   else if (!leaving && (item.say || !item.menu)) sendLine((agentId ? '@' + agentId + ' ' : '') + (item.say || item.label));
   if (item.menu) setTimeout(() => open(item.menu, { agentId }), 50);
 }
 
+// opts.flow: a workflow's menu step (story.js): the workflow does the rest.
+// Otherwise a menu on a character in the middle of a workflow pauses it: the
+// menu's words are not heard by it, and it goes on after the menu closes.
 function open(menuIn, opts = {}) {
   const menu = resolve(menuIn, opts.agentId || null);
-  if (!menu) { console.warn('[menu] no such menu', menuIn); return Promise.resolve(null); }
-  const agentId = opts.agentId || menu.agentId || null;
-  return box.open(menu, { agentId, title: agentId || '' });
+  if (!menu || !menu.items?.length) { console.warn('[menu] no such menu (or no choice shows)', menuIn); return Promise.resolve(null); }
+  const agentId = opts.agentId || menu.agentId || null, WF = window.tablefolkWorkflows;
+  // a workflow's menu: words that fit no choice go back to it (its "other" step, or it asks again)
+  const shown = box.open(opts.flow ? { ...menu, other: true } : menu, { agentId, title: agentId || '', flow: !!opts.flow });
+  if (opts.flow || !agentId || !WF?.active(agentId)) return shown;
+  WF.pause(agentId);
+  const W = window.tablefolk, heard = (W.getBrainConfig(agentId).pendingChat || []).length;
+  return shown.then(async r => {
+    // the choice's actions start first (onChoose), then what the menu said is dropped
+    await new Promise(res => setTimeout(res, 50));
+    const cfg = W.getBrainConfig(agentId); if (cfg.pendingChat?.length > heard) W.setBrainConfig(agentId, { pendingChat: cfg.pendingChat.slice(0, heard) });
+    WF.resume(agentId);
+    return r;
+  });
 }
 
 window.tablefolkMenu = {

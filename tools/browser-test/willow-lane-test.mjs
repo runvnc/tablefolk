@@ -56,6 +56,8 @@ const out = await page.evaluate(async () => {
   ok('flag set', S.get('cat_found') === true);
   ok('reward given', items().includes('silver locket'), `items ${items()}`);
   ok('pell: menu changes with the flag', /purring/.test(M.resolve(menuOf('pell'), 'pell')?.text || ''));
+  await sleep(600);
+  ok('trigger: bert hears the cat is home', /Whiskers is home/.test(said('bert')), said('bert'));
   const card = (window.tablefolkMind.cardLines?.(agent('hobb')) || []).join(' ');
   ok('hobb knows (a fact for the model)', /found Mrs\. Pell's lost cat/.test(card), card.slice(0, 160));
 
@@ -64,6 +66,15 @@ const out = await page.evaluate(async () => {
   ok('hobb friendly menu', shown.some(t => /Could I have a pie/.test(t)), shown.join(' | '));
   ok('hobb gives the pie', items().includes('blackberry pie'), `items ${items()}`);
   ok('pie choice gone once given (hobb lacks it)', !(M.resolve(menuOf('hobb'), 'hobb').items.some(i => i.id === 'pie')));
+
+  // a workflow with a menu step: the player picks by words; words that fit none branch, then the menu asks again
+  await talk('hobb', 'I want to order a cake');
+  await sleep(300);
+  ok('flow opens its menu', /Which cake/.test(document.querySelector('#menuBox .menu-text')?.textContent || ''), document.querySelector('#menuBox .menu-text')?.textContent);
+  await M.offer('can you fix my roof'); await settle(); await sleep(300);
+  ok('flow: words that fit none branch to "other"', /fix my roof\? I only bake/.test(said('hobb')) && !!M.active, said('hobb'));
+  await M.offer('the honey one please'); await settle();
+  ok('flow: a choice continues it', /One honey cake/.test(said('hobb')) && !window.tablefolkWorkflows.active('hobb'), said('hobb'));
 
   // the riddle workflow: answers typed in the chat box
   await talk('hobb', 'ask me a riddle');

@@ -12,6 +12,7 @@ to npm as its own package.
 | [`@tablefolk/decider`](decider/) | the Strands Decider (2B): one of a list, or yes/no, with calibrated probabilities | – |
 | [`@tablefolk/voice`](voice/) | text to speech: Pocket-TTS (small, CPU), Breeze TTS 2 (WebGPU), or the browser's own | models, device |
 | [`@tablefolk/hear`](hear/) | speech to text: Underdog Bark 3.0 (WebGPU or CPU) or the browser's SpeechRecognition | models, device |
+| [`@tablefolk/script`](script/) | scripted stories: flags and facts, one condition language, actions, a workflow runner (menus as steps), triggers, a validator; no DOM, runs in Node too | – |
 | [`@tablefolk/menus`](menus/) | JRPG-style menus: click, press a number, type or say a choice; words matched by number, label, keyword, meaning or a model | – |
 
 ## Using them

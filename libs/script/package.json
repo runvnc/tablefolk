@@ -1,0 +1,32 @@
+{
+  "name": "@tablefolk/script",
+  "version": "0.1.0",
+  "description": "Scripted stories for games and chat apps: world flags and facts, one condition language, actions, a step runner for workflows (menus as steps the player answers), triggers, and a validator. No DOM; runs in the browser and Node.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/script"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/script",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "dialogue",
+    "workflow",
+    "interactive-fiction",
+    "game",
+    "rpg",
+    "llm"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}

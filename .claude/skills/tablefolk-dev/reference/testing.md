@@ -156,6 +156,9 @@ transcribed word for word by Bark).
 
 ## Scripted worlds
 
+`node libs/script/test.mjs`: 35 checks in Node, no browser (the expression
+language, Willow Lane played with an in-memory host, old saves, pausing, menu
+steps, triggers, `validate` over every scenario). Then, in the game:
 `willow-lane-test.mjs` plays `scenarios/willow-lane.json` (`"brain": "none"`)
 through its menus, flags, inventory conditions and riddle workflow (23
 checks; load `http://localhost:8001/willow-lane` in the test Chrome first,

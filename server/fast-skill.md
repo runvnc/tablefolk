@@ -113,7 +113,11 @@ keywords. "flags": {"cat_found": false} sets starting values; "facts":
 {"cat_found": "The player found Mrs. Pell's cat."} is known to every character
 while the flag holds. "brain": "none" makes a world with no language model:
 then every choice needs reply/act, and characters act only through menus
-and workflows (await, if, set, take, command steps).
+and workflows (await, if, set, take, command, menu steps).
+"triggers": [{"on": "flag", "flag": "cat_found", "to": true, "as": "bert", "do": {"reply": "..."}}]
+runs actions when a flag changes ("on": "given" when the player hands someone
+an item, "start" at the beginning). Conditions: quote item names with and/or
+("player has \"bread and butter\""); brackets group.
 
 Skills: "skills": ["magic"] at the top, then on an agent "skills": ["magic"],
 "skillParams": {"magic": {"spells": ["spark", "fireball", "heal"]}}. Built in:

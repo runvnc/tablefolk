@@ -1,6 +1,6 @@
 # Workflows: keeping small models on track
 
-`app/workflows.js` (its header comment is the full reference). A workflow
+`@tablefolk/script` (`libs/script`, its README and `run.js` header are the full reference), run in the game by `app/story.js`. A workflow
 breaks a task into steps; the character's model only answers one narrow
 question at a time, and the steps decide what happens next. They suit
 anything transactional with steps and rules (haggling, a quest hand-in, a
@@ -40,6 +40,13 @@ character can start one itself (`workflow(haggle, 30)`; `"workflows":
 | `await` | `"speech"` (the next words or event addressed to it) or `"turns"` with `"turns": N` |
 | `set` | `{"set": {"tries": "{{tries}}+1"}}`; `"world.<flag>"` sets a world flag: `{"set": {"world.riddle_solved": true}}` |
 | `take` | `{"take": "lost cat"}`: the player hands it over; `"else": "step"` when they don't carry it; `save` gets yes/no |
+| `menu` | `{"menu": "hobb-cakes", "save": "cake", "options": {"plum": "s1"}, "then": "s2", "other": "odd", "closed": "bye"}`: the player picks from a menu (`menus`); the choice's id is saved and branches by `options` (else `then`, else the next step); words that fit no choice are saved and go to `other` (else the menu asks again); closing it goes to `closed` (else the workflow ends) |
+| `do` | `{"do": {"reply": "...", "act": ["give(pie)"], "set": {...}}}`: a menu choice's actions (characters.md) |
+
+`choose` takes `"by"`: who answers, in order, `["decider", "model",
+"default"]` (the default order; the Decider only when one is loaded, and only
+when it is sure enough, `"min"`: 0.5). `"by": "default"` answers at once
+with `"default"`.
 
 `if` takes the run's own variables and every world condition
 ([story.md](story.md)): `"world.cat_found"`, `"player has lost cat"`,
@@ -53,7 +60,14 @@ passes). Templates: `{{var}}`, `{{me}}`, `{{player}}`, `{{input}}`,
 
 - On an agent: `"workflow": "haggle"` (runs from the start).
 - The `workflow` command: the character starts one itself.
-- A menu choice: `"workflow": "riddle"` ([characters.md](characters.md)).
+- A menu choice: `"start": "riddle"` (or `"workflow"`) ([characters.md](characters.md)).
+- A trigger ([story.md](story.md)).
+
+A saved world keeps each run at its step's `id`: give steps ids, and edits
+that add or move steps leave saved runs where they were. A menu opened on a
+character in the middle of a workflow pauses it; the menu's words are not
+heard by it, and it goes on when the menu closes. One workflow per
+character: starting another replaces it.
 
 A workflow started from a menu, or spoken to while it waits for speech,
 goes on until it waits again (an `await`, or its end). Otherwise each
@@ -79,7 +93,7 @@ and `choose` takes its `"default"` without one. A riddle gate with no model:
   { "id": "again", "command": "say(\"You've solved my riddle already.\")", "end": true } ] }
 ```
 
-Tested (2026-11-13, `tools/browser-test/willow-lane-test.mjs`): a wrong
+Tested (2026-11-13: `node libs/script/test.mjs` without a browser, and `tools/browser-test/willow-lane-test.mjs` in the game): a wrong
 answer, the right one setting the flag, and the flag checked on the next
 run.
 
