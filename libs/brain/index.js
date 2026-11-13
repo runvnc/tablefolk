@@ -39,7 +39,8 @@ export const MODELS = {
   'gemma4-e4b': { engine: 'litert', id: 'gemma4-e4b-litert', label: 'Gemma 4 E4B', size: '3 GB', needGB: 6, readGB: 2.3 },
   'gemma4-e2b-vision': { engine: 'litert', id: 'gemma4-e2b-vision', label: 'Gemma 4 E2B with sight', size: '2.6 GB', vision: true, hidden: true },
   'bonsai2-27b': { engine: 'bonsai2', id: 'bonsai2-27b', label: 'Bonsai 2 27B', size: '5.9 GB', needGB: 10, readGB: 5.9 },
-  'bonsai2-9b': { engine: 'bonsai9b', id: 'bonsai2-9b', label: 'Bonsai 2 9B', size: '2.7 GB', needGB: 6, readGB: 2.7 },
+  'gemma4-12b': { engine: 'litert', id: 'gemma4-12b-litert', label: 'Gemma 4 12B', size: '5.6 GB', needGB: 10, readGB: 5.6 },
+  'bonsai2-9b': { engine: 'bonsai2', size9: true, id: 'bonsai2-9b', label: 'Bonsai 2 9B', size: '1.9 GB', needGB: 6, readGB: 1.9 },
   'qwen1.5-0.5b': { engine: 'wllama', id: 'qwen1.5-0.5b', label: 'Qwen1.5 0.5B', size: '0.4 GB', tiny: true },
   'qwen2.5-0.5b': { engine: 'wllama', id: 'qwen2.5-0.5b', label: 'Qwen2.5 0.5B', size: '0.5 GB', tiny: true },
 };
@@ -60,14 +61,9 @@ const ENGINES = {
     const engine = R.createWllama3Engine(w);
     return { generate: (messages, o) => R.generate(engine, '', { ...o, messages }), unload: () => L.unloadModel() };
   },
-  async bonsai9b(m, onStatus) {
-    const B = await import('./engines/bonsai9b.js');
-    const engine = await B.loadBonsai9b(onStatus);
-    return { generate: (messages, o) => B.generateBonsai9b(engine, '', { ...o, messages }), unload: () => engine.unload() };
-  },
   async bonsai2(m, onStatus) {
     const B = await import('./engines/bonsai2.js');
-    const engine = await B.loadBonsai2(onStatus);
+    const engine = await B.loadBonsai2(onStatus, { size: m.size9 ? '9B' : '27B' });
     return { generate: (messages, o) => B.generateBonsai2(engine, '', { ...o, messages }), unload: () => engine.unload() };
   },
   async endpoint(m, onStatus, { endpoint }) {

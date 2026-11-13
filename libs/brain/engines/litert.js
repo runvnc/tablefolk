@@ -15,6 +15,7 @@ const MODEL_CONFIG = {
   'gemma4-e2b-litert': { label: 'Gemma 4 E2B (LiteRT-LM)' },
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM)' },
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight (LiteRT-LM)', vision: true },
+  'gemma4-12b-litert': { label: 'Gemma 4 12B (LiteRT-LM)' },
   'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM)' },
   'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM)' },
   'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)' },

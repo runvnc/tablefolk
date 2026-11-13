@@ -11,7 +11,6 @@ import { generate as generateWllama3, createWllama3Engine } from '../../libs/bra
 import { OpenAI, collect } from '../../libs/brain/engines/openai.js';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from '../../libs/brain/engines/bonsai2.js';
-import { loadBonsai9b, generateBonsai9b } from '../../libs/brain/engines/bonsai9b.js';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel, noteBrainSpeed } from '../../libs/device/index.js';
 import { samplingFor, withChaos } from '../../libs/brain/sampling.js';
@@ -32,6 +31,7 @@ const SUPPORTED_MODELS = {
   'gemma4-e4b-litert': { label: 'Gemma 4 E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', needGB: 6, readGB: 2.3 },
   // NVIDIA's post-trained Gemma 4 E4B: takes the E4B's place once its
   // .litertlm is on R2 (tools/convert-litertlm.sh); hidden until then.
+  'gemma4-12b-litert': { label: 'Gemma 4 12B (LiteRT-LM; needs a 10 GB+ graphics card)', engine: 'litert-lm', size: '~5.6 GB', needGB: 10, readGB: 5.6 },
   'nemotron-bolt-e4b-litert': { label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM, larger)', engine: 'litert-lm', size: '~3 GB', hidden: true },
   // Prism ML's ternary Bonsai (Qwen3 based): small downloads; experimental,
   // not tested on every graphics card
@@ -49,9 +49,9 @@ const SUPPORTED_MODELS = {
   // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
   // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
   'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4 },   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
-  // Ternary Bonsai 2 9B as ONNX on Transformers.js (bonsai9b.js): ~2.7 GB, room beside
-  // a voice on a 12 GB card; memGB to be measured
-  'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU, Transformers.js; needs a 6 GB graphics card)', engine: 'bonsai9b', size: '~2.7 GB', needGB: 6, readGB: 2.7, memGB: 4 },
+  // Ternary Bonsai 2 9B on the same WebGPU kernel engine (bonsai2.js): 1.86 GB
+  // download, ~3.4 GB on the card at an 8192 window, ~107 tokens/s on an RTX 4070
+  'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU kernels; needs a 6 GB graphics card)', engine: 'bonsai2', bonsaiSize: '9B', size: '~1.9 GB', needGB: 6, readGB: 1.9, memGB: 3.4 },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // The newest official 0.5B Qwen (Qwen2.5-0.5B-Instruct; Qwen3 starts at 0.6B), Q4_K_M GGUF
@@ -183,16 +183,9 @@ export function createAgentBrainManager(config = {}) {
       onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
       return engine;
     }
-    if (getEngineType() === 'bonsai9b') {
-      if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
-      engine = await loadBonsai9b(status => onStatus(status));
-      loaded = true;
-      onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
-      return engine;
-    }
     if (getEngineType() === 'bonsai2') {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
-      engine = await loadBonsai2(status => onStatus(status));
+      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B' });
       loaded = true;
       onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
       return engine;
@@ -280,7 +273,6 @@ export function createAgentBrainManager(config = {}) {
     if (getEngineType() === 'none') return '';
     const generateFn = getEngineType() === 'openai' ? generateEndpoint
       : getEngineType() === 'bonsai2' ? generateBonsai2
-      : getEngineType() === 'bonsai9b' ? generateBonsai9b
       : getEngineType() === 'lfm3' ? generateLfm3
       : getEngineType() === 'transformers.js' ? generateTJS
       : getEngineType() === 'litert-lm' ? generateLiteRT

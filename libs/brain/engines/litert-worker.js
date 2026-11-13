@@ -62,6 +62,14 @@ const MODEL_CONFIG = {
   // same architecture, so it is converted with litert-torch
   // (tools/convert-litertlm.sh) and mirrored on R2 once converted; it takes
   // the place of the Gemma E4B in the picker (agent-brain.js).
+  // litert-community's web build (Apache-2.0, 2026-11-11; LiteRT-LM 0.17+): 5.57 GB,
+  // for graphics cards with 10 GB or more. Not mirrored on R2 yet.
+  'gemma4-12b-litert': {
+    label: 'Gemma 4 12B (LiteRT-LM)',
+    modelUrl: 'https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/resolve/main/gemma-4-12B-it-web.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/resolve/main/gemma-4-12B-it-web.litertlm',
+    vram: '~6-7 GB',
+  },
   'nemotron-bolt-e4b-litert': {
     label: 'Nemotron 3.5 Bolt E4B (LiteRT-LM)',
     modelUrl: 'https://geebr-models.mindroot.io/nemotron-3.5-bolt-e4b-web.litertlm',

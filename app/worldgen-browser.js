@@ -46,13 +46,10 @@
     let key = 'gemma4-e4b-litert';
     try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || k === 'bonsai2-27b' || k === 'bonsai2-9b') key = k; } catch {}
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
-    if (key === 'bonsai2-9b') {
-      const b = await import('/libs/brain/engines/bonsai9b.js'), engine = await b.loadBonsai9b(status);
-      L = { generate: (messages, opts, onToken) => b.generateBonsai9b(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, onToken }), clear: () => {} };
-    } else if (key === 'bonsai2-27b') {
+    if (key === 'bonsai2-27b' || key === 'bonsai2-9b') {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
-      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, context ? { context } : {});
-      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, onToken }), clear: () => {}, context: context || 8192 };
+      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, { size: key === 'bonsai2-9b' ? '9B' : '27B', ...(context ? { context } : {}) });
+      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, onToken }), clear: () => {}, context: context || 8192 };
     } else {
       const mod = await import(LOADER);
       const has = await mod.hasModelCached?.(key).catch(() => null);
