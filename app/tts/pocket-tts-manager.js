@@ -66,11 +66,17 @@
     for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
     const d=window.tablefolkDevice, free=d?.freeGB;
     if(free==null||Number.isNaN(free)) return 'the graphics card\'s memory is not known';
-    if(free<3.5) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model; Breeze wants 3.5`;
+    // Breeze wants ~3.5 GB, or ~2.6 with its text encoder on the processor (breezeTeCpu)
+    if(free<2.6) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model; Breeze wants 2.6 (3.5 for its fastest start)`;
     if((speeds()['breeze-web-2']??1)<.9) return 'measured slower than speech on this machine before';
     return '';
   }
   const BREEZE_WEB_READY='tablefolkBreezeWebReady';
+  // Breeze's text encoder (0.9 GB, once per line) on the processor when the graphics card is
+  // tight beside the characters' model (under 3.5 GB left): ~1 GB less, ~2.5 s more before a
+  // line starts (8 WASM threads; measured 2026-11-13 on an RTX 4070). localStorage
+  // tablefolkBreezeTeCpu '1' / '0' forces it.
+  function breezeTeCpu(){ const f=localStorage.getItem('tablefolkBreezeTeCpu'); if(f==='1'||f==='0') return f==='1'; const free=window.tablefolkDevice?.freeGB; return free!=null && free<3.5; }
   // The engine and why: this browser's choice (the voice pane), Breeze running
   // on this computer, Breeze in this browser when it was downloaded before and
   // fits, else the site's default (admin page), else the small Pocket-TTS.
@@ -119,7 +125,7 @@
         else if(m.type==='loaded'||m.type==='voices_loaded') done(true);
         else if(m.type==='error'){ this.upgrade={state:'failed',text:m.error}; window.tablefolkDiag?.note('voice','Breeze TTS 2 failed: '+m.error+' (staying with '+this.engineLabel()+')'); window.tablefolkToast?.('Breeze TTS 2 could not start: '+m.error,{type:'error'}); done(false); } };
       w.onerror=e=>{ this.upgrade={state:'failed',text:e.message||'worker error'}; window.tablefolkDiag?.note('voice','Breeze TTS 2 failed: '+this.upgrade.text); done(false); };
-      w.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:false}});
+      w.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:false,teCpu:breezeTeCpu()}});
     }
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
@@ -184,7 +190,7 @@
     // Switch engines: the running one is dropped and the new one loads now.
     async setEngine(id){ return this.switchEngine(id,true); }
     async switchEngine(id,persist=true){ if(!ENGINES[id])return; if(persist) localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); this.warmed=false; try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1'}}); }); return this.pendingLoad; }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1',teCpu:breezeTeCpu()}}); }); return this.pendingLoad; }
     async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(this.engine==='breeze-web')localStorage.setItem('tablefolkBreezeWebReady','1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.client||ENGINES[this.engine]?.cloneByText?'':' (CPU)'}`,'ready');resolve?.(); if(!this.offerChecked){ this.offerChecked=true; this.maybeOfferBreeze().catch(()=>{}); } await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry

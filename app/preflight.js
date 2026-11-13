@@ -42,7 +42,7 @@
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
     ['tts/breeze-client.js?v=20261113a'],
-    ['tts/pocket-tts-manager.js?v=20261113c'],
+    ['tts/pocket-tts-manager.js?v=20261113d'],
     ['tts/tts-ui.js?v=20261107b'],
     ['load-status.js?v=20261111c'],
     ['look.js?v=20261018b'],
@@ -83,7 +83,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261113h', 'module'],
+    ['llm_js/world-integration.js?v=20261113i', 'module'],
   ];
 
   function browserSummary() {

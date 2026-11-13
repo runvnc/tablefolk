@@ -47,7 +47,7 @@ const SUPPORTED_MODELS = {
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
   // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
   // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
-  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9 },
+  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4 },   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // The newest official 0.5B Qwen (Qwen2.5-0.5B-Instruct; Qwen3 starts at 0.6B), Q4_K_M GGUF
