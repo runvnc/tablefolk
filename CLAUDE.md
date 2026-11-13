@@ -57,20 +57,9 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 
 ## Open items (2026-11-01)
 
-- **TODO (user asked 2026-11-12): put the picker's models that still load
-  from Hugging Face on R2** (HF is slow), then point the code at R2 with HF
-  as the fallback. Ignore hidden models (they may be deleted). Left to do:
-  - Qwen1.5 0.5B (the Oracle's model): `qwen1_5-0_5b-chat-q4_0.gguf`,
-    376 MB, `app/llm_js/model-loader-wllama3.js` (`base`)
-  - Gemma 4 E2B with sight: `gemma-4-E2B-it.litertlm`, 2.4 GB,
-    `app/llm_js/litert-worker.js` (`gemma4-e2b-vision`)
-  - Bonsai 2 27B: ~5.9 GB of files from the webml-community HF space,
-    `app/llm_js/bonsai2-engine.js`
-  Already on R2: Gemma 4 E2B/E4B web builds, Breeze, Bark, Pocket-TTS voice
-  states. Pocket-TTS's own model files are still on HF (`app/tts/`). Uploads
-  need the user's R2 keys (ask first; files over 300 MiB need multipart or
-  the parts layout in assets.md, Hosting). Uploading from a cloud session
-  avoids the user's slow upload line.
+- The picker's Hugging Face models are mirrored on R2 (done 2026-11-12;
+  assets.md, Hosting). Still from HF: Pocket-TTS's own model files
+  (`app/tts/`) and hidden models.
 - Walk-in buildings: checked in first person 2026-10-31 (roof kept as the
   ceiling); the watch tower, bell tower and windmill remain closed models.
 - Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR

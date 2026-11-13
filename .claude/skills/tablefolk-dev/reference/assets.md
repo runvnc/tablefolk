@@ -129,6 +129,18 @@ refuses files over 300 MiB, and a single PUT over a slow line times out (about
 model's worker (`app/asr/worker.js`) reads that layout, four parts at a time
 from the four hostnames. The speech model is under `underdog-bark-3.0/`
 (fp16 and int8 variants); Bonsai (Transformers.js) loads from Hugging Face.
+Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader
+trying R2 first and Hugging Face as the fallback: `qwen1_5-0_5b-chat-q4_0.gguf`
+(the Oracle's Qwen1.5), `gemma-4-E2B-it.litertlm` (Gemma E2B with sight) and
+`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B). A copy already
+cached from Hugging Face stays in use (wllama and the Bonsai engine cache by URL).
+**Copying a public file from Hugging Face into R2 without the maintainer's
+line** (2026-11-12, 8.9 GB in about a minute): deploy a throwaway Worker bound
+to the bucket that, per 64 MiB part, fetches the range from Hugging Face and
+`uploadPart`s it (through a `FixedLengthStream`) into an R2 multipart upload,
+then `complete`s it; drive it from a script with a token header (and a
+User-Agent: Cloudflare answers Python's default with 403, error 1010), check the
+SHA-256 against Hugging Face's `x-linked-etag`, and `wrangler delete` the Worker.
 Breeze TTS 2 is under `breeze-tts-2/`: HoppouAI's `breeze-tts-2-q4_k-dd2.gguf`
 in 37 parts with a `parts.json` (size, part size, part names, SHA-256), the
 breeze-server v0.1.3 Linux and Windows builds, `LICENSE-model.txt`
