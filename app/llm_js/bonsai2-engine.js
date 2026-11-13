@@ -7,15 +7,16 @@
 // with `export{... as TernaryBonsai2 ...}`. We fetch the page at a pinned
 // revision, cut the module there and import it from a blob URL (the way
 // xen0bit/smolbox runs it), so nothing of it is copied into this repository.
-// The engine streams the weights from Hugging Face and keeps them in
-// IndexedDB.
+// The engine streams the weights from our R2 mirror (same bytes; Hugging
+// Face is the fallback) and keeps them in its cache.
 //
 //   const model = await loadBonsai2(status => ...);
 //   const text = await generateBonsai2(model, '', { messages, maxTokens, onToken });
 const SPACE_REV = '94320c9da2b7aeac5b5807c9e61d696a3c09edb5';
 const SPACE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai-2-webgpu-kernels/resolve/${SPACE_REV}/index.html`;
 export const BONSAI2_FILE = 'Ternary-Bonsai-2-27B-PTQ1_0.gguf';
-const LOADED = 'tablefolk_bonsai2_loaded';
+const MIRROR_URL = `https://geebr-models.mindroot.io/bonsai-2-27b/${BONSAI2_FILE}`;
+const LOADED = 'tablefolk_bonsai2_loaded';   // '1': cached from Hugging Face, 'r2': from the mirror
 const CONTEXT = 8192;   // tokens; the engine's default is 16384
 
 let modulePromise = null;
@@ -34,10 +35,20 @@ export function bonsai2Module() {
 
 export async function loadBonsai2(onStatus = () => {}) {
   const { TernaryBonsai2 } = await bonsai2Module();
-  const check = await TernaryBonsai2.checkAvailability(null, { file: BONSAI2_FILE }).catch(() => null);
+  // The engine caches by URL: a copy cached from Hugging Face stays there.
+  let source = null;
+  let cachedFromHF = false; try { cachedFromHF = localStorage.getItem(LOADED) === '1'; } catch {}
+  if (!cachedFromHF) {
+    try {
+      const r = await fetch(MIRROR_URL, { cache: 'no-store', headers: { Range: 'bytes=0-0' } });
+      await r.body?.cancel();
+      if (r.ok) source = MIRROR_URL;
+    } catch {}
+  }
+  const check = await TernaryBonsai2.checkAvailability(source, { file: BONSAI2_FILE }).catch(() => null);
   if (check && check.ok === false) throw new Error('Bonsai 2 27B cannot run here: ' + (check.reason || 'unsupported GPU'));
   const gb = n => (n / 2 ** 30).toFixed(2);
-  const model = await TernaryBonsai2.load(null, {
+  const model = await TernaryBonsai2.load(source, {
     file: BONSAI2_FILE, maxLength: CONTEXT, chatTemplateArgs: { enable_thinking: false },
     onProgress: e => {
       if (e.status === 'weights' && e.kind === 'bytes' && e.total > 0) onStatus(`${e.fromCache ? 'reading cached' : 'downloading'} Bonsai 2 27B ${Math.floor(100 * e.loaded / e.total)}% (${gb(e.loaded)} / ${gb(e.total)} GB)`);
@@ -45,7 +56,7 @@ export async function loadBonsai2(onStatus = () => {}) {
       else onStatus(e.message || e.status || 'loading Bonsai 2');
     },
   });
-  try { localStorage.setItem(LOADED, '1'); } catch {}
+  try { localStorage.setItem(LOADED, source ? 'r2' : '1'); } catch {}
   return { model, queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
@@ -67,7 +78,7 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
   return p;
 }
 
-export const hasBonsai2Cached = () => { try { return localStorage.getItem(LOADED) === '1'; } catch { return false; } };
+export const hasBonsai2Cached = () => { try { return !!localStorage.getItem(LOADED); } catch { return false; } };
 export async function clearBonsai2Cache() {
   try { localStorage.removeItem(LOADED); } catch {}
   for (const d of await indexedDB.databases?.() || []) if (/bonsai|gguf|kernel/i.test(d.name || '')) indexedDB.deleteDatabase(d.name);

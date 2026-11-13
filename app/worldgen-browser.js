@@ -21,7 +21,7 @@
  *       {scenario, code, link, ms, model} or 'failed' {error}
  */
 (function () {
-  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261030g';
+  const LOADER = '/app/llm_js/model-loader-litert.js?v=20261112a';
   const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman'.split(' ');
   const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon'.split(' ');
   const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon'.split(' '));
@@ -38,7 +38,7 @@
   // (bonsai2-engine.js; a 10 GB+ card): the one the builder's menu chose
   // (stored as 'tablefolk_model'), downloaded now if this browser has not got
   // it yet (the menu says how big; it is kept for the game too).
-  const BONSAI2 = '/app/llm_js/bonsai2-engine.js?v=20261030b';
+  const BONSAI2 = '/app/llm_js/bonsai2-engine.js?v=20261112a';
   let L = null, modelKey = '';
   async function model(emit) {
     if (L) return L;

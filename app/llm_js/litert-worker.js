@@ -41,7 +41,9 @@ const MODEL_CONFIG = {
   // Characters' look() sends what they see (tablefolkVision, world-integration.js).
   'gemma4-e2b-vision': {
     label: 'Gemma 4 E2B with sight (LiteRT-LM)',
-    modelUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
+    // Mirrored on R2 (same bytes); Hugging Face is the fallback.
+    modelUrl: 'https://geebr-models.mindroot.io/gemma-4-E2B-it.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
     vram: '~1.8 GB',
     lib: '0.19.0-nightly.20261023',   // the build it was tested with; 0.19.0 stable not tried with it yet
     vision: true,
@@ -582,7 +584,14 @@ async function handle(e, post, tag) {
         } else {
           onProgress({ phase: 'download', percent: 0, text: 'Starting first-time model download...' });
           // a test or a self-hosted copy can name its own URL (localStorage tablefolk_model_url:<key>)
-          modelFile = await downloadModelToOPFS(modelKey, e.data.url || cfg.modelUrl, onProgress);
+          try { modelFile = await downloadModelToOPFS(modelKey, e.data.url || cfg.modelUrl, onProgress); }
+          catch (err) {
+            // the mirror failed: start again from the fallback host
+            if (e.data.url || !cfg.fallbackUrl) throw err;
+            console.warn('[litert-worker] mirror download failed, trying the fallback:', err?.message);
+            onProgress({ phase: 'download', percent: 0, text: 'Mirror unavailable · downloading from Hugging Face...' });
+            modelFile = await downloadModelToOPFS(modelKey, cfg.fallbackUrl, onProgress);
+          }
         }
         onProgress({ phase: 'initialize', percent: 100, text: 'Download complete · initializing local brain...' });
         // The Emscripten glue that Engine.create() loads underneath tries to

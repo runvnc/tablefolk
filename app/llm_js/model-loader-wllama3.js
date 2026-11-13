@@ -26,6 +26,31 @@ const WLLAMA3_WASM = {
 
 const HF_BASE = 'https://huggingface.co/openbmb/MiniCPM5-1B-GGUF/resolve/main/';
 
+// wllama names its cache entry after the URL: a copy already cached from the
+// fallback host is used as is; otherwise the mirror, then the fallback.
+async function cachedFromUrl(cfg, url) {
+  try {
+    const cache = wllama?.cacheManager || new Wllama(WLLAMA3_WASM, { allowOffline: false }).cacheManager;
+    return await cache.getSize(await cache.getNameFromURL(url)) > 0;
+  } catch { return false; }
+}
+function modelUrls(cfg) {
+  return [(cfg.base || HF_BASE) + cfg.file, ...(cfg.fallbackBase ? [cfg.fallbackBase + cfg.file] : [])];
+}
+async function pickModelUrl(cfg) {
+  const urls = modelUrls(cfg);
+  for (const url of urls) if (await cachedFromUrl(cfg, url)) return url;
+  for (const url of urls.slice(0, -1)) {
+    try {
+      const r = await fetch(url, { cache: 'no-store', headers: { Range: 'bytes=0-0' } });
+      await r.body?.cancel();
+      if (r.ok) return url;
+    } catch {}
+    console.warn('[tablefolk-wllama3] not reachable, using the next source:', url);
+  }
+  return urls[urls.length - 1];
+}
+
 const MODEL_CONFIG = {
   'minicpm5-1b-wgpu': {
     label: 'MiniCPM5-1B (WebGPU, GGUF)',
@@ -39,7 +64,9 @@ const MODEL_CONFIG = {
   },
   'qwen1.5-0.5b': {
     label: 'Qwen1.5 0.5B Chat (WebGPU, GGUF Q4_0)',
-    base: 'https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/',
+    // Mirrored on R2 (same bytes); Hugging Face is the fallback.
+    base: 'https://geebr-models.mindroot.io/',
+    fallbackBase: 'https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/',
     file: 'qwen1_5-0_5b-chat-q4_0.gguf',   // the quantization Ollama's qwen:0.5b uses
     size: 395 * 1024 * 1024,
     gpuLayers: 99,
@@ -154,9 +181,10 @@ export async function loadModel(modelKey, onProgress) {
   onProgress?.(`Loading ${cfg.label} (GPU layers: ${nGpuLayers})...`);
 
   try {
+    const modelUrl = await pickModelUrl(cfg);
     const loadAt = async layers => {
     wllama = new Wllama(WLLAMA3_WASM, { allowOffline: false });
-    await wllama.loadModelFromUrl((cfg.base || HF_BASE) + cfg.file, {
+    await wllama.loadModelFromUrl(modelUrl, {
       n_ctx: 4096,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
@@ -230,10 +258,8 @@ export async function hasModelCached(modelKey) {
   // A Wllama instance does nothing until a model loads; its cache manager
   // reads the browser's storage. Unknown means the download question shows.
   const cfg = MODEL_CONFIG[modelKey]; if (!cfg) return false;
-  try {
-    const cache = wllama?.cacheManager || new Wllama(WLLAMA3_WASM, { allowOffline: false }).cacheManager;
-    return await cache.getSize(await cache.getNameFromURL((cfg.base || HF_BASE) + cfg.file)) > 0;
-  } catch { return false; }
+  for (const url of modelUrls(cfg)) if (await cachedFromUrl(cfg, url)) return true;
+  return false;
 }
 
 export function getCacheBackend() { return 'wllama3-internal'; }
