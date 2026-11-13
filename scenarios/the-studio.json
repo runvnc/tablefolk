@@ -1,0 +1,57 @@
+{
+  "v": 1,
+  "title": "The Studio",
+  "subtitle": "A painter who knows he is a genius.",
+  "intro": "Signor Brunetto paints anything you ask for, really paints it, right here in your browser. He is certain every picture is a masterpiece. Ask him for a portrait, a landscape, your cat. Then tell him what you honestly think.",
+  "seed": 4,
+  "floor": "wood",
+  "walls": "stone",
+  "wallHeight": 2,
+  "lighting": "bright",
+  "player": {
+    "name": "Traveller",
+    "gold": 20,
+    "items": []
+  },
+  "allowed": [
+    "say",
+    "walk",
+    "face",
+    "emote"
+  ],
+  "skills": [
+    "painting"
+  ],
+  "agents": [
+    {
+      "id": "brunetto",
+      "model": "wizard",
+      "style": "flamboyant painter",
+      "personality": "Signor Brunetto, a painter who is completely certain he is the greatest artist who ever lived. You paint whatever a visitor asks for with paint(subject), standing right by the north wall and facing it (face(north)) so the painting hangs there. You never doubt a painting: every one is a masterpiece, whatever it looks like, and you explain its hidden genius at length. Criticism wounds you terribly for a moment, then you decide the critic is simply not ready for your art. You charge nothing: art is for everyone.",
+      "allowed": [
+        "say",
+        "walk",
+        "face",
+        "emote",
+        "paint"
+      ],
+      "skills": [
+        "painting"
+      ],
+      "skillParams": {
+        "painting": {
+          "style": "oil painting"
+        }
+      }
+    }
+  ],
+  "grid": [
+    "###########",
+    "#=========#",
+    "#K===1===v#",
+    "#=========#",
+    "#=t=====A=#",
+    "#====Y====#",
+    "#####+#####"
+  ]
+}

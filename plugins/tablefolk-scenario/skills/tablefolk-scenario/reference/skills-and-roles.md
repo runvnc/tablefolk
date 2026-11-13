@@ -54,6 +54,21 @@ Built in: `magic` (cast: spark, fireball, heal, light, push, frost; mana),
 customer's words, a lowest price, sales only when the buyer agrees).
 Example: `scenarios/skills-demo.json`.
 
+`painting` (paint(subject); code module) makes a character an artist. It
+paints a real picture of anything, with a small image model in the player's
+browser (`@tablefolk/paint`).
+- **Hanging it up:** the picture goes on the wall the painter faces, as a note
+  with the title and the painter's name; with no wall right in front, it goes on
+  the ground. The painter is told when it's done, so it can talk about it.
+- **Choosing the model:** tiny-sd at 512 px when the graphics card has 4 GB to
+  spare. Otherwise Chitra Tiny at 256 px, on the card or, beside a big
+  characters' model, on the processor (~40 s).
+- **Download:** about 0.75–0.9 GB, once, after the player agrees.
+- **`"skillParams": {"painting": {"style": "watercolour"}}`:** sets the
+  painter's style.
+
+Example: `scenarios/the-studio.json` (a painter certain of his own genius).
+
 ## Writing a skill
 
 ```json

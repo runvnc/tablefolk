@@ -51,10 +51,10 @@ async function fetchFile(url, onBytes) {
   return buf;
 }
 
-async function load(model) {
+async function load(model, cpu = false) {
   if (S && which === model) return;
   const M = MODELS[model]; if (!M) throw new Error('unknown painting model ' + model);
-  if (!navigator.gpu || !(await navigator.gpu.requestAdapter().catch(() => null))) throw new Error('no WebGPU in this browser');
+  if (!cpu && (!navigator.gpu || !(await navigator.gpu.requestAdapter().catch(() => null)))) throw new Error('no WebGPU in this browser');
   S = null; which = null;
   tok = await AutoTokenizer.from_pretrained(M.tokenizer);
   const total = M.files.reduce((a, f) => a + f[2], 0); let got = 0, last = 0;
@@ -63,7 +63,8 @@ async function load(model) {
   for (const [k, f, , repo] of M.files) {   // one at a time: the WebGPU provider dislikes concurrent session creation
     const buf = await fetchFile(`https://huggingface.co/${repo || M.repo}/resolve/main/${f}`, onBytes);
     say({ type: 'progress', note: 'preparing', got, total });
-    s[k] = await ort.InferenceSession.create(buf, { executionProviders: ['webgpu'], graphOptimizationLevel: 'all' });
+    // cpu: the processor (WASM), for a graphics card that has no room left beside the other models
+    s[k] = await ort.InferenceSession.create(buf, { executionProviders: [cpu ? 'wasm' : 'webgpu'], graphOptimizationLevel: 'all' });
   }
   S = s; which = model;
 }
@@ -179,7 +180,7 @@ async function paintSD({ id, prompt, negative, steps, guidance, seed }) {
 
 self.onmessage = async ({ data }) => {
   try {
-    if (data.type === 'load') { await load(data.model); say({ type: 'ready', model: which }); return; }
+    if (data.type === 'load') { await load(data.model, !!data.cpu); say({ type: 'ready', model: which }); return; }
     if (data.type === 'paint') {
       if (!S) throw new Error('no painting model loaded');
       const M = MODELS[which], t0 = performance.now();

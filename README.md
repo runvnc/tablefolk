@@ -70,6 +70,8 @@ input about 1 GB.
 | voices (optional, better) | Breeze TTS 2 | browser (WebGPU) or a local server | **BreezeBlue research and non-commercial licence** |
 | speech input | Underdog Bark 3.0 (Parakeet TDT) | browser (WebGPU or CPU) | CC-BY-4.0 |
 | speech input (phones) | the browser's own recognition | the browser | – |
+| painting (artist characters) | tiny-sd 512 px, with the TAESD decoder | browser (WebGPU) | CreativeML Open RAIL-M (use restrictions); TAESD MIT |
+| painting (smaller cards) | Chitra Tiny 256 px | browser (WebGPU or CPU) | Apache-2.0 |
 
 For anything commercial, keep to the Apache-2.0 and CC-BY-4.0 models above
 (the defaults are): don't use Breeze TTS 2 or Qwen1.5. CC-BY-4.0 asks for
@@ -86,6 +88,7 @@ build step. They're on npm as **`@tablefolk/*`** (sources in [`libs/`](libs/READ
 | `@tablefolk/device` | what this device can run: graphics card, memory with the reason, measured bandwidth, the best model that fits |
 | `@tablefolk/voice` | text to speech (Pocket-TTS, Breeze TTS 2, the browser's), chosen for the device |
 | `@tablefolk/hear` | speech to text (Underdog Bark, the browser's), chosen for the device |
+| `@tablefolk/paint` | pictures from a sentence (tiny-sd or Chitra Tiny), on the graphics card or the processor |
 | `@tablefolk/menus` | JRPG-style menus: click, press a number, type or say it; matched by meaning |
 | `@tablefolk/script` | scripted stories: world flags, conditions, triggers, workflows, a validator; runs in Node too |
 | `@tablefolk/decider` | a 2B decision model: one of a list, or yes/no, with calibrated probabilities |

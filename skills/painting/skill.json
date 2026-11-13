@@ -1,0 +1,21 @@
+{
+  "id": "painting",
+  "name": "Painting",
+  "version": "1.0.0",
+  "description": "Paints a real picture of anything with a small image model in the player's browser (tiny-sd at 512 px, or Chitra Tiny at 256 px on smaller graphics cards), and hangs it up for everyone to see. Characters with this skill are artists.",
+  "params": {
+    "style": "oil painting"
+  },
+  "allow": [
+    "note"
+  ],
+  "prompt": "You are a painter. paint(subject) paints a picture of the subject in your style ({{style}}) and hangs it up: face a wall first to hang it there. A painting takes a little while.",
+  "commands": {
+    "paint": {
+      "usage": "paint(subject)",
+      "example": "paint(the harbour at dusk)",
+      "help": "paint a picture of something and hang it up (face a wall to hang it on the wall)"
+    }
+  },
+  "module": "skill.js"
+}

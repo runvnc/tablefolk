@@ -43,6 +43,7 @@ use, the rules and publishing, and each folder has its own README.
 | `decider` | the Strands Decider (was `app/llm_js/decider.js`) | not used by the game yet |
 | `voice` | the speech workers (Pocket 18M, Pocket 100M, Breeze web + its wasm, the PCM worklet; were in `app/tts/`), `createVoice()`, `chooseEngine()` | `app/tts/pocket-tts-manager.js` starts the workers from `/libs/voice/` and sends `mirror` in `load` |
 | `hear` | the Bark worker and `mel.js` (were `app/asr/`), `createListener()` | `app/speech-input.js` starts `/libs/hear/bark-worker.js` |
+| `paint` | text to image: `paint-worker.js` (ONNX Runtime Web; Chitra Tiny with rectified-flow Euler, tiny-sd with DPM++ 2M and the TAESD decoder; WebGPU or WASM), `createPainter`/`choosePainter` | `skills/painting/skill.js` (paint(subject): paints in the background, hangs the picture as a note through the `note` command, which the skill's `allow` unlocks; steps down tiny-sd, Chitra, the processor when the card is full) |
 | `script` | conditions (a tokenizer), state, actions, the workflow runner (menu steps, choosers, pause, step-id saves), triggers, `validate`; `test.mjs` runs headless in Node | `app/story.js` (host and `tablefolkStory`/`tablefolkWorkflows`), `app/menus.js` (choices), `scenario.js` (goals `if`, load warnings), `server/worldgen-core.js` (generator checks) |
 | `menus` | `match()`, `modelChooser()`, `createMenuBox()` and its look | `app/menus.js` (now a module): scenario menus by id, say/do/menu, `window.tablefolkMenu` |
 

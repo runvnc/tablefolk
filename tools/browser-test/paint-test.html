@@ -13,7 +13,7 @@ const log = s => { out.textContent += '\n' + s; };
 try {
   const { createPainter } = await import('/libs/paint/index.js');
   const t0 = performance.now(); let last = '';
-  const p = await createPainter({ model: q.get('model') || 'auto', onStatus: s => { if (s.replace(/\d+%$/, '') !== last) { last = s.replace(/\d+%$/, ''); log(s); } } });
+  const p = await createPainter({ model: q.get('model') || 'auto', cpu: q.has('cpu'), onStatus: s => { if (s.replace(/\d+%$/, '') !== last) { last = s.replace(/\d+%$/, ''); log(s); } } });
   const loadSeconds = +((performance.now() - t0) / 1000).toFixed(1);
   log(`${p.model} ready in ${loadSeconds} s: ${p.why}`);
   const prompts = (q.get('prompt') || 'an oil painting of a lighthouse on a rocky coast at sunset|a portrait of an old man with a beard').split('|');
