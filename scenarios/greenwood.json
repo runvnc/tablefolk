@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "title": "The Greenwood",
+  "subtitle": "A path through old woods, a camp, ruins and a shrine",
+  "intro": "The path runs north through the Greenwood. Hunters keep a camp by the trail, a hermit lives in a hut among the trees, and somewhere in the old ruins lies a silver horn the hunters have lost.",
+  "seed": 7,
+  "generate": { "kind": "forest", "places": ["camp", "ruins", "hut", "grove", "shrine"] },
+  "player": { "name": "Traveller", "gold": 10, "items": [] },
+  "allowed": ["say", "walk", "face", "emote", "give", "inventory"],
+  "objects": [ { "type": "chest", "in": "ruins", "items": ["silver horn"] } ],
+  "agents": [
+    { "id": "rowan", "model": "huntress", "in": "camp", "style": "hunter of the Greenwood", "personality": "Rowan, a sharp-eyed huntress who leads the hunters' camp. She lost the silver horn of her company when wolves chased her through the old ruins, and she will pay 15 gold to whoever brings it back. She knows the hermit Oswin sees everything in the woods. Use give() to pay the reward.", "inventory": { "gold": 15, "items": [] } },
+    { "id": "oswin", "model": "wizard", "in": "hut", "style": "old hermit", "personality": "Oswin, an old hermit who lives in a hut in the woods and talks to the birds. He knows the ruins hide a chest, and that the wolves sleep in the grove by day. He speaks in riddles but means well." },
+    { "id": "grey", "model": "wolf", "in": "ruins", "hostile": true },
+    { "id": "hart", "model": "stag", "in": "grove" },
+    { "id": "doe", "model": "deer", "in": "grove" },
+    { "id": "rusty", "model": "fox", "in": "shrine" }
+  ],
+  "goal": { "text": "Find the silver horn and bring it back to Rowan.", "win": { "agent_has": ["rowan", "silver horn"] }, "winText": "Rowan sounds the silver horn, and the whole Greenwood hears it." }
+}

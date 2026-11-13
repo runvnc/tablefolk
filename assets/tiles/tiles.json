@@ -737,6 +737,555 @@
     149.2,
     127.7
    ]
+  },
+  "stone_house": {
+   "file": "objects/stone_house.png",
+   "w": 355,
+   "h": 433,
+   "anchor": [
+    177.1,
+    268.2
+   ]
+  },
+  "tall_house": {
+   "file": "objects/tall_house.png",
+   "w": 221,
+   "h": 454,
+   "anchor": [
+    110,
+    310.9
+   ]
+  },
+  "barracks": {
+   "file": "objects/barracks.png",
+   "w": 401,
+   "h": 600,
+   "anchor": [
+    200.5,
+    413.5
+   ]
+  },
+  "sawmill": {
+   "file": "objects/sawmill.png",
+   "w": 516,
+   "h": 505,
+   "anchor": [
+    258,
+    341
+   ]
+  },
+  "blacksmith": {
+   "file": "objects/blacksmith.png",
+   "w": 465,
+   "h": 523,
+   "anchor": [
+    232.4,
+    356.1
+   ]
+  },
+  "mill_house": {
+   "file": "objects/mill_house.png",
+   "w": 389,
+   "h": 554,
+   "anchor": [
+    194,
+    421.1
+   ]
+  },
+  "inn": {
+   "file": "objects/inn.png",
+   "w": 568,
+   "h": 740,
+   "anchor": [
+    283.6,
+    499.7
+   ]
+  },
+  "gazebo": {
+   "file": "objects/gazebo.png",
+   "w": 257,
+   "h": 439,
+   "anchor": [
+    128.5,
+    306.7
+   ]
+  },
+  "hay": {
+   "file": "objects/hay.png",
+   "w": 133,
+   "h": 196,
+   "anchor": [
+    66,
+    139.7
+   ]
+  },
+  "fire_pit": {
+   "file": "objects/fire_pit.png",
+   "w": 145,
+   "h": 133,
+   "anchor": [
+    72.4,
+    76.7
+   ]
+  },
+  "fence_section": {
+   "file": "objects/fence_section.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "sacks": {
+   "file": "objects/sacks.png",
+   "w": 133,
+   "h": 130,
+   "anchor": [
+    66,
+    73.7
+   ]
+  },
+  "silo": {
+   "file": "objects/silo.png",
+   "w": 222,
+   "h": 466,
+   "anchor": [
+    110.7,
+    375.8
+   ]
+  },
+  "open_barn": {
+   "file": "objects/open_barn.png",
+   "w": 433,
+   "h": 583,
+   "anchor": [
+    216.1,
+    385.6
+   ]
+  },
+  "chicken_coop": {
+   "file": "objects/chicken_coop.png",
+   "w": 235,
+   "h": 273,
+   "anchor": [
+    117.2,
+    183.6
+   ]
+  },
+  "barn": {
+   "file": "objects/barn.png",
+   "w": 510,
+   "h": 669,
+   "anchor": [
+    254.6,
+    439
+   ]
+  },
+  "silo_barn": {
+   "file": "objects/silo_barn.png",
+   "w": 568,
+   "h": 825,
+   "anchor": [
+    283.6,
+    666
+   ]
+  },
+  "small_barn": {
+   "file": "objects/small_barn.png",
+   "w": 401,
+   "h": 523,
+   "anchor": [
+    200.4,
+    347.3
+   ]
+  },
+  "big_barn": {
+   "file": "objects/big_barn.png",
+   "w": 606,
+   "h": 873,
+   "anchor": [
+    302.7,
+    599.6
+   ]
+  },
+  "stone_windmill": {
+   "file": "objects/stone_windmill.png",
+   "w": 493,
+   "h": 639,
+   "anchor": [
+    246.4,
+    506.5
+   ]
+  },
+  "farm_fence": {
+   "file": "objects/farm_fence.png",
+   "w": 388,
+   "h": 113,
+   "anchor": [
+    194,
+    56.7
+   ]
+  },
+  "pine_tree": {
+   "file": "objects/pine_tree.png",
+   "w": 281,
+   "h": 437,
+   "anchor": [
+    140.4,
+    327.3
+   ]
+  },
+  "tall_pine": {
+   "file": "objects/tall_pine.png",
+   "w": 324,
+   "h": 554,
+   "anchor": [
+    161.6,
+    426.7
+   ]
+  },
+  "dead_tree": {
+   "file": "objects/dead_tree.png",
+   "w": 260,
+   "h": 432,
+   "anchor": [
+    129.7,
+    324.8
+   ]
+  },
+  "autumn_tree": {
+   "file": "objects/autumn_tree.png",
+   "w": 377,
+   "h": 519,
+   "anchor": [
+    188.2,
+    382.1
+   ]
+  },
+  "oak_tree": {
+   "file": "objects/oak_tree.png",
+   "w": 214,
+   "h": 448,
+   "anchor": [
+    106.8,
+    353.2
+   ]
+  },
+  "tall_tree": {
+   "file": "objects/tall_tree.png",
+   "w": 318,
+   "h": 544,
+   "anchor": [
+    159,
+    414.5
+   ]
+  },
+  "red_bush": {
+   "file": "objects/red_bush.png",
+   "w": 133,
+   "h": 168,
+   "anchor": [
+    66,
+    111.7
+   ]
+  },
+  "flower_bush": {
+   "file": "objects/flower_bush.png",
+   "w": 133,
+   "h": 168,
+   "anchor": [
+    66,
+    111.7
+   ]
+  },
+  "fern": {
+   "file": "objects/fern.png",
+   "w": 133,
+   "h": 130,
+   "anchor": [
+    66,
+    73.7
+   ]
+  },
+  "mushroom_cluster": {
+   "file": "objects/mushroom_cluster.png",
+   "w": 133,
+   "h": 116,
+   "anchor": [
+    66,
+    59.7
+   ]
+  },
+  "shelf_fungus": {
+   "file": "objects/shelf_fungus.png",
+   "w": 133,
+   "h": 116,
+   "anchor": [
+    66,
+    59.7
+   ]
+  },
+  "mossy_rock": {
+   "file": "objects/mossy_rock.png",
+   "w": 158,
+   "h": 162,
+   "anchor": [
+    78.8,
+    105.7
+   ]
+  },
+  "tall_grass": {
+   "file": "objects/tall_grass.png",
+   "w": 133,
+   "h": 126,
+   "anchor": [
+    66,
+    69.7
+   ]
+  },
+  "heather": {
+   "file": "objects/heather.png",
+   "w": 133,
+   "h": 119,
+   "anchor": [
+    66,
+    62.7
+   ]
+  },
+  "flower_patch": {
+   "file": "objects/flower_patch.png",
+   "w": 133,
+   "h": 144,
+   "anchor": [
+    66,
+    87.7
+   ]
+  },
+  "bear_trap": {
+   "file": "objects/bear_trap.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "backpack": {
+   "file": "objects/backpack.png",
+   "w": 133,
+   "h": 120,
+   "anchor": [
+    66,
+    63.7
+   ]
+  },
+  "shovel": {
+   "file": "objects/shovel.png",
+   "w": 133,
+   "h": 137,
+   "anchor": [
+    66,
+    80.7
+   ]
+  },
+  "frying_pan": {
+   "file": "objects/frying_pan.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "log": {
+   "file": "objects/log.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "shield": {
+   "file": "objects/shield.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "round_shield": {
+   "file": "objects/round_shield.png",
+   "w": 133,
+   "h": 121,
+   "anchor": [
+    66,
+    64.7
+   ]
+  },
+  "sword": {
+   "file": "objects/sword.png",
+   "w": 133,
+   "h": 134,
+   "anchor": [
+    66,
+    77.7
+   ]
+  },
+  "crown": {
+   "file": "objects/crown.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "book": {
+   "file": "objects/book.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "open_book": {
+   "file": "objects/open_book.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "coin_pouch": {
+   "file": "objects/coin_pouch.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "hunting_bow": {
+   "file": "objects/hunting_bow.png",
+   "w": 133,
+   "h": 136,
+   "anchor": [
+    66,
+    79.7
+   ]
+  },
+  "spear": {
+   "file": "objects/spear.png",
+   "w": 133,
+   "h": 186,
+   "anchor": [
+    66,
+    129.7
+   ]
+  },
+  "dagger": {
+   "file": "objects/dagger.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "necklace": {
+   "file": "objects/necklace.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "skull": {
+   "file": "objects/skull.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "bone": {
+   "file": "objects/bone.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "gold_bars": {
+   "file": "objects/gold_bars.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "leather_armor": {
+   "file": "objects/leather_armor.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "plate_armor": {
+   "file": "objects/plate_armor.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "greatsword": {
+   "file": "objects/greatsword.png",
+   "w": 133,
+   "h": 158,
+   "anchor": [
+    66,
+    101.7
+   ]
+  },
+  "war_hammer": {
+   "file": "objects/war_hammer.png",
+   "w": 133,
+   "h": 136,
+   "anchor": [
+    66,
+    79.7
+   ]
+  },
+  "crystals": {
+   "file": "objects/crystals.png",
+   "w": 133,
+   "h": 113,
+   "anchor": [
+    66,
+    56.7
+   ]
+  },
+  "scythe": {
+   "file": "objects/scythe.png",
+   "w": 133,
+   "h": 178,
+   "anchor": [
+    66,
+    121.7
+   ]
   }
  },
  "characters": {
@@ -1152,6 +1701,24 @@
    "anchor": [
     137.2,
     217.4
+   ]
+  },
+  "cow": {
+   "file": "characters/cow.png",
+   "w": 271,
+   "h": 329,
+   "anchor": [
+    135.1,
+    214.1
+   ]
+  },
+  "frog": {
+   "file": "characters/frog.png",
+   "w": 158,
+   "h": 161,
+   "anchor": [
+    78.8,
+    93.9
    ]
   }
  },

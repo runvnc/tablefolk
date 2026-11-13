@@ -302,6 +302,290 @@
     return finish({ kind: 'village', W, H, g, places: named, objects, start: named.find(p => p.kind === 'square'), lighting: 'bright' });
   }
 
+  // ------------------------------------------------- outdoor helpers (2026-11-13)
+  // Things placed as objects (pack types: the Quaternius village, farm and
+  // nature sets) rather than grid glyphs. A building takes an odd square of
+  // cells (span) so its middle is a cell; ry turns its front (+z, south) to face.
+  function placer(W, H, R) {
+    const at = toBoard(W, H), taken = makeGrid(W, H, false), objects = [];
+    const mark = (r0, c0, r1, c1) => { for (let r = Math.max(0, r0); r <= Math.min(H - 1, r1); r++) for (let c = Math.max(0, c0); c <= Math.min(W - 1, c1); c++) taken[r][c] = true; };
+    const free = (r0, c0, r1, c1, g, ok = [',']) => {
+      if (r0 < 1 || c0 < 1 || r1 > H - 2 || c1 > W - 2) return false;
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (taken[r][c] || (g && !ok.includes(g[r][c]))) return false;
+      return true;
+    };
+    // facing: 'n' | 's' | 'e' | 'w' (the side its front looks to)
+    const RY = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 };
+    const put = (type, r, c, facing, extra = {}) => { const [x, z] = at(r, c); objects.push({ type, x, z, ...(facing ? { ry: +RY[facing].toFixed(4) } : {}), ...extra }); };
+    // a building or other big thing in a free span x span square near (r, c)
+    const building = (type, span, g, r, c, facing, tries = 40) => {
+      const h = Math.floor(span / 2);
+      for (let t = 0; t < tries; t++) {
+        const rr = r + (t ? R.int(-3, 3) : 0), cc = c + (t ? R.int(-3, 3) : 0);
+        if (!free(rr - h, cc - h, rr + h, cc + h, g)) continue;
+        put(type, rr, cc, facing); mark(rr - h - 1, cc - h - 1, rr + h + 1, cc + h + 1);
+        return [rr, cc];
+      }
+      return null;
+    };
+    return { at, taken, objects, mark, free, put, building };
+  }
+  // trees and growth on open grass, objects in single cells, never touching a
+  // path, wall or each other's cell
+  function scatter(g, P, R, n, kinds, ok = [',']) {
+    const H = g.length, W = g[0].length;
+    for (let i = 0, tries = 0; i < n && tries < n * 30; tries++) {
+      const r = R.int(1, H - 2), c = R.int(1, W - 2);
+      if (!ok.includes(g[r][c]) || P.taken[r][c]) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dr, dc]) => ![',', ...ok].includes(g[r + dr]?.[c + dc]))) continue;
+      const type = typeof kinds === 'function' ? kinds() : R.pick(kinds);
+      P.put(type, r, c, null, { ry: +(R.next() * 6.283).toFixed(3) }); P.taken[r][c] = true; i++;
+    }
+  }
+  // a rectangle of floor (a clearing or a yard) with a dirt trail to the path
+  function clearing(g, R, P, h, w, floor, near, pathGlyph = ':') {
+    const H = g.length, W = g[0].length;
+    for (let t = 0; t < 120; t++) {
+      const r0 = R.int(2, H - 2 - h), c0 = R.int(2, W - 2 - w);
+      if (near && Math.abs(r0 + h / 2 - near[0]) + Math.abs(c0 + w / 2 - near[1]) > near[2]) continue;
+      if (!P.free(r0 - 1, c0 - 1, r0 + h, c0 + w, g, [',', '%'])) continue;
+      for (let r = r0; r < r0 + h; r++) for (let c = c0; c < c0 + w; c++) g[r][c] = floor;
+      P.mark(r0 - 1, c0 - 1, r0 + h, c0 + w);
+      return { r0, c0, r1: r0 + h - 1, c1: c0 + w - 1 };
+    }
+    return null;
+  }
+  // an L-shaped trail from a place's middle to the nearest path cell
+  function trail(g, p, isPath, glyph = ':') {
+    const H = g.length, W = g[0].length, mr = Math.floor((p.r0 + p.r1) / 2), mc = Math.floor((p.c0 + p.c1) / 2);
+    let best = null;
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (isPath(g[r][c]) && !(r >= p.r0 && r <= p.r1 && c >= p.c0 && c <= p.c1)) { const d = Math.abs(r - mr) + Math.abs(c - mc); if (!best || d < best[2]) best = [r, c, d]; }
+    if (!best) return;
+    const lay = (r, c) => { if (g[r][c] === ',' || g[r][c] === '%') g[r][c] = glyph; };
+    for (let r = mr; r !== best[0]; r += Math.sign(best[0] - mr)) lay(r, mc);
+    for (let c = mc; c !== best[1]; c += Math.sign(best[1] - mc)) lay(best[0], c);
+  }
+  // a small walled building (walls, floor, a door on one side) furnished like the village's
+  function hut(g, R, P, r0, c0, w, h, spec, side) {
+    const r1 = r0 + h - 1, c1 = c0 + w - 1;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) g[r][c] = (r === r0 || r === r1 || c === c0 || c === c1) ? '#' : spec.floor;
+    const door = side === 's' ? [r1, c0 + (w >> 1)] : side === 'n' ? [r0, c0 + (w >> 1)] : side === 'e' ? [r0 + (h >> 1), c1] : [r0 + (h >> 1), c0];
+    g[door[0]][door[1]] = '+';
+    const inner = { r0: r0 + 1, c0: c0 + 1, r1: r1 - 1, c1: c1 - 1 };
+    furnish(g, R, inner, spec, [door]);
+    P.mark(r0 - 1, c0 - 1, r1 + 1, c1 + 1);
+    // the door opens onto a step of dirt
+    const out = side === 's' ? [door[0] + 1, door[1]] : side === 'n' ? [door[0] - 1, door[1]] : side === 'e' ? [door[0], door[1] + 1] : [door[0], door[1] - 1];
+    if (g[out[0]]?.[out[1]] === ',') g[out[0]][out[1]] = ':';
+    return { ...inner, door };
+  }
+  const named = (W, H, places) => { const at = toBoard(W, H), count = {}; return places.map(p => { count[p.kind] = (count[p.kind] || 0) + 1; const n = places.filter(q => q.kind === p.kind).length; return { ...p, id: p.id || (n > 1 ? `${p.kind} ${count[p.kind]}` : p.kind), center: at(Math.floor((p.r0 + p.r1) / 2), Math.floor((p.c0 + p.c1) / 2)) }; }); };
+
+  // ---------------------------------------------------------------- forest
+  // Wild country: a winding path across, trees thick on both sides, and
+  // clearings along it: the clearing where you start, a camp, ruins, a grove,
+  // a shrine, a pond, a woodcutter's hut, a cave mouth. "style": "spooky"
+  // (dead trees, dusk), "autumn", "pine".
+  function forest(opts) {
+    const R = rng(opts.seed);
+    const W = clampSize(opts.size?.[0] ?? 37, 19, 63), H = clampSize(opts.size?.[1] ?? 29, 15, 63);
+    const g = makeGrid(W, H, ','), P = placer(W, H, R), style = String(opts.style || '').toLowerCase();
+    // the path: from the south edge to the north, wandering a little
+    let c = Math.floor(W / 2) + R.int(-3, 3);
+    for (let r = H - 1; r >= 0; r--) { g[r][c] = ':'; if (R.next() < .5) g[r][c + 1 < W - 1 ? c + 1 : c - 1] = ':'; if (R.next() < .3) { const nc = Math.max(3, Math.min(W - 4, c + R.pick([-1, 1]))); g[r][nc] = ':'; c = nc; } }
+    for (let r = 0; r < H; r++) for (let cc = 0; cc < W; cc++) if (g[r][cc] === ':') P.taken[r][cc] = true;
+    const want = (opts.want || []).filter(k => ['camp', 'ruins', 'grove', 'shrine', 'pond', 'hut', 'cave', 'clearing', 'meadow'].includes(k));
+    const kinds = [...new Set(['clearing', ...want, ...R.shuffle(['camp', 'ruins', 'grove', 'shrine', 'pond', 'hut', 'cave', 'meadow']).slice(0, Math.max(3, Math.round(W * H / 220)))])];
+    const places = [];
+    for (const k of kinds) {
+      const size = { clearing: [5, 7], camp: [5, 6], ruins: [7, 7], grove: [5, 5], shrine: [5, 5], pond: [4, 5], hut: [7, 7], cave: [5, 7], meadow: [6, 8] }[k];
+      // the start clearing sits by the path near the south edge
+      const near = k === 'clearing' ? [H - 5, Math.floor(W / 2), 9] : null;
+      const p = clearing(g, R, P, size[0], size[1], k === 'pond' ? ',' : k === 'ruins' || k === 'shrine' ? '^' : k === 'cave' ? ':' : ',', near);
+      if (!p) continue;
+      const mr = Math.floor((p.r0 + p.r1) / 2), mc = Math.floor((p.c0 + p.c1) / 2);
+      if (k === 'camp') { g[mr][mc] = 'X'; P.put('tent', p.r0, p.c0 + 1, 's'); P.put('tent', p.r0, p.c1 - 1, 's'); g[p.r1][p.c0] = 'd'; P.put('log', mr + 1, mc + 2, null, { ry: 1.2 }); P.put('backpack', mr - 1, mc - 2); }
+      if (k === 'ruins') {
+        // broken walls: a square with gaps, rubble, a statue in the middle
+        for (let r = p.r0; r <= p.r1; r++) for (let cc = p.c0; cc <= p.c1; cc++) if ((r === p.r0 || r === p.r1 || cc === p.c0 || cc === p.c1) && R.next() < .55 && !(cc === mc || r === mr)) g[r][cc] = '#';
+        P.put('statue', mr, mc, 's'); g[p.r0 + 1][p.c0 + 1] = 'r'; P.put('skull', p.r1 - 1, p.c1 - 1); if (R.next() < .6) g[p.r1 - 1][p.c0 + 1] = 'h';
+      }
+      if (k === 'grove') { for (const [dr, dc] of [[-2, -2], [-2, 2], [2, -2], [2, 2]]) P.put('autumn_tree', mr + dr, mc + dc, null, { ry: R.next() * 6 }); P.put('mushroom_cluster', mr, mc - 1); P.put('flower_patch', mr + 1, mc + 1); }
+      if (k === 'shrine') { P.put('statue', p.r0 + 1, mc, 's'); g[p.r0 + 1][mc - 2] = 'i'; g[p.r0 + 1][mc + 2] = 'i'; g[mr + 1][mc - 1] = '*'; g[mr + 1][mc + 1] = '*'; }
+      if (k === 'pond') { for (let r = p.r0; r <= p.r1; r++) for (let cc = p.c0; cc <= p.c1; cc++) if (!((r === p.r0 || r === p.r1) && (cc === p.c0 || cc === p.c1))) g[r][cc] = '~'; g[mr][mc] = 'y'; P.put('tall_grass', p.r0 - 1, p.c0); P.put('tall_grass', p.r1 + 1, p.c1); }
+      if (k === 'meadow') { for (let i = 0; i < 6; i++) { const r = R.int(p.r0, p.r1), cc = R.int(p.c0, p.c1); if (g[r][cc] === ',') P.put(R.pick(['flower_patch', 'heather', 'tall_grass']), r, cc); } }
+      if (k === 'cave') {
+        // a cave mouth: a dark floor in a ring of rocks, crystals in the back
+        for (let cc = p.c0; cc <= p.c1; cc++) { P.put(cc % 2 ? 'mossy_rock' : 'boulder', p.r0, cc, null, { ry: R.next() * 6 }); }
+        for (let r = p.r0 + 1; r <= p.r1 - 2; r++) { P.put('mossy_rock', r, p.c0, null, { ry: R.next() * 6 }); P.put('mossy_rock', r, p.c1, null, { ry: R.next() * 6 }); }
+        P.put('crystals', p.r0 + 1, mc); g[p.r0 + 1][mc - 1] = '^'; g[p.r0 + 1][mc + 1] = '^';
+      }
+      let hutPlace = null;
+      if (k === 'hut') hutPlace = hut(g, R, P, p.r0, p.c0, 6, 6, BUILDING_FURNISH.house, R.pick(['s', 'e', 'w']));
+      if (k !== 'pond') trail(g, hutPlace ? { r0: hutPlace.door[0], c0: hutPlace.door[1], r1: hutPlace.door[0], c1: hutPlace.door[1] } : p, v => v === ':');
+      places.push({ kind: k, ...(hutPlace || p), outdoor: k !== 'hut' });
+    }
+    // the woods: thick on open grass; a few bushes, ferns, rocks, flowers
+    const trees = style === 'spooky' ? ['dead_tree', 'dead_tree', 'dead_tree', 'pine_tree', 'tall_pine'] : style === 'autumn' ? ['autumn_tree', 'autumn_tree', 'oak_tree', 'tall_tree', 'pine_tree'] : style === 'pine' ? ['pine_tree', 'tall_pine', 'pine_tree', 'tall_pine', 'dead_tree'] : ['pine_tree', 'tall_pine', 'oak_tree', 'tall_tree', 'pine_tree', 'oak_tree', 'autumn_tree'];
+    scatter(g, P, R, Math.round(W * H / 6), trees);
+    scatter(g, P, R, Math.round(W * H / 28), style === 'spooky' ? ['mushroom_cluster', 'boulder', 'fern', 'skull', 'shelf_fungus'] : ['fern', 'red_bush', 'flower_bush', 'mossy_rock', 'mushroom_cluster', 'tall_grass', 'flower_patch', 'heather', 'shelf_fungus']);
+    const pl = named(W, H, places);
+    const objects = [...P.objects, ...pl.filter(p => p.kind === 'camp' || p.kind === 'shrine').map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.4, intensity: 1.6, range: 5, color: '#ffc98a' }))];
+    return finish({ kind: 'forest', W, H, g, places: pl, objects, start: pl.find(p => p.kind === 'clearing') || pl[0], lighting: style === 'spooky' ? 'night' : 'bright', dark: false });
+  }
+
+  // ---------------------------------------------------------------- farm
+  // A farmstead: a lane across, the farmhouse (walk in), a barn, a silo and a
+  // coop as buildings, a fenced pasture (for the animals), fields of crops,
+  // a yard with hay, a cart and a well, an orchard; woods around the edge.
+  function farm(opts) {
+    const R = rng(opts.seed);
+    const W = clampSize(opts.size?.[0] ?? 35, 21, 63), H = clampSize(opts.size?.[1] ?? 27, 17, 63);
+    const g = makeGrid(W, H, ','), P = placer(W, H, R);
+    const lane = Math.floor(H / 2) + R.int(-1, 1);
+    for (let c = 0; c < W; c++) { g[lane][c] = ':'; P.taken[lane][c] = true; }
+    const places = [];
+    // the yard by the lane, the farmhouse north of it
+    const mc = Math.floor(W / 2) + R.int(-3, 3);
+    const yard = { r0: lane + 2, c0: mc - 3, r1: lane + 5, c1: mc + 3 };
+    for (let r = yard.r0; r <= yard.r1; r++) for (let c = yard.c0; c <= yard.c1; c++) g[r][c] = ':';
+    P.mark(yard.r0, yard.c0, yard.r1, yard.c1);
+    g[yard.r1][yard.c0] = 'G'; g[yard.r0][yard.c1] = 'V'; P.put('hay', yard.r1, yard.c1); P.put('sacks', yard.r1, yard.c1 - 1);
+    places.push({ kind: 'yard', ...yard, outdoor: true });
+    const house = hut(g, R, P, lane - 7, mc - 3, 7, 6, BUILDING_FURNISH.house, 's');
+    for (let r = house.door[0] + 1; r < lane; r++) g[r][house.door[1]] = ':';
+    places.push({ kind: 'farmhouse', ...house });
+    // the barn and the outbuildings: objects on the grass, fronts to the lane
+    const bigBarn = R.pick(['barn', 'big_barn', 'silo_barn']);
+    const barn = P.building(bigBarn, 5, g, lane - 4, mc + 9, 's') || P.building(bigBarn, 5, g, lane + 5, mc - 9, 'n');
+    if (barn) places.push({ kind: 'barn', r0: barn[0] + 3, c0: barn[1] - 1, r1: barn[0] + 3, c1: barn[1] + 1, outdoor: true });
+    P.building('silo', 3, g, lane - 4, mc + 14, 's');
+    const coop = P.building('chicken_coop', 3, g, lane + 4, mc + 7, 'n');
+    if (coop) places.push({ kind: 'coop', r0: coop[0] - 2, c0: coop[1] - 1, r1: coop[0] - 2, c1: coop[1] + 1, outdoor: true });
+    if (R.next() < .7) P.building(R.pick(['stone_windmill', 'windmill']), 5, g, lane - 5, mc - 12, 's');
+    P.building(R.pick(['open_barn', 'small_barn']), 5, g, lane + 6, mc - 10, 'n');
+    // the pasture: a fence round grass (fence glyphs), a gate to the lane
+    const pas = clearing(g, R, P, 6, 9, ',', [lane + 7, mc + 8, 12]) || clearing(g, R, P, 6, 8, ',', null);
+    if (pas) {
+      for (let r = pas.r0 - 1; r <= pas.r1 + 1; r++) for (let c = pas.c0 - 1; c <= pas.c1 + 1; c++) if (r === pas.r0 - 1 || r === pas.r1 + 1 || c === pas.c0 - 1 || c === pas.c1 + 1) g[r][c] = 'f';
+      const gate = [pas.r0 - 1, Math.floor((pas.c0 + pas.c1) / 2)]; g[gate[0]][gate[1]] = ':';
+      trail(g, { r0: gate[0], c0: gate[1], r1: gate[0], c1: gate[1] }, v => v === ':');
+      P.put('hay', pas.r1, pas.c1); places.push({ kind: 'pasture', ...pas, outdoor: true });
+    }
+    // fields: rows of crops and furrows
+    for (let i = 0; i < 2; i++) {
+      const f = clearing(g, R, P, 5, 7, ':', null);
+      if (!f) continue;
+      for (let r = f.r0; r <= f.r1; r++) for (let c = f.c0; c <= f.c1; c++) if ((r - f.r0) % 2 === 0) g[r][c] = R.next() < .55 ? 'g' : ':';
+      trail(g, f, v => v === ':'); places.push({ kind: 'field', ...f, outdoor: true });
+    }
+    // an orchard of oaks
+    const orch = clearing(g, R, P, 5, 5, ',', null);
+    if (orch) { for (let r = orch.r0; r <= orch.r1; r += 2) for (let c = orch.c0; c <= orch.c1; c += 2) P.put('oak_tree', r, c, null, { ry: R.next() * 6 }); places.push({ kind: 'orchard', ...orch, outdoor: true }); }
+    scatter(g, P, R, Math.round(W * H / 26), ['pine_tree', 'oak_tree', 'tall_tree', 'pine_tree', 'flower_bush', 'red_bush', 'fern']);
+    scatter(g, P, R, Math.round(W * H / 60), ['flower_patch', 'tall_grass', 'heather', 'fence_section']);
+    const pl = named(W, H, places);
+    const objects = [...P.objects, ...pl.filter(p => p.kind === 'farmhouse').map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.5, intensity: 1.6, range: 4.5, color: '#ffd29a' }))];
+    return finish({ kind: 'farm', W, H, g, places: pl, objects, start: pl.find(p => p.kind === 'yard'), lighting: 'bright', dark: false });
+  }
+
+  // ---------------------------------------------------------------- cave
+  // Caverns: a cellular-automaton cave (organic walls, one connected system),
+  // chambers named by their place in it (the entrance nearest the south edge,
+  // the lair furthest), crystals, mushrooms, pools, bones; dark, lit by
+  // glowing crystals. "style": "mine" adds a miners' camp with lamps, carts and
+  // crates.
+  function cave(opts) {
+    const R = rng(opts.seed);
+    const W = clampSize(opts.size?.[0] ?? 33, 17, 63), H = clampSize(opts.size?.[1] ?? 25, 13, 63);
+    const style = String(opts.style || '').toLowerCase();
+    let open = makeGrid(W, H, false);
+    for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) open[r][c] = R.next() < .55;
+    for (let step = 0; step < 5; step++) {
+      const nx = makeGrid(W, H, false);
+      for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) {
+        let n = 0; for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if ((dr || dc) && open[r + dr][c + dc]) n++;
+        nx[r][c] = open[r][c] ? n >= 4 : n >= 5;
+      }
+      open = nx;
+    }
+    // keep the largest connected cave
+    const seen = makeGrid(W, H, -1), regions = [];
+    for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) if (open[r][c] && seen[r][c] < 0) {
+      const cells = [], q = [[r, c]]; seen[r][c] = regions.length;
+      while (q.length) { const [a, b] = q.pop(); cells.push([a, b]); for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = a + dr, y = b + dc; if (open[x]?.[y] && seen[x][y] < 0) { seen[x][y] = regions.length; q.push([x, y]); } } }
+      regions.push(cells);
+    }
+    const main = regions.sort((a, b) => b.length - a.length)[0] || [];
+    const g = makeGrid(W, H, '.'), P = placer(W, H, R);
+    for (const [r, c] of main) g[r][c] = R.next() < .8 ? ':' : '^';
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (g[r][c] === '.' && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dr, dc]) => [':', '^'].includes(g[r + dr]?.[c + dc]))) g[r][c] = '#';
+    // chambers: the widest spots, spread apart
+    const room = ([r, c]) => { let n = 0; for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if ([':', '^'].includes(g[r + dr]?.[c + dc])) n++; return n; };
+    const spots = R.shuffle(main.filter(p => room(p) >= 19)).sort((a, b) => room(b) - room(a));
+    const centres = [];
+    for (const s of spots) if (centres.every(t => Math.abs(t[0] - s[0]) + Math.abs(t[1] - s[1]) >= 8)) centres.push(s);
+    if (!centres.length && main.length) centres.push(main[0]);
+    const target = Math.max(3, Math.min(9, +opts.rooms || Math.round(W * H / 120)));
+    const chosen = centres.slice(0, target);
+    const entrance = chosen.slice().sort((a, b) => b[0] - a[0])[0];
+    const far = p => Math.abs(p[0] - entrance[0]) + Math.abs(p[1] - entrance[1]);
+    const rest = chosen.filter(p => p !== entrance).sort((a, b) => far(b) - far(a));
+    // places asked for come first ("in" and "generate": {"places": [...]}), then the rest
+    const CAVE_KINDS = ['crystals', 'grotto', 'pool', 'treasure', 'bones', 'camp', 'mine', 'chamber'];
+    const asked = [...new Set((opts.want || []).filter(k => CAVE_KINDS.includes(k)))];
+    const roles = ['lair', ...asked, ...R.shuffle(['crystals', 'grotto', 'pool', 'treasure', 'bones', style === 'mine' ? 'mine' : 'camp', 'chamber', 'chamber']).filter(k => !asked.includes(k))];
+    const places = [{ kind: 'entrance', r0: entrance[0] - 1, c0: entrance[1] - 1, r1: entrance[0] + 1, c1: entrance[1] + 1 }];
+    rest.forEach((p, i) => places.push({ kind: roles[i] || 'chamber', r0: p[0] - 1, c0: p[1] - 1, r1: p[0] + 1, c1: p[1] + 1 }));
+    const floorAt = (r, c) => [':', '^'].includes(g[r]?.[c]) && !P.taken[r][c];
+    const near = (p, n, fn) => { const cells = []; for (let r = p.r0 - 1; r <= p.r1 + 1; r++) for (let c = p.c0 - 1; c <= p.c1 + 1; c++) if (floorAt(r, c) && !(r === (p.r0 + p.r1) / 2 && c === (p.c0 + p.c1) / 2)) cells.push([r, c]); R.shuffle(cells).slice(0, n).forEach(([r, c]) => { fn(r, c); P.taken[r][c] = true; }); };
+    const lights = [];
+    for (const p of places) {
+      const mr = (p.r0 + p.r1) / 2, mc = (p.c0 + p.c1) / 2;
+      if (p.kind === 'crystals') { near(p, 4, (r, c) => P.put('crystals', r, c, null, { ry: R.next() * 6 })); lights.push([mr, mc, '#c58cff']); }
+      if (p.kind === 'grotto') near(p, 5, (r, c) => P.put(R.pick(['mushroom_cluster', 'shelf_fungus']), r, c, null, { ry: R.next() * 6 }));
+      if (p.kind === 'pool') near(p, 4, (r, c) => { g[r][c] = '~'; });
+      if (p.kind === 'treasure') { near(p, 1, (r, c) => { g[r][c] = 'h'; }); near(p, 2, (r, c) => P.put(R.pick(['gold_bars', 'coin_pouch', 'crown']), r, c)); }
+      if (p.kind === 'bones' || p.kind === 'lair') near(p, 3, (r, c) => P.put(R.pick(['skull', 'bone', 'bone']), r, c, null, { ry: R.next() * 6 }));
+      if (p.kind === 'camp') { near(p, 1, (r, c) => { g[r][c] = 'X'; }); near(p, 2, (r, c) => P.put(R.pick(['sacks', 'backpack', 'log']), r, c)); lights.push([mr, mc, '#ffb070']); }
+      if (p.kind === 'mine') { near(p, 2, (r, c) => { g[r][c] = R.pick(['C', 'p', 'V']); }); near(p, 1, (r, c) => P.put('crystals', r, c)); lights.push([mr, mc, '#ffd29a']); }
+      if (p.kind === 'entrance') lights.push([mr, mc, '#cfe2ff']);
+    }
+    // the rest of the cave: rocks and fungus against the walls
+    for (const [r, c] of R.shuffle(main.slice()).slice(0, Math.round(main.length / 14))) {
+      if (!floorAt(r, c) || ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dr, dc]) => g[r + dr]?.[c + dc] === '#')) continue;
+      P.put(R.pick(['mossy_rock', 'boulder', 'mushroom_cluster', 'crystals', 'mossy_rock']), r, c, null, { ry: R.next() * 6 }); P.taken[r][c] = true;
+    }
+    const pl = named(W, H, places), at = toBoard(W, H);
+    const objects = [...P.objects, ...lights.map(([r, c, color]) => { const [x, z] = at(Math.round(r), Math.round(c)); return { type: 'light', x, z, y: 1.4, intensity: 1.5, range: 5.5, color }; })];
+    return finish({ kind: 'cave', W, H, g, places: pl, objects, start: pl.find(p => p.kind === 'entrance'), lighting: 'night', dark: !!opts.dark });
+  }
+
+  // Villages look built-up all round: closed buildings (inn, stone and tall
+  // houses, a mill house, a sawmill, a blacksmith, barracks, a gazebo) on the
+  // grass left over, facing the nearest road, and varied trees.
+  function villageExtras(v, opts) {
+    const R = rng((opts.seed ?? 1) * 31 + 7), W = v.size[0], H = v.size[1];
+    const g = v.grid.map(row => row.split('')), P = placer(W, H, R);
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (g[r][c] !== ',') P.mark(r - 1, c - 1, r + 1, c + 1);
+    const style = String(opts.style || '').toLowerCase();
+    const kinds = style === 'farming' || style === 'hamlet' ? ['small_barn', 'barn', 'chicken_coop', 'silo', 'stone_house', 'hay', 'open_barn'] : ['inn', 'stone_house', 'tall_house', 'mill_house', 'stone_house', 'tall_house', 'sawmill', 'blacksmith', 'barracks', 'gazebo', 'fantasy_house', 'stone_house'];
+    const road = (r, c) => g[r]?.[c] === ':' || g[r]?.[c] === 'U';
+    const facing = (r, c) => { let best = null; for (const [d, dr, dc] of [['s', 1, 0], ['n', -1, 0], ['e', 0, -1], ['w', 0, 1]]) for (let k = 1; k < 12; k++) if (road(r + dr * k, c + dc * k)) { if (!best || k < best[1]) best = [d, k]; break; } return best ? best[0] : 's'; };
+    let n = 0;
+    for (let t = 0; t < 300 && n < Math.max(2, Math.round(W * H / 140)); t++) {
+      const r = R.int(3, H - 4), c = R.int(3, W - 4), type = kinds[n % kinds.length];
+      const span = ['hay', 'chicken_coop', 'silo', 'gazebo'].includes(type) ? 3 : 5;
+      if (P.building(type, span, g, r, c, facing(r, c), 1)) n++;
+    }
+    // swap some of the plain trees for the varied ones
+    const tree = () => R.pick(['pine_tree', 'oak_tree', 'tall_tree', 'autumn_tree', 'tall_pine', 'oak_tree']);
+    const extra = [];
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (g[r][c] === '%' && R.next() < .6) { g[r][c] = ','; const [x, z] = P.at(r, c); extra.push({ type: tree(), x, z, ry: +(R.next() * 6.283).toFixed(3) }); }
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (g[r][c] === ',' && !P.taken[r][c] && R.next() < .02) { const [x, z] = P.at(r, c); extra.push({ type: R.pick(['flower_bush', 'flower_patch', 'heather', 'fence_section', 'hay']), x, z, ry: +(R.next() * 6.283).toFixed(3) }); P.taken[r][c] = true; }
+    return { ...v, grid: g.map(row => row.join('')), objects: [...v.objects, ...P.objects, ...extra] };
+  }
+
   // Everything walkable must be reachable from the start: furniture that cuts
   // a corridor or doorway off is cleared (cheapest path through furniture).
   const HARD = new Set(['#', '.', '~', '&', '-', 'y', '%']);
@@ -356,13 +640,20 @@
     [/\b(smith|blacksmith|armou?rer|forge)/i, ['smithy']],
     [/\b(innkeeper|barkeep|bartender|tavern|barmaid|bard|drunk|patron)/i, ['tavern']],
     [/\b(merchant|shopkeeper|trader|peddler|vendor|seller)/i, ['shop', 'square']],
-    [/\b(stable|groom|farmer|horse)/i, ['stable', 'garden']],
+    [/\b(cow|bull|sheep|pig|horse|donkey|alpaca|goat)/i, ['pasture', 'stable', 'meadow', 'yard', 'clearing', 'garden', 'square']],
+    [/\b(deer|stag|fox|rabbit|bunny|boar)/i, ['grove', 'meadow', 'clearing', 'pasture']],
+    [/\b(dog|husky|hound)/i, ['yard', 'square', 'camp', 'farmhouse']],
+    [/\b(stable|groom|farmer|farmhand|milkmaid|shepherd)/i, ['field', 'farmhouse', 'yard', 'stable', 'garden', 'pasture']],
+    [/\b(hunter|huntress|ranger|bandit|outlaw|poacher|woodsman|woodcutter|scout)/i, ['camp', 'hut', 'clearing', 'ruins']],
+    [/\b(hermit|druid|witch|herbalist)/i, ['hut', 'shrine', 'grove']],
+    [/\b(miner|prospector|dwarf)/i, ['mine', 'camp', 'crystals']],
+    [/\b(wyrm|wyrmling|snake|serpent|wasp|frog|mushroom|imp)/i, ['lair', 'grotto', 'pool', 'grove', 'ruins', 'cave']],
     [/\b(gardener|herbalist)/i, ['garden', 'alchemist']],
     [/\b(treasure|dragon|hoard|miser)/i, ['treasure']],
     [/\b(child|kid|villager|elder|mayor|townsfolk|widow|fisher)/i, ['house', 'square']],
   ];
   function placeFor(agent, places, used) {
-    const text = [agent.id, agent.style, agent.personality, agent.role].filter(Boolean).join(' ');
+    const text = [agent.id, agent.style, agent.personality, agent.role, String(agent.model || '').replace(/_/g, ' ')].filter(Boolean).join(' ');
     const has = k => places.filter(p => p.kind === k || p.id === k);
     for (const [re, kinds] of ROLE_PLACES) if (re.test(text)) for (const k of kinds) { const ps = has(k); if (ps.length) return ps.find(p => !used.has(p.id)) || ps[0]; }
     return places.find(p => !used.has(p.id) && !['entrance', 'square', 'pond'].includes(p.kind)) || places[0];
@@ -401,7 +692,11 @@
     // places asked for: "generate": {"places": [...]}, and every "in"
     const want = [...(Array.isArray(opts.places) ? opts.places.map(p => ({ in: p })) : []), ...(Array.isArray(scn.locked) ? scn.locked : []), ...(scn.agents || []), ...(scn.objects || []), scn.player || {}].map(a => a.in).filter(v => v != null).map(v => String(v).toLowerCase().replace(/\s+\d+$/, ''));
     // dungeons are dark (fog of war, unlit rooms) unless the scenario says "dark": false
-    const gen = (kindName === 'village' || kindName === 'town' ? village : dungeon)({ ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? true });
+    const KINDS = { village, town: village, hamlet: village, forest, woods: forest, wilds: forest, wilderness: forest, farm, farmstead: farm, cave, caves: cave, cavern: cave, mine: cave, dungeon };
+    const make = KINDS[kindName] || dungeon, outdoor = make === village || make === forest || make === farm;
+    const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? !outdoor, style: opts.style || (kindName === 'mine' ? 'mine' : kindName === 'hamlet' ? 'hamlet' : '') };
+    let gen = make(genOpts);
+    if (make === village && opts.extras !== false) gen = villageExtras(gen, genOpts);
     const warnings = [], used = new Set(), occupied = new Set(), placed = {};
     const agents = (scn.agents || []).map(a => {
       if (Array.isArray(a.at)) { occupied.add(a.at[0] + ',' + a.at[1]); return a; }
@@ -431,7 +726,7 @@
     }
     return {
       scenario: { ...scn, grid: scn.grid?.length ? scn.grid : gen.grid, legend: { ...gen.legend, ...(scn.legend || {}) }, size: scn.size || gen.size,
-        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, dark: scn.dark ?? gen.dark, walls: scn.walls ?? 'stone', wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
+        objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, dark: scn.dark ?? gen.dark, walls: scn.walls ?? (make === forest || make === cave ? 'stone' : 'stone'), wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
       places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
       warnings,
     };
@@ -484,7 +779,7 @@
     const bx = Math.round(+b.x), bz = Math.round(+b.z), d = spec.pad || 2;
     return { pad: [bx + f[0] * d, bz + f[1] * d], beyond: [bx + f[0] * (d + 1), bz + f[1] * (d + 1)] };
   }
-  const api = { dungeon, village, applyToScenario, WALK_IN, WALK_IN_THINGS, walkInFootprint, doorPad, interiorScenario, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
+  const api = { dungeon, village, forest, farm, cave, applyToScenario, KINDS: ['dungeon', 'village', 'forest', 'farm', 'cave'], WALK_IN, WALK_IN_THINGS, walkInFootprint, doorPad, interiorScenario, ROOM_KINDS: Object.keys(ROOM_FURNISH), BUILDING_KINDS: Object.keys(BUILDING_FURNISH) };
   globalThis.TablefolkProcgen = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })();

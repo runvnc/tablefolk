@@ -38,8 +38,8 @@
   const alive = c => c && !c.defeated && !getBrainConfig(c.id).defeated && getBrainConfig(c.id).enabled !== false;
   const seenByPlayer = c => !me() || (window.tablefolkDark?.visible?.(posOf(c).x, posOf(c).z) ?? true) && Math.hypot(posOf(c).x - posOf(me()).x, posOf(c).z - posOf(me()).z) <= 12;
 
-  async function wander(c) {
-    if (Math.random() > .35) return;
+  async function wander(c, chance = .35) {
+    if (Math.random() > chance) return;
     const p = posOf(c), dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => Math.random() - .5);
     for (const [dx, dz] of dirs) {
       const x = Math.round(p.x) + dx, z = Math.round(p.z) + dz;
@@ -50,6 +50,13 @@
       await sleep(c.turnMove.dur * 1000 + 100);
       return;
     }
+  }
+  // an animal (play.js ANIMALS, no brain): ambles about, grazes, looks around
+  async function animalTurn(c) {
+    const r = Math.random();
+    if (r < .45) return wander(c, 1);
+    if (r < .7) { try { playRig(c, 'pickup', false); } catch {} return sleep(1200); }
+    const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][Math.floor(Math.random() * 4)]; try { setCharacterFacing(c, new BABYLON.Vector3(d[0], 0, d[1])); } catch {}
   }
   async function monsterTurn(c) {
     const pl = me();
@@ -123,6 +130,7 @@
       const hostile = P()?.isHostile?.(c), mind = !hostile || P()?.talksToo?.(c), why = reason(c);
       try {
         if (hostile && !mind) await monsterTurn(c);
+        else if (P()?.isAnimal?.(c)) await animalTurn(c);
         else if (!why && Math.random() < P0().idle) await idle(c);
         else {
           if (hostile) await monsterTurn(c);

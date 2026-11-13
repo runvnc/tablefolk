@@ -1010,7 +1010,7 @@
     }
   }
   // Hit points for monsters without "hp" (combat.js NATURAL has their damage).
-  const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24 };
+  const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24, wyrmling: 9, imp: 7, mushroom_warrior: 8, bunny: 5, snake: 4, wasp: 3, frog: 2, bull: 12, stag: 9, horse: 10, white_horse: 10, cow: 9, deer: 6, fox: 4, dog: 5, husky: 5, alpaca: 7, donkey: 8, pig: 6, sheep: 5 };
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
     // opts.sub: a subworld entered through a link (the player, the goal and the
@@ -1117,6 +1117,7 @@
         maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), wielding: null, defeated: false,
         // play.js: hostile characters fight with a built-in routine, no LLM
         // (unset: mindless monster models are hostile, everyone else talks)
+        talks: a.talks === true,   // an animal with a brain (play.js ANIMALS)
         ...(a.hostile != null ? { hostile: !!a.hostile } : { hostile: undefined }),
         // workflows.js: which routines it may start, none running yet
         workflows: Array.isArray(a.workflows) ? a.workflows.map(String) : null, wf: null,

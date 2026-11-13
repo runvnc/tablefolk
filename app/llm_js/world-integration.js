@@ -826,6 +826,15 @@ async function main() {
     // talk, an enemy with a mind (a necromancer, a bandit chief) talks when
     // spoken to or when the fight starts, with words only (say/whisper/emote:
     // its blows come from the routine, one a round)
+    // an animal without a brain ("talks": true gives it one): spoken to, it only reacts
+    if (window.tablefolkPlay?.isAnimal?.(g) && !window.tablefolkPlay?.isHostile(g)) {
+      if (cfg.pendingChat?.length) {
+        cfg.pendingChat = []; world.setBrainConfig(g.id, cfg);
+        const SOUND = { cow: 'moos', bull: 'snorts and paws the ground', horse: 'whinnies', white_horse: 'whinnies', donkey: 'brays', dog: 'wags its tail and barks', husky: 'howls happily', fox: 'yips and darts away a little', deer: 'flicks its ears', stag: 'lifts its antlers', alpaca: 'hums', pig: 'oinks', sheep: 'bleats' };
+        try { appendLog(`${g.id} ${SOUND[g.charModel] || 'looks at you'}.`); } catch {}
+      }
+      return false;
+    }
     const enemy = !!window.tablefolkPlay?.isHostile(g);
     if (enemy && !(window.tablefolkPlay?.talksToo?.(g) && cfg.pendingChat?.length)) return false;
     // look() again so soon learns nothing new (small models loop on it, and

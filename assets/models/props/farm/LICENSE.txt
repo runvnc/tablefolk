@@ -1,0 +1,12 @@
+Models by Quaternius (https://quaternius.com), CC0 1.0 (public domain), downloaded
+from Poly Pizza and compressed with tools/compress-glb.sh.
+
+  silo.glb               Silo                   https://poly.pizza/m/5GhLrv5Ce3
+  open_barn.glb          Open Barn              https://poly.pizza/m/ZIdWHxYsUv
+  chicken_coop.glb       ChickenCoop            https://poly.pizza/m/DM0F8siLam
+  barn.glb               Barn                   https://poly.pizza/m/vSqQNA7ez6
+  silo_barn.glb          Silo House             https://poly.pizza/m/ZgstejsAcN
+  small_barn.glb         Small Barn             https://poly.pizza/m/aTcDP7UERC
+  big_barn.glb           Big Barn               https://poly.pizza/m/q1N3xn2SpC
+  stone_windmill.glb     Tower Windmill         https://poly.pizza/m/52yaPyaAAG
+  farm_fence.glb         Fence                  https://poly.pizza/m/U7g0Wxpt63

@@ -1,0 +1,28 @@
+Models by Quaternius (https://quaternius.com), CC0 1.0 (public domain), downloaded
+from Poly Pizza and compressed with tools/compress-glb.sh.
+
+  bear_trap.glb          Bear Trap              https://poly.pizza/m/UTau9hyAnm
+  backpack.glb           Backpack               https://poly.pizza/m/2g9Jm7kvIU
+  shovel.glb             Shovel                 https://poly.pizza/m/oNBQSf87ZJ
+  frying_pan.glb         Pan                    https://poly.pizza/m/f9my9iJZMv
+  log.glb                Wood Log               https://poly.pizza/m/L4E32Wee6C
+  shield.glb             Shield                 https://poly.pizza/m/srN1KGAO7f
+  round_shield.glb       Shield Round           https://poly.pizza/m/UKXj8qjiF8
+  sword.glb              Sword                  https://poly.pizza/m/ajOJ2NLz5m
+  crown.glb              Crown                  https://poly.pizza/m/i0PZVuVlYv
+  book.glb               Book                   https://poly.pizza/m/Qkvcgg5tpj
+  open_book.glb          Open Book              https://poly.pizza/m/FsCIGEfTEs
+  coin_pouch.glb         Coin Pouch             https://poly.pizza/m/pTZyPTMH88
+  hunting_bow.glb        Wooden Bow             https://poly.pizza/m/QnpqjLSKFU
+  spear.glb              Spear                  https://poly.pizza/m/fH1zmvjPNx
+  dagger.glb             Dagger                 https://poly.pizza/m/kSMpR711Y2
+  necklace.glb           Necklace               https://poly.pizza/m/Mezewzksj5
+  skull.glb              Skull                  https://poly.pizza/m/YgmRBtFlcF
+  bone.glb               Bone                   https://poly.pizza/m/uMs0lDp1u3
+  gold_bars.glb          Gold Ingots            https://poly.pizza/m/3jRhAgbc6t
+  leather_armor.glb      Armor Leather          https://poly.pizza/m/na9KfWiKN8
+  plate_armor.glb        Armor Metal            https://poly.pizza/m/TMUoxILh9w
+  greatsword.glb         Claymore               https://poly.pizza/m/BBhN1O6TOL
+  war_hammer.glb         Doublesided Hammer     https://poly.pizza/m/UIXvQ73DS1
+  crystals.glb           Mineral                https://poly.pizza/m/STixpWYaTd
+  scythe.glb             Scythe                 https://poly.pizza/m/yE9TKCewO8

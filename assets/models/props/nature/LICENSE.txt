@@ -1,0 +1,18 @@
+Models by Quaternius (https://quaternius.com), CC0 1.0 (public domain), downloaded
+from Poly Pizza and compressed with tools/compress-glb.sh.
+
+  pine_tree.glb          Pine                   https://poly.pizza/m/rfnxJv0Rqa
+  tall_pine.glb          Pine                   https://poly.pizza/m/79gmlLnweB
+  dead_tree.glb          Dead Tree              https://poly.pizza/m/n8FhMgMldD
+  autumn_tree.glb        Twisted Tree           https://poly.pizza/m/9aWlx82xUf
+  oak_tree.glb           Tree                   https://poly.pizza/m/QVOop92WmG
+  tall_tree.glb          Tree                   https://poly.pizza/m/aVOxaHRPWe
+  red_bush.glb           Bush                   https://poly.pizza/m/EoTERLq3z2
+  flower_bush.glb        Bush with Flowers      https://poly.pizza/m/U1ymDy8tbY
+  fern.glb               Fern                   https://poly.pizza/m/jqcanvH7D6
+  mushroom_cluster.glb   Mushroom               https://poly.pizza/m/aOW08oSrd4
+  shelf_fungus.glb       Mushroom Laetiporus    https://poly.pizza/m/mxDOl0n6zt
+  mossy_rock.glb         Rock Medium            https://poly.pizza/m/KZdEP3uUpa
+  tall_grass.glb         Tall Grass             https://poly.pizza/m/JSIYtscPmP
+  heather.glb            Plant Big              https://poly.pizza/m/uwJ1rwrZlB
+  flower_patch.glb       Flower Group           https://poly.pizza/m/hfPzQAedOe

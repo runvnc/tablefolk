@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "title": "Millbrook Farm",
+  "subtitle": "A busy farmstead, and a cow that went missing",
+  "intro": "Millbrook Farm: a farmhouse, a big red barn, fields of pumpkins and a fenced pasture. Farmer Hale is counting his herd and is one cow short.",
+  "seed": 4,
+  "generate": { "kind": "farm" },
+  "player": { "name": "Traveller", "gold": 5, "items": [] },
+  "allowed": ["say", "walk", "face", "emote", "give", "sell", "inventory"],
+  "agents": [
+    { "id": "hale", "model": "farmer", "in": "yard", "style": "worried farmer", "personality": "Hale, the farmer of Millbrook. His best cow Clover has wandered off; she was last seen by the orchard. He sells pumpkins for 2 gold each and will give a pumpkin pie to anyone who finds Clover.", "inventory": { "gold": 6, "items": ["pumpkin pie"] } },
+    { "id": "tess", "model": "villager_woman", "in": "farmhouse", "style": "farmer's daughter", "personality": "Tess, Hale's daughter, who looks after the hens and the horses. She is cheerful and knows every animal by name: Clover the cow, Barley the horse, Pip the dog." },
+    { "id": "clover", "model": "cow", "in": "orchard" },
+    { "id": "daisy", "model": "cow", "in": "pasture" },
+    { "id": "barley", "model": "horse", "in": "pasture" },
+    { "id": "wool", "model": "sheep", "in": "pasture" },
+    { "id": "pip", "model": "dog", "in": "yard" },
+    { "id": "trotter", "model": "pig", "in": "barn" }
+  ]
+}

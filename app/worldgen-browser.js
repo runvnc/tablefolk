@@ -23,11 +23,18 @@
 (function () {
   const LOADER = '/libs/brain/engines/litert.js';
   const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman'.split(' ');
-  const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon'.split(' ');
-  const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon'.split(' '));
+  const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog'.split(' ');
+  const ANIMALS = 'cow bull horse white_horse donkey deer stag fox dog husky alpaca pig sheep'.split(' ');
+  const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog'.split(' '));
   const DUNGEON = 'entrance throne lair treasure library shrine barracks storage kitchen prison crypt alchemy'.split(' ');
   const VILLAGE = 'square tavern smithy shop temple alchemist guardhouse library stable house pond garden'.split(' ');
-  const THINGS = 'chest coin_pile note potion scroll key chalice rope torch barrel crate candles candelabra cage chains statue bookcase lectern cabinet well market_stand cart tent logs campfire banner'.split(' ');
+  // procgen.js forest, farm and cave (2026-11-13)
+  const FOREST = 'clearing camp ruins grove shrine pond hut cave meadow'.split(' ');
+  const FARM = 'yard farmhouse barn pasture field orchard coop'.split(' ');
+  const CAVE = 'entrance lair crystals grotto pool treasure bones camp mine chamber'.split(' ');
+  const GENERATED = { dungeon: DUNGEON, village: VILLAGE, forest: FOREST, farm: FARM, cave: CAVE };
+  const placesOf = kind => GENERATED[kind] || DUNGEON;
+  const THINGS = 'chest coin_pile note potion scroll key chalice rope torch barrel crate candles candelabra cage chains statue bookcase lectern cabinet well market_stand cart tent logs campfire banner sword shield crown book coin_pouch gold_bars crystals bear_trap hunting_bow dagger necklace skull hay sacks'.split(' ');
   const OUTDOOR_THINGS = 'campfire tree boulder tent cart logs crate barrel chest well fence signpost flowers lantern bench table mushroom coin_pile note'.split(' ');
   const ENEMY = /\b(villain|necromancer|evil|cultist|cult leader|bandit|brigand|captor|kidnapp\w*|warlord|tyrant|dark lord|lich|enemy|boss|raider|marauder|assassin|monster|warlock)\b/i;
   const HOSTILE_INTENT = /\b(attacks? (anyone|intruders|strangers|the player|on sight)|kills? (anyone|intruders|strangers|the player)|despises (the living|intruders|strangers)|wants (the player|intruders|them) dead)\b/i;
@@ -99,9 +106,12 @@
   function parsePlan(text, prompt) {
     const line = k => (text.match(new RegExp('^\\s*\\**' + k + '\\**\\s*:\\s*(.+)$', 'im')) || [])[1]?.trim() || '';
     const kindText = line('KIND') + ' ' + prompt;
-    const kind = /dungeon|crypt|cave|castle|tomb|keep|lair|mine|catacomb|tower/i.test(line('KIND') || prompt) ? 'dungeon'
-      : /village|town|hamlet|market|city/i.test(kindText) ? 'village' : /outdoor|forest|camp|grove|field|road|beach|clearing/i.test(kindText) ? 'outdoor' : 'dungeon';
-    const placeList = kind === 'village' ? VILLAGE : DUNGEON;
+    // the KIND line first, then the request
+    const kindOf = t => /\b(cave|caves|cavern|grotto|mine|mines)\b/i.test(t) ? 'cave' : /\b(farm|farmstead|ranch|pasture|barn|orchard|homestead)\b/i.test(t) ? 'farm'
+      : /\b(forest|woods?|woodland|grove|glade|wilds?|wilderness|camp|clearing|thicket)\b/i.test(t) ? 'forest' : /\b(dungeon|crypt|castle|tomb|keep|lair|catacombs?|tower|ruin(ed|s)? fortress)\b/i.test(t) ? 'dungeon'
+      : /\b(village|town|hamlet|market|city)\b/i.test(t) ? 'village' : /\b(outdoor|field|road|beach|coast|desert)\b/i.test(t) ? 'outdoor' : '';
+    const kind = kindOf(line('KIND')) || kindOf(prompt) || 'dungeon';
+    const placeList = placesOf(kind);
     const places = [...new Set(line('PLACES').split(/[,;]/).map(p => pickFrom(placeList, p)).filter(Boolean))];
     const chars = [];
     const block = text.split(/^\s*\**CHARACTERS\**\s*:/im)[1] || '';
@@ -109,7 +119,7 @@
       if (/^\s*\**[A-Z]+\**\s*:/.test(l) && chars.length) break;
       const parts = l.replace(/^\s*[-*\d.)]+\s*/, '').split('|').map(s => s.trim());
       if (parts.length < 3 || !parts[0]) continue;
-      const body = pickFrom(PEOPLE.concat(MONSTERS), parts[1]) || (/goblin/i.test(l) ? 'goblin' : /skelet/i.test(l) ? 'skeleton' : 'villager');
+      const body = pickFrom(PEOPLE.concat(MONSTERS, ANIMALS), parts[1]) || (/goblin/i.test(l) ? 'goblin' : /skelet/i.test(l) ? 'skeleton' : 'villager');
       chars.push({ name: parts[0].replace(/\*+/g, ''), body, role: parts[2] || '', want: parts[3] || '', know: parts[4] || '' });
     }
     return { title: line('TITLE').replace(/\*+/g, '') || prompt, kind, mood: line('MOOD'), places, chars: chars.slice(0, 6), treasure: line('TREASURE'), goal: line('GOAL'), text };
@@ -123,7 +133,7 @@
       player: { name: 'Traveller', gold: 10, items: [] }, allowed: ['say', 'walk', 'face', 'emote'], agents: [], goal: null,
     };
     const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
-    const places = plan.kind === 'village' ? VILLAGE : DUNGEON;
+    const places = placesOf(plan.kind);
     // models like to write the rooms out: [{name, objects: [...]}]
     for (const k of ['rooms', 'buildings']) if (Array.isArray(m[k])) {
       const rooms = m[k];
@@ -149,8 +159,11 @@
       return { scn, places: [] };
     }
     const n = Math.max(3, Math.min(plan.kind === 'village' ? 12 : 12, Math.round(+(m.rooms ?? m.buildings) || plan.places.length + 2)));
-    scn.generate = plan.kind === 'village' ? { kind: 'village', buildings: n, places: plan.places } : { kind: 'dungeon', rooms: n, places: plan.places };
-    scn.dark = plan.kind === 'dungeon' ? m.dark !== false : false;
+    scn.generate = plan.kind === 'village' ? { kind: 'village', buildings: n, places: plan.places } : { kind: plan.kind, rooms: n, places: plan.places };
+    if (plan.kind === 'forest' && /spooky|haunted|cursed|dark|dead/i.test(plan.text)) scn.generate.style = 'spooky';
+    if (plan.kind === 'cave' && /\bmine|miners?\b/i.test(plan.text)) scn.generate.style = 'mine';
+    scn.dark = plan.kind === 'dungeon' || plan.kind === 'cave' ? m.dark !== false : false;
+    if (plan.kind === 'forest' || plan.kind === 'farm') scn.lighting = /night/i.test(m.lighting || '') ? 'night' : 'bright';
     scn.objects = objects;
     let built = globalThis.TablefolkProcgen.applyToScenario(JSON.parse(JSON.stringify(scn)));
     // a thing put in a place that was not built goes to a like one that was
@@ -179,7 +192,8 @@
     const placeIds = built.places.map(p => p.id);
     const agents = list.map((a, i) => {
       let aid = id(a.id || a.name || plan.chars[i]?.name || 'npc' + i); while (ids.has(aid)) aid += '2'; ids.add(aid);
-      const model = PEOPLE.concat(MONSTERS).includes(a.model) ? a.model : pickFrom(PEOPLE.concat(MONSTERS), a.model) || plan.chars[i]?.body || 'villager';
+      const BODIES = PEOPLE.concat(MONSTERS, ANIMALS);
+      const model = BODIES.includes(a.model) ? a.model : pickFrom(BODIES, a.model) || plan.chars[i]?.body || 'villager';
       const ag = { id: aid, model };
       // a monster body given a real part (a ghost who guards and talks) talks
       const talks = MINDLESS.has(model) && a.hostile !== true && String(a.personality || '').length > 80 && (!a.allowed || a.allowed.includes('say'));
@@ -257,13 +271,13 @@
       await model(emit);
       // 1. plan
       const planText = await ask(emit, 'plan', 'step 1/5: planning the world', 'You design small adventure scenes for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
-        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(3-5 lines: at least one person the player can talk to, and monsters if there is danger. Example: - Brann | woodsman | the gravekeeper | wants the crypt sealed | knows the ghost was his sister. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
+        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village, forest, farm, cave or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}. Forest places: ${FOREST.join(', ')}. Farm places: ${FARM.join(', ')}. Cave places: ${CAVE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(3-5 lines: at least one person the player can talk to, and monsters if there is danger. Example: - Brann | woodsman | the gravekeeper | wants the crypt sealed | knows the ghost was his sister. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (they do not talk): ${ANIMALS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
       const plan = parsePlan(planText, prompt);
       // 2. map
       const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
       const mapAsk = plan.kind === 'outdoor'
         ? `Write the outdoor map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "map": ["place campfire at center", "place tree x6 scattered at north", "paint water x8 cluster at east", "place player at south"], "objects": [{"type": "chest", "gold": 30, "items": ["silver key"]}]}\nMap lines: place <thing> [xN] [scattered|cluster|row] at center|north|south|east|west|random, or near/beside <thing>. Things: ${OUTDOOR_THINGS.join(', ')}. No characters yet.`
-        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${(plan.kind === 'village' ? VILLAGE : DUNGEON).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
+        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${placesOf(plan.kind).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
       let mapOut = {};
       try { mapOut = json(await ask(emit, 'map', 'step 2/5: drawing the map', 'You turn adventure plans into game data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${mapAsk}`)); }
       catch (e) { emit('progress', { stage: 'map', label: 'the map answer was not JSON; using the plan' }); }
@@ -283,7 +297,7 @@
       const scn = built.scn;
       // 4. characters
       const where = plan.kind === 'outdoor' ? `"near": one of ${OUTDOOR_THINGS.join(', ')}` : `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
-      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
+      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (no talking: just id, model and where): ${ANIMALS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
       const chars = json(await ask(emit, 'characters', 'step 4/5: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
       buildAgents(plan, chars, built, scn);
       if (!scn.agents.length) throw new Error('the model wrote no characters');

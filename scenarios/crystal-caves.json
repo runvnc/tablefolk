@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "title": "The Crystal Caves",
+  "subtitle": "Glowing caverns, a wyrmling and its hoard",
+  "intro": "Below the hills the old mine opens into caverns of glowing crystal. A young wyrm has made its lair at the far end, sleeping on the miners' gold. Mind the snakes.",
+  "seed": 11,
+  "generate": { "kind": "cave", "rooms": 7, "style": "mine", "places": ["mine", "crystals", "treasure"] },
+  "player": { "name": "Traveller", "gold": 0, "items": [], "hp": 14 },
+  "allowed": ["say", "walk", "face", "emote", "give", "inventory", "attack", "wield"],
+  "objects": [ { "type": "chest", "in": "treasure", "gold": 60, "items": ["miner's lamp"] }, { "type": "sword", "in": "mine" } ],
+  "agents": [
+    { "id": "dunstan", "model": "hooded", "in": "mine", "style": "old miner", "personality": "Dunstan, the last miner left in the caves. He is scared of the wyrmling in the lair and will tell anyone that the sword by the mine carts is the only weapon down here. He wants his lamp back: it is in the treasure chest." },
+    { "id": "ember", "model": "wyrmling", "in": "lair" },
+    { "id": "hiss", "model": "snake", "in": "grotto" },
+    { "id": "coil", "model": "snake", "in": "pool" },
+    { "id": "spore", "model": "mushroom_warrior", "in": "crystals" }
+  ],
+  "goal": { "text": "Defeat the wyrmling and find the miners' gold.", "win": { "all": [ { "agent_defeated": "ember" }, { "player_gold": [">=", 60] } ] } }
+}

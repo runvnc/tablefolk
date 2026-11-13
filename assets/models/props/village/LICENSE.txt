@@ -24,3 +24,16 @@ from Poly Pizza and compressed with tools/compress-glb.sh.
   windmill.glb       https://poly.pizza/m/jpHoi9xDLG
   watch_tower.glb    https://poly.pizza/m/cMxuj2gt7D
   bell_tower.glb     https://poly.pizza/m/ux44tbeQvj
+
+  stone_house.glb        Fantasy House          https://poly.pizza/m/he3p42mUTH
+  tall_house.glb         Fantasy House          https://poly.pizza/m/dcPho4SUA3
+  barracks.glb           Fantasy Barracks       https://poly.pizza/m/wTDbVozPAj
+  sawmill.glb            Fantasy Sawmill        https://poly.pizza/m/alxTTFjKDM
+  blacksmith.glb         Blacksmith             https://poly.pizza/m/bV52eTG1Aj
+  mill_house.glb         Mill                   https://poly.pizza/m/89dsFYAoX1
+  inn.glb                Fantasy Inn            https://poly.pizza/m/x3ZcGn3jr4
+  gazebo.glb             Gazebo                 https://poly.pizza/m/xYZB1TmGMv
+  hay.glb                Hay                    https://poly.pizza/m/Yu8TOERkpw
+  fire_pit.glb           Bonfire                https://poly.pizza/m/Azj9hJwwwG
+  fence_section.glb      Fence                  https://poly.pizza/m/UXmKfG81fG
+  sacks.glb              Bags                   https://poly.pizza/m/gzvyAQ797z

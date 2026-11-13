@@ -5,7 +5,8 @@
   "license": "Props: Quaternius Fantasy Props MegaKit (free version), CC0 1.0. See models/props/License_Standard.txt. Nature and house models in models/props/gen/ were generated for Tablefolk. Village props in models/props/village/ and characters in models/characters/quaternius/: Quaternius via Poly Pizza (see the LICENSE.txt files there).",
   "about": "Each item: file (relative to this pack.json), size in cells w/h/d, physics (mass, static, shape, material, flammable), visual fit (scale, visualYOffset, visualRy, or fit: \"height\"/\"footprint\" to size the model to h or w/d), decor (no collision, not on the characters' map), optional aliases and tags.",
   "items": {
-    "chest": { "static": true,
+    "chest": {
+      "static": true,
       "file": "models/props/Chest_Wood.gltf",
       "w": 1.05,
       "h": 0.75,
@@ -77,7 +78,8 @@
         "fantasy"
       ]
     },
-    "cauldron": { "static": true,
+    "cauldron": {
+      "static": true,
       "file": "models/props/Cauldron.gltf",
       "w": 0.8,
       "h": 0.7,
@@ -94,7 +96,8 @@
         "pot"
       ]
     },
-    "anvil": { "static": true,
+    "anvil": {
+      "static": true,
       "file": "models/props/Anvil.gltf",
       "w": 0.9,
       "h": 0.55,
@@ -275,9 +278,7 @@
       "tags": [
         "nature"
       ],
-      "aliases": [
-        "pine"
-      ]
+      "aliases": []
     },
     "house": {
       "file": "models/props/gen/house.1k.glb",
@@ -311,9 +312,7 @@
       "tags": [
         "nature"
       ],
-      "aliases": [
-        "rock"
-      ]
+      "aliases": []
     },
     "flowers": {
       "file": "models/props/gen/daisy_clump.1k.glb",
@@ -632,7 +631,8 @@
         "village"
       ]
     },
-    "iron_chest": { "static": true,
+    "iron_chest": {
+      "static": true,
       "file": "models/props/village/iron_chest.glb",
       "w": 1.0,
       "h": 0.75,
@@ -675,7 +675,6 @@
       "static": true,
       "fit": "footprint",
       "aliases": [
-        "barn",
         "stables"
       ],
       "flammable": true,
@@ -999,6 +998,1062 @@
         "fantasy",
         "dungeon"
       ]
+    },
+    "stone_house": {
+      "file": "models/props/village/stone_house.glb",
+      "w": 2.74,
+      "h": 1.52,
+      "d": 3.0,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "stone_cottage"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "tall_house": {
+      "file": "models/props/village/tall_house.glb",
+      "w": 1.69,
+      "h": 2.47,
+      "d": 2.6,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "narrow_house"
+      ],
+      "flammable": true
+    },
+    "barracks": {
+      "file": "models/props/village/barracks.glb",
+      "w": 3.1,
+      "h": 3.34,
+      "d": 3.4,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village",
+        "castle"
+      ],
+      "aliases": [
+        "guardhouse",
+        "keep"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "sawmill": {
+      "file": "models/props/village/sawmill.glb",
+      "w": 4.0,
+      "h": 2.6,
+      "d": 2.99,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "lumber_mill"
+      ],
+      "flammable": true
+    },
+    "blacksmith": {
+      "file": "models/props/village/blacksmith.glb",
+      "w": 3.6,
+      "h": 2.78,
+      "d": 3.04,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "forge",
+        "smithy_house"
+      ],
+      "flammable": true
+    },
+    "mill_house": {
+      "file": "models/props/village/mill_house.glb",
+      "w": 3.0,
+      "h": 4.24,
+      "d": 2.41,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "mill_cottage"
+      ],
+      "flammable": true
+    },
+    "inn": {
+      "file": "models/props/village/inn.glb",
+      "w": 4.4,
+      "h": 3.81,
+      "d": 4.39,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "tavern_house",
+        "pub"
+      ],
+      "flammable": true
+    },
+    "gazebo": {
+      "file": "models/props/village/gazebo.glb",
+      "w": 1.98,
+      "h": 2.57,
+      "d": 2.4,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "village"
+      ],
+      "aliases": [
+        "pavilion",
+        "shelter"
+      ],
+      "flammable": true
+    },
+    "hay": {
+      "file": "models/props/village/hay.glb",
+      "w": 0.88,
+      "h": 1.3,
+      "d": 0.91,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "farm",
+        "village"
+      ],
+      "aliases": [
+        "haystack",
+        "hay_bale"
+      ],
+      "flammable": true
+    },
+    "fire_pit": {
+      "file": "models/props/village/fire_pit.glb",
+      "w": 1.1,
+      "h": 0.3,
+      "d": 0.98,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "camp",
+        "village"
+      ],
+      "aliases": [
+        "firepit",
+        "cold_campfire"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "fence_section": {
+      "file": "models/props/village/fence_section.glb",
+      "w": 1.0,
+      "h": 0.41,
+      "d": 0.03,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "village",
+        "farm"
+      ],
+      "aliases": [
+        "wooden_fence"
+      ],
+      "flammable": true
+    },
+    "sacks": {
+      "file": "models/props/village/sacks.glb",
+      "w": 0.9,
+      "h": 0.36,
+      "d": 0.8,
+      "fit": "footprint",
+      "mass": 4,
+      "tags": [
+        "village",
+        "farm"
+      ],
+      "aliases": [
+        "grain_sacks",
+        "flour_sacks"
+      ],
+      "flammable": true
+    },
+    "silo": {
+      "file": "models/props/farm/silo.glb",
+      "w": 1.7,
+      "h": 4.2,
+      "d": 1.63,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "grain_silo"
+      ],
+      "flammable": true
+    },
+    "open_barn": {
+      "file": "models/props/farm/open_barn.glb",
+      "w": 3.34,
+      "h": 2.76,
+      "d": 3.6,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "shed",
+        "cart_shed"
+      ],
+      "flammable": true
+    },
+    "chicken_coop": {
+      "file": "models/props/farm/chicken_coop.glb",
+      "w": 1.8,
+      "h": 1.38,
+      "d": 1.61,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "henhouse",
+        "coop"
+      ],
+      "flammable": true
+    },
+    "barn": {
+      "file": "models/props/farm/barn.glb",
+      "w": 3.95,
+      "h": 3.07,
+      "d": 4.2,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "red_barn"
+      ],
+      "flammable": true
+    },
+    "silo_barn": {
+      "file": "models/props/farm/silo_barn.glb",
+      "w": 4.4,
+      "h": 7.47,
+      "d": 2.89,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "farmstead"
+      ],
+      "flammable": true
+    },
+    "small_barn": {
+      "file": "models/props/farm/small_barn.glb",
+      "w": 3.1,
+      "h": 2.53,
+      "d": 3.2,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "byre"
+      ],
+      "flammable": true
+    },
+    "big_barn": {
+      "file": "models/props/farm/big_barn.glb",
+      "w": 4.7,
+      "h": 4.8,
+      "d": 5.0,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm"
+      ],
+      "aliases": [
+        "great_barn"
+      ],
+      "flammable": true
+    },
+    "stone_windmill": {
+      "file": "models/props/farm/stone_windmill.glb",
+      "w": 3.82,
+      "h": 5.5,
+      "d": 2.41,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "building",
+        "fantasy",
+        "farm",
+        "village"
+      ],
+      "aliases": [
+        "tower_windmill"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "farm_fence": {
+      "file": "models/props/farm/farm_fence.glb",
+      "w": 3.0,
+      "h": 0.6,
+      "d": 0.08,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "farm"
+      ],
+      "aliases": [
+        "rail_fence",
+        "paddock_fence"
+      ],
+      "flammable": true
+    },
+    "pine_tree": {
+      "file": "models/props/nature/pine_tree.glb",
+      "w": 0.9,
+      "h": 3.2,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "fir",
+        "spruce"
+      ],
+      "flammable": true
+    },
+    "tall_pine": {
+      "file": "models/props/nature/tall_pine.glb",
+      "w": 0.9,
+      "h": 4.4,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "tall_fir"
+      ],
+      "flammable": true
+    },
+    "dead_tree": {
+      "file": "models/props/nature/dead_tree.glb",
+      "w": 0.9,
+      "h": 3.2,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest",
+        "spooky"
+      ],
+      "aliases": [
+        "bare_tree",
+        "withered_tree"
+      ],
+      "flammable": true
+    },
+    "autumn_tree": {
+      "file": "models/props/nature/autumn_tree.glb",
+      "w": 0.9,
+      "h": 3.6,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "red_tree",
+        "maple"
+      ],
+      "flammable": true
+    },
+    "oak_tree": {
+      "file": "models/props/nature/oak_tree.glb",
+      "w": 0.9,
+      "h": 3.8,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "oak"
+      ],
+      "flammable": true
+    },
+    "tall_tree": {
+      "file": "models/props/nature/tall_tree.glb",
+      "w": 0.9,
+      "h": 4.2,
+      "d": 0.9,
+      "fit": "height",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "elm",
+        "beech"
+      ],
+      "flammable": true
+    },
+    "red_bush": {
+      "file": "models/props/nature/red_bush.glb",
+      "w": 0.97,
+      "h": 0.81,
+      "d": 1.0,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "autumn_bush"
+      ],
+      "flammable": true
+    },
+    "flower_bush": {
+      "file": "models/props/nature/flower_bush.glb",
+      "w": 0.97,
+      "h": 0.81,
+      "d": 1.0,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature",
+        "garden"
+      ],
+      "aliases": [
+        "rose_bush",
+        "blossom_bush"
+      ],
+      "flammable": true
+    },
+    "fern": {
+      "file": "models/props/nature/fern.glb",
+      "w": 1.0,
+      "h": 0.3,
+      "d": 0.94,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest"
+      ],
+      "aliases": [
+        "bracken"
+      ],
+      "flammable": true
+    },
+    "mushroom_cluster": {
+      "file": "models/props/nature/mushroom_cluster.glb",
+      "w": 0.43,
+      "h": 0.36,
+      "d": 0.6,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest",
+        "cave"
+      ],
+      "aliases": [
+        "toadstools"
+      ],
+      "flammable": true
+    },
+    "shelf_fungus": {
+      "file": "models/props/nature/shelf_fungus.glb",
+      "w": 0.7,
+      "h": 0.39,
+      "d": 0.57,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature",
+        "forest",
+        "cave"
+      ],
+      "aliases": [
+        "bracket_fungus"
+      ],
+      "flammable": true
+    },
+    "mossy_rock": {
+      "file": "models/props/nature/mossy_rock.glb",
+      "w": 1.2,
+      "h": 0.75,
+      "d": 0.98,
+      "fit": "footprint",
+      "static": true,
+      "tags": [
+        "nature",
+        "cave"
+      ],
+      "aliases": [
+        "stone_outcrop"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "tall_grass": {
+      "file": "models/props/nature/tall_grass.glb",
+      "w": 0.33,
+      "h": 0.7,
+      "d": 0.37,
+      "fit": "height",
+      "tags": [
+        "nature"
+      ],
+      "aliases": [
+        "reeds",
+        "rushes"
+      ],
+      "static": true,
+      "decor": true,
+      "flammable": true
+    },
+    "heather": {
+      "file": "models/props/nature/heather.glb",
+      "w": 0.87,
+      "h": 0.17,
+      "d": 0.9,
+      "fit": "footprint",
+      "tags": [
+        "nature",
+        "garden"
+      ],
+      "aliases": [
+        "lavender"
+      ],
+      "static": true,
+      "decor": true,
+      "flammable": true
+    },
+    "flower_patch": {
+      "file": "models/props/nature/flower_patch.glb",
+      "w": 0.56,
+      "h": 0.77,
+      "d": 0.6,
+      "fit": "footprint",
+      "tags": [
+        "nature",
+        "garden"
+      ],
+      "aliases": [
+        "wildflowers",
+        "lilies"
+      ],
+      "static": true,
+      "decor": true,
+      "flammable": true
+    },
+    "bear_trap": {
+      "file": "models/props/items/bear_trap.glb",
+      "w": 0.51,
+      "h": 0.11,
+      "d": 0.6,
+      "fit": "footprint",
+      "mass": 1.5,
+      "tags": [
+        "item",
+        "dungeon",
+        "forest"
+      ],
+      "aliases": [
+        "trap",
+        "snare"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "backpack": {
+      "file": "models/props/items/backpack.glb",
+      "w": 0.59,
+      "h": 0.55,
+      "d": 0.31,
+      "fit": "height",
+      "mass": 1.0,
+      "tags": [
+        "item",
+        "camp"
+      ],
+      "aliases": [
+        "rucksack",
+        "pack"
+      ],
+      "flammable": true
+    },
+    "shovel": {
+      "file": "models/props/items/shovel.glb",
+      "w": 0.21,
+      "h": 1.0,
+      "d": 0.05,
+      "fit": "height",
+      "mass": 1.2,
+      "tags": [
+        "item",
+        "farm",
+        "tool"
+      ],
+      "aliases": [
+        "spade"
+      ],
+      "flammable": true
+    },
+    "frying_pan": {
+      "file": "models/props/items/frying_pan.glb",
+      "w": 0.3,
+      "h": 0.06,
+      "d": 0.5,
+      "fit": "footprint",
+      "mass": 0.8,
+      "tags": [
+        "item",
+        "kitchen"
+      ],
+      "aliases": [
+        "skillet",
+        "pan"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "log": {
+      "file": "models/props/items/log.glb",
+      "w": 0.9,
+      "h": 0.26,
+      "d": 0.26,
+      "fit": "footprint",
+      "mass": 6,
+      "tags": [
+        "item",
+        "camp",
+        "forest"
+      ],
+      "aliases": [
+        "firewood",
+        "timber"
+      ],
+      "flammable": true
+    },
+    "shield": {
+      "file": "models/props/items/shield.glb",
+      "w": 0.55,
+      "h": 0.7,
+      "d": 0.16,
+      "fit": "height",
+      "mass": 2.5,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "heater_shield"
+      ],
+      "flammable": true
+    },
+    "round_shield": {
+      "file": "models/props/items/round_shield.glb",
+      "w": 0.65,
+      "h": 0.65,
+      "d": 0.2,
+      "fit": "height",
+      "mass": 2.5,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "buckler"
+      ],
+      "flammable": true
+    },
+    "sword": {
+      "file": "models/props/items/sword.glb",
+      "w": 0.15,
+      "h": 0.95,
+      "d": 0.04,
+      "fit": "height",
+      "mass": 1.5,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "longsword",
+        "blade"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "crown": {
+      "file": "models/props/items/crown.glb",
+      "w": 0.32,
+      "h": 0.21,
+      "d": 0.32,
+      "fit": "footprint",
+      "mass": 0.8,
+      "tags": [
+        "item",
+        "treasure"
+      ],
+      "aliases": [
+        "golden_crown",
+        "tiara"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "book": {
+      "file": "models/props/items/book.glb",
+      "w": 0.08,
+      "h": 0.3,
+      "d": 0.22,
+      "fit": "height",
+      "mass": 0.5,
+      "tags": [
+        "item",
+        "library"
+      ],
+      "aliases": [
+        "tome",
+        "journal",
+        "diary"
+      ],
+      "flammable": true
+    },
+    "open_book": {
+      "file": "models/props/items/open_book.glb",
+      "w": 0.4,
+      "h": 0.07,
+      "d": 0.31,
+      "fit": "footprint",
+      "mass": 0.5,
+      "tags": [
+        "item",
+        "library"
+      ],
+      "aliases": [
+        "spellbook",
+        "ledger"
+      ],
+      "flammable": true
+    },
+    "coin_pouch": {
+      "file": "models/props/items/coin_pouch.glb",
+      "w": 0.24,
+      "h": 0.28,
+      "d": 0.24,
+      "fit": "height",
+      "mass": 0.4,
+      "tags": [
+        "item",
+        "treasure"
+      ],
+      "aliases": [
+        "purse",
+        "money_bag"
+      ],
+      "flammable": true
+    },
+    "hunting_bow": {
+      "file": "models/props/items/hunting_bow.glb",
+      "w": 0.27,
+      "h": 1.0,
+      "d": 0.04,
+      "fit": "height",
+      "mass": 0.8,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "longbow",
+        "shortbow"
+      ],
+      "flammable": true
+    },
+    "spear": {
+      "file": "models/props/items/spear.glb",
+      "w": 0.09,
+      "h": 1.7,
+      "d": 0.06,
+      "fit": "height",
+      "mass": 1.6,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "pike",
+        "lance"
+      ],
+      "flammable": true
+    },
+    "dagger": {
+      "file": "models/props/items/dagger.glb",
+      "w": 0.09,
+      "h": 0.4,
+      "d": 0.03,
+      "fit": "height",
+      "mass": 0.4,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "knife",
+        "dirk"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "necklace": {
+      "file": "models/props/items/necklace.glb",
+      "w": 0.27,
+      "h": 0.27,
+      "d": 0.3,
+      "fit": "footprint",
+      "mass": 0.1,
+      "tags": [
+        "item",
+        "treasure"
+      ],
+      "aliases": [
+        "amulet",
+        "pendant"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "skull": {
+      "file": "models/props/items/skull.glb",
+      "w": 0.19,
+      "h": 0.25,
+      "d": 0.19,
+      "fit": "height",
+      "mass": 0.6,
+      "tags": [
+        "item",
+        "dungeon",
+        "spooky"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "bone": {
+      "file": "models/props/items/bone.glb",
+      "w": 0.45,
+      "h": 0.15,
+      "d": 0.08,
+      "fit": "footprint",
+      "mass": 0.3,
+      "tags": [
+        "item",
+        "dungeon",
+        "spooky"
+      ],
+      "aliases": [
+        "bones"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "gold_bars": {
+      "file": "models/props/items/gold_bars.glb",
+      "w": 0.45,
+      "h": 0.28,
+      "d": 0.38,
+      "fit": "footprint",
+      "mass": 6,
+      "tags": [
+        "item",
+        "treasure"
+      ],
+      "aliases": [
+        "gold_ingots",
+        "ingots"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "leather_armor": {
+      "file": "models/props/items/leather_armor.glb",
+      "w": 0.55,
+      "h": 0.46,
+      "d": 0.38,
+      "fit": "footprint",
+      "mass": 3,
+      "tags": [
+        "item",
+        "armor"
+      ],
+      "aliases": [
+        "jerkin"
+      ],
+      "flammable": true
+    },
+    "plate_armor": {
+      "file": "models/props/items/plate_armor.glb",
+      "w": 0.6,
+      "h": 0.43,
+      "d": 0.3,
+      "fit": "footprint",
+      "mass": 8,
+      "tags": [
+        "item",
+        "armor"
+      ],
+      "aliases": [
+        "breastplate",
+        "armour"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "greatsword": {
+      "file": "models/props/items/greatsword.glb",
+      "w": 0.19,
+      "h": 1.3,
+      "d": 0.05,
+      "fit": "height",
+      "mass": 3,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "claymore"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "war_hammer": {
+      "file": "models/props/items/war_hammer.glb",
+      "w": 0.42,
+      "h": 0.9,
+      "d": 0.15,
+      "fit": "height",
+      "mass": 3,
+      "tags": [
+        "item",
+        "weapon"
+      ],
+      "aliases": [
+        "maul",
+        "warhammer"
+      ],
+      "material": "metal",
+      "flammable": false
+    },
+    "crystals": {
+      "file": "models/props/items/crystals.glb",
+      "w": 0.5,
+      "h": 0.37,
+      "d": 0.48,
+      "fit": "footprint",
+      "mass": 2,
+      "tags": [
+        "item",
+        "cave",
+        "treasure"
+      ],
+      "aliases": [
+        "crystal",
+        "gems",
+        "amethyst"
+      ],
+      "material": "stone",
+      "flammable": false
+    },
+    "scythe": {
+      "file": "models/props/items/scythe.glb",
+      "w": 0.81,
+      "h": 1.5,
+      "d": 0.07,
+      "fit": "height",
+      "mass": 2,
+      "tags": [
+        "item",
+        "farm",
+        "tool",
+        "weapon"
+      ],
+      "aliases": [
+        "sickle"
+      ],
+      "flammable": true
     }
   }
 }

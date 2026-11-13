@@ -4682,28 +4682,33 @@ const FIGURES={
   adventurer_classic:{file:'adventurer',h:1.3}, adventurer_woman_classic:{file:'adventurer_woman',h:1.24}, villager_classic:{file:'villager',h:1.22}, witch_classic:{file:'witch',h:1.3},
   skeleton:{dir:'meshy',h:1.3,v:'20261101a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261101a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261101a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
   troll:{dir:'meshy',h:2.15,v:'20261101a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261101a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261101a'}, orc_classic:{file:'orc',h:1.45},
-  demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{file:'rat',h:.62,tint:[.62,.6,.62]},   // the wolf file's skinning is broken in Babylon: a big grey rat stands in bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
+  demon:{h:1.55}, giant:{h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{dir:'animals',h:.78,v:'20261114a'},   // Quaternius Animated Animal Pack (2026-11-13); the old wolf file's skinning was broken in Babylon
+  // animals (Quaternius Animated Animal and Farm Animal packs, CC0): not hostile, no brain unless "talks": true (play.js ANIMALS)
+  cow:{dir:'animals',h:1.3,v:'20261114a'}, bull:{dir:'animals',h:1.35,v:'20261114a'}, horse:{dir:'animals',h:1.6,v:'20261114a'}, white_horse:{dir:'animals',h:1.6,v:'20261114a'}, donkey:{dir:'animals',h:1.15,v:'20261114a'}, deer:{dir:'animals',h:1.25,v:'20261114a'}, stag:{dir:'animals',h:1.55,v:'20261114a'}, fox:{dir:'animals',h:0.5,v:'20261114a'}, dog:{dir:'animals',h:0.6,v:'20261114a'}, husky:{dir:'animals',h:0.65,v:'20261114a'}, alpaca:{dir:'animals',h:1.5,v:'20261114a'}, pig:{dir:'animals',h:0.65,v:'20261114a'}, sheep:{dir:'animals',h:0.75,v:'20261114a'},
+  // more monsters (Quaternius Ultimate Monsters and Animated Enemies, CC0)
+  wyrmling:{h:1.0,v:'20261114a'}, imp:{h:0.9,v:'20261114a'}, mushroom_warrior:{h:1.0,v:'20261114a'}, bunny:{h:0.8,v:'20261114a'}, snake:{h:0.45,v:'20261114a'}, wasp:{h:0.6,v:'20261114a',lift:.45}, frog:{h:0.35,v:'20261114a'},
+  bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
 };
 const FIG_CLIPS={
   Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],
-  Walking_A:['Walk','Fast_Flying','Flying','Run','Running'], Running_A:['Run','Running','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
-  Waving:['Wave','Yes','Talk'], Interact:['Interact','PickUp','Yes'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
+  Walking_A:['Walk','Fast_Flying','Flying','Run','Running','Jump'], Running_A:['Run','Running','Gallop','Run_Arms','Fast_Flying','Flying','Walk'],
+  Waving:['Wave','Yes','Talk'], Interact:['Interact','PickUp','Yes','Eating'], PickUp:['PickUp','Interact'], Cheering:['Yes','Wave','Dance'],
   Hit_A:['HitRecieve','HitReact','RecieveHit','Hit','Idle_HitReact_Left'], Hit_B:['HitRecieve_2','RecieveHit_2','Idle_HitReact_Right','HitRecieve','HitReact','Hit'],
   Death_A:['Death'],
-  Melee_1H_Attack_Chop:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
-  Melee_1H_Attack_Stab:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
-  Melee_2H_Attack_Chop:['Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Attack2','Headbutt','Punch'],
-  Melee_Unarmed_Attack_Punch_A:['Punch_Right','Punch','Attack','Bite_Front','Headbutt','Sword_Slash'],
-  Melee_Unarmed_Attack_Kick:['Kick_Right','Kick_Left','Punch_Left','Attack2','Attack'],
+  Melee_1H_Attack_Chop:['Attack_Headbutt','Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
+  Melee_1H_Attack_Stab:['Attack_Headbutt','Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Bite_Front','Headbutt','Punch_Right','Punch'],
+  Melee_2H_Attack_Chop:['Attack_Headbutt','Sword_Slash','Sword','Weapon','Staff_Attack','Attack','Attack2','Headbutt','Punch'],
+  Melee_Unarmed_Attack_Punch_A:['Attack_Headbutt','Punch_Right','Punch','Attack','Bite_Front','Headbutt','Sword_Slash'],
+  Melee_Unarmed_Attack_Kick:['Attack_Kick','Kick_Right','Kick_Left','Punch_Left','Attack2','Attack'],
   Ranged_Magic_Spellcasting:['Spell1','Spell2','Staff_Attack','Punch'], Ranged_Magic_Shoot:['Spell2','Spell1','Punch'],
-  Throw:['Punch_Right','Punch','Attack'], Sit_Floor_Idle:['Sit','Duck','Crawl'],
+  Throw:['Punch_Right','Punch','Attack'], Sit_Floor_Idle:['Sit','Duck','Crawl','Idle_Headlow'],
 };
 const isPersonModel=m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m]));
 // "CharacterArmature|CharacterArmature|Death|CharacterArmature|Dea" -> Death,
 // "BatArmature|Bat_Flying" -> Flying
 function figClipName(n){
   const seg=String(n).split('|').filter(s=>s && !/Armature/.test(s));
-  return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime|Skeleton)_/,'');
+  return (seg[0]||n).replace(/^(Bat|Rat|Spider|Slime|Skeleton|Snake|Frog|Wasp)_/,'');
 }
 // A figure is sized from its rest pose, but its idle clip may put a foot lower
 // (the wanderer's sank half a centimetre into the Oracle's rug). A few frames

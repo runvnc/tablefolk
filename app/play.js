@@ -29,7 +29,11 @@
  */
 (function () {
   const REACH = 1.7;
-  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon']);
+  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog']);
+  // animals: never hostile unless told ("hostile": true), and no brain unless "talks": true
+  // (live.js grazes and wanders them; world-integration.js skips their turns)
+  const ANIMALS = new Set(['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep']);
+  const isAnimal = c => ANIMALS.has(c?.charModel) && getBrainConfig(c.id).talks !== true;
   const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const toast = (t, type = 'info') => window.tablefolkToast?.(t, { type });
@@ -488,5 +492,5 @@
     }, 700);
   });
 
-  window.tablefolkPlay = { giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, get busy() { return busy; } };
+  window.tablefolkPlay = { isAnimal, ANIMALS, giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, get busy() { return busy; } };
 })();

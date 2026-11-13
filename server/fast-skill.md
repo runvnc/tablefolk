@@ -19,7 +19,8 @@ else (no prose, no markdown fences). Be quick: keep it compact.
   "agents": [ {
     "id": "vexa",                    // 1-24 chars [A-Za-z0-9_-], unique
     "model": "wizard",               // people: woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard
-                                     // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon
+                                     // monsters: skeleton skeleton_warrior zombie goblin kobold orc rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog
+                                     // animals (never hostile unless "hostile": true; they don't talk unless "talks": true): cow bull horse white_horse donkey deer stag fox dog husky alpaca pig sheep
                                      // (older chibi bodies: critter woman rogue knight mage ranger barbarian)
     "hostile": true,                 // optional: fights the player with a built-in routine (default true for mindless monsters); with a real personality it still talks when spoken to and as the fight starts. Set it on the story's enemies (a necromancer, a bandit chief), or they only talk
     "hp": 6,                         // optional, default 10
@@ -76,7 +77,16 @@ true. Loot: {"type": "chest", "x": 2, "z": -1, "gold": 30, "items": ["silver
 key"]} (or "in": "treasure"); the player opens it with E. Coin piles hold
 "gold". Characters use things: chests (take, put), beds (sleep at night), seats, anvil, workbench, cauldron (the station that fits their role by day): give homes a bed. Village props: well market_stand market_stalls cart tent logs bed
 bookcase banner wall_banner target dummy pumpkin statue torch iron_chest
-fantasy_house stable windmill watch_tower bell_tower. A house, fantasy_house
+fantasy_house stable windmill watch_tower bell_tower. Closed buildings (scenery,
+not entered): inn stone_house tall_house mill_house sawmill blacksmith barracks
+gazebo barn big_barn small_barn open_barn silo silo_barn chicken_coop
+stone_windmill. Nature: pine_tree tall_pine oak_tree tall_tree autumn_tree
+dead_tree red_bush flower_bush fern mushroom_cluster shelf_fungus mossy_rock
+tall_grass heather flower_patch. Farm and camp: hay sacks fence_section
+farm_fence fire_pit log backpack shovel scythe frying_pan bear_trap. Items to
+find or carry: sword greatsword dagger spear war_hammer hunting_bow shield
+round_shield leather_armor plate_armor crown necklace coin_pouch gold_bars
+crystals book open_book skull bone. A house, fantasy_house
 or stable (one object at its centre) becomes a building to walk into: 5x5,
 6x5, 7x5 squares with its walls, door on its front (south at "ry" 0),
 furnished; keep its squares free. Dungeon dressing:
@@ -126,19 +136,27 @@ healing (bandage(target)), thievery (steal(target)), bard (sing(rest|courage)).
 
 # Map methods (use exactly one)
 
-## A. "generate": procedural dungeon or village (fastest, best for big places)
+## A. "generate": procedural places (fastest, best for big places)
 
 "generate": { "kind": "dungeon", "rooms": 8 }      // 3-16 rooms
-"generate": { "kind": "village", "buildings": 7 }  // 3-14 buildings
+"generate": { "kind": "village", "buildings": 7 }  // 3-14 buildings; "style": "hamlet" for a farming one
+"generate": { "kind": "forest" }                   // wild woods; "style": "spooky" | "autumn" | "pine"
+"generate": { "kind": "farm" }                     // a farmstead
+"generate": { "kind": "cave", "rooms": 6 }         // caverns; "style": "mine" for a mine
 
 Put characters, objects and the player in places with "in". Dungeon places:
 entrance (player starts here), throne, lair, treasure, library, shrine,
 barracks, storage, kitchen, prison, crypt, alchemy. Village places: tavern,
 smithy, shop, temple, alchemist, guardhouse, library, stable, house (any
-house), square (player starts here), pond, garden. A place named in "in" is
-always built. Agents without "in" are placed by their role (goblin → lair,
+house), square (player starts here), pond, garden. Forest places: clearing
+(player starts here), camp, ruins, grove, shrine, pond, hut, cave, meadow.
+Farm places: yard (player starts here), farmhouse, barn, pasture, field,
+orchard, coop. Cave places: entrance (player starts here), lair, crystals,
+grotto, pool, treasure, bones, camp, mine, chamber. A place named in "in" is
+always built (in a forest, a place asked for in "generate": {"places": [...]}). Agents without "in" are placed by their role (goblin → lair,
 sorceress/king → throne, guard → barracks, priest → shrine/temple, smith →
-smithy, innkeeper → tavern, merchant → shop). Objects:
+smithy, innkeeper → tavern, merchant → shop, farm animals → pasture, deer →
+grove, hunter or bandit → camp, hermit or druid → hut, miner → mine). Objects:
 "objects": [{ "type": "chest", "in": "treasure" }]. Dungeons are lit at night
 automatically; rooms and buildings get doors. Don't add "grid" or "map".
 
@@ -184,9 +202,10 @@ weapon_stand axe pickaxe bucket bag potion scroll coin_pile mushroom lamp
 note wall counter tree house boulder campfire lantern fence signpost flowers
 bookshelf desk armchair sofa plant. Optional "size": [cols, rows] (odd, 9-41).
 
-Choose: dungeons, caves, castles, villages, towns → A. A specific room, shop,
-tavern interior, small exact layout → B. Outdoor scenes, camps, groves,
-loose scenes → C.
+Choose: dungeons, caves, mines, castles, villages, towns, forests, woods,
+farms → A. A specific room, shop,
+tavern interior, small exact layout → B. Small loose outdoor scenes (a
+beach, a roadside) → C.
 
 # Goals (optional; null for open-ended play)
 
