@@ -1,0 +1,31 @@
+{
+  "name": "@tablefolk/paint",
+  "version": "0.1.0",
+  "description": "Pictures from a sentence in the browser (WebGPU): tiny-sd at 512 px or Chitra Tiny at 256 px, chosen for the device; nothing sent anywhere.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/paint"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/paint",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "text-to-image",
+    "stable-diffusion",
+    "webgpu",
+    "onnx"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@tablefolk/models": "^0.1.0",
+    "@tablefolk/device": "^0.1.0"
+  }
+}

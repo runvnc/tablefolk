@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>paint test</title>
+<body style="font:14px sans-serif;background:#222;color:#ddd">
+<pre id="out">?model=chitra|tiny-sd&prompt=...</pre>
+<div id="pics"></div>
+<script type="module">
+// Paints with @tablefolk/paint (libs/paint) and shows the pictures:
+//   /tools/browser-test/paint-test.html?model=chitra&prompt=a%20red%20apple&n=2
+// window.RESULT: { model, why, loadSeconds, images: [{ seconds, size }] } or { error }
+const q = new URLSearchParams(location.search), out = document.getElementById('out');
+const log = s => { out.textContent += '\n' + s; };
+try {
+  const { createPainter } = await import('/libs/paint/index.js');
+  const t0 = performance.now(); let last = '';
+  const p = await createPainter({ model: q.get('model') || 'auto', onStatus: s => { if (s.replace(/\d+%$/, '') !== last) { last = s.replace(/\d+%$/, ''); log(s); } } });
+  const loadSeconds = +((performance.now() - t0) / 1000).toFixed(1);
+  log(`${p.model} ready in ${loadSeconds} s: ${p.why}`);
+  const prompts = (q.get('prompt') || 'an oil painting of a lighthouse on a rocky coast at sunset|a portrait of an old man with a beard').split('|');
+  const images = [];
+  for (const [i, prompt] of prompts.entries()) {
+    const r = await p.paint(prompt, { seed: i + 1 });
+    const img = new Image(); img.src = r.url; img.title = prompt; img.style.margin = '4px'; document.getElementById('pics').appendChild(img);
+    images.push({ prompt, seconds: +r.seconds.toFixed(1), size: r.size });
+    log(`${prompt}: ${r.seconds.toFixed(1)} s`);
+  }
+  window.RESULT = { model: p.model, why: p.why, loadSeconds, images };
+} catch (e) { log('ERROR ' + (e?.stack || e)); window.RESULT = { error: String(e?.message || e) }; }
+</script>
