@@ -222,6 +222,15 @@
     if (scn.map && scn.objectsOutdoor) { delete scn.objectsOutdoor; }
     // a goal the game can check, or none
     const g = out.goal || (out.agents || []).map(a => a?.goal).find(x => x?.player_has || x?.agent_defeated), holder = item => agents.find(a => a.inventory?.items?.some(i => i.toLowerCase() === String(item).toLowerCase()));
+    // small models copy the prompt's example goal ("silver key"): when the plan
+    // never mentions one, the goal is the story's own thing (named in its
+    // TREASURE or GOAL line) that someone carries or a chest holds
+    if (g?.player_has && /^silver key$/i.test(String(g.player_has).trim()) && !/silver key/i.test(plan.text)) {
+      const t = (plan.treasure + ' ' + plan.goal).toLowerCase();
+      const names = [...agents.flatMap(a => a.inventory?.items || []), ...(scn.objects || []).flatMap(o => o.items || [])].map(i => String(i?.name || i));
+      const own = names.find(n => n && !/silver key/i.test(n) && t.includes(n.toLowerCase().split(' ').pop()));
+      if (own) { g.player_has = own; g.text = plan.goal && plan.goal.length < 140 ? plan.goal : `Find the ${own}.`; }
+    }
     // a thing picked up from the floor goes by its kind ("key"), so "silver key" is the key
     const PICK = { key: 'key', chalice: 'gold chalice', potion: 'healing potion', scroll: 'scroll', rope: 'rope', torch: 'torch' };
     if (g?.player_has && !holder(g.player_has)) {
