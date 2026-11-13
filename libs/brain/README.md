@@ -46,7 +46,8 @@ if (key) brain = await createBrain({ model: 'endpoint', endpoint: openRouterEndp
 ```
 
 The models download from Hugging Face (Tablefolk's mirror on tablefolk.world).
-Each model's own licence applies (Gemma terms, Apache-2.0 for Qwen and
-Bonsai).
+Each model's own licence applies: Gemma 4 and Bonsai 2 are Apache-2.0;
+the tiny fallback, Qwen1.5 0.5B, is under the Tongyi Qianwen **research**
+licence (not for commercial use: pass `fallback` without `'qwen1.5-0.5b'`).
 
 Part of [Tablefolk](https://github.com/runvnc/tablefolk) (`libs/`). MIT.

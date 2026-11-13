@@ -112,8 +112,8 @@ The code is MIT, like the rest of the repository. The models are not ours:
 
 | model | licence |
 |---|---|
-| Gemma 4 | Gemma terms |
-| Qwen | Apache-2.0 / Tongyi Qianwen |
+| Gemma 4, EmbeddingGemma | Apache-2.0 |
+| Qwen1.5 0.5B (the tiny fallback) | **Tongyi Qianwen research licence: not for commercial use** |
 | Bonsai 2 | Apache-2.0 |
 | Pocket-TTS | CC-BY-4.0 (Kyutai) |
 | Underdog Bark 3.0 | CC-BY-4.0 |
