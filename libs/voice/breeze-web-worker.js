@@ -83,6 +83,9 @@ async function load(opts = {}) {
   const create = (await import('./breeze-web/breeze.mjs')).default;
   M = await create({ print: s => console.log('[breeze]', s), printErr: s => console.warn('[breeze]', s) });
   M.FS.mkdir('/m'); M.FS.mount(M.WORKERFS || M.FS.filesystems.WORKERFS, { files: [file] }, '/m');
+  // teCpu: the 0.9 GB text encoder on the processor (run once per line), ~1 GB less
+  // graphics memory, so Breeze fits beside a big characters' model (default on)
+  if (opts.teCpu !== false && M._tf_set_te_cpu) M._tf_set_te_cpu(1);
   const rc = await M.ccall('tf_init', 'number', ['string'], ['/m/' + MODEL], { async: true });
   if (rc !== 0) { const err = M.UTF8ToString(M._tf_error()); M = null; throw new Error('Breeze TTS 2 failed to load: ' + err); }
   stopPtr = M._tf_stop_flag();

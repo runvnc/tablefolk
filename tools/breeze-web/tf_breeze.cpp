@@ -17,6 +17,7 @@
 #include <emscripten.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstdio>
 #include <exception>
@@ -136,6 +137,10 @@ EMSCRIPTEN_KEEPALIVE const char * tf_trace(const int * codes, int n_codes, int f
 }
 
 // 0 on success
+// 1: the text encoder (0.9 GB, run once per line) on the CPU in this module's memory
+// instead of the GPU (te-cpu.patch reads BREEZE_TE_CPU); call before tf_init
+EMSCRIPTEN_KEEPALIVE void tf_set_te_cpu(int on) { setenv("BREEZE_TE_CPU", on ? "1" : "0", 1); }
+
 EMSCRIPTEN_KEEPALIVE int tf_init(const char * path) {
     try {
         if (!g_model.load(path, true)) { g_err = "failed to load the model"; return 1; }

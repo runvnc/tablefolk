@@ -109,7 +109,8 @@ async function speak() {
 }
 $('run').onclick = async () => {
   $('run').disabled = true; ensureWorker();
-  try { await step({ type: 'load', data: { allowCpu: $('cpu').checked } }); await speak(); }
+  // ?tecpu=0: the text encoder on the GPU as before (default: on the processor)
+  try { await step({ type: 'load', data: { allowCpu: $('cpu').checked, teCpu: new URLSearchParams(location.search).get('tecpu') !== '0' } }); await speak(); }
   catch (e) { log('error: ' + e.message); $('run').disabled = false; }
 };
 $('again').onclick = speak;
