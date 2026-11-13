@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Decider test</title>
+<pre id="out">loading…</pre>
+<script type="module">
+// The Strands Decider in the browser (app/llm_js/decider.js) on the menu cases.
+// ?local=1 loads the GGUF and head from /work/decider/ (a copy of the files, not
+// in git) instead of Hugging Face. window.result has the answers.
+import { loadDecider } from '/app/llm_js/decider.js';
+const q = new URLSearchParams(location.search), out = document.getElementById('out'), log = [];
+const say = t => { log.push(t); out.textContent = log.join('\n'); console.log(t); };
+const opts = q.has('local') ? { ggufUrl: location.origin + '/work/decider/strands-decider-2B-qwen3.5-v1-2610-Q8_0.gguf', headUrl: '/work/decider/decider-head.safetensors' } : {};
+if (q.has('gpu')) opts.gpuLayers = +q.get('gpu');
+const t0 = performance.now();
+const d = await loadDecider(s => { out.textContent = log.join('\n') + '\n' + s; }, opts);
+say(`loaded in ${Math.round(performance.now() - t0)} ms`);
+const ITEMS = { buy: 'Buy a sword (30 gold)', wolves: 'Ask about the wolves', repair: 'Get my armour repaired', hit: 'Attack her', bye: 'Leave', none: 'None of these: the player wants something else' };
+const CASES0 = [['can you fix my armor', 'repair'], ['I need a new blade', 'buy'], ["what's going on with those beasts in the forest", 'wolves'], ['goodbye then', 'bye'],
+  ["let's fight", 'hit'], ['how much for a weapon', 'buy'], ['my chainmail is dented', 'repair'], ['heard anything about the howling at night?', 'wolves'],
+  ['what is the weather like', 'none'], ['do you sell potions', 'none'], ['tell me a joke', 'none'], ['I have to go now', 'bye'],
+  ['the second one', 'wolves'], ['I will take the blade', 'buy'], ['never mind, see you', 'bye'], ['can I buy a shield', 'none'], ['die, smith!', 'hit'], ['those wolves took my sheep', 'wolves']];
+const CASES = q.has('n') ? CASES0.slice(0, +q.get('n')) : CASES0; const results = []; let ok = 0;
+for (const [text, want] of CASES) {
+  // ?short=1: the menu's question and the player's words only (the options carry the choices)
+  const state = q.has('short') ? `Brakka the smith asks: "What do you need, traveller?"\nThe player said: "${text}"`
+    : 'A game menu. Brakka the smith asks: "What do you need, traveller?" The choices are: ' + Object.values(ITEMS).slice(0, -1).map((v, i) => `${i + 1}. ${v}`).join('; ') + `.\nThe player said: "${text}"`;
+  const t = performance.now();
+  const r = (await d.decide(state, { pick: { type: 'choice', instructions: 'Which choice did the player pick with what they said?', criteria: ITEMS } })).pick;
+  const ms = Math.round(performance.now() - t), good = r.choice === want; ok += good;
+  results.push({ text, want, got: r.choice, conf: +r.confidence.toFixed(2), p: +r.probabilities[r.choice].toFixed(2), ms });
+  say(`${good ? 'ok  ' : 'MISS'} ${JSON.stringify(text).padEnd(48)} -> ${r.choice.padEnd(7)} conf ${r.confidence.toFixed(2)} p ${r.probabilities[r.choice].toFixed(2)} (want ${want}) ${ms} ms`);
+}
+const ms = results.map(r => r.ms).sort((a, b) => a - b);
+say(`${ok}/${CASES.length}, median ${ms[ms.length >> 1]} ms`);
+window.result = { ok, n: CASES.length, results, medianMs: ms[ms.length >> 1] };
+</script>

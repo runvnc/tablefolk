@@ -160,6 +160,35 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `#brainStatus` shows a failure (no WebGPU, a load error), a toast offers
     it once a session. The key is in localStorage and goes only to
     OpenRouter.
+- **Strands Decider** (experiment, 2026-11-12; `app/llm_js/decider.js`, not
+  wired into the game): AWS Strands Labs' decision models (Apache-2.0) pick
+  one of a list of options (or yes/no, or a level) with calibrated
+  probabilities instead of writing text: a LoRA and a pointer head (LayerNorm,
+  q/k projections) on a base model. Sizes: the Gemma 4 E4B one is 8.0B
+  parameters in all (4B "effective", the rest per-layer embeddings), ~15 GB of
+  GPU memory unquantized; base Gemma 4 GGUFs are E4B Q4 4.6-5.0 GB, E2B Q4
+  2.8 GB, and nobody has published a Gemma decider GGUF yet. The 2B (Qwen3.5)
+  one has community GGUFs (ArminBurkhardt/...-GGUF: Q8_0 2.0 GB, Q4_K_M 1.3
+  GB; pooling "last", so llama.cpp's embeddings give the final hidden state)
+  and a WebGPU int4 build (alxnahas/strands-decider-2B-webgpu). llama.cpp's
+  own System One API (wllama `createSystemOne`, Kev/JEV GGUFs) does not take
+  Strands models (their head has a LayerNorm). `decider.js` ports the GGUF's
+  decide.py: wllama 3.13.0 embeddings (one input per option, cut after its
+  line, plus the whole prompt; batch 512: 4096 ran the 6 GB card out of
+  memory), Transformers.js for the tokenizer (`_tokenizer.id_to_token` for
+  byte spans), the head in JS. Measured on the RTX 2060
+  (`tools/browser-test/decider-test.html?local=1` with the files in
+  `work/decider/`; `tools/decider-menu.py`, `tools/decider-control.py` on
+  llama-server): menus 17/18 in both (the miss at confidence 0.45); 0.53 s a
+  question natively, 6-8 s in the browser (Qwen3.5's recurrent layers are
+  slow on WebGPU; flash attention off changed nothing; per-token states are
+  not reachable through wllama's OAI-style embeddings, so each option costs a
+  forward). Steering a character (14 situations, direction and command, 0.9
+  s for both natively): direction 10/14 (three misses were "move one step to
+  the person" against "stay"), command 11/14; every answer at confidence 0.5+
+  was right (6/6, 8/8), every miss below it. Worth it as a local helper
+  (llama-server) for fast, confident choices with Gemma for the unsure ones;
+  in the browser too slow beside the current matcher (menus.js, 50-150 ms).
 - **Qwen2.5 0.5B** (`qwen2.5-0.5b`, engine `wllama3`, 2026-11-06):
   `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, the 491 MB Q4_K_M, the newest official 0.5B
   (Qwen3 starts at 0.6B, Qwen3.5 at 0.8B). Every layer on the GPU: about 50 tok/s,
