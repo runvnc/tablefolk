@@ -109,6 +109,43 @@ a ring in, and the player finds it there. The player does the same with E.
   told). Two unprompted talking turns, then quiet ones unless spoken to.
 - The dead say nothing.
 
+## Menus: choices instead of (or beside) free talk
+
+A character with a `menu` shows a JRPG-style list of choices when the player
+talks to it (E). The player clicks one, presses its number, or types or says
+anything: the words are matched to a choice ("2", "the second one", the
+label, a keyword, words it shares, then what it means, then the characters'
+model asked to pick). Menus can lead to other menus, and are shared by id in
+the scenario's `menus`:
+
+```json
+"menus": {
+  "smith": { "title": "Brakka the smith", "text": "What do you need, traveller?", "other": true,
+    "items": [
+      { "id": "buy",  "label": "Buy a sword (30 gold)", "say": "I would like to buy a sword." },
+      { "id": "wolves", "label": "Ask about the wolves", "keywords": ["wolf", "wolves", "howling"] },
+      { "id": "more", "label": "Something else…", "menu": "smith-more" },
+      { "id": "hit",  "label": "Attack her", "do": "/attack brakka" },
+      { "id": "bye",  "label": "Leave" } ] },
+  "smith-more": { "title": "Brakka the smith", "text": "Anything else?",
+    "items": [ { "id": "sharpen", "label": "Sharpen my dagger" }, { "id": "back", "label": "Never mind", "menu": "smith" } ] }
+},
+"agents": [ { "id": "brakka", "model": "woman", "at": [0, 0], "personality": "a gruff smith", "menu": "smith" } ]
+```
+
+- `say`: what the player says to the character when the choice is picked
+  (the character answers as to any chat); without `say`, `do` or `menu`
+  the label is said.
+- `do`: a player command instead (`/attack`, `/wield`, `/cast`...).
+- `menu`: open another menu after it (an id from `menus`, or a menu).
+- `keywords`: words that pick this choice outright when typed or said.
+- An item with the id `bye`, `leave`, `close` or `exit` and nothing else
+  just closes the menu.
+- `"other": true`: words that fit no choice go to the character as ordinary
+  chat; without it the menu says it did not understand and stays open.
+- A character's `menu` can also be a whole menu object instead of an id.
+  At most 24 choices; 1-9 have keys.
+
 ## Trading
 
 `give(item)` hands over an item the character has; `sell(item, price)` sells

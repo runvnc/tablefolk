@@ -171,6 +171,9 @@
     if (u.kind === 'person') {
       selectCharacter(u.thing);
       const to = document.getElementById('chatTo'); if (to) to.value = u.thing.id;
+      // a character with a menu (menus.js): its choices; typing or speaking still works
+      const menu = getBrainConfig(u.thing.id)?.menu;
+      if (menu && window.tablefolkMenu) { window.tablefolkMenu.open(menu, { agentId: u.thing.id }); return; }
       document.getElementById('chatInput')?.focus();
       toast('Say something to ' + u.thing.id);
       return;   // talking is not a turn: the one spoken to answers

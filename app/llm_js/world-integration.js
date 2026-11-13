@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261112d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261112e';
 import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261112c';
+import { installDevConsole } from './dev-console.js?v=20261112d';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261112a';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261112a';
@@ -524,7 +524,8 @@ async function main() {
   // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.
   window.tablefolkLLM = localClient({
-    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, onToken: onToken ? t => onToken(t) : null }),
+    // temperature 0 means greedy (the model's recommended sampling otherwise wins)
+    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, greedy: opts.temperature === 0, onToken: onToken ? t => onToken(t) : null }),
   }, { model: 'active-brain' });
   let running = false;
   let stepIndex = 0;
@@ -1191,6 +1192,8 @@ async function main() {
     if (!text) return;
     // "/attack gob1", "/wield sword": the player's own actions (combat.js).
     if (text.startsWith('/') && (window.tablefolkCombat?.playerCommand(text) || window.tablefolkSkills?.playerCommand(text))) { input.value = ''; return; }
+    // a menu is open (menus.js): the words pick one of its choices (typed or said)
+    if (window.tablefolkMenu?.active) { input.value = ''; window.tablefolkMenu.offer(text); return; }
     // "@bram hello" talks to bram (and selects him) whoever is selected.
     const at = text.match(/^@([A-Za-z0-9_-]+)[\s,:]+(.*)$/s);
     if (at) {

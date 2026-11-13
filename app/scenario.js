@@ -924,6 +924,8 @@
       grid: Array.isArray(s.grid) ? s.grid.map(r => String(r).replace(/\r$/, '')) : (typeof s.grid === 'string' ? s.grid.replace(/^\n+|\n+$/g, '').split('\n').map(r => r.replace(/\r$/, '')) : []),
       legend: s.legend && typeof s.legend === 'object' ? Object.fromEntries(Object.entries(s.legend).map(([k, v]) => [k, String(v)])) : {},
       skills: Array.isArray(s.skills) ? s.skills.map(String).slice(0, 16) : [],
+      // menus.js: menus by id (a character's "menu" may name one)
+      menus: s.menus && typeof s.menus === 'object' && !Array.isArray(s.menus) ? s.menus : {},
       workflows: s.workflows && typeof s.workflows === 'object' && !Array.isArray(s.workflows) ? s.workflows : {},
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       // packages.js: tablefolk.json packages (items, skills, roles, workflows, code)
@@ -1101,6 +1103,8 @@
         quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, onlySpokenTo: typeof a.onlySpokenTo === 'boolean' ? a.onlySpokenTo : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
         ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || scn.speech === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
+        // menus.js: choices shown when the player talks to it (E), a menu or a "menus" id
+        menu: a.menu && (typeof a.menu === 'string' || typeof a.menu === 'object') ? a.menu : null,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
         maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), wielding: null, defeated: false,
         // play.js: hostile characters fight with a built-in routine, no LLM
@@ -1372,12 +1376,13 @@
       player: { name: document.getElementById('chatName')?.value || 'Traveller', gold: st.player.gold || 0, items: st.player.items || [],
         ...(st.playerAvatar ? { at: [Math.round(st.playerAvatar.root.position.x), Math.round(st.playerAvatar.root.position.z)] } : {}) },
       allowed: [...st.allowed],
+      ...(active?.scn?.menus && Object.keys(active.scn.menus).length ? { menus: active.scn.menus } : {}),
       agents: w.getAgents().map(g => {
         const c = w.getBrainConfig(g.id);
         return { id: g.id, ...(g.charModel ? { model: g.charModel } : {}), at: [Math.round(g.root.position.x), Math.round(g.root.position.z)], facing: dirName(g.dir),
           personality: c.personality || '', ...(Array.isArray(c.allowed) ? { allowed: [...c.allowed] } : {}), ...(c.quest ? { quest: c.quest } : {}), ...(c.thinking ? { thinking: true } : {}), ...(typeof c.simple === 'boolean' ? { simple: c.simple } : {}), ...(typeof c.onlySpokenTo === 'boolean' ? { onlySpokenTo: c.onlySpokenTo } : {}), ...(c.systemPrompt ? { systemPrompt: c.systemPrompt } : {}),
           ...(c.showThoughts === false ? { showThoughts: false } : {}), ...(c.ttsVoiceId ? { ttsVoiceId: c.ttsVoiceId } : {}),
-          ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}) };
+          ...(c.inventory && (c.inventory.gold || c.inventory.items?.length) ? { inventory: c.inventory } : {}), ...(c.menu ? { menu: c.menu } : {}) };
       }),
       // Island/clearing content is already objects and paint here, so the
       // export is a plain board of the same size (or the dungeon, whose rim

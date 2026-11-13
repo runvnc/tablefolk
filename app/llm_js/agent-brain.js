@@ -281,7 +281,8 @@ export function createAgentBrainManager(config = {}) {
     // the game's temperature; the endpoint brain is matched by its model name.
     const made = samplingFor(getEngineType() === 'openai' ? getEndpointConfig().model : currentModelKey);
     // A character's chaos counts from the model's own settings (console callers pass a temperature instead)
-    const rec = agent.chaos != null ? withChaos(made, agent.chaos) : made;
+    // greedy (a classification: menus.js picking a choice): the one most likely answer
+    const rec = agent.greedy ? { temperature: 0, top_k: 1, top_p: 1 } : agent.chaos != null ? withChaos(made, agent.chaos) : made;
     let text;
     const turnStart = performance.now();
     try {

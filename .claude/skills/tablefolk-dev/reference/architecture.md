@@ -88,6 +88,7 @@ scenario.js, the tests and packages use.
 | `embed.js`, `embed-worker.js` | EmbeddingGemma 2 recall |
 | `roles.js`, `trade.js`, `skills.js`, `packages.js`, `workflows.js`, `registry.js` | roles, selling rules, skills, packages, workflows, the Library pane's search |
 | `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
+| `menus.js` | JRPG-style menus (`tablefolkMenu`): a character's `menu` on E, the scenario's `menus`; words from the chat box or the 🎤 matched to a choice (number, label, keyword, shared words, EmbeddingGemma when its best is 0.74+ and 0.06 ahead, then the brain picks a number greedily: 12/12 paraphrase and none-of-these cases with Gemma E2B, 2026-11-12); `pick()` lets the brain choose from any list |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
 | `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |

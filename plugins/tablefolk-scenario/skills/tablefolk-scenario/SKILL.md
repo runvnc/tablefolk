@@ -88,7 +88,7 @@ lines (`map`, quick natural scenes), explicit `objects` / `paint`, and
 | [map-lines.md](reference/map-lines.md) | the `place` / `paint` / `path` language and how the layout engine places things |
 | [generated.md](reference/generated.md) | `generate`: dungeons and villages, room and building kinds, `in`, auto-placement by role, fixed layouts |
 | [things.md](reference/things.md) | the object catalogue and where the lists live, walk-in buildings, notes, loot, locked doors, asset packs |
-| [characters.md](reference/characters.md) | commands (`allowed`), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
+| [characters.md](reference/characters.md) | commands (`allowed`), menus (choices the player clicks, types or says), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
 | [combat.md](reference/combat.md) | hit points, weapons, hostile monsters and talking enemies, looting bodies |
 | [living.md](reference/living.md) | worlds that live on their own: `live`, `pace`, the director and `events`, writing personalities for it, showcase worlds |
 | [goals.md](reference/goals.md) | win / lose predicates and scores |
