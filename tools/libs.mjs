@@ -9,7 +9,7 @@
 //                                          gets it (imports of ../<other>/ become
 //                                          @tablefolk/<other>, versions filled in)
 //   node tools/libs.mjs version <patch|minor|major|x.y.z> [names]
-//   node tools/libs.mjs publish [names] [--dry-run]
+//   node tools/libs.mjs publish [names] [--dry-run] [--otp=123456]
 //                                          build, then npm publish each, the ones
 //                                          others depend on first (needs npm login)
 //   node tools/libs.mjs list               names, versions, dependencies
@@ -110,7 +110,17 @@ else if (cmd === 'version') {
   if (check()) process.exit(1);
   const list = order(args.length ? args : names());
   build(list);
-  for (const n of list) execFileSync('npm', ['publish', '--access', 'public', ...(flags.includes('--dry-run') ? ['--dry-run'] : [])], { cwd: join(DIST, n), stdio: 'inherit' });
+  // --otp=123456: npm's one-time code (two-factor accounts). A code lasts ~30 s:
+  // packages already on npm at this version are skipped, so run it again with a
+  // fresh code if it expires partway through.
+  const otp = flags.find(f => f.startsWith('--otp='));
+  for (const n of list) {
+    const { name, version } = pkg(n);
+    let have = '';
+    try { have = execFileSync('npm', ['view', `${name}@${version}`, 'version'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch {}
+    if (have === version && !flags.includes('--dry-run')) { console.log(`${name}@${version} is already on npm: skipped`); continue; }
+    execFileSync('npm', ['publish', '--access', 'public', ...(otp ? [otp] : []), ...(flags.includes('--dry-run') ? ['--dry-run'] : [])], { cwd: join(DIST, n), stdio: 'inherit' });
+  }
 } else {
   console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 16).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
 }
