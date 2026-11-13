@@ -22,10 +22,10 @@
  */
 (function () {
   const LOADER = '/libs/brain/engines/litert.js';
-  const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman'.split(' ');
-  const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog'.split(' ');
+  const PEOPLE = 'woodsman huntress peasant peasant_woman adventurer adventurer_woman hooded king farmer villager witch wizard swordswoman sorceress swordsman wanderer villager_woman dwarf elf priest guard merchant'.split(' ');
+  const MONSTERS = 'skeleton skeleton_warrior skeleton_farmer zombie goblin kobold orc troll rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog minotaur lizardman werewolf mummy'.split(' ');
   const ANIMALS = 'cow bull horse white_horse donkey deer stag fox dog husky alpaca pig sheep'.split(' ');
-  const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog'.split(' '));
+  const MINDLESS = new Set('skeleton skeleton_warrior skeleton_farmer zombie rat spider wolf bat ghost slime demon giant dragon wyrmling imp mushroom_warrior bunny snake wasp frog minotaur lizardman werewolf mummy'.split(' '));
   const DUNGEON = 'entrance throne lair treasure library shrine barracks storage kitchen prison crypt alchemy'.split(' ');
   const VILLAGE = 'square tavern smithy shop temple alchemist guardhouse library stable house pond garden'.split(' ');
   // procgen.js forest, farm and cave (2026-11-13)
@@ -162,7 +162,8 @@
     scn.generate = plan.kind === 'village' ? { kind: 'village', buildings: n, places: plan.places } : { kind: plan.kind, rooms: n, places: plan.places };
     if (plan.kind === 'forest' && /spooky|haunted|cursed|dark|dead/i.test(plan.text)) scn.generate.style = 'spooky';
     if (plan.kind === 'cave' && /\bmine|miners?\b/i.test(plan.text)) scn.generate.style = 'mine';
-    scn.dark = plan.kind === 'dungeon' || plan.kind === 'cave' ? m.dark !== false : false;
+    if (plan.kind === 'dungeon') { const t = plan.text + ' ' + plan.title; if (/\b(castle|keep|fortress|palace|citadel)\b/i.test(t)) scn.generate.style = 'castle'; else if (/\b(crypt|tomb|catacombs?|mausoleum|barrow)\b/i.test(t)) scn.generate.style = 'crypt'; }
+    scn.dark = (plan.kind === 'dungeon' && scn.generate.style !== 'castle') || plan.kind === 'cave' ? m.dark !== false : false;
     if (plan.kind === 'forest' || plan.kind === 'farm') scn.lighting = /night/i.test(m.lighting || '') ? 'night' : 'bright';
     scn.objects = objects;
     let built = globalThis.TablefolkProcgen.applyToScenario(JSON.parse(JSON.stringify(scn)));

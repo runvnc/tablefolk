@@ -171,12 +171,19 @@
     const kind = rooms.map(() => 'room'); kind[entrance] = 'entrance';
     // Kinds the scenario asked for ("in") come first, so they always exist.
     const want = (opts.want || []).filter(k => ROOM_FURNISH[k] && !['entrance', 'room'].includes(k));
-    const boss = opts.boss || (want.includes('throne') ? 'throne' : want.includes('lair') ? 'lair' : (R.next() < .5 ? 'throne' : 'lair'));
+    // "style": "castle" (a keep: barracks, library, kitchen, a throne room) or
+    // "crypt" (tombs: crypts, shrines, a lair); else a mix
+    const style = String(opts.style || '').toLowerCase();
+    const boss = opts.boss || (want.includes('throne') ? 'throne' : want.includes('lair') ? 'lair' : style === 'castle' ? 'throne' : style === 'crypt' ? 'lair' : (R.next() < .5 ? 'throne' : 'lair'));
     if (order.length) kind[order[0]] = boss;
     const deadEnds = order.slice(1).filter(i => adj[i].size === 1);
     if (deadEnds.length) kind[deadEnds[0]] = 'treasure';
-    let pool = R.shuffle(['barracks', 'storage', 'library', 'shrine', 'kitchen', 'prison', 'crypt', 'alchemy', boss === 'throne' ? 'lair' : 'throne']);
-    pool = [...new Set([...want.filter(k => k !== boss && k !== 'treasure'), ...pool])];
+    let pool = style === 'castle' ? [...R.shuffle(['barracks', 'library', 'kitchen', 'storage']), ...R.shuffle(['barracks', 'prison', 'shrine', 'alchemy', 'storage'])]
+      : style === 'crypt' ? [...R.shuffle(['crypt', 'crypt', 'shrine']), ...R.shuffle(['crypt', 'storage', 'prison', 'shrine', 'crypt', 'alchemy'])]
+      : R.shuffle(['barracks', 'storage', 'library', 'shrine', 'kitchen', 'prison', 'crypt', 'alchemy', boss === 'throne' ? 'lair' : 'throne']);
+    // asked-for kinds first; a style's pool may repeat a kind (crypt 1, crypt 2)
+    const asked = [...new Set(want.filter(k => k !== boss && k !== 'treasure'))];
+    pool = [...asked, ...pool.filter((k, i) => !asked.includes(k) && (style === 'castle' || style === 'crypt' || pool.indexOf(k) === i))];
     if (want.includes('treasure') && !deadEnds.length && order.length > 1) kind[order[order.length - 1]] = 'treasure';
     for (const i of order) if (kind[i] === 'room' && pool.length) kind[i] = pool.shift();
     // Lay it into glyphs: walls wherever bare cells touch floor (8 ways).
@@ -226,6 +233,16 @@
       }
       if (spot) { const [tx, tz] = at(...spot); objects.push({ type: 'torch', x: tx, z: tz }); }
     }
+    // Dressing by room (pack things, as objects): bones in crypts and lairs,
+    // books in libraries, arms in barracks, gold in the treasure room...
+    const DRESS = { crypt: ['skull', 'bone', 'bone'], lair: ['bone', 'skull', 'bone'], prison: ['bone'], library: ['book', 'open_book'], barracks: [R.pick(['shield', 'round_shield']), R.pick(['sword', 'spear'])],
+      treasure: ['gold_bars', R.pick(['crown', 'necklace']), 'coin_pouch'], alchemy: ['crystals', 'book'], storage: ['sacks', 'sacks'], kitchen: ['sacks', 'frying_pan'], shrine: ['open_book'] };
+    rooms.forEach((rm, i) => {
+      const things = DRESS[kind[i]]; if (!things) return;
+      const nearDoor = (r, c) => doorsOf[i].some(([dr, dc]) => Math.abs(dr - r) + Math.abs(dc - c) <= 1);
+      const cells = []; for (let r = rm.r0; r <= rm.r1; r++) for (let c = rm.c0; c <= rm.c1; c++) if (g[r][c] === (ROOM_FURNISH[kind[i]] || ROOM_FURNISH.room).floor && !nearDoor(r, c)) cells.push([r, c]);
+      R.shuffle(cells).slice(0, things.length).forEach(([r, c], k) => { const [x, z] = at(r, c); objects.push({ type: things[k], x, z, ry: +(R.next() * 6.283).toFixed(3) }); });
+    });
     return finish({ kind: 'dungeon', W, H, g, places, objects, start: ent, lighting: 'night', dark: !!opts.dark });
   }
 
@@ -643,7 +660,7 @@
   // Which place suits a character: words in its id/style/personality.
   const ROLE_PLACES = [
     [/\b(king|queen|lord|lady|boss|warlord|chief|chieftain|emperor|sorcer|necromancer|lich|overlord|dragon|tyrant|throne)/i, ['throne', 'lair', 'temple', 'square']],
-    [/\b(goblin|orc|ogre|troll|kobold|bandit|brute|beast|wolf|rat|spider|monster|minion)/i, ['lair', 'barracks', 'storage', 'room']],
+    [/\b(goblin|orc|ogre|troll|kobold|bandit|brute|beast|wolf|werewolf|minotaur|lizardman|lizard|rat|spider|monster|minion)/i, ['lair', 'barracks', 'storage', 'room', 'camp', 'ruins']],
     [/\b(guard|soldier|knight|sentry|captain|warden|watch)/i, ['barracks', 'guardhouse', 'entrance', 'prison', 'square']],
     [/\b(prisoner|captive|hostage|chained|jailed)/i, ['prison', 'storage', 'room']],
     [/\b(priest|priestess|monk|nun|cleric|oracle|acolyte|shaman|druid)/i, ['shrine', 'temple', 'crypt']],
@@ -657,7 +674,7 @@
     [/\b(deer|stag|fox|rabbit|bunny|boar)/i, ['grove', 'meadow', 'clearing', 'pasture']],
     [/\b(dog|husky|hound)/i, ['yard', 'square', 'camp', 'farmhouse']],
     [/\b(stable|groom|farmer|farmhand|milkmaid|shepherd)/i, ['field', 'farmhouse', 'yard', 'stable', 'garden', 'pasture']],
-    [/\b(hunter|huntress|ranger|bandit|outlaw|poacher|woodsman|woodcutter|scout)/i, ['camp', 'hut', 'clearing', 'ruins']],
+    [/\b(hunter|huntress|ranger|elf|elven|bandit|outlaw|poacher|woodsman|woodcutter|scout)/i, ['camp', 'hut', 'clearing', 'ruins']],
     [/\b(hermit|druid|witch|herbalist)/i, ['hut', 'shrine', 'grove']],
     [/\b(miner|prospector|dwarf)/i, ['mine', 'camp', 'crystals']],
     [/\b(wyrm|wyrmling|snake|serpent|wasp|frog|mushroom|imp)/i, ['lair', 'grotto', 'pool', 'grove', 'ruins', 'cave']],
@@ -705,9 +722,13 @@
     // places asked for: "generate": {"places": [...]}, and every "in"
     const want = [...(Array.isArray(opts.places) ? opts.places.map(p => ({ in: p })) : []), ...(Array.isArray(scn.locked) ? scn.locked : []), ...(scn.agents || []), ...(scn.objects || []), scn.player || {}].map(a => a.in).filter(v => v != null).map(v => String(v).toLowerCase().replace(/\s+\d+$/, ''));
     // dungeons are dark (fog of war, unlit rooms) unless the scenario says "dark": false
-    const KINDS = { village, town: village, hamlet: village, forest, woods: forest, wilds: forest, wilderness: forest, farm, farmstead: farm, cave, caves: cave, cavern: cave, mine: cave, dungeon };
+    const KINDS = { village, town: village, hamlet: village, forest, woods: forest, wilds: forest, wilderness: forest, farm, farmstead: farm, cave, caves: cave, cavern: cave, mine: cave, dungeon,
+      castle: dungeon, keep: dungeon, fortress: dungeon, crypt: dungeon, tomb: dungeon, catacombs: dungeon };
+    const STYLE_OF = { mine: 'mine', hamlet: 'hamlet', castle: 'castle', keep: 'castle', fortress: 'castle', crypt: 'crypt', tomb: 'crypt', catacombs: 'crypt' };
     const make = KINDS[kindName] || dungeon, outdoor = make === village || make === forest || make === farm;
-    const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? !outdoor, style: opts.style || (kindName === 'mine' ? 'mine' : kindName === 'hamlet' ? 'hamlet' : '') };
+    const style = opts.style || STYLE_OF[kindName] || '';
+    // a castle is lit (its rooms are lived in); other dungeons and caves are dark
+    const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? (!outdoor && style !== 'castle'), style };
     let gen = make(genOpts);
     if (make === village && opts.extras !== false) gen = villageExtras(gen, genOpts);
     const warnings = [], used = new Set(), occupied = new Set(), placed = {};

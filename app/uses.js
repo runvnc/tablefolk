@@ -6,8 +6,9 @@
  *     bed, double_bed        lies down on it and rests (tiredness to zero)
  *     bench, stool, chairs   sits on it (tiredness down a little)
  *     anvil                  hammers;  workbench: saws;  cauldron: stirs
- *     tree, logs             chops (takes firewood);  boulder: breaks stone
- *     well                   draws water and drinks;  lectern, bookcase: reads
+ *     tree, logs (and the pines, oaks, other trees, a log)  chops (takes firewood);
+ *                            boulder, mossy_rock: breaks stone;  crystals: breaks off a crystal
+ *     well                   draws water and drinks;  lectern, bookcase, open_book: reads
  *     target, dummy          practises;  apple/carrot barrels and crates: takes one
  *   take(item, chest)   from a chest ("gold", "5 gold", "all", an item's name)
  *   put(item, chest)    into a chest, from what it carries (both open it if closed)
@@ -44,6 +45,9 @@
     anvil: 'anvil', workbench: 'workbench', cauldron: 'cauldron', well: 'well', tree: 'chop', logs: 'chop', boulder: 'mine',
     lectern: 'read', bookcase: 'read', bookshelf: 'read', target: 'train', dummy: 'train',
     apple_barrel: 'food', apple_crate: 'food', carrot_crate: 'food',
+    // the Quaternius nature and camp things (2026-11-13)
+    pine_tree: 'chop', tall_pine: 'chop', oak_tree: 'chop', tall_tree: 'chop', autumn_tree: 'chop', dead_tree: 'chop', log: 'chop',
+    mossy_rock: 'mine', crystals: 'mine', open_book: 'read',
   };
   // work at a thing: the clip (a playRig mode), how long, what is said, what it yields
   const WORK = {
@@ -154,8 +158,10 @@
   function work(g, o, k) {
     const w = WORK[k]; face(g, o);
     const food = FOOD_OF[o.type];
-    const text = w.did.replace('{t}', nice(o.type)).replace('{a}', food === 'apple' ? 'an apple' : 'a ' + (food || 'thing'));
-    const item = food || w.gives;
+    // crystals give a crystal, not stone
+    const crystal = o.type === 'crystals';
+    const text = crystal ? 'breaks a crystal off the cluster' : w.did.replace('{t}', nice(o.type)).replace('{a}', food === 'apple' ? 'an apple' : 'a ' + (food || 'thing'));
+    const item = food || (crystal ? 'crystal' : w.gives);
     if (item) {
       if (g === state.playerAvatar) { const have = state.player.items.find(i => i.name === item); if (have) have.qty = (have.qty ?? 1) + 1; else state.player.items.push({ name: item, qty: 1 }); inventoryChanged(); }
       else { const inv = charInventory(g); addItem(inv.items, item); setBrainConfig(g.id, { inventory: inv }); }

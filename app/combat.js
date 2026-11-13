@@ -37,6 +37,7 @@
     slime: { dmg: 1, name: 'acid' }, ghost: { dmg: 2, name: 'chilling touch' }, giant: { dmg: 4, name: 'huge fists' }, demon: { dmg: 3, name: 'claws' },
     dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, orc_classic: { dmg: 3, name: 'cleaver' }, troll: { dmg: 4, name: 'huge fists' }, goblin_classic: { dmg: 2, name: 'jagged knife' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
     wyrmling: { dmg: 3, name: 'fiery bite' }, imp: { dmg: 2, name: 'claws' }, mushroom_warrior: { dmg: 2, name: 'spore club' }, bunny: { dmg: 1, name: 'carrot sword' },
+    minotaur: { dmg: 4, name: 'horns' }, lizardman: { dmg: 3, name: 'claws and teeth' }, werewolf: { dmg: 3, name: 'claws' }, mummy: { dmg: 2, name: 'grasping wrappings' },
     snake: { dmg: 2, name: 'venomous fangs' }, wasp: { dmg: 1, name: 'sting' }, frog: { dmg: 1, name: 'sticky tongue' },
     bull: { dmg: 3, name: 'horns' }, stag: { dmg: 2, name: 'antlers' }, horse: { dmg: 2, name: 'hooves' }, white_horse: { dmg: 2, name: 'hooves' }, donkey: { dmg: 2, name: 'hooves' }, cow: { dmg: 1, name: 'horns' },
     dog: { dmg: 1, name: 'teeth' }, husky: { dmg: 1, name: 'teeth' }, fox: { dmg: 1, name: 'teeth' }, deer: { dmg: 1, name: 'hooves' }, alpaca: { dmg: 1, name: 'spit' }, pig: { dmg: 1, name: 'tusks' }, sheep: { dmg: 1, name: 'head' },

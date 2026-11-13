@@ -80,5 +80,47 @@
    "comedy",
    "very small brain"
   ]
+ },
+ {
+  "file": "greenwood.json",
+  "title": "The Greenwood",
+  "pitch": "Woods, a hunters' camp, a hermit's hut, old ruins with a wolf in them, and a lost silver horn.",
+  "who": [
+   "huntress",
+   "wizard",
+   "stag"
+  ],
+  "tags": [
+   "outdoors",
+   "quest"
+  ]
+ },
+ {
+  "file": "millbrook-farm.json",
+  "title": "Millbrook Farm",
+  "pitch": "Cows, horses, a dog and a pig, and one cow missing. The farmer pays in pie.",
+  "who": [
+   "farmer",
+   "cow",
+   "horse"
+  ],
+  "tags": [
+   "animals",
+   "outdoors"
+  ]
+ },
+ {
+  "file": "crystal-caves.json",
+  "title": "The Crystal Caves",
+  "pitch": "Glowing caverns, snakes in the dark, a wyrmling asleep on the miners' gold.",
+  "who": [
+   "wyrmling",
+   "snake",
+   "hooded"
+  ],
+  "tags": [
+   "caves",
+   "fight"
+  ]
  }
 ]

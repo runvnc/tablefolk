@@ -41,10 +41,10 @@
     carpet: { color: '#66727f' }, sea: { color: '#173550' },
   };
   const FLOOR_NAMES = Object.keys(FLOORS);
-  const MONSTERS = ['goblin', 'kobold', 'orc', 'troll', 'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'skeleton_classic', 'skeleton_warrior_classic', 'zombie', 'ghost', 'rat', 'spider', 'wolf', 'bat', 'slime', 'demon', 'giant', 'dragon', 'goblin_classic', 'orc_classic', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog'];
+  const MONSTERS = ['goblin', 'kobold', 'orc', 'troll', 'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'skeleton_classic', 'skeleton_warrior_classic', 'zombie', 'ghost', 'rat', 'spider', 'wolf', 'bat', 'slime', 'demon', 'giant', 'dragon', 'goblin_classic', 'orc_classic', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy'];
   const ANIMALS = ['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep'];
-  const PEOPLE = ['villager', 'peasant', 'peasant_woman', 'farmer', 'woodsman', 'huntress', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman'];
-  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog']);
+  const PEOPLE = ['villager', 'peasant', 'peasant_woman', 'farmer', 'woodsman', 'huntress', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman', 'dwarf', 'elf', 'priest', 'guard', 'merchant'];
+  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy']);
   const OBJECT_GROUPS = [
     ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note']],
     ['Light', ['torch', 'candelabra', 'candles', 'lantern', 'lamp', 'campfire', 'floor_lamp', 'crystal_ball', 'scrying_pool', 'rune_circle']],

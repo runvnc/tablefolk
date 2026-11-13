@@ -70,10 +70,11 @@ it is a few steps away (to a free cell beside it), and the prompt names
 | `bed`, `double_bed` | lies down on it and rests (tiredness gone) |
 | `bench`, `stool`, `wooden_chair`, `armchair`, `sofa`, `office_chair`, `throne` | sits on it (tiredness down a little) |
 | `anvil`, `workbench`, `cauldron` | hammers, saws, stirs |
-| `tree`, `logs` | chops (takes firewood) |
-| `boulder` | breaks off a stone (takes it) |
+| `tree`, `logs`, `pine_tree tall_pine oak_tree tall_tree autumn_tree dead_tree log` | chops (takes firewood) |
+| `boulder`, `mossy_rock` | breaks off a stone (takes it) |
+| `crystals` | breaks off a crystal (takes it) |
 | `well` | drinks (heals 1) |
-| `lectern`, `bookcase` | reads |
+| `lectern`, `bookcase`, `open_book` | reads |
 | `target`, `dummy` | practises |
 | `apple_barrel`, `apple_crate`, `carrot_crate` | takes an apple or a carrot (food: `eat` it) |
 

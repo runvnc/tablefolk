@@ -45,7 +45,14 @@ layout. `"lighting"`, `"walls"`, `"grid"` (replaces the generated one),
 
 BSP rooms, a spanning tree of L-shaped corridors plus a loop or two, one-cell
 walls around floors only, the sea outside (`"outside": "table"` keeps the bare
-board). Options: `"rooms"` (3-16), `"size"`, `"boss": "throne" | "lair"`.
+board). Options: `"rooms"` (3-16), `"size"`, `"boss": "throne" | "lair"`,
+`"style"`: `castle` (a keep: a throne room, barracks, a library, a kitchen,
+stores; lit, not dark) or `crypt` (tombs: crypts, shrines, a lair; dark).
+`"kind": "castle"` (or `keep`, `fortress`) and `"kind": "crypt"` (or `tomb`,
+`catacombs`) are short for those. Rooms are dressed by kind: skulls and bones
+in crypts, lairs and prisons, books in libraries and shrines, a shield and a
+weapon in barracks, gold bars, a crown or necklace and a coin pouch in the
+treasure room, sacks in stores and kitchens, crystals in the alchemy room.
 
 Room purposes come from the room graph: the `entrance` is nearest the south
 edge (the player starts there), the room furthest from it is the `throne` or

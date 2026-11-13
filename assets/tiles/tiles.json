@@ -1882,6 +1882,15 @@
     78.8,
     147.9
    ]
+  },
+  "dwarf": {
+   "file": "characters/dwarf.png",
+   "w": 220,
+   "h": 267,
+   "anchor": [
+    109.5,
+    173.8
+   ]
   }
  },
  "floors": {

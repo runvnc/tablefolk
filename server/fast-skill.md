@@ -138,7 +138,7 @@ healing (bandage(target)), thievery (steal(target)), bard (sing(rest|courage)).
 
 ## A. "generate": procedural places (fastest, best for big places)
 
-"generate": { "kind": "dungeon", "rooms": 8 }      // 3-16 rooms
+"generate": { "kind": "dungeon", "rooms": 8 }      // 3-16 rooms; "style": "castle" (lit keep) | "crypt" (tombs)
 "generate": { "kind": "village", "buildings": 7 }  // 3-14 buildings; "style": "hamlet" for a farming one
 "generate": { "kind": "forest" }                   // wild woods; "style": "spooky" | "autumn" | "pine"
 "generate": { "kind": "farm" }                     // a farmstead

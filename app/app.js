@@ -4640,7 +4640,7 @@ const PERSON_H=1.3;
 // (female or male), the same one every time for the same id. Genders and
 // descriptions come from the server's /api/voices (set on its admin page),
 // else these defaults.
-const FEMALE_MODELS=new Set(['woman','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
+const FEMALE_MODELS=new Set(['elf','woman','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
 const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
 fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
 // The designed voice library (assets/voices/, tools/fal-voices.py): samples
@@ -4676,6 +4676,8 @@ const FIGURES={
   swordsman:{dir:'meshy',h:1.36,v:'20261101a'}, wanderer:{dir:'meshy',h:1.36,v:'20261101a'},
   // the king (2026-10-30): an older king in red and gold; the Quaternius one stays as king_classic
   king:{dir:'meshy',h:1.38,v:'20261101a'}, king_classic:{file:'king',h:1.32},
+  // more people and monsters made the same way (tools/fal-character.py, 2026-11-13)
+  dwarf:{dir:'meshy',h:1.05,v:'20261114a'}, elf:{dir:'meshy',h:1.36,v:'20261114a'}, priest:{dir:'meshy',h:1.32,v:'20261114a'}, guard:{dir:'meshy',h:1.38,v:'20261114a'}, merchant:{dir:'meshy',h:1.3,v:'20261114a'}, minotaur:{dir:'meshy',h:1.9,v:'20261114a'}, lizardman:{dir:'meshy',h:1.45,v:'20261114a'}, werewolf:{dir:'meshy',h:1.6,v:'20261114a'}, mummy:{dir:'meshy',h:1.36,v:'20261114a'},
   adventurer_woman:{dir:'meshy',file:'swordswoman',h:1.3,v:'20261101a'}, witch:{dir:'meshy',file:'sorceress',h:1.32,v:'20261101a'}, peasant_woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'},
   villager:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'}, adventurer:{dir:'meshy',file:'swordsman',h:1.36,v:'20261101a'}, woodsman:{dir:'meshy',file:'wanderer',h:1.36,v:'20261101a'},
   woodsman_classic:{file:'woodsman',h:1.36}, huntress_classic:{file:'huntress',h:1.3}, peasant_woman_classic:{file:'peasant_woman',h:1.28},
