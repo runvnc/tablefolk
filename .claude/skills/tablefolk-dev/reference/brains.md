@@ -523,9 +523,7 @@ at a 2048 context. A short reply: 1.1 s.
 Load: 142 s the first time (5.95 GB from R2 in ~110 s, then compiling the
 kernels), 45 s from the cache.
 
-Not done yet: everything at once (Bark, the painter, EmbeddingGemma), the
-hard comparison with E4B, and the world builder with Bonsai (step by step
-and `?oneanswer=1`, added for this).
+Everything at once, the comparison and the world builder: below.
 
 Done the same day:
 - **Breeze's text encoder on the processor.** `te-cpu.patch` in the browser
@@ -560,10 +558,40 @@ each used once.
 Breeze's first audio, per line: 0.84 s with its text encoder on the GPU,
 about 3.7-5 s on the processor (every line, since it runs once per line).
 
+**The hard comparison** (micro-eval roles, smithy, shop-chaos,
+feelings-chaos, plus `evals/uses.json`; 2 runs each, a fresh Chrome per
+model, no voices): wins of 20.
+
+| | E4B (LiteRT) | Bonsai 2 9B | Bonsai 2 27B |
+|---|---|---|---|
+| total | 18 | 15 | 18 |
+| haggle to 45 | 1/2 | 0/2 | 0/2 |
+| store the ring | 2/2 | 1/2 | 2/2 |
+| fetch from the chest (open, take, give) | 1/2 | 0/2 | **2/2** (the first model to) |
+| the rest (small talk, horseshoe, lowball, hit-then-ask, sit, lie down, open the chest) | all won | all won | all won |
+
+The suites took 5 min (E4B), 13 min (9B) and 10 min (27B).
+
+**The world builder**, "a lighthouse keeper's island where a smuggler hides
+a stolen map":
+
+| | step by step | one answer (`?oneanswer=1`) |
+|---|---|---|
+| Bonsai 2 27B | 40 s (+142 s first load): map, 3 characters with sensible roles (keeper, smuggler, hostile goblin lookout) | 64 s (+40 s load): a full goal (win when holding the map, 30 turns), 3 characters; chose a dungeon generator for an island |
+| Bonsai 2 9B | 108 s (+110 s load): 7-line map, 2 characters; its goal asked for a "silver key" the story never mentions | **failed**: the graphics device was lost |
+
+**Bonsai 2 9B's prompt limit.** Transformers.js reads the whole prompt in
+one pass, and that grows fast: 1,000 tokens 21 s, 2,000 30 s, 3,000 44.5 s,
+4,500 out of memory on 12 GB and the device lost (the page's other models
+with it). Game turns and the step-by-step builder stay under it; the
+one-answer guide does not. So `bonsai9b.js` refuses prompts over
+`MAX_PROMPT` (3,500) with an error, and the one-answer builder uses step by
+step for the 9B.
+
 Ideas, next:
-- **Ternary Bonsai 2 9B as ONNX for WebGPU**
-  (`flackzz/Ternary-Bonsai-2-9B-ONNX-WebGPU`): smaller, leaving room for
-  everything; mirror it on R2.
+- **Chunked prefill for the 9B** (feed the prompt in pieces with the cache):
+  would lift the limit and the memory spike; the hybrid layers (linear
+  attention state plus 8 full-attention layers) make it more than a loop.
 - **CPU offload of Bonsai:** impossible in the browser (the engine is
   WebGPU-only; wllama lacks Prism's PTQ1_0). Possible natively with Prism's
   llama.cpp fork, as a local helper.

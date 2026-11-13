@@ -323,6 +323,9 @@
   // (Bonsai 2 27B, loaded with a 12288-token window for this); ?oneanswer=1.
   async function runOne(prompt, mode, emit) {
     const t0 = Date.now();
+    // Bonsai 2 9B (Transformers.js) runs out of graphics memory reading a prompt
+    // over about 4,000 tokens at once, and the guide is longer: step by step instead
+    try { if (localStorage.getItem('tablefolk_model') === 'bonsai2-9b') return run(prompt, emit); } catch {}
     try {
       await model(emit, { context: 12288 });
       const spec = await fetch('/api/worldgen/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: mode || 'auto' }) }).then(r => r.json());

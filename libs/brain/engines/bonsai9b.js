@@ -62,6 +62,11 @@ export async function loadBonsai9b(onStatus = () => {}, { mirror = mirrorAllowed
   return { T, tok, model, queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
+// Transformers.js reads the whole prompt in one pass; on a 12 GB card a prompt of
+// 4,500 tokens ran the card out of memory and lost the device (3,000 took 44 s).
+// Refusing first keeps the device (and the rest of the page) alive.
+export const MAX_PROMPT = 3500;
+
 const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
 
 // One turn at a time; the reply's text (thinking stripped)
@@ -71,6 +76,8 @@ export function generateBonsai9b(engine, _prompt, opts = {}) {
     const { T, tok, model } = engine;
     const messages = (opts.messages || []).map(m => ({ role: m.role, content: plain(m.content) }));
     const inputs = tok.apply_chat_template(messages, { add_generation_prompt: true, return_dict: true, enable_thinking: !!opts.enableThinking });
+    const n = inputs.input_ids.dims[1];
+    if (n > MAX_PROMPT) throw new Error(`Bonsai 2 9B reads at most ${MAX_PROMPT} tokens at once here (this prompt has ${n})`);
     let text = '';
     const streamer = new T.TextStreamer(tok, { skip_prompt: true, skip_special_tokens: true, callback_function: t => {
       text += t; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart());
