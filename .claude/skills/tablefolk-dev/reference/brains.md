@@ -527,10 +527,23 @@ Not done yet: everything at once (Bark, the painter, EmbeddingGemma), the
 hard comparison with E4B, and the world builder with Bonsai (step by step
 and `?oneanswer=1`, added for this).
 
+Done the same day:
+- **Breeze's text encoder on the processor.** `te-cpu.patch` in the browser
+  build, plus WASM SIMD and 8 threads (`tf_set_te_cpu`, the worker option
+  `teCpu`). Breeze alone: 1.78 GB instead of 2.68, first audio 3.7 s instead
+  of 1.2. The voice manager does this by itself when under 3.5 GB are left
+  beside the characters' model (`tablefolkBreezeTeCpu` forces it); Breeze is
+  offered from 2.6 GB left.
+- **Bonsai 27B (8192 context) plus Breeze on the 4070: 11.6-11.8 GB, both
+  work** (first audio ~5 s).
+- **Ternary Bonsai 2 9B** (`bonsai2-9b`, `libs/brain/engines/bonsai9b.js`):
+  flackzz's ONNX export, text only (2.7 GB), mirrored on R2
+  (`bonsai-2-9b-onnx/`). It runs on Transformers.js 4.3.1 with two fixes: the
+  text-only rope delta (`max + 1 + length` where `max + 1 - length` is right)
+  and `pixel_values: null`. On the 4070: 55 s to download and load, 4.6 GB,
+  3-9 s a turn. Mog haggled correctly, and its free writing is fluent.
+
 Ideas, next:
-- **Breeze in the browser with its text encoder on the processor**, like the
-  native build (~2.1 GB instead of ~3.2): Bonsai at 4096 + Breeze would fit
-  in 12 GB.
 - **Ternary Bonsai 2 9B as ONNX for WebGPU**
   (`flackzz/Ternary-Bonsai-2-9B-ONNX-WebGPU`): smaller, leaving room for
   everything; mirror it on R2.
