@@ -624,7 +624,7 @@ floor of 40, how many potions 20 gold buys): wins of 8.
 
 With thinking the 27B split "60 for all three" into potions at 8 + 8 and
 the sword at 44. On the easier deciding tasks (haggle to 45, store the ring,
-fetch from the chest) with thinking: 27B 6/6, E4B 5/6.
+fetch from the chest) with thinking: 27B 6/6 (run before the leak was fixed), E4B 5/6.
 
 Ideas, next:
 - **The 9B's speed**: a 4-bit export, or newer ONNX Runtime WebGPU kernels
