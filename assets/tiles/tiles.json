@@ -1936,6 +1936,33 @@
     196.6,
     312
    ]
+  },
+  "lizardman": {
+   "file": "characters/lizardman.png",
+   "w": 301,
+   "h": 366,
+   "anchor": [
+    150.5,
+    238.1
+   ]
+  },
+  "werewolf": {
+   "file": "characters/werewolf.png",
+   "w": 332,
+   "h": 404,
+   "anchor": [
+    165.8,
+    263.1
+   ]
+  },
+  "mummy": {
+   "file": "characters/mummy.png",
+   "w": 283,
+   "h": 344,
+   "anchor": [
+    141.3,
+    223.9
+   ]
   }
  },
  "floors": {
