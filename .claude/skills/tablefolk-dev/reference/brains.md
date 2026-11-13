@@ -478,3 +478,62 @@ skips characters (it drops their pending chat) unless a workflow is active;
 `replyNow` drives an active workflow with `world.driveWorkflow` until it
 waits. Menus (`menus.js`) do not ask the model in such a world;
 EmbeddingGemma still matches by meaning. Test: `willow-lane-test.mjs`.
+
+## Bonsai 2 27B on a cloud RTX 4070 (2026-11-13)
+
+vast.ai, RTX 4070 12 GB (driver 560), the "Linux Desktop Container" image
+(`vastai/linux-desktop:cuda-12.9-ubuntu24.04-2026-02-05`,
+`NVIDIA_DRIVER_CAPABILITIES=all`): Vulkan sees the card. Headless Chrome uses
+the test flags plus
+`--enable-dawn-features=allow_unsafe_apis,disable_adapter_blocklist`. Its
+debugging port is tunnelled over SSH, so the local test tools drive it
+unchanged. A fresh Chrome for every memory measurement: navigating away
+does not free the GPU.
+
+Bugs found and fixed (Bonsai 2 had not really worked before):
+- **From the R2 mirror it failed to load** ("Array buffer allocation
+  failed"). R2's CORS does not expose `Accept-Ranges`, so the engine read the
+  whole 5.95 GB into one array. HEAD answers from the mirror now get the
+  header (bonsai2.js). Exposing the header in the bucket's CORS would also fix
+  it.
+- **Every character turn failed** with "No user query found in messages": the
+  engine's chat template refuses `system` messages. Their text now goes in
+  front of the first user message.
+- **Breeze TTS 2 in the browser needs a recent Chrome**: on Chrome 144 a
+  subgroup kernel (`mul_mat_vec_q4_K_f32_sg_reduce`) fails to compile; Chrome
+  157 works.
+
+Graphics memory, `?gfx=light`, the Haggler world:
+
+| loaded | GB used of 12.28 |
+|---|---|
+| the light world only | 0.2 |
+| Breeze TTS 2 only (first audio 0.85 s, 1.16x real time) | 3.5 |
+| Bonsai, 8192 context (`?bonsaictx=`) | 9.9 |
+| Bonsai, 4096 context | 9.3 (Breeze beside it ran out of memory) |
+| Bonsai, 2048 context + Breeze | 11.75 once (both worked); the next identical run, Breeze ran out |
+
+So Bonsai is about 9 GB at any context: the window is only ~0.6 GB of it.
+On 12 GB, Bonsai plus Breeze is unreliable.
+
+Bonsai as a character (after the fixes): Mog haggled correctly ("Twenty
+gold? Get out of my shop, I want fifty gold"; sold at 45), **2-4 s a turn**,
+at a 2048 context. A short reply: 1.1 s.
+
+Load: 142 s the first time (5.95 GB from R2 in ~110 s, then compiling the
+kernels), 45 s from the cache.
+
+Not done yet: everything at once (Bark, the painter, EmbeddingGemma), the
+hard comparison with E4B, and the world builder with Bonsai (step by step
+and `?oneanswer=1`, added for this).
+
+Ideas, next:
+- **Breeze in the browser with its text encoder on the processor**, like the
+  native build (~2.1 GB instead of ~3.2): Bonsai at 4096 + Breeze would fit
+  in 12 GB.
+- **Ternary Bonsai 2 9B as ONNX for WebGPU**
+  (`flackzz/Ternary-Bonsai-2-9B-ONNX-WebGPU`): smaller, leaving room for
+  everything; mirror it on R2.
+- **CPU offload of Bonsai:** impossible in the browser (the engine is
+  WebGPU-only; wllama lacks Prism's PTQ1_0). Possible natively with Prism's
+  llama.cpp fork, as a local helper.
