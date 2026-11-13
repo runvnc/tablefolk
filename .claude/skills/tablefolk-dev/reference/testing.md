@@ -77,7 +77,7 @@ Scripted (no model): `uses-test.mjs` drives every kind of `use`, `put`, `take`, 
 copies at chaos 50. Point the test Chrome's output at a file on disk, not
 in /tmp: headless Chrome's log grew to 7 GB in two hours of evals and filled
 the 7.8 GB RAM disk (Claude Code's temp folder is there too). 2026-10-30 (RUNS=2, 36 scenario runs, each model at its
-makers' recommended sampling, sampling.js): Gemma 4 E2B on LiteRT-LM 0.19.0
+makers' recommended sampling, libs/brain/sampling.js): Gemma 4 E2B on LiteRT-LM 0.19.0
 35/36 (one lowball sale); LFM3-1.7B on the WebGPU kernels (greedy) 30/36
 (misses: haggling and list prices from the personality alone, recalling a
 gift, one dagger commission); MiniCPM5-2B int4 on the LiteRT nightly at
@@ -141,3 +141,15 @@ per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
 - `runAgentCommand` takes the space syntax (`walk n`), not `walk(n)`.
 - From Claude Code: run `launch-chrome.sh` with `run_in_background`, and
   stream long runs through a Monitor.
+
+## The libraries (libs/)
+
+`node tools/libs.mjs check` (imports and no game globals), then
+`/tools/browser-test/libs-test.html` on a test server: it imports every
+library and checks what needs no download (the mirror rule, device
+detection, menu matching and the menu box, `createBrain` with a stand-in
+engine: chat, stream, pick, yes/no, json, the Prompt-API session, a decider
+stand-in; the voice and speech choices). With models cached (the :8000
+origin), `createBrain({ model: "gemma4-e2b" })`, `createVoice` and
+`createListener` were checked end to end on 2026-11-13 (Pocket-TTS line
+transcribed word for word by Bark).

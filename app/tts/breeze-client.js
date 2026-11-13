@@ -8,7 +8,7 @@
 // breeze-server started with --cors).
 //
 // It stands in for a speech worker: pocket-tts-manager.js talks to it with
-// the same messages as pocket18-worker.js (load, set_audio_port, generate,
+// the same messages as libs/voice/pocket18-worker.js (load, set_audio_port, generate,
 // stop, encode_voice ... / loaded, generation_started, audio_chunk_meta,
 // stream_ended, error), and it streams the server's 24 kHz s16le PCM into the
 // same audio worklet, so panning, volume and lip sync work unchanged.

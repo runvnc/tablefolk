@@ -4,6 +4,11 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-13
+
+- **Tablefolk's parts as libraries**: device detection, the language models, the Strands Decider, the voices, speech input and the menus are now standalone packages in `libs/` (`@tablefolk/device`, `brain`, `decider`, `voice`, `hear`, `menus`, and `models` beneath them). The game is built on them, and any web page can use them (npm, or a CDN with an import map). `@tablefolk/brain` gives a model in one call: it picks what the device can run (Gemma 4, a tiny Qwen, Chrome's built-in model, or OpenRouter with the visitor's own sign-in) and offers chat, streaming, pick-one-of, yes/no, JSON, and Chrome's Prompt API shape. `tools/libs.mjs` checks, builds and publishes them.
+- **The model mirror is for tablefolk.world**: other sites using the libraries download the models from Hugging Face (Breeze TTS 2 too, which came only from the mirror before).
+
 ## 2026-11-12
 
 - **Menus**: a character can have a JRPG-style menu of choices that opens when you talk to it (E). Click a choice, press its number, or type or say anything: "the second one", "can you fix my armor" or "my chainmail is dented" find the right choice (by number, words, meaning, or the characters' model), and words that fit none can go to the character as ordinary chat. Choices can say a line, run a command or open another menu; scenarios share menus by id (`menus`).

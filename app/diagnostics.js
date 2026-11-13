@@ -10,7 +10,7 @@
  * "This device" pane (#deviceReport) shows everything detected (graphics
  * card and its memory, what is left beside the brain, this browser's
  * abilities, storage) and every decision with its time. Both refresh while
- * open. Sources: window.tablefolkDevice (hardware.js through
+ * open. Sources: window.tablefolkDevice (libs/device/index.js through
  * world-integration.js), window.tablefolkBrowser (browser-check.js),
  * window.tablefolkTTS (pocket-tts-manager.js), window.tablefolkSpeech
  * (speech-input.js), window.TABLEFOLK_GFX (graphics-settings.js).

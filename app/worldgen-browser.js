@@ -35,7 +35,7 @@
 
   // ---- the model ----
   // Gemma 4 E2B/E4B on LiteRT-LM, or Bonsai 2 27B on its WebGPU kernels
-  // (bonsai2-engine.js; a 10 GB+ card): the one the builder's menu chose
+  // (libs/brain/engines/bonsai2.js; a 10 GB+ card): the one the builder's menu chose
   // (stored as 'tablefolk_model'), downloaded now if this browser has not got
   // it yet (the menu says how big; it is kept for the game too).
   const BONSAI2 = '/libs/brain/engines/bonsai2.js';

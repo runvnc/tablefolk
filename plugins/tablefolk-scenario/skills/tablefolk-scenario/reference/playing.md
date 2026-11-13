@@ -29,7 +29,7 @@ tests read the same values from `window.tablefolkBrowser`.
 
 The first time a character speaks, the page asks before downloading the
 model, cached in the browser afterwards. A first visit starts with the best
-model the graphics card holds (`app/llm_js/hardware.js`: the card is found by
+model the graphics card holds (`libs/device/index.js`: the card is found by
 name and its memory looked up in a table, since browsers never report free
 memory): Gemma 4 E2B (about 2 GB) below 6 GB, E4B from 6 GB, Bonsai 2 27B from
 10 GB. The menu marks that one "best fit for this device"; a model the player

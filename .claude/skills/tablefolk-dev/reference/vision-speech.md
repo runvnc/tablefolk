@@ -15,7 +15,7 @@ and `gemma-4-E*-it-web.litertlm` has no vision or audio encoder. The
 `@litert-lm/core` JS API (0.18) already has `image`/`audio` message parts and
 `visionModalityEnabled`/`audioModalityEnabled` session flags, so in-browser
 multimodal input should arrive as soon as Google ships a web model with the
-encoders. Then `litert-worker.js` only has to pass content parts through (and
+encoders. Then `libs/brain/engines/litert-worker.js` only has to pass content parts through (and
 bump from 0.14.0).
 
 Native builds have the encoders: `gemma-4-E2B-it.litertlm` (2.6 GB) reports
@@ -92,7 +92,7 @@ click, the model load from the browser's cache included.
 
 **Which build on which machine** (`barkPlan` in `speech-input.js`): fp16 on
 the graphics card when the adapter has shader-f16 and `tablefolkDevice.freeGB`
-(usable graphics memory from `hardware.js` minus the chat model's `needGB`;
+(usable graphics memory from `libs/device/index.js` minus the chat model's `needGB`;
 less 3 GB when Breeze speaks) is 1.5 GB or more; otherwise int8 on the
 processor. Without a device estimate (art mode, no brain yet) it assumes
 room. An endpoint or cloud brain leaves the card free, so fp16. The browser
@@ -112,7 +112,7 @@ built.
    took 9 s for en-US). 3.6% / 2.0%, no graphics memory, nothing from us to
    download: the right fallback for weak machines. Chrome/Edge only.
 3. **Parakeet-TDT 0.6B v3** itself (25 European languages, same architecture
-   and frontend, so `app/asr/` could load an ONNX export of it with little
+   and frontend, so `libs/hear/` could load an ONNX export of it with little
    change): for players who don't speak English.
 4. **LFM3-Omni-2B / LFM3-Audio-2B** (Liquid AI, late October 2026; LFM Open
    License): audio in, text or speech out, 18 languages, streaming

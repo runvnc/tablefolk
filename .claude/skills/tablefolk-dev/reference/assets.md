@@ -16,7 +16,7 @@
 | voices | `app/tts/` (built-in Pocket-TTS voices); descriptions in `.admin/settings.json` via the admin page |
 | skills, roles, packages | `skills/*/skill.json`, `roles/*/role.json`, `packages/*/tablefolk.json`; `registry/index.json` |
 | scenarios | `scenarios/*.json`; `scenarios/showcase.json` for the welcome screen; `EXAMPLES` in `app/scenario.js` |
-| browser models | `SUPPORTED_MODELS` in `app/llm_js/agent-brain.js`; `MODEL_MIRRORS` in `app/llm_js/litert-worker.js` |
+| browser models | `SUPPORTED_MODELS` in `app/llm_js/agent-brain.js`; `MODEL_MIRRORS` in `libs/brain/engines/litert-worker.js` |
 | licences | `LICENSE.txt` / `License*.txt` beside each set: `assets/models/props/`, `props/village/`, `characters/quaternius/`, `characters/kaykit/`, `animations/kaykit/`, `sounds/*/`; `characters/meshy/README.md` |
 
 Model folders: `assets/models/characters/kaykit/` (chibi people and the 8
@@ -118,6 +118,12 @@ idle model turned toward the camera.
 
 ## Hosting
 
+**Only tablefolk.world uses the mirror** (and the game on localhost):
+`@tablefolk/models` `mirrorAllowed()` decides, so other sites using the
+libraries download from Hugging Face. Every mirrored file needs a Hugging
+Face source beside it (`sources({ mirror, hf })`, a worker's `fallbackUrl`).
+Files only on R2 (Nemotron's conversion) always come from R2.
+
 The large browser models live in the `geebr-models` R2 bucket
 (Cloudflare, `wrangler`), served under four hostnames
 (`geebr-models[-2|-3|-4].mindroot.io`). Uploads cost the owner money and
@@ -126,7 +132,7 @@ bandwidth: ask first. `wrangler r2 object put geebr-models/<key> --file <f>
 refuses files over 300 MiB, and a single PUT over a slow line times out (about
 200 s): split big files into 64 MiB parts `<name>.p000 ...` plus a
 `<name>.parts.json` (`{ size, partSize, parts }`) and upload those; the speech
-model's worker (`app/asr/worker.js`) reads that layout, four parts at a time
+model's worker (`libs/hear/bark-worker.js`) reads that layout, four parts at a time
 from the four hostnames. The speech model is under `underdog-bark-3.0/`
 (fp16 and int8 variants); Bonsai (Transformers.js) loads from Hugging Face.
 Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader

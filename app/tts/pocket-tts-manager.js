@@ -26,7 +26,7 @@
   // Breeze is picked by itself (nothing chosen in this browser) when it is
   // running or installed on this machine (the Tablefolk server then starts
   // it: breeze-client.js start) and the graphics card has room for it beside
-  // the chat model (hardware.js freeGB): its own graphics memory (2.1 GB for
+  // the chat model (libs/device/index.js freeGB): its own graphics memory (2.1 GB for
   // tools/breeze-server/build.sh's build, which keeps the text encoder on the
   // processor, else 3) plus half a gigabyte. A 6 GB card with Gemma E2B (3 GB
   // free) takes the 2.1 GB build; Pocket-TTS on the processor is the fallback.
@@ -54,7 +54,7 @@
   const serverDefault=()=>serverEngine||(serverEngine=Promise.race([fetch('/api/voices').then(r=>r.ok?r.json():{}).then(d=>d.ttsEngine).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),1500))]));
   // Breeze TTS 2 in this browser (breeze-web): WebGPU with shader-f16 and JSPI
   // (browser-check.js) and room on the graphics card beside the characters'
-  // model (hardware.js through world-integration.js: 3 GB and half a
+  // model (libs/device/index.js through world-integration.js: 3 GB and half a
   // gigabyte). '' when it fits, else why not, in words for the readout.
   async function breezeWebWhyNot(){
     const B=window.tablefolkBrowser;
@@ -129,7 +129,7 @@
       // buffer (lowest latency, e.g. for synths/games where every ms
       // matters) - it's also the most prone to glitching whenever the OS
       // misses a real-time audio deadline under system load. This sits
-      // below our own JS ring buffer (pcm-worklet.js) in the pipeline, so a
+      // below our own JS ring buffer (libs/voice/pcm-worklet.js) in the pipeline, so a
       // full software buffer doesn't protect against a too-thin hardware
       // buffer. 'playback' trades a bit more fixed startup latency for a
       // much more glitch-resistant buffer - the right trade for narration.

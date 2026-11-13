@@ -93,6 +93,6 @@ admin page allows.
 
 The browser models download from the `geebr-models` R2 bucket under four
 hostnames (`geebr-models[-2|-3|-4].mindroot.io`, `MODEL_MIRRORS` in
-`app/llm_js/litert-worker.js`): Chrome opens one connection per host, so four
+`libs/brain/engines/litert-worker.js`): Chrome opens one connection per host, so four
 hosts reach line speed. A self-hosted copy can point them elsewhere. The
 "with sight" model still downloads from Hugging Face.

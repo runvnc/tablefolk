@@ -15,7 +15,7 @@ is the scenario skill's `server.md`; this is how it works inside.
 ## The world generator
 
 - `runModel({label, mode, ep, emit, user, maxTokens, merge})` streams one
-  chat completion through `app/llm_js/openai-client.js` (the same client the
+  chat completion through `libs/brain/engines/openai.js` (the same client the
   browser uses), reporting thoughts and token counts as server-sent events.
   Replies may be 17000 tokens (reasoning models think at length), changes
   17000-24000; requests time out after 10 minutes. The stream's timeout timer

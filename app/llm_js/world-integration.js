@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113b';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261113a';
+import { installDevConsole } from './dev-console.js?v=20261113b';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -936,7 +936,7 @@ async function main() {
           // of it went into reasoning and no answer came).
           enableThinking: cfg.thinking === true,
           maxTokens: cfg.thinking === true ? 4096 : simple ? 70 : undefined,
-          chaos: cfg.chaos ?? 1,   // sampling.js withChaos: counts from the model's recommended settings
+          chaos: cfg.chaos ?? 1,   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
         });
       } finally {
         world.clearPendingThought?.(g.id);
@@ -1282,7 +1282,7 @@ async function main() {
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };
   // ---- sight: look() with a brain that can see (senses.js calls lookFor) ----
   // The character's own view (senses.snapshot) goes to the vision model: in
-  // the browser, Gemma 4 E2B with sight (litert-worker.js "see"); or the
+  // the browser, Gemma 4 E2B with sight (libs/brain/engines/litert-worker.js "see"); or the
   // endpoint brain's model when Brain options > vision is on (Gemma 4 26B
   // takes images). Its answer, in the character's voice, is told to it on
   // its next turn, and shown to the player with the picture.

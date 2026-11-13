@@ -18,9 +18,9 @@ import { samplingFor, withChaos } from '../../libs/brain/sampling.js';
 // hidden: kept working but not offered in the model picker (MiniCPM retired
 // from the UI 2026-10-11). Still reachable with ?model=<key>.
 // readGB: weights read for each token (with the measured bandwidth, how fast it
-// would write here: hardware.js predictedToks).
+// would write here: libs/device/index.js predictedToks).
 // needGB: graphics memory it wants with the game drawing beside it; a first
-// visit starts with the biggest one that fits (hardware.js).
+// visit starts with the biggest one that fits (libs/device/index.js).
 const SUPPORTED_MODELS = {
   'minicpm5-1b': { label: 'MiniCPM5-1B (CPU)', engine: 'wllama', size: '~690 MB', hidden: true },
   'minicpm5-1b-q8': { label: 'MiniCPM5-1B (CPU, Q8_0)', engine: 'wllama', size: '~1.15 GB', hidden: true },
@@ -46,7 +46,7 @@ const SUPPORTED_MODELS = {
   // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
   // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
-  // (bonsai2-engine.js): far smarter, for cards with 10 GB or more
+  // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
   'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9 },
   // The full multimodal E2B: characters really see when they look
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
@@ -87,13 +87,13 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   // Settings may change between turns; rebuild the client when they do.
   if (fresh.baseURL !== engine.client.baseURL || fresh.apiKey !== engine.client.apiKey) Object.assign(engine, createEndpointEngine());
   const body = { model: fresh.model || undefined, messages: opts.messages || [], max_tokens: opts.maxTokens ?? 256, temperature: opts.temperature ?? 0.7, stream: true };
-  // a model with recommended sampling (sampling.js): llama.cpp and OpenRouter
+  // a model with recommended sampling (libs/brain/sampling.js): llama.cpp and OpenRouter
   // take top_k, min_p and repetition_penalty beside the OpenAI fields
   if (opts.topP != null) body.top_p = opts.topP;
   if (opts.topK != null) body.top_k = opts.topK;
   if (opts.minP != null) body.min_p = opts.minP;
   if (samplingFor(fresh.model)?.repetition_penalty) body.repetition_penalty = opts.repetitionPenalty;
-  // The models in sampling.js think by default in their chat templates (LFM3:
+  // The models in libs/brain/sampling.js think by default in their chat templates (LFM3:
   // enable_thinking defaults to true, and all of max_tokens went into
   // reasoning_content, leaving no answer); llama.cpp and vLLM take the switch.
   // Not sent to others: strict APIs refuse unknown fields.
@@ -277,7 +277,7 @@ export function createAgentBrainManager(config = {}) {
       useGrammar,
       constraintInstruction,
     });
-    // The makers' recommended sampling for this model (sampling.js) wins over
+    // The makers' recommended sampling for this model (libs/brain/sampling.js) wins over
     // the game's temperature; the endpoint brain is matched by its model name.
     const made = samplingFor(getEngineType() === 'openai' ? getEndpointConfig().model : currentModelKey);
     // A character's chaos counts from the model's own settings (console callers pass a temperature instead)
@@ -306,7 +306,7 @@ export function createAgentBrainManager(config = {}) {
       throw err;
     }
     console.log('[tablefolk-brain] RAW LLM OUTPUT:', text);
-    // how fast this model runs here (hardware.js: a model too slow is not picked
+    // how fast this model runs here (libs/device/index.js: a model too slow is not picked
     // by itself again); not the endpoint, nor the first turn (kernels compiling)
     if (getEngineType() !== 'openai' && !agent.dryRun) {
       if (warmTurns++ > 0) noteBrainSpeed(currentModelKey, String(text || '').length, (performance.now() - turnStart) / 1000);

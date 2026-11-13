@@ -55,6 +55,15 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - This laptop's USB Ethernet adapter drops its link every few minutes
   (2026-11-09): long downloads in tests can fail with ERR_NETWORK_CHANGED.
 
+## Libraries (2026-11-13)
+
+- `libs/` holds the standalone `@tablefolk/*` packages the game is built
+  on (device, brain, decider, voice, hear, menus, models): `libs/README.md`.
+  No game globals and no `?v=` there; run `node tools/libs.mjs check` after
+  editing them. Publishing (`node tools/libs.mjs publish`) needs `npm login`
+  and the `tablefolk` npm org; ask before publishing.
+- The R2 mirror is used only on tablefolk.world (and the game on localhost).
+
 ## Open items (2026-11-01)
 
 - The picker's Hugging Face models and Pocket-TTS are mirrored on R2

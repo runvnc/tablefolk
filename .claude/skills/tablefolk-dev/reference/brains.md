@@ -8,8 +8,8 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
 `app/llm_js/agent-brain.js` holds `SUPPORTED_MODELS`. The ones in use:
 
 - **LiteRT-LM** (`@litert-lm/core`, Gemma 4 E2B ~2 GB / E4B ~3 GB web
-  builds): `model-loader-litert.js` + `gpt-runner-litert.js` talk to
-  `litert-worker.js`, a **classic** worker that owns the WASM engine, its own
+  builds): `libs/brain/engines/litert.js` + `libs/brain/engines/litert-runner.js` talk to
+  `libs/brain/engines/litert-worker.js`, a **classic** worker that owns the WASM engine, its own
   WebGPU device, the OPFS model cache and all conversations.
   - The worker is shared between tabs and stays loaded two minutes after the
     last page goes (a Web Lock tracks live pages; the back/forward cache kept
@@ -27,7 +27,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   3.3 GB of graphics memory with the game. It still downloads from Hugging
   Face (mirroring it on R2 is an open launch item); for tests a local copy
   can be named with `localStorage['tablefolk_model_url:gemma4-e2b-vision']`.
-- **Other LiteRT-LM bundles** (same worker, `MODEL_CONFIG` in `litert-worker.js`
+- **Other LiteRT-LM bundles** (same worker, `MODEL_CONFIG` in `libs/brain/engines/litert-worker.js`
   and `SUPPORTED_MODELS` in `agent-brain.js`):
   - **Ternary Bonsai 1.7B / 8B** (Prism ML, Qwen3 based, INT2;
     `litert-community/Ternary-Bonsai-*`, entries `bonsai-*-litert`, **hidden**):
@@ -43,7 +43,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `model.generate` call failed in GroupQueryAttention). Tested in the app
     on the RTX 2060: answers in character. **Hidden** since 2026-10-30:
     Bonsai 2 27B took its place in the picker.
-- **Bonsai 2 27B** (`bonsai2-27b`, engine `bonsai2`, `bonsai2-engine.js`):
+- **Bonsai 2 27B** (`bonsai2-27b`, engine `bonsai2`, `libs/brain/engines/bonsai2.js`):
   `prism-ml/Ternary-Bonsai-2-27B-gguf`, the 5.95 GB `PTQ1_0` file, on the
   webml-community WebGPU kernel engine. That engine exists only inside its
   demo page (Space `webml-community/ternary-bonsai-2-webgpu-kernels`), so the
@@ -56,7 +56,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   queued (one cache). Weights stream from Hugging Face into IndexedDB; a
   localStorage flag marks a finished load. Not run on the maintainer's 6 GB
   card; untested in the app with real weights.
-- **Sampling** (`sampling.js`, 2026-10-30): a model with makers' recommended
+- **Sampling** (`libs/brain/sampling.js`, 2026-10-30): a model with makers' recommended
   settings is always run with them, and a character's chaos counts from
   them (`withChaos`, 2026-11-06: 0 and 1 unchanged, then temperature, top-p and top-k open up on a curve): Gemma 4 temperature 1.0, top-p 0.95, top-k 64; MiniCPM5 1.0,
   top-p 0.95, min-p 0; LFM3 0.1, top-k 50, repetition penalty 1.1. The LiteRT
@@ -80,7 +80,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   Liquid's LFM3 ONNX export did not work on Transformers.js 4.3.2 (it feeds
   num_logits_to_keep, the export wants logits_to_keep; renamed, it then died
   with "divide by zero"). Eval scores: testing.md.
-- **Choosing for the device** (`hardware.js`, `pickForDevice` in the
+- **Choosing for the device** (`libs/device/index.js`, `pickForDevice` in the
   manager; 2026-11-12). New devices come out all the time, so it leans on
   what can be measured, with name tables only as hints:
   - **Class** (`deviceClass`): phone, tablet, computer or headset, from the
@@ -88,7 +88,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `formFactors`. Client Hints also give the processor architecture
     (`arm` on Windows on Arm), the OS and a phone's model name.
   - **Graphics card by name**: the WebGL renderer string (fast GPU and
-    default, the discrete one preferred) looked up in `gpu-memory.json`
+    default, the discrete one preferred) looked up in `libs/device/gpu-memory.json`
     (1546 cards: VRAM in GB, 0 for shared memory), ported from
     onepunk/llmsizer (MIT; data from onepunk/open-gpu-db, Apache-2.0).
   - **Bandwidth, measured** (`measureBandwidth`): ten copies of a 256 MB
@@ -137,7 +137,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     is `hidden` until the converted file is on R2; then un-hide it and hide
     the Gemma E4B. Until then it runs through an endpoint (llama.cpp or
     Ollama on the GGUF; the Brain options have presets).
-- **Endpoint** (`openai-client.js`): any OpenAI-compatible server; by
+- **Endpoint** (`libs/brain/engines/openai.js`): any OpenAI-compatible server; by
   default this server's `/api/llm/v1` proxy (keys stay on the server).
   Picking it in the top bar opens `#endpointPop` with the Brain options'
   endpoint fields moved into it (`⚙ endpoint` reopens it); it loads on
@@ -160,7 +160,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `#brainStatus` shows a failure (no WebGPU, a load error), a toast offers
     it once a session. The key is in localStorage and goes only to
     OpenRouter.
-- **Strands Decider** (experiment, 2026-11-12; `app/llm_js/decider.js`, not
+- **Strands Decider** (experiment, 2026-11-12; `libs/decider/index.js`, not
   wired into the game): AWS Strands Labs' decision models (Apache-2.0) pick
   one of a list of options (or yes/no, or a level) with calibrated
   probabilities instead of writing text: a LoRA and a pointer head (LayerNorm,
@@ -172,7 +172,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   GB; pooling "last", so llama.cpp's embeddings give the final hidden state)
   and a WebGPU int4 build (alxnahas/strands-decider-2B-webgpu). llama.cpp's
   own System One API (wllama `createSystemOne`, Kev/JEV GGUFs) does not take
-  Strands models (their head has a LayerNorm). `decider.js` ports the GGUF's
+  Strands models (their head has a LayerNorm). `libs/decider/index.js` ports the GGUF's
   decide.py: wllama 3.13.0 embeddings (one input per option, cut after its
   line, plus the whole prompt; batch 512: 4096 ran the 6 GB card out of
   memory), Transformers.js for the tokenizer (`_tokenizer.id_to_token` for
@@ -207,7 +207,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   "missing pre-tokenizer type... GENERATION QUALITY WILL BE DEGRADED" on this old file;
   leave it, it may be part of the joke. What makes them dumb, measured: model and prompt
   far more than temperature (Qwen2.5 still said 20 at temperature 2.75). `-q2` is a hidden Q2_K of Qwen2.5.
-- **wllama GPU failure** (`loadAt` in `model-loader-wllama3.js`): with a card too full
+- **wllama GPU failure** (`loadAt` in `libs/brain/engines/wllama.js`): with a card too full
   (seen at 5.4 of 6 GB), the weights' buffer is invalid ("Invalid Buffer tensor_buf0"),
   ggml's error callback aborts the wasm and every later call is "RuntimeError:
   unreachable". The load is retried on a new instance with `n_gpu_layers: 0`.
@@ -236,7 +236,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
 ### Model downloads
 
 Models come from the `geebr-models` R2 bucket under four hostnames
-(`MODEL_MIRRORS` in `litert-worker.js`): Chrome gives each host one HTTP/2
+(`MODEL_MIRRORS` in `libs/brain/engines/litert-worker.js`): Chrome gives each host one HTTP/2
 connection, which caps near 40 MB/s; four hosts reach line speed without the
 user's `enable-parallel-downloading` flag. Ranges are fetched in parallel
 across hosts and written with an OPFS sync access handle (`createWritable`
@@ -325,8 +325,8 @@ with `?trustSkills=1`, or after the player allows that package.
 ## Speech
 
 - Output: `app/tts/pocket-tts-manager.js` with swappable engines:
-  Pocket-TTS small (18M, `pocket18-worker.js`, English, lower latency) and
-  the 100M model (`inference-worker.js`, five languages). Stereo pan and
+  Pocket-TTS small (18M, `libs/voice/pocket18-worker.js`, English, lower latency) and
+  the 100M model (`libs/voice/pocket-worker.js`, five languages). Stereo pan and
   distance gain place voices. On by default (`tablefolkTtsEnabled !== '0'`).
   `silence(agent)` stops a defeated character mid-line.
 - **Breeze TTS 2** (engine `breeze`, `app/tts/breeze-client.js`): BreezeBlue's
@@ -392,7 +392,7 @@ with `?trustSkills=1`, or after the player allows that package.
   (9-10/10) and the exact words in both. Its Vulkan build needs the SPIR-V
   headers (fetched into ~/.cache/tablefolk-build when missing).
 - **Breeze TTS 2 in the browser** (engine `breeze-web`,
-  `app/tts/breeze-web-worker.js`, `app/tts/breeze-web/breeze.{mjs,wasm}`):
+  `libs/voice/breeze-web-worker.js`, `libs/voice/breeze-web/breeze.{mjs,wasm}`):
   Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend
   (`tools/breeze-web/build.sh`: emsdk in `~/.cache/tablefolk-build`, Breeze at
   87b4366, JSPI, `-sMAXIMUM_MEMORY=4GB`; details in `tools/breeze-web/README.md`).
@@ -437,7 +437,7 @@ with `?trustSkills=1`, or after the player allows that package.
 - Input: `app/speech-input.js`, chosen in Brain options (`tablefolk.speech`):
   automatic (the server's `/api/transcribe`, Gemma `gemma4-e2b-mm` on
   `litert-lm serve`, else the browser's SpeechRecognition); **in the
-  browser** with Underdog Bark 3.0 (`app/asr/`: `worker.js` runs
+  browser** with Underdog Bark 3.0 (`libs/hear/`: `worker.js` runs
   `ai-ecoverse/Underdog-Bark-3.0-ONNX`, a Parakeet-TDT 0.6B fine-tune, CC-BY-4.0,
   on onnxruntime-web: the fp16 encoder on WebGPU where the card has
   `shader-f16`, else int8 on WASM; `mel.js` is the log-mel frontend, checked
@@ -457,7 +457,7 @@ with `?trustSkills=1`, or after the player allows that package.
 (areas `device`, `brain`, `voice`, `speech`): world-integration.js (the
 hardware line, the brain and `window.tablefolkBrainWhy`: link, world's own,
 remembered, best for the card, default; a failed load),
-model-loader-wllama3.js (GPU or processor, the GPU-to-CPU fallback),
+libs/brain/engines/wllama.js (GPU or processor, the GPU-to-CPU fallback),
 pocket-tts-manager.js (`chooseEngine` returns `{id, why}`; `breezeWebWhyNot`
 checks browser-check.js's needs, `tablefolkDevice.freeGB` >= 3.5 and the
 measured speed; `maybeOfferBreeze` once the brain is ready, at most twice per
