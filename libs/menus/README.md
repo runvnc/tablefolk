@@ -19,6 +19,8 @@ const menu = { title: 'Brakka', text: 'What do you need?', other: true,
   items: [{ id: 'buy', label: 'Buy a sword' }, { id: 'fix', label: 'Repair my armour', keywords: ['mend'] }, { id: 'bye', label: 'Leave' }] };
 
 await match(menu, 'can you mend it')     // { item: {id:'fix',...}, by: 'keyword', score: 1 }
+// close between a few choices by meaning, with no model to decide: { none: true, by: 'unsure', unsure: [items] }
+// (the box then asks "did you mean 1. ... or 2. ...?")
 
 const box = createMenuBox({
   matchOptions: () => ({ choose: modelChooser((messages, o) => brain.chat(messages, o)) }),   // optional

@@ -153,3 +153,15 @@ stand-in; the voice and speech choices). With models cached (the :8000
 origin), `createBrain({ model: "gemma4-e2b" })`, `createVoice` and
 `createListener` were checked end to end on 2026-11-13 (Pocket-TTS line
 transcribed word for word by Bark).
+
+## Scripted worlds
+
+`willow-lane-test.mjs` plays `scenarios/willow-lane.json` (`"brain": "none"`)
+through its menus, flags, inventory conditions and riddle workflow (23
+checks; load `http://localhost:8001/willow-lane` in the test Chrome first,
+with EmbeddingGemma on). A world with a model: `haggle-workflow` on :8000
+(Gemma cached), chat 20 then 45 gold: Mog counters, then sells at 45. Turn
+voices off in the test profile (`tablefolkTtsEnabled` 0): a Breeze server
+started for the page beside the test Chrome filled the 6 GB card and the
+LiteRT worker hung (2026-11-13); after that the shared worker needs a Chrome
+restart.

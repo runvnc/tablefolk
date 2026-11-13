@@ -27,6 +27,10 @@ format and everything users see are in the scenario skill
 4. **Public repo**: no secrets (keys live in `.env`), only redistributable
    assets.
 5. New scenario fields go through `normalizeScenario` in `app/scenario.js`.
+6. **Libraries** (`libs/`, the `@tablefolk/*` packages the game is built on:
+   device, brain, decider, voice, hear, menus, models): no game globals, no
+   `?v=`; run `node tools/libs.mjs check` after editing them. Their use and
+   publishing: `libs/README.md`; how the game wires them: architecture.md.
 
 ## Start here
 
