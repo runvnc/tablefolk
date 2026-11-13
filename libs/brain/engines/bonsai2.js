@@ -101,7 +101,16 @@ const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 
 export function generateBonsai2(engine, _prompt, opts = {}) {
   const run = async () => {
     if (opts.dryRun) return '';
-    const messages = (opts.messages || []).map(m => ({ role: m.role, content: plain(m.content) }));
+    // The engine's chat template refuses a "system" message ("No user query found in
+    // messages", 2026-11-13): its text goes in front of the first user message instead.
+    let messages = (opts.messages || []).map(m => ({ role: m.role, content: plain(m.content) }));
+    const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+    messages = messages.filter(m => m.role !== 'system');
+    if (sys) {
+      const i = messages.findIndex(m => m.role === 'user');
+      if (i >= 0) messages[i] = { role: 'user', content: sys + '\n\n' + messages[i].content };
+      else messages.push({ role: 'user', content: sys });
+    }
     let text = '';
     for await (const c of engine.model.generate(messages, { maxNewTokens: opts.maxTokens || 256 })) {
       if (c.delta) { text += c.delta; opts.onToken?.(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart()); }
