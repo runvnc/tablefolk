@@ -543,6 +543,23 @@ Done the same day:
   and `pixel_values: null`. On the 4070: 55 s to download and load, 4.6 GB,
   3-9 s a turn. Mog haggled correctly, and its free writing is fluent.
 
+**Everything at once** on the 4070, in The Studio with light graphics: the
+characters' model, Breeze, Bark, EmbeddingGemma and the painter in one page,
+each used once.
+
+| | Bonsai 2 9B | Bonsai 2 27B |
+|---|---|---|
+| graphics memory, all loaded | 10.1 of 12.3 GB | 11.4 of 12.3 GB |
+| where Breeze's text encoder, Bark and the painter run (chosen automatically) | GPU (Bark fp16, tiny-sd) | processor (Bark int8, Chitra) |
+| a character's turn with the voice speaking | 19-25 s | 8.5-9.5 s |
+| asked to paint | talked about it, no `paint()` | `face(north)` then `paint()`: painted |
+| painting | tiny-sd 7.5 s | Chitra on the processor 46.6 s |
+| Bark, the innkeeper sample (word for word) | 1.6 s | 2.3 s |
+| EmbeddingGemma | 0.16 s | 0.13 s |
+
+Breeze's first audio, per line: 0.84 s with its text encoder on the GPU,
+about 3.7-5 s on the processor (every line, since it runs once per line).
+
 Ideas, next:
 - **Ternary Bonsai 2 9B as ONNX for WebGPU**
   (`flackzz/Ternary-Bonsai-2-9B-ONNX-WebGPU`): smaller, leaving room for
