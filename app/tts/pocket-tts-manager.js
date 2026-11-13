@@ -12,8 +12,8 @@
   // choice: this browser's (the voice pane, localStorage tablefolkTtsEngine),
   // else the server's default (admin page, /api/voices), else the first.
   const ENGINES={
-    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261030a',languages:false},
-    'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261030a',languages:true},
+    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261112a',languages:false},
+    'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261112a',languages:true},
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
@@ -56,6 +56,9 @@
   async function breezeWebWhyNot(){
     const B=window.tablefolkBrowser;
     if(B?.needs?.breezeWeb) return B.needs.breezeWeb;
+    // a phone reports its whole (shared) memory, at most 8 GB, which looks like
+    // room; Breeze beside the chat model is too much for it: Pocket-TTS there
+    if(B?.mobile ?? /Android|iPhone|iPad|iPod/.test(navigator.userAgent)) return 'a phone or tablet: Pocket-TTS is lighter';
     if(!navigator.gpu) return 'no WebGPU in this browser';
     for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
     const d=window.tablefolkDevice, free=d?.freeGB;

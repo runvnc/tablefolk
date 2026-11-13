@@ -50,11 +50,23 @@ let stTensors = [];
 let isGenerating = false;
 let isReady = false;
 
+// The model files: our R2 mirror (same bytes as the Space's), the Space as the fallback.
 const HF_REPO_BASE = "https://huggingface.co/spaces/KevinAHM/pocket-tts-web/resolve/main";
+const MIRROR_BASE = "https://geebr-models.mindroot.io/pocket-tts/web";
+let repoBase = MIRROR_BASE;
+
+// fetch from the mirror; on failure switch to the fallback for good
+async function fetchModelFile(path) {
+    if (repoBase === MIRROR_BASE) {
+        try { const r = await fetch(`${MIRROR_BASE}/${path}`); if (r.ok) return r; } catch {}
+        console.warn("[pocket-tts] mirror unavailable, using Hugging Face");
+        repoBase = HF_REPO_BASE;
+    }
+    return fetch(`${HF_REPO_BASE}/${path}`);
+}
 
 function bundleDir(language) {
-    // Model files are not shipped in this minimal demo. Fetch them from the Space.
-    return `${HF_REPO_BASE}/onnx/${language}`;
+    return `${repoBase}/onnx/${language}`;
 }
 
 function bundlePath(language, filename) {
@@ -489,8 +501,7 @@ function precomputeFlowBuffers() {
 async function importSentencePiece() {
   if (self.__sentencePieceModule) return self.__sentencePieceModule;
   postMessage({ type: "status", status: "Loading SentencePiece...", state: "loading" });
-  const url = `${HF_REPO_BASE}/sentencepiece.js`;
-  const res = await fetch(url);
+  const res = await fetchModelFile("sentencepiece.js");
   if (!res.ok) throw new Error(`Failed to fetch sentencepiece.js: ${res.status}`);
   const js = await res.text();
   const blobUrl = URL.createObjectURL(new Blob([js], { type: "application/javascript" }));
@@ -549,9 +560,8 @@ async function loadBundle(language, { initialLoad = false } = {}) {
 
     postMessage({ type: "status", status: `Loading ${language} bundle...`, state: "loading" });
     currentLanguage = language;
+    const metadataResponse = await fetchModelFile(`onnx/${language}/bundle.json`);
     currentBundleDir = bundleDir(language);
-
-    const metadataResponse = await fetch(bundlePath(language, "bundle.json"));
     if (!metadataResponse.ok) {
         throw new Error(`Failed to load bundle metadata for ${language}`);
     }

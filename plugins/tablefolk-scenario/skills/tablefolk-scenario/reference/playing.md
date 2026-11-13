@@ -59,7 +59,9 @@ approve the download on a user's behalf.
 Chat commands: `/attack grub`, `/wield sword`, `/cast heal me`, `/steal
 rook` (skills). The 🎤 button is hold-to-talk: hold it down (mouse, finger, or
 Space on the focused button) while you speak and let go to send; the words
-go like typed chat (a tap under a third of a second is dropped with a hint). By default the speech is turned into
+go like typed chat (a tap under a third of a second is dropped with a hint). On a phone or tablet the
+browser's own recognition is the default (and the voice is Pocket-TTS:
+Breeze is too heavy there). Elsewhere, by default the speech is turned into
 text in the browser by Underdog Bark 3.0 (English; asked once before its
 download of 0.9-1.3 GB; nothing leaves the computer). Once approved it loads
 by itself after the characters' model on later visits; while it loads the 🎤

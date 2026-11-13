@@ -335,7 +335,7 @@
       <div id="ttsTelemetry">backend: WASM CPU · waiting for speech metrics</div>
       <div class="section-subtitle">Speech input (the 🎤 button)</div>
       <label><select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
-        <option value="auto">Automatic: Underdog Bark in this browser (asks before its download), else this server's Gemma, else llama.cpp with a model that hears, else the browser's</option>
+        <option value="auto">Automatic: on a phone the browser's own; else Underdog Bark in this browser (asks before its download), else this server's Gemma, else llama.cpp with a model that hears, else the browser's</option>
         <option value="bark">In this browser: Underdog Bark 3.0 (private; on the graphics card when it has room, else the processor)</option>
         <option value="bark-cpu">In this browser, on the processor: Underdog Bark 3.0 int8 (0.9 GB, no graphics memory, about 1 s a sentence)</option>
         <option value="gemma">This server's Gemma 4 audio input (bun server/server.js --litert)</option>
@@ -474,6 +474,6 @@
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261107b"></script>
   <script src="diagnostics.js?v=20261109b"></script>
-  <script src="preflight.js?v=20261112c"></script>
+  <script src="preflight.js?v=20261112e"></script>
 </body>
 </html>

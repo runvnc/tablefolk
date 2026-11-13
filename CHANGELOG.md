@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-12
 
+- **Phones default to light speech**: on a phone or tablet, Automatic speech input is the browser's own recognition (not Underdog Bark's 1 GB download), and the voice is Pocket-TTS (Breeze TTS 2 is no longer offered or chosen there, even if downloaded before). A phone reports its whole shared memory (8 GB on a Pixel 9a), which looked like room for both.
+- **Pocket-TTS from our own mirror**: both Pocket-TTS models (the 18M English and the 100M five-language one) download from R2, with Hugging Face as the fallback.
 - **Three more models from our own mirror**: Qwen1.5 0.5B (the Oracle), Gemma 4 E2B with sight and Bonsai 2 27B now download from R2 (faster than Hugging Face), with Hugging Face as the fallback; a copy already cached from Hugging Face keeps being used.
 - **Libraries from our own server**: `tools/vendor-fetch.sh` downloads Babylon.js, its loaders, Havok (and its wasm), the `studio.env` environment texture, pako, UPNG and html2canvas into `app/vendor/` with a manifest; the app loads those copies first and falls back to the CDNs. The app then runs where only our own server is reachable (cloud test machines), and the public site stops depending on Babylon's CDN. All are vendored now (Babylon 9.35.0, 12 MB). Still from outside: the character-brain modules in `llm_js/` (jsdelivr, esm.run, Hugging Face) and the tile models hosted on R2.
 - **Screenshots with no GPU**: `tools/browser-test/cloud-shot.py` renders the app on a cloud VM (Playwright's Chromium on Mesa lavapipe), reads the 3D frame from the GPU and lays it into the page screenshot; `OFFLINE=1` blocks everything but localhost. The Oracle (`?art=1`) is ready in 7-17 s there.

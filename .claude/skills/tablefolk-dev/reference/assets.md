@@ -132,7 +132,11 @@ from the four hostnames. The speech model is under `underdog-bark-3.0/`
 Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader
 trying R2 first and Hugging Face as the fallback: `qwen1_5-0_5b-chat-q4_0.gguf`
 (the Oracle's Qwen1.5), `gemma-4-E2B-it.litertlm` (Gemma E2B with sight) and
-`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B). A copy already
+`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B). Pocket-TTS's models
+too, under `pocket-tts/web/` (KevinAHM/pocket-tts-web: `onnx/<language>/`
+for the five languages, `sentencepiece.js`, its README and licences) and
+`pocket-tts/18m/` (maxime/pocket-tts-18m-onnx, `english_18m_refl_2026-10/`);
+both CC-BY-4.0. The 18M worker keeps the Hugging Face URLs as its cache keys. A copy already
 cached from Hugging Face stays in use (wllama and the Bonsai engine cache by URL).
 **Copying a public file from Hugging Face into R2 without the maintainer's
 line** (2026-11-12, 8.9 GB in about a minute): deploy a throwaway Worker bound

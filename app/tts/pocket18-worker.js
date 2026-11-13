@@ -19,9 +19,14 @@
 // "drifting" (one call maps noise to the next latent); the Mimi decoder
 // keeps its own states, zeroed at the start of an utterance.
 
+// Cache keys keep the Hugging Face URLs (copies cached from there stay valid);
+// downloads come from our R2 mirror (same bytes), Hugging Face as the fallback.
 const BASE = "https://huggingface.co/maxime/pocket-tts-18m-onnx/resolve/main/english_18m_refl_2026-10/";
+const MIRROR = "https://geebr-models.mindroot.io/pocket-tts/18m/english_18m_refl_2026-10/";
+let useMirror = true;
 const ORT_VERSION = "1.31.1";
 const SENTENCEPIECE_URL = "https://huggingface.co/spaces/KevinAHM/pocket-tts-web/resolve/main/sentencepiece.js";
+const SENTENCEPIECE_MIRROR = "https://geebr-models.mindroot.io/pocket-tts/web/sentencepiece.js";
 const CACHE = "tablefolk-tts-pocket18";
 const MAX_TOKENS_PER_CHUNK = 50, FIRST_DECODE = 4, DECODE = 6, CACHE_STEP = 64;
 
@@ -38,8 +43,15 @@ const status = (text, state = "loading") => postMessage({ type: "status", status
 async function bytes(name, { range = null, key = BASE + name } = {}) {
     let cache = null;
     try { cache = await caches.open(CACHE); const hit = await cache.match(key); if (hit) return await hit.arrayBuffer(); } catch {}
-    const res = await fetch(BASE + name, range ? { headers: { Range: `bytes=${range[0]}-${range[1] - 1}` } } : {});
-    if (!res.ok || (range && res.status !== 206)) throw new Error(`${name}: HTTP ${res.status}`);
+    const init = range ? { headers: { Range: `bytes=${range[0]}-${range[1] - 1}` } } : {};
+    const good = r => r.ok && (!range || r.status === 206);
+    let res = null;
+    if (useMirror) {
+        try { res = await fetch(MIRROR + name, init); } catch {}
+        if (!res || !good(res)) { console.warn("[pocket18] mirror unavailable, using Hugging Face"); useMirror = false; res = null; }
+    }
+    res ||= await fetch(BASE + name, init);
+    if (!good(res)) throw new Error(`${name}: HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
     try { await cache?.put(key, new Response(buf.slice(0))); } catch {}
     return buf;
@@ -266,7 +278,9 @@ async function load() {
     ]);
     status("Loading tokenizer...");
     if (!self.__sp) {
-        const js = await (await fetch(SENTENCEPIECE_URL)).text();
+        let r = await fetch(SENTENCEPIECE_MIRROR).catch(() => null);
+        if (!r?.ok) r = await fetch(SENTENCEPIECE_URL);
+        const js = await r.text();
         self.__sp = await import(URL.createObjectURL(new Blob([js], { type: "application/javascript" })));
     }
     sp = new self.__sp.SentencePieceProcessor();

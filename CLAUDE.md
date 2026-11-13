@@ -57,9 +57,8 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 
 ## Open items (2026-11-01)
 
-- The picker's Hugging Face models are mirrored on R2 (done 2026-11-12;
-  assets.md, Hosting). Still from HF: Pocket-TTS's own model files
-  (`app/tts/`) and hidden models.
+- The picker's Hugging Face models and Pocket-TTS are mirrored on R2
+  (done 2026-11-12; assets.md, Hosting). Hidden models still load from HF.
 - Walk-in buildings: checked in first person 2026-10-31 (roof kept as the
   ceiling); the watch tower, bell tower and windmill remain closed models.
 - Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR

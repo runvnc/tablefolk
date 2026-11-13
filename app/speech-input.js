@@ -10,7 +10,8 @@
  *   2. Otherwise the browser's built-in speech recognition (Chrome/Edge).
  * The words go into the chat box and are sent like typed text.
  *
- * The Voice pane's "Speech input" picks one. Automatic (the default):
+ * The Voice pane's "Speech input" picks one. Automatic (the default) on a
+ * phone or tablet: the browser's recognition (when it has one). Elsewhere:
  * Underdog Bark 3.0 in this browser (app/asr/; asked once before its download,
  * nothing leaves the machine), else the server's Gemma, else a llama.cpp model
  * with audio input on this computer (LFM3-Omni-2B: tools/llama-server.sh
@@ -34,8 +35,13 @@
 
   const pick = () => { try { return localStorage.getItem('tablefolk.speech') || 'auto'; } catch { return 'auto'; } };
   const barkOk = () => { try { return localStorage.getItem('tablefolk.barkOk'); } catch { return null; } };   // '1' yes, '0' declined
+  // a phone or tablet: Automatic uses the browser's own recognition (Bark's
+  // 1 GB download and its memory are too much there); Bark when it has none
+  const phone = () => window.tablefolkBrowser?.mobile ?? /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+  const hasSR = () => !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   async function detect() {
     const p = pick();
+    if (p === 'auto' && phone() && hasSR()) return 'browser';
     if (p === 'bark' || p === 'bark-cpu' || (p === 'auto' && barkOk() !== '0')) return 'bark';
     if (p === 'browser' && (window.SpeechRecognition || window.webkitSpeechRecognition)) return 'browser';
     if (p === 'llama' && (await findLlama())) return 'llama';
@@ -312,7 +318,7 @@
     setState('idle'); showEngine();
   }
   const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; const e = await guessEngine(m); showEngine(e);
-    const why = { bark: barkOk() === '1' ? 'in this browser (downloaded before or approved): ' + barkWhy : 'in this browser; asks before its download on the first 🎤 click', gemma: 'this server\'s Gemma', llama: 'a llama.cpp model with audio on this computer', browser: barkOk() === '0' ? 'the browser\'s own (Underdog Bark was declined)' : 'the browser\'s own' }[m] || 'none available';
+    const why = { bark: barkOk() === '1' ? 'in this browser (downloaded before or approved): ' + barkWhy : 'in this browser; asks before its download on the first 🎤 click', gemma: 'this server\'s Gemma', llama: 'a llama.cpp model with audio on this computer', browser: pick() === 'auto' && phone() ? 'the browser\'s own (a phone or tablet)' : barkOk() === '0' ? 'the browser\'s own (Underdog Bark was declined)' : 'the browser\'s own' }[m] || 'none available';
     window.tablefolkDiag?.note('speech', `${e}: ${why}`); preload(); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   function state() {
