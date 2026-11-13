@@ -1543,11 +1543,11 @@
   },
   "wolf": {
    "file": "characters/wolf.png",
-   "w": 158,
-   "h": 182,
+   "w": 164,
+   "h": 199,
    "anchor": [
-    78.8,
-    114.9
+    81.9,
+    129.3
    ]
   },
   "bat": {
@@ -1719,6 +1719,168 @@
    "anchor": [
     78.8,
     93.9
+   ]
+  },
+  "bull": {
+   "file": "characters/bull.png",
+   "w": 281,
+   "h": 342,
+   "anchor": [
+    140.2,
+    222.8
+   ]
+  },
+  "horse": {
+   "file": "characters/horse.png",
+   "w": 332,
+   "h": 404,
+   "anchor": [
+    165.8,
+    263.1
+   ]
+  },
+  "white_horse": {
+   "file": "characters/white_horse.png",
+   "w": 332,
+   "h": 404,
+   "anchor": [
+    165.8,
+    263.1
+   ]
+  },
+  "donkey": {
+   "file": "characters/donkey.png",
+   "w": 240,
+   "h": 292,
+   "anchor": [
+    119.8,
+    190.1
+   ]
+  },
+  "deer": {
+   "file": "characters/deer.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "stag": {
+   "file": "characters/stag.png",
+   "w": 322,
+   "h": 391,
+   "anchor": [
+    160.7,
+    254.4
+   ]
+  },
+  "fox": {
+   "file": "characters/fox.png",
+   "w": 158,
+   "h": 173,
+   "anchor": [
+    78.8,
+    105.9
+   ]
+  },
+  "dog": {
+   "file": "characters/dog.png",
+   "w": 158,
+   "h": 180,
+   "anchor": [
+    78.8,
+    112.9
+   ]
+  },
+  "husky": {
+   "file": "characters/husky.png",
+   "w": 158,
+   "h": 184,
+   "anchor": [
+    78.8,
+    116.9
+   ]
+  },
+  "alpaca": {
+   "file": "characters/alpaca.png",
+   "w": 312,
+   "h": 379,
+   "anchor": [
+    155.6,
+    246.7
+   ]
+  },
+  "pig": {
+   "file": "characters/pig.png",
+   "w": 158,
+   "h": 184,
+   "anchor": [
+    78.8,
+    116.9
+   ]
+  },
+  "sheep": {
+   "file": "characters/sheep.png",
+   "w": 158,
+   "h": 192,
+   "anchor": [
+    78.8,
+    124.9
+   ]
+  },
+  "wyrmling": {
+   "file": "characters/wyrmling.png",
+   "w": 209,
+   "h": 254,
+   "anchor": [
+    104.4,
+    165.2
+   ]
+  },
+  "imp": {
+   "file": "characters/imp.png",
+   "w": 189,
+   "h": 229,
+   "anchor": [
+    94.2,
+    148.8
+   ]
+  },
+  "mushroom_warrior": {
+   "file": "characters/mushroom_warrior.png",
+   "w": 209,
+   "h": 254,
+   "anchor": [
+    104.4,
+    165.2
+   ]
+  },
+  "bunny": {
+   "file": "characters/bunny.png",
+   "w": 168,
+   "h": 204,
+   "anchor": [
+    83.9,
+    132.5
+   ]
+  },
+  "snake": {
+   "file": "characters/snake.png",
+   "w": 158,
+   "h": 169,
+   "anchor": [
+    78.8,
+    101.9
+   ]
+  },
+  "wasp": {
+   "file": "characters/wasp.png",
+   "w": 158,
+   "h": 215,
+   "anchor": [
+    78.8,
+    147.9
    ]
   }
  },

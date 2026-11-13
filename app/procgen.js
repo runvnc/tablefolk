@@ -232,7 +232,8 @@
   // ---------------------------------------------------------------- village
   function village(opts) {
     const R = rng(opts.seed);
-    const W = clampSize(opts.size?.[0] ?? 35, 17, 63), H = clampSize(opts.size?.[1] ?? 27, 15, 63);
+    // a little larger by default when the grass gets closed buildings too
+    const W = clampSize(opts.size?.[0] ?? (opts.extras === false ? 35 : 41), 17, 63), H = clampSize(opts.size?.[1] ?? (opts.extras === false ? 27 : 31), 15, 63);
     const g = makeGrid(W, H, ',');
     const midR = Math.floor(H / 2) + R.int(-1, 1), midC = Math.floor(W / 2) + R.int(-2, 2);
     // Roads: a dirt east-west road and a north-south one, two wide.
@@ -285,6 +286,29 @@
     const placeBlob = (h, w, fn) => { for (let tries = 0; tries < 80; tries++) { const r0 = R.int(1, H - 1 - h), c0 = R.int(1, W - 1 - w); if (free(r0, c0, r0 + h - 1, c0 + w - 1)) { fn(r0, c0); mark(r0 - 1, c0 - 1, r0 + h, c0 + w); return [r0, c0]; } } return null; };
     const pond = placeBlob(3, 4, (r0, c0) => { for (let r = r0; r < r0 + 3; r++) for (let c = c0; c < c0 + 4; c++) if (!((r === r0 || r === r0 + 2) && (c === c0 || c === c0 + 3))) g[r][c] = '~'; g[r0 + 1][c0 + 1] = 'y'; });
     const garden = placeBlob(4, 5, (r0, c0) => { for (let r = r0; r < r0 + 4; r++) for (let c = c0; c < c0 + 5; c++) g[r][c] = (r === r0 || r === r0 + 3) ? 'f' : (c === c0 || c === c0 + 4 ? ',' : (R.next() < .35 ? 'g' : '*')); });
+    // Closed buildings (objects you can't enter: an inn, stone and tall houses,
+    // a mill house...) on the grass left over, before the trees, each facing
+    // the nearest road; "style": "hamlet" (or "farming") puts barns, a silo and a
+    // coop there instead; "extras": false leaves the grass bare.
+    const extraObjs = [];
+    if (opts.extras !== false) {
+      const at0 = toBoard(W, H), farming = /hamlet|farm/i.test(String(opts.style || ''));
+      const kinds = farming ? ['small_barn', 'barn', 'chicken_coop', 'silo', 'stone_house', 'open_barn', 'hay'] : ['inn', 'stone_house', 'tall_house', 'mill_house', 'gazebo', 'stone_house', 'tall_house', 'sawmill', 'blacksmith', 'barracks', 'fantasy_house'];
+      const RY = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 };
+      const road = (r, c) => g[r]?.[c] === ':' || g[r]?.[c] === 'U';
+      const facing = (r, c) => { let best = null; for (const [d, dr, dc] of [['s', 1, 0], ['n', -1, 0], ['e', 0, -1], ['w', 0, 1]]) for (let k = 1; k < 14; k++) if (road(r + dr * k, c + dc * k)) { if (!best || k < best[1]) best = [d, k]; break; } return best ? best[0] : 's'; };
+      const target = Math.max(2, Math.round(W * H / 120));
+      for (let t = 0, n = 0; t < 600 && n < target; t++) {
+        // half the span: 1 for buildings about 3 cells across, 2 for the big ones
+        const type = kinds[n % kinds.length], h = ['inn', 'sawmill', 'blacksmith', 'barracks', 'barn', 'big_barn', 'open_barn', 'small_barn'].includes(type) ? 2 : 1;
+        const r = R.int(1 + h, H - 2 - h), c = R.int(1 + h, W - 2 - h);
+        if (!free(r - h, c - h, r + h, c + h)) continue;
+        let grass = true; for (let rr = r - h; rr <= r + h; rr++) for (let cc = c - h; cc <= c + h; cc++) if (g[rr][cc] !== ',') grass = false;
+        if (!grass) continue;
+        const [x, z] = at0(r, c); extraObjs.push({ type, x, z, ry: +RY[facing(r, c)].toFixed(4) });
+        mark(r - h - 1, c - h - 1, r + h + 1, c + h + 1); n++;
+      }
+    }
     // Trees, flowers and boulders on open grass (not against walls or paths).
     const open = (r, c) => g[r][c] === ',' && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].every(([dr, dc]) => [',', '%', '*', 'r'].includes(g[r + dr]?.[c + dc] ?? ','));
     for (let i = 0, n = Math.round(W * H / 30), tries = 0; i < n && tries < 2000; tries++) { const r = R.int(1, H - 2), c = R.int(1, W - 2); if (open(r, c)) { g[r][c] = R.next() < .72 ? '%' : (R.next() < .6 ? '*' : 'r'); i++; } }
@@ -298,7 +322,7 @@
     named.push({ id: 'square', kind: 'square', ...sq, center: at(midR, midC) });
     if (pond) named.push({ id: 'pond', kind: 'pond', r0: pond[0], c0: pond[1], r1: pond[0] + 2, c1: pond[1] + 3, center: at(pond[0] + 1, pond[1] + 2), outdoor: true });
     if (garden) named.push({ id: 'garden', kind: 'garden', r0: garden[0] + 1, c0: garden[1] + 1, r1: garden[0] + 2, c1: garden[1] + 3, center: at(garden[0] + 1, garden[1] + 2) });
-    const objects = named.filter(p => !['square', 'pond', 'garden'].includes(p.kind)).map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.5, intensity: 1.6, range: 4.5, color: '#ffd29a' }));
+    const objects = [...named.filter(p => !['square', 'pond', 'garden'].includes(p.kind)).map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.5, intensity: 1.6, range: 4.5, color: '#ffd29a' })), ...extraObjs];
     return finish({ kind: 'village', W, H, g, places: named, objects, start: named.find(p => p.kind === 'square'), lighting: 'bright' });
   }
 
@@ -427,7 +451,7 @@
     }
     // the woods: thick on open grass; a few bushes, ferns, rocks, flowers
     const trees = style === 'spooky' ? ['dead_tree', 'dead_tree', 'dead_tree', 'pine_tree', 'tall_pine'] : style === 'autumn' ? ['autumn_tree', 'autumn_tree', 'oak_tree', 'tall_tree', 'pine_tree'] : style === 'pine' ? ['pine_tree', 'tall_pine', 'pine_tree', 'tall_pine', 'dead_tree'] : ['pine_tree', 'tall_pine', 'oak_tree', 'tall_tree', 'pine_tree', 'oak_tree', 'autumn_tree'];
-    scatter(g, P, R, Math.round(W * H / 6), trees);
+    scatter(g, P, R, Math.round(W * H / 9), trees);
     scatter(g, P, R, Math.round(W * H / 28), style === 'spooky' ? ['mushroom_cluster', 'boulder', 'fern', 'skull', 'shelf_fungus'] : ['fern', 'red_bush', 'flower_bush', 'mossy_rock', 'mushroom_cluster', 'tall_grass', 'flower_patch', 'heather', 'shelf_fungus']);
     const pl = named(W, H, places);
     const objects = [...P.objects, ...pl.filter(p => p.kind === 'camp' || p.kind === 'shrine').map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.4, intensity: 1.6, range: 5, color: '#ffc98a' }))];
@@ -561,23 +585,12 @@
     return finish({ kind: 'cave', W, H, g, places: pl, objects, start: pl.find(p => p.kind === 'entrance'), lighting: 'night', dark: !!opts.dark });
   }
 
-  // Villages look built-up all round: closed buildings (inn, stone and tall
-  // houses, a mill house, a sawmill, a blacksmith, barracks, a gazebo) on the
-  // grass left over, facing the nearest road, and varied trees.
+  // Villages get varied trees (pines, oaks, autumn trees) for some of the
+  // plain ones, and a few flowers, fences and hay on the grass.
   function villageExtras(v, opts) {
     const R = rng((opts.seed ?? 1) * 31 + 7), W = v.size[0], H = v.size[1];
     const g = v.grid.map(row => row.split('')), P = placer(W, H, R);
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (g[r][c] !== ',') P.mark(r - 1, c - 1, r + 1, c + 1);
-    const style = String(opts.style || '').toLowerCase();
-    const kinds = style === 'farming' || style === 'hamlet' ? ['small_barn', 'barn', 'chicken_coop', 'silo', 'stone_house', 'hay', 'open_barn'] : ['inn', 'stone_house', 'tall_house', 'mill_house', 'stone_house', 'tall_house', 'sawmill', 'blacksmith', 'barracks', 'gazebo', 'fantasy_house', 'stone_house'];
-    const road = (r, c) => g[r]?.[c] === ':' || g[r]?.[c] === 'U';
-    const facing = (r, c) => { let best = null; for (const [d, dr, dc] of [['s', 1, 0], ['n', -1, 0], ['e', 0, -1], ['w', 0, 1]]) for (let k = 1; k < 12; k++) if (road(r + dr * k, c + dc * k)) { if (!best || k < best[1]) best = [d, k]; break; } return best ? best[0] : 's'; };
-    let n = 0;
-    for (let t = 0; t < 300 && n < Math.max(2, Math.round(W * H / 140)); t++) {
-      const r = R.int(3, H - 4), c = R.int(3, W - 4), type = kinds[n % kinds.length];
-      const span = ['hay', 'chicken_coop', 'silo', 'gazebo'].includes(type) ? 3 : 5;
-      if (P.building(type, span, g, r, c, facing(r, c), 1)) n++;
-    }
     // swap some of the plain trees for the varied ones
     const tree = () => R.pick(['pine_tree', 'oak_tree', 'tall_tree', 'autumn_tree', 'tall_pine', 'oak_tree']);
     const extra = [];

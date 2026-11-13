@@ -159,10 +159,18 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   `orc goblin skeleton skeleton_warrior troll skeleton_farmer` are the
   grittier Meshy models (`assets/models/characters/meshy/`); the old cartoon
   ones are `orc_classic goblin_classic skeleton_classic
-  skeleton_warrior_classic`. `wolf` is a big grey rat for now (the wolf
-  file's skinning is broken in Babylon).
+  skeleton_warrior_classic`. More monsters (Quaternius, CC0): `wyrmling`
+  (a young red dragon), `imp`, `mushroom_warrior`, `bunny` (a rabbit with a
+  sword), `snake`, `wasp` (a giant one), `frog` (a giant one).
 - Mindless monsters (skeletons, zombie, rat, spider, wolf, bat, slime,
-  ghost, giant, demon, dragon) are hostile by default and never talk.
+  ghost, giant, demon, dragon and the ones above) are hostile by default and
+  never talk.
+- **Animals** (Quaternius, CC0): `cow bull horse white_horse donkey deer stag
+  fox dog husky alpaca pig sheep`, and `wolf` (hostile by default). They are
+  never hostile unless `"hostile": true`, take no brain turns (they wander,
+  graze and look about; spoken to, they moo, bark or bleat in the log), and
+  need only an `id`, a `model` and where they are. `"talks": true` gives one a
+  mind like a person's (a talking cat in a fable, a wise old stag).
 - Voices default to one that fits the body's gender
   (`defaultVoiceFor` in `app/app.js`; descriptions on the admin page).
 

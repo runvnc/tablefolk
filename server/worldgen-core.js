@@ -42,7 +42,7 @@ export const MODELS = new Set(['critter', 'woman', 'rogue', 'knight', 'mage', 'r
   'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman',
   'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'troll', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep']);
 // what picking up an object gives (app/play.js PICKUPS)
-export const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
+export const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch', sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', spear: 'spear', war_hammer: 'war hammer', hunting_bow: 'hunting bow', shield: 'shield', round_shield: 'round shield', leather_armor: 'leather armor', plate_armor: 'plate armor', crown: 'golden crown', necklace: 'necklace', gold_bars: 'gold bars', crystals: 'crystals', book: 'book', open_book: 'spellbook', skull: 'skull', bone: 'bone', shovel: 'shovel', scythe: 'scythe', backpack: 'backpack', frying_pan: 'frying pan', log: 'firewood', sacks: 'sack of grain', bear_trap: 'bear trap' };
 export const MODES = { generate: 'A ("generate")', grid: 'B ("grid")', map: 'C ("map")' };
 
 
@@ -275,7 +275,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261114a"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261114a"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261114b"></script><script src="/app/map-editor.js?v=20261108a"></script><script src="/app/builder.js?v=20261114a"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -399,7 +399,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261114a').then(()=>load('/app/worldgen-browser.js?v=20261114a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261114b').then(()=>load('/app/worldgen-browser.js?v=20261114a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261108b'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))

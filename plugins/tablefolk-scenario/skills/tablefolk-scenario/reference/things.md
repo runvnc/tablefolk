@@ -43,6 +43,21 @@ truth is in files:
   bed double_bed bookcase banner wall_banner target dummy pumpkin statue
   torch iron_chest house fantasy_house stable windmill watch_tower
   bell_tower`.
+- **Closed buildings** (scenery, not entered; Quaternius, CC0; front faces
+  south at `ry` 0): `inn stone_house tall_house mill_house sawmill blacksmith
+  barracks gazebo`, farm buildings `barn big_barn small_barn open_barn silo
+  silo_barn chicken_coop stone_windmill`. They take 3-5 cells; generated
+  villages and farms place them ([generated.md](generated.md)).
+- **Nature** (Quaternius Stylized Nature, CC0): `pine_tree tall_pine oak_tree
+  tall_tree autumn_tree dead_tree red_bush flower_bush fern mushroom_cluster
+  shelf_fungus mossy_rock` (solid; trees by the trunk), `tall_grass heather
+  flower_patch` (decoration).
+- **Farm and camp**: `hay sacks fence_section farm_fence fire_pit log
+  backpack shovel scythe frying_pan bear_trap`.
+- **Arms, armour and treasure** (Quaternius RPG items, CC0; light, carried and
+  found): `sword greatsword dagger spear war_hammer hunting_bow shield
+  round_shield leather_armor plate_armor crown necklace coin_pouch gold_bars
+  crystals book open_book skull bone`.
 - **Dungeon dressing** (Quaternius Fantasy Props MegaKit, CC0): `candelabra
   candles cabinet lectern cage chains wooden_chair nightstand apple_barrel
   pot vase broken_pot iron_crate`, and the pick-ups `key chalice rope`.

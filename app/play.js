@@ -34,7 +34,7 @@
   // (live.js grazes and wanders them; world-integration.js skips their turns)
   const ANIMALS = new Set(['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep']);
   const isAnimal = c => ANIMALS.has(c?.charModel) && getBrainConfig(c.id).talks !== true;
-  const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch' };
+  const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch', sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', spear: 'spear', war_hammer: 'war hammer', hunting_bow: 'hunting bow', shield: 'shield', round_shield: 'round shield', leather_armor: 'leather armor', plate_armor: 'plate armor', crown: 'golden crown', necklace: 'necklace', gold_bars: 'gold bars', crystals: 'crystals', book: 'book', open_book: 'spellbook', skull: 'skull', bone: 'bone', shovel: 'shovel', scythe: 'scythe', backpack: 'backpack', frying_pan: 'frying pan', log: 'firewood', sacks: 'sack of grain', bear_trap: 'bear trap' };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const toast = (t, type = 'info') => window.tablefolkToast?.(t, { type });
   const sfx = (n, p) => window.tablefolkSfx?.play(n, p);

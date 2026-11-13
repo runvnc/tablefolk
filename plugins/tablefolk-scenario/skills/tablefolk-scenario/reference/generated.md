@@ -1,4 +1,4 @@
-# Generated dungeons and villages (`generate`)
+# Generated places (`generate`): dungeons, villages, forests, farms, caves
 
 The fastest way to a big place: the app builds the whole map from a seed, and
 you say which place each character belongs in. `app/procgen.js` (seeded, no
@@ -20,8 +20,15 @@ the same result.
 
 ```json
 "generate": { "kind": "dungeon", "rooms": 9, "size": [33, 25], "boss": "throne", "outside": "sea" }
-"generate": { "kind": "village", "buildings": 7, "size": [35, 27] }
+"generate": { "kind": "village", "buildings": 7, "size": [35, 27], "style": "hamlet" }
+"generate": { "kind": "forest", "places": ["camp", "ruins"], "style": "spooky" }
+"generate": { "kind": "farm" }
+"generate": { "kind": "cave", "rooms": 7, "style": "mine" }
 ```
+
+Other names work too: `town`, `hamlet` (a village); `woods`, `wilds`,
+`wilderness` (a forest); `farmstead`; `caves`, `cavern`, `mine` (a cave with a
+mine).
 
 ## What it makes
 
@@ -57,8 +64,46 @@ Two crossing dirt roads, a flagstone `square` (campfire, lanterns, signpost;
 the player starts here), buildings facing the roads with a door and a path
 (`tavern smithy shop temple alchemist guardhouse library stable house N`,
 furnished by `BUILDING_FURNISH`), a `pond`, a fenced flower `garden`, trees,
-flowers and boulders. Options: `"buildings"` (3-14), `"size"`. Buildings get
-thatched roofs ([board.md](board.md)).
+flowers and boulders. Options: `"buildings"` (3-14), `"size"`, `"style"`.
+Buildings get thatched roofs ([board.md](board.md)). The grass left over is
+built up with closed buildings you can't enter (an inn, stone and tall houses,
+a mill house, a sawmill, a blacksmith's, barracks, a gazebo), each facing the
+nearest road, and varied trees (pines, oaks, autumn trees); `"style":
+"hamlet"` (or `"farming"`) puts barns, a silo, a coop and hay there instead;
+`"extras": false` leaves the grass bare.
+
+### Forest (`"kind": "forest"`)
+
+Wild country: a dirt path winding from the south edge to the north, the woods
+thick on both sides (pines, oaks, tall and autumn trees, with ferns, bushes,
+mushrooms, rocks and flowers), and clearings along the path, each joined to it
+by a trail: the `clearing` where the player starts, then several of `camp`
+(tents, a campfire, a log), `ruins` (broken stone walls, a statue, a skull,
+often a chest), `grove` (autumn trees round mushrooms and flowers), `shrine`
+(a statue between torches), `pond`, `hut` (a little house to walk into),
+`cave` (a ring of rocks round a cave mouth, crystals at the back), `meadow`
+(flowers and tall grass). Places asked for (`in`, or `"places"`) are always
+built. `"style"`: `spooky` (dead trees, night), `autumn`, `pine`. Bright by
+day, not dark.
+
+### Farm (`"kind": "farm"`)
+
+A farmstead on a lane: the `yard` (a well, a cart, hay; the player starts
+here), the `farmhouse` to walk into, a barn (`barn`, its front), a silo, a
+chicken `coop`, often a windmill and a shed, a fenced `pasture` with a gate (for
+the animals), one or two `field`s of pumpkins in furrows, an `orchard` of oaks,
+trees and flowers round the edge.
+
+### Cave (`"kind": "cave"`)
+
+Organic caverns (a cellular automaton, kept to one connected system) with
+rock walls, dark. Chambers are named by where they are: the `entrance` nearest
+the south edge (the player starts there), the `lair` furthest from it, and
+`crystals` (glowing crystal clusters and a violet light), `grotto` (mushrooms
+and fungus), `pool` (water), `treasure` (a chest and gold), `bones`, `camp`, or
+with `"style": "mine"` a `mine` (a cart, crates, a pickaxe, a lamp); the rest
+are `chamber N`. Rocks, fungus and crystals line the walls. Options:
+`"rooms"` (3-9 chambers), `"size"`, `"style"`.
 
 ## Putting things in places
 
@@ -68,7 +113,10 @@ thatched roofs ([board.md](board.md)).
 - An agent with neither `at` nor `in` is matched by words in its id, style
   and personality: goblins and monsters to the lair, rulers and sorcerers to
   the throne room, guards to barracks, priests to the shrine or temple,
-  smiths to the smithy, innkeepers to the tavern, merchants to the shop...
+  smiths to the smithy, innkeepers to the tavern, merchants to the shop,
+  farm animals to the pasture (or a village's garden or square), deer to the
+  grove, hunters and bandits to the camp, hermits and druids to the hut,
+  miners to the mine... Its body counts too (a `cow` called "bess").
 - Unknown places are reported in the Scenario pane.
 - `locked` with `"in"` locks every door into that place ([things.md](things.md)).
 - Characters can walk to places by name: `walk(tavern)`.
