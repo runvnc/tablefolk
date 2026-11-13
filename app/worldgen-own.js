@@ -23,7 +23,7 @@
   const KEY = 'tablefolk_own_model', VERIFIER = 'tablefolk_or_verifier';
   const OPENROUTER = 'https://openrouter.ai/api/v1';
   const PLAY_MODEL = 'google/gemma-4-26b-a4b-it';   // the server's default characters' model: quick and cheap
-  const CLIENT = '/app/llm_js/openai-client.js?v=20261108a';
+  const CLIENT = '/libs/brain/engines/openai.js';
 
   function get() {
     let c = {}; try { c = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}

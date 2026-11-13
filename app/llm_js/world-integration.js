@@ -1,13 +1,22 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261112e';
-import { localClient } from './openai-client.js?v=20261024a';
-import { installDevConsole } from './dev-console.js?v=20261112d';
-import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from './model-loader-litert.js?v=20261112a';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113a';
+import { localClient } from '../../libs/brain/engines/openai.js';
+import { installDevConsole } from './dev-console.js?v=20261113a';
+import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
-import { hasBonsai2Cached, clearBonsai2Cache } from './bonsai2-engine.js?v=20261112a';
+import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB } from '../../libs/device/index.js';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
-import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from './model-loader-wllama3.js?v=20261112a';
+import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from '../../libs/brain/engines/wllama.js';
+import { setMirror, mirrorAllowed, on as onLibNote } from '../../libs/models/index.js';
+
+// The @tablefolk libraries (libs/) in the game: their mirror rule is
+// tablefolk.world only; the game adds this repository's own server on
+// localhost (the maintainer's tests). Classic scripts (the voice, speech
+// input) ask window.tablefolkMirrorAllowed. Their notes go to "This device".
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) setMirror(true);
+window.tablefolkMirrorAllowed = () => mirrorAllowed();
+onLibNote(n => window.tablefolkDiag?.note?.(n.lib, n.text));
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 

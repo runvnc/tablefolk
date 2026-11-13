@@ -4,7 +4,7 @@
 // The Strands Decider in the browser (app/llm_js/decider.js) on the menu cases.
 // ?local=1 loads the GGUF and head from /work/decider/ (a copy of the files, not
 // in git) instead of Hugging Face. window.result has the answers.
-import { loadDecider } from '/app/llm_js/decider.js';
+import { loadDecider } from '/libs/decider/index.js';
 const q = new URLSearchParams(location.search), out = document.getElementById('out'), log = [];
 const say = t => { log.push(t); out.textContent = log.join('\n'); console.log(t); };
 const opts = q.has('local') ? { ggufUrl: location.origin + '/work/decider/strands-decider-2B-qwen3.5-v1-2610-Q8_0.gguf', headUrl: '/work/decider/decider-head.safetensors' } : {};

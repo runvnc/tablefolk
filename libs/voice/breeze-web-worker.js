@@ -18,6 +18,10 @@
 // are kept in IndexedDB.
 const BASES = ['https://geebr-models.mindroot.io', 'https://geebr-models-2.mindroot.io', 'https://geebr-models-3.mindroot.io', 'https://geebr-models-4.mindroot.io'];
 const MODEL = 'breeze-tts-2-q4_k-dd2.gguf', DIR = 'tablefolk-breeze';
+// the same file on Hugging Face: pages other than tablefolk.world download from there
+// (the load message's mirror: false), in 64 MiB ranges like the mirror's parts
+const HF_URL = 'https://huggingface.co/HoppouAI/Breeze-TTS-2.cpp/resolve/main/' + MODEL;
+let useMirror = true;
 let M = null, port = null, stopPtr = 0, loading = null;
 // views of the module's memory made fresh each time (they go stale when it grows)
 const f32 = () => new Float32Array(M.wasmMemory.buffer), i32 = () => new Int32Array(M.wasmMemory.buffer);
@@ -26,7 +30,11 @@ const status = (text, state = 'loading') => postMessage({ type: 'status', status
 
 async function opfsModel(onProgress) {
   const root = await navigator.storage.getDirectory(), dir = await root.getDirectoryHandle(DIR, { create: true });
-  const man = await (await fetch(`${BASES[0]}/breeze-tts-2/${MODEL}.parts.json`)).json();
+  const man = useMirror ? await (await fetch(`${BASES[0]}/breeze-tts-2/${MODEL}.parts.json`)).json() : await (async () => {
+    const r = await fetch(HF_URL, { headers: { Range: 'bytes=0-0' } }); await r.body?.cancel();
+    const size = Number(r.headers.get('Content-Range')?.split('/')[1]) || 0; if (!size) throw new Error('Breeze TTS 2: Hugging Face gave no size');
+    const partSize = 64 * 2 ** 20; return { size, partSize, parts: Array.from({ length: Math.ceil(size / partSize) }, (_, i) => i) };
+  })();
   const fh = await dir.getFileHandle(MODEL, { create: true });
   let file = await fh.getFile();
   if (file.size === man.size && (await dir.getFileHandle(MODEL + '.ok').then(() => true, () => false))) return file;
@@ -38,7 +46,8 @@ async function opfsModel(onProgress) {
     const one = async (i) => {
       for (let t = 0; ; t++) {
         try {
-          const r = await fetch(`${BASES[i % 4]}/breeze-tts-2/${man.parts[i]}`);
+          const r = useMirror ? await fetch(`${BASES[i % 4]}/breeze-tts-2/${man.parts[i]}`)
+            : await fetch(HF_URL, { headers: { Range: `bytes=${i * man.partSize}-${Math.min((i + 1) * man.partSize, man.size) - 1}` } });
           if (!r.ok) throw new Error('HTTP ' + r.status);
           const buf = new Uint8Array(await r.arrayBuffer());
           h.write(buf, { at: i * man.partSize }); done += buf.length; onProgress(done, man.size); return;
@@ -59,6 +68,7 @@ async function cachePut(key, v) { try { const d = await db(); d.transaction('cod
 
 async function load(opts = {}) {
   if (M) return;
+  if (opts.mirror === false) useMirror = false;
   // what it needs, checked before the 2.5 GB download (browser-check.js has the same rules)
   if (typeof WebAssembly.Suspending !== 'function') throw new Error('Breeze TTS 2 failed: this browser has no JSPI (WebAssembly.Suspending); it needs Chrome or Edge 137+, Safari 27+ or Firefox 153+');
   if (!opts.allowCpu) {
@@ -70,7 +80,7 @@ async function load(opts = {}) {
   const t0 = performance.now();
   const file = await opfsModel((n, total) => status(`Downloading Breeze TTS 2 ${Math.floor(100 * n / total)}% (${(n / 2 ** 30).toFixed(2)} / ${(total / 2 ** 30).toFixed(2)} GB, once)`));
   status('Breeze TTS 2: loading onto the GPU…');
-  const create = (await import('./breeze-web/breeze.mjs?v=20261107a')).default;
+  const create = (await import('./breeze-web/breeze.mjs')).default;
   M = await create({ print: s => console.log('[breeze]', s), printErr: s => console.warn('[breeze]', s) });
   M.FS.mkdir('/m'); M.FS.mount(M.WORKERFS || M.FS.filesystems.WORKERFS, { files: [file] }, '/m');
   const rc = await M.ccall('tf_init', 'number', ['string'], ['/m/' + MODEL], { async: true });

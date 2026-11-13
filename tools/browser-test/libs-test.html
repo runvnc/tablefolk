@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>libs test</title>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+// Imports every @tablefolk library from libs/ and runs what needs no model
+// download: device detection, the mirror rule, menu matching, the menu box,
+// brain with a stand-in engine (pick, yes/no, json, stream, Prompt-API
+// session), the voice and speech choices. window.RESULT holds the outcome.
+//   node tools/browser-test/eval.mjs ... or open /tools/browser-test/libs-test.html
+const out = [], ok = (name, cond, extra = '') => out.push(`${cond ? 'ok  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`);
+try {
+  const M = await import('/libs/models/index.js');
+  ok('models: no mirror off tablefolk.world', M.mirrorAllowed('example.com') === false && M.mirrorAllowed('tablefolk.world') === true && M.mirrorAllowed('www.tablefolk.world') === true);
+  ok('models: sources', JSON.stringify(M.sources({ mirror: 'm', hf: 'h' }, false)) === '["h"]' && JSON.stringify(M.sources({ mirror: 'm', hf: 'h' }, true)) === '["m","h"]' && JSON.stringify(M.sources({ mirror: 'm' }, false)) === '["m"]');
+  const notes = []; M.on(n => notes.push(n));
+
+  const D = await import('/libs/device/index.js');
+  const hw = await D.detectHardware();
+  ok('device: detect', !!hw && 'cls' in hw, D.describeHardware(hw));
+  ok('device: recommend', typeof D.recommendModel(hw, [{ key: 'a', needGB: 1, readGB: .5 }], 'a') === 'string', hw.choiceWhy || '');
+
+  const Mn = await import('/libs/menus/index.js');
+  const menu = { title: 'Smith', items: [{ id: 'buy', label: 'Buy a sword' }, { id: 'fix', label: 'Repair my armour', keywords: ['mend'] }, { id: 'bye', label: 'Leave' }] };
+  const r1 = await Mn.match(menu, 'the second one'), r2 = await Mn.match(menu, 'can you mend it'), r3 = await Mn.match(menu, 'repaired armour please'), r4 = await Mn.match(menu, 'sing me a song');
+  ok('menus: number', r1.item?.id === 'fix' && r1.by === 'number');
+  ok('menus: keyword', r2.item?.id === 'fix' && r2.by === 'keyword');
+  ok('menus: words', r3.item?.id === 'fix' && r3.by === 'words');
+  ok('menus: none without a model', r4.none === true);
+  const chooser = Mn.modelChooser(async () => '3');
+  const r5 = await Mn.match(menu, 'I am off now', { choose: chooser });
+  ok('menus: model chooser', r5.item?.id === 'bye' && r5.by === 'model');
+  const box = Mn.createMenuBox({ matchOptions: () => ({}) });
+  const opened = box.open(menu, { who: 'test' });
+  ok('menus: box shows', !document.getElementById('menuBox').hidden && document.querySelectorAll('[data-menu-item]').length === 3);
+  await box.offer('buy a sword');
+  const res = await opened;
+  ok('menus: box choice', res?.item?.id === 'buy' && document.getElementById('menuBox').hidden);
+
+  const B = await import('/libs/brain/index.js');
+  const choice = await B.chooseModel({});
+  ok('brain: chooseModel', !!choice.key, `${choice.key}: ${choice.why}`);
+  // a stand-in engine: answers by the last message
+  const engine = { async generate(messages, o) {
+    const last = messages[messages.length - 1].content;
+    const text = /number only/.test(last) ? '2' : /yes or no/.test(last) ? 'Yes.' : /JSON/.test(messages[0].content) ? 'Sure: {"name": "Mara", "age": 40}' : 'Hello there, traveller.';
+    if (o.onToken) { let s = ''; for (const w of text.split(/(?= )/)) { s += w; o.onToken(s); await new Promise(r => setTimeout(r, 5)); } }
+    return text; }, unload() {} };
+  const brain = await B.createBrain({ engine });
+  ok('brain: chat', (await brain.chat('hi')) === 'Hello there, traveller.');
+  const pk = await brain.pick('Which?', ['a', 'b', 'c']);
+  ok('brain: pick', pk.index === 1 && pk.choice === 'b');
+  ok('brain: yesno', (await brain.yesno('The sky is blue.')) === 1);
+  const js = await brain.json('A tavern keeper', { example: { name: 'x', age: 1 } });
+  ok('brain: json', js.name === 'Mara' && js.age === 40);
+  let streamed = ''; for await (const p of brain.stream('hi')) streamed += p;
+  ok('brain: stream', streamed === 'Hello there, traveller.', JSON.stringify(streamed));
+  const s = await brain.languageModel.create({ initialPrompts: [{ role: 'system', content: 'Be brief.' }] });
+  ok('brain: Prompt API session', (await s.prompt('hi')) === 'Hello there, traveller.');
+  let ps = ''; const rd = s.promptStreaming('again').getReader(); for (;;) { const { value, done } = await rd.read(); if (done) break; ps += value; }
+  ok('brain: promptStreaming', ps === 'Hello there, traveller.');
+  // a decider stand-in
+  brain.useDecider({ decide: async (state, q) => ({ q: q.q.type === 'noul' ? { noul: .8 } : { choice: 'o3', confidence: .9, probabilities: {} } }) });
+  ok('brain: pick via decider', (await brain.pick('Which?', ['a', 'b', 'c'])).index === 2 && (await brain.yesno('x')) === .8);
+  await import('/libs/brain/openrouter.js');
+  ok('brain: openrouter module', true);
+
+  const V = await import('/libs/voice/index.js');
+  const ve = await V.chooseEngine({});
+  ok('voice: chooseEngine', !!ve.engine, `${ve.engine}: ${ve.why}`);
+  ok('voice: no Breeze when not allowed', (await V.chooseEngine({ allowBreeze: false })).engine === 'pocket-18m');
+  const H = await import('/libs/hear/index.js');
+  const he = await H.chooseEngine();
+  ok('hear: chooseEngine', !!he.engine, `${he.engine}: ${he.why}`);
+  ok('hear: level', H.level(new Float32Array(16000)).voiced === 0);
+  await import('/libs/decider/index.js');
+  ok('decider: module', true);
+  ok('models: notes', notes.length > 0, notes.map(n => n.lib).join(','));
+} catch (e) { out.push('FAIL exception: ' + (e?.stack || e)); }
+document.getElementById('out').textContent = out.join('\n');
+window.RESULT = out;
+</script>

@@ -12,7 +12,7 @@
  *
  * The Voice pane's "Speech input" picks one. Automatic (the default) on a
  * phone or tablet: the browser's recognition (when it has one). Elsewhere:
- * Underdog Bark 3.0 in this browser (app/asr/; asked once before its download,
+ * Underdog Bark 3.0 in this browser (libs/hear, @tablefolk/hear; asked once before its download,
  * nothing leaves the machine), else the server's Gemma, else a llama.cpp model
  * with audio input on this computer (LFM3-Omni-2B: tools/llama-server.sh
  * --omni; found through the endpoint settings or the helper finder), else the
@@ -195,17 +195,20 @@
     try { localStorage.setItem('tablefolk.barkOk', yes ? '1' : '0'); } catch {}
     return yes;
   }
-  const BARK_URLS = ['https://geebr-models.mindroot.io/underdog-bark-3.0/', 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/'];
+  // the R2 mirror only where the page allows it (window.tablefolkMirrorAllowed: @tablefolk/models)
+  const BARK_HF = 'https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX/resolve/main/';
+  const mirrorOk = () => window.tablefolkMirrorAllowed?.() ?? /(^|\.)tablefolk\.world$|^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const BARK_URLS_ = () => mirrorOk() ? ['https://geebr-models.mindroot.io/underdog-bark-3.0/', BARK_HF] : [BARK_HF];
   // the on-screen readout of downloads (load-status.js)
   const loadEvent = d => window.dispatchEvent(new CustomEvent('tablefolk-load', { detail: { key: 'speech', label: '🎤 Speech input', state: 'loading', ...d } }));
   let barkWorker = null, barkReady = null, barkId = 0, barkVariant = null, barkIsReady = false, loadPct = 0, loadNote = '', barkWhy = ''; const barkWait = new Map();
   function barkLoad() {
     if (barkReady) return barkReady;
     if (barkOk() !== '1') return Promise.reject(new Error('download not approved'));
-    const urls = (new URLSearchParams(location.search).get('asr') ? [new URLSearchParams(location.search).get('asr')] : []).concat(BARK_URLS);
+    const urls = (new URLSearchParams(location.search).get('asr') ? [new URLSearchParams(location.search).get('asr')] : []).concat(BARK_URLS_());
     barkReady = barkPlan().then(plan => new Promise((res, rej) => {
       barkVariant = plan.variant; showEngine('Bark ' + (plan.variant === 'q8' ? 'CPU' : 'GPU'));
-      barkWorker = new Worker('/app/asr/worker.js?v=20261101a', { type: 'module' });
+      barkWorker = new Worker('/libs/hear/bark-worker.js', { type: 'module' });
       barkWorker.onmessage = e => {
         const m = e.data;
         if (m.type === 'progress') { loadPct = Math.round(m.fraction * 100); loadNote = m.note || ''; loadEvent({ text: `${loadNote} ${loadPct}%`.trim() }); const b = button(); if (b) { b.title = `speech model: ${m.note} ${loadPct}% (the 🎤 works once it is loaded)`; const tag = b.querySelector('.mic-engine'); if (tag) tag.textContent = loadPct + '%'; } }

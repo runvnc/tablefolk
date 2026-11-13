@@ -17,7 +17,7 @@ import { randomBytes } from 'node:crypto';
 import { config, ROOT, LITERT_URL } from './config.js';
 import { ADMIN_DIR, publicSettings, updateSettings, voices } from './settings.js';
 import { encodeScenario, recent } from './generate.js';
-import { OpenAI } from '../app/llm_js/openai-client.js';
+import { OpenAI } from '../libs/brain/engines/openai.js';
 
 const PW_FILE = join(ADMIN_DIR, 'password.json');
 const INITIAL_FILE = join(ADMIN_DIR, 'initial-password.txt');

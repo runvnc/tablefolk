@@ -1,0 +1,32 @@
+{
+  "name": "@tablefolk/hear",
+  "version": "0.1.0",
+  "description": "Speech to text in the browser: Underdog Bark 3.0 (Parakeet TDT, WebGPU or CPU) or the browser's SpeechRecognition, chosen for the device.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/hear"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/hear",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "asr",
+    "speech-recognition",
+    "stt",
+    "parakeet",
+    "webgpu"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@tablefolk/models": "^0.1.0",
+    "@tablefolk/device": "^0.1.0"
+  }
+}

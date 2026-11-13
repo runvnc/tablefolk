@@ -1,5 +1,5 @@
-// Main-thread proxy for the LiteRT-LM (Gemma 4 E2B) engine, which now runs
-// entirely inside llm_js/litert-worker.js. This file keeps the exact same
+// Main-thread proxy for the LiteRT-LM (Gemma 4 E2B) engine, which runs
+// entirely inside litert-worker.js (next to this file). This file keeps the exact same
 // exported API it had when it ran the engine in-process, so agent-brain.js
 // and world-integration.js need no changes - only the implementation moved.
 //
@@ -24,15 +24,17 @@ const MODEL_CONFIG = {
 let worker = null, shared = false;
 let nextId = 1;
 // One URL for every page (the game and the world builder), so they share it.
-const WORKER_URL = '/app/llm_js/litert-worker.js?v=20261112a';
+import { workerUrl, mirrorAllowed, local } from '../../models/index.js';
+// next to this module (a blob that loads it when this comes from a CDN)
+const WORKER_URL = workerUrl(new URL('./litert-worker.js', import.meta.url), { module: false });
 // A model this browser has loaded before (so it is in OPFS): the engine runs
 // in a shared worker, which survives a reload or the step from the world
 // builder into the game: it keeps the model 2 minutes after the last page
 // lets go (litert-worker.js), while Chrome keeps the worker running. The
 // first download stays in a dedicated worker: only there can it write OPFS
 // with a sync access handle (a shared worker's async writes cap near 34 MB/s).
-const CACHED = 'tablefolkLitertCached';
-const wasCached = () => { try { return !!localStorage.getItem(CACHED); } catch { return false; } };
+const CACHED = 'LitertCached';
+const wasCached = () => !!local.get(CACHED);
 const pending = new Map(); // id -> {resolve, reject, onProgress, onToken}
 
 // Mirrors the worker's own load/unload state so getCurrentModel()/isLoaded()
@@ -122,9 +124,9 @@ export async function loadModel(modelKey, onProgress) {
     // object straight through to onProgress - preserve both shapes exactly.
     onProgress?.(p);
   };
-  let url = ''; try { url = localStorage.getItem('tablefolk_model_url:' + modelKey) || ''; } catch {}
+  const url = local.get('_model_url:' + modelKey) || '', mirror = mirrorAllowed();
   try {
-    try { await call('load', { modelKey, url }, { onProgress: wrappedProgress }); }
+    try { await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress }); }
     catch (e) {
       // the worker runs another LiteRT-LM version (the vision model needs the
       // nightly): a fresh dedicated worker for this one
@@ -132,19 +134,19 @@ export async function loadModel(modelKey, onProgress) {
         try { await call('unload'); } catch {}
         try { shared ? worker.close() : worker.terminate(); } catch {}
         worker = null; getWorker(true);
-        await call('load', { modelKey, url }, { onProgress: wrappedProgress });
+        await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress });
       } else {
       // a shared worker that cannot run it (no WebGPU there, say): once more, dedicated
       if (!shared) throw e;
       console.warn('[model-loader-litert] shared worker failed, using a dedicated one:', e.message);
       try { worker.close(); } catch {}
       worker = null; getWorker(true);
-      await call('load', { modelKey, url }, { onProgress: wrappedProgress });
+      await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress });
       }
     }
     currentModel = modelKey;
     loaded = true;
-    try { localStorage.setItem(CACHED, modelKey); } catch {}
+    local.set(CACHED, modelKey);
   } catch (e) {
     throw new Error(`Failed to load LiteRT-LM model: ${e.message}`);
   }
@@ -161,7 +163,7 @@ export function unloadModel() {
 }
 
 export async function clearModelCache(modelKey) {
-  try { localStorage.removeItem(CACHED); } catch {}
+  local.remove(CACHED);
   return call('clearCache', { modelKey: modelKey || 'gemma4-e2b-litert' });
 }
 
@@ -181,7 +183,9 @@ export function setCacheBackend() {
 // real litert Engine instance, which now only exists inside the worker) ----
 export const litertClient = {
   async generate(messages, opts, onToken) {
-    const data = await call('generate', { messages, opts, streaming: !!onToken }, { onToken });
+    // functions (a caller's onToken in opts) cannot be posted to the worker
+    const plainOpts = Object.fromEntries(Object.entries(opts || {}).filter(([, v]) => typeof v !== 'function'));
+    const data = await call('generate', { messages, opts: plainOpts, streaming: !!onToken }, { onToken });
     // Thinking mode: the reasoning is split off the answer in the worker;
     // surface it for the UI log without mixing it into the command text.
     if (data.thinking) {
@@ -208,4 +212,4 @@ export const litertClient = {
 };
 
 // DevTools/test access: window.__tablefolkLiteRT.lastPrompt()
-try { window.__tablefolkLiteRT = litertClient; } catch {}
+try { globalThis.__tablefolkLiteRT = litertClient; } catch {}

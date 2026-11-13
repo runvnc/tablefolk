@@ -1,0 +1,34 @@
+{
+  "name": "@tablefolk/brain",
+  "version": "0.1.0",
+  "description": "A language model in the browser with one call: picks Gemma 4 (WebGPU), a tiny Qwen, Chrome's built-in model or an OpenAI-compatible server (OpenRouter sign-in included) for this device; chat, stream, pick, yes/no, JSON and a Prompt-API-shaped session.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/brain"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/brain",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "llm",
+    "webgpu",
+    "gemma",
+    "litert",
+    "wllama",
+    "openrouter",
+    "prompt-api"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@tablefolk/models": "^0.1.0",
+    "@tablefolk/device": "^0.1.0"
+  }
+}

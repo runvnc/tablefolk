@@ -1,0 +1,32 @@
+{
+  "name": "@tablefolk/voice",
+  "version": "0.1.0",
+  "description": "Text to speech in the browser: Pocket-TTS (small, CPU) and Breeze TTS 2 (WebGPU), chosen for the device, or the browser's speechSynthesis.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/voice"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/voice",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "tts",
+    "speech",
+    "pocket-tts",
+    "breeze",
+    "webgpu"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@tablefolk/models": "^0.1.0",
+    "@tablefolk/device": "^0.1.0"
+  }
+}

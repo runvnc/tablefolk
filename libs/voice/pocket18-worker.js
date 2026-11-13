@@ -278,7 +278,7 @@ async function load() {
     ]);
     status("Loading tokenizer...");
     if (!self.__sp) {
-        let r = await fetch(SENTENCEPIECE_MIRROR).catch(() => null);
+        let r = useMirror ? await fetch(SENTENCEPIECE_MIRROR).catch(() => null) : null;
         if (!r?.ok) r = await fetch(SENTENCEPIECE_URL);
         const js = await r.text();
         self.__sp = await import(URL.createObjectURL(new Blob([js], { type: "application/javascript" })));
@@ -298,7 +298,8 @@ async function load() {
 self.onmessage = async e => {
     const { type, data } = e.data || {};
     try {
-        if (type === "load") return await load();
+        // the R2 mirror only where the page allows it (@tablefolk/models mirrorAllowed: tablefolk.world)
+        if (type === "load") { if (data?.mirror === false) useMirror = false; return await load(); }
         if (type === "set_audio_port") { audioPort = e.ports?.[0] || null; return; }
         if (type === "stop") { generating = false; status("Stopped", "idle"); return; }
         if (type === "set_language") { postMessage({ type: "voices_loaded", voices: bundle?.predefined_voices || [], defaultVoice: currentVoice, language: "english" }); return; }

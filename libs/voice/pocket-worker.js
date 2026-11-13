@@ -669,6 +669,8 @@ self.onmessage = async (e) => {
 
     try {
         if (type === "load") {
+            // the R2 mirror only where the page allows it (@tablefolk/models mirrorAllowed: tablefolk.world)
+            if (data?.mirror === false) repoBase = HF_REPO_BASE;
             await loadBundle(data?.language || DEFAULT_LANGUAGE, { initialLoad: true });
             return;
         }

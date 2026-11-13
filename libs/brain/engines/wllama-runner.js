@@ -8,7 +8,7 @@
 //   3. Streaming is { stream: true, onData } and the response carries llama.cpp's
 //      own `timings`, which is a far more trustworthy prefill measurement than
 //      timing the first token from JS.
-import { getCurrentModel } from './model-loader-wllama3.js';
+import { getCurrentModel } from './wllama.js';
 
 // Same MiniCPM5 ChatML template as the 2.3.7 runner. The <think></think> tags
 // must be literal - they were once mangled into the bare words 'thinking' /
@@ -48,7 +48,7 @@ export function createWllama3Engine(wllamaInstance) {
           const t0 = performance.now();
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
             'prompt chars:', prompt.length, 'maxTokens:', maxTokens, 'sampling:', { temperature, top_p: config.top_p, top_k: config.top_k, repeat: config.repetition_penalty },
-            'grammar:', grammar ? 'yes' : 'no', 'renderPaused:', !!window.TABLEFOLK_PAUSE_RENDER);
+            'grammar:', grammar ? 'yes' : 'no', 'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
           console.log('[tablefolk-wllama3] PROMPT PREVIEW:', prompt.slice(0, 1500));
 
           const aborter = new AbortController();
@@ -91,7 +91,7 @@ export function createWllama3Engine(wllamaInstance) {
                   firstTokenAt = performance.now();
                   console.log('[tablefolk-wllama3] PREFILL DONE / first token at',
                     new Date().toISOString(), 'elapsed ms:', Math.round(firstTokenAt - t0),
-                    'renderPaused:', !!window.TABLEFOLK_PAUSE_RENDER);
+                    'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
                 }
                 full += piece;
                 if (full.includes(stopToken) || shouldAbort?.()) { aborter.abort(); return; }

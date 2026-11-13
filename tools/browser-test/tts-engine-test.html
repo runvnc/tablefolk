@@ -1,14 +1,14 @@
 <!doctype html><meta charset="utf-8"><title>TTS engine test</title>
 <pre id="out">running…</pre>
 <script type="module">
-// Runs a speech engine's worker (?engine=pocket18-worker.js) on its own, without
+// Runs a speech engine's worker (?engine=pocket18-worker.js or pocket-worker.js, in libs/voice) on its own, without
 // the app: loads it, speaks two lines (a preset voice), and reports what came
 // back (seconds of audio, loudness, real-time factor). window.result has it.
 // ?asr=1 also transcribes the audio with Whisper tiny (Transformers.js, ~40 MB)
 // to check it is the words asked for. ?custom=1 then clones a voice from that
 // audio (the voice encoder) and speaks with it too (result.custom).
 const q = new URLSearchParams(location.search), file = q.get('engine') || 'pocket18-worker.js';
-const w = new Worker('/app/tts/' + file + '?t=' + Date.now(), { type: 'module' });
+const w = new Worker('/libs/voice/' + file + '?t=' + Date.now(), { type: 'module' });
 const log = [], out = document.getElementById('out'), say = t => { log.push(t); out.textContent = log.join('\n'); };
 const chunks = [];
 let samples = 0, sumSq = 0, metrics = null, started = 0, firstAt = null;

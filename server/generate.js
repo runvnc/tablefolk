@@ -18,7 +18,7 @@
 // generated/.
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OpenAI, collect } from '../app/llm_js/openai-client.js';
+import { OpenAI, collect } from '../libs/brain/engines/openai.js';
 import { config, ROOT, endpoint, LITERT_URL } from './config.js';
 import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';

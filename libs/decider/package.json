@@ -1,0 +1,27 @@
+{
+  "name": "@tablefolk/decider",
+  "version": "0.1.0",
+  "description": "The Strands Decider (a 2B decision model) in the browser: picks one of a list of options, or answers yes/no, with calibrated probabilities.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runvnc/tablefolk.git",
+    "directory": "libs/decider"
+  },
+  "homepage": "https://github.com/runvnc/tablefolk/tree/main/libs/decider",
+  "keywords": [
+    "tablefolk",
+    "browser",
+    "llm",
+    "decision",
+    "classification",
+    "wllama"
+  ],
+  "sideEffects": false
+}

@@ -25,7 +25,7 @@
 <body>
 <main>
   <h1>Breeze TTS 2 in this browser</h1>
-  <p class="lead">Runs <code>app/tts/breeze-web-worker.js</code> on its own: the first run downloads the 2.46 GB model from the Tablefolk mirror into this site's storage. Linux with an NVIDIA card: start Chrome with <code>--enable-dawn-features=vulkan_enable_f16_on_nvidia</code>, or WebGPU has no <code>shader-f16</code>.</p>
+  <p class="lead">Runs <code>libs/voice/breeze-web-worker.js</code> on its own: the first run downloads the 2.46 GB model from the Tablefolk mirror into this site's storage. Linux with an NVIDIA card: start Chrome with <code>--enable-dawn-features=vulkan_enable_f16_on_nvidia</code>, or WebGPU has no <code>shader-f16</code>.</p>
   <label for="text">Line to speak</label>
   <textarea id="text" rows="3">Well met, traveller. The road north is muddy after the rain, but the inn at the crossing still has a warm fire and a free bed.</textarea>
   <div class="row">
@@ -61,7 +61,7 @@ const log = s => { $('log').textContent += s + '\n'; console.log(s); };
 let worker = null, chunks = [], started = 0, firstAt = 0, done = null;
 function ensureWorker() {
   if (worker) return worker;
-  worker = new Worker('/app/tts/breeze-web-worker.js?v=20261107b', { type: 'module' });
+  worker = new Worker('/libs/voice/breeze-web-worker.js', { type: 'module' });
   worker.onmessage = e => {
     const m = e.data || {};
     if (m.type === 'status') { show('status', m.status); }

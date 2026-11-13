@@ -16,7 +16,8 @@ const SPACE_REV = '94320c9da2b7aeac5b5807c9e61d696a3c09edb5';
 const SPACE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai-2-webgpu-kernels/resolve/${SPACE_REV}/index.html`;
 export const BONSAI2_FILE = 'Ternary-Bonsai-2-27B-PTQ1_0.gguf';
 const MIRROR_URL = `https://geebr-models.mindroot.io/bonsai-2-27b/${BONSAI2_FILE}`;
-const LOADED = 'tablefolk_bonsai2_loaded';   // '1': cached from Hugging Face, 'r2': from the mirror
+import { mirrorAllowed, local } from '../../models/index.js';
+const LOADED = '_bonsai2_loaded';   // '1': cached from Hugging Face, 'r2': from the mirror
 const CONTEXT = 8192;   // tokens; the engine's default is 16384
 
 let modulePromise = null;
@@ -37,8 +38,9 @@ export async function loadBonsai2(onStatus = () => {}) {
   const { TernaryBonsai2 } = await bonsai2Module();
   // The engine caches by URL: a copy cached from Hugging Face stays there.
   let source = null;
-  let cachedFromHF = false; try { cachedFromHF = localStorage.getItem(LOADED) === '1'; } catch {}
-  if (!cachedFromHF) {
+  const cachedFromHF = local.get(LOADED) === '1';
+  // the mirror only on tablefolk.world (@tablefolk/models mirrorAllowed)
+  if (!cachedFromHF && mirrorAllowed()) {
     try {
       const r = await fetch(MIRROR_URL, { cache: 'no-store', headers: { Range: 'bytes=0-0' } });
       await r.body?.cancel();
@@ -56,7 +58,7 @@ export async function loadBonsai2(onStatus = () => {}) {
       else onStatus(e.message || e.status || 'loading Bonsai 2');
     },
   });
-  try { localStorage.setItem(LOADED, source ? 'r2' : '1'); } catch {}
+  local.set(LOADED, source ? 'r2' : '1');
   return { model, queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
@@ -78,8 +80,8 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
   return p;
 }
 
-export const hasBonsai2Cached = () => { try { return !!localStorage.getItem(LOADED); } catch { return false; } };
+export const hasBonsai2Cached = () => !!local.get(LOADED);
 export async function clearBonsai2Cache() {
-  try { localStorage.removeItem(LOADED); } catch {}
+  local.remove(LOADED);
   for (const d of await indexedDB.databases?.() || []) if (/bonsai|gguf|kernel/i.test(d.name || '')) indexedDB.deleteDatabase(d.name);
 }

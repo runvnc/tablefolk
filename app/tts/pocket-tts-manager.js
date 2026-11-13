@@ -11,13 +11,16 @@
   // Speech engines, swappable: the same messages, another worker. The
   // choice: this browser's (the voice pane, localStorage tablefolkTtsEngine),
   // else the server's default (admin page, /api/voices), else the first.
+  // The workers live in libs/voice (@tablefolk/voice); they take the R2 mirror only where
+  // the page allows it (window.tablefolkMirrorAllowed: world-integration.js, @tablefolk/models).
+  const mirrorOk=()=>window.tablefolkMirrorAllowed?.()??/(^|\.)tablefolk\.world$|^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   const ENGINES={
-    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'./tts/pocket18-worker.js?v=20261112a',languages:false},
-    'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'./tts/inference-worker.js?v=20261112a',languages:true},
+    'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'/libs/voice/pocket18-worker.js',languages:false},
+    'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'/libs/voice/pocket-worker.js',languages:true},
     // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
-    'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'./tts/breeze-web-worker.js?v=20261107d',languages:false,cloneByText:true,progress:true},
+    'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'/libs/voice/breeze-web-worker.js',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
   // Breeze is picked by itself (nothing chosen in this browser) when it is
@@ -116,7 +119,7 @@
         else if(m.type==='loaded'||m.type==='voices_loaded') done(true);
         else if(m.type==='error'){ this.upgrade={state:'failed',text:m.error}; window.tablefolkDiag?.note('voice','Breeze TTS 2 failed: '+m.error+' (staying with '+this.engineLabel()+')'); window.tablefolkToast?.('Breeze TTS 2 could not start: '+m.error,{type:'error'}); done(false); } };
       w.onerror=e=>{ this.upgrade={state:'failed',text:e.message||'worker error'}; window.tablefolkDiag?.note('voice','Breeze TTS 2 failed: '+this.upgrade.text); done(false); };
-      w.postMessage({type:'load',data:{language:settings().language,allowCpu:false}});
+      w.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:false}});
     }
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
@@ -131,7 +134,7 @@
       // buffer. 'playback' trades a bit more fixed startup latency for a
       // much more glitch-resistant buffer - the right trade for narration.
       this.audioCtx=new (AudioContext||webkitAudioContext)({sampleRate:24000,latencyHint:'playback'});
-      await this.audioCtx.audioWorklet.addModule('./tts/pcm-worklet.js?v=20261107a');
+      await this.audioCtx.audioWorklet.addModule('/libs/voice/pcm-worklet.js');
       // targetBufferSamples keeps the ~1.7x ratio the defaults (350ms/600ms) had;
       // it's the throttle-back point the worker watches via the capacity message,
       // not a hard requirement, so it just needs to stay comfortably above min.
@@ -181,7 +184,7 @@
     // Switch engines: the running one is dropped and the new one loads now.
     async setEngine(id){ return this.switchEngine(id,true); }
     async switchEngine(id,persist=true){ if(!ENGINES[id])return; if(persist) localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); this.warmed=false; try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{language:settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1'}}); }); return this.pendingLoad; }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1'}}); }); return this.pendingLoad; }
     async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(this.engine==='breeze-web')localStorage.setItem('tablefolkBreezeWebReady','1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.client||ENGINES[this.engine]?.cloneByText?'':' (CPU)'}`,'ready');resolve?.(); if(!this.offerChecked){ this.offerChecked=true; this.maybeOfferBreeze().catch(()=>{}); } await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry

@@ -34,6 +34,7 @@ const MODEL_CONFIG = {
     // Mirrored on our R2 bucket (byte-identical to litert-community/gemma-4-E2B-it-litert-lm
     // on Hugging Face, sha256 3a08e8d9...); HF's download speeds were too slow.
     modelUrl: 'https://geebr-models.mindroot.io/gemma-4-E2B-it-web.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm',
     vram: '~0.8GB in-memory (PLE memory-mapped)',
   },
   // Gemma 4 E2B with sight: the full multimodal file (the web builds above
@@ -54,6 +55,7 @@ const MODEL_CONFIG = {
     // as litert-community/gemma-4-E4B-it-litert-lm on Hugging Face (sha256
     // 3904d826..., 2969059328 bytes; copied server-side, spot-checked).
     modelUrl: 'https://geebr-models.mindroot.io/gemma-4-E4B-it-web.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.litertlm',
     vram: 'larger; PLE memory-mapped',
   },
   // NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4 E4B post-trained by NVIDIA): the
@@ -584,10 +586,14 @@ async function handle(e, post, tag) {
         } else {
           onProgress({ phase: 'download', percent: 0, text: 'Starting first-time model download...' });
           // a test or a self-hosted copy can name its own URL (localStorage tablefolk_model_url:<key>)
-          try { modelFile = await downloadModelToOPFS(modelKey, e.data.url || cfg.modelUrl, onProgress); }
+          // the R2 mirror only where the page allows it (tablefolk.world: @tablefolk/models
+          // mirrorAllowed, sent as e.data.mirror); elsewhere Hugging Face (fallbackUrl).
+          // A file only on the mirror (no fallbackUrl: our own conversions) comes from there.
+          const viaMirror = e.data.mirror !== false || !cfg.fallbackUrl;
+          try { modelFile = await downloadModelToOPFS(modelKey, e.data.url || (viaMirror ? cfg.modelUrl : cfg.fallbackUrl), onProgress); }
           catch (err) {
             // the mirror failed: start again from the fallback host
-            if (e.data.url || !cfg.fallbackUrl) throw err;
+            if (e.data.url || !cfg.fallbackUrl || !viaMirror) throw err;
             console.warn('[litert-worker] mirror download failed, trying the fallback:', err?.message);
             onProgress({ phase: 'download', percent: 0, text: 'Mirror unavailable · downloading from Hugging Face...' });
             modelFile = await downloadModelToOPFS(modelKey, cfg.fallbackUrl, onProgress);

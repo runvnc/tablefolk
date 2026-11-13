@@ -40,9 +40,11 @@ function check() {
     for (const f of walk(join(LIBS, n)).filter(f => /\.m?js$/.test(f))) {
       // without comments (their examples import the packages by name)
       const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
-      for (const s of specs(src)) {
+      for (let s of specs(src)) {
         if (/^(https?:|blob:|data:)/.test(s) || s.startsWith('${')) continue;
         if (/\?v=/.test(s)) say(f, `version string in ${s} (libs are served without them)`);
+        // a plain file name (emscripten's new URL('x.wasm', import.meta.url)) is relative too
+        if (!s.startsWith('.') && /^[\w.-]+\.(wasm|json|js|mjs|data)$/.test(s)) s = './' + s;
         if (!s.startsWith('.')) { say(f, `bare import ${s} (use a relative path or an https URL)`); continue; }
         const target = relative(LIBS, join(dirname(f), s.replace(/\?.*$/, '')));
         const lib = target.split('/')[0];

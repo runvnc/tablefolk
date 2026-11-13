@@ -17,6 +17,7 @@
 // 2.3.7 is deliberately left in place and untouched, so a failed experiment
 // here cannot break the working CPU engine.
 import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js';
+import { MIRROR, sources, note } from '../../models/index.js';
 
 // 3.x ships ONE wasm and takes { default: url }; the old
 // single-thread/multi-thread keys are deprecated.
@@ -34,8 +35,9 @@ async function cachedFromUrl(cfg, url) {
     return await cache.getSize(await cache.getNameFromURL(url)) > 0;
   } catch { return false; }
 }
+// the mirror (on tablefolk.world: @tablefolk/models) when the file is there, else Hugging Face
 function modelUrls(cfg) {
-  return [(cfg.base || HF_BASE) + cfg.file, ...(cfg.fallbackBase ? [cfg.fallbackBase + cfg.file] : [])];
+  return sources({ mirror: cfg.mirrored ? MIRROR + cfg.file : null, hf: (cfg.base || HF_BASE) + cfg.file });
 }
 async function pickModelUrl(cfg) {
   const urls = modelUrls(cfg);
@@ -64,9 +66,9 @@ const MODEL_CONFIG = {
   },
   'qwen1.5-0.5b': {
     label: 'Qwen1.5 0.5B Chat (WebGPU, GGUF Q4_0)',
-    // Mirrored on R2 (same bytes); Hugging Face is the fallback.
-    base: 'https://geebr-models.mindroot.io/',
-    fallbackBase: 'https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/',
+    // Mirrored on R2 (same bytes) for tablefolk.world; Hugging Face elsewhere and as the fallback.
+    mirrored: true,
+    base: 'https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/',
     file: 'qwen1_5-0_5b-chat-q4_0.gguf',   // the quantization Ollama's qwen:0.5b uses
     size: 395 * 1024 * 1024,
     gpuLayers: 99,
@@ -222,14 +224,14 @@ export async function loadModel(modelKey, onProgress) {
     catch (e) {
       if (!(nGpuLayers > 0)) throw e;
       console.warn('[tablefolk-wllama3] could not load on the graphics card, trying the CPU:', e?.message);
-      globalThis.tablefolkDiag?.note('brain', 'not on the graphics card (' + (e?.message || 'error') + '): trying the processor');
+      note('brain', 'not on the graphics card (' + (e?.message || 'error') + '): trying the processor');
       onProgress?.('Not enough graphics memory: loading on the CPU...');
       Promise.resolve().then(() => wllama?.exit()).catch(() => {});
       usedLayers = 0;
       await loadAt(0);
     }
     currentModel = modelKey;
-    globalThis.tablefolkDiag?.note('brain', `${cfg.label} loaded on the ${usedLayers > 0 ? 'graphics card' : 'processor'} (${usedLayers > 0 ? usedLayers + ' layers on the GPU' : 'no WebGPU for it here'})`);
+    note('brain', `${cfg.label} loaded on the ${usedLayers > 0 ? 'graphics card' : 'processor'} (${usedLayers > 0 ? usedLayers + ' layers on the GPU' : 'no WebGPU for it here'})`);
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);
