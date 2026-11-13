@@ -53,7 +53,7 @@ node close.mjs                                         # always close it: it hol
 | `viewer.html`, `vshot.mjs` | look at one model file, screenshot it |
 | `itchdl.mjs` | download from itch.io through Chrome (the HTTP flow says "invalid key") |
 | `test-pack/` | a minimal asset pack and test scenarios (bodies, props, dungeon, village, two rooms) |
-| `cloud-shot.py <url> <out.png> [s]`, `cloud-gpucap.js` | screenshot on a machine with no GPU or display (a cloud VM): Playwright's Chromium on Mesa lavapipe, the 3D frame read from the GPU; needs `app/vendor/` when the CDNs are blocked (details in its header) |
+| `cloud-shot.py <url> <out.png> [s]`, `cloud-gpucap.js` | screenshot on a machine with no GPU or display (a cloud VM): Playwright's Chromium on Mesa lavapipe, the 3D frame read from the GPU and laid into the page (`out_full.png`); `OFFLINE=1` blocks all but localhost (details in its header) |
 | `_*.mjs` | one-off scratch scripts from past sessions; not maintained |
 
 ## Evals (`tools/browser-test/evals/`)

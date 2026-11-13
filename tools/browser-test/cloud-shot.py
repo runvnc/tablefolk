@@ -5,8 +5,9 @@ Usage: python3 tools/browser-test/cloud-shot.py URL out.png [wait_seconds]
   e.g. bun server/server.js 8001 &   then
        python3 tools/browser-test/cloud-shot.py "http://localhost:8001/oracle?art=1" oracle.png 60
 
-Writes out.png (the page, whose 3D canvas comes out blank) and out_3d.png
-(the 3D frame, read from the GPU by cloud-gpucap.js), and prints the page's
+Writes out.png (the page, whose 3D canvas comes out blank), out_3d.png
+(the 3D frame, read from the GPU by cloud-gpucap.js) and out_full.png (the
+page with the frame in place of the canvas), and prints the page's
 last console lines.
 
 What works (tested 2026-11-12): Playwright's own Chromium with Mesa's
@@ -18,6 +19,7 @@ the frame is copied out of the GPU after the app's own submit instead.
 The libraries must be in app/vendor/ (tools/vendor-fetch.sh) when the VM's
 network blocks the CDNs. Software rendering: a few frames a second at most.
 Paths: PW_CHROMIUM and LVP_ICD override the defaults below.
+OFFLINE=1 blocks every request that is not to localhost (checks app/vendor/).
 """
 import base64, glob, os, sys, time
 from playwright.sync_api import sync_playwright
@@ -38,15 +40,28 @@ with sync_playwright() as p:
     logs = []
     page.on("console", lambda m: logs.append(f"[{m.type}] {m.text}"[:300]))
     page.on("pageerror", lambda e: logs.append(f"[pageerror] {e}"[:300]))
+    if os.environ.get("OFFLINE") == "1":
+        page.route("**/*", lambda r: r.continue_() if r.request.url.split("/")[2].split(":")[0] in ("localhost", "127.0.0.1") or r.request.url.startswith(("data:", "blob:")) else r.abort())
     page.add_init_script(path=os.path.join(HERE, "cloud-gpucap.js"))
     page.goto(url, timeout=60000)
-    time.sleep(wait)
+    t0 = time.time()  # until the scene is ready (tablefolk-scene-ready), at most `wait` s
+    while time.time() - t0 < wait and not page.evaluate("() => !!window.__sceneReady"): time.sleep(2)
+    print(f"scene ready: {page.evaluate('() => !!window.__sceneReady')} after {time.time() - t0:.0f} s")
+    time.sleep(float(os.environ.get("SETTLE", "5")))
     page.screenshot(path=out)
     d = page.evaluate("() => window.__gpuCapture ? Promise.race([window.__gpuCapture(), new Promise(r => setTimeout(() => r(null), 30000))]) : null")
     if d:
         out3d = out[:-4] + "_3d.png" if out.endswith(".png") else out + "_3d.png"
         open(out3d, "wb").write(base64.b64decode(d.split(",")[1]))
         print("3D frame:", out3d)
+        # the whole page: the frame laid over the canvas, then a page screenshot
+        page.evaluate("""d => { const c = document.getElementById('renderCanvas') || document.querySelector('canvas');
+          const r = c.getBoundingClientRect(), im = new Image(); im.src = d;
+          Object.assign(im.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', pointerEvents: 'none' });
+          c.style.visibility = 'hidden'; c.after(im); return im.decode(); }""", d)
+        outfull = out[:-4] + "_full.png" if out.endswith(".png") else out + "_full.png"
+        page.screenshot(path=outfull)
+        print("page with the 3D frame:", outfull)
     else:
         print("no 3D frame (the app drew nothing in 30 s)")
     print("\n".join(l for l in logs if not l.startswith("[verbose]"))[-4000:])

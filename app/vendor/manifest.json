@@ -1,7 +1,14 @@
 {
   "fetched": "2026-11-13",
-  "babylon": "not vendored yet: run tools/vendor-fetch.sh",
+  "babylon": "9.35.0",
   "files": {
-    "https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako_deflate.min.js": "pako_deflate.min.js"
+    "https://cdn.babylonjs.com/babylon.js": "babylon.js",
+    "https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js": "babylonjs.loaders.min.js",
+    "https://cdn.babylonjs.com/havok/HavokPhysics_umd.js": "HavokPhysics_umd.js",
+    "https://cdn.babylonjs.com/havok/HavokPhysics.wasm": "HavokPhysics.wasm",
+    "https://assets.babylonjs.com/environments/studio.env": "studio.env",
+    "https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako_deflate.min.js": "pako_deflate.min.js",
+    "https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js": "UPNG.js",
+    "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js": "html2canvas.min.js"
   }
 }

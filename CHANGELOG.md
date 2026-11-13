@@ -6,8 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-12
 
-- **Libraries from our own server**: `tools/vendor-fetch.sh` downloads Babylon.js, its loaders, Havok (and its wasm), the `studio.env` environment texture, pako, UPNG and html2canvas into `app/vendor/` with a manifest; the app loads those copies first and falls back to the CDNs. The app then runs where only our own server is reachable (cloud test machines), and the public site stops depending on Babylon's CDN. pako is vendored already; run the script once and commit `app/vendor/` for the rest.
-- **Screenshots with no GPU**: `tools/browser-test/cloud-shot.py` renders the app on a cloud VM (Playwright's Chromium on Mesa lavapipe) and reads the 3D frame from the GPU.
+- **Libraries from our own server**: `tools/vendor-fetch.sh` downloads Babylon.js, its loaders, Havok (and its wasm), the `studio.env` environment texture, pako, UPNG and html2canvas into `app/vendor/` with a manifest; the app loads those copies first and falls back to the CDNs. The app then runs where only our own server is reachable (cloud test machines), and the public site stops depending on Babylon's CDN. All are vendored now (Babylon 9.35.0, 12 MB). Still from outside: the character-brain modules in `llm_js/` (jsdelivr, esm.run, Hugging Face) and the tile models hosted on R2.
+- **Screenshots with no GPU**: `tools/browser-test/cloud-shot.py` renders the app on a cloud VM (Playwright's Chromium on Mesa lavapipe), reads the 3D frame from the GPU and lays it into the page screenshot; `OFFLINE=1` blocks everything but localhost. The Oracle (`?art=1`) is ready in 7-17 s there.
 
 ## 2026-11-11
 

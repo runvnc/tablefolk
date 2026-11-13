@@ -12,7 +12,11 @@
   };
   const origGet = GPUCanvasContext.prototype.getCurrentTexture;
   GPUCanvasContext.prototype.getCurrentTexture = function () {
-    const t = origGet.call(this); lastTex = t; lastCtx = this; return t;
+    const t = origGet.call(this);
+    // the main 3D view: #renderCanvas, else the largest canvas seen
+    const c = this.canvas, big = !lastCtx || c.id === 'renderCanvas' || (lastCtx.canvas.id !== 'renderCanvas' && c.width * c.height >= lastTex.width * lastTex.height);
+    if (big) { lastTex = t; lastCtx = this; }
+    return t;
   };
   const origSubmit = GPUQueue.prototype.submit;
   GPUQueue.prototype.submit = function (bufs) {
@@ -40,6 +44,7 @@
     }
     return r;
   };
+  addEventListener('tablefolk-scene-ready', () => { window.__sceneReady = true; });
   window.__gpuCapture = () => new Promise((resolve, reject) => { pending = { resolve, reject }; });
   window.__gpuCaptureArmNow = () => { window.__gpuCapPromise = window.__gpuCapture(); };
 })();
