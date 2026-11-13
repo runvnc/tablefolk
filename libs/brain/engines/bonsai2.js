@@ -34,7 +34,9 @@ export function bonsai2Module() {
   })().catch(e => { modulePromise = null; throw e; });
 }
 
-export async function loadBonsai2(onStatus = () => {}) {
+// opts.context: the context window in tokens (default 8192; the world builder's
+// one-answer mode wants 12288: the whole guide plus a whole world)
+export async function loadBonsai2(onStatus = () => {}, { context = CONTEXT } = {}) {
   const { TernaryBonsai2 } = await bonsai2Module();
   // The engine caches by URL: a copy cached from Hugging Face stays there.
   let source = null;
@@ -51,7 +53,7 @@ export async function loadBonsai2(onStatus = () => {}) {
   if (check && check.ok === false) throw new Error('Bonsai 2 27B cannot run here: ' + (check.reason || 'unsupported GPU'));
   const gb = n => (n / 2 ** 30).toFixed(2);
   const model = await TernaryBonsai2.load(source, {
-    file: BONSAI2_FILE, maxLength: CONTEXT, chatTemplateArgs: { enable_thinking: false },
+    file: BONSAI2_FILE, maxLength: context, chatTemplateArgs: { enable_thinking: false },
     onProgress: e => {
       if (e.status === 'weights' && e.kind === 'bytes' && e.total > 0) onStatus(`${e.fromCache ? 'reading cached' : 'downloading'} Bonsai 2 27B ${Math.floor(100 * e.loaded / e.total)}% (${gb(e.loaded)} / ${gb(e.total)} GB)`);
       else if (e.status === 'weights' && e.kind === 'tensors') onStatus(/warm|compil|tuning/i.test(e.message || '') ? 'compiling WebGPU kernels…' : `packing weights ${e.loaded || 0} / ${e.total || '?'}`);

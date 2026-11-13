@@ -40,7 +40,7 @@
   // it yet (the menu says how big; it is kept for the game too).
   const BONSAI2 = '/libs/brain/engines/bonsai2.js';
   let L = null, modelKey = '';
-  async function model(emit) {
+  async function model(emit, { context } = {}) {
     if (L) return L;
     emit('progress', { stage: 'loading', label: 'loading the model in this browser…' });
     let key = 'gemma4-e4b-litert';
@@ -48,8 +48,8 @@
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
     if (key === 'bonsai2-27b') {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
-      const b = await import(BONSAI2), engine = await b.loadBonsai2(status);
-      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, onToken }), clear: () => {} };
+      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, context ? { context } : {});
+      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, onToken }), clear: () => {}, context: context || 8192 };
     } else {
       const mod = await import(LOADER);
       const has = await mod.hasModelCached?.(key).catch(() => null);
@@ -313,5 +313,42 @@
       emit('failed', { error: e.message || String(e) });
     }
   }
-  window.tfWorldgen = { run, parsePlan, json, log };
+  // ---- one answer: the model gets the generator's whole guide (the same prompt the
+  // server's model and "your own key" get: POST /api/worldgen/messages) and writes
+  // the whole scenario JSON at once; the server checks it (POST /api/finish) and its
+  // problems go back to the model, at most twice. For capable in-browser models
+  // (Bonsai 2 27B, loaded with a 12288-token window for this); ?oneanswer=1.
+  async function runOne(prompt, mode, emit) {
+    const t0 = Date.now();
+    try {
+      await model(emit, { context: 12288 });
+      const spec = await fetch('/api/worldgen/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: mode || 'auto' }) }).then(r => r.json());
+      if (!spec.messages) throw new Error(spec.error || 'no prompt from the server');
+      const messages = spec.messages.map(m => ({ role: m.role, content: String(m.content) }));
+      for (let round = 0; round < 3; round++) {
+        const agentId = 'worldgen-one-' + round + '-' + Date.now();
+        emit('progress', { stage: round ? 'repairing' : 'writing', label: round ? 'fixing the problems the checks found…' : 'writing the whole world…', chars: 0 });
+        let last = 0;
+        const text = await L.generate(messages, { agentId, temperature: spec.temperature ?? 0.7, maxTokens: 4096 }, t => {
+          if (t.length - last > 120) { last = t.length; emit('progress', { stage: round ? 'repairing' : 'writing', chars: t.length, preview: t.slice(-200) }); }
+        });
+        L.clear(agentId);
+        log.push({ stage: 'one-answer-' + round, text });
+        let scenario = null, problems = [];
+        try { scenario = json(text); } catch (e) { problems = [e.message]; }
+        if (scenario) {
+          const d = await fetch('/api/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, prompt, model: modelKey, ms: Date.now() - t0, mode: 'own' }) }).then(r => r.json());
+          if (!d.problems) return emit('done', { ...d, ms: Date.now() - t0, model: modelKey + ' (in this browser, one answer)', rounds: round + 1 });
+          problems = d.problems;
+        }
+        emit('progress', { stage: 'problems', problems });
+        // keep the window small: the guide, the last answer and the problems
+        messages.splice(spec.messages.length);
+        messages.push({ role: 'assistant', content: text }, { role: 'user', content: `Fix these problems and reply with the whole corrected JSON object only:\n- ${problems.join('\n- ')}` });
+      }
+      throw new Error('the model did not produce a usable world in three tries');
+    } catch (e) { emit('failed', { error: String(e.message || e) }); }
+  }
+
+  window.tfWorldgen = { run, runOne, parsePlan, json, log };
 })();

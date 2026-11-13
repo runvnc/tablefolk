@@ -12,7 +12,8 @@ window.steps = [];
 const load = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 load('/app/procgen.js?t=' + Date.now()).then(() => load('/app/worldgen-browser.js?t=' + Date.now())).then(() => {
   const t0 = Date.now(); let stage = '';
-  window.tfWorldgen.run(q.get('prompt') || 'a haunted crypt where a ghost guards a silver key', (ev, d) => {
+  // ?oneanswer=1: the whole world in one answer from the generator's guide (tfWorldgen.runOne)
+  (q.has('oneanswer') ? cb => window.tfWorldgen.runOne(q.get('prompt') || 'a haunted crypt where a ghost guards a silver key', q.get('mode') || 'auto', cb) : cb => window.tfWorldgen.run(q.get('prompt') || 'a haunted crypt where a ghost guards a silver key', cb))((ev, d) => {
     if (ev === 'progress') { if (d.stage !== stage) { stage = d.stage; say(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${d.label || d.stage}`); } if (d.problems) say('problems: ' + d.problems.join(' | ')); if (d.preview) window.steps[stage] = d.preview; }
     if (ev === 'done') { window.result = { ok: true, ms: d.ms, title: d.scenario.title, link: d.link, scenario: d.scenario }; say('DONE in ' + (d.ms / 1000).toFixed(0) + 's: ' + d.scenario.title); }
     if (ev === 'failed') { window.result = { ok: false, error: d.error }; say('FAILED: ' + d.error); }
