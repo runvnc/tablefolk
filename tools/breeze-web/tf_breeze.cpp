@@ -139,7 +139,11 @@ EMSCRIPTEN_KEEPALIVE const char * tf_trace(const int * codes, int n_codes, int f
 // 0 on success
 // 1: the text encoder (0.9 GB, run once per line) on the CPU in this module's memory
 // instead of the GPU (te-cpu.patch reads BREEZE_TE_CPU); call before tf_init
-EMSCRIPTEN_KEEPALIVE void tf_set_te_cpu(int on) { setenv("BREEZE_TE_CPU", on ? "1" : "0", 1); }
+// threads: the CPU backend's threads for it (the module starts 8 workers; more would wait)
+EMSCRIPTEN_KEEPALIVE void tf_set_te_cpu(int on, int threads) {
+    setenv("BREEZE_TE_CPU", on ? "1" : "0", 1);
+    if (threads > 0) { char b[8]; snprintf(b, sizeof b, "%d", threads < 8 ? threads : 8); setenv("BREEZE_TE_THREADS", b, 1); }
+}
 
 EMSCRIPTEN_KEEPALIVE int tf_init(const char * path) {
     try {

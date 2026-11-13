@@ -35,11 +35,11 @@ grep -q convtr1d_stream src/codec_decoder.cpp || { echo "expected Breeze with th
 emcmake cmake -S . -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DBREEZE_VULKAN=OFF -DGGML_WEBGPU=ON -DGGML_WEBGPU_JSPI=ON -DGGML_OPENMP=OFF -DGGML_NATIVE=OFF \
   -DBREEZE_BUILD_CLI=OFF -DBREEZE_BUILD_SERVER=OFF -DBREEZE_BUILD_SHARED=OFF -DBREEZE_MP3=OFF \
-  -DCMAKE_C_FLAGS="-fwasm-exceptions -msimd128" -DCMAKE_CXX_FLAGS="-fwasm-exceptions -msimd128" > build-web.cmake.log
+  -DCMAKE_C_FLAGS="-fwasm-exceptions -msimd128 -pthread" -DCMAKE_CXX_FLAGS="-fwasm-exceptions -msimd128 -pthread" > build-web.cmake.log
 cmake --build build-web --target breeze_core -j "$(nproc)"
 LIBS=$(find build-web -name '*.a' | sort)
 OUT="$ROOT/libs/voice/breeze-web"; mkdir -p "$OUT"
-em++ -O3 -fwasm-exceptions -msimd128 -std=c++17 -I "$HERE" -I include -I third_party/ggml/include "$HERE/tf_breeze.cpp" \
+em++ -O3 -fwasm-exceptions -msimd128 -pthread -sPTHREAD_POOL_SIZE=8 -std=c++17 -I "$HERE" -I include -I third_party/ggml/include "$HERE/tf_breeze.cpp" \
   -Wl,--start-group $LIBS -Wl,--end-group \
   --use-port=emdawnwebgpu -sJSPI -sJSPI_EXPORTS="['tf_init','tf_encode','tf_generate','tf_hash_tensors','tf_stages','tf_matvec_check','tf_trace']" \
   -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=worker -sALLOW_MEMORY_GROWTH -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=8MB \
