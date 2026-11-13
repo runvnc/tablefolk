@@ -84,7 +84,8 @@ export function generateBonsai9b(engine, _prompt, opts = {}) {
     if (n > MAX_PROMPT) throw new Error(`Bonsai 2 9B reads at most ${MAX_PROMPT} tokens (this prompt has ${n})`);
     let text = '';
     const streamer = new T.TextStreamer(tok, { skip_prompt: true, skip_special_tokens: false, callback_function: t => {
-      text += t.replace(/<\|[^|]*\|>/g, '');   // keeps </think>, drops <|im_end|> and the like opts.onToken?.(answerOf(text, opts.enableThinking));
+      // special tokens kept so </think> survives; <|im_end|> and the like dropped
+      text += t.replace(/<\|[^|]*\|>/g, ''); opts.onToken?.(answerOf(text, opts.enableThinking));
     } });
     const t = opts.temperature ?? 0.7;
     const chunk = opts.chunk ?? CHUNK;

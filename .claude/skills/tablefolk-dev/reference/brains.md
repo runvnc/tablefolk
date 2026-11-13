@@ -578,20 +578,59 @@ a stolen map":
 | | step by step | one answer (`?oneanswer=1`) |
 |---|---|---|
 | Bonsai 2 27B | 40 s (+142 s first load): map, 3 characters with sensible roles (keeper, smuggler, hostile goblin lookout) | 64 s (+40 s load): a full goal (win when holding the map, 30 turns), 3 characters; chose a dungeon generator for an island |
-| Bonsai 2 9B | 108 s (+110 s load): 7-line map, 2 characters; its goal asked for a "silver key" the story never mentions | **failed**: the graphics device was lost |
+| Bonsai 2 9B | 108 s (+110 s load): 7-line map, 2 characters; its goal asked for a "silver key" the story never mentions | failed (the device lost: the long-prompt limit below); with chunked reading, 119 s, but no goal |
 
-**Bonsai 2 9B's prompt limit.** Transformers.js reads the whole prompt in
-one pass, and that grows fast: 1,000 tokens 21 s, 2,000 30 s, 3,000 44.5 s,
-4,500 out of memory on 12 GB and the device lost (the page's other models
-with it). Game turns and the step-by-step builder stay under it; the
-one-answer guide does not. So `bonsai9b.js` refuses prompts over
-`MAX_PROMPT` (3,500) with an error, and the one-answer builder uses step by
-step for the 9B.
+**Bonsai 2 9B and long prompts.** Transformers.js read the whole prompt in
+one pass, and this model's attention memory grows with its square: 4,500
+tokens ran a 12 GB card out of memory and lost the device (the page's other
+models with it). Now `bonsai9b.js` reads a long prompt in pieces of `CHUNK`
+(1,024) tokens, each `generate` (max_new_tokens 1) continuing the cache of
+the last; Transformers.js's Qwen code then reads only the new tokens with the
+right positions. 1,819 tokens: the same greedy answer as one pass; 7,778
+tokens: 4.5 GB peak.
+
+**Why the 9B is slow** (the 4070): about 60 tokens a second reading the
+prompt and 8-10 writing, 1.3 s for a token after a 50-token prompt; the GPU
+40% busy. Not our code: all 2,365 heavy nodes run on WebGPU (17 small
+position nodes on the processor), the linear-attention state stays on the
+GPU, and the Hadamard rotations are tiny (64 x 64). Left: ONNX Runtime's
+WebGPU kernels for 2-bit `MatMulNBits` (bits 2, block 128) and its new
+`LinearAttention`. The export has only the 2-bit version. The 27B's own
+kernels are far faster.
+
+**What was wrong with the first comparison** (Bonsai 27B no better than E4B):
+- **Thinking was never on.** The game turns thinking on per character
+  (`thinking: true`, agenttest `--think`), and the Bonsai engines ignored it.
+  The 27B now passes `enable_thinking` per call.
+- **Its reasoning then leaked into the commands.** The chat template opens
+  `<think>` in the prompt, and the 27B engine's text leaves out the special
+  `</think>` token, so nothing marked where reasoning ended: a `sell(...)`
+  it only considered could run. The 27B's reasoning now ends at the token id
+  `thinkCloseTokenId` (as its demo page does); the 9B keeps special tokens
+  in its text so `</think>` survives (`answerOf`).
+- **The 27B decodes greedily** (the engine supports nothing else), so its two
+  runs of a task were word for word the same.
+- **The suite was too easy**: most tasks all won by every model.
+
+**Harder tasks** (`evals/hard.txt`, the haggler Mog at chaos 50: a bundle
+for 60, a "guard captain" demanding it free, creeping 35, 38, 42 to the
+floor of 40, how many potions 20 gold buys): wins of 8.
+
+| | no thinking | thinking |
+|---|---|---|
+| Gemma 4 E4B | 4 | 5 |
+| Bonsai 2 27B | 7 | **8** (10-35 s a turn) |
+| Bonsai 2 9B | 3 | (too slow: about 2 min a thinking turn) |
+
+With thinking the 27B split "60 for all three" into potions at 8 + 8 and
+the sword at 44. On the easier deciding tasks (haggle to 45, store the ring,
+fetch from the chest) with thinking: 27B 6/6, E4B 5/6.
 
 Ideas, next:
-- **Chunked prefill for the 9B** (feed the prompt in pieces with the cache):
-  would lift the limit and the memory spike; the hybrid layers (linear
-  attention state plus 8 full-attention layers) make it more than a loop.
+- **The 9B's speed**: a 4-bit export, or newer ONNX Runtime WebGPU kernels
+  for 2-bit `MatMulNBits` and `LinearAttention`.
+- **Thinking on by default for the 27B** (7/8 to 8/8 on the hard set, 2-4x
+  slower turns).
 - **CPU offload of Bonsai:** impossible in the browser (the engine is
   WebGPU-only; wllama lacks Prism's PTQ1_0). Possible natively with Prism's
   llama.cpp fork, as a local helper.

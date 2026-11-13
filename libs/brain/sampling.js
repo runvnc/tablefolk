@@ -14,6 +14,9 @@ const RECOMMENDED = [
   // LiquidAI/LFM3-1.7B card, "General (chat, tool use, agents, coding)";
   // generation_config.json (1.0 is only for maths)
   { match: /lfm[-_ ]?3/i, temperature: 0.1, top_k: 50, repetition_penalty: 1.1 },
+  // Ternary Bonsai 2 (Prism ML; made from Qwen3.5/3.6): Qwen's recommended
+  // non-thinking settings. (The 27B's WebGPU engine decodes greedily only.)
+  { match: /bonsai[-_ ]?2/i, temperature: 0.7, top_p: 0.8, top_k: 20 },
   // Qwen/Qwen1.5-0.5B-Chat generation_config.json (it names no temperature: Transformers' default, 1.0)
   { match: /qwen[-_ ]?1\.5/i, temperature: 1.0, top_p: 0.8, repetition_penalty: 1.1 },
   // Qwen/Qwen2.5-0.5B-Instruct generation_config.json
