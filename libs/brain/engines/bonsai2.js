@@ -36,7 +36,28 @@ export function bonsai2Module() {
 
 // opts.context: the context window in tokens (default 8192; the world builder's
 // one-answer mode wants 12288: the whole guide plus a whole world)
+// The engine reads the model in ranges only when a HEAD answer says
+// "Accept-Ranges: bytes"; the R2 mirror supports ranges but does not expose that
+// header to pages (CORS), so the engine fell back to reading the whole 5.9 GB
+// file into one array, which browsers refuse ("Array buffer allocation failed",
+// 2026-11-13, an RTX 4070 in the cloud). HEAD answers from the mirror get the
+// header added here.
+let fetchPatched = false;
+function patchMirrorHead() {
+  if (fetchPatched || typeof globalThis.fetch !== 'function') return;
+  fetchPatched = true;
+  const real = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = async (input, init) => {
+    const res = await real(input, init);
+    const url = String(input?.url || input), method = (init?.method || input?.method || 'GET').toUpperCase();
+    if (method !== 'HEAD' || !/\.mindroot\.io\//.test(url) || res.headers.get('accept-ranges')) return res;
+    const headers = new Headers(res.headers); headers.set('accept-ranges', 'bytes');
+    return new Response(null, { status: res.status, statusText: res.statusText, headers });
+  };
+}
+
 export async function loadBonsai2(onStatus = () => {}, { context = CONTEXT } = {}) {
+  patchMirrorHead();
   const { TernaryBonsai2 } = await bonsai2Module();
   // The engine caches by URL: a copy cached from Hugging Face stays there.
   let source = null;
