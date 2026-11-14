@@ -43,6 +43,11 @@ bpy.context.view_layer.objects.active = news[0]
 if len(news) > 1: bpy.ops.object.join()
 new = bpy.context.view_layer.objects.active
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# heavy models (Hunyuan3D's default is 500k faces): down to about 40k
+if len(new.data.polygons) > 60000:
+    dm = new.modifiers.new('dec', 'DECIMATE'); dm.ratio = 40000 / len(new.data.polygons)
+    bpy.ops.object.modifier_apply(modifier=dm.name)
+    print('[reskin] decimated to', len(new.data.polygons), 'faces')
 for o in [o for o in bpy.data.objects if o not in before and o != new]:
     bpy.data.objects.remove(o, do_unlink=True)
 
@@ -90,7 +95,20 @@ bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 # is much nearer (a long tail beside where the old body's thighs were took
 # their weights and smeared into a sheet as the legs walked), gets weights by
 # distance to the nearest bone segments instead (--no-fix skips this).
-if not AUTO and '--no-fix' not in argv:
+BONES = '--bones' in argv   # every vertex by distance to the nearest bones (no copy from the old surface)
+if BONES:
+    from mathutils.geometry import intersect_point_line
+    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups}
+    def segd(p, ab):
+        a, b = ab; q, t = intersect_point_line(p, a, b); t = min(1, max(0, t)); return (p - (a + (b - a) * t)).length
+    for vg in new.vertex_groups: vg.remove(list(range(len(new.data.vertices))))
+    for v in new.data.vertices:
+        p = new.matrix_world @ v.co
+        ds = sorted((segd(p, ab), n) for n, ab in segs.items())[:3]
+        inv = [(1 / max(d, 1e-4) ** 6, n) for d, n in ds]; tot = sum(w for w, _ in inv)
+        for w, n in inv: new.vertex_groups[n].add([v.index], w / tot, 'REPLACE')
+    print('[reskin] weights by bone distance for all', len(new.data.vertices), 'vertices')
+elif not AUTO and '--no-fix' not in argv:
     from mathutils.geometry import intersect_point_line
     segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups}
     def segd(p, ab):
