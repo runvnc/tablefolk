@@ -83,10 +83,13 @@ for i, o in enumerate(olds):
 bpy.context.view_layer.objects.active = new
 bpy.ops.object.mode_set(mode='OBJECT')
 new.select_set(True)
+# (smoothing the weights here, vertex_group_smooth, speckled the whole body: tried 2026-11-14)
 bpy.ops.object.vertex_group_limit_total(limit=4)
 bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 for o in olds: bpy.data.objects.remove(o, do_unlink=True)
-new.parent = arm
+# into the armature's space (its import rotation and scale would apply twice)
+new.data.transform(arm.matrix_world.inverted()); new.matrix_world = Matrix.Identity(4)
+new.parent = arm; new.matrix_parent_inverse = Matrix.Identity(4); new.matrix_basis = Matrix.Identity(4)
 m = new.modifiers.new('Armature', 'ARMATURE'); m.object = arm
 new.name = 'Body'
 arm.data.pose_position = 'POSE'

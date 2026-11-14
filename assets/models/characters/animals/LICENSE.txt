@@ -1,0 +1,5 @@
+
+wolf.glb (2026-11-14): the mesh and textures were made for Tablefolk with
+fal.ai (FLUX concept, Meshy v6 image-to-3D) and fitted onto the Quaternius
+wolf's skeleton and clips (CC0) with tools/blender/reskin-animal.py.
+Released with the game's assets.
