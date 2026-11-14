@@ -1,5 +1,6 @@
 
-wolf.glb, cow.glb, deer.glb (2026-11-14): the meshes and textures were made for Tablefolk with
-fal.ai (FLUX concept, Meshy v6 image-to-3D) and fitted onto the Quaternius
-animals' skeletons and clips (CC0) with tools/blender/reskin-animal.py.
-Released with the game's assets.
+wolf.glb, cow.glb, deer.glb, horse.glb, dog.glb (2026-11-14): the meshes and
+textures were made for Tablefolk with fal.ai (FLUX concepts; Meshy v6
+image-to-3D for the wolf, cow and deer, Hunyuan3D 3.1 Pro for the horse and
+dog) and fitted onto the Quaternius animals' skeletons and clips (CC0) with
+tools/blender/reskin-animal.py. Released with the game's assets.
