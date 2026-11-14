@@ -26,7 +26,7 @@ def key():
 def call(endpoint, payload, k, label, poll=5):
     req = urllib.request.Request(f'https://queue.fal.run/{endpoint}', data=json.dumps(payload).encode(), headers={'Authorization': f'Key {k}', 'Content-Type': 'application/json'})
     sub = json.load(urllib.request.urlopen(req))
-    print(f'[{label}] queued', flush=True); t0 = time.time()
+    print(f'[{label}] queued {sub.get("response_url", "")}', flush=True); t0 = time.time()   # the response url: fetch it later if this process dies
     while True:
         time.sleep(poll)
         st = json.load(urllib.request.urlopen(urllib.request.Request(sub['status_url'], headers={'Authorization': f'Key {k}'})))

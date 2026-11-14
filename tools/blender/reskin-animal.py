@@ -1,5 +1,5 @@
 # Put a detailed mesh on a rigged low-poly animal, keeping its skeleton and clips.
-#   blender -b -P tools/blender/reskin-animal.py -- old_rigged.glb new_mesh.glb out.glb [--flip] [--turn]
+#   blender -b -P tools/blender/reskin-animal.py -- old_rigged.glb new_mesh.glb out.glb [--flip] [--turn] [--auto]
 # The new mesh (Meshy image-to-3D, no rig) is turned to lie along the old
 # body's length with its head the same way (guessed: the head end is the
 # taller one; --flip turns it round, --turn 90 degrees), scaled per axis to
@@ -11,7 +11,7 @@ from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 OLD, NEW, OUT = argv[:3]
-FLIP, TURN = '--flip' in argv, '--turn' in argv
+FLIP, TURN, AUTO = '--flip' in argv, '--turn' in argv, '--auto' in argv
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=OLD)
@@ -74,7 +74,7 @@ new.data.update()
 for o in olds:
     for vg in o.vertex_groups:
         if vg.name not in new.vertex_groups: new.vertex_groups.new(name=vg.name)
-for i, o in enumerate(olds):
+for i, o in enumerate([] if AUTO else olds):
     dt = new.modifiers.new('wt%d' % i, 'DATA_TRANSFER'); dt.object = o
     dt.use_vert_data = True; dt.data_types_verts = {'VGROUP_WEIGHTS'}; dt.vert_mapping = 'POLYINTERP_NEAREST'
     dt.layers_vgroup_select_src = 'ALL'; dt.layers_vgroup_select_dst = 'NAME'
@@ -86,11 +86,44 @@ new.select_set(True)
 # (smoothing the weights here, vertex_group_smooth, speckled the whole body: tried 2026-11-14)
 bpy.ops.object.vertex_group_limit_total(limit=4)
 bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+# Repair: a vertex driven mostly by a bone far from it, while another bone
+# is much nearer (a long tail beside where the old body's thighs were took
+# their weights and smeared into a sheet as the legs walked), gets weights by
+# distance to the nearest bone segments instead (--no-fix skips this).
+if not AUTO and '--no-fix' not in argv:
+    from mathutils.geometry import intersect_point_line
+    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups}
+    def segd(p, ab):
+        a, b = ab; q, t = intersect_point_line(p, a, b); t = min(1, max(0, t)); return (p - (a + (b - a) * t)).length
+    gi = {vg.index: vg.name for vg in new.vertex_groups}
+    L = max((ohi - olo)); fixed = 0
+    for v in new.data.vertices:
+        p = new.matrix_world @ v.co
+        ws = [(g.weight, gi[g.group]) for g in v.groups if gi.get(g.group) in segs and g.weight > 0]
+        if not ws: continue
+        top = max(ws)[1]; dtop = segd(p, segs[top])
+        ds = sorted((segd(p, ab), n) for n, ab in segs.items())
+        if ds[0][0] < .45 * dtop and dtop > .06 * L:
+            near = ds[:3]; inv = [(1 / max(d, 1e-4) ** 4, n) for d, n in near]; tot = sum(w for w, _ in inv)
+            for g in list(v.groups): new.vertex_groups[gi[g.group]].remove([v.index])
+            for w, n in inv: new.vertex_groups[n].add([v.index], w / tot, 'REPLACE')
+            fixed += 1
+    print('[reskin] re-weighted', fixed, 'vertices by bone distance')
 for o in olds: bpy.data.objects.remove(o, do_unlink=True)
 # into the armature's space (its import rotation and scale would apply twice)
 new.data.transform(arm.matrix_world.inverted()); new.matrix_world = Matrix.Identity(4)
-new.parent = arm; new.matrix_parent_inverse = Matrix.Identity(4); new.matrix_basis = Matrix.Identity(4)
-m = new.modifiers.new('Armature', 'ARMATURE'); m.object = arm
+if AUTO:
+    # --auto: Blender's bone-heat weights instead of the old surface's (for a
+    # body whose parts sit elsewhere than the old one's: the dog's low tail
+    # took hind-leg weights and stretched into a sheet)
+    for vg in list(new.vertex_groups): new.vertex_groups.remove(vg)
+    bpy.ops.object.select_all(action='DESELECT'); new.select_set(True); arm.select_set(True)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    print('[reskin] automatic weights:', len(new.vertex_groups), 'groups')
+else:
+    new.parent = arm; new.matrix_parent_inverse = Matrix.Identity(4); new.matrix_basis = Matrix.Identity(4)
+    m = new.modifiers.new('Armature', 'ARMATURE'); m.object = arm
 new.name = 'Body'
 arm.data.pose_position = 'POSE'
 for img in bpy.data.images:
