@@ -136,13 +136,41 @@ maps a body to a bank and a playback rate.
 
 ### A detailed mesh for a rigged animal (2026-11-14)
 
-The Quaternius animals are ~2,000 triangles. `tools/fal-animal.py image|model
-<name>` makes a FLUX side-view concept and a Meshy v6 model (no rig, about
-12k faces); `blender -b -P tools/blender/reskin-animal.py -- old.glb new.glb
-out.glb` turns the new mesh to the old body's length and head direction,
-scales it per axis onto the old bounding box, copies the old mesh's skin
-weights from its nearest surface (Data Transfer in the rest pose) and
-exports it on the old skeleton with every clip.
+The Quaternius animals were ~2,000 triangles. Now detailed: wolf, cow, deer
+(Meshy v6), horse, dog, bull, white horse, donkey, pig, stag, husky
+(Hunyuan3D 3.1 Pro). Still low-poly: fox (crumples walking whatever the
+weights), sheep (its farm-pack rig fits sideways: bind and rest pose differ
+in Blender), alpaca. Steps:
+
+1. `tools/fal-animal.py image <name> "<description>"`: a FLUX side-profile
+   concept (~$0.08). Side views fit best (a three-quarter husky smeared).
+2. A 3D model of it on fal: `tools/fal-3d.py hunyuan31 work/animals/<name>`
+   (Hunyuan3D 3.1 Pro with PBR, $0.525, ~3 min; the best of the four tried),
+   `tools/fal-3d.py trellis2 ...` (TRELLIS.2 at 1024, $0.30, 21 s, a step
+   down) or `tools/fal-animal.py model <name>` (Meshy v6, $0.80, ~6.5 min).
+3. `blender -b -P tools/blender/reskin-animal.py -- old.glb new.glb out.glb
+   --bones`: decimates past 60k faces, turns the new mesh to the old body's
+   length and head, scales it per axis onto the old box, weights every vertex
+   by distance to the nearest three bones (`--bones`; copying the old
+   surface's weights, the default, smeared tails and hind legs of the horse
+   and dog where their shape differs; `--auto`, Blender's bone heat, failed
+   on these meshes). Then `tools/compress-glb.sh out.glb
+   assets/models/characters/animals/<name>.glb`, bump the body's `v` in
+   FIGURES, render its tile, look at it walking (`tools/browser-test/
+   scenarios/animals.json` stands every animal in a row).
+
+The old rigs must be uncompressed (Blender here has no meshopt decoder): the
+re-exported ones of 2026-11-13 and the Poly Pizza originals were used.
+
+Self-hosting (2026-11-14, vast.ai RTX 4090 at $0.375/h): Pixal3D (Tencent
+ARC, MIT, on TRELLIS.2) needs ~18 min of building (TRELLIS.2's setup.sh
+extensions, natten), its requirements fail to resolve (MoGe's trimesh pin;
+installed by hand), its background remover RMBG-2.0 is gated and
+non-commercial (patched out; cut-outs made with rembg's ISNet), and its
+full 1536 mode runs out of memory on 24 GB (low-VRAM mode, 1024). Then
+95-170 s a model, of which diffusion is ~15 s and mesh finalising (remesh,
+UV, bake; mostly CPU) ~100 s, so a 5090 would gain little. Its animals came
+out speckled and walked worse than Hunyuan3D's: not used. fal is the way.
 
 ## Hosting
 
