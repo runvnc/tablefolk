@@ -41,11 +41,11 @@ approve the download on a user's behalf.
 
 | key | does |
 |---|---|
-| W A S D / arrows | move (in first person: W/S walk where you look, A/D turn) |
+| W A S D / arrows | move; held down, you keep walking (in first person: W/S walk where you look, A/D turn) |
 | click the ground | walk there (not in first person: there only the keys walk) |
-| mouse wheel | zoom towards what the pointer is over, close enough to read a face (the follow camera zooms on you; in first person it narrows the view towards what the pointer is on: point and scroll, no dragging) |
+| mouse wheel | zoom towards what the pointer is over, close enough to read a face, in every camera (the follow camera keeps following you while zoomed; in first person it narrows the view towards what the pointer is on: point and scroll, no dragging) |
 | drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it); in the follow camera, turn the view around you (it keeps that angle while it follows you) |
-| E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk |
+| E | use what is in front of you: open a chest (take everything; E on an open, empty one closes it), sit on a seat, lie on a bed, hammer at an anvil, chop a tree, pick up, read a note, search a body, open a locked door with its key, talk; an animal's menu (milk, shear, pet, feed...) |
 | F | attack the nearest foe |
 | C | camera: the free camera, the follow camera and first person in turn (in first person your hands show the weapon and torch) |
 | V | first person and back (C reaches it too) |
@@ -54,10 +54,14 @@ approve the download on a user's behalf.
 | I | the Adventurer pane |
 | Enter | chat |
 | \ | open / close the side panel |
-| Esc | close the panel or a dialog |
+| Esc | close the panel or a dialog; undo a zoom (back to the view before you zoomed in) |
 
 Chat commands: `/attack grub`, `/wield sword`, `/cast heal me`, `/steal
-rook` (skills). The 🎤 button is hold-to-talk: hold it down (mouse, finger, or
+rook` (skills); with animals `/milk cow`, `/shear sheep`, `/pet dog`,
+`/feed horse`, `/groom horse`, `/fetch dog`, `/follow dog`, `/stay dog`
+(`/milk(daisy)` works too). Walk up to someone and face them and they
+become who you talk to (the chat's "to:"), unless you picked someone
+yourself in the last few seconds. The 🎤 button is hold-to-talk: hold it down (mouse, finger, or
 Space on the focused button) while you speak and let go to send; the words
 go like typed chat (a tap under a third of a second is dropped with a hint). On a phone or tablet the
 browser's own recognition is the default (and the voice is Pocket-TTS:
@@ -77,7 +81,7 @@ pack of about 300 MB on the first click), else its makers' servers. When the
 player declines Bark's download, Automatic takes the next of these that
 answers.
 
-**Cameras.** The free camera (the default with an avatar) orbits (drag) and
+**Cameras.** The follow camera is the default with an avatar (2026-11-14). The free camera orbits (drag) and
 zooms freely and stays where you put it; every wall stands at half height
 there, so no one is hidden behind one. The follow camera (C from the free
 camera) starts as a high Diablo-style view behind the player and stays
@@ -95,6 +99,15 @@ character close by, or press its "give" button (the nearest one). The
 character gets it and is told. Every hand-over shows: the two face each
 other, the giver reaches out with the thing (its picture, coins for gold, a
 little parcel for anything else) and it passes into the other's hand.
+
+**Animals.** E near an animal (or `/milk cow` and the like) does things
+with it: cows give milk, sheep and alpacas wool (each takes a while to come
+back), you can pet, groom or scratch them, throw a stick for a dog, and feed
+them anything they eat that you carry (an apple, a carrot, bread, hay; meat
+or bread for a dog). A fed animal follows you for two minutes; a dog follows
+when called (`/follow dog`, `/stay dog`). Deer, stags and foxes shy away from
+a hand unless fed first. An animal makes its sound when you do something with
+it, and one with a mind (`"talks": true`) is told what you did and answers.
 
 **Talking.** A character turns to whoever it speaks to: someone near it names,
 else whoever spoke to it last, else the player when close. The listener turns

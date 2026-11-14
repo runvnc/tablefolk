@@ -117,6 +117,16 @@ With the follow camera, walls between the camera and the player drop to a low
 stub (`app/cutaway.js`), so tall walls never hide the hero. With the free
 camera every wall stands at half height; first person shows them whole.
 
+## Beyond the edge
+
+Outdoor worlds needn't stop at a hard edge: `"surroundings": "forest"` sets
+the board in woods that run on into the haze (a few rows of trees, thickest
+near the edge, on ground out to the horizon), `"fields"` in open country with
+scattered trees, `"none"` leaves the board alone. A generated forest gets
+`forest` and a generated village, town, hamlet or farm `fields` by default;
+other boards (islands at sea, dungeons, caves, dark worlds) none. It is only
+scenery: nobody can walk there, and characters don't see it.
+
 ## Light
 
 `lighting`: `bright` (default), `night`, `dim` (night at half ambient). The

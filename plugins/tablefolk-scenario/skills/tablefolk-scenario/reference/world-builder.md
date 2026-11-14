@@ -29,6 +29,9 @@ walls.
   one JSON answer, checked and fixed up to twice; for Bonsai 2 and Gemma 4
   12B). **Think first** (`?think=1`, off by default): the model reasons
   before each answer; slower, better plans (Bonsai 2 9B gains the most).
+  **Size** (every way of building; `?size=large|huge`): a generated map
+  made bigger (large 51 by 39, huge 63 by 49; normal leaves it to the
+  model). The map editor's generate panel takes any `[cols, rows]`.
   Step by step writes it in small steps
   (`app/worldgen-browser.js`): a plan (text), the map (a little JSON; code
   builds it with `procgen.js`, or layout lines outdoors), a review of the map

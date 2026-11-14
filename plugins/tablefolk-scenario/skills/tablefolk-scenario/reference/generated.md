@@ -38,7 +38,9 @@ ordinary `grid` + `legend`, `objects` (one `light` per room or building),
 so the person-height doors fit; set `1` for low tabletop walls), a `+` door
 in every doorway, and a position for every character and the player. The
 link keeps the short form; same seed, same map. Change `"seed"` for another
-layout. `"lighting"`, `"walls"`, `"grid"` (replaces the generated one),
+layout. `"size": [cols, rows]` makes any kind bigger or smaller (odd numbers,
+up to 63 by 63; the world builder's Size choice: large is 51 by 39, huge 63
+by 49). `"lighting"`, `"walls"`, `"grid"` (replaces the generated one),
 `"legend"`, more `"objects"` and `"goal"` all work as usual.
 
 ### Dungeon (`"kind": "dungeon"`)

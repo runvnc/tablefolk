@@ -81,7 +81,7 @@
   function mapBox() {
     if (!scn.generate && !scn.grid?.length && (scn.objects?.length || 0) > 40) return `<p class="muted">Fixed layout: ${scn.objects.length} objects and ${scn.paint?.length || 0} floor tiles at exact positions (moved in the tabletop map). Move things there, or ask the AI for changes.${scn.places?.length ? ' Rooms: ' + esc(scn.places.map(p => p.id).join(', ')) + '.' : ''}</p>
       ${field('board size [columns, rows]', 'size', 'json', { rows: 1 })}`;
-    if (scn.generate) return `<div class="cols">${field('kind', 'generate.kind', 'select', { options: ['dungeon', 'village', 'forest', 'farm', 'cave'] })}${field(scn.generate.kind === 'village' ? 'buildings' : 'rooms', scn.generate.kind === 'village' ? 'generate.buildings' : 'generate.rooms', 'num')}${field('seed', 'generate.seed', 'num')}</div>
+    if (scn.generate) return `<div class="cols">${field('kind', 'generate.kind', 'select', { options: ['dungeon', 'village', 'forest', 'farm', 'cave'] })}${field(scn.generate.kind === 'village' ? 'buildings' : 'rooms', scn.generate.kind === 'village' ? 'generate.buildings' : 'generate.rooms', 'num')}${field('seed', 'generate.seed', 'num')}${field('size [cols, rows]', 'generate.size', 'json', { ph: 'default; up to [63, 63]' })}</div>
       ${field('objects (JSON)', 'objects', 'json', { wide: true, rows: 4 })}`;
     if (scn.grid?.length) return `${field('grid (top = north, left = west; digits are the characters in order)', 'grid', 'lines', { wide: true, rows: Math.min(30, scn.grid.length + 1) })}
       ${field('legend (JSON)', 'legend', 'json', { wide: true, rows: 2 })}${field('objects (JSON)', 'objects', 'json', { wide: true, rows: 3 })}${field('map lines', 'map', 'lines', { wide: true, rows: 3 })}`;
@@ -261,5 +261,6 @@
   window.tfBuilder = {
     show(result, opts = {}) { scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
     get scenario() { return scn; },
+    encode,
   };
 })();

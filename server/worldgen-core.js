@@ -189,6 +189,7 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <div class="field"><span class="lbl">Where the model runs</span><div class="seg" id="where" role="radiogroup" aria-label="where the model runs"><span class="muted">loading…</span></div></div>
     <label class="field"><span class="lbl">Model</span><select name="model" id="model"></select></label>
     <label class="field" id="styleBox" hidden><span class="lbl">How</span><select name="style"><option value="steps">step by step</option><option value="one">whole world at once</option></select></label>
+    <label class="field" id="sizeBox"><span class="lbl">Size</span><select name="size"><option value="">normal</option><option value="large">large</option><option value="huge">huge</option></select></label>
     <label class="field" id="thinkBox" hidden><span class="lbl">Think first</span><input type="checkbox" name="think"></label>
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
@@ -285,7 +286,7 @@ if(f){
   const remembered=(()=>{ try{ return JSON.parse(localStorage.getItem('tablefolk.worldgen')||'{}'); }catch{ return {}; } })();
   const want={ where: qs.get('where')||(qs.get('how')==='browser'?'browser':null)||remembered.where, model: qs.get('model')||remembered.model };
   f.mode.value=qs.get('mode')||'auto';
-  f.style.value=qs.has('oneanswer')?'one':(remembered.style||'steps'); f.think.checked=qs.has('think')||!!remembered.think;
+  f.style.value=qs.has('oneanswer')?'one':(remembered.style||'steps'); f.think.checked=qs.has('think')||!!remembered.think; f.size.value=qs.get('size')||remembered.size||'';
   const setWhere=id=>{
     const w=OPTS.where.find(x=>x.id===id)||OPTS.where[0]; if(!w) return;
     for(const b of $('where').querySelectorAll('button')) b.setAttribute('aria-checked',String(b.dataset.w===w.id));
@@ -335,9 +336,10 @@ if(f){
     const where=f.dataset.where||'cloud';
     if(where==='own'){ const c=ownSave(); const miss=c.provider==='openrouter'&&!c.apiKey?'Sign in with OpenRouter or paste a key first.':c.provider==='custom'&&!/^https?:[/][/]/.test(c.baseURL)?'Type your server’s address first (e.g. http://localhost:8080/v1).':!c.model?'Choose a model first.':''; if(miss){ $('whereNote').textContent=miss; return; } }
     const model=where==='own'?own().get().model:$('model').value;
-    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked})); }catch{}
+    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked,size:f.size.value})); }catch{}
     const q=new URLSearchParams(); for(const k of ['art','brain','llm','view','go']) if(qs.has(k)) q.set(k,qs.get(k));
     q.set('where',where); if(model) q.set('model',model); if(where!=='browser') q.set('mode',f.mode.value);
+    if(f.size.value) q.set('size',f.size.value); else q.delete('size');
     if(where==='browser'){ if(f.style.value==='one') q.set('oneanswer','1'); if(f.think.checked) q.set('think','1'); }
     location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
@@ -385,7 +387,10 @@ if(words){
     if(d.stage==='repairing' && !d.chars) seenChars=0;
     if(d.label) $('stage').textContent=d.label+(d.chars?tok(d.chars):'');
     if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');};
-  const onDone=d=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('stop');
+  const onDone=async d=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('stop');
+    // Size: a generated map's cols and rows (procgen.js takes up to 63)
+    const sz={large:[51,39],huge:[63,49]}[f.size?.value||qs.get('size')||''];
+    if(sz && d.scenario?.generate){ d.scenario.generate.size=sz; try{ const cs=new CompressionStream('deflate-raw'), w=cs.writable.getWriter(); w.write(new TextEncoder().encode(JSON.stringify(d.scenario))); w.close(); const b=new Uint8Array(await new Response(cs.readable).arrayBuffer()); let t=''; for(let i=0;i<b.length;i+=0x8000) t+=String.fromCharCode(...b.subarray(i,i+0x8000)); d.code=btoa(t).split('+').join('-').split('/').join('_').replace(/=+$/,''); d.link='/app/#s='+d.code; }catch{} }
     $('stage').textContent='done in '+(d.ms/1000).toFixed(1)+'s: '+(d.scenario.title||'scenario')+' (opening…)'; $('clock').textContent='';
     // the loading view just goes there: nothing to click
     if(view==='loading'){ $('fill').style.transition='width .25s linear'; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; setTimeout(()=>location.href=appLink(d.link),500); return; }

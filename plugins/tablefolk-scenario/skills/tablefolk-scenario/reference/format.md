@@ -62,6 +62,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `base`, `size`, `floor`, `paint`, `campfire` | the board | [board.md](board.md) |
 | `lighting` | `bright`, `night`, `dim` | [board.md](board.md) |
 | `dark` | fog of war; default true for generated dungeons | [board.md](board.md) |
+| `surroundings` | beyond the board's edge: `forest` (thick woods), `fields` (open ground, scattered trees) or `none`; default: forest for a generated forest, fields for a generated village or farm, none otherwise | [board.md](board.md) |
 | `walls`, `wallHeight` | wall style and height | [board.md](board.md) |
 | `roofs` | `true` / `false` overrides the automatic thatched roofs | [board.md](board.md) |
 | `pathfinding`, `earshot`, `safety` | walking, hearing, crisis banner | [board.md](board.md), [characters.md](characters.md) |
