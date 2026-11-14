@@ -1239,7 +1239,7 @@ function makeObject(type,x,z,opts={}){
 // the object's opts, which saves and restores with it.
 function keepLoot(m,opts){
   const mm=m&&meta(m); if(!mm) return m;
-  const o={}; for(const k of ['gold','items','name','opened']) if(opts?.[k]!=null) o[k]=opts[k];
+  const o={}; for(const k of ['gold','items','name','opened','left']) if(opts?.[k]!=null) o[k]=opts[k];
   if(Object.keys(o).length) mm.opts={...(mm.opts||{}),...o};
   return m;
 }
@@ -2923,6 +2923,10 @@ async function importPropAsset(scene,file,opts={}){
     // Some props (the chest) bring a skeleton and animation clips; free those
     // with the object (disposeWorldObject runs meta.cleanup).
     for(const ag of result.animationGroups||[]) ag.stop();
+    // The importer starts the first clip (the chest's Chest_Close, whose first
+    // frame has the lid open): pose a "closed" clip's last frame instead.
+    const rest=(result.animationGroups||[]).find(a=>/_closed$/i.test(a.name))||(result.animationGroups||[]).find(a=>/_close$/i.test(a.name));
+    if(rest){ try{ rest.start(false,1,rest.to,rest.to); rest.goToFrame(rest.to); rest.pause(); }catch{} }
     if(proxy.isDisposed?.()){ for(const ag of result.animationGroups||[]) ag.dispose(); for(const sk of result.skeletons||[]) sk.dispose(); for(const m of result.meshes) m.dispose(); return proxy; }
     const pm=meta(proxy); if(pm){ const prev=pm.cleanup; pm.cleanup=()=>{ try{ prev?.(); }catch{} for(const ag of result.animationGroups||[]) try{ ag.dispose(); }catch{} for(const sk of result.skeletons||[]) try{ sk.dispose(); }catch{} }; }
     // Its clips stay on the object (packages.js plays them on use); a pack
@@ -3065,8 +3069,10 @@ function setCharacterFacing(g,d){
   if(!g || !d) return;
   if(Math.abs(d.x||0)+Math.abs(d.z||0)<.001) return;
   g.dir = new BABYLON.Vector3(Math.sign(d.x||0),0,Math.sign(d.z||0));
-  const yaw=yawForDir(g.dir);
-  if(g.root) g.root.rotation.y=yaw;
+  // The body turns there smoothly (bodyYaw, every frame); setting the yaw
+  // here snapped it, so a quick key press or a look around swung the figure
+  // round in a blink. Only the first facing (a new character) is set at once.
+  if(g.root && !g._faced){ g.root.rotation.y=yawForDir(g.dir); g._faced=true; }
 }
 // Turning to someone: the body turns smoothly to face them exactly (g.dir,
 // which the game logic reads, snaps to the nearest of the eight directions)
@@ -5349,7 +5355,7 @@ function installWorldAPI(){
   const prior=window.tablefolk||{};
   window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,startHandover,faceToward,
     getAgents:()=>state.characters.slice(), getSelectedAgent:()=>state.selected,
-    getBrainConfig, setBrainConfig, refreshAgentSelect,
+    getBrainConfig, setBrainConfig, refreshAgentSelect, isPersonModel:m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m] && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep|wolf|wyrmling|imp|mushroom_warrior|bunny|snake|wasp|frog|skeleton.*|troll|orc.*|demon|giant|rat|spider|bat|dragon|ghost|slime|minotaur|lizardman|werewolf|mummy)$/.test(m))), isFemaleModel:m=>FEMALE_MODELS.has(m),
     getAllowedCommands:(agentId=null)=>Array.from(commandsFor(state.characters.find(x=>x.id===agentId))), allowedFor, commandsFor, canRun,
     getAgentPerception:(agentId=null,radius=7)=>buildVisiblePerception(agentId,radius), buildVisiblePerception,
     parseInventoryItems, formatInventoryItems, getPlayer:()=>state.player,

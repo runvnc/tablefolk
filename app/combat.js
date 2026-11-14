@@ -176,7 +176,7 @@
   }
 
   // what a blow sounds like, by weapon kind (sfx.js)
-  const HIT_SOUND = { fists: 'hit', natural: 'hit', sword: 'hitBlade', axe: 'hitBlade', dagger: 'hitBlade', spear: 'hitBlade', club: 'hitBlunt', mace: 'hitBlunt', hammer: 'hitBlunt', staff: 'hitBlunt' };
+  const HIT_SOUND = { fists: 'hit', natural: 'hitNatural', sword: 'hitBlade', axe: 'hitBlade', dagger: 'hitBlade', spear: 'hitBlade', club: 'hitBlunt', mace: 'hitBlunt', hammer: 'hitBlunt', staff: 'hitBlunt' };
   function swingAnim(g) {
     const wName = wielded(g), w = wName && (weaponFor(wName) || { kind: 'club' });
     playClip(g, !w ? ['Melee_Unarmed_Attack_Punch_A'] : w.two ? ['Melee_2H_Attack_Chop'] : ['Melee_1H_Attack_Chop'], 900);
@@ -206,6 +206,8 @@
     playClip(g, clip, 900);
     window.tablefolkSfx?.play(w.two || w.kind === 'natural' && w.dmg >= 3 ? 'swingHeavy' : 'swing', g.root.position);
     if (isPlayer(g)) window.tablefolkHands?.swing(w);
+    // monsters and beasts growl, roar, hiss or bark as they strike (reactions.js voice banks)
+    else if (Math.random() < .7) window.tablefolkReact?.voice(g, 'attack');
     const miss = Math.random() < .15, dmg = miss ? 0 : w.dmg + (Math.random() < .35 ? 1 : 0);
     const who = nameOf(g), whom = nameOf(v);
     const wThe = w.kind === 'natural' ? 'its ' + w.name : w.name === 'fists' ? 'bare fists' : 'the ' + w.name, wA = w.kind === 'natural' ? 'its ' + w.name : withA(w.name);

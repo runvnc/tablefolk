@@ -162,6 +162,14 @@
     const crystal = o.type === 'crystals';
     const text = crystal ? 'breaks a crystal off the cluster' : w.did.replace('{t}', nice(o.type)).replace('{a}', food === 'apple' ? 'an apple' : 'a ' + (food || 'thing'));
     const item = food || (crystal ? 'crystal' : w.gives);
+    // a crystal cluster gives three crystals and shrinks with each one; then it is spent
+    if (crystal) {
+      const m = meshOf(o), mm = meta(m) || {}; mm.opts ||= {};
+      const left = mm.opts.left ?? 3;
+      if (left <= 0) return say(g, `the ${nice(o.type)} is spent: no crystals are left on it`, false);
+      mm.opts.left = left - 1;
+      try { const s = .35 + .65 * (mm.opts.left / 3); m.scaling.setAll(s); if (!mm.opts.left) m.getChildMeshes?.(false).forEach(c => c.visibility = .35); saveWorldState(); } catch {}
+    }
     if (item) {
       if (g === state.playerAvatar) { const have = state.player.items.find(i => i.name === item); if (have) have.qty = (have.qty ?? 1) + 1; else state.player.items.push({ name: item, qty: 1 }); inventoryChanged(); }
       else { const inv = charInventory(g); addItem(inv.items, item); setBrainConfig(g.id, { inventory: inv }); }

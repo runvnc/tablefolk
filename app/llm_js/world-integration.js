@@ -831,7 +831,7 @@ async function main() {
       if (cfg.pendingChat?.length) {
         cfg.pendingChat = []; world.setBrainConfig(g.id, cfg);
         const SOUND = { cow: 'moos', bull: 'snorts and paws the ground', horse: 'whinnies', white_horse: 'whinnies', donkey: 'brays', dog: 'wags its tail and barks', husky: 'howls happily', fox: 'yips and darts away a little', deer: 'flicks its ears', stag: 'lifts its antlers', alpaca: 'hums', pig: 'oinks', sheep: 'bleats' };
-        try { appendLog(`${g.id} ${SOUND[g.charModel] || 'looks at you'}.`); } catch {}
+        try { appendLog(`${g.id} ${SOUND[g.charModel] || 'looks at you'}.`); window.tablefolkReact?.voice(g, 'call'); } catch {}
       }
       return false;
     }

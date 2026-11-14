@@ -14,6 +14,8 @@
  * (Kenney's RPG Audio and Impact Sounds, CC0, assets/sounds/kenney-*), one
  * picked at random, layered with a synthesized thump; the rest are
  * synthesized, as are all of them until the samples have loaded.
+ *   window.tablefolkSfx.voiceBuffer(bank)  a random recorded cry or call from
+ *       a voice bank (null until loaded; reactions.js plays them)
  */
 (function () {
   let ctx = null, master = null, noiseBuf = null;
@@ -55,7 +57,35 @@
     src.connect(to); src.start(t);
     return true;
   }
-  const wake = () => { try { audio()?.resume(); loadSamples(); } catch {} };
+  // Voices (assets/sounds/voices/, CC0 recordings picked and checked by ear,
+  // see its LICENSE.txt): banks of short clips, banks.json lists them:
+  // people (hurt_m, hurt_f, die_m), monsters (mon_*, big_*, undead_*,
+  // small_hurt, bug, flesh) and animals (cow, bull, pig, horse, donkey,
+  // alpaca, sheep, deer, howl, bark, fox, frog, hiss, buzz). reactions.js
+  // picks the bank for a body; voiceBuffer(bank) is null until loaded.
+  const voices = {}; let voicesLoading = false;
+  function loadVoices() {
+    if (voicesLoading || !ctx) return; voicesLoading = true;
+    const base = new URL('../assets/sounds/voices/', document.baseURI);
+    fetch(new URL('banks.json?v=20261114a', base)).then(r => r.json()).then(banks => {
+      for (const [bank, files] of Object.entries(banks)) for (const f of files)
+        fetch(new URL(f + '?v=20261114a', base)).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+          .then(b => ctx.decodeAudioData(b)).then(buf => (voices[bank] ||= []).push(buf)).catch(e => console.warn('voice', f, e));
+    }).catch(e => console.warn('voices', e));
+  }
+  let lastPick = {};
+  function voiceBuffer(bank) {
+    const list = voices[bank]; if (!list?.length) return null;
+    // never the same clip twice running
+    let i = Math.floor(Math.random() * list.length); if (list.length > 1 && i === lastPick[bank]) i = (i + 1) % list.length;
+    lastPick[bank] = i; return list[i];
+  }
+  function flesh(out, t, gain) {
+    const b = voiceBuffer('flesh'); if (!b) return false;
+    const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = .9 + Math.random() * .2;
+    const g = ctx.createGain(); g.gain.value = gain; src.connect(g); g.connect(out); src.start(t); return true;
+  }
+  const wake = () => { try { audio()?.resume(); loadSamples(); loadVoices(); } catch {} };
   addEventListener('pointerdown', wake, { capture: true });
   addEventListener('keydown', wake, { capture: true });
 
@@ -149,7 +179,9 @@
     swingHeavy(out, t) { whoosh(out, t, .38, 380, 1500, .7); },
     // fists: a recorded punch over a low body thump
     hit(out, t) { sample('punch', out, t, 1.1) || noise(t, .14, { type: 'lowpass', freq: 900, gain: .7 }).connect(out); thump(out, t, .9); },
-    hitBlade(out, t) { sample('slice', out, t, .9); sample('punch', out, t + .01, .7) || noise(t, .1, { type: 'highpass', freq: 2500, gain: .4 }).connect(out); thump(out, t, .6); },
+    // a bite or claw: a wet crunch (the voices' flesh bank) over the thump
+    hitNatural(out, t) { flesh(out, t, .8) || sample('soft', out, t, 1); thump(out, t, .9); },
+    hitBlade(out, t) { if (Math.random() < .5) flesh(out, t + .01, .45); sample('slice', out, t, .9); sample('punch', out, t + .01, .7) || noise(t, .1, { type: 'highpass', freq: 2500, gain: .4 }).connect(out); thump(out, t, .6); },
     hitBlunt(out, t) { sample('soft', out, t, 1) || sample('punch', out, t); thump(out, t, 1.1); },
     hitMetal(out, t) { sample('metal', out, t, .8); sample('punch', out, t, .6); thump(out, t, .5); },
     miss(out, t) { whoosh(out, t, .18, 1400, 600, .2); },
@@ -166,7 +198,7 @@
   }
 
   window.tablefolkSfx = {
-    play,
+    play, voiceBuffer,
     // spells.js builds its own 3D (HRTF) sounds on the same context:
     // { ctx, master, noise } once audio is running, else null.
     context() { return enabled && audio() && ctx.state === 'running' ? { ctx, master, noise: noiseBuf } : null; },

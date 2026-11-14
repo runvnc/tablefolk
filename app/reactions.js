@@ -254,12 +254,43 @@
     o.start(t); o.stop(t + dur + .05); return dur + .1;
   }
   function sayAny(ctx, out, noise, t, p, death) { return p.kind === 'voice' ? sayVoice(ctx, out, noise, t, p, death) : sayCreature(ctx, out, noise, t, p, death); }
+  // Recorded voices (sfx.js voice banks): which bank a body uses for each kind
+  // of sound ('hurt', 'death', 'attack', 'call'), and how fast it is played
+  // (below 1 deeper, for big ones; above, smaller). Unknown people are men or
+  // women by FEM; anything else that is no person is a monster.
+  const ANIMAL_BANK = { cow: 'cow', bull: 'bull', pig: 'pig', horse: 'horse', white_horse: 'horse', donkey: 'donkey', alpaca: 'alpaca', sheep: 'sheep', deer: 'deer', stag: 'deer', fox: 'fox', dog: 'bark', husky: 'bark', frog: 'frog', snake: 'hiss' };
+  function bankFor(g, kind) {
+    const m = isPlayer(g) ? String(state.player?.model || g.charModel || '') : String(g.charModel || g.style || '');
+    const r = hash(g.id || 'player'), A = ANIMAL_BANK[m];
+    if (A) return { bank: A, rate: (kind === 'hurt' ? 1.12 : kind === 'death' ? .88 : 1) * (.94 + .12 * r) };
+    if (m === 'wolf') return { bank: kind === 'call' ? 'howl' : kind === 'attack' ? 'big_roar' : 'small_hurt', rate: kind === 'attack' ? 1.35 : kind === 'call' ? 1 : .8 };
+    if (/wasp|spider|beetle|scorpion/.test(m)) return { bank: kind === 'call' || kind === 'attack' && m === 'wasp' ? 'buzz' : 'bug', rate: .9 + .2 * r };
+    if (/bunny|rat|bat/.test(m)) return { bank: 'small_hurt', rate: 1.45 + .2 * r };
+    if (/skeleton|zombie|mummy|ghost|lich|wraith|undead/.test(m)) return { bank: kind === 'death' ? 'undead_die' : 'undead_hurt', rate: (/ghost/.test(m) ? 1.15 : .95) + .1 * r };
+    if (/giant|troll|dragon|wyrmling|demon|minotaur|ogre|bear|golem|werewolf/.test(m)) {
+      const rate = (/wyrmling|werewolf/.test(m) ? 1.15 : .85) + .1 * r;
+      return { bank: kind === 'death' ? 'big_die' : kind === 'attack' || kind === 'call' ? 'big_roar' : 'mon_hurt', rate: kind === 'hurt' ? rate * .85 : rate };
+    }
+    if (/goblin|kobold|imp|mushroom|slime/.test(m)) return { bank: kind === 'death' ? 'mon_die' : kind === 'attack' ? 'mon_attack' : 'small_hurt', rate: 1.15 + .15 * r };
+    if (/orc|lizard|monster|beast|serpent|wyrm/.test(m) || !(window.tablefolk?.isPersonModel?.(m) ?? true)) return { bank: kind === 'death' ? 'mon_die' : kind === 'attack' || kind === 'call' ? 'mon_attack' : 'mon_hurt', rate: .95 + .1 * r };
+    if (kind === 'attack' || kind === 'call') return null;   // people don't growl as they swing
+    const cfg = !isPlayer(g) && g.id ? (getBrainConfig(g.id) || {}) : {};
+    if (FEM.test(String(cfg.ttsVoiceId || '') + ' ' + m) || window.tablefolk?.isFemaleModel?.(m)) return { bank: 'hurt_f', rate: (kind === 'death' ? .86 : 1) * (.96 + .08 * r) };
+    return { bank: kind === 'death' ? 'die_m' : 'hurt_m', rate: (/dwarf/.test(m) ? .9 : /wizard|king|old|elder|priest/.test(m) ? .94 : .97) + .08 * r };
+  }
   function voice(g, kind = 'hurt') {
     if (!g?.root || !window.tablefolkSfx?.enabled) return;
     const A = window.tablefolkSpells?.audio; if (!A) return;
     const death = kind === 'death', at = g.root.position.add(V3(0, (g.height || 1.2) * .85, 0));
-    const s = A.source(at, { gain: death ? 1.6 : 1.1, ref: 2, wet: .3, ms: 2500 }); if (!s) return;
-    // keep it a little apart from the blow's thud
+    const pick = bankFor(g, kind), buf = pick && window.tablefolkSfx.voiceBuffer?.(pick.bank);
+    if (!buf && (kind === 'attack' || kind === 'call')) return;
+    const s = A.source(at, { gain: death ? 1.5 : kind === 'call' ? .9 : 1.1, ref: 2, wet: .3, ms: buf ? buf.duration * 1000 / pick.rate + 600 : 2500 }); if (!s) return;
+    if (buf) {
+      const src = s.ctx.createBufferSource(); src.buffer = buf;
+      src.playbackRate.value = pick.rate * (.97 + Math.random() * .06);
+      src.connect(s.out); src.start(s.t + .04); return;
+    }
+    // not loaded yet (or no bank): the synthesized cry, a little apart from the blow's thud
     sayAny(s.ctx, s.out, s.noise, s.t + .04, profile(g), death);
   }
   // offline: the cry as a 16-bit WAV (tools / tests)
@@ -307,5 +338,5 @@
   }
   window.addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { warm(); } catch (e) { console.warn('[react] warm', e); } }, 2000));
 
-  window.tablefolkReact = { gesture, hit, voice, render, profile };
+  window.tablefolkReact = { gesture, hit, voice, render, profile, bankFor };
 })();

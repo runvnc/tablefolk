@@ -54,6 +54,8 @@
   // an animal (play.js ANIMALS, no brain): ambles about, grazes, looks around
   async function animalTurn(c) {
     const r = Math.random();
+    // now and then a moo, a bray, a bark (reactions.js voice banks; quiet with distance)
+    if (Math.random() < .18) try { window.tablefolkReact?.voice(c, 'call'); } catch {}
     if (r < .45) return wander(c, 1);
     if (r < .7) { try { playRig(c, 'pickup', false); } catch {} return sleep(1200); }
     const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][Math.floor(Math.random() * 4)]; try { setCharacterFacing(c, new BABYLON.Vector3(d[0], 0, d[1])); } catch {}
