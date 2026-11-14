@@ -116,6 +116,34 @@ idle model turned toward the camera.
 - **Registry**: `node tools/registry.mjs` rebuilds the built-in entries;
   `--check` validates community ones.
 
+### Sounds and voices (2026-11-14)
+
+`assets/sounds/voices/` holds the recorded cries and calls: banks listed in
+`banks.json` (hurt_m, hurt_f, die_m; mon_hurt, mon_die, mon_attack,
+big_roar, big_die, undead_hurt, undead_die, small_hurt, bug, flesh; cow,
+bull, pig, horse, donkey, alpaca, sheep, deer, howl, bark, fox, frog, hiss,
+buzz), all CC0 (sources clip by clip in its LICENSE.txt). They were picked
+with `tools/sound-judge.py`: Gemini 4 Argon on OpenRouter listens to a batch
+of candidates (each cut to 6 s) and answers, per clip, what it hears, quality
+and fit out of 10, the role it suits and the start and end of the best
+instance; the chosen windows were cut with ffmpeg (silence trimmed, faded,
+peak-normalised to -1 dB, Ogg Vorbis q3), then the finished cuts judged
+again (four too-short grunts were recut). Freesound previews are reachable
+without a key (`cdn.freesound.org/previews/<id/1000>/<id>_<user>-hq.mp3`; the
+search page filtered to `license:"Creative Commons 0"` lists them).
+`sfx.js` loads the banks after the first gesture; `reactions.js bankFor`
+maps a body to a bank and a playback rate.
+
+### A detailed mesh for a rigged animal (2026-11-14)
+
+The Quaternius animals are ~2,000 triangles. `tools/fal-animal.py image|model
+<name>` makes a FLUX side-view concept and a Meshy v6 model (no rig, about
+12k faces); `blender -b -P tools/blender/reskin-animal.py -- old.glb new.glb
+out.glb` turns the new mesh to the old body's length and head direction,
+scales it per axis onto the old bounding box, copies the old mesh's skin
+weights from its nearest surface (Data Transfer in the rest pose) and
+exports it on the old skeleton with every clip.
+
 ## Hosting
 
 **Only tablefolk.world uses the mirror** (and the game on localhost):

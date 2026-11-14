@@ -79,6 +79,17 @@ post-processing).
   once took the first 8 lights in scene order and lava's light vanished: that
   is why the nearest-4 rule exists. Hidden meshes keep their nearby lights.
 
+### Surroundings (`app/surroundings.js`, 2026-11-14)
+
+Outdoor boards sit in a 280 m ground plane (just under the board's top, the
+grass texture tiled) and a band of trees beyond the edge: each tree model is
+loaded once, its meshes baked to model space (feet at 0, height 1) and drawn
+as thin instances (`thinInstanceSetBuffer`), so ~1000 trees cost one draw
+per mesh of each model. The fog thickens (0.03 for a forest) so the band
+fades out. Seeded by the scenario's seed; half the trees at light quality.
+Not pickable, no physics, not in any prompt. `scenario.js` calls `start(scn)`
+after each world (and sub-world) is built and `clear()` on exit.
+
 ## Glows and magic
 
 - Unlit glows are `StandardMaterial` with `disableLighting`, the colour in
