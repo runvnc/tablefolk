@@ -20,7 +20,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "showIntro": false,                  // no intro card: straight into the world (the link can override: ?intro=1)
   "speech": false,                // no character speaks aloud in this world (one character: "ttsEnabled": false on it)
   "memory": false,                // no meaning-based recall: the memory model (EmbeddingGemma) is not loaded
-  "view": "first",                 // the camera at the start: overview (free camera, the default) | follow | first (first person); ?view= overrides
+  "view": "first",                 // the camera at the start: follow (the default: behind you, wheel zooms toward the pointer, Escape undoes it) | overview (free camera) | first (first person); ?view= overrides
   "seed": 7,                       // layout randomness: same JSON + seed = same map
   "base": "plain",                 // plain (default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63

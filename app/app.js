@@ -175,9 +175,30 @@ function setupMouseWheelZoom(camera){
     // First person: the wheel zooms by narrowing the field of view, towards
     // what the pointer is on: the view turns so the direction under the
     // pointer stays under it (no drag needed to aim; zooming out undoes it).
-    if(state.firstPerson && fpCam){ fpZoomAt(clamp(fpCam.fov*factor,.15,1.3),state.scene.pointerX,state.scene.pointerY); return; }
-    // The follow camera keeps you centred: only the radius.
-    if(state.cameraMode==='follow'){ camera.radius=clamp(camera.radius*factor,FOLLOW.min,FOLLOW.max); return; }
+    if(state.firstPerson && fpCam){ if(factor<1 && !state.zoomHome) state.zoomHome={fp:true,fov:fpCam.fov}; fpZoomAt(clamp(fpCam.fov*factor,.15,1.3),state.scene.pointerX,state.scene.pointerY); if(state.zoomHome?.fp && fpCam.fov>=state.zoomHome.fov-.01) state.zoomHome=null; return; }
+    // The follow camera zooms about the point under the pointer too: the
+    // pivot is kept as an offset from you (followOffset), so it still follows
+    // you; zooming back out past where you started drops the offset.
+    if(state.cameraMode==='follow'){
+      const p=factor<1?pivotUnderPointer(camera,state.scene.pointerX,state.scene.pointerY):null;
+      if(factor<1 && !state.zoomHome) state.zoomHome={follow:true,radius:camera.radius};
+      if(p && retargetToDepth(camera,p)){
+        const dist=BABYLON.Vector3.Distance(arcEye(camera),p);
+        let k=clamp(dist*factor,Math.min(ZOOM_NEAR,dist),Infinity)/dist; k=clamp(k,(camera.lowerRadiusLimit||.25)/camera.radius,FOLLOW.max/camera.radius);
+        camera.target.copyFrom(p.add(camera.target.subtract(p).scale(k))); camera.radius*=k;
+      } else camera.radius=clamp(camera.radius*factor,Math.min(FOLLOW.min,camera.lowerRadiusLimit||FOLLOW.min),FOLLOW.max);
+      const g=state.playerAvatar, a=g?.root.position;
+      if(a){
+        let off=camera.target.subtract(new BABYLON.Vector3(a.x,FOLLOW.height,a.z));
+        if(factor>1) off=off.scale(1/Math.pow(factor,4));
+        const home=state.zoomHome?.radius??FOLLOW.radius;
+        if(factor>1 && camera.radius>=home-.05){ off.setAll(0); state.zoomHome=null; }
+        state.followOffset=off.length()>.01?off:null;
+        if(!state.followOffset) camera.setTarget(new BABYLON.Vector3(a.x,FOLLOW.height,a.z),false,false,true);
+      }
+      return;
+    }
+    if(factor<1 && !state.zoomHome) state.zoomHome={free:true,target:camera.target.clone(),radius:camera.radius,alpha:camera.alpha,beta:camera.beta};
     // The free camera zooms about the point under the pointer (a real pick:
     // a character's head, a wall top, the ground): the target first moves
     // along the line of sight to that point's depth (no visible change),
@@ -205,6 +226,27 @@ function setupMouseWheelZoom(camera){
 // be far from what you look at). Eye and target turn rigidly about that
 // point, so it stays put on screen; the angles keep their limits. Babylon's
 // pointer input stays attached for pinch zoom, with its turning switched off.
+// Escape: back to the view from before you zoomed in (any camera), eased.
+function cancelZoom(){
+  const h=state.zoomHome; if(!h) return false; state.zoomHome=null;
+  const cam=state.camera, t0=performance.now(), D=280;
+  const from=h.fp?{fov:fpCam?.fov}:{target:cam.target.clone(),radius:cam.radius,alpha:cam.alpha,beta:cam.beta};
+  if(h.follow) state.followOffset=null;
+  const obs=state.scene.onBeforeRenderObservable.add(()=>{
+    const u=Math.min(1,(performance.now()-t0)/D), k=1-Math.pow(1-u,3);
+    if(h.fp){ if(fpCam) fpCam.fov=from.fov+(h.fov-from.fov)*k; if(h.yaw!=null){ state.fpYaw=h.yaw; state.fpPitch=h.pitch; } }
+    else if(h.follow){ cam.radius=from.radius+(h.radius-from.radius)*k; }
+    else { cam.setTarget(BABYLON.Vector3.Lerp(from.target,h.target,k),false,false,true); cam.radius=from.radius+(h.radius-from.radius)*k; cam.alpha=from.alpha+(h.alpha-from.alpha)*k; cam.beta=from.beta+(h.beta-from.beta)*k; state.zoomFocus=cam.target.clone(); }
+    if(u>=1) state.scene.onBeforeRenderObservable.remove(obs);
+  });
+  return true;
+}
+window.addEventListener('keydown',e=>{
+  if(e.key!=='Escape' || !state.zoomHome) return;
+  const tag=(e.target?.tagName||'').toLowerCase(); if(tag==='input'||tag==='textarea'||tag==='select') return;
+  if(document.querySelector('dialog[open], .menu-open, .tf-menu.open')) return;
+  if(cancelZoom()) e.preventDefault();
+});
 function setupPivotOrbit(camera){
   const pin=camera.inputs?.attached?.pointers;
   if(pin){ pin.buttons=[0]; pin.angularSensibilityX=pin.angularSensibilityY=1e12; }
@@ -399,6 +441,9 @@ function playRig(g,mode,loop=true){
   // seated or lying (uses.js): that clip in place of idle and talk; anything else gets up first
   if(g?.pose){ if(mode==='idle'||mode==='talk'||mode==='sit'||mode==='sleep') { mode='pose_'+g.pose.mode; loop=true; } else if(!/^pose_/.test(mode)) window.tablefolkUses?.standUp(g,true); }
   if(!g?.rigged || g.rigMode===mode) return;
+  // a walk picks up where the last one left off: a grid step is half a stride
+  // or so, and restarting the clip each step played the same half stride over
+  if(g.activeRigAnim && g.rigMode==='walk'){ try{ g._walkFrame=g.activeRigAnim.animatables[0]?.masterFrame; }catch{} }
   if(g.activeRigAnim) g.activeRigAnim.stop();
   const choices={
     idle:['Idle_A','Idle_B','Melee_Unarmed_Idle'],
@@ -426,7 +471,13 @@ function playRig(g,mode,loop=true){
     pickup:['PickUp','Interact'], open:['Interact','PickUp'], pose_sit:['Sit_Chair_Idle','Sit_Floor_Idle'], pose_lie:['Lie_Idle','Sit_Floor_Idle']
   }[g.charModel && mode==='talk' ? 'idle' : mode] || ['Idle_A'];   // people talk without waving
   const ag=pickAnim(g,choices) || pickAnim(g,['Idle_A']);
-  if(ag){ ag.start(loop,1.0,ag.from,ag.to,false); g.activeRigAnim=ag; g.rigMode=mode; }
+  if(ag){
+    // walk and idle ease into each other (no snap from mid-stride to standing)
+    if(mode==='walk'||mode==='idle'){ ag.enableBlending=true; ag.blendingSpeed=.12; }
+    ag.start(loop,1.0,ag.from,ag.to,false);
+    if(mode==='walk' && g._walkFrame!=null && g._walkFrame>ag.from && g._walkFrame<ag.to) try{ ag.goToFrame(g._walkFrame); }catch{}
+    g.activeRigAnim=ag; g.rigMode=mode;
+  }
   g._lastRigAnimName = ag ? ag.name : null;
 }
 function debugRigAnims(g){ try{ console.log('[character rig]', g.id, 'clips:', Object.keys(g.rigAnims||{})); }catch{} }
@@ -3118,7 +3169,31 @@ function startTurnMove(g,d,distance=null){
   zeroMeshMotion(g.collider);
 }
 
-function selectCharacter(g){ state.characters.forEach(x=>x.selected=false); g.selected=true; state.selected=g; state.nextAgentId=g.id; state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); const sel=document.getElementById('agentSelect'); if(sel) sel.value=g.id; log('selected '+g.id); playRig(g,'idle',true); updatePerceptionUI(); try{ window.tablefolk?.onAgentSelected?.(g); }catch{} try{ window.tablefolkTabs?.showIfOpen('character'); }catch{} }
+// Walk up to someone and face them: they become who you talk to (the chat
+// box's "to:"), without a click. Not over a pick you made yourself in the
+// last 12 s (clicking, the "to:" list, E); checked 4 times a second.
+let autoTargetAt=0;
+function autoChatTarget(){
+  const now=performance.now(); if(now-autoTargetAt<250) return; autoTargetAt=now;
+  const g=state.playerAvatar; if(!g || g.defeated || window.TABLEFOLK_TABLETOP) return;
+  if(state.selected && now-(state.manualSelectAt||0)<12000) return;
+  const p=g.logicalPos||g.root.position, y=state.firstPerson?(state.fpYaw??0):null;
+  const fx=y!=null?Math.sin(y):-Math.sin(g.root.rotation.y), fz=y!=null?Math.cos(y):-Math.cos(g.root.rotation.y);
+  let best=null, bd=Infinity;
+  for(const c of state.characters){
+    if(c.defeated || !c.root) continue;
+    const q=c.logicalPos||c.root.position, dx=q.x-p.x, dz=q.z-p.z, d=Math.hypot(dx,dz);
+    if(d>2.8 || d<.05) continue;
+    if((dx*fx+dz*fz)/d<.6) continue;   // within ~53 degrees of where you look
+    if(d<bd){ bd=d; best=c; }
+  }
+  if(!best || best===state.selected) return;
+  state.characters.forEach(x=>x.selected=false); best.selected=true; state.selected=best; state.nextAgentId=best.id;
+  const sel=document.getElementById('agentSelect'); if(sel) sel.value=best.id;
+  const to=document.getElementById('chatTo'); if(to && document.activeElement!==to) to.value=best.id;
+  try{ updatePerceptionUI(); }catch{} try{ window.tablefolk?.onAgentSelected?.(best); }catch{}
+}
+function selectCharacter(g){ state.manualSelectAt=performance.now(); state.characters.forEach(x=>x.selected=false); g.selected=true; state.selected=g; state.nextAgentId=g.id; state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); const sel=document.getElementById('agentSelect'); if(sel) sel.value=g.id; log('selected '+g.id); playRig(g,'idle',true); updatePerceptionUI(); try{ window.tablefolk?.onAgentSelected?.(g); }catch{} try{ window.tablefolkTabs?.showIfOpen('character'); }catch{} }
 // Show/update a streaming bubble for an agent during LLM generation.
 function showStreamingBubble(g, text) {
   if (g?.defeated) return;
@@ -4918,7 +4993,7 @@ function playerStep(dir){
   const lock=window.tablefolkLocks?.lockedAt(nx,nz); if(lock && !window.tablefolkLocks.tryOpen(lock)) { emitBadge(g,'locked'); return false; }
   if(isBlocked(nx,nz) || !hasGroundAt(nx,nz)) { emitBadge(g,'bonk'); return false; }
   startTurnMove(g,dir,Math.hypot(nx-lp.x,nz-lp.z)); g.anim='walk'; playRig(g,'walk',true);
-  setTimeout(()=>{ if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+60);
+  setTimeout(()=>{ if(g.anim==='walk' && !g.turnMove){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+120);
   state.followAvatar=true;
   window.tablefolkPlay?.acted('move');
   return true;
@@ -4983,9 +5058,17 @@ function fpWalk(g,dt){
     if(g.fpCell!==cell){ const was=g.fpCell; g.fpCell=cell; if(was) window.tablefolkPlay?.acted('move'); }
   } else if(g.fpWalking){ g.fpWalking=false; g.anim='idle'; playRig(g,'idle',true); }
 }
+// Third person: a key held down walks on, step after step, with no stop
+// between them (each step starts as the last one ends: continueHeldStep).
+const tpHeld=new Set();
+const TP_KEYS={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
+function continueHeldStep(g){
+  if(g!==state.playerAvatar || state.firstPerson || !tpHeld.size) return;
+  const act=[...tpHeld].pop(); setTimeout(()=>{ if(!g.turnMove && tpHeld.has(act)) playerStep(cameraCardinal(act)); },0);
+}
 function setupPlayerControls(){
-  window.addEventListener('keyup',e=>{ const a=FP_KEYS[e.key.toLowerCase()]; if(a) fpHeld.delete(a); });
-  window.addEventListener('blur',()=>fpHeld.clear());
+  window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(), a=FP_KEYS[k]; if(a) fpHeld.delete(a); const t=TP_KEYS[k]; if(t) tpHeld.delete(t); });
+  window.addEventListener('blur',()=>{ fpHeld.clear(); tpHeld.clear(); });
   window.addEventListener('keydown',e=>{
     const g=state.playerAvatar; if(!g) return;
     const tag=(e.target?.tagName||'').toLowerCase();
@@ -5001,12 +5084,14 @@ function setupPlayerControls(){
       if(act==='right') return turnPlayer(-1);
       fpHeld.add(act); return;   // walked each frame in updateFirstPersonView
     }
-    playerStep(cameraCardinal(act==='fwd'?'fwd':act));
+    tpHeld.delete(act); tpHeld.add(act);   // the latest key leads
+    if(!e.repeat) playerStep(cameraCardinal(act));
   });
 }
 // ---- first-person view ----
 let fpCam=null;
 function setFirstPerson(on){
+  state.zoomHome=null; state.followOffset=null;
   const sc=state.scene, g=state.playerAvatar; if(!sc) return;
   if(on && !g) return;
   state.firstPerson=!!on;
@@ -5092,6 +5177,7 @@ function lockCamera(cam,on){
   if(on) cam.panningSensibility=0;   // the target is the avatar's
 }
 function followCameraStart(){
+  state.zoomHome=null; state.followOffset=null;
   const g=state.playerAvatar, cam=state.camera; if(!g || !cam) return;
   state.cameraMode='follow';
   const p=g.root.position;
@@ -5099,6 +5185,7 @@ function followCameraStart(){
   updateFirstPersonButton();
 }
 function freeCameraStart(){
+  state.zoomHome=null; state.followOffset=null;
   const cam=state.camera; if(!cam) return;
   state.cameraMode='overview'; lockCamera(cam,false); window.tablefolkCutaway?.clear();
   // a good part of the board, not all of a big one, eased onto the avatar
@@ -5133,8 +5220,9 @@ function followAvatarCamera(dt){
   if(!g || !cam || state.firstPerson) return;
   const p=g.root.position;
   if(state.cameraMode==='follow'){
-    cam.setTarget(BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(p.x,FOLLOW.height,p.z),Math.min(1,dt*7)),false,false,true);
-    cam.radius=clamp(cam.radius,FOLLOW.min,FOLLOW.max); state.followRadius=cam.radius;
+    const want=new BABYLON.Vector3(p.x,FOLLOW.height,p.z); if(state.followOffset) want.addInPlace(state.followOffset);
+    cam.setTarget(BABYLON.Vector3.Lerp(cam.target,want,Math.min(1,dt*7)),false,false,true);
+    cam.radius=clamp(cam.radius,state.followOffset?.25:FOLLOW.min,FOLLOW.max); if(!state.zoomHome) state.followRadius=cam.radius;
     // the cut is shaped for a view from the south; turned away, half walls
     const lp=g.logicalPos||p, off=Math.abs(Math.atan2(Math.sin(cam.alpha-FOLLOW.alpha),Math.cos(cam.alpha-FOLLOW.alpha)));
     if(off<.5) window.tablefolkCutaway?.update(lp.x,lp.z); else window.tablefolkCutaway?.half();
@@ -5628,11 +5716,11 @@ function updateCompassHUD(){
   const charFacing=character ? facingNameFromDir(character.dir)[0].toUpperCase() : '—';
   compassHud.querySelector('small').textContent='camera '+name+' · character '+charFacing+' · N=-Z E=-X';
 }
-function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
+function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); autoChatTarget(); updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
       if(g.turnMove.path){ const pp=pathPoint(g.turnMove,k); p=pp.p; if(pp.dir.lengthSquared()>1e-6) setCharacterFacing(g,legFacing(pp.dir)); } else p=BABYLON.Vector3.Lerp(g.turnMove.start,g.turnMove.end,k);
       // Walked off the island: fall instead of hovering over the sea.
       if(!hasGroundAt(p.x,p.z)){ const tm=g.turnMove, len=BABYLON.Vector3.Distance(tm.start,tm.end)||1; g.lastSafePos=tm.start.clone(); startFall(g,tm.end.subtract(tm.start).scale(clamp(len/tm.dur,1.4,3.4)/len)); continue; }
-      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
+      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); continueHeldStep(g); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
     const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=bodyYaw(g,dt); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
     else if(g.anim==='panic'){ g.root.rotation.y+=Math.sin(g.t*28)*.055; g.arms[0].rotation.z=.92+Math.sin(g.t*21)*.5; g.arms[1].rotation.z=-.92-Math.sin(g.t*19)*.5; g.head.scaling.x=1.06; }
     else if(g.anim==='talk'){ g.head.scaling.y=1+Math.sin(g.t*24)*.065; g.arms[0].rotation.z=.44; g.arms[1].rotation.z=-.44; }

@@ -73,8 +73,16 @@
     }
     const torch = !!(g && window.tablefolkDark?.carriesTorch(g));
     if (torch && !rig.torch && window.tablefolkDark?.torchMesh) {
-      const t = window.tablefolkDark.torchMesh(); t.root.parent = rig.l; t.root.position.set(0, -.04, .02); t.root.rotation.set(.18, 0, -.12); t.root.scaling.setAll(.72);
-      prep(t.root); if (t.ps) t.ps.renderingGroupId = 1; rig.torch = t;
+      // Held low at the left edge and toned down: a flame this near the lens
+      // filled the view with glow (2026-11-14): no glow layer on it, a dimmer
+      // flame of its own, fewer and fainter sparks.
+      const t = window.tablefolkDark.torchMesh(); t.root.parent = rig.l; t.root.position.set(-.03, -.1, .02); t.root.rotation.set(.12, 0, -.2); t.root.scaling.setAll(.6);
+      prep(t.root);
+      const fm = new BABYLON.StandardMaterial('fp_torch_fire', rig.sc); fm.emissiveColor = C3(.62, .34, .1); fm.diffuseColor = C3(0, 0, 0); fm.disableLighting = true; fm.alpha = .7;
+      t.flame.material = fm;
+      for (const m of t.root.getChildMeshes(false)) try { state.glowLayer?.addExcludedMesh(m); } catch {}
+      if (t.ps) { t.ps.renderingGroupId = 1; t.ps.emitRate = 28; t.ps.color1.scaleInPlace(.45); t.ps.color2.scaleInPlace(.45); t.ps.maxSize = .05; }
+      rig.torch = t;
     } else if (!torch && rig.torch) { rig.torch.root.dispose(false, false); rig.torch = null; }
     return { w, torch };
   }

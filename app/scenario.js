@@ -952,6 +952,7 @@
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
       speech: s.speech === false ? false : null,
       memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
+      surroundings: ['forest', 'fields', 'none'].includes(s.surroundings) ? s.surroundings : null,   // surroundings.js: beyond the board's edge
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: s.brain === 'none' ? 'none' : typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
@@ -1181,6 +1182,7 @@
       try { history.replaceState(null, '', '#s=' + code); } catch {}
     }
     window.tablefolkDark?.start(scn.dark);
+    window.tablefolkSurroundings?.start(scn).catch?.(e => console.warn('[surroundings]', e));
     placePads(world.links);
     try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title, live: !!base.live, sub: !!opts.sub } })); } catch {}
     if (opts.sub) { renderBanner(); return { scenario: base, plan }; }
@@ -1265,7 +1267,7 @@
 
   async function exitScenario() {
     const w = W();
-    stopChecker(); active = null; frames.length = 0; clearPads(); world = { base: null, scn: null, links: [] }; renderBanner(); hideEnd();
+    stopChecker(); active = null; frames.length = 0; clearPads(); world = { base: null, scn: null, links: [] }; renderBanner(); hideEnd(); window.tablefolkSurroundings?.clear();
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
     w.setWallHeight?.(1);
@@ -1326,7 +1328,7 @@
   let linkView = null;
   function startView(scn) {
     const q = new URLSearchParams(location.search).get('view') ?? linkView;
-    return VIEWS.includes(q) ? q : scn.view || 'overview';
+    return VIEWS.includes(q) ? q : scn.view || (scn.player === false || scn.noPlayer ? 'overview' : 'follow');   // the follow camera by default (2026-11-14)
   }
   function wantIntro(scn) {
     const q = new URLSearchParams(location.search).get('intro') ?? linkIntro;

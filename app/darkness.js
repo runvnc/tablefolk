@@ -25,6 +25,7 @@
  * gridKey, charInventory, addLampPool); off in tabletop mode.
  */
 (function () {
+  const C3 = (r, g, b) => new BABYLON.Color3(r, g, b);
   const FLAT_H = 2.5, FOG_H = 2.7, DIM_H = .04, VIEW = 13, NEAR = 1.5, TORCH_R = 5;
   // light radius (cells) of objects that light a room, by type
   const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8, crystal_ball: 2.2, scrying_pool: 2.2, rune_circle: 1.2 };
@@ -151,7 +152,7 @@
     const sc = state.scene; if (!sc || !!fpFog === want) return;
     if (want) {
       fpFog = { mode: sc.fogMode, density: sc.fogDensity, color: sc.fogColor.clone(), clear: sc.clearColor.clone() };
-      sc.fogMode = BABYLON.Scene.FOGMODE_EXP2; sc.fogDensity = .14; sc.fogColor = C3(0, 0, 0); sc.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+      sc.fogMode = BABYLON.Scene.FOGMODE_EXP2; sc.fogDensity = .085; sc.fogColor = C3(0, 0, 0); sc.clearColor = new BABYLON.Color4(0, 0, 0, 1);   // .085, was .14: the room went black 3 cells ahead, where the follow camera shows the torch's 5
     } else {
       sc.fogMode = fpFog.mode; sc.fogDensity = fpFog.density; sc.fogColor = fpFog.color; sc.clearColor = fpFog.clear; fpFog = null;
     }
@@ -174,7 +175,6 @@
   }
 
   // ---- carried torches ----
-  const C3 = (r, g, b) => new BABYLON.Color3(r, g, b);
   let torchMats = null;
   function torchMesh() {
     const sc = state.scene, root = new BABYLON.TransformNode('carried_torch', sc);
