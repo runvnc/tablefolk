@@ -67,6 +67,10 @@ if rot:
     new.data.transform(Matrix.Rotation(rot, 4, 'Z')); nv = [v.co.copy() for v in new.data.vertices]; nlo, nhi = box(nv)
 if head_sign(nv, oax) != head_sign(ov, oax) or FLIP:
     new.data.transform(Matrix.Rotation(math.pi, 4, 'Z')); nv = [v.co.copy() for v in new.data.vertices]; nlo, nhi = box(nv)
+# --tip / --tip-back: the old body lies along Z, not Y (the farm-pack sheep's
+# rig): tip the new mesh 90 degrees about X so its length follows
+if '--tip' in argv or '--tip-back' in argv:
+    new.data.transform(Matrix.Rotation((1 if '--tip' in argv else -1) * math.pi / 2, 4, 'X')); nv = [v.co.copy() for v in new.data.vertices]; nlo, nhi = box(nv)
 print('[reskin] old axis', 'XY'[oax], 'head', head_sign(ov, oax), 'turned', rot, 'old box', tuple(round(x, 3) for x in (ohi - olo)), 'new box', tuple(round(x, 3) for x in (nhi - nlo)))
 # per-axis fit to the old body's box
 s = Vector(((ohi.x - olo.x) / (nhi.x - nlo.x), (ohi.y - olo.y) / (nhi.y - nlo.y), (ohi.z - olo.z) / (nhi.z - nlo.z)))
