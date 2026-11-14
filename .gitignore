@@ -32,3 +32,4 @@ cloud/.wrangler/
 
 # npm packages of libs/ (tools/libs.mjs build)
 /dist/
+__pycache__/
