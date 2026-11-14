@@ -49,7 +49,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261108a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261114c'],
+    ['app.js?v=20261114d'],
     ['scenery.js?v=20261108h'],
     ['combat.js?v=20261114a'],
     ['spells.js?v=20261108k'],
@@ -68,8 +68,9 @@
     ['mind.js?v=20261113a'],
     ['uses.js?v=20261114a'],
     ['roles.js?v=20261024a'],
-    ['play.js?v=20261113d'],
-    ['live.js?v=20261114a'],
+    ['play.js?v=20261114a'],
+    ['animals.js?v=20261114c'],
+    ['live.js?v=20261114b'],
     ['director.js?v=20261025zc'],
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261113a'],
@@ -84,7 +85,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261114a', 'module'],
+    ['llm_js/world-integration.js?v=20261114b', 'module'],
   ];
 
   function browserSummary() {

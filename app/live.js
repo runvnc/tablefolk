@@ -53,6 +53,16 @@
   }
   // an animal (play.js ANIMALS, no brain): ambles about, grazes, looks around
   async function animalTurn(c) {
+    // fed, or a dog called along (animals.js): it walks after you
+    const lead = window.tablefolkAnimals?.following(c);
+    if (lead && !lead.defeated) {
+      const a = posOf(c), b = posOf(lead);
+      if (Math.hypot(a.x - b.x, a.z - b.z) > 1.8) {
+        const leg = findRoute(new BABYLON.Vector3(a.x, 0, a.z), new BABYLON.Vector3(Math.round(b.x), 0, Math.round(b.z)));
+        if (leg?.length > 1) { const steps = leg.slice(0, Math.min(3, leg.length - 1)); startTurnPath(c, steps); c.anim = 'walk'; playRig(c, 'walk', true); setTimeout(() => { if (c.anim === 'walk' && !c.turnMove) { c.anim = 'idle'; playRig(c, 'idle', true); } }, c.turnMove.dur * 1000 + 120); await sleep(c.turnMove.dur * 1000 + 150); }
+      }
+      return;
+    }
     const r = Math.random();
     // now and then a moo, a bray, a bark (reactions.js voice banks; quiet with distance)
     if (Math.random() < .18) try { window.tablefolkReact?.voice(c, 'call'); } catch {}
@@ -79,6 +89,8 @@
   function tempo() { const idle = (performance.now() - lastPlayerAt) / 1000; return idle < 30 ? .6 : idle > 180 ? 1.7 : 1; }
   const rand = ([a, b]) => a + Math.random() * (b - a);
   function schedule(c, first = false) {
+    // a follower (animals.js) keeps up: a turn every second or two
+    if (window.tablefolkAnimals?.following(c)) { nextAt.set(c, performance.now() + 900 + Math.random() * 700); return; }
     const k = (seenByPlayer(c) ? 1 : 2) * tempo();
     nextAt.set(c, performance.now() + rand(P0().turn) * 1000 * k * (first ? Math.random() : 1));
   }

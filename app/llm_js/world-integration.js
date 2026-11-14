@@ -1213,7 +1213,7 @@ async function main() {
     let text = input?.value?.trim();
     if (!text) return;
     // "/attack gob1", "/wield sword": the player's own actions (combat.js).
-    if (text.startsWith('/') && (window.tablefolkCombat?.playerCommand(text) || window.tablefolkSkills?.playerCommand(text))) { input.value = ''; return; }
+    if (text.startsWith('/') && (window.tablefolkCombat?.playerCommand(text) || window.tablefolkSkills?.playerCommand(text) || window.tablefolkAnimals?.playerCommand(text))) { input.value = ''; return; }
     // a menu is open (menus.js): the words pick one of its choices (typed or said)
     if (window.tablefolkMenu?.active) { input.value = ''; window.tablefolkMenu.offer(text); return; }
     // "@bram hello" talks to bram (and selects him) whoever is selected.

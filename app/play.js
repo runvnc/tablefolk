@@ -174,6 +174,8 @@
     if (!u) { toast('Nothing to use here. Walk up to a chest, a bed, a seat, an item or a person and press E.'); return; }
     if (u.kind === 'person') {
       selectCharacter(u.thing);
+      // an animal: its actions (animals.js: milk, shear, pet, feed...)
+      if (window.tablefolkAnimals?.isBeast(u.thing) && window.tablefolkAnimals.menu(u.thing)) return;
       const to = document.getElementById('chatTo'); if (to) to.value = u.thing.id;
       // a character with a menu (menus.js): its choices; typing or speaking still works
       const menu = getBrainConfig(u.thing.id)?.menu;

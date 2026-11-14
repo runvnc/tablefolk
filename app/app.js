@@ -4677,6 +4677,13 @@ async function spawnAt(type, x, z) {
 function plasticFinish(m,{coat=.6,coatRough=.1,rough=null}={}){
   if(!(m instanceof BABYLON.PBRMaterial)) return m;
   if(rough!==null) m.roughness=rough;
+  // Light quality has no post effects to soften highlights: a 0.1 coat on
+  // small facets (pine needles, leaves) lit up single pixels, a scatter of
+  // little glowing dots instead of a sheen (2026-11-14). Specular
+  // anti-aliasing widens a highlight where the surface turns fast, and the
+  // coat is a little less sharp there.
+  m.enableSpecularAntiAliasing=true;
+  if(window.TABLEFOLK_GFX?.lite) coatRough=Math.max(coatRough,.3);
   m.clearCoat.isEnabled=true; m.clearCoat.intensity=coat; m.clearCoat.roughness=coatRough;
   m.environmentIntensity=Math.max(m.environmentIntensity||0,.85);
   return m;
