@@ -3352,6 +3352,8 @@ function parseLLMCommandLine(line){
   const name=m[1].toLowerCase();
   let arg=m[2].trim();
   if((arg.startsWith('"')&&arg.endsWith('"'))||(arg.startsWith("'")&&arg.endsWith("'"))) arg=arg.slice(1,-1);
+  // say(eat(bread)): a small model wrapped a command in speech; run the command
+  if(name==='say' && /^(eat|use|take|put|give|wield|attack|walk|emote|remember|goal|sell|close)\([^()]*\)$/i.test(arg)) return parseLLMCommandLine(arg);
   if(name==='say') return {kind:'say',text:arg||'...'};
   if(name==='whisper') return {kind:'whisper',text:arg||'...'};
   if(name==='walk') return parseWalkDestination(arg);
