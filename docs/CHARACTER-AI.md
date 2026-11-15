@@ -81,6 +81,5 @@ with sight are in the picker but not yet run on a card big enough for them.
    scoring pass.
 5. **A stable prompt prefix** to cut LiteRT rebuilds: measure the cache reuse
    first.
-6. **A director that knows the minds**: director.js already makes things
-   happen; its events could come from secrets, agendas and gossip (a rumour
-   about the buried silver, a rival's move).
+6. **A director that knows the minds**: started 2026-11-15 (agendas,
+   secrets, rumours as events); next, events that move a story forward.

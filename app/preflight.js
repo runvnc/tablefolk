@@ -71,7 +71,7 @@
     ['play.js?v=20261115c'],
     ['animals.js?v=20261114c'],
     ['live.js?v=20261115a'],
-    ['director.js?v=20261025zc'],
+    ['director.js?v=20261115b'],
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261113a'],
     ['online-brain.js?v=20261112b'],

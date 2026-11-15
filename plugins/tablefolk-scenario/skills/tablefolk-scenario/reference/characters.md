@@ -280,6 +280,10 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   things and places around it and what it remembers; they become its goals
   in turn (up to 10 turns each, or until it sets its own). `"plans": false`
   turns it off.
+- **The director knows the minds**: in a living world, about one director
+  event in three (when there is material) comes from the characters: a
+  chance at what one is quietly after, unease about its secret, or a rumour
+  another character carries (remembered as hearsay).
 - **What worked before**: when a character hands you what you asked for
   (a give or a sale), it remembers the commands that got it there; the next
   similar request puts "Last time this worked: use(chest) -> take(old map,

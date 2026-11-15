@@ -10,7 +10,9 @@
  * some events, made real (a mushroom grows, a coin purse lies on the floor,
  * a note is pushed under the door).
  *
- * The scenario's own events come first: "events": ["A bell rings in the
+ * mind.js material comes first, one time in three when there is any
+ * (fromMind: an agenda's chance, unease about a secret, another's rumour).
+ * The scenario's own events come next: "events": ["A bell rings in the
  * tower.", {"text": "{who} finds a letter addressed to the queen.", "spawn":
  * "note", "note": "Meet me at midnight."}], "{who}" being the character it
  * happens to. Then generic ones, by setting (indoors / outdoors / dungeon).
@@ -75,7 +77,24 @@
     if (s.dark || s.base === 'dungeon') return DUNGEON;
     return walls > 12 ? INDOOR : OUTDOOR;
   }
-  function pick() {
+  // Events from the minds (mind.js): a chance at what the character is
+  // quietly after, unease about its secret, or a rumour another character
+  // carries (it is remembered as hearsay). One time in three when there is one.
+  function fromMind(c) {
+    const M = window.tablefolkMind; if (!c || !M?.mindOf || state.mind === false) return null;
+    const cfg = getBrainConfig(c.id), out = [];
+    if (cfg.agenda) out.push({ text: `{who} notices a chance to ${String(cfg.agenda).replace(/[.!]+$/, '')}.` });
+    if (cfg.secret) out.push({ text: '{who} has the uneasy feeling that someone nearby suspects something.' });
+    for (const o of state.characters) {
+      if (o === c || o.defeated) continue;
+      const e = (M.mindOf(o).mem || []).filter(x => (x.kind === 'event' || x.kind === 'belief') && x.w >= 1.5 && !/^You (sold|gave)/.test(x.text)).pop();
+      if (e) { const said = String(e.text).replace(/\byour\b/gi, o.id + "'s").replace(/\byou\b/gi, o.id); out.push({ text: `{who} overhears a rumour: ${said}`, rumour: said }); }
+    }
+    const fresh = out.filter(e => !used.has(e.text.replace(/\{who\}/g, c.id)) && !used.has(e.text));
+    return fresh.length && Math.random() < .33 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
+  }
+  function pick(c) {
+    const mind = fromMind(c); if (mind) return mind;
     const fresh = l => l.filter(e => !used.has(e.text));
     const own = fresh(scnEvents.filter(e => !Number.isFinite(+e.round)));
     if (own.length && Math.random() < .7) return own[Math.floor(Math.random() * own.length)];
@@ -104,6 +123,7 @@
         makeObject(ev.spawn, cell[0], cell[1], opts);
       } catch (e) { console.warn('[director] spawn', e); }
     }
+    if (ev.rumour) try { window.tablefolkMind?.addMemory?.(c, `You overheard a rumour: ${ev.rumour}`, 1.6, 'heard'); } catch {}
     if (ev.hunger) try { const m = window.tablefolkMind?.mindOf?.(c); if (m) m.hunger = Math.min(1, (m.hunger || 0) + ev.hunger); } catch {}
     // told to it and to whoever is near enough to notice
     const p = posOf(c);
@@ -156,12 +176,12 @@
     // to someone the player can see, when there is someone
     const seen = state.characters.filter(o => !o.defeated && (window.tablefolkDark?.visible?.(posOf(o).x, posOf(o).z) ?? true));
     const target = seen.length ? seen[Math.floor(Math.random() * seen.length)] : c;
-    if (target) happen(target, pick());
+    if (target) happen(target, pick(target));
   }
   function now(text) {
     const list = state.characters.filter(o => !o.defeated); if (!list.length) return null;
     const c = list[Math.floor(Math.random() * list.length)];
-    return happen(c, text ? { text } : pick());
+    return happen(c, text ? { text } : pick(c));
   }
   window.tablefolkDirector = { tick, now, happen };
 })();
