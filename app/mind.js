@@ -89,7 +89,7 @@
     const k = memKey(g); if (!k) return;
     try {
       const v = JSON.parse(localStorage.getItem(k) || 'null'); if (!v) return;
-      if (v.pf) m.pf = { ...v.pf, met: 0, last: 0, visits: (v.pf.visits || 1) + 1, talks: v.pf.talks || 0 };
+      if (v.pf) m.pf = { ...v.pf, met: 0, last: 0, gap: 0, visits: (v.pf.visits || 1) + 1, talks: v.pf.talks || 0, talksAtStart: v.pf.talks || 0 };
       m.mem = (v.mem || []).map(e => ({ ...e, turn: 0 }));
       if (v.rel) m.rel = v.rel;
       if (typeof v.trust === 'number') m.mood.trust = .5 + (v.trust - .5) * .7;   // a little faded
@@ -191,7 +191,7 @@
   const theirs = t => String(t).replace(/\b(my|mine|me|myself|i'm|i am|i)\b/gi, w => ({ my: 'their', mine: 'theirs', me: 'them', myself: 'themselves', "i'm": "they're", 'i am': 'they are', i: 'they' })[w.toLowerCase()]).replace(/\byou\b/gi, 'you').replace(/\byour\b/gi, 'your');
   function learnFromPlayer(g, text) {
     const pf = pfOf(g), t = String(text || '').trim(); if (!t) return;
-    pf.talks++; pf.last = mindOf(g).turn;
+    const now = mindOf(g).turn; pf.gap = pf.last != null ? now - pf.last : 0; pf.talks++; pf.last = now;
     let r;
     if ((r = t.match(/\b(?:my name is|my name's|call me|i am called|name'?s)\s+([A-Z][\w'-]{1,20})/i)) || (r = t.match(/\b(?:i'?m|i am)\s+([A-Z][a-z'-]{1,20})\b(?![\w\s]*\b(?:years|tired|hungry|sorry|lost|looking|here|fine|good|ok))/))) pf.name = r[1];
     for (const sent of t.split(/(?<=[.!?])\s+/)) {
@@ -219,7 +219,12 @@
     if (pf.kept) bits.push(`kept ${pf.kept === 1 ? 'a promise' : pf.kept + ' promises'} to you`);
     if (pf.gifts.length) bits.push('gave you ' + pf.gifts.slice(-3).join(', '));
     if (pf.hits) bits.push(pf.hits === 1 ? 'hit you once' : `hit you ${pf.hits} times`);
-    return ['About ' + who + ': ' + bits.map(b => b[0].toUpperCase() + b.slice(1)).join('. ') + '.'];
+    const out = ['About ' + who + ': ' + bits.map(b => b[0].toUpperCase() + b.slice(1)).join('. ') + '.'];
+    // back after a while (or another visit) with something still wanted: a
+    // natural thing to ask about, so the character shows it remembers
+    const back = pf.visits > 1 && pf.talks <= (pf.talksAtStart ?? 0) + 1 || (pf.gap || 0) >= 8;
+    if (back && pf.wants.length) out.push(`You could ask ${who} how it is going: ${pf.wants[pf.wants.length - 1]}.`);
+    return out;
   }
 
   // ---- how much the game does for it, by the size of its brain ----
@@ -355,7 +360,14 @@
   }
   // a free cell about 4 steps straight away from the foe (else the player, an ally)
   function fleeSpot(g, foe) {
-    const a = posOf2(g), b = posOf2(foe); let dx = a.x - b.x, dz = a.z - b.z; const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+    const a = posOf2(g), b = posOf2(foe);
+    // toward the player when the player is further from the foe: help is there
+    const pl = state.playerAvatar;
+    if (pl && !pl.defeated && dist2(pl, foe) > dist2(g, foe) + 1) {
+      const p = posOf2(pl);
+      for (const [ox, oz] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) { const x = Math.round(p.x) + ox, z = Math.round(p.z) + oz; try { if (cellPassable(x, z) && !occupantAt(x, z, g) && Math.hypot(x - b.x, z - b.z) > dist2(g, foe)) return `${x},${z}`; } catch { break; } }
+    }
+    let dx = a.x - b.x, dz = a.z - b.z; const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
     for (const k of [5, 4, 3]) for (const rot of [0, .5, -.5, 1, -1]) {
       const c = Math.cos(rot), sn = Math.sin(rot), x = Math.round(a.x + (dx * c - dz * sn) * k), z = Math.round(a.z + (dx * sn + dz * c) * k);
       try { if (cellPassable(x, z) && !occupantAt(x, z, g)) return `${x},${z}`; } catch { return null; }

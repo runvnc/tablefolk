@@ -25,8 +25,13 @@ Estimates given before starting (calibrated: code at a quarter of instinct,
 
 | task | estimate | real | notes |
 |---|---|---|---|
-| A. Player file (what each character knows about the player) | 10 min + 1 test round | | |
-| B. Reflection on sleep/every N turns, memories tagged saw/heard/guessed | 15 min + 1 round | | |
-| C. Gossip between characters, secrets and agendas | 15 min + 1 round | | |
-| D. Survival for E4B: monsters that hunt characters, hunger, fight/flee options, tiers by brain size, survival eval | 35 min + 3 rounds | | |
-| E. E4B and 12B with sight in the picker; sight feeds memory | 10 min (+ 3.7 GB download) | | |
+| A. Player file (what each character knows about the player) | 10 min + 1 test round | ~2 min code (01:05-01:07) | node unit checks; model eval queued |
+| B. Reflection on sleep/every N turns, memories tagged saw/heard/guessed | 15 min + 1 round | ~2 min code | belief counting needed a second pass (repeats were deduplicated before they could be counted) |
+| C. Gossip between characters, secrets and agendas | 15 min + 1 round | ~1 min code (with B) | |
+| D. Survival for E4B: monsters that hunt characters, hunger, fight/flee options, tiers by brain size, survival eval | 35 min + 3 rounds | code 3 min (01:08-01:11); first E4B result 01:16 incl. a 2.8 GB download | found a real bug: a turn saved stale settings over blows and wield(); the test's wait condition read banner text instead of its class |
+| E. E4B and 12B with sight in the picker; sight feeds memory | 10 min (+ 3.7 GB download) | ~2 min (download not done) | |
+
+Note: everything A-E was coded in about 10 minutes of wall clock; the
+time went to model evals (each survival run 1-3 minutes with E4B) and to
+a full disk (another session's 3D work filled /mnt/files at 01:17;
+freed at 01:19).
