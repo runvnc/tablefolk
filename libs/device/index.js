@@ -30,10 +30,10 @@
 //   recommendModel(hw, [{ key: 'small', needGB: 2, readGB: 1 }, { key: 'big', needGB: 6, readGB: 2.3 }], 'small')
 //                                        // the biggest model that fits and is fast enough; hw.choiceWhy says why
 //   noteBrainSpeed(key, chars, seconds)  // after a reply: a model measured too slow is not picked again
-//   hw.vramOptions, hw.vramAsk           // a card sold with more than one memory size ([8, 16]) and
-//   setCardMemory(hw.gpu, 16)            //   not told apart here: ask the player, keep it, reload
+//   hw.vramOptions, hw.vramAsk           // a card sold with more than one memory size ([8, 16]): told
+//   setCardMemory(hw.gpu, 16)            //   apart by a probe (probeHolds), else ask the player, keep it, reload
 // Kept in localStorage (prefix from @tablefolk/models configure(), 'tablefolk'
-// by default): GpuBandwidth (30 days), BrainSpeed and CardGB:<card name>.
+// by default): GpuBandwidth (30 days), BrainSpeed, CardProbe and CardGB:<card name>.
 import { local } from '../models/index.js';
 let tablePromise = null;
 const table = () => tablePromise ||= fetch(new URL('./gpu-memory.json', import.meta.url)).then(r => r.json()).catch(() => ({ vram: {}, aliases: {}, integrated: [] }));
@@ -116,7 +116,51 @@ export function cardVariants(name, t) {
 const VARIANT_BW = { 'geforce rtx 3060': [300, 12] };
 // What the player said their card has (Settings, or the download prompt): kept per card name
 const CARD_KEY = 'CardGB:';
+// ?memprobe=0 (or localStorage <prefix>NoMemProbe '1'): no probe, the smaller size and the question
+const noProbe = () => { try { return new URLSearchParams(globalThis.location?.search || '').get('memprobe') === '0' || local.get('NoMemProbe') === '1'; } catch { return false; } };
 export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY + gpu, String(gb)); else local.remove(CARD_KEY + gpu); } }
+
+// Whether the card holds more than `gb` GB: allocate that much in 256 MB
+// buffers, clear each (so it really lands on the card) and copy through the
+// last. On Vulkan (Linux, Android) a card that is full refuses the buffer
+// (out-of-memory); on Windows the driver may page it out to system memory
+// instead, and copies through it fall to bus speed (~25 GB/s against the
+// card's 150+). true: it held; false: refused, spilled, lost or too slow;
+// null: not measured. Under a second on the card, and freed at once. Kept per
+// card and browser like the bandwidth (CardProbe).
+const PROBE_KEY = 'CardProbe';
+export async function probeHolds(adapter, gb, sig, bwGBs = null) {
+  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && typeof c.holds === 'boolean') return c.holds; } catch {}
+  const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
+  let dev = null, holds = null, lost = false;
+  try {
+    dev = await adapter.requestDevice();
+    dev.lost.then(() => { lost = true; });
+    const t0 = performance.now();
+    holds = true;
+    for (let i = 0; i < n; i++) {
+      dev.pushErrorScope('out-of-memory');
+      const b = dev.createBuffer({ size: CH, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+      const e = dev.createCommandEncoder(); e.clearBuffer(b); dev.queue.submit([e.finish()]);
+      bufs.push(b);
+      if (await dev.popErrorScope() || lost) { holds = false; break; }
+      if (i % 8 === 7) await dev.queue.onSubmittedWorkDone();
+      if (performance.now() - t0 > 6000) { holds = false; break; }   // paging: far slower than the card
+    }
+    if (holds) {
+      await dev.queue.onSubmittedWorkDone();
+      // copies between the first and the last buffer: still at the card's speed?
+      const t = performance.now(), e = dev.createCommandEncoder();
+      for (let k = 0; k < 4; k++) e.copyBufferToBuffer(bufs[k % 2 ? 0 : bufs.length - 1], 0, bufs[k % 2 ? bufs.length - 1 : 0], 0, CH);
+      dev.queue.submit([e.finish()]); await dev.queue.onSubmittedWorkDone();
+      const gbs = 2 * 4 * CH / ((performance.now() - t) / 1000) / 1e9;
+      if (lost || gbs < Math.max(40, (bwGBs || 0) * .3)) holds = false;
+    }
+  } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : null; }
+  finally { for (const b of bufs) try { b.destroy(); } catch {} try { dev?.destroy(); } catch {} }
+  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, at: Date.now() });
+  return holds;
+}
 
 // phone | tablet | computer | xr, from the client hints' form factors, else
 // the user agent (an iPad passes for a Mac but has a touch screen)
@@ -223,8 +267,13 @@ export function detectHardware() {
       const opts = cardVariants(gpu, t);
       if (opts.length) {
         hw.vramOptions = opts;
-        const said = +local.get(CARD_KEY + gpu), bw = VARIANT_BW[String(gpu).toLowerCase()];
+        const said = +local.get(CARD_KEY + gpu), bw = VARIANT_BW[String(gpu).toLowerCase()]; let held;
         if (opts.includes(said)) { hw.vramGB = said; hw.memWhy = 'as you said (it comes with ' + opts.join(' or ') + ' GB)'; }
+        else if (adapter && hw.cls === 'computer' && !noProbe() && typeof (held = await probeHolds(adapter, opts[0] + Math.min(1, (opts[1] - opts[0]) / 3), [hw.renderer, hw.adapter].join('|'), hw.bwGBs)) === 'boolean') {
+          hw.vramGB = held ? opts[1] : opts[0]; hw.memProbed = true;
+          hw.memWhy = `measured: it ${held ? 'holds more than' : 'does not hold'} ${opts[0]} GB (it comes with ${opts.join(' or ')} GB)`;
+          if (opts.length > 2 && held) hw.vramAsk = true;
+        }
         else if (bw && hw.bwGBs) { hw.vramGB = hw.bwGBs * 1.6 >= bw[0] ? bw[1] : opts[0]; hw.memWhy = `from its measured bandwidth (${hw.bwGBs} GB/s; it comes with ${opts.join(' or ')} GB)`; }
         else { hw.vramGB = opts[0]; hw.vramAsk = true; hw.memWhy = `it comes with ${opts.join(' or ')} GB; ${opts[0]} assumed until you say which`; }
       }
