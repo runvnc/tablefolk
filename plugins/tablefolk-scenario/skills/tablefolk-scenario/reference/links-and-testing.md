@@ -12,6 +12,29 @@
 - `?scenario=<url>`: fetch the JSON from a URL (it must allow CORS), for large
   or hosted scenarios.
 - A link works on any host serving the app (`/app/`).
+
+## World files: a picture or a .zip
+
+Chat apps and some sites cut long links short or drop the part after `#`.
+A world can travel as a file instead (`app/world-file.js`; the world
+builder's **Share as a picture**, **.zip** and **.json**, and the same in the
+Scenario pane). Drop the file on the game or the world builder, or use
+**open a world file** / **Open a file**, to open it; the game puts its `#s=`
+link in the address bar.
+
+- **The picture** (PNG, 1200 x 675, about 0.8 MB): a card with the title,
+  the characters, the map and how to open it, with the whole world inside
+  it twice: in a private PNG chunk `tfWd` (the JSON, deflated) and in the
+  two low bits of each pixel's red, green and blue (`TFW1`, the length, a
+  CRC-32, the same data). So it still opens when a site strips the PNG's
+  metadata or re-saves it losslessly; a site that turns it into a JPEG
+  loses the world, and the page says so. Send the file itself (as a file
+  or a document, not a photo that the app may shrink).
+- **The .zip**: `world.json`, its voices as `voices/<id>.ogg` and its
+  pictures as `media/<n>.<ext>` (each named in `world.json` as
+  `"zip:<path>"`), and a `README.txt`. A zip with a single `.json` in it
+  opens too.
+- A `.json` file, or a text with a `#s=` link in it, opens the same way.
 - Players can decode and edit a link to "win". Fine for sharing; leaderboards
   would have to replay recorded turns on a server.
 

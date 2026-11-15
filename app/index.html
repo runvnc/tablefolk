@@ -272,6 +272,11 @@
         <button id="scnFromWorld" type="button">from current world</button><button id="scnToAscii" type="button" title="Rewrite this scenario's objects, floor and positions as an ASCII grid (top = north)">→ ASCII grid</button>
         <button id="scnCopyLink" type="button">copy link</button>
       </div>
+      <div class="row">
+        <button id="scnSharePic" type="button" title="A picture of the world with the whole world inside it: send the file itself; the game opens it when it is dropped on the page">share as a picture</button>
+        <button id="scnShareZip" type="button" title="The world as a .zip (world.json, its voices and pictures as files)">download .zip</button>
+        <button id="scnOpenFile" type="button" title="Open a world from a picture, a .zip or a .json (or drop it on the page)">open a world file</button>
+      </div>
       <div id="scnStatus" class="pane-note"></div>
       <div class="section-subtitle">Map</div>
       <label class="personality-label">Describe the place<input id="scnDescribe" type="text" placeholder="a tiny shop with a counter, barrels and a lamp" /></label>
@@ -476,6 +481,6 @@
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261115a"></script>
   <script src="diagnostics.js?v=20261115c"></script>
-  <script src="preflight.js?v=20261115bb"></script>
+  <script src="preflight.js?v=20261115bd"></script>
 </body>
 </html>

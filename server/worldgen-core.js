@@ -302,6 +302,7 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
   <p class="note" id="whereNote"></p>
+  ${view === 'builder' ? '<p class="note">Or <a href="#" id="openWorldFile">open a world file</a> (a picture, .zip or .json shared from Tablefolk), or drop one on this page.</p>' : ''}
   <p id="byoNote" hidden>This site does not pay for the AI that writes worlds: use a model that runs in your browser (free, once downloaded), or your own key (an <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a> account, or your own OpenAI-compatible server).</p>
   <div id="ownBox" class="own" hidden>
     <div class="seg" id="ownProv" role="radiogroup" aria-label="whose model"><button type="button" role="radio" data-p="openrouter">OpenRouter</button><button type="button" role="radio" data-p="custom">OpenAI-compatible server</button></div>
@@ -326,7 +327,7 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
 <div class="card progress" id="card" ${words ? '' : 'hidden'}><div class="row1"><span class="spin" id="spin"></span><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span><span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
 <div id="workspace" hidden>
   <div class="wshead"><div><h2 id="wsTitle"></h2><p class="muted" id="wsSub"></p></div>
-    <div class="acts"><button type="button" class="primary" data-act="play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>Play</button><button type="button" data-act="dev">Play in dev mode</button><button type="button" data-act="table">Print / tabletop</button><button type="button" data-act="copy">Copy link</button><button type="button" data-act="download">Download</button><span id="edmsg" class="muted"></span></div></div>
+    <div class="acts"><button type="button" class="primary" data-act="play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>Play</button><button type="button" data-act="dev">Play in dev mode</button><button type="button" data-act="table">Print / tabletop</button><button type="button" data-act="copy">Copy link</button><button type="button" data-act="sharePic" title="A picture of the world with the whole world inside it (voices and pictures too): send the file itself; the game opens it when it is dropped on the page">Share as a picture</button><button type="button" data-act="zip" title="The world as a .zip: world.json, its voices and pictures as files">.zip</button><button type="button" data-act="download" title="The world as one JSON file">.json</button><button type="button" data-act="openFile" title="Open a world from a picture, a .zip or a .json (or drop it on the page)">Open a file</button><span id="edmsg" class="muted"></span></div></div>
   <div id="mapEditor"></div>
   <div id="editor" hidden></div>
 </div>`;
@@ -387,7 +388,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115j"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115d"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115l"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

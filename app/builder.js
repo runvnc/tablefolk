@@ -395,6 +395,26 @@
     return next;
   }
 
+  // ---- a world as a file (app/world-file.js): a picture with the world inside, a .zip, a .json ----
+  const WF = () => window.tablefolkWorldFile;
+  function openWorld(s) {
+    if (scn) remember();
+    // the page's own way of asking for changes (worldgen-core.js reviseWith), so Ask works on it too
+    let rv = revise; try { rv = reviseWith(); } catch {}
+    window.tfBuilder.show({ scenario: s, model: 'a file', ms: 0 }, { appLink, revise: rv, opened: true });
+    msg('opened ' + (s.title || 'the world') + ' from a file');
+  }
+  document.addEventListener('click', async e => {
+    if (e.target.id !== 'openWorldFile') return; e.preventDefault();
+    try { openWorld(await WF().pick()); } catch (err) { alert(err.message); }
+  });
+  window.addEventListener('dragover', e => { if ([...(e.dataTransfer?.items || [])].some(i => i.kind === 'file') && !e.target.closest?.('input[type=file]')) e.preventDefault(); });
+  window.addEventListener('drop', async e => {
+    const f = e.dataTransfer?.files?.[0]; if (!f || e.target.closest?.('input[type=file]') || !WF()?.isWorldFile(f)) return;
+    e.preventDefault();
+    try { openWorld(await WF().read(f)); } catch (err) { msg('could not open ' + f.name + ': ' + err.message); if (!scn) alert('could not open ' + f.name + ': ' + err.message); }
+  });
+
   // ---- the map editor ----
   function mapEditor() {
     if (ed || !window.tfMapEditor || !$('mapEditor')) return ed;
@@ -475,6 +495,9 @@
     if (act === 'play' || act === 'dev') window.open(await link(act === 'dev'), '_blank');
     else if (act === 'copy') { await navigator.clipboard.writeText(location.origin + await link(false)); msg('link copied'); setTimeout(() => msg(''), 2500); }
     else if (act === 'download') { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(scn, null, 2)], { type: 'application/json' })); a.download = (scn.title || 'scenario').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.json'; a.click(); }
+    else if (act === 'sharePic') { msg('drawing the picture…'); try { await mapLaidOut(); const shot = await ed?.snapshot?.({ maxSide: 1000 }), blob = await WF().toImage(scn, { picture: shot?.url }); WF().download(blob, WF().fileName(scn, 'png')); msg(`picture saved (${Math.round(blob.size / 1024)} KB): send the file itself; the game opens it when it is dropped on the page`); } catch (err) { msg('failed: ' + err.message); } }
+    else if (act === 'zip') { try { const blob = await WF().toZip(scn); WF().download(blob, WF().fileName(scn, 'zip')); msg(`.zip saved (${Math.round(blob.size / 1024)} KB)`); } catch (err) { msg('failed: ' + err.message); } }
+    else if (act === 'openFile') { try { openWorld(await WF().pick()); } catch (err) { msg(err.message); } }
     else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); mapSoon(); }
     else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); loadMap(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'ask') ask();
@@ -689,7 +712,7 @@
       // the form's "look it over" (?improve=N): the agent starts on the new world
       // (or "always, after every change" is on)
       if (opts.improve > 0 && revise.where !== undefined) { agent.rounds = Math.min(5, +opts.improve); setTimeout(() => improve(agent.rounds), 600); }
-      else if (agent.auto && revise.where !== undefined) setTimeout(() => improve(), 600);
+      else if (agent.auto && revise.where !== undefined && !opts.opened) setTimeout(() => improve(), 600);
     },
     improve, paintPending, pendingPictures, get agent() { return agent; }, get editor() { return ed; },
     get scenario() { return scn; },

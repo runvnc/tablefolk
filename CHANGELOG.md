@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **Share a world as a picture or a .zip**: chat apps often cut long links short. The world builder (and the Scenario pane) can now save a world as a picture: a card with its title, characters and map, with the whole world hidden inside it (voices and pictures too). It still opens if a site strips the picture's metadata, though not if it is turned into a JPEG. A .zip holds the world as `world.json` with its voices and pictures as files. Drop either one on the game or the world builder to open it.
+
 - **Voices of a world's own**: the world builder has a Voices tab. Clone a voice from a file or record yourself, give it to a character, and try a line in it with ZONOS3-Mini. The voice travels inside the world as a short compressed clip (about 35 KB), so anyone who opens the link hears it, with ZONOS3-Mini, Pocket-TTS or Breeze TTS. "Save to my voices" keeps a voice in your browser for every world you make, and voices you cloned in the game's Voice pane show up there too. A character's voice list now also offers the 20 library voices and ZONOS3-Mini's ten built-in ones.
 
 - **Cards sold with more than one memory size are measured**: an RTX 4060 Ti or 5060 Ti (8 or 16 GB), RTX 3060 (8 or 12), RTX 2060 (6 or 12), RX 9060 XT (8 or 16) has the same name either way, and no browser reports a card's memory, so a 16 GB 4060 Ti was taken for 8 GB and given Gemma 4 E4B. The game now measures it once (it briefly fills the card just past the smaller size) and remembers; when it can't tell, the download prompt asks, and the This device pane can change it. A 16 GB RTX 4060 Ti now gets Bonsai 2 27B, and ZONOS3-Mini fits beside it (11.6 GB at the peak).

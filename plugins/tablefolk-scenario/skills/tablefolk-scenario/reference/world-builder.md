@@ -135,7 +135,10 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   may cast it ([characters.md](characters.md), "Voices").
 - The story, player, characters, layout and raw JSON as forms.
 - **Play**, **play in dev mode**, **print / tabletop** (the `?tabletop=1`
-  view in a frame), **copy link**, **download**.
+  view in a frame), **copy link**, **Share as a picture** (a PNG with the
+  whole world inside), **.zip**, **.json**, and **Open a file** (a picture,
+  .zip or .json; or drop one on the page, also before building anything):
+  [links-and-testing.md](links-and-testing.md), "World files".
 
 `/world/?edit=<file>` (admin) edits a saved world from `generated/`.
 

@@ -1810,6 +1810,17 @@ turns: 6`;
       try { const o = normalizeScenario(syncMapIntoJson()); const code = await encodeScenario(o); copy(linkFor(code), 'scenario link'); setStatus(`link is ${linkFor(code).length} characters`); }
       catch (e) { setStatus(e.message, true); }
     });
+    // a world as a file (world-file.js): a picture with the world inside, or a .zip
+    const WF = () => window.tablefolkWorldFile;
+    $('scnSharePic')?.addEventListener('click', async () => {
+      try { const o = normalizeScenario(syncMapIntoJson()); setStatus('drawing the picture…'); const blob = await WF().toImage(readJson(), { picture: await viewPicture() }); WF().download(blob, WF().fileName(o, 'png')); setStatus(`picture saved (${Math.round(blob.size / 1024)} KB): send the file itself; the game opens it when it is dropped on the page`); }
+      catch (e) { setStatus(e.message, true); }
+    });
+    $('scnShareZip')?.addEventListener('click', async () => {
+      try { const o = normalizeScenario(syncMapIntoJson()); const blob = await WF().toZip(readJson()); WF().download(blob, WF().fileName(o, 'zip')); setStatus(`.zip saved (${Math.round(blob.size / 1024)} KB)`); }
+      catch (e) { setStatus(e.message, true); }
+    });
+    $('scnOpenFile')?.addEventListener('click', async () => { try { await openWorld(await WF().pick()); } catch (e) { setStatus(e.message, true); } });
     $('scnGenerate')?.addEventListener('click', async () => {
       const d = ($('scnDescribe')?.value || '').trim(); if (!d) { setStatus('describe the place first', true); return; }
       try {
@@ -1871,6 +1882,29 @@ turns: 6`;
     }
     catch (e) { console.error(e); window.tablefolkToast?.('scenario failed: ' + e.message, { type: 'error' }); }
   }
+  // the 3D view as it is now (a JPEG data URL) for the picture of a world
+  async function viewPicture() {
+    try {
+      const sc = window.BABYLON?.EngineStore?.LastCreatedScene, eng = sc?.getEngine(); if (!eng) return null;
+      eng.beginFrame(); sc.render(); eng.endFrame();
+      return eng.getRenderingCanvas().toDataURL('image/jpeg', .85);
+    } catch { return null; }
+  }
+  // a world from a file (a picture, a .zip, a .json): played, and its link put in the address bar
+  async function openWorld(scn) {
+    const code = await encodeScenario(normalizeScenario(scn));
+    await playScenario(scn, { code }); writeJson(normalizeScenario(scn));
+    try { history.replaceState(null, '', location.pathname + location.search + '#s=' + code); } catch {}
+    window.tablefolkToast?.('opened ' + (scn.title || 'the world'), { type: 'info' });
+  }
+  // dropped on the page (not on a field that takes files itself)
+  window.addEventListener('dragover', e => { if ([...(e.dataTransfer?.items || [])].some(i => i.kind === 'file') && !e.target.closest?.('input[type=file]')) e.preventDefault(); });
+  window.addEventListener('drop', async e => {
+    const f = e.dataTransfer?.files?.[0]; if (!f || e.target.closest?.('input[type=file]') || !window.tablefolkWorldFile?.isWorldFile(f)) return;
+    e.preventDefault();
+    try { await openWorld(await window.tablefolkWorldFile.read(f)); }
+    catch (err) { console.error(err); window.tablefolkToast?.('could not open ' + f.name + ': ' + err.message, { type: 'error' }); }
+  });
   window.addEventListener('hashchange', () => { if (/^#s(cenario)?=/.test(location.hash) && location.hash.slice(3) !== active?.code) openFromUrl({ pasted: true }); });
   function onReady() { refreshThings(); initPane(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
