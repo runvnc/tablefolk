@@ -467,7 +467,12 @@ function buildAgentMessages(world, g, cfg) {
   // dig it out of a long history.
   // a big brain (mind.js tier "ambitious": 9B and up, online models) keeps twice as much
   const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
-  for (const m of hist.slice(-keep)) {
+  // The window moves 8 messages at a time, not one: a window sliding every
+  // turn changed the prompt right after the system message, so the engine's
+  // cached prefix (LiteRT, Bonsai) was lost each turn and the whole prompt
+  // was read again (Bonsai 2 27B on an RTX 3060: 9-14 s a turn).
+  const from = hist.length <= keep ? 0 : Math.floor((hist.length - keep) / 8) * 8;
+  for (const m of hist.slice(from)) {
     const last = messages[messages.length - 1];
     if (last && last.role === m.role) {
       last.content += '\n' + m.content;
@@ -1123,7 +1128,8 @@ async function main() {
       }
       // A new human utterance should not be drowned by old action chatter.
       // Keep it as the latest conversational event after generation as well.
-      if(chatSuffix && cfg.messages?.length>30) cfg.messages=cfg.messages.slice(-30);
+      // trimmed 8 at a time so the prompt's start stays the same between trims (cached prefix)
+      if(chatSuffix && cfg.messages?.length>32) cfg.messages=cfg.messages.slice(-24);
       // Add agent's action as assistant message
       // Its own reply goes into its history as commands: plain text that was
       // spoken is stored as say("..."), so it learns the format from itself.
@@ -1162,7 +1168,7 @@ async function main() {
       if (droppedSpeech) cfg.messages = cfg.messages.concat([{ role: 'user', content: quiet ? 'SYSTEM: You kept quiet this turn; nobody heard that.' : 'SYSTEM: Only your first two lines were spoken. Say less.' }]);
       if (saidPlain && !simple) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
-      if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);
+      if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-32);
       freshen(world, g, cfg);
       world.setBrainConfig(g.id, cfg);
       // Tell every other character what this one did, once, in readable form

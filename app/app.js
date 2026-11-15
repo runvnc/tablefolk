@@ -4369,8 +4369,10 @@ function buildCommandExamples(g=null){
   if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe) - set what you are working toward');
   if(allowed.has('remember')) ex.push('remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later');
   if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
-  if(allowed.has('eat') && g && (charInventory(g).items||[]).some(i=>window.tablefolkMind?.isFood(i.name))) ex.push('eat(food) e.g. eat(bread) - eat food you carry');
-  if(allowed.has('use') && g){ const u=window.tablefolkUses?.exampleLine(g); if(u) ex.push(u); }
+  // the same every turn (this is the cached prompt prefix): what it carries and
+  // what is near it go at the end (commandReminder), not here
+  if(allowed.has('eat') && g) ex.push('eat(food) e.g. eat(bread) - eat food you carry, or drink a potion you carry');
+  if(allowed.has('use') && g) ex.push('use(thing) e.g. use(chest) - use something near you: open a chest, sit on a seat, lie on a bed, work at an anvil');
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
@@ -4484,7 +4486,7 @@ function buildAgentPrompt(g, cfg) {
     'Reply with commands only, one per line. When someone speaks to you, always answer with say(...); if you also act, put the action on the next line.',
     // Thinking on (Character setup, or "thinking": true in a scenario): small
     // reasoning models (LFM3 1.7B) otherwise spend hundreds of tokens per turn
-    ...((getBrainConfig(g.id).thinking === true || window.tablefolkMind?.thinkNow?.(g)) ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),
+    ...(getBrainConfig(g.id).thinking === true ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),
     'Talk like a real person: one or two short sentences at a time.',
     '',
     `Character: ${g.id}`,
@@ -4503,6 +4505,9 @@ function buildAgentPrompt(g, cfg) {
     'SYSTEM: ' + String(perception).slice(0, 2400),
     // senses.js: a short menu of things it could do right here
     ...(window.tablefolkSenses?.hereLine ? [window.tablefolkSenses.hereLine(g)].filter(Boolean) : []),
+    // a concrete use(...) for the thing nearest (it used to sit in the prefix,
+    // which then changed whenever the character moved: no cache reuse)
+    ...(allowedFor(g).has('use') || commandsFor(g).has('use') ? [window.tablefolkUses?.exampleLine(g)].filter(Boolean) : []),
     '',
     // Who it is, near the end where a small model looks hardest: its
     // personality sits at the top of the system prompt, and without this
@@ -4519,6 +4524,9 @@ function buildAgentPrompt(g, cfg) {
     // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
+    // a turn the game chose to think on (mind.js thinkNow): at the end, so the
+    // cached prefix stays the same whether it thinks or not
+    ...(cfg.thinking !== true && window.tablefolkMind?.thinkNow?.(g) ? ['This turn matters: think it through briefly (a few sentences), then stop. Your reply after thinking is commands only, as above.'] : []),
   ].join('\n');
   return { systemMessage: systemOverride(g, cfg, cmds) || systemMessage, commandReminder };
 }
@@ -6326,7 +6334,8 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     // Breeze in the browser shares the GPU with the picture, and must keep up with real
     // time while it speaks: full graphics at 60 fps left it under 0.43x, 15 fps about 1.07x
     // after the first sound (RTX 2060). Graphics pane, localStorage tablefolkSpeakFps; 60 = no cap.
-    if(window.tablefolkTTS?.running && window.tablefolkTTS.engine==='breeze-web'){ const fps=speakFps(); if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
+    // ZONOS3-Mini (zonos-web) is far lighter: capped only when tablefolkSpeakFpsZonos is set.
+    if(window.tablefolkTTS?.running && (window.tablefolkTTS.engine==='breeze-web' || (window.tablefolkTTS.engine==='zonos-web' && localStorage.getItem('tablefolkSpeakFpsZonos')))){ const fps=speakFps(); if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     lastFrameAt=performance.now();
     scene.render(); window.TABLEFOLK_FRAMES=(window.TABLEFOLK_FRAMES||0)+1;
     const dev=engine._device; if(dev?.queue?.onSubmittedWorkDone){ gpuFramesInFlight++; dev.queue.onSubmittedWorkDone().then(()=>gpuFramesInFlight--,()=>gpuFramesInFlight--); }
