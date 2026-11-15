@@ -297,7 +297,7 @@
       // too (a small model takes it and stops: "fetch from the chest" 0/3)
       const heard = String(getBrainConfig(g.id).mind?.heard || '').toLowerCase(), key = String(got).toLowerCase().split(/\s+/).filter(w => w.length > 2 && !/^\d/.test(w));
       if (g !== state.playerAvatar && state.playerAvatar && /\b(bring|fetch|get|give|hand|pass)\b/.test(heard) && key.some(w => heard.includes(w)))
-        setTimeout(() => { try { if (!g.defeated && (charInventory(g).items || []).some(i => i.name === got)) give(g, got); } catch (e) { console.warn('[uses] fetch give', e); } }, 1500);
+        setTimeout(() => { try { if (!g.defeated && (charInventory(g).items || []).some(i => i.name === got)) give(g, got); } catch (e) { console.warn('[uses] fetch give', e); } }, 250);
       return act(g, `${g.id} takes ${got} from the ${nice(o.type)}`, 'pickup', 1300, false);
     });
   }
