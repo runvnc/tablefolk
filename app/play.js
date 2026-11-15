@@ -386,6 +386,10 @@
         // after an attack the player waits for the characters with a mind
         // too (they may strike back, or cast), so blows go turn about
         if (state.playerAttackLock && talking) { setBusy(true, 'the others are deciding…'); await talking; }
+        // a character in a fight (a monster within reach of it) gets its turn
+        // before the monsters strike again: a slow brain (Bonsai 2 27B, a
+        // few seconds a turn) otherwise lost whole rounds to them
+        else if (talking && talkers.some(c => window.tablefolkMind?.foes?.(c, 2.2)?.length)) { setBusy(true, 'the others are deciding…'); await talking; }
         for (const c of fighters) {
           if (c.defeated || me()?.defeated) break;
           setBusy(true, `${c.id}${/s$/.test(c.id) ? "'" : "'s"} turn`);

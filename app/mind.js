@@ -447,7 +447,7 @@
   function potion(g) { return (charInventory(g).items || []).find(i => POTION.test(i.name) && (i.qty ?? 1) > 0)?.name || null; }
   function dangerLines(g) {
     const fs = foes(g); if (!fs.length) return [];
-    const f = fs[0], C = window.tablefolkCombat, me = C?.hpOf(g) || { hp: 10, max: 10 }, fh = C?.hpOf(f) || { hp: 5, max: 5 };
+    const f = fs[0], m = mindOf(g), C = window.tablefolkCombat, me = C?.hpOf(g) || { hp: 10, max: 10 }, fh = C?.hpOf(f) || { hp: 5, max: 5 };
     const d = dist2(g, f), reach = d <= (C?.REACH ?? 1.6) + .05, dir = dirWord(posOf2(f).x - posOf2(g).x, posOf2(f).z - posOf2(g).z);
     const held = getBrainConfig(g.id).wielding, w = bestWeapon(g), pot = potion(g), spot = fleeSpot(g, f);
     const out = [`DANGER: ${f.id} (${String(f.charModel || 'monster').replace(/_/g, ' ')}, ${fh.hp}/${fh.max} health) is ${reach ? 'right next to you' : Math.round(d) + ' steps ' + dir}${fs.length > 1 ? `, with ${fs.length - 1} more nearby` : ''}. You have ${me.hp}/${me.max} health${held ? ', holding ' + held : ''}.`];
@@ -460,6 +460,9 @@
     if (!pot && spot && may('walk') && me.hp <= risk) ch.unshift(`walk("${spot}") - run away now`);
     if (spot && may('walk') && me.hp > risk) ch.push(`walk("${spot}") - run away from it (it may follow)`);
     if (may('say') && state.playerAvatar && !state.playerAvatar.defeated) ch.push(`say("Help! ${f.id} is attacking!") - call for help`);
+    // it was hitting someone who is already down (Bonsai 27B kept at it)
+    const last = String(m.lastLine || '').match(/attack\(\s*"?([\w -]+?)"?\s*\)/)?.[1];
+    if (last && last !== f.id && state.characters.some(c => c.id === last && (c.defeated || getBrainConfig(c.id).defeated))) out.push(`${last} is already down: turn to ${f.id}.`);
     if (ch.length) out.push('Choose one now: ' + ch.join(' | ') + (food(g) ? ` (food such as ${food(g)} does not heal you: not now)` : ''));
     return out;
   }
