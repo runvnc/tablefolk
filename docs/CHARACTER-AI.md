@@ -81,5 +81,6 @@ with sight are in the picker but not yet run on a card big enough for them.
    scoring pass.
 5. **A stable prompt prefix** to cut LiteRT rebuilds: measure the cache reuse
    first.
-6. **A director that pushes**: story beats when things go quiet, not only
-   reactions.
+6. **A director that knows the minds**: director.js already makes things
+   happen; its events could come from secrets, agendas and gossip (a rumour
+   about the buried silver, a rival's move).
