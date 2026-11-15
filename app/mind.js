@@ -92,6 +92,7 @@
       if (v.pf) m.pf = { ...v.pf, met: 0, last: 0, gap: 0, visits: (v.pf.visits || 1) + 1, talks: v.pf.talks || 0, talksAtStart: v.pf.talks || 0 };
       m.mem = (v.mem || []).map(e => ({ ...e, turn: 0 }));
       if (v.rel) m.rel = v.rel;
+      if (Array.isArray(v.recipes)) m.recipes = v.recipes;
       if (typeof v.trust === 'number') m.mood.trust = .5 + (v.trust - .5) * .7;   // a little faded
     } catch {}
   }
@@ -100,7 +101,7 @@
       const m = getBrainConfig(g.id)?.mind, k = m && memKey(g); if (!k) continue;
       if (!m.pf && !m.mem.some(e => e.w >= 2)) continue;
       const mem = m.mem.filter(e => e.w >= 2 || ['belief', 'thought', 'note'].includes(e.kind)).slice(-12).map(({ text, w, kind, n, src, who, pi }) => ({ text, w, kind, n, src, who, pi }));
-      try { localStorage.setItem(k, JSON.stringify({ pf: m.pf, mem, rel: m.rel, trust: m.mood.trust, at: Date.now() })); } catch {}
+      try { localStorage.setItem(k, JSON.stringify({ pf: m.pf, mem, rel: m.rel, trust: m.mood.trust, recipes: m.recipes, at: Date.now() })); } catch {}
     }
   }
   setInterval(persist, 20000);
@@ -205,6 +206,7 @@
       if ((r = sn.match(/\bi(?:'m| am) ((?:a|an|the)\s+[\w\s'-]{2,40}|from\s+[\w\s'-]{2,40})/i))) keep(pf.said, theirs(r[1]));
       else if ((r = sn.match(/\bi (live|work|love|like|hate|fear|have)\s+([\w\s'-]{2,40})/i))) keep(pf.said, ({ have: 'has' }[r[1].toLowerCase()] || r[1].toLowerCase() + 's') + ' ' + theirs(r[2]));
     }
+    if (/\b(bring|fetch|get|give|hand|pass|sell|buy|need|want)\b/i.test(t)) { const mm = mindOf(g); mm.askedAt = mm.turn; mm.askWords = [...new Set(words(t))].slice(0, 8); }
     // something new they want or promise: answered first, this turn
     pf.fresh = (pf.wants.join('|') + '#' + pf.promises.join('|')) !== before ? { want: pf.wants[pf.wants.length - 1], promise: pf.promises[pf.promises.length - 1], turn: mindOf(g).turn } : null;
   }
@@ -494,6 +496,32 @@
     return null;
   }
 
+  // ---- recipes: what worked before ----
+  // A small Voyager-style skill memory. Its last few command lines are kept;
+  // when a give or sale to someone completes what the player had asked for,
+  // the commands since that request are saved as a recipe under the
+  // request's words. A later request that shares two or more words gets
+  // "Last time this worked: walk(chest) -> take(map, chest) -> give(map)".
+  function noteLine(g, line) {
+    const m = mindOf(g), cmds = String(line || '').match(/\b(walk|take|put|use|give|sell|open|wield|eat|close)\([^()]*\)/g);
+    if (!cmds) return;
+    m.recent = [...(m.recent || []), ...cmds.map(c => ({ c, turn: m.turn }))].slice(-8);
+  }
+  function learnRecipe(g) {
+    const m = mindOf(g), ask = m.askedAt, words0 = m.askWords;
+    if (ask == null || !words0?.length) return;
+    const steps = (m.recent || []).filter(x => x.turn >= ask).map(x => x.c);
+    if (!steps.length) return;
+    m.recipes = [...(m.recipes || []).filter(r => r.words.join() !== words0.join()), { words: words0, steps: steps.slice(-5) }].slice(-6);
+    m.askedAt = null;
+  }
+  function recipeLine(g) {
+    const m = mindOf(g); if (!m.recipes?.length || !m.heard) return '';
+    const said = new Set(words(m.heard)); let best = null, bs = 1;
+    for (const r of m.recipes) { const n = r.words.filter(w => said.has(w)).length; if (n > bs) { best = r; bs = n; } }
+    return best ? 'Last time this worked: ' + best.steps.join(' -> ') : '';
+  }
+
   // ---- mood ----
   function push(g, mood, by, why) {
     const m = mindOf(g);
@@ -532,8 +560,10 @@
       push(g, 'joy', .2, `you sold ${d.item}`);
       if (isPlayerName(d.buyer)) m.mood.trust = clamp01(m.mood.trust + .05);
       addMemory(g, `You sold ${d.buyer} ${d.item} for ${d.price} gold.`, 2);
+      if (isPlayerName(d.buyer)) learnRecipe(g);
     } else if (kind === 'gave') {
       addMemory(g, `You gave ${d.to} ${d.item}.`, 1.5);
+      if (isPlayerName(d.to)) learnRecipe(g);
     } else if (kind === 'heard') {
       m.heard = String(d.text || '');
       if (me) learnFromPlayer(g, d.text);
@@ -560,6 +590,7 @@
   function tick(g, line = '') {
     const cfg = getBrainConfig(g.id); if (cfg.defeated) return;
     const m = mindOf(g), b = baseline(cfg);
+    noteLine(g, line);
     m.turn++; m.lastRound = round; m.lastLine = String(line || '');
     // feelings fade over a few turns (a punch is still felt five turns on), trust over many
     for (const k of MOODS) m.mood[k] += (b[k] - m.mood[k]) * .07;
@@ -642,6 +673,7 @@
     if (cfg.goal) { const n = m.turn - m.goalTurn; out.push(`Current goal: ${cfg.goal}` + (n >= 6 ? ` (${n} turns on it: what is the next step?)` : '')); }
     const mem = recall(g, { basic: 3, capable: 4, ambitious: 6 }[tier(g)]); if (mem.length) out.push('You remember: ' + mem.join(' | '));
     const kn = facts(g); if (kn.length) out.push('You know: ' + kn.join(' | '));
+    const rc = !danger.length && recipeLine(g); if (rc) out.push(rc);
     const gl = !danger.length && gossipLine(g); if (gl) out.push(gl);
     out.push(...danger);
     return out;
@@ -724,5 +756,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

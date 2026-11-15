@@ -225,6 +225,13 @@ All in `app/mind.js` unless named.
   (or the player), or 12 turns since the last: `lookFor(g)` (its answer goes
   to pendingChat and memory, kind `saw`). One at a time; not while a plan or
   reflection call runs.
+- **Recipes** (`noteLine`, `learnRecipe`, `recipeLine`): command calls from
+  each turn's line (walk, take, put, use, give, sell, open, wield, eat, close)
+  are kept (last 8); a player request (bring/fetch/get/give/hand/pass/sell/
+  buy/need/want) marks the turn and its words; a `gave` or `sold` to the
+  player saves the commands since then (up to 5) under those words (up to 6
+  recipes, persisted). A later request sharing 2+ words shows the recipe.
+  Unit-checked only (no model eval yet).
 - **Fetching** (uses.js `take`): when the player's last words to it ask to
   bring/fetch/get/give/hand/pass something matching what it took, `give()`
   to the player 1.5 s later.

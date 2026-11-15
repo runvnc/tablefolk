@@ -280,6 +280,10 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   things and places around it and what it remembers; they become its goals
   in turn (up to 10 turns each, or until it sets its own). `"plans": false`
   turns it off.
+- **What worked before**: when a character hands you what you asked for
+  (a give or a sale), it remembers the commands that got it there; the next
+  similar request puts "Last time this worked: use(chest) -> take(old map,
+  chest) -> give(old map)" on its card. Kept between visits too.
 - **What it saw**: with a brain that sees (Gemma 4 E2B, E4B or 12B with
   sight, or an online model with vision on), what it saw when it looked
   stays in its memory. Characters with E4B-class or bigger brains also look
