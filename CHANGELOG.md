@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **Look it over, always**: a toggle beside "Look it over and improve" ("always, after every change") stays on until unticked and runs the agent by itself after every new world and every Ask; rounds, painting and the toggle are remembered in this browser.
+
 - **The world builder looks over its own worlds**: "Look it over and improve" (and "Look it over: N rounds" on the build form) has the AI review the whole map, drawn at once by the map editor as a picture with coordinates (for models that can see) and as text, find problems (people in walls, unreachable rooms, a goal that cannot be won, empty rooms, a stale intro) and ideas, make the changes, and look again, for 1-5 rounds. Each round is logged with the map it saw; what a change lost (a chest, a floor) is shown and handed to the next round to put back. Undo steps back through every change.
 - **Pictures in worlds**: a new `picture` object (a framed painting, a woven tapestry, or an inn's or shop's sign with its name), hanging on a wall or standing on posts; notes can carry a picture (wanted posters, maps); books get painted covers. The world builder paints them in the browser with tiny-sd (Chitra Tiny when the graphics card is full) from a few words: the AI writes those words when it builds or changes a world, and you can paint, repaint or upload in the map editor and the Books tab.
 

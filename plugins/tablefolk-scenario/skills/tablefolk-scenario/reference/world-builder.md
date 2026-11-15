@@ -108,7 +108,9 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   (click to enlarge), what it found and what changed; what a change lost
   (a chest, a floor, a character) is marked and handed to the next round.
   Then, with **then paint the pictures** ticked, the pictures it asked for
-  are painted.
+  are painted. **always, after every change** keeps it on until unticked:
+  every new world and every change asked for is looked over by itself (the
+  rounds, painting and this choice are remembered in this browser).
 - **Pictures** ([things.md](things.md)): signs, paintings, tapestries, notes
   with a picture and book covers are painted in this browser by a small
   image model from their `prompt` (tiny-sd, 512 px, about 0.9 GB once; on a

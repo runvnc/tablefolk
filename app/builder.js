@@ -113,7 +113,7 @@
     box.innerHTML = `${canAsk ? `<fieldset class="ask"><legend>Ask the AI for changes</legend>
         <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
         <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div>
-        <div class="toolbar"><button type="button" data-act="${agent.running ? 'stopImprove' : 'improve'}" title="The AI looks at the whole map (as a picture, if the model can see, and as text), finds problems and things to improve, makes the changes, and looks again">${agent.running ? '■ Stop after this step' : '🔍 Look it over and improve'}</button><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0">rounds <select id="aiRounds">${[1, 2, 3, 4, 5].map(n => `<option${n === agent.rounds ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0"><input type="checkbox" id="aiPaint" ${agent.paint ? 'checked' : ''} style="width:auto;margin:0"> then paint the pictures</label></div>
+        <div class="toolbar"><button type="button" data-act="${agent.running ? 'stopImprove' : 'improve'}" title="The AI looks at the whole map (as a picture, if the model can see, and as text), finds problems and things to improve, makes the changes, and looks again">${agent.running ? '■ Stop after this step' : '🔍 Look it over and improve'}</button><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0">rounds <select id="aiRounds">${[1, 2, 3, 4, 5].map(n => `<option${n === agent.rounds ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0"><input type="checkbox" id="aiPaint" ${agent.paint ? 'checked' : ''} style="width:auto;margin:0"> then paint the pictures</label><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0" title="Stays on until you untick it: every new world and every change you ask for is looked over and improved by itself"><input type="checkbox" id="aiAuto" ${agent.auto ? 'checked' : ''} style="width:auto;margin:0"> always, after every change</label></div>
         ${agent.log.length ? `<ol class="agentlog">${agent.log.map(l => `<li class="${l.kind || ''}">${l.html}</li>`).join('')}</ol>` : ''}</fieldset>` : ''}
       ${paintBar()}
       <div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === tabNow ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
@@ -247,7 +247,11 @@
   }
   // the agent's log: a map snapshot grows when clicked; its options are kept
   document.addEventListener('click', e => { const im = e.target.closest?.('.agentshot'); if (im) im.classList.toggle('big'); });
-  document.addEventListener('change', e => { if (e.target.id === 'aiRounds') agent.rounds = +e.target.value; if (e.target.id === 'aiPaint') agent.paint = e.target.checked; });
+  document.addEventListener('change', e => {
+    const id = e.target.id; if (!['aiRounds', 'aiPaint', 'aiAuto'].includes(id)) return;
+    if (id === 'aiRounds') agent.rounds = +e.target.value; if (id === 'aiPaint') agent.paint = e.target.checked; if (id === 'aiAuto') agent.auto = e.target.checked;
+    saveAgent();
+  });
   // The AI that changes the world sees each book as a short summary (title,
   // author, what it is about), not its text; its answer gets the text back.
   function lightBooks(s) {
@@ -343,7 +347,7 @@
     else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); mapSoon(); }
     else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); loadMap(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'ask') ask();
-    else if (act === 'improve') { agent.rounds = +($('aiRounds')?.value || 3); agent.paint = !!$('aiPaint')?.checked; improve(); }
+    else if (act === 'improve') { agent.rounds = +($('aiRounds')?.value || 3); agent.paint = !!$('aiPaint')?.checked; saveAgent(); improve(); }
     else if (act === 'stopImprove') { agent.stop = true; b.disabled = true; b.textContent = 'stopping after this step…'; }
     else if (act === 'paintAll') paintPending();
     else if (act === 'undo' && past.length) { scn = JSON.parse(past.pop()); render(); loadMap(); msg('undone'); }
@@ -398,8 +402,9 @@
       const done = await reviseAI(req, say);
       $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
       if (pendingPictures().length) render();
-    } catch (e) { say('failed: ' + e.message); }
+    } catch (e) { say('failed: ' + e.message); return; }
     finally { asking = false; }
+    if (agent.auto) improve();
   }
 
   // ---- look it over and improve: the agent ----
@@ -410,7 +415,12 @@
   // the new map is drawn again and looked at in the next round, until the
   // model calls it good or the rounds run out. Then the pictures it asked for
   // are painted (builder-paint.js) when "then paint the pictures" is ticked.
-  const agent = { running: false, stop: false, rounds: 3, paint: true, log: [] };
+  // "Always": the settings stay on (this browser remembers them) and the agent
+  // runs by itself after every new world and every change asked for
+  const AGENT_KEY = 'tablefolk.builderAgent';
+  const agent = { running: false, stop: false, rounds: 3, paint: true, auto: false, log: [] };
+  try { const o = JSON.parse(localStorage.getItem(AGENT_KEY) || '{}'); if (o.rounds) agent.rounds = Math.min(5, Math.max(1, +o.rounds)); if (o.paint != null) agent.paint = !!o.paint; agent.auto = !!o.auto; } catch {}
+  const saveAgent = () => { try { localStorage.setItem(AGENT_KEY, JSON.stringify({ rounds: agent.rounds, paint: agent.paint, auto: agent.auto })); } catch {} };
   const logLine = (html, kind = '') => { agent.log.push({ html, kind }); render(); };
   async function mapLaidOut() {
     // "map" lines are laid out by the tabletop page first (layOut)
@@ -535,7 +545,9 @@
     show(result, opts = {}) {
       scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       // the form's "look it over" (?improve=N): the agent starts on the new world
+      // (or "always, after every change" is on)
       if (opts.improve > 0 && revise.where !== undefined) { agent.rounds = Math.min(5, +opts.improve); setTimeout(() => improve(agent.rounds), 600); }
+      else if (agent.auto && revise.where !== undefined) setTimeout(() => improve(), 600);
     },
     improve, paintPending, pendingPictures, get agent() { return agent; }, get editor() { return ed; },
     get scenario() { return scn; },
