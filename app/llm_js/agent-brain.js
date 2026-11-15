@@ -48,7 +48,7 @@ const SUPPORTED_MODELS = {
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
   // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
   // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
-  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4 },   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
+  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1 },   // the pick for 10-12 GB+ cards: 10.2 GB peak with the game at high quality on a 4070 (2026-11-15)   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
   // Ternary Bonsai 2 9B on the same WebGPU kernel engine (bonsai2.js): 1.86 GB
   // download, ~3.4 GB on the card at an 8192 window, ~107 tokens/s on an RTX 4070
   'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU kernels; needs a 6 GB graphics card)', engine: 'bonsai2', bonsaiSize: '9B', size: '~1.9 GB', needGB: 6, readGB: 1.9, memGB: 3.4 },
@@ -358,7 +358,11 @@ export function createAgentBrainManager(config = {}) {
     const hw = await detectHardware().catch(() => null);
     let chosen = false;
     try { chosen = new URLSearchParams(location.search).has('model') || !!localStorage.getItem('tablefolk_model'); } catch {}
-    const key = recommendModel(hw, Object.entries(SUPPORTED_MODELS).map(([key, m]) => ({ key, ...m })), DEFAULT_MODEL);
+    // models that failed to start in this browser (a WebGPU kernel that would
+    // not compile: Bonsai 2 on Chrome 144) are skipped until the browser changes
+    let failed = [];
+    try { failed = (JSON.parse(localStorage.getItem('tablefolk_failed_models') || '[]') || []).filter(f => f.ua === navigator.userAgent).map(f => f.key); } catch {}
+    const key = recommendModel(hw, Object.entries(SUPPORTED_MODELS).map(([key, m]) => ({ key, ...m, failed: failed.includes(key) })), DEFAULT_MODEL);
     if (!chosen && !loaded && key !== currentModelKey) setModel(key, false);
     return { key, hw, applied: !chosen };
   }

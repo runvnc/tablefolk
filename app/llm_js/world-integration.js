@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261113g';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261115a';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261113g';
+import { installDevConsole } from './dev-console.js?v=20261115a';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -789,6 +789,20 @@ async function main() {
     setStatus('Auto-load failed: ' + err.message + ' Open Agent brains to retry.', 'error');
     el('loadBrains').disabled = false;
     appendLog('auto-load failed: ' + err.message);
+    // The model this device was given could not run in this browser (a
+    // kernel that does not compile): note it and start again with the next
+    // best. Only for the device's own pick, and only for GPU errors.
+    const failedKey = manager.getModelKey();
+    let userChose = false; try { userChose = new URLSearchParams(location.search).has('model') || !!localStorage.getItem('tablefolk_model'); } catch {}
+    if (!userChose && /ShaderModule|WGSL|GPUValidation|subgroup|Invalid (Buffer|Texture|BindGroup|CommandBuffer)/i.test(String(err?.message || err))) {
+      try {
+        const list = JSON.parse(localStorage.getItem('tablefolk_failed_models') || '[]');
+        if (!list.some(f => f.key === failedKey && f.ua === navigator.userAgent)) { list.push({ key: failedKey, ua: navigator.userAgent, at: Date.now() }); localStorage.setItem('tablefolk_failed_models', JSON.stringify(list.slice(-8))); }
+        window.tablefolkDiag?.note('brain', failedKey + ' cannot run in this browser: trying the next best model');
+        setStatus(failedKey + ' cannot run in this browser: switching to the next best model…', 'busy');
+        setTimeout(() => location.reload(), 1500);
+      } catch {}
+    }
   }
 
   world.onAgentSelected = () => syncSelectedBrainUI(world);

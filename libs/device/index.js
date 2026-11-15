@@ -240,7 +240,9 @@ export function recommendModel(hw, models, fallback) {
   const gb = usableGB(hw);
   if (gb == null) { if (hw) hw.choiceWhy = 'graphics memory unknown: the default'; return fallback; }
   const speeds = brainSpeeds(), skipped = [];
-  const fits = models.filter(m => m.needGB && !m.hidden && m.needGB <= gb && (!m.needF16 || hw.f16)).sort((a, b) => b.needGB - a.needGB);
+  // biggest first; at the same size the one marked prefer (Bonsai 2 27B over
+  // Gemma 4 12B: 12/12 against 9/12 on the hard set); failed: it could not run here
+  const fits = models.filter(m => m.needGB && !m.hidden && !m.failed && m.needGB <= gb && (!m.needF16 || hw.f16)).sort((a, b) => b.needGB - a.needGB || (b.prefer || 0) - (a.prefer || 0));
   for (const m of fits) {
     const s = speeds[m.key], toks = predictedToks(hw, m);
     if (s?.turns >= 3 && s.cps < MIN_CPS) { skipped.push(`${m.key}: measured ${s.cps.toFixed(0)} chars/s here`); continue; }

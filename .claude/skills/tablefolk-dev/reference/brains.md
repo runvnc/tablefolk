@@ -719,3 +719,55 @@ Ideas, next:
 - **CPU offload of Bonsai:** impossible in the browser (the engine is
   WebGPU-only; wllama lacks Prism's PTQ1_0). Possible natively with Prism's
   llama.cpp fork, as a local helper.
+
+## Bonsai 2 on 12 GB cards, with the new minds (2026-11-15)
+
+vast.ai: an RTX 4070 12 GB (driver 535) and an RTX 3060 12 GB (driver 580),
+the `vastai/linux-desktop:cuda-12.9-ubuntu24.04-2026-02-05` image. The
+image's Chrome 144 cannot compile Bonsai's kernels ("'subgroupBallot' must
+only be called from uniform control flow"): install the current Chrome
+(157 worked). The box clones the public repo and serves it on its own :8000
+(`BREEZE_AUTOSTART=0`); only its CDP port is tunnelled back
+(`ssh -L 9231:localhost:9223`), and the test scripts take `CDP_PORT`. A
+fresh Chrome per model: a 27B still on the card made the 9B fail with
+invalid buffers.
+
+Fixes these runs found (they help every brain):
+- **Monsters waited for nobody** (play.js): in turn mode a character's
+  model turn ran in the background while monsters struck every round, so a
+  4-12 s brain lost whole rounds. A character with a monster in reach now
+  gets its turn first. E4B against two skeletons: 1/4 survived before, 2/3
+  after (6 of 6 skeletons killed).
+- **Auto-thinking** (mind.js `thinkNow`): ambitious-tier brains that think
+  well (Bonsai 2, 12B, endpoints) think on turns that matter (danger, a fresh
+  request, a trade cue); 1536 tokens, the "keep your thinking short" line,
+  and an answer without thinking if thinking gave none (without the line,
+  Bonsai thought past its answer and said nothing).
+- **Hitting the dead**: the danger line says when its last target is down.
+- **Fetching** hands the thing over 250 ms after taking it (1.5 s was after
+  the turn's end).
+- **Secrets**: "never hint at it, not even as a joke" (Bonsai 27B joked
+  "not a chest of silver under the old oak"); then kept 2/2.
+
+Results (`?norender=1`; one run each for the agenttest evals):
+
+| | Bonsai 2 27B, 4070 | Bonsai 2 27B, 3060 (before the fixes) | Bonsai 2 9B, 3060 | Gemma 4 E4B, 4070 |
+|---|---|---|---|---|
+| one wolf (survived, kills) | 3/3, 2 | 3/3, 3 | 3/3, 2 | 3/3, 3 |
+| two skeletons | **3/3, 6** (before the fixes: 1/3) | 0/3, 2 | 3/3, 3 | 2/3, 6 |
+| hunger (fed) | 2/2 | 2/2 | 1/2 | 2/2 |
+| knows the player (errand, promise, secret) | 3/3 | 2/3 | 2/3 (the promise check missed "you definitely did") | 2/3 (handed the gold back) |
+| using things | 5/5 | 4/5 (fetch, before the fix) | 3/5 (gave the ring away; walked to the chest) | 5/5 |
+| shop-role, roles | 4/4, 4/4 | 4/4, 4/4 | 4/4, 4/4 | 4/4, 4/4 |
+| plan, reflection | 2.7 s, 3.1 s | 4.8 s, 5.1 s | 1.6 s, 1.6 s | 0.9 s, 1.0 s |
+| seconds a turn (rough, agenttest) | 6.6 (with auto-thinking) | 11.6 | 9.2 | 4.0 |
+
+Graphics memory, Bonsai 2 27B with the game drawing (`--render`, roles,
+EmbeddingGemma loaded), RTX 4070: light quality peak 9.75 GB, high quality
+peak 10.2 GB of 12.28. So the 27B and the full game fit a 12 GB card with
+about 2 GB spare (Pocket-TTS voices; Breeze would not fit beside it, a 16 GB
+card would hold it).
+
+Reflection quality (mind-check): 27B "Grub's repeated thefts show me that
+kindness must be guarded with a fence, not just a smile."; 9B "Trust is a
+fickle thing; even neighbors can be hungry."; E4B shorter and plainer.
