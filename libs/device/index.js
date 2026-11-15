@@ -136,7 +136,16 @@ export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY +
 const PROBE_KEY = 'CardProbe';
 export let lastProbe = null;   // { gb, holds, why, gbs }: the last probe run here
 export async function probeHolds(adapter, gb, sig, bwGBs = null) {
-  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || (c.holds === false && Date.now() - c.at < 864e5))) return c.holds; } catch {}   // a no again after a day: the card may only have been busy
+  // a yes is kept; a no is measured again after a day (the card may only have been busy)
+  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || (c.holds === false && Date.now() - c.at < 864e5))) return c.holds; } catch {}
+  // a no or a can't-tell again after 2 s: a page closed just before (a reload) may still be
+  // giving its memory back, its GPU work still running
+  let holds = await probeOnce(adapter, gb, bwGBs);
+  if (holds !== true) { await new Promise(r => setTimeout(r, 2000)); holds = await probeOnce(adapter, gb, bwGBs); }
+  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why: lastProbe?.why || '', at: Date.now() });
+  return holds;
+}
+async function probeOnce(adapter, gb, bwGBs) {
   const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
   let dev = null, holds = null, lost = false, why = '', gbs = null;
   try {
@@ -151,7 +160,7 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
       bufs.push(b);
       if (await dev.popErrorScope() || lost) { holds = false; why = lost ? 'device lost' : 'out of memory at ' + ((i + 1) / 4) + ' GB'; break; }
       if (i % 8 === 7) await dev.queue.onSubmittedWorkDone();
-      if (performance.now() - t0 > 6000) { holds = false; why = 'over 6 s at ' + ((i + 1) / 4) + ' GB'; break; }   // paging: far slower than the card
+      if (performance.now() - t0 > 6000) { holds = null; why = 'over 6 s at ' + ((i + 1) / 4) + ' GB: the card busy, or paging'; break; }   // can't tell: other work on the card, or paging out
     }
     if (holds) {
       await dev.queue.onSubmittedWorkDone();
@@ -165,7 +174,6 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
   } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : null; }
   finally { for (const b of bufs) try { b.destroy(); } catch {} try { dev?.destroy(); } catch {} }
   lastProbe = { gb, holds, why, gbs };
-  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why, at: Date.now() });
   return holds;
 }
 
