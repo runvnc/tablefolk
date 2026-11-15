@@ -68,18 +68,12 @@ async function call(method, path, json, pcm) {
   return out;
 }
 
-async function load(opts = {}) {
-  if (engine) return;
-  if (opts.base) base = opts.base;
-  else if (opts.mirror !== false) base = await firstReachable([MIRROR_BASE + 'backbone/manifest.json', HF_BASE + 'backbone/manifest.json']).then(u => u.replace(/backbone\/manifest\.json$/, ''));
-  if (ZONOS_LANGUAGES[opts.language] || opts.language === 'auto') language = opts.language;
-  if (!navigator.gpu) throw new Error('ZONOS3-Mini needs WebGPU, and this browser\'s workers have none');
-  status('ZONOS3-Mini: checking the model…');
-  const t0 = performance.now();
+// the engine and codec workers, up to the engine's 'ready'
+async function start() {
   engine = new Worker(new URL('./zonos-web/engine-worker.js', import.meta.url), { type: 'module' });
   codec = new Worker(new URL('./zonos-web/codec-worker.js', import.meta.url), { type: 'module' });
   const ready = Promise.withResolvers();
-  let lastPct = -1;
+  let lastPct = -1, isReady = false;
   engine.onmessage = e => {
     const m = e.data || {};
     if (m.type === 'progress') {
@@ -87,8 +81,8 @@ async function load(opts = {}) {
       const pct = Math.floor(100 * m.loaded / m.total); if (pct === lastPct) return; lastPct = pct;
       const what = m.models?.includes('spk') ? 'its voice encoder' : 'ZONOS3-Mini';
       status(m.fetched > 0 ? `Downloading ${what} ${pct}% (${(m.loaded / 2 ** 30).toFixed(2)} / ${(m.total / 2 ** 30).toFixed(2)} GB, once)` : `ZONOS3-Mini: loading ${pct}%`);
-    } else if (m.type === 'ready') ready.resolve();
-    else if (m.type === 'fatal') { ready.reject(new Error(m.message)); postMessage({ type: 'error', error: 'ZONOS3-Mini: ' + m.message }); }
+    } else if (m.type === 'ready') { isReady = true; ready.resolve(); }
+    else if (m.type === 'fatal') { if (isReady) postMessage({ type: 'error', fatal: true, error: 'ZONOS3-Mini: ' + m.message }); else ready.reject(new Error(m.message)); }
     else if (m.type === 'res') pending.get(m.id)?.res(m);
     else if (m.type === 'chunk') pending.get(m.id)?.chunk(m.data);
     else if (m.type === 'end') pending.get(m.id)?.end();
@@ -100,6 +94,26 @@ async function load(opts = {}) {
   // voicesPcm: the built-in voices' clips, only for previews (they carry their codes and embeddings)
   engine.postMessage({ type: 'init', base, cache: true, voicesPcm: {}, codecPort: ch.port1 }, [ch.port1]);
   try { await ready.promise; } catch (e) { try { engine.terminate(); codec.terminate(); } catch {} engine = codec = null; throw e; }
+}
+
+async function load(opts = {}) {
+  if (engine) return;
+  if (opts.base) base = opts.base;
+  else if (opts.mirror !== false) base = await firstReachable([MIRROR_BASE + 'backbone/manifest.json', HF_BASE + 'backbone/manifest.json']).then(u => u.replace(/backbone\/manifest\.json$/, ''));
+  if (ZONOS_LANGUAGES[opts.language] || opts.language === 'auto') language = opts.language;
+  if (!navigator.gpu) throw new Error('ZONOS3-Mini needs WebGPU, and this browser\'s workers have none');
+  status('ZONOS3-Mini: checking the model…');
+  const t0 = performance.now();
+  // a download cut short (a dropped connection: "network error") is tried again twice; the
+  // shards already in Cache Storage are not fetched again
+  for (let attempt = 1; ; attempt++) {
+    try { await start(); break; }
+    catch (e) {
+      if (attempt >= 3 || !/network|fetch|ERR_/i.test(e.message)) throw e;
+      status(`ZONOS3-Mini: the download broke off (${e.message}); trying again…`);
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
   const caps = await call('GET', '/v2/capabilities').catch(() => null);
   // the languages with alignment heads (laci/index.json): laci: true for another is a 400
   laciLanguages = new Set(Object.keys(await fetch(base + 'laci/index.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))));
