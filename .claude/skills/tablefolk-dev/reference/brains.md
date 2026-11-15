@@ -859,7 +859,11 @@ a voice on).
   s (a reloaded page still giving its memory back made it slow or full);
   "can't tell" asks in the download prompt (`vramOptions`,
   `setCardMemory`). With 16 measured, the pick is Bonsai 2 27B, 6.6 GB left
-  beside it. Not tried on Windows.
+  beside it. Windows: Dawn's D3D12 residency manager pages memory out to stay
+  in the OS budget instead of refusing an allocation, so the probe clears all
+  its buffers in one submission (nothing that submission uses can be paged
+  out): out of memory, or a run far slower than one buffer alone, means the
+  smaller card. Not yet tried on a Windows machine.
 - **Four conversation caches ran it out of memory** (15.9 GB, the page's
   WebGPU device lost): one cache again.
 - **Live village, Bonsai 27B with ZONOS3-Mini speaking** (market village, 240

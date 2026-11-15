@@ -126,11 +126,12 @@ const noProbe = () => { try { return new URLSearchParams(globalThis.location?.se
 export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY + gpu, String(gb)); else local.remove(CARD_KEY + gpu); } }
 
 // Whether the card holds more than `gb` GB: allocate that much in 256 MB
-// buffers, clear each (so it really lands on the card) and copy through the
-// last. On Vulkan (Linux, Android) a card that is full refuses the buffer
-// (out-of-memory); on Windows the driver may page it out to system memory
-// instead, and copies through it fall to bus speed (~25 GB/s against the
-// card's 150+). true: it held; false: refused, spilled, lost or too slow;
+// buffers, then clear them all in one submission. On Vulkan (Linux, Android)
+// a full card refuses the buffer (out-of-memory). On Windows Dawn keeps under
+// the OS's budget by paging memory out rather than refusing, but cannot page
+// out what the running submission uses (dawn/native/d3d12/
+// ResidencyManagerD3D12.cpp): past the card's memory that submission fails
+// out of memory or runs at bus speed (~25 GB/s against the card's 150+). true: it held; false: refused, spilled, lost or too slow;
 // null: not measured. Under a second on the card, and freed at once. Kept per
 // card and browser like the bandwidth (CardProbe).
 const PROBE_KEY = 'CardProbe';
@@ -148,31 +149,37 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
 async function probeOnce(adapter, gb, bwGBs) {
   const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
   let dev = null, holds = null, lost = false, why = '', gbs = null; const start = performance.now();
+  const late = () => performance.now() - start > 20000;
   try {
     dev = await adapter.requestDevice();
     dev.lost.then(() => { lost = true; });
-    const t0 = performance.now();
-    holds = true;
-    for (let i = 0; i < n; i++) {
+    // 1. allocate: Vulkan (Linux, Android) refuses past the card's memory
+    for (let i = 0; i < n && holds === null; i++) {
       dev.pushErrorScope('out-of-memory');
-      const b = dev.createBuffer({ size: CH, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
-      const e = dev.createCommandEncoder(); e.clearBuffer(b); dev.queue.submit([e.finish()]);
-      bufs.push(b);
-      if (await dev.popErrorScope() || lost) { holds = false; why = lost ? 'device lost' : 'out of memory at ' + ((i + 1) / 4) + ' GB'; break; }
-      if (i % 8 === 7) await dev.queue.onSubmittedWorkDone();
-      if (performance.now() - t0 > 20000) { holds = null; why = 'over 20 s at ' + ((i + 1) / 4) + ' GB: the card busy, or paging'; break; }   // can't tell (the page's own start-up shares the card: 5-10 s seen)
+      bufs.push(dev.createBuffer({ size: CH, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      if (await dev.popErrorScope() || lost) { holds = false; why = lost ? 'device lost' : 'out of memory at ' + ((i + 1) / 4) + ' GB'; }
+      else if (late()) { holds = undefined; why = 'over 20 s allocating: the card busy'; }
     }
-    if (holds) {
-      await dev.queue.onSubmittedWorkDone();
-      // copies between the first and the last buffer: still at the card's speed?
-      const t = performance.now(), e = dev.createCommandEncoder();
-      for (let k = 0; k < 4; k++) e.copyBufferToBuffer(bufs[k % 2 ? 0 : bufs.length - 1], 0, bufs[k % 2 ? bufs.length - 1 : 0], 0, CH);
-      dev.queue.submit([e.finish()]); await dev.queue.onSubmittedWorkDone();
-      gbs = Math.round(2 * 4 * CH / ((performance.now() - t) / 1000) / 1e9);
-      if (lost || gbs < Math.max(40, (bwGBs || 0) * .3)) { holds = false; why = `copies at ${gbs} GB/s`; }
+    if (holds === null) {
+      // 2. the card's speed on one buffer, then 3. every buffer in one submission. Windows
+      // (D3D12) pages memory out to stay in budget instead of refusing it, but nothing a
+      // submission uses can be paged out while it runs (Dawn's residency manager): past the
+      // card's memory that one either fails out of memory or runs at bus speed.
+      const clearAll = async list => { const e = dev.createCommandEncoder(); for (const b of list) e.clearBuffer(b); dev.queue.submit([e.finish()]); await dev.queue.onSubmittedWorkDone(); };
+      await clearAll([bufs[0]]);
+      let t = performance.now(); await clearAll([bufs[0], bufs[0], bufs[0], bufs[0]]); const one = (performance.now() - t) / 4;
+      dev.pushErrorScope('out-of-memory');
+      t = performance.now(); await clearAll(bufs); const all = performance.now() - t;
+      const oom = await dev.popErrorScope();
+      gbs = Math.round(n * CH / (all / 1000) / 1e9);
+      if (oom || lost) { holds = false; why = lost ? 'device lost in one submission' : 'out of memory in one submission'; }
+      else if (late()) { holds = undefined; why = 'over 20 s: the card busy'; }
+      else if (all > n * one * 3 + 30 && gbs < Math.max(40, (bwGBs || 0) * .5)) { holds = false; why = `one submission of ${gb} GB ran at ${gbs} GB/s (one buffer: ${Math.round(CH / (one / 1000) / 1e9)}): paged out`; }
+      else holds = true;
     }
-  } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : null; }
+  } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : undefined; why = String(e?.message || e).slice(0, 120); }
   finally { for (const b of bufs) try { b.destroy(); } catch {} try { dev?.destroy(); } catch {} }
+  if (holds === undefined) holds = null;
   lastProbe = { gb, holds, why, gbs, ms: Math.round(performance.now() - start) };
   return holds;
 }
