@@ -1,10 +1,10 @@
 // ZONOS3-Mini in the browser (Zyphra, Apache-2.0 weights; its WebGPU engine is
 // MIT): a speech worker for pocket-tts-manager.js and createVoice (the same
 // messages as breeze-web-worker.js):
-//   in:  load {language}, set_audio_port, generate {text, voice}, stop,
+//   in:  load {language, mirror, base}, set_audio_port, generate {text, voice, language}, stop,
 //        encode_voice {voiceId, audio (24 kHz), cacheKey},
 //        voice_embedding {voiceId, embedding (192 floats)}, get_embedding {voiceId},
-//        delete_voice, warmup
+//        set_language {language: a ZONOS_LANGUAGES code or 'auto'}, delete_voice, warmup
 //   out: status, runtime_info, bundle_loaded, voices_loaded, loaded,
 //        voice_encoded, generation_started, audio_chunk(_meta),
 //        generation_metrics, stream_ended, embedding, warmed, error
@@ -20,8 +20,14 @@
 //
 // It speaks at 44.1 kHz; this worker resamples to 24 kHz (the page's audio
 // graph runs at 24 kHz for every engine) with a windowed-sinc filter.
+import { MIRROR, firstReachable } from '../models/index.js';
 const REV = 'd2d142a86b1e6aeb4252679673c86ecd86177bf8';
 const HF_BASE = `https://huggingface.co/Zyphra/ZONOS3-Mini/resolve/${REV}/web/`;
+// Tablefolk's R2 mirror of what this worker uses of that folder (the backbone, the keep2_plain
+// decoder, the speaker encoder, companions, LACI heads, the voices' codes and embeddings; not the
+// reference encoder, the aligner, speech editing or the full_mr decoder, which the engine then
+// leaves out), byte for byte (SHA-256 checked). Pages where @tablefolk/models allows the mirror.
+const MIRROR_BASE = `${MIRROR}zonos3-mini/${REV.slice(0, 7)}/web/`;
 const OUT_RATE = 24000, IN_RATE = 44100;
 // the built-in voices by name (gguf/voices/README.md); the page's Pocket-TTS
 // names map onto them so a world written for Pocket keeps its men and women
@@ -33,8 +39,8 @@ export const ZONOS_VOICES = {
 };
 const FROM_POCKET = { alba: 'savannah', azelma: 'imogen', cosette: 'sakura', eponine: 'willow', fantine: 'morgana', javert: 'rupert', jean: 'wyatt', marius: 'cillian' };
 
-let LACI = true;   // set_options {laci} turns it off (tests)
-let engine = null, codec = null, port = null, loading = null, nextId = 1, base = HF_BASE, language = 'en_us';
+let LACI = true, laciLanguages = new Set();   // set_options {laci} turns it off (tests)
+let engine = null, codec = null, port = null, loading = null, nextId = 1, base = HF_BASE, language = 'auto';
 const pending = new Map();   // request id -> { res(head), chunk(bytes), end() }
 const voices = new Map();    // voiceId -> Float32Array embedding (cloned voices)
 const SESSION = 'tablefolk';
@@ -65,6 +71,8 @@ async function call(method, path, json, pcm) {
 async function load(opts = {}) {
   if (engine) return;
   if (opts.base) base = opts.base;
+  else if (opts.mirror !== false) base = await firstReachable([MIRROR_BASE + 'backbone/manifest.json', HF_BASE + 'backbone/manifest.json']).then(u => u.replace(/backbone\/manifest\.json$/, ''));
+  if (ZONOS_LANGUAGES[opts.language] || opts.language === 'auto') language = opts.language;
   if (!navigator.gpu) throw new Error('ZONOS3-Mini needs WebGPU, and this browser\'s workers have none');
   status('ZONOS3-Mini: checking the model…');
   const t0 = performance.now();
@@ -93,6 +101,8 @@ async function load(opts = {}) {
   engine.postMessage({ type: 'init', base, cache: true, voicesPcm: {}, codecPort: ch.port1 }, [ch.port1]);
   try { await ready.promise; } catch (e) { try { engine.terminate(); codec.terminate(); } catch {} engine = codec = null; throw e; }
   const caps = await call('GET', '/v2/capabilities').catch(() => null);
+  // the languages with alignment heads (laci/index.json): laci: true for another is a 400
+  laciLanguages = new Set(Object.keys(await fetch(base + 'laci/index.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))));
   postMessage({ type: 'runtime_info', data: { backend: 'ZONOS3-Mini in this browser (WebGPU' + (caps?.decoder ? ', decoder ' + (caps.decoder.id || caps.decoder) : '') + ')' } });
   postMessage({ type: 'bundle_loaded', sampleRate: OUT_RATE });
   postMessage({ type: 'voices_loaded', voices: Object.keys(ZONOS_VOICES), defaultVoice: 'savannah' });
@@ -165,7 +175,21 @@ function resampleWhole(a, from, to) {
 }
 
 let current = null;   // { id, stopped }
-async function generate({ text, voice, silent = false }) {
+// 'auto': the script tells non-Latin languages apart; Latin text is English (a player who
+// writes worlds in French or German picks the language in the Voice pane)
+export const ZONOS_LANGUAGES = { en_us: 'English (US)', en_gb: 'English (UK)', fr_fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt_br: 'Portuguese (Brazil)', nl: 'Dutch', pl: 'Polish', cs: 'Czech', sk: 'Slovak', hu: 'Hungarian', ro: 'Romanian', bg: 'Bulgarian', ru: 'Russian', uk: 'Ukrainian', el: 'Greek', sv: 'Swedish', da: 'Danish', no: 'Norwegian', fi: 'Finnish', tr: 'Turkish', ar: 'Arabic', he: 'Hebrew', ka: 'Georgian', cmn: 'Mandarin Chinese', ja: 'Japanese', ko: 'Korean', vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay', th: 'Thai', tl: 'Tagalog', hi: 'Hindi', bn: 'Bengali', ta: 'Tamil', te: 'Telugu', mr: 'Marathi', gu: 'Gujarati', kn: 'Kannada', ml: 'Malayalam', pa: 'Punjabi', or: 'Odia', ur: 'Urdu' };
+const SCRIPTS = [[/[\u3040-\u30ff]/, 'ja'], [/[\uac00-\ud7af\u1100-\u11ff]/, 'ko'], [/[\u4e00-\u9fff]/, 'cmn'], [/[\u0400-\u04ff]/, 'ru'], [/[\u0600-\u06ff]/, 'ar'], [/[\u0590-\u05ff]/, 'he'], [/[\u0370-\u03ff]/, 'el'], [/[\u10a0-\u10ff]/, 'ka'], [/[\u0e00-\u0e7f]/, 'th'], [/[\u0900-\u097f]/, 'hi'], [/[\u0980-\u09ff]/, 'bn'], [/[\u0b80-\u0bff]/, 'ta'], [/[\u0c00-\u0c7f]/, 'te'], [/[\u0a80-\u0aff]/, 'gu'], [/[\u0c80-\u0cff]/, 'kn'], [/[\u0d00-\u0d7f]/, 'ml'], [/[\u0a00-\u0a7f]/, 'pa'], [/[\u0b00-\u0b7f]/, 'or']];
+function pickLanguage(text, want) {
+  if (want && want !== 'auto' && ZONOS_LANGUAGES[want]) {
+    // a non-Latin line under a Latin-script choice (a Russian character in an English world): its script wins
+    if (!/^(ar|he|el|ka|cmn|ja|ko|th|hi|bn|ta|te|mr|gu|kn|ml|pa|or|ur|ru|uk|bg)$/.test(want)) for (const [re, l] of SCRIPTS) if (re.test(text)) return l;
+    return want;
+  }
+  for (const [re, l] of SCRIPTS) if (re.test(text)) return l;
+  return 'en_us';
+}
+
+async function generate({ text, voice, language: lang, silent = false }) {
   text = String(text || '').trim();
   if (!text) { if (!silent) postMessage({ type: 'stream_ended' }); return; }
   const t0 = performance.now();
@@ -174,7 +198,8 @@ async function generate({ text, voice, silent = false }) {
   // 2026-11-15: one sentence ran on for 132 s without it); max_tokens caps it anyway at 15
   // frames a second for the text read at 6 characters a second, plus 3 s
   const maxFrames = Math.ceil(15 * (text.length / 6 + 3));
-  const r = request('POST', '/v2/generate', { text, language, stream: true, format: 'pcm', laci: !!LACI, max_tokens: maxFrames, ...speakerFields(voice) });
+  const L = pickLanguage(text, lang || language);
+  const r = request('POST', '/v2/generate', { text, language: L, stream: true, format: 'pcm', laci: !!LACI && laciLanguages.has(L), max_tokens: maxFrames, ...speakerFields(voice) });
   const me = current = { id: r.id, stopped: false };
   const h = await r.head;
   if (h.status >= 400) { const e = await r.json().catch(() => null); current = null; throw new Error('ZONOS3-Mini: ' + (typeof e?.detail === 'string' ? e.detail : JSON.stringify(e?.detail || h.status))); }
@@ -215,7 +240,7 @@ self.onmessage = e => {
   if (type === 'stop') { if (current) { current.stopped = true; engine?.postMessage({ type: 'abort', id: current.id }); } return; }
   if (type === 'set_options') { if ('laci' in data) LACI = !!data.laci; return; }
   if (type === 'delete_voice') { voices.delete(data.voiceId); return; }
-  if (type === 'set_language') { language = /^[a-z]{2}(_[a-z]{2})?$/.test(data.language || '') ? data.language : 'en_us'; postMessage({ type: 'voices_loaded', voices: Object.keys(ZONOS_VOICES), language }); return; }
+  if (type === 'set_language') { language = ZONOS_LANGUAGES[data.language] ? data.language : 'auto'; postMessage({ type: 'voices_loaded', voices: Object.keys(ZONOS_VOICES), language }); return; }
   chain = chain.then(async () => {
     try {
       if (type === 'load') return await (loading ||= load(data).catch(err => { loading = null; throw err; }));

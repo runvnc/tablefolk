@@ -207,6 +207,13 @@ to the bucket that, per 64 MiB part, fetches the range from Hugging Face and
 then `complete`s it; drive it from a script with a token header (and a
 User-Agent: Cloudflare answers Python's default with 403, error 1010), check the
 SHA-256 against Hugging Face's `x-linked-etag`, and `wrangler delete` the Worker.
+ZONOS3-Mini is under `zonos3-mini/d2d142a/web/` (2026-11-15; the Hugging Face
+revision's first seven characters): the part of Zyphra/ZONOS3-Mini's `web/`
+that `libs/voice/zonos-web-worker.js` uses (backbone, `zac`, `spk`,
+`companions`, `laci`, the voices' json, codes and embeddings; 121 files,
+0.9 GB, none over 102 MB), downloaded, checked against Hugging Face's
+SHA-256 and put one by one with `wrangler r2 object put` (four at a time).
+A new export goes under a new revision prefix.
 Breeze TTS 2 is under `breeze-tts-2/`: HoppouAI's `breeze-tts-2-q4_k-dd2.gguf`
 in 37 parts with a `parts.json` (size, part size, part names, SHA-256), the
 breeze-server v0.1.3 Linux and Windows builds, `LICENSE-model.txt`

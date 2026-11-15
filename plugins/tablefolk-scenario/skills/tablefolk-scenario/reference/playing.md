@@ -183,6 +183,12 @@ sound in under a second). It is the first choice: offered when the graphics
 card has 2 GB left beside the characters' model, and picked by itself once
 downloaded. If it runs out of graphics memory it gives way to the default
 voice for a day. The library's voices are cloned for it ahead of time.
+Its language is in the Voice pane: Automatic (the default) speaks English,
+and tells languages with their own script (Russian, Japanese, Chinese,
+Korean, Arabic, Hindi...) by their letters; pick French, German or any of
+the others to have Latin-script lines read in that language. Android phones
+with 8 GB of memory or more are offered it too; iPhones and smaller phones
+keep Pocket-TTS.
 Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
 languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs

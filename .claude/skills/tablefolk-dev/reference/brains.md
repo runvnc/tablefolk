@@ -390,7 +390,20 @@ with `?trustSkills=1`, or after the player allows that package.
   Zyphra/ZONOS3-Mini on Hugging Face pinned to revision `d2d142a`, Zyphra's own
   quant (Q4_0 experts, Q8_0 mixer, `output.weight` q8_0; 0.86 GB with the
   `keep2_plain` decoder), cached by the engine in Cache Storage
-  (`zonos3-web-models-v6`). Other quants checked 2026-11-15 and not taken:
+  (`zonos3-web-models-v6`, by URL). Mirrored on R2 under
+  `zonos3-mini/d2d142a/web/` (assets.md, Hosting): where the page allows the
+  mirror the worker probes it (`firstReachable`) and else takes Hugging Face.
+  Languages: `generate` takes a language, else the worker's (`set_language`,
+  the Voice pane's list when ZONOS3-Mini runs, `tablefolkZonosLanguage`);
+  `auto` (the default) reads Latin text as `en_us` and tells non-Latin
+  scripts apart (kana `ja`, hangul `ko`, Han `cmn`, Cyrillic `ru`, Arabic,
+  Hebrew, Greek, Georgian, Thai, the Indic scripts); a chosen Latin-script
+  language still yields to a line in another script. LACI is asked only for
+  the languages in `laci/index.json` (all 44 today). French, German,
+  Russian and Japanese lines came out at plausible lengths (2026-11-15; not
+  transcribed: Bark is English only). Phones: Android with
+  `navigator.deviceMemory` of 8 or more is offered it (Zyphra measured a
+  Pixel 9; not tried here); iPhones and iPads stay on Pocket-TTS. Other quants checked 2026-11-15 and not taken:
   AtomicChat's AD-Q4_K_M GGUF (llama.cpp only; K-quants would need new WGSL
   kernels), groxaxo's GPTQ INT4 (CUDA, slower, worse Spanish WER), the
   `full_mr` decoder (+1.25 GB, ~3x slower decode). Voices: the ten English

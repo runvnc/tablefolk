@@ -50,7 +50,8 @@ const b64 = buf => { const u = new Uint8Array(buf); let t = ''; for (let i = 0; 
 let loaded = null;
 window.zt = {
   options: o => w.postMessage({ type: 'set_options', data: o }),
-  load: () => loaded ||= step({ type: 'load', data: {} }, ['loaded']).then(m => m.loadMs),
+  // ?mirror=0: from Hugging Face, not Tablefolk's R2 mirror
+  load: () => loaded ||= step({ type: 'load', data: { mirror: new URLSearchParams(location.search).get('mirror') !== '0' } }, ['loaded']).then(m => m.loadMs),
   // a library sample cloned into voiceId (its embedding comes back)
   async clone(voiceId, url) {
     await this.load();
@@ -59,9 +60,9 @@ window.zt = {
     await step({ type: 'encode_voice', data: { voiceId, audio } }, ['voice_encoded']);
     return (await step({ type: 'get_embedding', data: { voiceId } }, ['embedding'])).embedding;
   },
-  async say(text, voice) {
+  async say(text, voice, language) {
     await this.load(); chunks = []; metrics = null;
-    await step({ type: 'generate', data: { text, voice } }, ['stream_ended']);
+    await step({ type: 'generate', data: { text, voice, language } }, ['stream_ended']);
     const n = chunks.reduce((t, c) => t + c.length, 0), pcm = new Float32Array(n); let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
     let peak = 0; for (const x of pcm) peak = Math.max(peak, Math.abs(x));
     const f = wav(pcm, 24000); $('audio').src = URL.createObjectURL(new Blob([f], { type: 'audio/wav' })); $('audio').hidden = false;
