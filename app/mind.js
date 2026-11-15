@@ -195,11 +195,14 @@
     let r;
     if ((r = t.match(/\b(?:my name is|my name's|call me|i am called|name'?s)\s+([A-Z][\w'-]{1,20})/i)) || (r = t.match(/\b(?:i'?m|i am)\s+([A-Z][a-z'-]{1,20})\b(?![\w\s]*\b(?:years|tired|hungry|sorry|lost|looking|here|fine|good|ok))/))) pf.name = r[1];
     for (const sent of t.split(/(?<=[.!?])\s+/)) {
-      if ((r = sent.match(/\b(i(?:'m| am) (?:looking|searching) for|i need to|i want to|i(?:'d| would) like to|i(?:'m| am) trying to|i came (?:here )?to|help me(?: to)?|i need|i want|i(?:'d| would) like|i came (?:here )?for)\s+(.{3,80})/i))) keep(pf.wants, (/looking|searching|for$/i.test(r[1]) ? 'find ' : /^i (need|want)$|like$/i.test(r[1]) ? 'get ' : '') + theirs(r[2]));
-      else if ((r = sent.match(/^(?:can|could|would|will) you\s+(.{3,80})\?/i))) keep(pf.wants, 'asked you to ' + theirs(r[1]));
-      if ((r = sent.match(/\b(?:i promise(?: to| that i'?ll)?|i swear(?: to| i'?ll)?|i'?ll|i will)\s+((?:bring|pay|give|come back|return|find|get|help|fetch|kill|deal with|save|protect|tell)\b.{0,70})/i))) keep(pf.promises, theirs(r[1]));
-      if ((r = sent.match(/\bi(?:'m| am) ((?:a|an|the)\s+[\w\s'-]{2,40}|from\s+[\w\s'-]{2,40})/i))) keep(pf.said, theirs(r[1]));
-      else if ((r = sent.match(/\bi (live|work|love|like|hate|fear|have)\s+([\w\s'-]{2,40})/i))) keep(pf.said, ({ have: 'has' }[r[1].toLowerCase()] || r[1].toLowerCase() + 's') + ' ' + theirs(r[2]));
+      const sn = sent.replace(/\bim\b/gi, "I'm").replace(/,?\s*please\b/gi, '');
+      if ((r = sn.match(/\b(?:i'?ll|i will|i'?m going to|i am going to)\s+((?:kill|hurt|beat|stab|burn|rob|get)\s+you\b.{0,40})/i))) { keep(pf.threats ||= [], theirs(r[1])); const m = mindOf(g); push(g, temperament(getBrainConfig(g.id)) === 'brave' ? 'anger' : 'fear', .3, `${playerName()} threatened you`); m.mood.trust = clamp01(m.mood.trust - .2); continue; }
+      if ((r = sn.match(/\bi (?:want|need|would like|'d like) you to\s+(.{3,80})/i))) { keep(pf.wants, 'you to ' + theirs(r[1])); continue; }
+      if ((r = sn.match(/\b(i(?:'m| am) (?:looking|searching) for|i need to|i want to|i(?:'d| would) like to|i(?:'m| am) trying to|i came (?:here )?to|help me(?: to)?|i need|i want|i(?:'d| would) like|i came (?:here )?for)\s+(.{3,80})/i))) keep(pf.wants, (/looking|searching|for$/i.test(r[1]) ? 'find ' : /^i (need|want)$|like$/i.test(r[1]) ? 'get ' : '') + theirs(r[2]));
+      else if ((r = sn.match(/^(?:can|could|would|will) you\s+(.{3,80})\?/i))) keep(pf.wants, 'you to ' + theirs(r[1]));
+      if ((r = sn.match(/\b(?:i promise(?: to| that i'?ll)?|i swear(?: to| i'?ll)?|i'?ll|i will)\s+((?:bring|pay|give|come back|return|find|get|help|fetch|kill|deal with|save|protect|tell)\b.{0,70})/i))) keep(pf.promises, theirs(r[1]));
+      if ((r = sn.match(/\bi(?:'m| am) ((?:a|an|the)\s+[\w\s'-]{2,40}|from\s+[\w\s'-]{2,40})/i))) keep(pf.said, theirs(r[1]));
+      else if ((r = sn.match(/\bi (live|work|love|like|hate|fear|have)\s+([\w\s'-]{2,40})/i))) keep(pf.said, ({ have: 'has' }[r[1].toLowerCase()] || r[1].toLowerCase() + 's') + ' ' + theirs(r[2]));
     }
   }
   // the player gave it something: a promise about that thing is kept
@@ -218,6 +221,7 @@
     if (pf.promises.length) bits.push('they promised to ' + pf.promises.join('; ') + ' (not done yet)');
     if (pf.kept) bits.push(`kept ${pf.kept === 1 ? 'a promise' : pf.kept + ' promises'} to you`);
     if (pf.gifts.length) bits.push('gave you ' + pf.gifts.slice(-3).join(', '));
+    if (pf.threats?.length) bits.push('threatened to ' + pf.threats.join('; '));
     if (pf.hits) bits.push(pf.hits === 1 ? 'hit you once' : `hit you ${pf.hits} times`);
     const out = ['About ' + who + ': ' + bits.map(b => b[0].toUpperCase() + b.slice(1)).join('. ') + '.'];
     // back after a while (or another visit) with something still wanted: a
