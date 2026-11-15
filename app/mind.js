@@ -469,6 +469,10 @@
     const brave = temperament(cfg) === 'brave', basic = t === 'basic';
     if (f) {
       const pot = potion(g), risk = incoming(g, fs), spot = () => fleeSpot(g, f);
+      // nearly dead and in reach: finish it (running then gave it the last
+      // bite: E2B and E4B both died with the wolf at 1-2 health)
+      const fh = C?.hpOf(f), myDmg = (cfg.wielding && C?.weaponFor(cfg.wielding)?.dmg) || 1;
+      if (reach && fh && fh.hp <= myDmg) return { line: `attack(${f.id})`, why: `${f.id} is nearly down: finishes it` };
       // in real danger of dying next round: the potion; running only when the
       // next round would kill it and there is no potion (monsters chase, and
       // a turn spent running is a free blow: seen in the survival eval)
