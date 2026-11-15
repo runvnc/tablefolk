@@ -15,12 +15,14 @@ The bandwidth tells a big unified-memory chip from an ordinary integrated
 one, and rates a device newer than every table.
 
 ```js
-import { detectHardware, recommendModel, usableGB, describeHardware, noteBrainSpeed } from '@tablefolk/device';
+import { detectHardware, recommendModel, usableGB, describeHardware, noteBrainSpeed, setCardMemory } from '@tablefolk/device';
 
 const hw = await detectHardware();
 describeHardware(hw)   // "NVIDIA GeForce RTX 2060, 6 GB, 138 GB/s"
 hw.cls                 // 'phone' | 'tablet' | 'computer' | 'xr'
 usableGB(hw)           // graphics memory a model may use (a share of shared memory)
+hw.vramOptions         // [8, 16] for a card sold with more than one memory size (the smaller is assumed)
+setCardMemory(hw.gpu, 16)  // what the player says theirs has: kept, used from the next detectHardware()
 recommendModel(hw, [{ key: 'small', needGB: 3, readGB: 1.3 }, { key: 'big', needGB: 6, readGB: 2.3 }], 'small')
 hw.choiceWhy           // "6 GB usable, 138 GB/s"
 noteBrainSpeed('big', replyChars, seconds)   // a model measured too slow is not picked again
