@@ -169,8 +169,20 @@ tools/blender/add-jaw.py -- fitted.glb out.glb [--angle .5] [--line .42]
 Head bone moves most, the snout runs along the neck-to-head direction to its
 farthest vertex, the faces across the mouth line ahead of the hinge are cut,
 a dark squashed sphere inside fills the gap, and the lower jaw turns down
-about a sideways axis at the hinge. Used for `red_dragon` (Hunyuan3D model on
-the horse rig, `--bones`).
+about a sideways axis at the hinge. The cut stops short of the corners and
+the tip (holes showed there), the head counts the rig's ear bones, and the
+mouth inside takes the surrounding skin's weights and starts at 45% size (a
+ball poked out of the nose otherwise). Used for `red_dragon`: a prowling
+concept, Hunyuan3D, on the wolf rig with `--bones --keep-width --flip`
+(reskin: `--keep-width` keeps the new body's own width for its length;
+`--flip` overrides the head-direction guess, which raised wings fooled;
+the rig's IK and pole control bones never take weights).
+
+Big bodies block every square under them (app.js bigBodyAt, g.footHalf: half
+length and width of the model and its centre offset, set at spawn for
+figures longer or wider than ~1.6 squares, turned with the body). Checked by
+playerStep, fpWalk, findRoute (not the body the route starts from) and
+occupantAt.
 
 Self-hosting (2026-11-14, vast.ai RTX 4090 at $0.375/h): Pixal3D (Tencent
 ARC, MIT, on TRELLIS.2) needs ~18 min of building (TRELLIS.2's setup.sh

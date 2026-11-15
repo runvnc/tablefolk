@@ -44,7 +44,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
-- **A talking red dragon** (`red_dragon`): a big detailed dragon whose jaw opens and closes in time with its voice, for dragons you parley with.
+- **A talking red dragon** (`red_dragon`): a big detailed dragon, low and prowling with its head forward so it looks at you, whose jaw opens and closes in time with its voice, for dragons you parley with.
+- **Big creatures block all the squares under them**: the dragon (and horses, cows and other long bodies) can no longer be walked into; the player's steps, routes and other characters go around the whole body, turned the way it faces.
 - **More and better monsters**: the zombie, kobold, demon, giant and imp are now detailed, fully animated models (the old ones stay as `*_classic`), and there are new common foes: an ogre, a gnoll, a lich, a vampire, a cultist, a bandit, a gargoyle, a dark knight and a bear. Ogres, liches, vampires, cultists and bandits can talk (and bargain or threaten); gnolls, gargoyles, dark knights and bears just fight. The world builder and the map editor offer them all.
 
 ## 2026-11-14

@@ -3521,14 +3521,33 @@ function isBlocked(x, z) {
 // A* over integer cells (8 directions, no cutting past a blocked corner),
 // then string-pulled into as few straight legs as the obstacles allow.
 function cellPassable(x,z){ return hasGroundAt(x,z) && !isBlocked(x,z); }
+// Big bodies (a figure longer or wider than ~1.6 squares: the red dragon)
+// block every square under them, not just their centre: a rectangle from the
+// model's own length and width, turned with the body (g.footHalf, set at
+// spawn). Checked for the player's steps, first-person walking, routes (the
+// body a route starts from is never in its own way) and occupantAt.
+function bigBodyAt(x,z,except){
+  for(const c of state.characters.concat(state.playerAvatar?[state.playerAvatar]:[])){
+    const f=c?.footHalf; if(!f || c===except || !c.root) continue;
+    const p=c.logicalPos||c.root.position, th=c.root.rotation.y, co=Math.cos(th), si=Math.sin(th);
+    const dx=x-p.x, dz=z-p.z, lx=dx*co-dz*si-f[2], lz=dx*si+dz*co-f[3];
+    if(Math.abs(lx)<f[0]+.3 && Math.abs(lz)<f[1]+.3) return c;
+  }
+  return null;
+}
+let routeExcept=undefined;   // findRoute: the body the route starts from
 function segmentClear(a,b){
   const len=Math.hypot(b.x-a.x,b.z-a.z), n=Math.max(1,Math.ceil(len/.2));
-  for(let i=1;i<=n;i++){ const t=i/n, x=a.x+(b.x-a.x)*t, z=a.z+(b.z-a.z)*t; if(isBlocked(x,z) || !hasGroundAt(x,z)) return false; }
+  for(let i=1;i<=n;i++){ const t=i/n, x=a.x+(b.x-a.x)*t, z=a.z+(b.z-a.z)*t; if(isBlocked(x,z) || !hasGroundAt(x,z) || (routeExcept!==undefined && bigBodyAt(x,z,routeExcept))) return false; }
   return true;
 }
 // Returns waypoints (excluding the start), [] if already there, or null if
 // there is no way through.
 function findRoute(from,to){
+  routeExcept=state.characters.concat(state.playerAvatar?[state.playerAvatar]:[]).find(c=>{ const p=c?.logicalPos||c?.root?.position; return p && Math.abs(p.x-from.x)<.6 && Math.abs(p.z-from.z)<.6; })||null;
+  try{ return findRouteInner(from,to); } finally { routeExcept=undefined; }
+}
+function findRouteInner(from,to){
   const sx=Math.round(from.x), sz=Math.round(from.z);
   let gx=Math.round(to.x), gz=Math.round(to.z);
   if(segmentClear(from,to)) return Math.hypot(to.x-from.x,to.z-from.z)<.05 ? [] : [to.clone()];
@@ -3547,7 +3566,7 @@ function findRoute(from,to){
     if(x===gx && z===gz){ found=true; break; }
     for(const [dx,dz,c] of N){
       const nx=x+dx, nz=z+dz;
-      if(Math.abs(nx)>WORLD.halfW+3 || Math.abs(nz)>WORLD.halfH+3 || !cellPassable(nx,nz)) continue;
+      if(Math.abs(nx)>WORLD.halfW+3 || Math.abs(nz)>WORLD.halfH+3 || !cellPassable(nx,nz) || bigBodyAt(nx,nz,routeExcept)) continue;
       if(dx && dz && (!cellPassable(x+dx,z) || !cellPassable(x,z+dz))) continue;
       const nc=cost.get(key(x,z))+c, k=key(nx,nz);
       if(nc<(cost.get(k)??1e9)){ cost.set(k,nc); came.set(k,key(x,z)); open.push([nx,nz,nc,nc+Math.hypot(gx-nx,gz-nz)]); }
@@ -3592,7 +3611,7 @@ function pathPoint(tm,k){
 // Someone (a character or the player's avatar) standing on cell x,z, other than g.
 function occupantAt(x,z,g){
   const bodies=[...state.characters.filter(c=>c!==g),...(state.playerAvatar && state.playerAvatar!==g ? [state.playerAvatar] : [])];
-  return bodies.find(c=>{ const p=c.logicalPos||c.root.position; return Math.abs(p.x-x)<.6 && Math.abs(p.z-z)<.6; })||null;
+  return bodies.find(c=>{ const p=c.logicalPos||c.root.position; return Math.abs(p.x-x)<.6 && Math.abs(p.z-z)<.6; })||bigBodyAt(x,z,g)||null;
 }
 // a character (or the player) by name, for walk(name)
 function whoByName(name,g){
@@ -4868,7 +4887,7 @@ const FIGURES={
   adventurer_classic:{file:'adventurer',h:1.3}, adventurer_woman_classic:{file:'adventurer_woman',h:1.24}, villager_classic:{file:'villager',h:1.22}, witch_classic:{file:'witch',h:1.3},
   skeleton:{dir:'meshy',h:1.3,v:'20261101a'}, skeleton_classic:{file:'skeleton',h:1.25,v:'20261022b'}, skeleton_warrior:{dir:'meshy',h:1.38,v:'20261101a'}, skeleton_warrior_classic:{file:'skeleton_warrior',h:1.26}, zombie:{dir:'meshy',h:1.34,v:'20261115a'}, zombie_classic:{file:'zombie',h:1.28}, goblin:{dir:'meshy',h:.95,v:'20261101a'}, goblin_classic:{file:'goblin',h:.9}, kobold:{dir:'meshy',h:.92,v:'20261115a'}, kobold_classic:{file:'goblin',h:.78,tint:[1.25,.62,.42]},
   troll:{dir:'meshy',h:2.15,v:'20261101a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261101a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261101a'}, orc_classic:{file:'orc',h:1.45},
-  demon:{dir:'meshy',h:1.85,v:'20261115a'}, demon_classic:{file:'demon',h:1.55}, giant:{dir:'meshy',h:2.2,v:'20261115a'}, giant_classic:{file:'giant',h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{dir:'animals',h:.78,v:'20261114b'}, bear:{dir:'animals',h:1.15,v:'20261115a'}, red_dragon:{dir:'animals',h:9.2,v:'20261115b'},   // Quaternius Animated Animal Pack (2026-11-13); the old wolf file's skinning was broken in Babylon
+  demon:{dir:'meshy',h:1.85,v:'20261115a'}, demon_classic:{file:'demon',h:1.55}, giant:{dir:'meshy',h:2.2,v:'20261115a'}, giant_classic:{file:'giant',h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{dir:'animals',h:.78,v:'20261114b'}, bear:{dir:'animals',h:1.15,v:'20261115a'}, red_dragon:{dir:'animals',h:5,v:'20261115g'},   // Quaternius Animated Animal Pack (2026-11-13); the old wolf file's skinning was broken in Babylon
   // animals (Quaternius Animated Animal and Farm Animal packs, CC0): not hostile, no brain unless "talks": true (play.js ANIMALS)
   cow:{dir:'animals',h:1.3,v:'20261114b'}, bull:{dir:'animals',h:1.35,v:'20261114b'}, horse:{dir:'animals',h:1.6,v:'20261114b'}, white_horse:{dir:'animals',h:1.6,v:'20261114b'}, donkey:{dir:'animals',h:1.15,v:'20261114b'}, deer:{dir:'animals',h:1.25,v:'20261114b'}, stag:{dir:'animals',h:1.55,v:'20261114b'}, fox:{dir:'animals',h:0.5,v:'20261114a'}, dog:{dir:'animals',h:0.6,v:'20261114b'}, husky:{dir:'animals',h:0.65,v:'20261114b'}, alpaca:{dir:'animals',h:1.5,v:'20261114a'}, pig:{dir:'animals',h:0.65,v:'20261114b'}, sheep:{dir:'animals',h:0.75,v:'20261114a'},
   // more monsters (Quaternius Ultimate Monsters and Animated Enemies, CC0)
@@ -4997,6 +5016,10 @@ async function createFigure(id,pos,model,label){
   root.computeWorldMatrix(true);
   const bb=root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0);
   const k=F.h/Math.max(.05,bb.max.y-bb.min.y); root.scaling.setAll(k);
+  // big ones block all the squares under them (bigBodyAt): half length and
+  // width and the centre's offset, in the body's own frame (it faces -z here)
+  const ex=(bb.max.x-bb.min.x)*k/2, ez=(bb.max.z-bb.min.z)*k/2;
+  const footHalf=Math.max(ex,ez)>.8 ? [ex*.85,ez*.85,((bb.max.x+bb.min.x)/2-root.position.x)*k,((bb.max.z+bb.min.z)/2-root.position.z)*k] : null;
   importedRoot.position.y=(-(bb.min.y-root.position.y)+(F.lift||0)/k);
   const wide=Math.max(.4,Math.min(1.1,F.h*.55));
   const collider=BABYLON.MeshBuilder.CreateBox(id+'_collider',{width:wide,height:Math.max(.4,Math.min(1.4,F.h)),depth:wide},sc);
@@ -5004,7 +5027,7 @@ async function createFigure(id,pos,model,label){
   const agg=addBody(collider,'dynamic','BOX',1.25,{friction:.92,restitution:.02});
   agg?.body?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
   const g={id,root,collider,agg,selected:false,anim:'idle',t:Math.random()*10,dir:new BABYLON.Vector3(0,0,-1),style:label||model,traits:{fireball:40,obedience:50},rigged:true,rigRoot:importedRoot,rigAnims,
-    owned:{meshes:[...res.meshes],skeletons:[...(res.skeletons||[])],groups:[...(res.animationGroups||[])]},rigMode:null,activeRigAnim:null,cosmetic:{},logicalPos:new BABYLON.Vector3(pos.x,0,pos.z),charModel:model,figure:true,height:F.h};
+    owned:{meshes:[...res.meshes],skeletons:[...(res.skeletons||[])],groups:[...(res.animationGroups||[])]},rigMode:null,activeRigAnim:null,cosmetic:{},logicalPos:new BABYLON.Vector3(pos.x,0,pos.z),charModel:model,figure:true,height:F.h,footHalf};
   // a model with a "mouth_open" morph target talks with it (wizard.glb: its
   // mouth and beard, tools/wizard-extras.mjs); updateMouth drives it
   const mouthTargets=res.meshes.flatMap(m=>{ const mtm=m.morphTargetManager; if(!mtm) return []; const out=[]; for(let i=0;i<mtm.numTargets;i++){ const t=mtm.getTarget(i); if(t.name==='mouth_open') out.push(t); } return out; });
@@ -5094,7 +5117,7 @@ function playerStep(dir){
   const lp=g.logicalPos||g.root.position, nx=Math.round(lp.x+dir.x), nz=Math.round(lp.z+dir.z);
   // a locked door opens if you carry its key (locks.js)
   const lock=window.tablefolkLocks?.lockedAt(nx,nz); if(lock && !window.tablefolkLocks.tryOpen(lock)) { emitBadge(g,'locked'); return false; }
-  if(isBlocked(nx,nz) || !hasGroundAt(nx,nz)) { emitBadge(g,'bonk'); return false; }
+  if(isBlocked(nx,nz) || !hasGroundAt(nx,nz) || bigBodyAt(nx,nz,g)) { emitBadge(g,'bonk'); return false; }
   startTurnMove(g,dir,Math.hypot(nx-lp.x,nz-lp.z)); g.anim='walk'; playRig(g,'walk',true);
   setTimeout(()=>{ if(g.anim==='walk' && !g.turnMove){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+120);
   state.followAvatar=true;
@@ -5147,7 +5170,7 @@ function fpWalk(g,dt){
   }
   const yaw=state.fpYaw??0, step=Math.min(dt,.05)*2.6*sign, lp=g.logicalPos||g.root.position;
   let x=lp.x, z=lp.z;
-  const ok=(px,pz)=>!isBlocked(px,pz) && hasGroundAt(px,pz);
+  const ok=(px,pz)=>!isBlocked(px,pz) && hasGroundAt(px,pz) && !bigBodyAt(px,pz,g);
   const nx=x+Math.sin(yaw)*step, nz=z+Math.cos(yaw)*step;
   if(ok(nx,z)) x=nx;
   if(ok(x,nz)) z=nz;

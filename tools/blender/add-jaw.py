@@ -34,7 +34,9 @@ up = (arm.matrix_world.inverted().to_3x3() @ Vector((0, 0, 1))).normalized()
 P = {v.index: to_arm @ v.co for v in me.vertices}
 # the head: vertices the Head bone moves most (a fixed weight threshold kept
 # only the part next to the bone with distance-based weights)
-headv = [v.index for v in me.vertices if v.groups and max(v.groups, key=lambda g: g.weight).group == gi]
+# (the head's own small bones count as head: the wolf rig's ears took most of it)
+hg = {gi} | {g.index for g in body.vertex_groups if any(k in g.name for k in ('Ear', 'Jaw', 'Horn', 'Mouth', 'Eye'))}
+headv = [v.index for v in me.vertices if v.groups and max(v.groups, key=lambda g: g.weight).group in hg]
 assert len(headv) > 50, 'too few head vertices: %d' % len(headv)
 # ahead: the way the neck points into the head (horns sweeping back can reach
 # farther from the bone than the snout, so not just the farthest vertex)
@@ -75,15 +77,17 @@ mid_s = (s0 + L) / 2
 band = [i for i in headv if abs(s[i] - mid_s) < .12 * (L - s0) and abs(h[i] - mouth(s[i])) < .25 * L]
 if len(band) < 8: band = [i for i in headv if s[i] > s0]
 wc = sum(w[i] for i in band) / len(band)
-inner_w = max(1e-3, .45 * (max(w[i] for i in band) - min(w[i] for i in band)) / 2)
+inner_w = max(1e-3, .3 * (max(w[i] for i in band) - min(w[i] for i in band)) / 2)
 hs = [h[i] for i in headv if abs(s[i] - mid_s) < .12 * (L - s0)]
-inner_h = max(1e-3, .16 * (max(hs) - min(hs)))
-c_arm = H + fwd * mid_s + up2 * mouth(mid_s) + side * wc
+inner_h = max(1e-3, .11 * (max(hs) - min(hs)))
+mid_s = s0 + .42 * (L - s0)   # toward the hinge, where the snout is deep
+c_arm = H + fwd * mid_s + up2 * (mouth(mid_s) - .3 * inner_h) + side * wc
 snout_half = (max(w[i] for i in band) - min(w[i] for i in band)) / 2
 jaw = set(i for i in jaw if abs(w[i] - wc) < 1.3 * snout_half)   # the jaw only, not cheeks and frills beside it
 # cut the lips: faces ahead of the hinge with corners on both sides of the line
 bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
-cut = [f for f in bm.faces if all(v.index in s for v in f.verts) and min(s[v.index] for v in f.verts) > s0 + .08 * L
+# only the front of the mouth: cut at the corners, holes showed (2026-11-15); there the skin stretches
+cut = [f for f in bm.faces if all(v.index in s for v in f.verts) and min(s[v.index] for v in f.verts) > s0 + .3 * (L - s0) and max(s[v.index] for v in f.verts) < L - .12 * (L - s0)
        and all(abs(w[v.index] - wc) < 1.15 * snout_half for v in f.verts)
        and any(v.index in jaw for v in f.verts) and not all(v.index in jaw for v in f.verts)]
 bmesh.ops.delete(bm, geom=cut, context='FACES_ONLY'); bm.to_mesh(me); bm.free()
@@ -92,7 +96,24 @@ print('[jaw] cut', len(cut), 'faces')
 # the dark mouth inside, on the head bone
 bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=1)
 inner = bpy.context.active_object; inner.name = 'MouthInside'
-M = Matrix.Identity(4); M.col[0][:3] = fwd * ((L - s0) * .36); M.col[1][:3] = side * inner_w; M.col[2][:3] = up2 * inner_h; M.col[3][:3] = c_arm
+M = Matrix.Identity(4); M.col[0][:3] = fwd * ((L - s0) * .3); M.col[1][:3] = side * inner_w; M.col[2][:3] = up2 * inner_h; M.col[3][:3] = c_arm
+# shrink it until it sits inside the head (a ball on the nose showed through
+# a narrow snout): each point is inside if a ray from it hits the body's
+# surface's nearest point faces away from it
+from mathutils.bvhtree import BVHTree
+bm2 = bmesh.new(); bm2.from_mesh(me); bm2.transform(to_arm); tree = BVHTree.FromBMesh(bm2); bm2.free()
+def inside(pt):
+    # behind the nearest bit of surface (ray parity failed: the mesh isn't watertight)
+    loc, nrm, idx, dist = tree.find_nearest(pt)
+    return loc is not None and (pt - loc).dot(nrm) < 0
+pts0 = [v.co.copy() for v in inner.data.vertices]
+for f in (.45, .35, .28, .22):   # (starts small: the inside test can't be trusted on open meshes)
+    Mf = Matrix.Identity(4)
+    for c in range(3): Mf.col[c][:3] = Vector(M.col[c][:3]) * f
+    Mf.col[3][:3] = c_arm
+    inn = sum(1 for q in pts0 if inside(Mf @ q)) / len(pts0)
+    if inn > .97: break
+M = Mf; print('[jaw] mouth inside at scale', f, 'inside', round(inn, 2))
 inner.data.transform(from_arm @ M)
 # parented like the body (its local space is the armature's): set the parent
 # first, then the same local transform, or the armature's scale applies twice

@@ -6,7 +6,7 @@
 # the old body's bounding box, then takes the old mesh's skin weights from
 # the nearest point of its surface (Data Transfer, in the rest pose). The
 # old mesh is dropped; textures are cut to 1024 px. 2026-11-14.
-import bpy, sys, math
+import bpy, sys, math, re
 from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:]
@@ -65,7 +65,7 @@ rot = 0.0
 if long_axis(nlo, nhi) != oax or TURN: rot += math.pi / 2
 if rot:
     new.data.transform(Matrix.Rotation(rot, 4, 'Z')); nv = [v.co.copy() for v in new.data.vertices]; nlo, nhi = box(nv)
-if head_sign(nv, oax) != head_sign(ov, oax) or FLIP:
+if (head_sign(nv, oax) != head_sign(ov, oax)) != FLIP:   # --flip overrides the guess
     new.data.transform(Matrix.Rotation(math.pi, 4, 'Z')); nv = [v.co.copy() for v in new.data.vertices]; nlo, nhi = box(nv)
 # --tip / --tip-back: the old body lies along Z, not Y (the farm-pack sheep's
 # rig): tip the new mesh 90 degrees about X so its length follows
@@ -110,7 +110,7 @@ bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 BONES = '--bones' in argv   # every vertex by distance to the nearest bones (no copy from the old surface)
 if BONES:
     from mathutils.geometry import intersect_point_line
-    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups}
+    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups and not re.match(r'(IK|Pole|FF)', b.name)}   # not the leg controls
     def segd(p, ab):
         a, b = ab; q, t = intersect_point_line(p, a, b); t = min(1, max(0, t)); return (p - (a + (b - a) * t)).length
     for vg in new.vertex_groups: vg.remove(list(range(len(new.data.vertices))))
@@ -122,7 +122,7 @@ if BONES:
     print('[reskin] weights by bone distance for all', len(new.data.vertices), 'vertices')
 elif not AUTO and '--no-fix' not in argv:
     from mathutils.geometry import intersect_point_line
-    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups}
+    segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups and not re.match(r'(IK|Pole|FF)', b.name)}   # not the leg controls
     def segd(p, ab):
         a, b = ab; q, t = intersect_point_line(p, a, b); t = min(1, max(0, t)); return (p - (a + (b - a) * t)).length
     gi = {vg.index: vg.name for vg in new.vertex_groups}
