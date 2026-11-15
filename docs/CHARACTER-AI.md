@@ -47,7 +47,10 @@ what Tablefolk has, and what is next. Internals: the maintainer skill's
 | Gossip spreading as hearsay; secrets; agendas | mind.js `onSpoke`, `secretLines` |
 | Survival: danger choices, a damage estimate, reflexes by brain tier | mind.js `dangerLines`, `reflex`, `tier` |
 | Monsters that hunt everyone | play.js `preyFor` |
-| Sight that becomes memory (E2B, E4B, 12B with sight) | world-integration.js `lookFor` |
+| Sight that becomes memory (E2B, E4B, 12B with sight); glances on their own | world-integration.js `lookFor`, mind.js `maybeGlance` |
+| A plan for the day (three goals) | mind.js `planDay` |
+| Recipes: what worked before | mind.js `recipeLine` |
+| Answer a fresh request first | mind.js `urgentLines` |
 
 ### Brain tiers (`expect`)
 
@@ -60,19 +63,19 @@ what Tablefolk has, and what is next. Internals: the maintainer skill's
 
 Survival eval (`tools/browser-test/survival-test.mjs`): one woodcutter
 (10 health, an axe, bread, a potion) against two skeletons (6 health each),
-hunger 0.75, the player only waiting. Results on 2026-11-15 are in the
-CHANGELOG and minds.md.
+hunger 0.75, the player only waiting; a one-wolf variant and a hunger eval
+too. Results (2026-11-15) are in minds.md, "Measured". Gemma 4 E4B and 12B
+with sight are in the picker but not yet run on a card big enough for them.
 
 ## Next, by payoff
 
 1. **A Tablefolk fine-tune of E4B**: a big model plays thousands of turns,
    and a LoRA learns the command format, the card and staying in character.
    This is the largest raw gain. It is a training job, so ask first.
-2. **Learned skills**: save a command sequence that worked (open, take,
-   give) as a named skill the character calls next time; fetching from a
-   chest is 0/3 today.
-3. **Daily plans**: one planning call each in-game morning becomes a
-   schedule that code follows.
+2. **Learned skills, further**: recipes (2026-11-15) are shown as text;
+   next, run a recipe as one command, and learn from more than hand-overs.
+3. **Plans tied to the day/night clock** (plans exist now, but not by time
+   of day).
 4. **Best-of-N with a chooser**: 2-3 candidate actions, picked by the
    Decider (as a local helper: 0.5 s natively, 6-8 s in the browser) or by a
    scoring pass.
