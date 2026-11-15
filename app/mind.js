@@ -474,11 +474,11 @@
       // a turn spent running is a free blow: seen in the survival eval)
       if (pot && frac < .7 && (me.hp <= risk * (basic ? 1.6 : 1.3) || frac <= (basic ? .45 : .35))) return { line: `eat(${pot})`, why: `${me.hp}/${me.max} health with ${f.id} near: drinks the ${pot}` };
       if (!pot && !brave && me.hp <= risk) { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `about to fall: runs from ${f.id}` }; }
-      if (basic && reach) {
-        const w = bestWeapon(g), held = cfg.wielding;
-        if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
-        return { line: `attack(${f.id})`, why: `fights back against ${f.id}` };
-      }
+      // draw the best weapon as soon as it comes near (drawing it in reach
+      // cost a turn of blows), and strike back when it is in reach
+      const w = bestWeapon(g), held = cfg.wielding;
+      if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg) && (basic || reach)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
+      if (basic && reach) return { line: `attack(${f.id})`, why: `fights back against ${f.id}` };
       if (basic && !reach && temperament(cfg) === 'timid') { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `keeps away from ${f.id}` }; }
       return null;
     }
