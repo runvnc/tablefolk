@@ -33,12 +33,16 @@ is the scenario skill's `server.md`; this is how it works inside.
   the `ENEMY` / `HOSTILE_INTENT` patterns (personality text gave false
   positives, so only intent words count).
 - `reviseScenario` (`POST /api/revise`): big fixed layouts keep their
-  objects on the server (`mergeKept`); the model answers with
-  `add_objects`, `remove_objects`, `add_paint`.
+  objects on the server (`mergeKept`); the model answers with edit
+  commands (`remove_objects`/`move_objects`/`add_objects`, `paint_area`/
+  `add_paint`/`remove_paint`, `update_agents`/`remove_agents`; listed above
+  `mergeKept` in `worldgen-core.js`). `mergeKept(s, null)` applies the same
+  commands to a small map's answer, so every revision goes through it.
 - `POST /api/finish`: the same checks for the in-browser step-by-step run
   (`app/worldgen-browser.js`: Gemma 4 E4B/E2B on LiteRT-LM or Bonsai 2 27B,
   as the menu picks, downloaded on first use) and for the visitor's own
-  model; with `kept` it merges a big map's revision first (`mergeKept`).
+  model; it applies a revision's edit commands first (`mergeKept`, with `kept`
+  for a big map).
 - **Your own key** (`app/worldgen-own.js`, where `own`): `POST
   /api/worldgen/messages` returns the exact messages, token budget and (for a
   revision) `kept` that `runModel` would use (`systemPrompt`,

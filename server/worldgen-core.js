@@ -25,7 +25,7 @@ export const systemPrompt = (skill, voices) => skill + `\n\nVoices (ttsVoiceId a
 export function finishScenario(body, packVoices = []) {
   let { scenario, kept = null } = body || {}, problems;
   try {
-    if (kept && scenario && typeof scenario === 'object' && Array.isArray(kept.objects) && Array.isArray(kept.paint)) scenario = mergeKept(scenario, kept);
+    if (scenario && typeof scenario === 'object') scenario = mergeKept(scenario, kept && Array.isArray(kept.objects) && Array.isArray(kept.paint) ? kept : null);
     problems = checkScenario(scenario, packVoices);
   } catch (e) { problems = [e.message]; }
   if (problems.length) return { problems };
@@ -147,11 +147,17 @@ export function reviseRequest(scenario, request) {
   const big = (scenario.objects?.length || 0) > 40 || (scenario.paint?.length || 0) > 40;
   const kept = big ? { objects: scenario.objects || [], paint: scenario.paint || [] } : null;
   const shown = big ? { ...scenario, objects: undefined, paint: undefined } : scenario;
+  const cmds = '"remove_objects": [[x, z], [x, z, "type"], {"from": [x, z], "to": [x, z]}] (everything, or only that type, on those squares or in that area); '
+    + '"move_objects": [{"from": [x, z], "to": [x, z], "type": "chest"}] (moves what stands there, keeping all its settings; without "type" everything on the square but walls and doors); '
+    + '"add_objects": [{"type": ..., "x": ..., "z": ..., ...}]; '
+    + '"paint_area": [{"from": [x, z], "to": [x, z], "mat": "grass"}] (a whole patch of floor tiles, replacing what was there); "add_paint": [{"x", "z", "mat"}] (one tile); "remove_paint": [[x, z], {"from": [x, z], "to": [x, z]}] (back to the plain floor); '
+    + '"update_agents": [{"id": "mog", ...only the fields to change}] (e.g. "personality", "quest", "agenda", "knows", "inventory", "model" for the body, "ttsVoiceId", "hostile", "at"); "remove_agents": ["id"]';
   const note = big ? `\n\nThis map has fixed positions: its ${kept.objects.length} objects and ${kept.paint.length} floor tiles are not shown and are kept as they are. `
-    + 'Do not write "objects" or "paint". To change the map, add "add_objects": [{"type": ..., "x": ..., "z": ..., ...}] and/or "remove_objects": [[x, z], ...] (removes the objects on those squares; [x, z, "type"] removes only that type) and/or "add_paint": [{"x", "z", "mat"}]. '
+    + `Do not write "objects" or "paint". To change the map, add these fields to the JSON: ${cmds}. `
     + `Characters and the player move with "at": [x, z]. The board is ${scenario.size?.join(' x ') || 'unknown'} squares, x from west to east is decreasing, z grows to the south. Rooms: ${(scenario.places || []).map(p => p.id + (p.center ? ' at ' + JSON.stringify(p.center) : '')).join(', ') || 'none'}.`
     + `\nObjects by type: ${Object.entries((kept.objects).reduce((m, o) => (m[o.type] = (m[o.type] || 0) + 1, m), {})).map(([t, n]) => t + ' ' + n).join(', ')}.`
-    + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.` : '';
+    + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.`
+    : `\n\nYou may edit "objects", "paint" and "agents" directly, or add these fields for the edits (applied after your JSON is read): ${cmds}.`;
   // books (app/books.js) arrive as summaries from the builder; their text stays there
   const bookNote = shown.books && Object.keys(shown.books).length ? '\n\n"books" are knowledge bases shown as summaries: keep each entry as it is (you may change title, author, about). A character carries a book by having its title in inventory.items, and answers from the books it carries with "readsBooks": true; a book can lie on the floor as {"type": "book", "book": "<id>", "x", "z"}.' : '';
   const json = JSON.stringify(shown);
@@ -184,13 +190,15 @@ Look for problems first, then for room for improvement:
 - people, monsters, things or the player inside walls, off the board, or shut in with no door; rooms that cannot be reached; doors that open onto walls
 - the goal: can it be reached with what exists (the item, the person who has it, the key to a locked door)?
 - the story: characters with nothing to want or say, a villain without a reason, an intro that promises what the map does not have
-- empty or samey rooms, things blocking doors or corridors, a map much too big or too small for what happens in it, nothing to find
+- characters: thin or contradictory personalities, goals they cannot pursue here, the wrong body or voice for who they are, inventory that does not fit, someone standing where they would never be
+- empty or samey rooms, things blocking doors or corridors, a floor that does not fit (grass in a cellar, stone in a meadow), a map much too big or too small for what happens in it, nothing to find
 - atmosphere: light in dark places; a sign on an inn or shop, paintings or tapestries in halls and chapels, a wanted poster, covers for books
 Use only the object types, bodies and fields the guide lists (no made-up types). A thing with "wall" hangs on that side of its own square: that is how pinned notes and pictures work, not a mistake. If an earlier round lost something that should stay (a chest, a floor, a character), ask for it back.
 Pictures are painted for the world after you finish: {"type": "picture", "style": "painting" | "tapestry" | "sign", "title": "words on it (signs)", "prompt": "what it shows, 5-15 words"} on a free square beside a wall (it hangs on that wall), or standing on its own; a note with "prompt" carries a picture; a book gets a cover with "coverPrompt". Pictures that are already painted are kept.
 
 Answer with one JSON object only:
-{"verdict": "good" or "improve", "problems": ["short, specific, with squares [x, z] and names"], "ideas": ["..."], "request": "the changes to make now, as instructions for the editor: concrete, with squares and names, at most 5 changes; empty when good"}
+{"verdict": "good" or "improve", "problems": ["short, specific, with squares [x, z] and names"], "ideas": ["..."], "request": "the changes to make now, as instructions for the editor: concrete, with squares and names (move the chest from [3, 4] to [5, 4]; floor from [0, 0] to [6, 4] becomes wood; give mog a reason to hate the miller), at most 5 changes; empty when good"}
+The editor can remove, move and add things, replace a whole patch of floor tiles at once, and change any field of a character.
 Say "good" when nothing real is wrong and what is left is a matter of taste.${round === rounds ? ' This is the last round: ask only for what matters most.' : ''}`;
   return { user, maxTokens: 6000 };
 }
@@ -202,15 +210,64 @@ export function parseCritique(text) {
   return { verdict, problems: list(c.problems), ideas: list(c.ideas), request: verdict === 'good' ? '' : request };
 }
 
+// A change's edit commands (the model may use them on any map; a big map's
+// objects and floor tiles are not shown to it, so there they are the only way):
+//   remove_objects [[x, z(, type)] | {from, to(, type)}]   squares or an area
+//   move_objects   [{from: [x, z], to: [x, z](, type)}]     keeps every setting
+//   add_objects    [{type, x, z, ...}]
+//   remove_paint   [[x, z] | {from, to}]                    back to the plain floor
+//   paint_area     [{from: [x, z], to: [x, z], mat}]        a whole patch of tiles
+//   add_paint      [{x, z, mat}]                            replaces that square's tile
+//   update_agents  [{id, ...fields}]                        changes only those fields
+//   remove_agents  [id]
+// kept: the layout left out of a big map's prompt (null: the answer's own).
+const num = v => Number.isFinite(+v);
+const cell = v => Array.isArray(v) && num(v[0]) && num(v[1]) ? [Math.round(+v[0]), Math.round(+v[1])] : null;
+function area(e) {   // [x, z(, type)] or {from, to(, type)} (or {x, z}) -> {x0, x1, z0, z1, type}
+  const a = Array.isArray(e) ? cell(e) : cell(e?.from) || (e && num(e.x) && num(e.z) ? cell([e.x, e.z]) : null);
+  if (!a) return null;
+  const b = (!Array.isArray(e) && cell(e?.to)) || a, type = Array.isArray(e) ? e[2] : e.type;
+  return { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), z0: Math.min(a[1], b[1]), z1: Math.max(a[1], b[1]), type: typeof type === 'string' ? type : null };
+}
+const inArea = (r, x, z) => Math.round(x) >= r.x0 && Math.round(x) <= r.x1 && Math.round(z) >= r.z0 && Math.round(z) <= r.z1;
+const list = v => Array.isArray(v) ? v : v && typeof v === 'object' ? [v] : [];
 export function mergeKept(s, kept) {
-  const rm = Array.isArray(s.remove_objects) ? s.remove_objects.filter(Array.isArray) : [];
-  const gone = o => rm.some(([x, z, t]) => Math.round(o.x) === Math.round(+x) && Math.round(o.z) === Math.round(+z) && (!t || t === o.type));
-  s.objects = [...kept.objects.filter(o => !gone(o)), ...(Array.isArray(s.add_objects) ? s.add_objects.filter(o => o && o.type && Number.isFinite(+o.x) && Number.isFinite(+o.z)) : [])];
-  s.paint = [...kept.paint, ...(Array.isArray(s.add_paint) ? s.add_paint.filter(c => c && c.mat && Number.isFinite(+c.x) && Number.isFinite(+c.z)) : [])];
-  delete s.add_objects; delete s.remove_objects; delete s.add_paint;
+  if (!s || typeof s !== 'object') return s;
+  let objects = (kept ? kept.objects : s.objects) || [], paint = (kept ? kept.paint : s.paint) || [];
+  const rm = list(s.remove_objects).map(area).filter(Boolean);
+  if (rm.length) objects = objects.filter(o => !rm.some(r => inArea(r, o.x, o.z) && (!r.type || r.type === o.type)));
+  for (const m of list(s.move_objects)) {
+    const from = cell(m?.from || m?.[0]), to = cell(m?.to || m?.[1]), type = m?.type || m?.[0]?.[2];
+    if (!from || !to) continue;
+    const dx = to[0] - from[0], dz = to[1] - from[1];
+    // without a type, everything on the square but its walls and doors moves
+    const moves = o => Math.round(o.x) === from[0] && Math.round(o.z) === from[1] && (type ? type === o.type : !['wall', 'door'].includes(o.type));
+    objects = objects.map(o => moves(o) ? { ...o, x: o.x + dx, z: o.z + dz } : o);
+  }
+  objects = [...objects, ...list(s.add_objects).filter(o => o && o.type && num(o.x) && num(o.z))];
+  // floor tiles: one per square, the newest wins
+  const tiles = new Map(paint.filter(c => c && num(c.x) && num(c.z)).map(c => [Math.round(c.x) + ',' + Math.round(c.z), c]));
+  for (const r of list(s.remove_paint).map(area).filter(Boolean)) for (const [k, c] of tiles) if (inArea(r, c.x, c.z)) tiles.delete(k);
+  for (const e of list(s.paint_area)) {
+    const r = area(e); if (!r || !e.mat) continue;
+    if ((r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1) > 10000) continue;   // a slip, not a patch
+    for (let x = r.x0; x <= r.x1; x++) for (let z = r.z0; z <= r.z1; z++) tiles.set(x + ',' + z, { ...(e.tint ? { tint: e.tint } : {}), x, z, mat: e.mat });
+  }
+  for (const c of list(s.add_paint)) if (c && c.mat && num(c.x) && num(c.z)) tiles.set(Math.round(c.x) + ',' + Math.round(c.z), c);
+  if (kept || s.objects || objects.length) s.objects = objects;
+  if (kept || s.paint || tiles.size) s.paint = [...tiles.values()];
+  // characters: change only the fields named (nested objects such as inventory are merged one level down)
+  if (Array.isArray(s.agents)) {
+    const gone = new Set(list(s.remove_agents).map(String));
+    s.agents = s.agents.filter(a => !gone.has(String(a?.id)));
+    for (const u of list(s.update_agents)) {
+      const a = s.agents.find(x => x && u && x.id === u.id); if (!a) continue;
+      for (const [k, v] of Object.entries(u)) if (k !== 'id') a[k] = v && typeof v === 'object' && !Array.isArray(v) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k]) ? { ...a[k], ...v } : v;
+    }
+  }
+  for (const k of ['add_objects', 'remove_objects', 'move_objects', 'add_paint', 'remove_paint', 'paint_area', 'update_agents', 'remove_agents']) delete s[k];
   return s;
 }
-
 
 export const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -324,7 +381,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115h"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115i"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

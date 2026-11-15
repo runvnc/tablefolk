@@ -456,7 +456,18 @@
     for (const id of ib) if (!ia.has(id)) added.push('character ' + id);
     for (const id of ia) if (!ib.has(id)) lost.push('character ' + id);
     for (const k of ['floor', 'base', 'lighting', 'walls', 'dark', 'goal', 'intro', 'books', 'generate', 'events']) if (a[k] != null && b[k] == null) lost.push(`"${k}"`);
-    const text = [added.length ? 'added ' + added.join(', ') : '', lost.length ? 'removed ' + lost.join(', ') : ''].filter(Boolean).join('; ');
+    // moved: a type whose count stayed the same but whose squares changed
+    const at = (s, t) => (s.objects || []).filter(o => o?.type === t).map(o => Math.round(o.x) + ',' + Math.round(o.z));
+    const moved = Object.keys(ca).filter(t => !['wall', 'door', 'light'].includes(t) && ca[t] === cb[t] && at(a, t).sort().join() !== at(b, t).sort().join());
+    for (const x of b.agents || []) { const y = (a.agents || []).find(q => q.id === x.id); if (y && JSON.stringify(y.at) !== JSON.stringify(x.at)) moved.push(x.id); }
+    const tile = s => new Map((s.paint || []).map(c => [Math.round(c.x) + ',' + Math.round(c.z), c.mat]));
+    const ta = tile(a), tb = tile(b); let tiles = 0;
+    for (const k of new Set([...ta.keys(), ...tb.keys()])) if (ta.get(k) !== tb.get(k)) tiles++;
+    const changed = (b.agents || []).flatMap(x => { const y = (a.agents || []).find(q => q.id === x.id); if (!y) return [];
+      const f = [...new Set([...Object.keys(x), ...Object.keys(y)])].filter(k => k !== 'at' && JSON.stringify(x[k]) !== JSON.stringify(y[k]));
+      return f.length ? [`${x.id} (${f.join(', ')})`] : []; });
+    const text = [added.length ? 'added ' + added.join(', ') : '', lost.length ? 'removed ' + lost.join(', ') : '', moved.length ? 'moved ' + moved.join(', ') : '',
+      tiles ? `${tiles} floor tile${tiles > 1 ? 's' : ''} changed` : '', changed.length ? 'changed ' + changed.join(', ') : ''].filter(Boolean).join('; ');
     return { added, lost, text };
   }
   async function improve(rounds = agent.rounds) {

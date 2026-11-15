@@ -142,5 +142,10 @@ scenario with every object, floor tile and character at an exact position:
 `generate`, `grid` and `map` are dropped; `objects`, `paint`, `size` and
 `base` hold the board; `places` keeps the rooms (a scenario with `places` and
 no `generate` keeps them as they are). The world builder's AI change box keeps
-such big lists on the server and lets the model use `add_objects`,
-`remove_objects` ([x, z] or [x, z, type]) and `add_paint` instead.
+such big lists on the server and lets the model edit with commands instead
+(on small maps it may use them too): `remove_objects` (squares, `[x, z, type]`,
+or an area `{from, to}`), `move_objects` (`{from, to, type}`, keeping every
+setting), `add_objects`, `paint_area` (a whole patch of floor tiles
+`{from, to, mat}`), `add_paint` (one tile, replacing that square's),
+`remove_paint`, `update_agents` (`{id, ...only the fields to change}`) and
+`remove_agents`.

@@ -111,6 +111,10 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   are painted. **always, after every change** keeps it on until unticked:
   every new world and every change asked for is looked over by itself (the
   rounds, painting and this choice are remembered in this browser).
+  Its changes can move things (keeping their contents), remove or add them,
+  repaint a whole patch of floor at once and change any field of a character
+  (see [generated.md](generated.md)); the log says what moved, how many floor
+  tiles changed and which character fields.
 - **Pictures** ([things.md](things.md)): signs, paintings, tapestries, notes
   with a picture and book covers are painted in this browser by a small
   image model from their `prompt` (tiny-sd, 512 px, about 0.9 GB once; on a

@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **The world builder's changes edit the map precisely**: besides rewriting, a change (Ask or the agent) can use `move_objects` (keeps a chest's contents), area `remove_objects`, `paint_area` (a whole patch of floor tiles), `remove_paint` (and `add_paint` now replaces the square's tile), `update_agents` (only the fields named) and `remove_agents`, on big and small maps. The review prompt looks at characters and floors too; the agent's log lists moves, floor tiles and character fields changed.
+
 - **Look it over, always**: a toggle beside "Look it over and improve" ("always, after every change") stays on until unticked and runs the agent by itself after every new world and every Ask; rounds, painting and the toggle are remembered in this browser.
 
 - **The world builder looks over its own worlds**: "Look it over and improve" (and "Look it over: N rounds" on the build form) has the AI review the whole map, drawn at once by the map editor as a picture with coordinates (for models that can see) and as text, find problems (people in walls, unreachable rooms, a goal that cannot be won, empty rooms, a stale intro) and ideas, make the changes, and look again, for 1-5 rounds. Each round is logged with the map it saw; what a change lost (a chest, a floor) is shown and handed to the next round to put back. Undo steps back through every change.

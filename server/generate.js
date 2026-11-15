@@ -80,7 +80,7 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
 // "add a second treasure room"); the whole updated JSON comes back.
 export async function reviseScenario({ scenario, request, ep, emit = () => {} }) {
   const { kept, maxTokens, user } = reviseRequest(scenario, request);
-  return runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens, user, merge: kept ? out => mergeKept(out, kept) : null });
+  return runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens, user, merge: out => mergeKept(out, kept) });
 }
 async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }) {
   const t0 = Date.now(), prompt = label;
