@@ -30,8 +30,10 @@
 //   recommendModel(hw, [{ key: 'small', needGB: 2, readGB: 1 }, { key: 'big', needGB: 6, readGB: 2.3 }], 'small')
 //                                        // the biggest model that fits and is fast enough; hw.choiceWhy says why
 //   noteBrainSpeed(key, chars, seconds)  // after a reply: a model measured too slow is not picked again
+//   hw.vramOptions, hw.vramAsk           // a card sold with more than one memory size ([8, 16]) and
+//   setCardMemory(hw.gpu, 16)            //   not told apart here: ask the player, keep it, reload
 // Kept in localStorage (prefix from @tablefolk/models configure(), 'tablefolk'
-// by default): GpuBandwidth (30 days) and BrainSpeed.
+// by default): GpuBandwidth (30 days), BrainSpeed and CardGB:<card name>.
 import { local } from '../models/index.js';
 let tablePromise = null;
 const table = () => tablePromise ||= fetch(new URL('./gpu-memory.json', import.meta.url)).then(r => r.json()).catch(() => ({ vram: {}, aliases: {}, integrated: [] }));
@@ -94,6 +96,27 @@ export function lookupVram(name, t) {
   if (!best && lower.length >= 4) for (const k of keys) if (k.toLowerCase().includes(lower) && (!best || k.length < best.length || (k.length === best.length && k < best))) best = k;
   return best ? t.vram[best] : null;
 }
+
+// The memory sizes a card is sold with when its name alone does not say
+// ("GeForce RTX 4060 Ti": 8 or 16 GB; "RTX 3060": 8 or 12; "RTX 5060 Ti": 8 or
+// 16): the table's "<name> <n> GB" entries and the plain name's. [] when the
+// name settles it. No browser reports a card's memory.
+export function cardVariants(name, t) {
+  const lower = String(name || '').toLowerCase(); if (!lower || !t?.vram) return [];
+  const gbs = new Set(), is = b => lower === b || lower.endsWith(' ' + b);   // "NVIDIA GeForce RTX 3060" is "GeForce RTX 3060"
+  for (const [k, v] of Object.entries(t.vram)) {
+    const kl = k.toLowerCase(), base = kl.replace(/ \d+ gb( [a-z]{2}\d{3})?$/, '');
+    if (is(kl) || (base !== kl && is(base))) gbs.add(v);
+  }
+  return gbs.size > 1 ? [...gbs].sort((a, b) => a - b) : [];
+}
+// Variants told apart by bus width: the card's rated GB/s (measured x1.6) at
+// or above which it is the bigger one (RTX 3060: 8 GB on a 128-bit bus, 240
+// GB/s; 12 GB on 192-bit, 360)
+const VARIANT_BW = { 'geforce rtx 3060': [300, 12] };
+// What the player said their card has (Settings, or the download prompt): kept per card name
+const CARD_KEY = 'CardGB:';
+export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY + gpu, String(gb)); else local.remove(CARD_KEY + gpu); } }
 
 // phone | tablet | computer | xr, from the client hints' form factors, else
 // the user agent (an iPad passes for a Mac but has a touch screen)
@@ -195,7 +218,17 @@ export function detectHardware() {
     hw.vramGB = hw.shared ? null : vram || null;
     if (adapter) hw.bwGBs = await measureBandwidth(adapter, [hw.renderer, hw.adapter, hw.maxBufferGB].join('|'), hw.cls === 'computer' ? 256 : 128);
     if (hw.shared) { const m = memoryEstimate(hw); hw.sharedGB = m.gb; hw.memWhy = m.why; }
-    else if (hw.vramGB) hw.memWhy = 'from the card\'s name';
+    else if (hw.vramGB) {
+      hw.memWhy = 'from the card\'s name';
+      const opts = cardVariants(gpu, t);
+      if (opts.length) {
+        hw.vramOptions = opts;
+        const said = +local.get(CARD_KEY + gpu), bw = VARIANT_BW[String(gpu).toLowerCase()];
+        if (opts.includes(said)) { hw.vramGB = said; hw.memWhy = 'as you said (it comes with ' + opts.join(' or ') + ' GB)'; }
+        else if (bw && hw.bwGBs) { hw.vramGB = hw.bwGBs * 1.6 >= bw[0] ? bw[1] : opts[0]; hw.memWhy = `from its measured bandwidth (${hw.bwGBs} GB/s; it comes with ${opts.join(' or ')} GB)`; }
+        else { hw.vramGB = opts[0]; hw.vramAsk = true; hw.memWhy = `it comes with ${opts.join(' or ')} GB; ${opts[0]} assumed until you say which`; }
+      }
+    }
     else if (adapter && (hw.vramGB = vramFromBandwidth(hw.bwGBs))) hw.memWhy = `at least, from its measured bandwidth (${hw.bwGBs} GB/s; the card is not in the table)`;
     return hw;
   })();

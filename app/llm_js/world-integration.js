@@ -5,7 +5,7 @@ import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached,
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
-import { describeHardware, usableGB } from '../../libs/device/index.js';
+import { describeHardware, usableGB, setCardMemory } from '../../libs/device/index.js';
 import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from '../../libs/brain/engines/wllama.js';
 import { setMirror, mirrorAllowed, on as onLibNote } from '../../libs/models/index.js';
@@ -113,6 +113,17 @@ function setStatus(status, noticeState = null) {
   else if (progress.phase || /load|download|cache|initializ|prepar|checking/i.test(text)) updateModelNotice(status, 'loading');
 }
 
+// A card sold with more than one memory size (RTX 4060 Ti: 8 or 16 GB) that the
+// browser can't tell apart: the smaller is assumed (libs/device); the player says
+// which here or in the This device pane, and the page reloads to pick again.
+function cardMemoryAsk() {
+  const hw = window.tablefolkDevice?.hw; if (!hw?.vramAsk || !hw.vramOptions?.length) return '';
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return `<span class="card-memory-ask">Your ${esc(hw.gpu)} comes with ${hw.vramOptions.join(' or ')} GB; this picked the model for ${hw.vramGB} GB. Which is yours? `
+    + hw.vramOptions.map(gb => `<button type="button" onclick="tablefolkSetCardMemory(${gb})">${gb} GB</button>`).join(' ') + '</span>';
+}
+window.tablefolkSetCardMemory = gb => { const hw = window.tablefolkDevice?.hw; if (!hw?.gpu) return; setCardMemory(hw.gpu, gb); location.reload(); };
+
 function showDownloadConsent(modelLabel, modelSize) {
   const notice = el('modelLoadNotice');
   const consent = el('modelConsent');
@@ -123,7 +134,8 @@ function showDownloadConsent(modelLabel, modelSize) {
   if (el('modelLoadSubtitle')) el('modelLoadSubtitle').textContent = `${modelLabel} runs locally on this device`;
   if (el('modelConsentText')) {
     el('modelConsentText').innerHTML = '<strong>Run the characters locally?</strong> This needs a one-time '
-      + (modelSize ? `<b>${modelSize}</b> ` : '') + `${modelLabel} download.`;
+      + (modelSize ? `<b>${modelSize}</b> ` : '') + `${modelLabel} download.`
+      + cardMemoryAsk();
   }
   clearTimeout(modelNoticeDismissTimer);
   modelNoticePercent = null;

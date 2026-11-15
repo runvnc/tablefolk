@@ -74,6 +74,7 @@
         ['WebGPU adapter', hw?.adapter || [B.adapter?.vendor, B.adapter?.architecture].filter(Boolean).join(' ') || (B.webgpu === false ? 'none' : '')],
         ['Device', hw ? [{ phone: 'phone', tablet: 'tablet', xr: 'headset', computer: 'computer' }[hw.cls], hw.model, hw.os, hw.arch].filter(Boolean).join(', ') : 'checking…'],
         ['Graphics memory', hw ? (hw.vramGB ? hw.vramGB + ' GB (' + (hw.memWhy || 'from the card\'s name') + ')' : hw.shared ? 'shared with the system' + (hw.sharedGB ? ', about ' + hw.sharedGB + ' GB (' + hw.memWhy + ')' : '') : 'unknown (card not in the table)') : 'checking…'],
+        hw?.vramOptions && ['Which one is yours', '__VRAM__'],
         ['Memory bandwidth (measured)', hw?.bwGBs ? hw.bwGBs + ' GB/s' : hw ? 'not measured' : '?'],
         ['Model choice', hw?.choiceWhy || ''],
         ['Measured model speed here', Object.entries((() => { try { return JSON.parse(localStorage.getItem('tablefolkBrainSpeed') || '{}'); } catch { return {}; } })()).map(([k, v]) => `${k} ${Math.round(v.cps)} chars/s (${v.turns} turns)`).join('; ') || 'none yet'],
@@ -92,7 +93,8 @@
       ['Running now', '<div class="running-now">' + rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + '</div>'],
       ['Decisions and fallbacks', list.length ? '<ol class="diag-log">' + list.map(n => `<li><span>${((n.t - t0) / 1000).toFixed(1)} s</span><b>${esc(n.area)}</b> ${esc(n.text)}</li>`).join('') + '</ol>' : '<p class="pane-note">none yet</p>'],
     ];
-    box.innerHTML = sections.map(([h, body]) => `<div class="section-subtitle">${esc(h)}</div>${body}`).join('')
+    const vram = (hw?.vramOptions || []).map(n => `<button type="button" class="diag-vram${n === hw.vramGB ? ' on' : ''}" data-diag="vram" data-gb="${n}">${n} GB</button>`).join(' ') + ' <small>(the page reloads to pick models again)</small>';
+    box.innerHTML = sections.map(([h, body]) => `<div class="section-subtitle">${esc(h)}</div>${body.replace('__VRAM__', vram)}`).join('')
       + '<button type="button" class="diag-copy" data-diag="copy">copy this report</button>';
   }
   function render() { try { renderRunning(); renderDevice(); } catch (e) { console.warn('[diag]', e); } }
@@ -103,6 +105,7 @@
   document.addEventListener('click', e => {
     const b = e.target.closest?.('[data-diag]'); if (!b) return;
     if (b.dataset.diag === 'breeze') window.tablefolkTTS?.upgradeToBreezeWeb?.();
+    if (b.dataset.diag === 'vram') window.tablefolkSetCardMemory?.(+b.dataset.gb);
     if (b.dataset.diag === 'copy') navigator.clipboard?.writeText(text()).then(() => window.tablefolkToast?.('report copied'), () => {});
   });
   setInterval(() => { if (visible()) render(); }, 1500);
