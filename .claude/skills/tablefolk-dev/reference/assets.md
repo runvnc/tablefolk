@@ -162,6 +162,16 @@ in Blender), alpaca. Steps:
 The old rigs must be uncompressed (Blender here has no meshopt decoder): the
 re-exported ones of 2026-11-13 and the Poly Pizza originals were used.
 
+A mouth for a creature that talks (2026-11-15): `blender -b -P
+tools/blender/add-jaw.py -- fitted.glb out.glb [--angle .5] [--line .42]
+[--hinge .35] [--bone Head]` adds a `mouth_open` shape key (app.js drives any
+`mouth_open` morph from the voice, updateMouth): the head is the vertices the
+Head bone moves most, the snout runs along the neck-to-head direction to its
+farthest vertex, the faces across the mouth line ahead of the hinge are cut,
+a dark squashed sphere inside fills the gap, and the lower jaw turns down
+about a sideways axis at the hinge. Used for `red_dragon` (Hunyuan3D model on
+the horse rig, `--bones`).
+
 Self-hosting (2026-11-14, vast.ai RTX 4090 at $0.375/h): Pixal3D (Tencent
 ARC, MIT, on TRELLIS.2) needs ~18 min of building (TRELLIS.2's setup.sh
 extensions, natten), its requirements fail to resolve (MoGe's trimesh pin;

@@ -1,0 +1,32 @@
+{
+ "v": 1,
+ "title": "Dragon test",
+ "seed": 1,
+ "size": [
+  13,
+  9
+ ],
+ "base": "plain",
+ "lighting": "bright",
+ "floor": "grass",
+ "player": {
+  "name": "T",
+  "at": [
+   0,
+   3
+  ],
+  "facing": "n"
+ },
+ "agents": [
+  {
+   "id": "Ignis",
+   "model": "red_dragon",
+   "at": [
+    0,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  }
+ ]
+}

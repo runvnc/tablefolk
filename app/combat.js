@@ -38,6 +38,7 @@
     dragon: { dmg: 4, name: 'teeth and claws' }, orc: { dmg: 3, name: 'cleaver' }, orc_classic: { dmg: 3, name: 'cleaver' }, troll: { dmg: 4, name: 'huge fists' }, goblin_classic: { dmg: 2, name: 'jagged knife' }, goblin: { dmg: 2, name: 'jagged knife' }, kobold: { dmg: 2, name: 'little spear' },
     wyrmling: { dmg: 3, name: 'fiery bite' }, imp: { dmg: 2, name: 'claws' }, mushroom_warrior: { dmg: 2, name: 'spore club' }, bunny: { dmg: 1, name: 'carrot sword' },
     gargoyle: { dmg: 3, name: 'stone claws' }, dark_knight: { dmg: 3, name: 'black blade' },
+    red_dragon: { dmg: 5, name: 'fiery bite' },
     ogre: { dmg: 4, name: 'huge fists' }, gnoll: { dmg: 2, name: 'claws and bite' }, lich: { dmg: 3, name: 'necrotic touch' }, vampire: { dmg: 3, name: 'claws and bite' }, bear: { dmg: 3, name: 'claws' },
     zombie_classic: { dmg: 2, name: 'grasping hands' }, kobold_classic: { dmg: 1, name: 'little spear' }, demon_classic: { dmg: 3, name: 'claws' }, giant_classic: { dmg: 4, name: 'huge fists' }, imp_classic: { dmg: 2, name: 'claws' },
     minotaur: { dmg: 4, name: 'horns' }, lizardman: { dmg: 3, name: 'claws and teeth' }, werewolf: { dmg: 3, name: 'claws' }, mummy: { dmg: 2, name: 'grasping wrappings' },

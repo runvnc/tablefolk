@@ -2089,6 +2089,15 @@
     150.5,
     238.1
    ]
+  },
+  "red_dragon": {
+   "file": "characters/red_dragon.png",
+   "w": 476,
+   "h": 579,
+   "anchor": [
+    237.5,
+    377.3
+   ]
   }
  },
  "floors": {

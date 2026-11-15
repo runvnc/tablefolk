@@ -175,7 +175,11 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   models stay as `zombie_classic kobold_classic demon_classic giant_classic
   imp_classic`), and `ogre`, `gnoll` (hyena-headed), `lich` (a crowned undead
   sorcerer), `vampire`, `cultist` (red-robed, masked), `bandit`, `gargoyle`, `dark_knight`;
-  and `bear` (a grizzly). Gargoyles and dark knights are mindless. Ogres, liches, vampires, cultists and bandits have minds (they
+  and `bear` (a grizzly). Gargoyles and dark knights are mindless.
+  `red_dragon`: a great red dragon (about two squares tall) that talks: its
+  jaw opens and closes with its voice (a deep voice suits it, e.g.
+  `"ttsVoiceId": "pack:villain_m"`); it walks, attacks and dies like the
+  other beasts. The old `dragon` (a small flying cartoon one) is mindless. Ogres, liches, vampires, cultists and bandits have minds (they
   can talk, threaten, bargain); give one `"hostile": true` to make it fight.
 - **More people** (made for the game, 2026-11-13; they sit, sleep and work
   like the others): `dwarf` (a red-bearded miner), `elf` (a silver-haired
