@@ -189,14 +189,14 @@ export function createAgentBrainManager(config = {}) {
     }
     if (getEngineType() === 'bonsai2') {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
-      // Sessions (each speaker keeps its own cache: libs/brain/engines/bonsai2.js):
-      // as many as the card holds beside the model and the game (0.8 GB each,
-      // 2.5 GB kept for the drawing and a voice), 1 to 4: a 12 GB card with the
-      // 27B keeps one (no gain measured there in a live village, 2026-11-15:
-      // turns were 5.7 s with one, 6.1 s with two), a 16 GB card four.
-      const hw = await detectHardware().catch(() => null), free = (usableGB(hw) ?? 0) - (SUPPORTED_MODELS[currentModelKey]?.memGB || 9.4) - 2.5;
-      const sessions = Math.max(1, Math.min(4, 1 + Math.floor(free / 0.8)));
-      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B', sessions });
+      // One conversation cache (session) for everyone: a speaker of its own costs a whole
+      // cache (~3.4 GB with the 8192 window: 9.4 GB measured less 5.95 of weights), and
+      // per-speaker caches gave no gain in a live village (12 GB card, 2026-11-15: 5.7 s
+      // a turn with one, 6.1 with two). Four on a 16 GB card ran it out of memory (an RTX
+      // 4060 Ti, 15.9 GB). ?bonsaisessions=N still tries more.
+      const hw = await detectHardware().catch(() => null);
+      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B' });
+      const sessions = engine.maxSessions || 1;
       window.tablefolkDiag?.note('brain', `Bonsai 2 keeps ${sessions} conversation cache${sessions > 1 ? 's' : ''} (${usableGB(hw) ?? '?'} GB usable)`);
       loaded = true;
       onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
