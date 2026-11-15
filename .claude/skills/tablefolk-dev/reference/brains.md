@@ -826,8 +826,10 @@ Done for that: history moves 8 messages at a time; the thinking line and the
 nearby `use(...)` example moved out of the system message. Per-speaker
 caches (`model.create_session()` per character, an LRU pool in bonsai2.js)
 made no difference in a 4-character live village (median 5.7 s one cache,
-6.1 s two) and are only on with 16 GB+. Next for speed: a shorter end
-(perception, card) for the 27B.
+6.1 s two). Each costs a whole cache (~3.4 GB at the 8192 window), so the
+first rule (16 GB+ cards get up to four) ran a 16 GB card out of memory: one
+cache everywhere now (`?bonsaisessions=N` to try more). Next for speed: a
+shorter end (perception, card) for the 27B.
 
 Graphics memory, Bonsai 2 27B with the game drawing (`--render`, roles,
 EmbeddingGemma loaded), RTX 4070: light quality peak 9.75 GB, high quality
@@ -838,3 +840,27 @@ card would hold it).
 Reflection quality (mind-check): 27B "Grub's repeated thefts show me that
 kindness must be guarded with a fence, not just a smile."; 9B "Trust is a
 fickle thing; even neighbors can be hungry."; E4B shorter and plainer.
+
+## Bonsai 2 27B on a 16 GB card, with ZONOS3-Mini (2026-11-15)
+
+vast.ai RTX 4060 Ti 16 GB (driver 580, Chrome 157), same setup as above
+(`tools/cloud-gpu`; `voicerun.sh` samples memory during a live village with
+a voice on).
+
+- **The card was taken for 8 GB**: the browser's name is "GeForce RTX 4060
+  Ti" for both versions, and the PCI ID in the renderer string is the same
+  too (0x2803 on this 16 GB card). The download prompt now asks (libs/device
+  `vramOptions`, `setCardMemory`); answered 16, the pick is Bonsai 2 27B
+  with 6.6 GB left beside it. A probe (allocate past the smaller size: on
+  Vulkan the 16 GB card took 8.5 GB more beside 7.1 GB in use before
+  out-of-memory, copies at ~250 GB/s throughout) can settle it without
+  asking: not built yet.
+- **Four conversation caches ran it out of memory** (15.9 GB, the page's
+  WebGPU device lost): one cache again.
+- **Live village, Bonsai 27B with ZONOS3-Mini speaking** (market village, 240
+  s): 13 events; peak 11.55 GB of 16; ZONOS3-Mini 13x real time beside the
+  27B, first sound 0.57 s, no underruns. On a 12 GB card (10.2 GB peak
+  without a voice, ~1.45 for ZONOS) it would be about 11.6 of 12.28: tight.
+- ZONOS3-Mini asks the R2 mirror for `edit/`, `aligner/` and
+  `zac-full_mr/manifest.json` (404 there).
+
