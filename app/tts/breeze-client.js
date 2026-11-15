@@ -91,17 +91,17 @@
 
     // a library voice, saved on the server the first time it is needed
     async voiceId(id) {
-      const [packId, mood] = id.split('@'), v = (window.TABLEFOLK_PACK_VOICES || []).find(x => x.id === packId);
+      const [packId, mood] = id.split('@'), v = window.tablefolkPackVoice?.(packId) || (window.TABLEFOLK_PACK_VOICES || []).find(x => x.id === packId);
       const file = v && ((mood && v.moods?.[mood]) || v.file), text = v && ((mood && v.mood_text?.[mood]) || v.text);
       if (!file || !text) return null;
-      const name = ('tf_' + packId.slice(5) + '_' + (mood && v.moods?.[mood] ? mood : 'main') + '_' + (v.v || '0')).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+      const name = ('tf_' + (v.scenario ? 'w_' : '') + packId.slice(5) + '_' + (mood && v.moods?.[mood] ? mood : 'main') + '_' + (v.v || '0')).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
       if (!this.saved) {
         const r = await fetch(base() + '/v1/voices').catch(() => null);
         this.saved = new Set(r?.ok ? (await r.json().catch(() => [])).map(x => x.id) : []);
       }
       if (this.saved.has(name)) return name;
       if (!this.making.has(name)) this.making.set(name, (async () => {
-        const res = await fetch((window.tablefolkPacks?.base || './assets/') + 'voices/' + file + '?v=' + (v.v || ''));
+        const res = await fetch(window.tablefolkVoiceUrl ? window.tablefolkVoiceUrl(v, file) : (window.tablefolkPacks?.base || './assets/') + 'voices/' + file + '?v=' + (v.v || ''));
         if (!res.ok) throw new Error('voice sample ' + res.status);
         const ctx = new OfflineAudioContext(1, 1, 24000), audio = await ctx.decodeAudioData(await res.arrayBuffer());
         const fd = new FormData();
@@ -115,7 +115,7 @@
     }
     // a voice designed from words: the built-in names' descriptions
     instructionFor(voice) {
-      const id = voice.replace(/^(builtin|custom):/, ''), v = (window.TABLEFOLK_VOICES || []).find(x => x.id === id);
+      const id = voice.replace(/^(builtin|custom):/, ''), z = window.TABLEFOLK_ZONOS_BUILTINS?.[id], v = (window.TABLEFOLK_VOICES || []).find(x => x.id === (z || id)) || window.tablefolkPackVoice?.(voice.split('@')[0]);
       if (v) return `A ${v.gender || ''} voice: ${v.description || 'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g, ' ');
       return 'A warm, natural speaking voice. Speak clearly and naturally.';
     }

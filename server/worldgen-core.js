@@ -35,6 +35,8 @@ export function finishScenario(body, packVoices = []) {
 export const COMMANDS = new Set(['say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
   'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing']);
 export const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius']);
+// ZONOS3-Mini's built-in voices (libs/voice/zonos-web-worker.js); other engines speak them as a Pocket-TTS one
+export const ZONOS_VOICES = new Set(['cillian', 'imogen', 'jett', 'morgana', 'rupert', 'sakura', 'savannah', 'thaddeus', 'willow', 'wyatt']);
 // app.js AVATAR_MODELS + FIGURES; MINDLESS as in play.js (hostile by default)
 export const MINDLESS = new Set(['skeleton', 'skeleton_warrior', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy', 'bear', 'gnoll', 'gargoyle', 'dark_knight']);
 export const ANIMALS = new Set(['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep']);
@@ -77,7 +79,9 @@ export function checkScenario(s, packVoices = []) {
     // monsters that only fight need no brief
     if (!a.personality && (a.hostile || (a.hostile == null && MINDLESS.has(a.model)))) a.personality = `A hostile ${String(a.model).replace(/_/g, ' ')}.`;
     if (!a.personality) problems.push(`agent ${a.id}: needs a "personality"`);
-    if (a.ttsVoiceId) { const raw = String(a.ttsVoiceId).toLowerCase(), v = raw.replace(/^builtin:/, ''); if (packVoices.some(p => p.id === raw)) a.ttsVoiceId = raw; else if (VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
+    // a voice of the world's own ("voices", made in the builder) keeps its exact id
+    if (a.ttsVoiceId && Array.isArray(s.voices) && s.voices.some(v => 'pack:' + v?.id === String(a.ttsVoiceId))) {}
+    else if (a.ttsVoiceId) { const raw = String(a.ttsVoiceId).toLowerCase(), v = raw.replace(/^builtin:/, ''); if (packVoices.some(p => p.id === raw)) a.ttsVoiceId = raw; else if (VOICES.has(v) || ZONOS_VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
     for (const c of a.allowed || []) if (!COMMANDS.has(c)) problems.push(`agent ${a.id} "allowed": unknown command ${c}`);
   }
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
@@ -160,10 +164,12 @@ export function reviseRequest(scenario, request) {
     : `\n\nYou may edit "objects", "paint" and "agents" directly, or add these fields for the edits (applied after your JSON is read): ${cmds}.`;
   // books (app/books.js) arrive as summaries from the builder; their text stays there
   const bookNote = shown.books && Object.keys(shown.books).length ? '\n\n"books" are knowledge bases shown as summaries: keep each entry as it is (you may change title, author, about). A character carries a book by having its title in inventory.items, and answers from the books it carries with "readsBooks": true; a book can lie on the floor as {"type": "book", "book": "<id>", "x", "z"}.' : '';
+  // the world's own voices (app/tts/voice-sample.js) arrive without their samples
+  const voiceNote = Array.isArray(shown.voices) && shown.voices.length ? '\n\n"voices" are this world\'s own voices (recorded samples, shown without their audio): keep each entry as it is (you may change name, gender, description); a character speaks with one as "ttsVoiceId": "pack:<id>".' : '';
   const json = JSON.stringify(shown);
   const maxTokens = Math.min(24000, Math.max(17000, Math.ceil(json.length / 2.5) + 8000));
   return { kept, maxTokens,
-    user: `Here is a scenario:\n\n${json}${note}${bookNote}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.` };
+    user: `Here is a scenario:\n\n${json}${note}${bookNote}${voiceNote}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.` };
 }
 
 // The builder's "look it over and improve" agent (app/builder.js): one round
@@ -381,7 +387,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115i"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115j"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

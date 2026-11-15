@@ -77,7 +77,133 @@
   const spokenSelect = (path, v) => `<label><span>speaks only when spoken to</span><select data-path="${path}" data-type="bool3"><option value=""${v == null ? ' selected' : ''}>auto (in simple mode)</option><option value="true"${v === true ? ' selected' : ''}>yes</option><option value="false"${v === false ? ' selected' : ''}>no</option></select></label>`;
   const directorSelect = v => `<label><span>director (random events in a living world)</span><select data-path="director" data-type="bool3"><option value=""${v == null || Number.isFinite(+v) && v !== false ? ' selected' : ''}>${Number.isFinite(+v) && v != null && v !== false ? 'on: every ' + esc(v) + ' turns' : 'on'}</option><option value="false"${v === false ? ' selected' : ''}>off</option></select></label>`;
   const modelOptions = [['', '(critter)'], ...PEOPLE.map(m => [m, 'person: ' + m]), ...MONSTERS.map(m => [m, 'monster: ' + m]), ...ANIMALS.map(m => [m, 'animal: ' + m]), ...OLDER.filter(m => m !== 'critter').map(m => [m, 'chibi: ' + m])];
-  const voiceOptions = () => [['', '(fits the body)'], ...(voices.length ? voices : ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'].map(id => ({ id }))).map(v => ['builtin:' + v.id, v.id + (v.gender || v.description ? ' (' + [v.gender, v.description].filter(Boolean).join(', ') + ')' : '')])];
+  // voices: the world's own first (Voices tab), then mine (this browser), the library, ZONOS3-Mini's and Pocket-TTS's built-in ones
+  const about = v => v.gender || v.description ? ' (' + [v.gender, v.description].filter(Boolean).join(', ') + ')' : '';
+  const voiceOptions = () => [['', '(fits the body)'],
+    ...(scn.voices || []).map(v => ['pack:' + v.id, '★ this world: ' + v.name + about(v)]),
+    ...myList.filter(m => !(scn.voices || []).some(v => v.v === m.v)).map(m => ['my:' + m.id, '♥ my voices: ' + m.name + about(m)]),
+    ['__new', '+ a new voice from a sample or a recording…'],
+    ...libVoices.map(v => ['pack:' + v.id, 'library: ' + v.name + about(v)]),
+    ...ZONOS_BUILT.map(([id, g, d]) => ['builtin:' + id, `ZONOS3-Mini: ${id} (${g}, ${d}; other engines: a Pocket-TTS voice)`]),
+    ...(voices.length ? voices : ['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius'].map(id => ({ id }))).map(v => ['builtin:' + v.id, 'Pocket-TTS: ' + v.id + about(v)])];
+
+  // ---- voices (app/tts/voice-sample.js): the world's own ("voices": a short sample each,
+  // spoken as "pack:<id>"), mine (kept in this browser, for every world), the library's
+  const VS = () => window.tablefolkVoiceSample;
+  const ZONOS_BUILT = [['cillian', 'male', 'Irish'], ['imogen', 'female', 'British'], ['jett', 'male', 'energetic'], ['morgana', 'female', 'a witch'], ['rupert', 'male', 'British'], ['sakura', 'female', 'anime'], ['savannah', 'female', 'American'], ['thaddeus', 'male', 'an announcer'], ['willow', 'female', 'soft, close (ASMR)'], ['wyatt', 'male', 'American']];
+  const READ_THIS = "The road north is longer than it looks, friend. Keep your lantern lit, mind the river, and don't trust anyone who smiles too quickly.";
+  let libVoices = [], myList = [], paneVoices = [], voiceMsg = '', assignTo = null, recording = null, voiceBusy = false;
+  fetch('/app/assets/voices/voices.json').then(r => r.ok ? r.json() : []).then(d => { libVoices = Array.isArray(d) ? d : []; if (scn) render(); }).catch(() => {});
+  async function refreshMine() { if (!VS()) return; myList = await VS().myVoices.list(); paneVoices = await VS().myVoices.fromVoicePane(); if (scn) render(); }
+  setTimeout(refreshMine, 0);
+  const voiceSay = t => { voiceMsg = t; const el = $('voiceMsg'); if (el) el.textContent = t; };
+  function voiceSlug(name) { const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 24) || 'voice'; let id = base; const taken = x => (scn.voices || []).some(v => v.id === x) || libVoices.some(v => v.id === x); for (let n = 2; taken(id); n++) id = base + '_' + n; return id; }
+  const kb = n => Math.round(n / 1024) + ' KB';
+  // make the ZONOS3-Mini voice here when it is downloaded (else the game makes it from the sample)
+  async function zonosFor(v, audio) {
+    if (v.zonos || !VS().zonosReady()) return;
+    voiceSay('making the ZONOS3-Mini voice…');
+    const a = audio || await VS().decode(v.sample), z = await VS().embedding(a, v.v);
+    if (z && (scn.voices || []).includes(v)) { v.zonos = z; voiceSay(''); render(); }
+  }
+  async function addVoiceFrom(blob, name, extra = {}) {
+    if (voiceBusy) return; voiceBusy = true;
+    try {
+      voiceSay('reading the sample…');
+      const p = await VS().prepare(blob), id = voiceSlug(name || 'voice');
+      const v = { id, name: String(name || id).slice(0, 40), ...(extra.gender ? { gender: extra.gender } : {}), ...(extra.description ? { description: extra.description } : {}), sample: p.sample, v: p.v, ...(extra.text ? { text: extra.text } : {}) };
+      remember(); (scn.voices ||= []).push(v);
+      if (assignTo) { set(assignTo, 'pack:' + id); assignTo = null; }
+      voiceSay(`${v.name}: ${p.seconds.toFixed(1)} s, ${kb(p.sample.length)} in the world`); render(); mapSoon();
+      await zonosFor(v, p.audio).catch(e => voiceSay('ZONOS3-Mini voice not made here (' + e.message + '); the game makes it'));
+    } catch (e) { voiceSay('failed: ' + e.message); }
+    finally { voiceBusy = false; }
+  }
+  // one of my voices into this world (a copy: the world carries it)
+  function addMine(id) {
+    const m = myList.find(x => x.id === id); if (!m) return null;
+    const have = (scn.voices || []).find(v => v.v === m.v); if (have) return have.id;
+    const { saved, ...v } = m; v.id = voiceSlug(m.id);
+    (scn.voices ||= []).push(v); return v.id;
+  }
+  function voicesPanel() {
+    if (!VS()) return '<p class="muted">The voice tools did not load.</p>';
+    const vs = scn.voices || [], users = id => (scn.agents || []).filter(a => a.ttsVoiceId === 'pack:' + id).map(a => a.id);
+    const zr = VS().zonosReady(), total = vs.reduce((n, v) => n + JSON.stringify(v).length, 0);
+    const forWho = assignTo ? get(assignTo.replace(/\.ttsVoiceId$/, '.id')) : null;
+    return `<p class="muted">A voice of this world's own: a short sample of one person speaking (3 to 12 seconds; a file or a recording), kept in the world (about 35 KB each) so it travels with the link. ZONOS3-Mini clones it from its sound (${zr ? 'downloaded in this browser: the voice is made here and you can try lines' : 'not downloaded in this browser yet: the game makes the voice the first time it speaks; the Voice pane in the game downloads it'}); Pocket-TTS clones it from the sample too; Breeze TTS also needs the words said in it. Give a voice to a character here or in the Characters tab.</p>
+      ${forWho ? `<p><b>The next voice you add goes to ${esc(forWho)}.</b> <button type="button" class="ghost small" data-vact="unassign">cancel</button></p>` : ''}
+      ${vs.map((v, i) => `<fieldset class="agent" data-voice="${i}"><legend>${esc(v.name)} <button type="button" class="ghost small" data-vact="remove">remove</button></legend><div class="cols">
+        <label><span>name</span><input data-vfield="name" value="${esc(v.name)}"></label>
+        <label><span>gender</span><select data-vfield="gender">${[['', '(not said)'], 'female', 'male', 'other'].map(o => { const [k, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${k}"${(v.gender || '') === k ? ' selected' : ''}>${t}</option>`; }).join('')}</select></label>
+        <label class="wide"><span>what it sounds like (a few words, for the AI casting it and for engines that design voices)</span><input data-vfield="description" value="${esc(v.description || '')}" placeholder="e.g. gruff old sailor, slow, a little hoarse"></label>
+        <label class="wide"><span>the words said in the sample (exactly; Breeze TTS clones from them)</span><input data-vfield="text" value="${esc(v.text || '')}"></label>
+        <label><span>the sample</span><audio controls preload="none" src="${esc(v.sample)}" style="width:100%;height:32px"></audio></label>
+        <label><span>speaks for</span><select data-vfield="assign"><option value="">${users(v.id).length ? esc(users(v.id).join(', ')) : '(nobody yet)'}</option>${(scn.agents || []).filter(a => a.ttsVoiceId !== 'pack:' + v.id).map(a => `<option value="${esc(a.id)}">+ give it to ${esc(a.id)}</option>`).join('')}</select></label>
+        <label class="wide"><span>try a line (ZONOS3-Mini)</span><span style="display:flex;gap:8px"><input data-vtry value="Well met, traveller. What brings you all this way?" style="flex:1"><button type="button" data-vact="try" ${zr ? '' : `disabled title="ZONOS3-Mini is not downloaded in this browser (the game's Voice pane downloads it)"`}>▶ try it</button></span></label>
+        <p class="muted" style="grid-column:1/-1;margin:0">${kb(JSON.stringify(v).length)} · ${v.zonos ? 'ZONOS3-Mini voice made' : 'ZONOS3-Mini voice: made by the game the first time it speaks'}${v.text ? '' : ' · no words: Breeze TTS designs a voice from the description instead'} <button type="button" class="ghost small" data-vact="save">${myList.some(m => m.v === v.v) ? '♥ in my voices' : '♥ save to my voices'}</button></p>
+      </div></fieldset>`).join('')}
+      <fieldset class="agent"><legend>Add a voice</legend><div class="cols">
+        <label><span>name</span><input id="vNewName" placeholder="e.g. Old Sailor"></label>
+        <label><span>gender</span><select id="vNewGender"><option value="">(not said)</option><option>female</option><option>male</option><option>other</option></select></label>
+        <label class="wide"><span>from a file (WAV, MP3, OGG, M4A...: one person, no music; the first 12 seconds are kept)</span><input type="file" accept="audio/*,.wav,.mp3,.ogg,.m4a,.webm,.flac" id="vNewFile"></label>
+        <label class="wide"><span>or record it: read this aloud (its words are kept for Breeze TTS)</span><span style="display:flex;gap:8px;align-items:center"><em style="flex:1">${esc(READ_THIS)}</em><button type="button" data-vact="record">${recording ? '■ stop' : '● record'}</button></span></label>
+        <p class="muted" style="grid-column:1/-1;margin:0"><span id="voiceMsg">${esc(voiceMsg)}</span>${vs.length ? ` · the world's voices: ${kb(total)} (a saved world can be up to about 390 KB in all)` : ''}</p>
+      </div></fieldset>
+      ${myList.length || paneVoices.length ? `<fieldset class="agent"><legend>My voices (kept in this browser)</legend>
+        ${myList.map(m => `<div class="toolbar" data-mine="${esc(m.id)}"><b>${esc(m.name)}</b><span class="muted">${esc(about(m))}</span><audio controls preload="none" src="${esc(m.sample)}" style="height:28px;width:180px"></audio>${(scn.voices || []).some(v => v.v === m.v) ? '<span class="muted">in this world</span>' : '<button type="button" data-vact="useMine">add to this world</button>'}<button type="button" class="ghost small" data-vact="forget">delete</button></div>`).join('')}
+        ${paneVoices.map(p => `<div class="toolbar" data-pane="${esc(p.id)}"><b>${esc(p.name)}</b><span class="muted">made in the game's Voice pane</span><button type="button" data-vact="usePane">add to this world</button></div>`).join('')}
+      </fieldset>` : ''}`;
+  }
+  document.addEventListener('change', e => {
+    const el = e.target; if (!el.closest?.('#editor')) return;
+    if (el.id === 'vNewFile' && el.files?.[0]) { const f = el.files[0]; addVoiceFrom(f, $('vNewName')?.value.trim() || f.name.replace(/\.[^.]+$/, ''), { gender: $('vNewGender')?.value }); return; }
+    const box = el.closest('[data-voice]'), v = box && scn.voices?.[+box.dataset.voice]; if (!v || !el.dataset.vfield) return;
+    const f = el.dataset.vfield;
+    if (f === 'assign') { const a = (scn.agents || []).find(a => a.id === el.value); if (a) { remember(); a.ttsVoiceId = 'pack:' + v.id; render(); mapSoon(); } return; }
+    if (f === 'gender') { if (el.value) v.gender = el.value; else delete v.gender; mapSoon(); }
+  });
+  document.addEventListener('input', e => {
+    const el = e.target, box = el.closest?.('[data-voice]'), v = box && scn.voices?.[+box.dataset.voice]; if (!v || !el.dataset.vfield || el.tagName === 'SELECT') return;
+    const f = el.dataset.vfield;
+    if (el.value.trim()) v[f] = el.value; else if (f !== 'name') delete v[f];
+    mapSoon();
+  });
+  document.addEventListener('click', async e => {
+    const b = e.target.closest?.('#editor [data-vact]'); if (!b) return;
+    const act = b.dataset.vact, box = b.closest('[data-voice]'), v = box && scn.voices?.[+box.dataset.voice];
+    if (act === 'unassign') { assignTo = null; render(); }
+    else if (act === 'remove' && v) { remember(); for (const a of scn.agents || []) if (a.ttsVoiceId === 'pack:' + v.id) delete a.ttsVoiceId; scn.voices.splice(+box.dataset.voice, 1); if (!scn.voices.length) delete scn.voices; render(); mapSoon(); }
+    else if (act === 'save' && v) { await VS().myVoices.put({ ...v }); await refreshMine(); voiceSay(v.name + ' is in my voices: offered in every world in this browser'); }
+    else if (act === 'try' && v) {
+      const line = box.querySelector('[data-vtry]')?.value.trim(); if (!line) return;
+      b.disabled = true;
+      try { if (!v.zonos) await zonosFor(v); if (!v.zonos) throw new Error('no ZONOS3-Mini voice'); voiceSay('speaking…'); const secs = await VS().say(line, v.zonos); voiceSay(`spoken (${secs.toFixed(1)} s)`); }
+      catch (err) { voiceSay('failed: ' + err.message); } finally { b.disabled = false; }
+    }
+    else if (act === 'useMine') { const id = b.closest('[data-mine]')?.dataset.mine; remember(); const got = addMine(id); if (got && assignTo) { set(assignTo, 'pack:' + got); assignTo = null; } render(); mapSoon(); }
+    else if (act === 'forget') { const id = b.closest('[data-mine]')?.dataset.mine, m = myList.find(x => x.id === id); if (m && await (window.confirmDialog ? window.confirmDialog(`Delete ${m.name} from my voices in this browser? Worlds that have it keep their copy.`, { title: 'Delete voice?', confirmText: 'delete', danger: true }) : confirm(`Delete ${m.name} from my voices?`))) { await VS().myVoices.remove(id); refreshMine(); } }
+    else if (act === 'usePane') { const p = paneVoices.find(x => x.id === b.closest('[data-pane]')?.dataset.pane); if (p) addVoiceFrom(VS().floatsToFile(Float32Array.from(p.audio)), p.name); }
+    else if (act === 'record') {
+      if (recording) { recording.stop(); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } }), parts = [], rec = new MediaRecorder(stream);
+        rec.ondataavailable = x => { if (x.data.size) parts.push(x.data); };
+        rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); recording = null; render(); addVoiceFrom(new Blob(parts, { type: rec.mimeType }), $('vNewName')?.value.trim() || 'my voice', { gender: $('vNewGender')?.value, text: READ_THIS }); };
+        rec.start(); recording = rec; voiceMsg = 'recording: read the line, then press stop'; render();
+        setTimeout(() => { if (recording === rec) rec.stop(); }, 15000);
+      } catch (err) { voiceSay('no microphone: ' + err.message); }
+    }
+  });
+  // the AI that changes the world sees each voice without its sample; its answer gets them back
+  function lightVoices(s) { return Array.isArray(s.voices) ? { ...s, voices: s.voices.map(v => ({ id: v.id, name: v.name, ...(v.gender ? { gender: v.gender } : {}), ...(v.description ? { description: v.description } : {}) })) } : s; }
+  function heavyVoices(next, before) {
+    if (!Array.isArray(before.voices)) return next;
+    if (!Array.isArray(next.voices)) { next.voices = before.voices; return next; }
+    const out = next.voices.map(v => { const old = before.voices.find(o => o.id === v?.id); return old && { ...old, ...(v.name ? { name: String(v.name) } : {}), ...(v.gender != null ? { gender: String(v.gender) } : {}), ...(v.description != null ? { description: String(v.description) } : {}) }; }).filter(Boolean);
+    if (out.length) next.voices = out; else delete next.voices;
+    return next;
+  }
 
   function agentBox(a, i) {
     const p = 'agents.' + i, hostile = a.hostile == null ? '' : String(!!a.hostile);
@@ -109,7 +235,7 @@
     $('wsTitle').textContent = scn.title || 'Untitled world';
     $('wsSub').textContent = [scn.subtitle, meta.model ? 'built with ' + meta.model : ''].filter(Boolean).join(' · ');
     const typed = $('aiReq')?.value || '', said = $('aiMsg')?.textContent || '', canAsk = revise.where !== undefined;
-    const tabs = [['story', 'Story'], ['player', 'Player'], ['characters', `Characters (${(scn.agents || []).length})`], ['layout', 'Layout'], ['books', `Books (${Object.keys(scn.books || {}).length})`], ['raw', 'JSON']];
+    const tabs = [['story', 'Story'], ['player', 'Player'], ['characters', `Characters (${(scn.agents || []).length})`], ['layout', 'Layout'], ['books', `Books (${Object.keys(scn.books || {}).length})`], ['voices', `Voices (${(scn.voices || []).length})`], ['raw', 'JSON']];
     box.innerHTML = `${canAsk ? `<fieldset class="ask"><legend>Ask the AI for changes</legend>
         <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
         <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div>
@@ -130,6 +256,7 @@
       <div data-panel="characters" ${tabNow === 'characters' ? '' : 'hidden'}><fieldset><legend>Characters</legend>${(scn.agents || []).map(agentBox).join('') || '<p class="muted">No characters yet: drag monsters and people onto the map.</p>'}<button type="button" data-act="add">+ add a character</button></fieldset></div>
       <div data-panel="layout" ${tabNow === 'layout' ? '' : 'hidden'}><fieldset><legend>Map${scn.generate ? ' (generated ' + esc(scn.generate.kind || 'dungeon') + ')' : scn.grid?.length ? ' (drawn grid)' : scn.map?.length ? ' (layout lines)' : ' (fixed positions)'}</legend>${mapBox()}</fieldset></div>
       <div data-panel="books" ${tabNow === 'books' ? '' : 'hidden'}><fieldset><legend>Books</legend>${booksPanel()}</fieldset></div>
+      <div data-panel="voices" ${tabNow === 'voices' ? '' : 'hidden'}><fieldset><legend>Voices</legend>${voicesPanel()}</fieldset></div>
       <div data-panel="raw" ${tabNow === 'raw' ? '' : 'hidden'}><fieldset><legend>Raw JSON</legend><textarea id="rawJson" class="mono" rows="22"></textarea><div class="toolbar"><button type="button" data-act="applyRaw">Apply JSON</button></div></fieldset></div>`;
     if (typed && $('aiReq')) $('aiReq').value = typed; if (said && $('aiMsg')) $('aiMsg').textContent = said;
     if ($('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2);
@@ -313,6 +440,10 @@
     const el = e.target; if (!el.dataset?.path) return;
     try {
       const v = readInput(el);
+      if (/\.ttsVoiceId$/.test(el.dataset.path) && (v === '__new' || String(v).startsWith('my:'))) {
+        if (v === '__new') { assignTo = el.dataset.path; tabNow = 'voices'; render(); return; }
+        remember(); const id = addMine(String(v).slice(3)); if (id) set(el.dataset.path, 'pack:' + id); render(); mapSoon(); return;
+      }
       if (el.dataset.path === '__rules') { scn.goal = { ...(scn.goal?.text ? { text: scn.goal.text } : {}), ...(v || {}) }; if (!Object.keys(scn.goal).length) delete scn.goal; }
       else set(el.dataset.path, v);
       msg('');
@@ -365,7 +496,7 @@
   const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars || 0} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
   // one change by the AI: the new scenario replaces this one (undo steps back)
   async function reviseAI(req, say) {
-    const { light, heavy } = lightImages(lightBooks(scn));
+    const { light, heavy } = lightImages(lightVoices(lightBooks(scn)));
     let done = null;
     // the visitor's own key or server: this page calls it (app/worldgen-own.js)
     if (revise.where === 'own' && window.tfOwnModel) {
@@ -390,7 +521,7 @@
       }
       if (!done) throw new Error('no answer');
     }
-    remember(); scn = heavyBooks(heavy(done.scenario), scn); render(); loadMap();
+    remember(); scn = heavyVoices(heavyBooks(heavy(done.scenario), scn), scn); render(); loadMap();
     return done;
   }
   let asking = false;
@@ -431,7 +562,7 @@
   async function critique(round, rounds, history, say) {
     await mapLaidOut();
     const shot = await ed?.snapshot?.(), mapText = ed?.describe?.() || '';
-    const { light } = lightImages(lightBooks(scn));
+    const { light } = lightImages(lightVoices(lightBooks(scn)));
     const body = { scenario: light, mapText, round, rounds, history };
     if (revise.where === 'own' && window.tfOwnModel) {
       const r = await window.tfOwnModel.critique(body, shot?.url, say);

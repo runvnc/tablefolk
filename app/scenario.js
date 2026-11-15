@@ -940,6 +940,8 @@
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       // books.js: knowledge bases characters read from (passages, vectors, cover and spine)
       books: s.books && typeof s.books === 'object' && !Array.isArray(s.books) ? s.books : {},
+      // tts/voice-sample.js: the world's own voices (a short sample each), spoken as "pack:<id>"
+      voices: Array.isArray(s.voices) ? s.voices.filter(v => v && typeof v === 'object' && /^[A-Za-z0-9_-]{1,32}$/.test(String(v.id || '')) && typeof v.sample === 'string' && /^data:audio\//.test(v.sample)).slice(0, 32) : [],
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // mind.js: news passed between characters, reflection, how much the game helps the characters; play.js: who monsters go after
       gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: s.monsters === 'everyone' ? 'everyone' : 'player',
@@ -1041,6 +1043,8 @@
     // Packages (packages.js): their items, skills, roles and workflows.
     const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages) : [];
     const parentAgents = opts.restore ? base.agents : null;
+    // the world's own voices (a subworld keeps its parent's unless it brings its own)
+    if (!opts.sub || base.voices.length) try { window.tablefolkTTS?.setScenarioVoices?.(base.voices); } catch (e) { console.warn('[voices]', e); }
     for (const m of packageWarnings) console.warn('[packages]', m);
     refreshThings();
     w.setWorldSize?.(...boardSizeFor(base));

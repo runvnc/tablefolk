@@ -13,6 +13,16 @@
   // else the server's default (admin page, /api/voices), else the first.
   // The workers live in libs/voice (@tablefolk/voice); they take the R2 mirror only where
   // the page allows it (window.tablefolkMirrorAllowed: world-integration.js, @tablefolk/models).
+  // pack voices: the world's own (scenario "voices", app/tts/voice-sample.js) before the library's
+  const packVoice=id=>(window.TABLEFOLK_SCENARIO_VOICES||[]).find(x=>x.id===id)||(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id);
+  window.tablefolkPackVoice=packVoice;
+  // where a pack voice's sample is: a world's voice carries it (a data URL), the library's are files
+  const voiceUrl=(v,file)=>/^(data:|blob:|https?:)/.test(file)?file:(window.tablefolkPacks?.base||'./assets/')+'voices/'+file+'?v='+(v.v||'');
+  window.tablefolkVoiceUrl=voiceUrl;
+  const decodeSample=async(v,file)=>{ if(window.tablefolkVoiceSample) return window.tablefolkVoiceSample.decode(voiceUrl(v,file)); const r=await fetch(voiceUrl(v,file)); if(!r.ok) throw new Error('voice sample '+r.status); return (await new OfflineAudioContext(1,1,24000).decodeAudioData(await r.arrayBuffer())).getChannelData(0).slice(); };
+  // ZONOS3-Mini's built-in voices (libs/voice/zonos-web-worker.js ZONOS_VOICES) as Pocket-TTS's for the other engines
+  const ZONOS_BUILTINS={cillian:'marius',imogen:'azelma',jett:'jean',morgana:'fantine',rupert:'javert',sakura:'cosette',savannah:'alba',thaddeus:'javert',willow:'eponine',wyatt:'jean'};
+  window.TABLEFOLK_ZONOS_BUILTINS=ZONOS_BUILTINS;
   const mirrorOk=()=>window.tablefolkMirrorAllowed?.()??/(^|\.)tablefolk\.world$|^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   const ENGINES={
     'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'/libs/voice/pocket18-worker.js',languages:false},
@@ -168,8 +178,8 @@
     }
     wasLoaded(){return localStorage.getItem(CACHE_MARKER)==='1';}
     async loadCustomIndex(){ for(const v of await this.dbAll().catch(()=>[])) this.custom.set(v.id,v); this.dispatchEvent(new Event('voiceschanged')); }
-    voices(){ const cat=window.TABLEFOLK_VOICES||[]; const packs=(window.TABLEFOLK_PACK_VOICES||[]).map(v=>({id:v.id,name:`${v.name} (${[v.gender,v.description].filter(Boolean).join(', ')})`})); return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat(packs).concat([...this.custom.values()].filter(v=>!v.pack).map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
-    async ensureAudio(early=false){ if(!this.audioCtx){
+    voices(){ const cat=window.TABLEFOLK_VOICES||[]; const packs=[...(window.TABLEFOLK_SCENARIO_VOICES||[]),...(window.TABLEFOLK_PACK_VOICES||[]).filter(v=>!(window.TABLEFOLK_SCENARIO_VOICES||[]).some(x=>x.id===v.id))].map(v=>({id:v.id,name:`${v.name} (${[v.gender,v.description].filter(Boolean).join(', ')})`})); return BUILTINS.map(id=>{ const v=cat.find(x=>x.id===id); const d=[v?.gender,v?.description].filter(Boolean).join(', '); return {id:`builtin:${id}`,name:d?`${id} (${d})`:id}; }).concat(packs).concat([...this.custom.values()].filter(v=>!v.pack).map(v=>({id:`custom:${v.id}`,name:`custom: ${v.name}`}))); }
+    async ensureAudio(early=false){ if(this._audioInit) await this._audioInit; if(!this.audioCtx){ let initDone; this._audioInit=new Promise(r=>initDone=r); try{   // one setup at a time: a second caller waits for the graph (scenario prepare() and a first line race)
       // 'interactive' asks Chrome for the smallest possible hardware audio
       // buffer (lowest latency, e.g. for synths/games where every ms
       // matters) - it's also the most prone to glitching whenever the OS
@@ -211,7 +221,7 @@
         if(m.type==='capacity'&&!this.directPort){this.telemetry.bufferedMs=Math.round((m.buffered||0)/this.audioCtx.sampleRate*1000);this.flushAudio();}
       };
       this.audioCtx.onstatechange=()=>{if(this.audioCtx.state==='suspended')this.status('Click anywhere once to enable speech','error');};
-    } if(this.audioCtx.state==='suspended'){ if(early){ this.audioCtx.resume().catch(()=>{}); this.resumeOnGesture(); } else await this.audioCtx.resume(); } this.gain.gain.value=settings().volume; }
+    } finally { this._audioInit=null; initDone(); } } if(this.audioCtx.state==='suspended'){ if(early){ this.audioCtx.resume().catch(()=>{}); this.resumeOnGesture(); } else await this.audioCtx.resume(); } this.gain.gain.value=settings().volume; }
     // The browser starts audio only after a click or key press: the first one resumes it.
     resumeOnGesture(){ if(this.gestureHooked)return; this.gestureHooked=true; const kick=()=>{ this.audioCtx?.resume?.().catch(()=>{}); for(const t of ['pointerdown','keydown'])removeEventListener(t,kick,true); this.gestureHooked=false; }; for(const t of ['pointerdown','keydown'])addEventListener(t,kick,true); }
     // Ready before the first line (scenario.js calls it once the characters are
@@ -245,16 +255,16 @@
       if(m.type==='error'&&m.fatal&&this.engine==='zonos-web'){ localStorage.setItem('tablefolkZonosFailed',String(Date.now())); window.tablefolkDiag?.note('voice','ZONOS3-Mini failed: '+m.error+'; back to the default voice'); queueMicrotask(async()=>{ const def=await serverDefault(); await this.switchEngine(ENGINES[def]&&def!=='zonos-web'?def:'pocket-18m',false); }); }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     // for engines that design a voice from words (Breeze) when there is no sample to clone
-    designFor(voice){ const id=String(voice).replace(/^(builtin|custom):/,''), v=(window.TABLEFOLK_VOICES||[]).find(x=>x.id===id); return v?`A ${v.gender||''} voice: ${v.description||'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g,' '):'A warm, natural speaking voice. Speak clearly and naturally.'; }
+    designFor(voice){ const id=String(voice).replace(/^(builtin|custom):/,''), v=(window.TABLEFOLK_VOICES||[]).find(x=>x.id===id)||packVoice(String(voice).split('@')[0]); return v?`A ${v.gender||''} voice: ${v.description||'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g,' '):'A warm, natural speaking voice. Speak clearly and naturally.'; }
     // a preview (the admin page's Try it): speaks even when the player has speech off
     speakTest(text,voiceId){ if(!text?.trim())return; this.queue.push({agent:{id:'preview'},text:String(text).slice(0,300),voice:voiceId||'builtin:alba',at:Date.now(),speakAt:performance.now()}); this.pump(); }
     // a library voice with mood samples speaks in the one for the character's strongest feeling (mind.js: joy, fear, anger, sadness at .45 or more), else its main sample
-    moodVoice(agent,voice){ const v=voice?.startsWith('pack:')&&!voice.includes('@')&&(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===voice); if(!v?.moods) return voice; try{ if(!agent||agent.id==='player'||agent.id==='preview') return voice; const mood=window.tablefolkMind?.mindOf?.(agent)?.mood; if(!mood) return voice; let best=null; for(const k of ['anger','fear','sadness','joy']) if(v.moods[k]&&mood[k]>=.45&&(!best||mood[k]>mood[best])) best=k;
+    moodVoice(agent,voice){ const v=voice?.startsWith('pack:')&&!voice.includes('@')&&packVoice(voice); if(!v?.moods) return voice; try{ if(!agent||agent.id==='player'||agent.id==='preview') return voice; const mood=window.tablefolkMind?.mindOf?.(agent)?.mood; if(!mood) return voice; let best=null; for(const k of ['anger','fear','sadness','joy']) if(v.moods[k]&&mood[k]>=.45&&(!best||mood[k]>mood[best])) best=k;
       // seductive: only for a character written that way (or told so with "ttsMood": "seductive"), when no strong feeling says otherwise
       if(!best&&v.moods.seductive){ const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsMood==='seductive'||/\b(seduct\w*|flirt\w*|sultry|alluring|temptress|coquett\w*|smouldering|siren)\b/i.test((cfg.personality||'')+' '+(cfg.style||''))) best='seductive'; }
       return best?voice+'@'+best:voice; }catch{ return voice; } }
     speak(agent,text,voiceId,level=1){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,level:clamp(+level||1,.1,1.5),text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
-    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.pcmNode?.port.postMessage({type:'set-min-buffer',samples:Math.floor(this.audioCtx.sampleRate*holdFor(this.engine,item.text))}); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(item.voice)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
+    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); const asked=item.voice; if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const bare=item.voice.replace('builtin:',''); if(this.engine!=='zonos-web'&&ZONOS_BUILTINS[bare]) item.voice='builtin:'+ZONOS_BUILTINS[bare]; const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.pcmNode?.port.postMessage({type:'set-min-buffer',samples:Math.floor(this.audioCtx.sampleRate*holdFor(this.engine,item.text))}); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(asked)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
     streamChunk(data,metrics={}){if(!this.pcmNode||!data.length)return;if(!this.receivedSamples&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;this.receivedSamples+=data.length;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(metrics?.chunkRtfx)||0;this.pendingAudio.push(data);this.flushAudio();}
@@ -360,6 +370,10 @@
     setEnabled(v){localStorage.setItem('tablefolkTtsEnabled',v?'1':'0');if(!v)this.stop();}
     setVolume(v){localStorage.setItem('tablefolkTtsVolume',String(v));this.volume=Number(v);if(this.gain)this.gain.gain.value=Number(v);this.dispatchEvent(new Event('volumechange'));}
     setBufferMs(v){localStorage.setItem('tablefolkTtsBufferMs',String(v));}
+    // a world's own voices (scenario "voices"): spoken as "pack:<id>"; a changed sample is cloned anew
+    setScenarioVoices(list=[]){ const next=(Array.isArray(list)?list:[]).filter(v=>v&&v.id&&v.sample).map(v=>({...v,id:'pack:'+String(v.id).replace(/^pack:/,''),file:v.sample,scenario:true,v:v.v||window.tablefolkVoiceSample?.hash(v.sample)||String(v.sample.length)}));
+      for(const v of next){ const old=(window.TABLEFOLK_SCENARIO_VOICES||[]).find(x=>x.id===v.id); if(old&&old.v===v.v) continue; const bare=v.id.slice(5); for(const k of [...this.custom.keys()]) if(['zs-','bz-','pack-'].some(p=>k===p+bare||k.startsWith(p+bare+'@'))) this.custom.delete(k); }
+      window.TABLEFOLK_SCENARIO_VOICES=next; this.dispatchEvent(new Event('voiceschanged')); }
     async addVoice(name,file){await this.ensureAudio();const ab=await file.arrayBuffer(), decoded=await this.audioCtx.decodeAudioData(ab), mono=this.toMono(decoded), audio0=this.resample(mono,decoded.sampleRate,24000);let audio=audio0.length>MAX_CUSTOM_VOICE_SAMPLES?audio0.slice(0,MAX_CUSTOM_VOICE_SAMPLES):audio0;if((audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME)).length===0)audio=new Float32Array(1);let peak=0;for(const x of audio)peak=Math.max(peak,Math.abs(x));if(peak>.001){const k=Math.min(1.8,.9/peak);for(let i=0;i<audio.length;i++)audio[i]*=k;}const id=crypto.randomUUID();const rec={id,name:name||file.name.replace(/\\.[^.]+$/,''),audio:Array.from(audio),created:Date.now()};await this.dbPut(rec);this.custom.set(id,rec);this.dispatchEvent(new Event('voiceschanged'));if(this.ready)await this.encode(rec);return id;}
     // A voice from the designed library (assets/voices/): fetched, cloned like an
     // uploaded sample (kept for this page only), used as custom:pack-<id>.
@@ -370,42 +384,40 @@
       // precomputed (assets/voices/zonos-embeddings.json, tools/browser-test/zonos-embeddings.mjs)
       if(ENGINES[this.engine]?.cloneBySample){
         const zk='zs-'+id.slice(5); if(this.custom.has(zk)) return 'custom:'+zk;
-        const [zId,zMood]=id.split('@'), zv=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===zId); if(!zv) throw new Error('unknown voice '+id);
+        const [zId,zMood]=id.split('@'), zv=packVoice(zId); if(!zv) throw new Error('unknown voice '+id);
         const zFile=(zMood&&zv.moods?.[zMood])||zv.file, stem=zFile.split('/').pop().replace(/\.[^.]+$/,'');
         await this.load(); await this.ensureAudio(true);
         this._zemb||=fetch((window.tablefolkPacks?.base||'./assets/')+'voices/zonos-embeddings.json').then(r=>r.ok?r.json():{}).catch(()=>({}));
-        const pre=(await this._zemb)[stem];
+        const pre=zv.zonos&&!zMood?Array.from(window.tablefolkVoiceSample?.b64ToFloats(zv.zonos)||[]):zv.scenario?null:(await this._zemb)[stem];
         if(Array.isArray(pre)&&pre.length) await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'voice_embedding',data:{voiceId:zk,embedding:pre}}); });
         else {
-          const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+zFile+'?v='+(zv.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
-          const dec=await new OfflineAudioContext(1,1,24000).decodeAudioData(await r.arrayBuffer()), audio=dec.getChannelData(0).slice();
-          await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:zk,audio,cacheKey:zFile+':'+(zv.v||'')}},[audio.buffer]); });
+          const audio=await decodeSample(zv,zFile);
+          await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:zk,audio,cacheKey:zv.scenario?'scn:'+zv.v:zFile+':'+(zv.v||'')}},[audio.buffer]); });
         }
         this.custom.set(zk,{id:zk,name:zv.name,audio:[],created:Date.now(),pack:true,stateOnly:true}); return 'custom:'+zk;
       }
       // Breeze in the browser: the sample and its exact transcript, encoded once in the worker (codes kept there)
       if(ENGINES[this.engine]?.cloneByText){
         const bk='bz-'+id.slice(5); if(this.custom.has(bk)) return 'custom:'+bk;
-        const [bId,bMood]=id.split('@'), bv=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===bId); if(!bv) throw new Error('unknown voice '+id);
+        const [bId,bMood]=id.split('@'), bv=packVoice(bId); if(!bv) throw new Error('unknown voice '+id);
         const bFile=(bMood&&bv.moods?.[bMood])||bv.file, bText=(bMood&&bv.mood_text?.[bMood])||bv.text;
+        if(!bText) return 'builtin:'+(bv.gender==='female'?'alba':'jean');   // no words to clone with: designed from its description (designFor)
         await this.load(); await this.ensureAudio(true);
         // codes encoded natively ahead of time, for the library's voices (tools/breeze-web/build-voice-codes.mjs)
-        const cr=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/breeze-codes/'+bFile.split('/').pop().replace(/\.[^.]+$/,'')+'.bin?v='+(bv.v||'')).catch(()=>null), ct=cr?.ok&&!/text\/html/.test(cr.headers.get('content-type')||'')?await cr.arrayBuffer():null;
+        const cr=bv.scenario?null:await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/breeze-codes/'+bFile.split('/').pop().replace(/\.[^.]+$/,'')+'.bin?v='+(bv.v||'')).catch(()=>null), ct=cr?.ok&&!/text\/html/.test(cr.headers.get('content-type')||'')?await cr.arrayBuffer():null;
         if(ct&&ct.byteLength&&ct.byteLength%32===0){ const codes=Int32Array.from(new Int16Array(ct)); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'voice_codes',data:{voiceId:bk,codes,frames:codes.length/16,text:bText}}); }); this.custom.set(bk,{id:bk,name:bv.name,audio:[],created:Date.now(),pack:true,stateOnly:true}); return 'custom:'+bk; }
-        const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+bFile+'?v='+(bv.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
-        const dec=await new OfflineAudioContext(1,1,24000).decodeAudioData(await r.arrayBuffer()), audio=dec.getChannelData(0).slice();   // the browser's own resampler: resample() is linear, without a filter, and folds high frequencies into the voice
-        await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:bk,audio,text:bText,cacheKey:bFile+':'+(bv.v||'')+':24k'}},[audio.buffer]); });
+        const audio=await decodeSample(bv,bFile);   // the browser's own resampler: resample() is linear, without a filter, and folds high frequencies into the voice
+        await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'encode_voice',data:{voiceId:bk,audio,text:bText,cacheKey:(bv.scenario?'scn:'+bv.v:bFile+':'+(bv.v||''))+':24k'}},[audio.buffer]); });
         this.custom.set(bk,{id:bk,name:bv.name,audio:[],created:Date.now(),pack:true,stateOnly:true}); return 'custom:'+bk;
       }
       const key='pack-'+id.slice(5); if(this.custom.has(key)) return 'custom:'+key;
-      const [baseId,mood]=id.split('@'), v=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===baseId); if(!v) throw new Error('unknown voice '+id); const file=(mood&&v.moods?.[mood])||v.file;
-      await this.load(); const ck=this.stateKey('pack:'+id.slice(5)+':'+file+':'+(v.v||'')), hit=await this.loadState(ck);
+      const [baseId,mood]=id.split('@'), v=packVoice(baseId); if(!v) throw new Error('unknown voice '+id); const file=(mood&&v.moods?.[mood])||v.file;
+      await this.load(); const ck=this.stateKey(v.scenario?'scn:'+v.v:'pack:'+id.slice(5)+':'+file+':'+(v.v||'')), hit=await this.loadState(ck);
       if(hit){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await this.useState(rec,hit); return 'custom:'+key; }
       // precomputed on R2 (tools/build-voice-states.mjs): a range of one file, no encoder, no prefill
-      const pre=await this.fetchPrecomputed(id);
+      const pre=v.scenario?null:await this.fetchPrecomputed(id);
       if(pre){ const rec={id:key,name:v.name,audio:[],created:Date.now(),pack:true,cacheKey:ck,stateOnly:true}; this.custom.set(key,rec); await new Promise((resolve,reject)=>{ this.pending.set('encode',{resolve,reject}); this.worker.postMessage({type:'load_voice_bin',data:{voiceId:key,buf:pre}},[pre]); }); return 'custom:'+key; }
-      await this.ensureAudio(true); const r=await fetch((window.tablefolkPacks?.base||'./assets/')+'voices/'+file+'?v='+(v.v||'')); if(!r.ok) throw new Error('voice sample '+r.status);
-      const decoded=await this.audioCtx.decodeAudioData(await r.arrayBuffer()), mono=this.toMono(decoded); let audio=this.resample(mono,decoded.sampleRate,24000);
+      await this.ensureAudio(true); let audio=await decodeSample(v,file);
       if(audio.length>MAX_CUSTOM_VOICE_SAMPLES) audio=audio.slice(0,MAX_CUSTOM_VOICE_SAMPLES); audio=audio.slice(0,audio.length-audio.length%CUSTOM_FRAME);
       let peak=0; for(const x of audio) peak=Math.max(peak,Math.abs(x)); if(peak>.001){ const k=Math.min(1.8,.9/peak); for(let i=0;i<audio.length;i++) audio[i]*=k; }
       const rec={id:key,name:v.name,audio:Array.from(audio),created:Date.now(),pack:true,cacheKey:ck}; this.custom.set(key,rec); if(this.ready) await this.encode(rec); return 'custom:'+key;
@@ -425,7 +437,7 @@
         const base=new URLSearchParams(location.search).get('states')||'https://geebr-models.mindroot.io/pocket-tts/';
         // one small file per state: states-v6/<voice>[@<mood>].bin (tools/build-voice-states.mjs)
         // ?v=: the voice's version in voices.json, so a re-recorded voice is fetched anew past every cache
-        const pv=(window.TABLEFOLK_PACK_VOICES||[]).find(x=>x.id===id.split('@')[0])?.v;
+        const pv=packVoice(id.split('@')[0])?.v;
         const r=await fetch(base+'states-v6/'+id.slice(5)+'.bin'+(pv?'?v='+pv:'')); if(!r.ok) return null;
         const buf=await r.arrayBuffer(); return buf.byteLength>1000?buf:null;
       }catch{ return null; }

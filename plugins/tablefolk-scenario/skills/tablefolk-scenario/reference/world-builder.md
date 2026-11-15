@@ -123,6 +123,16 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   select a picture or note to write what it shows, paint it, paint it again
   or upload a file; the Books tab paints a book's cover. The AI never sees
   the pictures' data, only their prompts.
+- **Voices** (a tab): a world's own voices from a file or a recording (read
+  the line shown; its words are kept for Breeze TTS), each with a name,
+  gender, a few words on how it sounds, the sample to play, who it speaks
+  for, and **try it** (a line in that voice by ZONOS3-Mini, when it is
+  downloaded in this browser). **Save to my voices** keeps one in this
+  browser for every world; voices made in the game's Voice pane are listed
+  too. A character's voice list (Characters tab) has the world's voices, my
+  voices, "a new voice from a sample", the library and the built-in ones of
+  ZONOS3-Mini and Pocket-TTS. The AI sees each voice without its sample and
+  may cast it ([characters.md](characters.md), "Voices").
 - The story, player, characters, layout and raw JSON as forms.
 - **Play**, **play in dev mode**, **print / tabletop** (the `?tabletop=1`
   view in a frame), **copy link**, **download**.

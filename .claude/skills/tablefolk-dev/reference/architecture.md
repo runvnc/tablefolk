@@ -13,7 +13,7 @@ read whole.
 | `index.html`, `home.js`, `home.css` | the landing page served at `/` |
 | `app/` | the app at `/app/` (below) |
 | `app/llm_js/` | the bridge from the language models to the world, the older engines (ES modules) |
-| `app/tts/` | the game's voice: playback, voices, Breeze on a server (the engines' workers are in `libs/voice/`) |
+| `app/tts/` | the game's voice: playback, voices, Breeze on a server (the engines' workers are in `libs/voice/`); `voice-sample.js`: a world's own voices (scenario `voices`: an Ogg Opus sample written with WebCodecs, the ZONOS3-Mini embedding) and "my voices" (IndexedDB `tablefolk-my-voices`), shared by the builder and the game, which speaks them as `pack:<id>` (`TABLEFOLK_SCENARIO_VOICES`, checked before the library by `tablefolkPackVoice`) |
 | `libs/` | the standalone libraries `@tablefolk/*` the game is built on: models, device, brain, decider, voice, hear, menus ([below](#libraries-libs)) |
 | `server/` | the Bun server: static files, AI proxies, world builder, admin |
 | `server/fast-skill.md` | the condensed scenario skill the world generator's model reads |

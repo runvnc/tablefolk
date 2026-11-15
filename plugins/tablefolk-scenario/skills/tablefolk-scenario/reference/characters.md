@@ -343,6 +343,32 @@ farmer_m scholar_m villain_m king_m hooded_x`. A character without a
 `ttsVoiceId` gets one of its gender from the library (the same one every
 time); the world generator casts from it by description.
 
+ZONOS3-Mini's own built-in voices are `builtin:cillian imogen jett morgana
+rupert sakura savannah thaddeus willow wyatt` (Irish man, British woman,
+energetic man, witch, British man, anime girl, American woman, announcer,
+soft close woman, American man); the other engines speak them as a
+Pocket-TTS voice of the same kind.
+
+A world can carry **voices of its own** (the world builder's Voices tab:
+a file or a recording, 3 to 12 seconds of one person):
+
+```json
+"voices": [{ "id": "old_captain", "name": "Old Captain", "gender": "male",
+  "description": "gruff old sailor", "sample": "data:audio/ogg;base64,...",
+  "text": "the words said in the sample", "zonos": "<base64>", "v": "1x2y3z" }],
+"agents": [{ "id": "brann", "ttsVoiceId": "pack:old_captain", ... }]
+```
+
+`sample` is a short clip as a data URL (Ogg Opus, about 35 KB for 12 s);
+ZONOS3-Mini and Pocket-TTS clone from it, Breeze TTS from it and its `text`
+(without `text` Breeze designs a voice from the `description`). `zonos` is
+ZONOS3-Mini's speaker embedding (192 numbers), made by the builder when
+ZONOS3-Mini is downloaded in that browser, else by the game the first time
+the voice speaks. A world's voice wins over a library voice of the same id;
+a subworld uses its parent's voices. The builder also keeps **my voices** in
+the browser (offered in every world; a world gets a copy) and lists the
+voices made in the game's Voice pane.
+
 ## Very small brains: simple mode, a world's default brain, the whole system prompt
 
 Three fields, in the JSON and on the world builder's Story and Characters tabs:
