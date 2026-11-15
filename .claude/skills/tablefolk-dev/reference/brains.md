@@ -807,16 +807,27 @@ Fixes these runs found (they help every brain):
 
 Results (`?norender=1`; one run each for the agenttest evals):
 
-| | Bonsai 2 27B, 4070 | Bonsai 2 27B, 3060 (before the fixes) | Bonsai 2 9B, 3060 | Gemma 4 E4B, 4070 |
+| | Bonsai 2 27B, 4070 | Bonsai 2 27B, 3060 | Bonsai 2 9B, 3060 | Gemma 4 E4B, 4070 |
 |---|---|---|---|---|
 | one wolf (survived, kills) | 3/3, 2 | 3/3, 3 | 3/3, 2 | 3/3, 3 |
-| two skeletons | **3/3, 6** (before the fixes: 1/3) | 0/3, 2 | 3/3, 3 | 2/3, 6 |
+| two skeletons | **3/3, 6** (before the fixes 1/3) | **3/3, 6** (before 0/3) | 3/3, 3 | 2/3, 6 |
 | hunger (fed) | 2/2 | 2/2 | 1/2 | 2/2 |
-| knows the player (errand, promise, secret) | 3/3 | 2/3 | 2/3 (the promise check missed "you definitely did") | 2/3 (handed the gold back) |
-| using things | 5/5 | 4/5 (fetch, before the fix) | 3/5 (gave the ring away; walked to the chest) | 5/5 |
+| knows the player (errand, promise, secret) | 3/3 | 3/3 | 2/3 (missed only by the check's wording) | 2/3 (handed the gold back) |
+| using things | 5/5 | 5/5 (fetch 2/2 after the last fix) | 3/5 (gave the ring away; walked to the chest) | 5/5 |
 | shop-role, roles | 4/4, 4/4 | 4/4, 4/4 | 4/4, 4/4 | 4/4, 4/4 |
 | plan, reflection | 2.7 s, 3.1 s | 4.8 s, 5.1 s | 1.6 s, 1.6 s | 0.9 s, 1.0 s |
-| seconds a turn (rough, agenttest) | 6.6 (with auto-thinking) | 11.6 | 9.2 | 4.0 |
+| seconds a turn (rough) | 5-7 | 9-14 | 9 | 4 |
+
+Where a Bonsai turn's time goes (4070): a 2,000-token prompt read cold took
+14 s, the same prompt again 1.4 s (the engine keeps the shared start), 60
+tokens of answer about 0.4 s more. So a turn is mostly reading the part of
+the prompt that changed: the end (what it sees, the card) and new history.
+Done for that: history moves 8 messages at a time; the thinking line and the
+nearby `use(...)` example moved out of the system message. Per-speaker
+caches (`model.create_session()` per character, an LRU pool in bonsai2.js)
+made no difference in a 4-character live village (median 5.7 s one cache,
+6.1 s two) and are only on with 16 GB+. Next for speed: a shorter end
+(perception, card) for the 27B.
 
 Graphics memory, Bonsai 2 27B with the game drawing (`--render`, roles,
 EmbeddingGemma loaded), RTX 4070: light quality peak 9.75 GB, high quality
