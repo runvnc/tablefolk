@@ -36,7 +36,7 @@ trading, `emote` for flavour.
 | `remember(text)` | note something important |
 | `eat(food)` | eat food it carries |
 | `use(thing)` | use a thing with an obvious use ([below](#using-things)): open a chest (or say what is in an open one), sit on a seat, lie down on a bed, hammer at an anvil, chop a tree... |
-| `take(item, chest)`, `put(item, chest)` | take from or store in a chest, opening it if closed (`take(5 gold, chest)`, `take(all, chest)`) |
+| `take(item, chest)`, `put(item, chest)` | take from or store in a chest, opening it if closed (`take(5 gold, chest)`, `take(all, chest)`); when the player just asked it to bring, get or hand over that thing, it hands it to the player too |
 | `close(chest)` | shut a chest |
 | `feel(mood)` | show a mood (off by default: it used up turns) |
 | `attack(target)`, `wield(item)` | [combat.md](combat.md) |

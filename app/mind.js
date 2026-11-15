@@ -287,6 +287,36 @@
     } catch (e) { console.warn('[mind] reflect', e); }
     finally { reflecting = false; }
   }
+  // ---- a plan for the day (capable and ambitious brains) ----
+  // A character with no goal of its own asks itself, once in a while, for
+  // three small things it means to do here; they become its goals one by
+  // one (each kept for up to 10 of its turns). Generative Agents' daily
+  // plan, small. Off with "plans": false; not for characters with a quest.
+  let planning = false;
+  async function planDay(g) {
+    const m = mindOf(g), cfg = getBrainConfig(g.id);
+    if (planning || reflecting || state.plans === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated || cfg.goal || cfg.quest) return;
+    planning = true; m.lastPlanned = m.turn;
+    try {
+      const things = (window.tablefolkUses?.nearby(g, 10) || []).map(o => String(o.type).replace(/_/g, ' ')).slice(0, 8);
+      const places = (state.places || []).map(p => p.name || p.kind).filter(Boolean).slice(0, 8);
+      const ctx = [cfg.role ? 'Your job: ' + cfg.role + '.' : '', cfg.agenda ? 'You are quietly after: ' + cfg.agenda + '.' : '', things.length ? 'Near you: ' + things.join(', ') + '.' : '', places.length ? 'Places here: ' + places.join(', ') + '.' : '', recall(g, 3).length ? 'You remember: ' + recall(g, 3).join(' | ') : ''].filter(Boolean).join('\n');
+      const r = await window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: `You are ${g.id}. ${String(cfg.personality || '').slice(0, 300)}` }, { role: 'user', content: `${ctx}\n\nWhat three small things will you do next, here, in your own way? One per line, each a short goal under 10 words (like "sweep the tavern floor" or "ask the stranger about the road"). No numbering.` }], max_tokens: 70, temperature: .8, agentId: g.id + '~plan' });
+      const lines = String(r?.choices?.[0]?.message?.content || '').split('\n').map(t => t.replace(/^[-*\d.)\s]+/, '').replace(/^["']|["'.]$/g, '').trim()).filter(t => t.length > 4 && t.length < 80 && !/[{}()<>]/.test(t)).slice(0, 3);
+      if (lines.length && !getBrainConfig(g.id).goal) {
+        m.plan = lines.slice(1); setBrainConfig(g.id, { goal: lines[0] }); m.planGoal = lines[0];
+        console.log('[mind] ' + g.id + ' plans:', lines.join(' | '));
+      }
+    } catch (e) { console.warn('[mind] plan', e); }
+    finally { planning = false; }
+  }
+  function advancePlan(g) {
+    const m = mindOf(g), cfg = getBrainConfig(g.id);
+    if (!m.planGoal) return;
+    if (cfg.goal !== m.planGoal) { m.planGoal = null; return; }   // it chose another goal itself
+    if (m.turn - m.goalTurn >= 10) { const next = (m.plan || []).shift(); m.planGoal = next || null; setBrainConfig(g.id, { goal: next || '' }); }
+  }
+
   // how a memory reads on the card: what it was told or thought is marked as such
   const shown = e => e.kind === 'thought' ? `(you concluded) ${e.text}` : e.text;
 
@@ -502,6 +532,8 @@
     const slept = (m.prevTired ?? 0) - m.tired > .3; m.prevTired = m.tired;
     if (slept || m.turn - (m.lastConsolidated ?? 0) >= 12) consolidate(g);
     if (slept || m.turn - (m.lastReflected ?? 0) >= 30) setTimeout(() => reflectWithModel(g), 50);
+    advancePlan(g);
+    if (!getBrainConfig(g.id).goal && m.turn >= 2 && m.turn - (m.lastPlanned ?? -99) >= 40) setTimeout(() => planDay(g), 400);
     if ((cfg.goal || '') !== m.goal) { m.goal = cfg.goal || ''; m.goalTurn = m.turn; }
     if (m.feel && m.turn - m.feel.turn > 4) m.feel = null;
     if (m.threat && m.mood.fear < .3 && m.mood.anger < .3) m.threat = null;
@@ -630,5 +662,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();
