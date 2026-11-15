@@ -14,7 +14,7 @@ const scenario = JSON.parse(fs.readFileSync(file, 'utf8'));
 if (flag('expect')) scenario.expect = flag('expect');
 if (args.includes('--no-reflexes')) scenario.reflexes = false;
 const hunger = +(flag('hunger') || .75);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = ctx.pages()[0] || await ctx.newPage();
 page.on('console', m => { const t = m.text(); if (/reflex|reflects|\berror\b/i.test(t) && !/favicon|DEPRECATED/.test(t)) console.log('  [page]', t.slice(0, 200)); });
 await page.goto(base + '/app/?norender=1' + (flag('model') ? '&model=' + flag('model') : ''));

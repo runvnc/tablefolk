@@ -33,7 +33,7 @@ const scenario = JSON.parse(fs.readFileSync(scnFile, 'utf8')), tacticsText = fs.
 if (flag('think')) for (const a of scenario.agents || []) a.thinking = true;
 const only = flag('only=') ? new RegExp(flag('only=').slice(7), 'i') : null;
 
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = ctx.pages()[0] || await ctx.newPage();
 page.on('console', m => { const t = m.text(); if (/\berror\b|failed/i.test(t) && !/DEPRECATED_ENDPOINT|favicon/.test(t)) console.log('[page]', t.slice(0, 240)); });
 // A fresh page (so it runs the code on disk): no 3D rendering, so the model

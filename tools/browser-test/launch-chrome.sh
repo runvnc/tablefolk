@@ -21,7 +21,10 @@
 # CHROME_EXTRA: more flags, e.g. a WAV file as the microphone:
 #   CHROME_EXTRA="--use-fake-ui-for-media-stream --use-fake-device-for-media-stream --use-file-for-fake-audio-capture=/path/clip.wav"
 set -u
-PROFILE="$HOME/.cache/tablefolk-test-chrome"
+# TEST_PROFILE / TEST_CDP_PORT: a second test Chrome beside the first (another
+# session's tests): its own profile (its own model cache) and debugging port.
+PROFILE="${TEST_PROFILE:-$HOME/.cache/tablefolk-test-chrome}"
+PORT="${TEST_CDP_PORT:-9223}"
 URL="${1:-http://localhost:8000/app/?norender=1}"
 W="${TEST_WIN_W:-1280}" H="${TEST_WIN_H:-887}" X="${TEST_WIN_X:-620}" Y="${TEST_WIN_Y:-40}"
 CLASS=tablefolk-test
@@ -69,13 +72,13 @@ if [ "${HEADLESS:-}" = 1 ]; then
       sleep 20
     done ) >/dev/null 2>&1 &
   exec >> "$LOG" 2>&1
-  exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
+  exec "$CHROME" --headless=new --user-data-dir="$PROFILE" --remote-debugging-port="$PORT" \
     --no-first-run --no-default-browser-check --window-size="$W,$((H - 87))" --mute-audio \
     --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
     --disable-vulkan-surface --ignore-gpu-blocklist --enable-dawn-features=vulkan_enable_f16_on_nvidia ${CHROME_EXTRA:-} "$URL"
 fi
 place_window &
 
-exec "$CHROME" --user-data-dir="$PROFILE" --remote-debugging-port=9223 \
+exec "$CHROME" --user-data-dir="$PROFILE" --remote-debugging-port="$PORT" \
   --no-first-run --no-default-browser-check --class="$CLASS" --enable-dawn-features=vulkan_enable_f16_on_nvidia \
   --window-size="$W,$H" ${CHROME_EXTRA:-} --new-window "$URL"

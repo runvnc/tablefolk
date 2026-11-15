@@ -3,7 +3,7 @@
 // gossip between two characters, and the card a character gets.
 //   node mind-check.mjs [--base=URL]
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 page.on('console', m => { if (/\[mind\]/.test(m.text())) console.log('  [page]', m.text().slice(0, 300)); });
 // a fresh page (the code on disk), on the model given (default E4B)

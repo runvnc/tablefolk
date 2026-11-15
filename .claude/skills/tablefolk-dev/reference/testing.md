@@ -24,6 +24,10 @@ node close.mjs                                         # always close it: it hol
   back to SwiftShader. `--mute-audio` keeps game sounds off the speakers.
   Visible mode floats and sizes the window with `hyprctl` under Hyprland
   (tiling ignores `--window-size`).
+- Two sessions at once: `TEST_CDP_PORT=9225 TEST_PROFILE=~/.cache/tablefolk-test-chrome-d0`
+  for `launch-chrome.sh` gives a second test Chrome (its own model cache: a
+  download), and `CDP_PORT=9225` points the scripts at it. They share the
+  GPU, so only one should run a model on a 6 GB card.
 - `?art=1`: no model, no voices, no intro card. Use it for anything visual.
 - `?norender=1`: no 3D drawing, so the model has the GPU (agent tests).
 - `?gfx=light&fps=10`: cheap rendering when both are needed.
