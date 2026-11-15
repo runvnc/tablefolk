@@ -3,6 +3,7 @@
 // action and its result, the director's events) for N seconds. Saves the
 // transcript to results/live-<name>-<ts>.json.
 // Usage: node live-watch.mjs <scenario url or path> [seconds] [base]
+// Env: MODEL (a brain key), VOICE (a voice engine id; voices are off without it), CDP_PORT.
 import { chromium } from 'playwright-core';
 import { writeFileSync, mkdirSync } from 'node:fs';
 const [src, secs = '180', base = 'http://localhost:8000'] = process.argv.slice(2);
@@ -15,7 +16,8 @@ page.on('pageerror', e => errors.push(String(e).slice(0, 300)));
 page.on('console', m => { if (/\[mind\]|\(reflex/.test(m.text())) console.log('  ' + m.text().slice(0, 300)); });
 page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 300)); });
 page.on('response', r => { if (r.status() >= 400) errors.push(r.status() + ' ' + r.url().slice(0, 200)); });
-await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
+// VOICE=zonos-web (or another engine id): the characters speak with it; else voices off
+await page.addInitScript(v => { try { localStorage.setItem('tablefolkTtsEnabled', v ? '1' : '0'); if (v) localStorage.setItem('tablefolkTtsEngine', v); } catch {} }, process.env.VOICE || '');
 await page.goto(`${base}/app/?play=1&model=${process.env.MODEL || ''}&scenario=${encodeURIComponent(src)}&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
@@ -37,6 +39,7 @@ while (Date.now() - t1 < +secs * 1000) {
 const turns = await page.evaluate(() => window.tablefolkLive.round);
 if (process.env.PROMPT) console.log('LAST PROMPT:\n' + JSON.stringify(await page.evaluate(() => window.__tablefolkLiteRT?.lastPrompt?.()), null, 1).slice(0, 4000));
 await page.evaluate(() => window.tablefolkLive.stop());
+if (process.env.VOICE) console.log('VOICE ' + JSON.stringify(await page.evaluate(() => { const t = window.tablefolkTTS; let sp = {}; try { sp = JSON.parse(localStorage.getItem('tablefolkTtsRtfx') || '{}'); } catch {} return { engine: t?.engine, ready: t?.ready, why: t?.why, rtfx: sp, underruns: t?.telemetry?.underruns, firstAudioMs: t?.telemetry?.firstAudioMs }; })));
 const name = String(src).split('/').pop().replace(/\.json$/, '');
 mkdirSync(new URL('./results/', import.meta.url), { recursive: true });
 writeFileSync(new URL(`./results/live-${name}-${Date.now()}.json`, import.meta.url), JSON.stringify({ src, secs, rounds: turns, lines, errors }, null, 1));
