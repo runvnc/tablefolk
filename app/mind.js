@@ -688,6 +688,20 @@
     return [`${m.pf.name || playerName()} just told you what they ${fr.promise && !fr.want ? 'promise' : 'want'}: ${fr.want || fr.promise}. Answer that first, in character.`];
   }
 
+  // Think before acting this turn? Only big brains (tier "ambitious"), only
+  // when it matters: danger close by, a fresh request or promise from the
+  // player, or a trade cue (skills' urgent lines). A character's "thinking":
+  // true makes it think every turn; the scenario's "autoThink": false turns
+  // this off.
+  function thinkNow(g) {
+    if (state.autoThink === false || tier(g) !== 'ambitious') return false;
+    const key = String(window.tablefolkBrainInfo?.()?.key || '');
+    if (!/bonsai2|12b|endpoint/i.test(key)) return false;   // models that think well
+    if (dangerLines(g).length) return true;
+    if (urgentLines(g).length) return true;
+    return (window.tablefolkSkills?.urgentLines?.(g) || []).length > 0;
+  }
+
   // ---- the director: who takes a turn ----
   // play.js asks after each player action. A character near the player takes
   // a model turn when there is something for it to do: it was spoken to or
@@ -756,5 +770,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

@@ -942,7 +942,7 @@
       books: s.books && typeof s.books === 'object' && !Array.isArray(s.books) ? s.books : {},
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // mind.js: news passed between characters, reflection, how much the game helps the characters; play.js: who monsters go after
-      gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: s.monsters === 'everyone' ? 'everyone' : 'player',
+      gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: s.monsters === 'everyone' ? 'everyone' : 'player',
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // subworlds: other maps (a building's inside, a dungeon) the player walks into through a link at a square
@@ -1054,7 +1054,7 @@
     window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     window.tablefolkBooks?.load(scn.books);
-    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player';   // workflows.js   // generated maps' rooms and buildings (senses.js)
+    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player';   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);

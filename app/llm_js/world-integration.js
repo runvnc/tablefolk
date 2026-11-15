@@ -949,7 +949,12 @@ async function main() {
       window.TABLEFOLK_PAUSE_RENDER = true;
       console.log('[tablefolk-world] render paused at', new Date().toISOString());
       let line;
-      if (cfg.thinking === true) world.showThought?.(g.id, '', true);
+      // thinking: always when the character is set to; otherwise a big brain
+      // (mind.js tier "ambitious") thinks only when it matters (danger, an
+      // offer, a fresh request): Bonsai 2 27B won 12/12 hard tasks thinking,
+      // 8 without, but a thinking turn takes 10-35 s
+      const thinking = cfg.thinking === true || !!window.tablefolkMind?.thinkNow?.(g);
+      if (thinking) world.showThought?.(g.id, '', true);
       try {
         line = await manager.decide({
           agentId: g.id,
@@ -960,8 +965,8 @@ async function main() {
           // command lines, so raise the token budget too: 2048, LFM3's own
           // quick-start budget (its agent eval ran at 1024 a turn; at 256 all
           // of it went into reasoning and no answer came).
-          enableThinking: cfg.thinking === true,
-          maxTokens: cfg.thinking === true ? 4096 : simple ? 70 : undefined,
+          enableThinking: thinking,
+          maxTokens: thinking ? 4096 : simple ? 70 : undefined,
           chaos: cfg.chaos ?? 1,   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
         });
       } finally {
@@ -972,7 +977,7 @@ async function main() {
       console.log('[tablefolk-world] RAW LLM OUTPUT for agent', g.id, 'at', new Date().toISOString(), 'elapsed ms:', Math.round(performance.now() - decideT0), ':', line);
       // With thinking off, text up to a stray </think> is reasoning (LFM3 and
       // other small models sometimes reason anyway and close the tag).
-      if (cfg.thinking !== true && /<\/think>/i.test(String(line || ''))) line = String(line).replace(/^[\s\S]*<\/think>/i, '');
+      if (!thinking && /<\/think>/i.test(String(line || ''))) line = String(line).replace(/^[\s\S]*<\/think>/i, '');
       // Tool calls in the model's own trained format become our command lines:
       // LFM3 with thinking on writes <tool_call><function=say><parameter=text>
       // Hello</parameter></function></tool_call> (and some models JSON:
@@ -993,7 +998,7 @@ async function main() {
       // on, plain lines are leftover reasoning and are dropped below.)
       // (a bare "sit", "sleep", "lie down" is the action: app.js parseCommand)
       const looksLikeCommand = l => /^[A-Za-z_][\w.-]*\s*\(/.test(l) || /^(sit|sleep|rest|nap|sit down|lie down)\.?$/i.test(l.trim());
-      const speakPlain = !quiet && cfg.thinking !== true && (simple || world.getAllowedCommands(g.id).includes('say'));
+      const speakPlain = !quiet && !thinking && (simple || world.getAllowedCommands(g.id).includes('say'));
       // ... except plain lines that are the model planning aloud, which small
       // models (LFM3 1.7B) write beside their commands: "Say that she's hungry.
       // Then offer food.", "As hector, I should question her. Let me respond
@@ -1070,7 +1075,7 @@ async function main() {
       if (echoed && !simple) cfg.pendingChat = (cfg.pendingChat || []).concat(['(That line only repeated what was just said, so nobody heard it. Say something new, in your own words, or do something.)']).slice(-5);
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
-      if (cfg.thinking === true) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
+      if (thinking) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
       // Speech this turn: none while quiet, at most two lines otherwise.
       let lines = 0, droppedSpeech = false;
       for (let i = 0; i < planCmds.length; i++) {
