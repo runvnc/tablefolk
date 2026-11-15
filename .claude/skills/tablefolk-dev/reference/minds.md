@@ -192,10 +192,25 @@ All in `app/mind.js` unless named.
   finds a free cell 3-5 steps away from the foe.
 - **Reflexes** (`reflex`, called first in world-integration.js
   `runAgentTurn`; the command goes through `stepAgentTurn` with source
-  `reflex`, and the `tablefolk-agent-turn` event carries `reflex: true`):
-  basic tier potion at 50% health, flee at 35% (not brave), wield the best
-  weapon then attack a foe in reach, timid ones keep away, eat at hunger .8;
-  capable tier only potion at 30%, flee at 25%, eat at .92; ambitious none.
+  `reflex`, and the `tablefolk-agent-turn` event carries `reflex: true`).
+  With a foe within 4 cells, in this order:
+  - finish off a foe in reach that one blow would fell
+  - a potion below 70% health when the next round is dangerous (health at
+    most 1.6x the expected damage for basic, 1.3x for capable) or below
+    45% / 35%
+  - run only when the next round would kill and there is no potion (not
+    brave)
+  - draw the best weapon (basic: as the foe comes near; capable: once it
+    is in reach and still unarmed)
+  - basic: attack a foe in reach
+  - capable: attack a foe in reach when its last action was not a blow,
+    potion or wield and it is not about to fall (so it alternates with the
+    model)
+  - basic: timid characters keep away
+
+  With no foe: eat (or take food from a barrel or a known chest) at hunger
+  .8 basic / .92 capable. Ambitious: none. The expected damage comes from
+  `incoming()`: foes within 3.2 cells, weapon damage or 2.5.
 - **Monsters hunting everyone** (play.js `preyFor`): `state.monsters` or the
   agent's `hunts` = "everyone"; the nearest visible non-hostile, non-animal
   character or the player within 8 cells. live.js `monsterTurn` uses it too.
@@ -225,17 +240,24 @@ All in `app/mind.js` unless named.
   pendingChat merged before each save.
 - **Measured 2026-11-15** (RTX 2060 6 GB, `?norender=1`, small samples:
   read them as direction, not proof):
-  - survival (`evals/survival.json`, two skeletons; survived, monsters
-    killed):
-    - E4B capable (latest thresholds): 1/4, 4 kills
-    - E4B forced basic (full reflexes): 2/4, 3 kills
-    - E4B with no help: 1/3, 1 kill
-    - E2B basic: 2/3, 2 kills
+  - survival against one wolf (`evals/survival-one.json`: an axe, no
+    potion; survived of runs, wolves killed), final rules:
+    - E4B capable: 4/4 (1 kill; in two runs the wolf never closed in).
+      Before the strike-back reflex: 0/3, 0 kills (it ran from the faster
+      wolf).
+    - E2B basic: 2/4, 2 kills. Without reflexes: 1/3, 0 kills.
+  - survival against two skeletons (`evals/survival.json`: plus bread and a
+    potion), about 4 damage a round against 10 health, so hard by design:
+    - E4B capable: 1/3 to 1/4 across rule versions, 1-5 kills.
+    - E4B with no help: 1/3, 1 kill.
+    - E2B basic: 2/3 (early rules).
 
-    The fight is hard by design (about 4 damage a round from two skeletons
-    against 10 health). What decided runs: drinking the potion in time (E4B
-    alone attacked at 4/10 and died) and not running away at 8/10 (an
-    earlier flee rule gave the skeletons free blows: 0/3).
+    What decided runs: drinking the potion in time, not running at 8/10
+    (an early rule that did: 0/3), not eating bread mid-fight (it doesn't
+    heal; the card says so now), and finishing a monster at 1-2 health
+    instead of running.
+  - Invalid runs, discarded: Breeze running beside E4B (empty answers), and
+    E2B after E4B in one test Chrome (50 s empty turns).
   - hunger (`evals/hunger.json`, an apple barrel, no food carried, hunger
     0.85): E4B 3/3 walked over, took an apple and ate it by itself (about 12
     rounds); E2B 3/3, by reflexes alone.
