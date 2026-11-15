@@ -304,7 +304,12 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   - `capable` (Gemma 4 E4B): the model chooses from the danger choices; the
     game steps in only when it is nearly dead or starving.
   - `ambitious` (12B and up, online models): no help.
-  `"reflexes": false` (scenario or agent) turns the help off. `eat()` with a
+  `"reflexes": false` (scenario or agent) turns the help off. Ambitious
+  brains that reason well (Bonsai 2, Gemma 4 12B, online models) think
+  before acting on turns that matter (danger, an offer, your fresh
+  request); `"autoThink": false` on the scenario turns that off, and an
+  agent's `"thinking": true` makes it think every turn. In a fight,
+  monsters wait for the character's turn. `eat()` with a
   healing potion drinks it (4 health).
 - **Monsters that hunt everyone**: `"monsters": "everyone"` (or a monster's
   `"hunts": "everyone"`) sends monsters after the nearest character they
