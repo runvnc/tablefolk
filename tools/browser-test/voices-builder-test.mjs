@@ -3,7 +3,7 @@
 // the voice spoken by ZONOS3-Mini and by Pocket-TTS small.
 // Usage: [ZONOS=1] PORT=8001 CDP_PORT=9224 node voices-builder-test.mjs [sample.mp3] [out.png]
 import { chromium } from 'playwright-core';
-const base = 'http://localhost:' + (process.env.PORT || 8000);
+const base = process.env.BASE || 'http://localhost:' + (process.env.PORT || 8000);
 const sample = process.argv[2] || '../../app/assets/voices/captain_m.mp3', out = process.argv[3] || 'results/voices-builder.png';
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
