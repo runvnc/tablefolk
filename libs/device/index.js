@@ -134,10 +134,11 @@ export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY +
 // null: not measured. Under a second on the card, and freed at once. Kept per
 // card and browser like the bandwidth (CardProbe).
 const PROBE_KEY = 'CardProbe';
+export let lastProbe = null;   // { gb, holds, why, gbs }: the last probe run here
 export async function probeHolds(adapter, gb, sig, bwGBs = null) {
   try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || (c.holds === false && Date.now() - c.at < 864e5))) return c.holds; } catch {}   // a no again after a day: the card may only have been busy
   const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
-  let dev = null, holds = null, lost = false;
+  let dev = null, holds = null, lost = false, why = '', gbs = null;
   try {
     dev = await adapter.requestDevice();
     dev.lost.then(() => { lost = true; });
@@ -148,9 +149,9 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
       const b = dev.createBuffer({ size: CH, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
       const e = dev.createCommandEncoder(); e.clearBuffer(b); dev.queue.submit([e.finish()]);
       bufs.push(b);
-      if (await dev.popErrorScope() || lost) { holds = false; break; }
+      if (await dev.popErrorScope() || lost) { holds = false; why = lost ? 'device lost' : 'out of memory at ' + ((i + 1) / 4) + ' GB'; break; }
       if (i % 8 === 7) await dev.queue.onSubmittedWorkDone();
-      if (performance.now() - t0 > 6000) { holds = false; break; }   // paging: far slower than the card
+      if (performance.now() - t0 > 6000) { holds = false; why = 'over 6 s at ' + ((i + 1) / 4) + ' GB'; break; }   // paging: far slower than the card
     }
     if (holds) {
       await dev.queue.onSubmittedWorkDone();
@@ -158,12 +159,13 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
       const t = performance.now(), e = dev.createCommandEncoder();
       for (let k = 0; k < 4; k++) e.copyBufferToBuffer(bufs[k % 2 ? 0 : bufs.length - 1], 0, bufs[k % 2 ? bufs.length - 1 : 0], 0, CH);
       dev.queue.submit([e.finish()]); await dev.queue.onSubmittedWorkDone();
-      const gbs = 2 * 4 * CH / ((performance.now() - t) / 1000) / 1e9;
-      if (lost || gbs < Math.max(40, (bwGBs || 0) * .3)) holds = false;
+      gbs = Math.round(2 * 4 * CH / ((performance.now() - t) / 1000) / 1e9);
+      if (lost || gbs < Math.max(40, (bwGBs || 0) * .3)) { holds = false; why = `copies at ${gbs} GB/s`; }
     }
   } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : null; }
   finally { for (const b of bufs) try { b.destroy(); } catch {} try { dev?.destroy(); } catch {} }
-  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, at: Date.now() });
+  lastProbe = { gb, holds, why, gbs };
+  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why, at: Date.now() });
   return holds;
 }
 
@@ -276,7 +278,7 @@ export function detectHardware() {
         if (opts.includes(said)) { hw.vramGB = said; hw.memWhy = 'as you said (it comes with ' + opts.join(' or ') + ' GB)'; }
         else if (adapter && hw.cls === 'computer' && !noProbe() && typeof (held = await probeHolds(adapter, opts[0] + Math.min(1, (opts[1] - opts[0]) / 3), [hw.renderer, hw.adapter].join('|'), hw.bwGBs)) === 'boolean') {
           hw.vramGB = held ? opts[1] : opts[0]; hw.memProbed = true;
-          hw.memWhy = held ? `measured: room for more than ${opts[0]} GB (it comes with ${opts.join(' or ')} GB)` : `measured: no room past ${opts[0]} GB, so ${opts[0]} (it comes with ${opts.join(' or ')} GB; or the card was busy: measured again tomorrow)`;
+          hw.memWhy = held ? `measured: room for more than ${opts[0]} GB (it comes with ${opts.join(' or ')} GB)` : `measured: no room past ${opts[0]} GB, so ${opts[0]} (it comes with ${opts.join(' or ')} GB; or the card was busy: measured again tomorrow${lastProbe?.why ? '; ' + lastProbe.why : ''})`;
           if (opts.length > 2 && held) hw.vramAsk = true;
         }
         else if (bw && hw.bwGBs) { hw.vramGB = hw.bwGBs * 1.6 >= bw[0] ? bw[1] : opts[0]; hw.memWhy = `from its measured bandwidth (${hw.bwGBs} GB/s; it comes with ${opts.join(' or ')} GB)`; }
