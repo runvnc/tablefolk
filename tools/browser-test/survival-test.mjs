@@ -33,7 +33,7 @@ for (let run = 1; run <= runs; run++) {
   await page.evaluate(async ({ scenario, hunger }) => {
     await window.tablefolkScenario.playScenario(scenario, { testing: true });
     window.__sv = { log: [], reflex: 0, model: 0 };
-    if (!window.__svOn) window.__svOn = addEventListener('tablefolk-agent-turn', e => { if (e.detail?.agentId !== 'tam') return; if (e.detail.reflex) window.__sv.reflex++; else window.__sv.model++; window.__sv.log.push((e.detail.reflex ? 'REFLEX ' : 'model  ') + String(e.detail.line || '').replace(/\s+/g, ' ').slice(0, 160)); });
+    if (!window.__svOn && (window.__svOn = true)) addEventListener('tablefolk-agent-turn', e => { if (e.detail?.agentId !== 'tam') return; if (e.detail.reflex) window.__sv.reflex++; else window.__sv.model++; window.__sv.log.push((e.detail.reflex ? 'REFLEX ' : 'model  ') + String(e.detail.line || '').replace(/\s+/g, ' ').slice(0, 160)); });
     const g = tablefolk.getAgents().find(a => a.id === 'tam'); window.tablefolkMind.mindOf(g).hunger = hunger;
   }, { scenario, hunger });
   console.log(`--- run ${run} (expect: ${await page.evaluate(() => window.tablefolkMind.tier(tablefolk.getAgents().find(a => a.id === 'tam')))})`);
@@ -52,12 +52,12 @@ for (let run = 1; run <= runs; run++) {
     });
     console.log(`r${r} tam ${out.dead ? 'DEAD' : out.hp + 'hp'} hunger ${out.hunger} ${out.held || '-'} [${out.inv}] | ${out.mons.join(', ')}`);
     for (const l of out.lines) console.log('     ' + l);
-    if (out.dead || (!out.monsLeft && r > 6)) break;
+    if (out.dead || (!out.monsLeft && r > 6 && out.mons.length) || (!out.mons.length && out.hunger < .3)) break;
   }
   const res = { run, survived: !out.dead, hp: out.hp, monstersLeft: out.monsLeft, hunger: out.hunger, reflex: out.reflex, model: out.model };
   console.log('RESULT', JSON.stringify(res)); all.push(res);
 }
 fs.mkdirSync('results', { recursive: true });
 fs.writeFileSync(`results/survival-${Date.now()}.json`, JSON.stringify({ args, all }, null, 1));
-console.log('SUMMARY', all.filter(r => r.survived).length + '/' + all.length, 'survived;', all.reduce((a, r) => a + (2 - r.monstersLeft), 0), 'monsters defeated');
+console.log('SUMMARY', all.filter(r => r.survived).length + '/' + all.length, 'survived;', all.reduce((a, r) => a + (2 - r.monstersLeft), 0), 'monsters defeated;', all.filter(r => r.hunger < .3).length + '/' + all.length, 'fed');
 await b.close().catch(() => {});

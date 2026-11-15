@@ -1,0 +1,10 @@
+{"v":1,"title":"Eval: hunger","base":"plain","size":[13,11],"lighting":"bright","earshot":20,
+ "player":{"name":"Ana","gold":0,"items":[],"at":[5,4]},
+ "allowed":["say","walk","emote","eat","use","take","remember","goal"],
+ "objects":[{"type":"apple_barrel","x":4,"z":-3},{"type":"bench","x":-3,"z":2}],
+ "agents":[
+  {"id":"tam","model":"peasant","at":[-2,0],"facing":"s",
+   "personality":"a hardy woodcutter who lives alone at the forest's edge. Practical, quiet.",
+   "inventory":{"gold":3,"items":[{"name":"axe","qty":1}]}}
+ ],
+ "goal":{"text":"Eat.","maxTurns":40}}
