@@ -50,7 +50,7 @@ function wer(ref, hyp) {
   return { errors: d[r.length][h.length], words: r.length };
 }
 
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages()[0];
 p.on('pageerror', e => console.log('  [pageerror]', e.message));
 p.on('console', m => { if (/asr|bark|onnx|webgpu/i.test(m.text())) console.log('  [page]', m.text().slice(0, 200)); });

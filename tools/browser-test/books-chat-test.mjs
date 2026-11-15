@@ -2,7 +2,7 @@
 // goes to Bram and he answers from it. Needs the cached Gemma 4 E2B on :8000.
 //   node books-chat-test.mjs
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 await page.goto('http://localhost:8000/app/?play=1&norender=1&intro=0&scenario=/tools/browser-test/scenarios/books.json&t=' + Date.now());
 for (let i = 0; i < 120; i++) {

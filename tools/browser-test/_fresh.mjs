@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'fs';
 const S = '/tmp/claude-1000/-mnt-files-geebr-world/bde8bf29-8007-4375-b49f-eeda1155bc3c/scratchpad/';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0]; const page = await ctx.newPage();
 await page.setViewportSize({ width: 1366, height: 800 });
 await page.goto('http://localhost:8001/app/');

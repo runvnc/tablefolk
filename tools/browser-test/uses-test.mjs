@@ -5,7 +5,7 @@
 import { chromium } from 'playwright-core';
 import { writeFileSync, mkdirSync } from 'fs';
 const dir = process.argv[2] || 'results/uses'; mkdirSync(dir, { recursive: true });
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages()[0];
 p.on('console', m => { if (/error|uses|\[emote\]/i.test(m.text()) && !/favicon/.test(m.text())) console.log('  [page]', m.text().slice(0, 200)); });
 p.on('pageerror', e => console.log('  [pageerror]', e.message));

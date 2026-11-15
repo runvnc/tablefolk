@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => p.url().includes('localhost:8001'));
 const S = '/tmp/claude-1000/-mnt-files-geebr-world/bde8bf29-8007-4375-b49f-eeda1155bc3c/scratchpad/';
 await page.evaluate(() => { const s = TABLEFOLK_STATE, t = tablefolk; t.setCharacterLogicalPosition(s.playerAvatar, { x: 1, z: 2 }); });

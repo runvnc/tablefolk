@@ -1,7 +1,7 @@
 // node vshot.mjs "<viewer query>" out.png  -- screenshot viewer.html in a new tab of the test Chrome
 import { chromium } from 'playwright-core';
 const [qs, out] = process.argv.slice(2);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 await page.setViewportSize({ width: 1100, height: 700 });
 await page.goto('http://localhost:8001/tools/browser-test/viewer.html?' + qs);

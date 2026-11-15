@@ -2,7 +2,7 @@
 // and search finds the right passage for questions in other words. Needs the
 // cached EmbeddingGemma (port 8000) and the test Chrome:  node books-test.mjs
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 await page.goto('http://localhost:8000/app/?play=1&norender=1&intro=0&scenario=/tools/browser-test/scenarios/books.json&t=' + Date.now());
 await page.waitForFunction(() => window.TABLEFOLK_SCENE_READY && window.tablefolkBooks && window.tablefolkEmbed, null, { timeout: 60000 });

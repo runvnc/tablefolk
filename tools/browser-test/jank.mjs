@@ -12,7 +12,7 @@
 import { chromium } from 'playwright-core';
 const url = process.argv[2] || 'http://localhost:8000/app/?play=1';
 const secs = +(process.argv[3] || 25);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0];
 const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close();

@@ -1,7 +1,7 @@
 // run N turns of one character in a scenario and print its raw output and prompt tail
 import { chromium } from 'playwright-core';
 const [src, who, n = '3'] = process.argv.slice(2);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0]; const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close();
 page.on('console', m => { const t = m.text(); if (t.includes('RAW LLM OUTPUT for agent ' + who) || t.includes('RAW LiteRT OUTPUT')) console.log('RAW:', t.replace(/.*elapsed ms: \d+ :/, '').slice(0, 400)); });

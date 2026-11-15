@@ -4,7 +4,7 @@
 // Usage: node books-builder-test.mjs [out.png]
 import { chromium } from 'playwright-core';
 const base = 'http://localhost:8000', out = process.argv[2] || 'books-builder.png';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 for (const p of b.contexts()[0].pages()) if (p !== page) await p.close();
 page.on('console', m => { if (/embed|books|error/i.test(m.text())) console.log('[page]', m.text().slice(0, 200)); });

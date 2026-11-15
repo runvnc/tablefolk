@@ -2,7 +2,7 @@
 // Free ("name your own price") itch.io download through the test Chrome.
 import { chromium } from 'playwright-core';
 const [url, pat, out] = process.argv.slice(2);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = await ctx.newPage();
 try {
   await page.goto(url, { waitUntil: 'domcontentloaded' });

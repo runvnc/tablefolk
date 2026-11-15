@@ -2,7 +2,7 @@
 // with a native build (tools/breeze-web/README.md):  node breeze-web-stages.mjs out.txt
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'fs';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages()[0];
 await p.goto('http://localhost:8000/tools/browser-test/breeze-web-test.html');
 const text = await p.evaluate(async () => {

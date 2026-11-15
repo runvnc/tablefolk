@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 import fs from 'fs';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => /8000/.test(p.url()));
 const out = await page.evaluate(async (H) => { const process_eye = (p, d) => new BABYLON.Vector3(p.x + d.x * .3, H, p.z + d.z * .3 + (H > 2 ? 4 : 0));
   const sc = state.scene, cam = sc.activeCamera, g = state.characters[0];

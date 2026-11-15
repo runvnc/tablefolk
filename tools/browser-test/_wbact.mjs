@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const out = process.argv[2];
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => p.url().includes('/world/'));
 const cdp = await page.context().newCDPSession(page);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });

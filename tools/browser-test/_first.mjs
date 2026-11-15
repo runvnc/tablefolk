@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const [url, out, wait = '9000'] = process.argv.slice(2);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 await page.setViewportSize({ width: 1366, height: 800 });
 await page.goto(url); await page.waitForTimeout(+wait);

@@ -1,7 +1,7 @@
 // Test the "find helpers on this computer" button against breeze-server (:8137) and llama-server (:8080) running here:
 // the probe, the llama.cpp offer and the endpoint fill. node helpers-test.mjs (the test Chrome, page on :8000)
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages()[0] || await b.contexts()[0].newPage();
 const errs = []; p.on('pageerror', e => errs.push(String(e)));
 await p.goto('http://localhost:8000/app/?norender=1&t=' + Date.now());

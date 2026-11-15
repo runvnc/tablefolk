@@ -2,7 +2,7 @@
 //   node fp-shots.mjs '[["name",x,z,yawDeg,pitch],...]' outdir   (yaw 180 looks north, -z; canvas read, so headless works)
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'fs';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages().find(x => x.url().includes(process.env.FP_PAGE || 'scenario='));
 const cdp = await p.context().newCDPSession(p);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 640, deviceScaleFactor: 1, mobile: false });

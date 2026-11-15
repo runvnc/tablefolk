@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 for (const f of process.argv.slice(2)) {
   const urls = []; const h = r => { if (/\.(png|avif)/.test(r.url())) urls.push(r.status() + ' ' + r.url().split('/').pop()); }; page.on('response', h);

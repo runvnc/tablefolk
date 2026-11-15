@@ -3,7 +3,7 @@
 // Usage: node editor-test.mjs [base]
 import { chromium } from 'playwright-core';
 const base = process.argv[2] || 'http://localhost:8000';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 const errs = []; page.on('pageerror', e => errs.push(String(e)));
 await page.setViewportSize({ width: 1440, height: 1000 });

@@ -1,7 +1,7 @@
 // Print the page's console output for N seconds. Usage: node console.mjs [seconds]
 import { chromium } from 'playwright-core';
 const secs = +(process.argv[2] || 10);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => /localhost:80\d\d/.test(p.url()));
 const seen = new Map();
 page.on('console', m => { const t = (m.type() + ': ' + m.text()).slice(0, 400); seen.set(t, (seen.get(t) || 0) + 1); });

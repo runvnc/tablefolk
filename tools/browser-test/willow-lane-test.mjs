@@ -6,7 +6,7 @@
 // EmbeddingGemma must be on (localStorage tablefolkEmbed not 'off') for the
 // "meaning" check.
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => /willow-lane|scenario=/.test(p.url())) || b.contexts()[0].pages()[0];
 const out = await page.evaluate(async () => {
   const res = [], ok = (name, cond, extra = '') => res.push(`${cond ? 'ok  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`);

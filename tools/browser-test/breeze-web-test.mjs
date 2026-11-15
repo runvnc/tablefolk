@@ -2,7 +2,7 @@
 //   node breeze-web-test.mjs ["text"]   (OUT=path.wav; the test Chrome on :9223, page on :8000)
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'fs';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const p = b.contexts()[0].pages().find(x => x.url().includes('breeze-web-test')) || b.contexts()[0].pages()[0];
 await p.goto('http://localhost:8000/tools/browser-test/breeze-web-test.html');
 p.on('console', m => { const t = m.text(); console.log('console:', t.slice(0, 300)); });

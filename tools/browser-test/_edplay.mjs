@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0]; const page = await ctx.newPage();
 await page.setViewportSize({ width: 1440, height: 1000 });
 await page.goto('http://localhost:8001/world/?t=' + Date.now());

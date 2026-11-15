@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const [out, file = 'the-cramped-warrens-1792821276923.json', js = ''] = process.argv.slice(2);
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0];
 let page = ctx.pages().find(p => p.url().includes('/world/'));
 const errs = [];

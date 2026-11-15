@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 import fs from 'fs';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages().find(p => /8000/.test(p.url()));
 const out = await page.evaluate(async () => {
   const sc = state.scene, cam = sc.activeCamera, eng = state.engine, g = state.characters[0];

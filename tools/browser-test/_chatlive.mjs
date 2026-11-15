@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0]; const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close();
 await page.goto('http://localhost:8000/app/?play=1&scenario=/scenarios/haunted-tavern.json&t=' + Date.now());

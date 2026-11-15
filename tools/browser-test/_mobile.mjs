@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const S = '/tmp/claude-1000/-home-runvnc/bde8bf29-8007-4375-b49f-eeda1155bc3c/scratchpad/';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto('http://localhost:8000/app/?play=1'); await page.waitForTimeout(9000);

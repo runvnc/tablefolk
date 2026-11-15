@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage(); const bad = new Set();
 const s = await page.context().newCDPSession(page); await s.send('Network.enable'); await s.send('Network.clearBrowserCache');
 page.on('response', r => { if (r.status() >= 400) bad.add(r.status() + ' ' + r.url()); });
