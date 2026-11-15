@@ -1435,11 +1435,11 @@
   },
   "zombie": {
    "file": "characters/zombie.png",
-   "w": 267,
-   "h": 324,
+   "w": 279,
+   "h": 339,
    "anchor": [
-    133.1,
-    210.8
+    139.2,
+    220.6
    ]
   },
   "goblin": {
@@ -1462,11 +1462,11 @@
   },
   "kobold": {
    "file": "characters/kobold.png",
-   "w": 164,
-   "h": 199,
+   "w": 193,
+   "h": 234,
    "anchor": [
-    81.9,
-    129.3
+    96.2,
+    152.1
    ]
   },
   "troll": {
@@ -1507,20 +1507,20 @@
   },
   "demon": {
    "file": "characters/demon.png",
-   "w": 322,
-   "h": 391,
+   "w": 383,
+   "h": 466,
    "anchor": [
-    160.7,
-    254.4
+    191.4,
+    303.3
    ]
   },
   "giant": {
    "file": "characters/giant.png",
-   "w": 435,
-   "h": 529,
+   "w": 455,
+   "h": 554,
    "anchor": [
-    217,
-    344.6
+    227.3,
+    361
    ]
   },
   "rat": {
@@ -1840,11 +1840,11 @@
   },
   "imp": {
    "file": "characters/imp.png",
-   "w": 189,
-   "h": 229,
+   "w": 179,
+   "h": 217,
    "anchor": [
-    94.2,
-    148.8
+    89,
+    141.2
    ]
   },
   "mushroom_warrior": {
@@ -1962,6 +1962,114 @@
    "anchor": [
     141.3,
     223.9
+   ]
+  },
+  "ogre": {
+   "file": "characters/ogre.png",
+   "w": 424,
+   "h": 516,
+   "anchor": [
+    211.9,
+    336
+   ]
+  },
+  "gnoll": {
+   "file": "characters/gnoll.png",
+   "w": 322,
+   "h": 391,
+   "anchor": [
+    160.7,
+    254.4
+   ]
+  },
+  "lich": {
+   "file": "characters/lich.png",
+   "w": 301,
+   "h": 366,
+   "anchor": [
+    150.5,
+    238.1
+   ]
+  },
+  "vampire": {
+   "file": "characters/vampire.png",
+   "w": 287,
+   "h": 349,
+   "anchor": [
+    143.3,
+    227.2
+   ]
+  },
+  "cultist": {
+   "file": "characters/cultist.png",
+   "w": 279,
+   "h": 339,
+   "anchor": [
+    139.2,
+    220.6
+   ]
+  },
+  "bandit": {
+   "file": "characters/bandit.png",
+   "w": 279,
+   "h": 339,
+   "anchor": [
+    139.2,
+    220.6
+   ]
+  },
+  "bear": {
+   "file": "characters/bear.png",
+   "w": 240,
+   "h": 292,
+   "anchor": [
+    119.8,
+    190.1
+   ]
+  },
+  "zombie_classic": {
+   "file": "characters/zombie_classic.png",
+   "w": 267,
+   "h": 324,
+   "anchor": [
+    133.1,
+    210.8
+   ]
+  },
+  "kobold_classic": {
+   "file": "characters/kobold_classic.png",
+   "w": 164,
+   "h": 199,
+   "anchor": [
+    81.9,
+    129.3
+   ]
+  },
+  "demon_classic": {
+   "file": "characters/demon_classic.png",
+   "w": 322,
+   "h": 391,
+   "anchor": [
+    160.7,
+    254.4
+   ]
+  },
+  "giant_classic": {
+   "file": "characters/giant_classic.png",
+   "w": 435,
+   "h": 529,
+   "anchor": [
+    217,
+    344.6
+   ]
+  },
+  "imp_classic": {
+   "file": "characters/imp_classic.png",
+   "w": 189,
+   "h": 229,
+   "anchor": [
+    94.2,
+    148.8
    ]
   }
  },

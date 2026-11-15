@@ -14,6 +14,10 @@ skill (internals); `git log` has every commit.
 - **Fix**: a character's turn no longer undoes what happened while its model was thinking (a blow that landed, a weapon it drew, food it ate, news it was told).
 - **Gemma 4 E4B and 12B with sight** are model choices (the full multimodal files, for 8 GB and 12 GB cards), and what a character sees when it looks stays in its memory.
 
+## 2026-11-15
+
+- **More and better monsters**: the zombie, kobold, demon, giant and imp are now detailed, fully animated models (the old ones stay as `*_classic`), and there are new common foes: an ogre, a gnoll, a lich, a vampire, a cultist, a bandit and a bear. Ogres, liches, vampires, cultists and bandits can talk (and bargain or threaten); gnolls and bears just fight. The world builder and the map editor offer them all.
+
 ## 2026-11-14
 
 - **Real voices**: characters cry out, groan and die with recorded voices instead of synthesized ones, and they differ by body: men and women, big monsters (a troll, a dragon, a minotaur roar and bellow), small ones (goblins, imps, rats squeal), the undead (rattling breaths), insects and snakes. Monsters and beasts growl, hiss or bark as they attack, and bites land with a wet crunch. Animals have their own calls (moo, bellow, oink, whinny, bray, baa, howl, bark, croak, buzz), heard now and then as they graze and whenever you speak to them. 92 CC0 clips from OpenGameArt and Freesound, picked and checked by ear with Gemini 4 Argon.

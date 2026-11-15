@@ -170,11 +170,19 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   (a young red dragon), `imp`, `mushroom_warrior`, `bunny` (a rabbit with a
   sword), `snake`, `wasp` (a giant one), `frog` (a giant one). Made for the
   game like the Meshy people: `minotaur`, `lizardman`, `werewolf`, `mummy`.
+  Made for the game in 2026-11 (rigged Meshy models): `zombie`, `kobold` (a
+  little red dragon-dog), `demon`, `giant` (a hill giant), `imp` (their old
+  models stay as `zombie_classic kobold_classic demon_classic giant_classic
+  imp_classic`), and `ogre`, `gnoll` (hyena-headed), `lich` (a crowned undead
+  sorcerer), `vampire`, `cultist` (red-robed, masked), `bandit`; and `bear`
+  (a grizzly). Ogres, liches, vampires, cultists and bandits have minds (they
+  can talk, threaten, bargain); give one `"hostile": true` to make it fight.
 - **More people** (made for the game, 2026-11-13; they sit, sleep and work
   like the others): `dwarf` (a red-bearded miner), `elf` (a silver-haired
   ranger), `priest`, `guard` (a town guard in a tabard), `merchant`.
-- Mindless monsters (skeletons, zombie, rat, spider, wolf, bat, slime,
-  ghost, giant, demon, dragon and the ones above) are hostile by default and
+- Mindless monsters (skeletons, zombie, rat, spider, wolf, bear, gnoll, bat,
+  slime, ghost, giant, demon, dragon and the Quaternius and Meshy ones above,
+  not the ogre, lich, vampire, cultist or bandit) are hostile by default and
   never talk.
 - **Animals** (Quaternius, CC0): `cow bull horse white_horse donkey deer stag
   fox dog husky alpaca pig sheep`, and `wolf` (hostile by default). They are
