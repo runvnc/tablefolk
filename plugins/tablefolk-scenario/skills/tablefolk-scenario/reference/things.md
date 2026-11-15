@@ -196,7 +196,11 @@ wanted poster's face, a treasure map, a child's drawing.
   name is `title`). The world builder paints every picture that has a
   `prompt` and no `image` (tiny-sd in the browser: see
   [world-builder.md](world-builder.md)), small JPEGs kept in the world.
-  Without an image the game draws a plain board with the title.
+  Without an image the game draws a plain board with the title. A painting's
+  prompt is painted as "painting ..." and a tapestry's as "woven tapestry ..."
+  when it does not name its kind (the painter heeds the start of a prompt
+  most); the map editor starts a new one's words that way. Paintings and
+  tapestries are matte (no shine).
 - It is scenery: not carried, no physics. Map lines: `place picture against
   north_wall` (also `painting`, `tapestry`, `portrait`).
 

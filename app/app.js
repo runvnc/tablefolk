@@ -2184,10 +2184,11 @@ function makePicture(scene,x,z,opts={}){
   let w=st.w, h=st.h;
   if(wall && h>H-.3){ const k=(H-.3)/h; w*=k; h*=k; }
   const back=BABYLON.MeshBuilder.CreateBox('picture',{width:w,height:h,depth:.05},scene);
-  const bm=colorMat(scene,'picture_back',BABYLON.Color3.FromHexString(st.frame).scale(.8)); back.material=bm;
+  // matte: paint and cloth have no shine (no highlight, no reflection of the sky)
+  const bm=colorMat(scene,'picture_back',BABYLON.Color3.FromHexString(st.frame).scale(.8)); bm.roughness=1; bm.specularIntensity=0; bm.environmentIntensity=st.cloth?.25:.4; back.material=bm;
   const face=BABYLON.MeshBuilder.CreatePlane('picture_face',{width:w,height:h},scene);
   const fm=new BABYLON.StandardMaterial('picture_mat',scene); fm.diffuseTexture=pictureTexture(scene,st,w,h,opts);
-  fm.specularColor=new BABYLON.Color3(.06,.06,.06); fm.emissiveColor=new BABYLON.Color3(.12,.11,.1); face.material=fm;
+  fm.specularColor=BABYLON.Color3.Black(); fm.specularPower=1; fm.emissiveColor=new BABYLON.Color3(.12,.11,.1); face.material=fm;
   face.parent=back; face.position.z=-.027; face.isPickable=false;
   back.receiveShadows=true; face.receiveShadows=true;
   tag(back,'picture',{health:2,material:st.cloth?'cloth':'wood',flammable:true});

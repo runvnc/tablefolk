@@ -65,6 +65,9 @@
   // pictures (app.js makePicture) and notes with a picture hang on a wall of their square
   const PIC_WALLS = { north: 'north', n: 'north', south: 'south', s: 'south', east: 'east', e: 'east', west: 'west', w: 'west' };
   const isPicture = o => o.type === 'picture' || (o.type === 'note' && (o.image || o.prompt));
+  // what a painting's or a tapestry's words start with (the painter heeds the front of a prompt most)
+  const PIC_PREFIX = { painting: 'painting ', tapestry: 'woven tapestry ' };
+  const picPrefix = o => o.type === 'picture' ? PIC_PREFIX[o.style || 'painting'] || '' : '';
   const keepModels = () => { try { return localStorage.getItem('tablefolk.keepModels') !== '0'; } catch { return true; } };
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nice = s => String(s || '').replace(/_/g, ' ');
@@ -442,7 +445,7 @@
     // what a picture shows: painted in this browser (window.tfPaint, app/builder-paint.js), or a file
     let paintMsg = '';
     function pictureBox(o) {
-      return `<label class="wide"><span>What it shows (painted by a small image model in this browser)</span><textarea data-k="prompt" rows="3" placeholder="e.g. a foaming tankard and a sleeping fox, painted wooden inn sign">${esc(o.prompt || '')}</textarea></label>
+      return `<label class="wide"><span>What it shows (painted by a small image model in this browser)</span><textarea data-k="prompt" rows="3" placeholder="e.g. a foaming tankard and a sleeping fox, painted wooden inn sign">${esc(o.prompt || picPrefix(o))}</textarea></label>
         <div class="wide tfme-pic">${o.image ? `<img alt="" src="${esc(o.image)}">` : '<span class="tfme-muted">no picture yet: the game draws a plain one</span>'}</div>
         <div class="wide tfme-actions"><button type="button" data-act="paint" ${window.tfPaint ? '' : 'disabled title="painting works in the world builder"'}>🎨 ${o.image ? 'Paint again' : 'Paint it'}</button><label class="tfme-file">upload<input type="file" accept="image/*" data-act="picfile" hidden></label>${o.image ? '<button type="button" data-act="nopic">clear</button>' : ''}<span class="tfme-muted" data-paintmsg>${esc(paintMsg)}</span></div>`;
     }
@@ -480,6 +483,13 @@
       if (typing !== el) { snapshot(); typing = el; }
       if (k === 'locked') { if (raw.trim()) sel.ref.locked = raw.trim(); else delete sel.ref.locked; }
       else if (k === 'id') { const id = raw.trim().replace(/\s+/g, '_'); if (id && !L.agents.some(a => a !== sel.ref && a.id === id)) sel.ref.id = id; }
+      else if (k === 'style' && sel.ref.type === 'picture') {
+        // a new kind: its words' opening changes with it ("painting ..." <-> "woven tapestry ...")
+        const o = sel.ref, before = picPrefix(o), p = String(o.prompt || '');
+        setPath(o, k, v);
+        const after = picPrefix(o), rest = before && p.toLowerCase().startsWith(before) ? p.slice(before.length) : p;
+        if (p.trim() && p.trim() !== before.trim()) o.prompt = (rest.toLowerCase().startsWith(after) ? '' : after) + rest; else delete o.prompt;
+      }
       else setPath(sel.ref, k, v);
       writeBack(scn, L); dirty = true; opts.onChange?.(scn);
       if (el.tagName === 'SELECT') renderInspector();

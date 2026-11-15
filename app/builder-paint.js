@@ -55,6 +55,10 @@
   }
   async function paint(prompt, { kind = 'painting', onStatus = () => {}, seed } = {}) {
     prompt = String(prompt || '').trim(); if (!prompt) throw new Error('nothing to paint');
+    // the kind first: tiny-sd heeds the front of a prompt most (the AI's prompts and the editor's alike)
+    if (kind === 'painting' && !/painting/i.test(prompt)) prompt = 'painting ' + prompt;
+    if (kind === 'tapestry' && !/tapestry/i.test(prompt)) prompt = 'woven tapestry ' + prompt;
+    if (/^(painting|woven tapestry)\s*$/i.test(prompt)) throw new Error('write what it shows first');
     if (!(await consent())) throw new Error('the painter was not downloaded');
     let p = await getPainter(onStatus);
     for (;;) {

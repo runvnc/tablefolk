@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **Paintings and tapestries look like paint and cloth**: no more shine on them. In the world builder, a painting's description now starts with "painting" and a tapestry's with "woven tapestry" (the painter pays most attention to the first words), and switching a picture's kind swaps them.
+
 - **The picture painters download from Tablefolk's own mirror**: tiny-sd and Chitra Tiny (about 0.9 GB and 0.75 GB) now come from Tablefolk's R2 mirror on tablefolk.world, with Hugging Face as the fallback, and are pinned to one version, so a change on Hugging Face can't break them.
 
 - **Share a world as a picture or a .zip**: chat apps often cut long links short. The world builder (and the Scenario pane) can now save a world as a picture: a card with its title, characters and map, with the whole world hidden inside it (voices and pictures too). It still opens if a site strips the picture's metadata, though not if it is turned into a JPEG. A .zip holds the world as `world.json` with its voices and pictures as files. Drop either one on the game or the world builder to open it.
