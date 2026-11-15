@@ -28,9 +28,18 @@ player's `"player": {"hp": 20}` (default 20).
   else a jolt backwards), flashes red for a moment and cries out, a short
   grunt in its own voice (a man's, a woman's, a goblin's, a troll's growl;
   rats squeak, wolves yelp, spiders hiss, skeletons rattle, slimes squelch,
-  ghosts wail), louder and longer when it falls. The cries are synthesized on
-  the spot, positioned in 3D and muted with the sound effects
-  (`app/reactions.js`); not the voice engine, which is too slow for a blow.
+  ghosts wail), louder and longer when it falls. The cries are recorded
+  voices (people, monsters, beasts, animals), positioned in 3D and muted with
+  the sound effects (`app/reactions.js`); not the voice engine, which is too
+  slow for a blow.
+- **Dragon's breath**: dragons (`red_dragon`, `dragon`, `wyrmling`) can
+  always use `breathe_fire(target)` (also written `fire(target)`): the jaw
+  opens, a cone of flame streams from the mouth for about three and a half
+  seconds with a roar, and everyone in the cone burns: 5 to the target, 3 to
+  anyone else in it; flammable things catch fire and the ground is scorched.
+  Without a target it breathes straight ahead. Then the dragon must rest about
+  20 seconds before it can breathe again. Other characters can be given it
+  with `"allowed": [..., "spell.firebreath"]`.
 - The player fights with F (the nearest foe), `/attack grub` and `/wield
   sword` in the chat box, or the Adventurer pane. The player gets a red flash
   when hit, and a defeat card ("try again", "look around").

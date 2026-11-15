@@ -12,8 +12,8 @@
  "player": {
   "name": "T",
   "at": [
-   0,
-   3
+   7,
+   7
   ],
   "facing": "n"
  },
@@ -23,9 +23,19 @@
    "model": "red_dragon",
    "at": [
     0,
-    -1
+    -2
    ],
    "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "Aldric",
+   "model": "guard",
+   "at": [
+    0,
+    5
+   ],
+   "facing": "n",
    "hostile": false
   }
  ]

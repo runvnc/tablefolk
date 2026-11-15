@@ -2,6 +2,7 @@
  * and how they sound.
  *
  *   fireball(target?)   lightning(target?)   spawn(thing[, how many])
+ *   breathe_fire(target?)  a dragon's breath ("spell.firebreath"; see below)
  *
  * Allowed in a scenario as "spell.fireball", "spell.lightning" and "spawn"
  * (app.js COMMANDS; parseLLMCommandLine turns fireball(x) / lightning(x) into
@@ -565,11 +566,114 @@
   // the casting gesture, held for the spell (reactions.js; the old loop without it)
   function castPose(g, ms) { if (window.tablefolkReact) window.tablefolkReact.gesture(g, 'cast', ms); else { g.anim = 'cast'; playRig(g, 'cast', true); settle(g, ms); } }
 
+  // ------------------------------------------------------------ dragon's breath
+  // breathe_fire(target): the jaw opens (app.js updateMouth, g._mouthHold), a
+  // cone of flame streams from the mouth toward the target (or straight ahead)
+  // for as long as the roar lasts (assets/sounds/dragonfire.ogg, ~3.6 s), and
+  // everyone in the cone burns: 5 to the target, 3 to anyone else in it;
+  // flammable things in it catch fire, the ground under it is scorched. Then
+  // 20 s to draw breath again. For dragons (app.js DRAGON_BODIES allows
+  // "spell.firebreath"; a scenario can allow it for others).
+  const BREATH_MS = 3600, BREATH_REST = 20000;
+  let breathBuf = null, breathLoading = null;
+  function breathSound(pos) {
+    const a = au(); if (!a) return null;
+    if (!breathBuf && !breathLoading) breathLoading = fetch(new URL('../assets/sounds/dragonfire.ogg?v=20261115a', document.baseURI)).then(r => r.arrayBuffer()).then(b => a.ctx.decodeAudioData(b)).then(b => { breathBuf = b; }).catch(e => console.warn('[spells] dragonfire', e));
+    const play = () => { const s = source(pos, { gain: 2.2, ms: BREATH_MS + 1500, ref: 3, wet: .45 }); if (!s || !breathBuf) return; const src = s.ctx.createBufferSource(); src.buffer = breathBuf; src.connect(s.out); src.start(s.t); };
+    if (breathBuf) play(); else breathLoading?.then(play);
+    return true;
+  }
+  function mouthOf(g, dir) {
+    const h = g.height || heightOf(g);
+    const sk = g.root.getChildMeshes().find(m => m.skeleton)?.skeleton, hb = sk?.bones.find(b => b.name === 'Head');
+    let p = null;
+    try { const n = hb?.getTransformNode?.(); p = n ? n.getAbsolutePosition().clone() : hb?.getAbsolutePosition(g.root.getChildMeshes().find(m => m.skeleton)); } catch {}
+    if (!p) p = g.root.position.add(V3(0, h * .7, 0));
+    return p.add(dir.scale(h * .1)).add(V3(0, -h * .02, 0));
+  }
+  function breathe(g, tgt) {
+    const now = performance.now();
+    if (g._breathAt && now - g._breathAt < BREATH_REST) {
+      const left = Math.ceil((BREATH_REST - (now - g._breathAt)) / 1000);
+      report(g, `${g.id} draws a long breath: the fire is not ready yet (about ${left} s)`);
+      if (isPlayer(g)) window.tablefolkToast?.(`Your fire is not ready yet (${left} s)`);
+      return false;
+    }
+    g._breathAt = now;
+    const h = g.height || heightOf(g);
+    let dir = tgt ? tgt.pos().subtract(g.root.position) : fwd(g); dir.y = 0;
+    if (dir.lengthSquared() < 1e-4) dir = fwd(g); dir.normalize();
+    if (tgt?.who) faceToward(g, tgt.who, BREATH_MS + 1500);
+    else if (tgt?.thing) try { setCharacterFacing(g, dir); } catch {}
+    g._mouthHold = now + BREATH_MS;   // jaw wide open while it breathes (app.js updateMouth)
+    const mouth0 = mouthOf(g, dir);
+    const dist = tgt ? BABYLON.Vector3.Distance(V3(mouth0.x, 0, mouth0.z), V3(tgt.pos().x, 0, tgt.pos().z)) : 5;
+    const range = Math.max(2.5, Math.min(9, dist + 1));
+    const aimY = tgt ? (tgt.who ? (tgt.who.height || heightOf(tgt.who)) * .3 : .2) : .2;   // low: the stream falls onto them
+    const aimAt = () => { const m = mouthOf(g, dir); const end = V3(m.x, 0, m.z).add(dir.scale(range)); end.y = tgt ? (tgt.pos().y + aimY) : aimY; return { m, d: end.subtract(m).normalize() }; };
+    breathSound(mouth0);
+    // the flame: tongues of fire (alpha-blended, stays orange), a hot white-gold
+    // core at the mouth, embers, smoke rolling off the end
+    const em = new BABYLON.TransformNode('spell_breath_emitter', sc()); em.position.copyFrom(mouth0);
+    const life = .55, speed = range / life;
+    const fire = particles('breath_fire', 1400, em, T.fire(), { blend: 'std' });
+    Object.assign(fire, { minSize: .12, maxSize: .3, minLifeTime: life * .75, maxLifeTime: life * 1.05, emitRate: 1100, minEmitPower: speed * .85, maxEmitPower: speed * 1.15, gravity: V3(0, .3, 0) });
+    grad(fire, [[0, C4(1, .95, .62, .95)], [.18, C4(1, .72, .2, .9)], [.5, C4(1, .42, .06, .75)], [.8, C4(.55, .13, .03, .4)], [1, C4(.15, .05, .03, 0)]]);
+    fire.addSizeGradient(0, .6); fire.addSizeGradient(.5, 1.9); fire.addSizeGradient(1, 2.8);
+    // a hot additive heart down the middle of the stream (white-gold near the mouth)
+    const core = particles('breath_core', 600, em, T.flare());
+    Object.assign(core, { minSize: .2, maxSize: .38, minLifeTime: life * .45, maxLifeTime: life * .7, emitRate: 520, minEmitPower: speed * .85, maxEmitPower: speed * 1.05, gravity: V3(0, .5, 0) });
+    grad(core, [[0, C4(1, .9, .6, .55)], [.35, C4(1, .62, .16, .45)], [.75, C4(.9, .3, .04, .25)], [1, C4(.3, .06, 0, 0)]]);
+    core.addSizeGradient(0, .5); core.addSizeGradient(1, 1.8);
+    const embers = particles('breath_embers', 400, em, T.flare());
+    Object.assign(embers, { minSize: .035, maxSize: .08, minLifeTime: .5, maxLifeTime: 1.2, emitRate: 260, minEmitPower: speed * .6, maxEmitPower: speed * 1.25, gravity: V3(0, -3, 0) });
+    embers.billboardMode = BABYLON.ParticleSystem.BILLBOARDMODE_STRETCHED; embers.color1 = C4(1, .9, .5, 1); embers.color2 = C4(1, .55, .15, 1); embers.colorDead = C4(.6, .1, 0, 0);
+    const smoke = particles('breath_smoke', 200, em, T.smoke(), { blend: 'std' });
+    Object.assign(smoke, { minSize: .6, maxSize: 1.2, minLifeTime: 1.1, maxLifeTime: 1.8, emitRate: 60, minEmitPower: speed * .55, maxEmitPower: speed * .75, gravity: V3(0, 1.4, 0) });
+    grad(smoke, [[0, C4(.15, .12, .1, 0)], [.35, C4(.2, .17, .15, .45)], [1, C4(.35, .34, .33, 0)]]); smoke.addSizeGradient(0, .6); smoke.addSizeGradient(1, 2.6);
+    const spreadOf = (d, a) => { const side = V3(-d.z, 0, d.x).normalize(); return [d.add(side.scale(a)).add(V3(0, a * .6, 0)), d.subtract(side.scale(a)).add(V3(0, -a * .5, 0))]; };
+    const aimAll = () => {
+      const { m, d } = aimAt(); em.position.copyFrom(m);
+      for (const [ps, a] of [[fire, .15], [core, .06], [embers, .22], [smoke, .16]]) { const [d1, d2] = spreadOf(d, a); ps.direction1 = d1; ps.direction2 = d2; }
+      return { m, d };
+    };
+    aimAll(); for (const ps of [fire, core, embers, smoke]) ps.start();
+    const L = light(mouth0, C3(1, .5, .15), 0, range * 1.2);
+    const L2 = light(mouth0, C3(1, .4, .1), 0, 4);
+    tween(BREATH_MS, u => {
+      const { m, d } = aimAll(), ramp = Math.min(1, u * 8) * Math.min(1, (1 - u) * 6);
+      fire.emitRate = 1100 * ramp; core.emitRate = 520 * ramp; embers.emitRate = 260 * ramp; smoke.emitRate = 60 * ramp;
+      L.position.copyFrom(m.add(d.scale(range * .6))); L.intensity = 6 * ramp * (.8 + Math.random() * .4);
+      L2.position.copyFrom(m); L2.intensity = 3 * ramp * (.75 + Math.random() * .5);
+    }, () => { for (const ps of [fire, core, embers, smoke]) retire(ps, 0); later(2500, () => kill(em)); kill(L, L2); });
+    // who and what the fire reaches (twice: as it lands, and again mid-breath)
+    const burned = new Set(), lit = new Set();
+    const scorchLine = () => { const { m, d } = aimAt(); for (let k = 1; k <= Math.floor(range / 1.4); k++) { const at = V3(m.x, 0, m.z).add(V3(d.x, 0, d.z).normalize().scale(k * 1.4)); at.y = (state.terrainTopY ?? 0) + .02; scorch(at, 1.2 + k * .15); } floorGlow(V3(m.x, 0, m.z).add(V3(d.x, 0, d.z).normalize().scale(range * .6)), range * .8, C3(1, .45, .12), .7, 1500); };
+    const sweep = first => {
+      const { m } = aimAt(), flat = V3(dir.x, 0, dir.z);
+      const inCone = p => { const v = V3(p.x - m.x, 0, p.z - m.z), l = v.length(); return l < range + .6 && (l < .8 || BABYLON.Vector3.Dot(v.scale(1 / l), flat) > .9); };
+      for (const c of state.characters.concat(state.playerAvatar ? [state.playerAvatar] : [])) {
+        if (!c || c === g || c.defeated || burned.has(c) || !inCone(c.logicalPos || c.root.position)) continue;
+        burned.add(c); window.tablefolkCombat?.hurt(c, c === tgt?.who ? 5 : 3, g.id, 'dragon fire');
+      }
+      for (const o of state.props.concat(state.blocks)) {
+        if (!o || o.isDisposed?.() || lit.has(o) || !inCone(o.position)) continue;
+        lit.add(o); damage(o, meta(o)?.flammable ? 2 : 1, 'fire');
+      }
+      if (first) scorchLine();
+    };
+    later(450, () => sweep(true)); later(1800, () => sweep(false));
+    shake(mouth0, .6);
+    later(BREATH_MS * .5, () => report(g, `${g.id} breathes fire${tgt ? ' at ' + (tgt.who ? nameOf(tgt.who) : 'the ' + (meta(tgt.thing)?.type || 'thing')) : ''}: ` + (burned.size ? [...burned].map(c => nameOf(c) + (c === tgt?.who ? ' (5 damage)' : ' (3)')).join(', ') + ' burned' : 'the flames scorch the ground')));
+    return true;
+  }
+
   // ------------------------------------------------------------ cast
   function cast(g, spell, targetName) {
     if (!g?.root || g.defeated) return false;
     const tgt = resolveTarget(g, targetName);
     if (tgt?.who) faceToward(g, tgt.who, 4000);
+    if (spell === 'firebreath') return breathe(g, tgt);
     castPose(g, 1500);
     const aim = tgt ? tgt.pos() : null, hand = handPos(g, aim);
     if (spell === 'fireball') {

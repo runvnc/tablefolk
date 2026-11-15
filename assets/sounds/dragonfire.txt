@@ -1,0 +1,2 @@
+dragonfire.ogg: the dragon's fire-breath roar (spells.js breathe_fire), provided by
+the project owner (2026-11-15), trimmed and converted to Ogg Vorbis.

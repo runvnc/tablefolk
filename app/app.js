@@ -26,7 +26,7 @@ function applyWorldDims(cols, rows){
   WORLD.size=Math.max(WORLD.w,WORLD.h); WORLD.half=WORLD.size/2;
 }
 if(!LEGACY_ISLAND) applyWorldDims(...BOARD_DEFAULT);
-const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','spell.lightning','spawn','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat','use','put','take','close'];
+const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop','throw','dig','build','repair','panic','emote','note','spell.push','spell.spark','spell.fireball','spell.firebreath','spell.lightning','spawn','goal','give_quest','give','sell','inventory','whisper','attack','wield','workflow','remember','feel','eat','use','put','take','close'];
 // mind.js: every talking character has these, unless the scenario says "mind": false
 // (feel() is there for scenarios that allow it: by default it used up turns
 // that should have been speech). use/put/take (uses.js): things with an
@@ -630,7 +630,8 @@ function addMouthMorph(mesh,scene){
 // playing, and chatters procedurally for unvoiced speech bubbles.
 function updateMouth(g,dt){
   const tts=window.tablefolkTTS; let want=0;
-  if(tts?.current?.agent===g) want=clamp((tts.level?.()||0)*7-.03,0,1);
+  if(g._mouthHold && performance.now()<g._mouthHold) want=1;   // breathing fire (spells.js): jaws wide
+  else if(tts?.current?.agent===g) want=clamp((tts.level?.()||0)*7-.03,0,1);
   else if(g.speaking && !g.voiced) want=Math.max(0,Math.sin(g.t*13))*(.55+.45*Math.sin(g.t*3.3+1.1));
   const m=g.mouth, rate=want>m.influence?28:14;   // open fast, close a bit slower
   m.influence+=(want-m.influence)*Math.min(1,rate*dt);
@@ -3391,7 +3392,9 @@ function nearestTarget(g,range=3.0){ if(state.target && !state.target.isDisposed
 // agent, kept in its brain config), else the scenario-wide list.
 function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.allowed; return Array.isArray(own)?new Set(own):state.allowed; }
 // What it may run: its list, plus the mind commands (mind.js) for characters.
-function commandsFor(g){ const s=allowedFor(g); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
+// Dragons breathe fire whatever the scenario allows (spells.js breathe_fire)
+const DRAGON_BODIES=new Set(['red_dragon','dragon','wyrmling']);
+function commandsFor(g){ let s=allowedFor(g); if(g && DRAGON_BODIES.has(g.charModel) && !s.has('spell.firebreath')) s=new Set([...s,'spell.firebreath']); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 // A command a character may not run, or one that makes no sense: the player
 // hears it; a model-run character's goes only into its own history (its next
@@ -3446,6 +3449,7 @@ function parseLLMCommandLine(line){
   if(name==='spell'){ const [sp,...tg]=arg.split(','); return {kind:'spell',spell:(sp||'spark').trim().toLowerCase()||'spark',target:tg.join(',').trim().replace(/^["']|["']$/g,'')}; }
   // fireball(target?), lightning(target?), spawn(thing[, how many]): spells.js
   if(name==='fireball'||name==='lightning') return {kind:'spell',spell:name,target:arg.trim().replace(/^["']|["']$/g,'')};
+  if(/^(breathe_?fire|fire_?breath|breath|breathe|fire|dragonfire|flame)$/.test(name)) return {kind:'spell',spell:'firebreath',target:arg.trim().replace(/^["']|["']$/g,'')};
   if(name==='spawn'){ const [th,n]=arg.split(','); return {kind:'spawn',thing:(th||'').trim().replace(/^["']|["']$/g,''),count:(n||'').trim()}; }
   if(name==='build'){ const ci=arg.indexOf(','); const thing=(ci<0?arg:arg.slice(0,ci)).trim()||'wall'; const at=ci<0?null:parseLocationArg(arg.slice(ci+1)); return {kind:'build',thing,at}; }
   if(name==='face'){ const fd=(arg.split(',')[0]||'n').trim().toLowerCase(); return {kind:'face',dir:fd||'n'}; }
@@ -4149,7 +4153,7 @@ function giveQuest(g,text){
   if(!targets.length){ return say(g,'no one nearby to quest upon'); }
   const target=pickRandom(targets); const tcfg=getBrainConfig(target.id); tcfg.quest=text||''; setBrainConfig(target.id,tcfg); say(g,`bestowed quest upon ${target.id}: ${text}`); say(target,`received quest: ${text}`); updatePerceptionUI();
 }
-function castSpell(g,spell,target=''){ if((spell==='fireball'||spell==='lightning') && window.tablefolkSpells) return window.tablefolkSpells.cast(g,spell,target); g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,`${g.id} casts a spark`); g.anim='idle'; playRig(g,'idle',true); },220); }
+function castSpell(g,spell,target=''){ if((spell==='fireball'||spell==='lightning'||spell==='firebreath') && window.tablefolkSpells) return window.tablefolkSpells.cast(g,spell,target); g.anim='cast'; playRig(g,'cast',true); const origin=g.root.position.clone(); makeRing(origin,spell==='fireball'?state.materials.fire:state.materials.magic); if(spell==='spark'){ const t=nearestTarget(g,3); if(t){ const m=meta(t); if(m?.type==='lamp'||m?.type==='crystal') emitBadge(t,'glow'); else damage(t,.35,'spark'); } return setTimeout(()=>{ say(g,`${g.id} casts a spark`); g.anim='idle'; playRig(g,'idle',true); },220); }
   if(spell==='push'){ for(const m of state.props) if(!m.isDisposed() && BABYLON.Vector3.Distance(origin,m.position)<3.4) impulse(m,origin,6.5,.28); setTimeout(()=>{ say(g,`${g.id} casts push: everything nearby is shoved away`); g.anim='idle'; },220); return; }
   if(spell==='fireball'){ const target=nearestTarget(g,4.5); const hit=target?.getAbsolutePosition?.() || origin.add(g.dir.scale(3)); fireballVfx(origin.add(new BABYLON.Vector3(0,.85,0)),hit); setTimeout(()=>{ for(const m of state.props.concat(state.blocks)){ if(!m.isDisposed() && BABYLON.Vector3.Distance(hit,m.position)<2.25){ impulse(m,hit.add(new BABYLON.Vector3(0,.1,0)),7.2,.55); damage(m,meta(m)?.flammable?2:1,'fire'); } } for(const other of state.characters){ if(other!==g && BABYLON.Vector3.Distance(hit,other.root.position)<2.4){ other.anim='panic'; say(other,pickRandom(['hot weather attack','the sun is local now','why did you invite fire'])); setTimeout(()=>other.anim='idle',1100); } } say(g,pickRandom(['fireball is basically planning','wood is now bridge ingredients','careful fireball is still careful'])); g.anim='idle'; },420); }
 }
@@ -4469,6 +4473,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('spell.push')) ex.push('spell(push)');
   if(allowed.has('spell.spark')) ex.push('spell(spark)');
   if(allowed.has('spell.fireball')) ex.push('spell(fireball)');
+  if(allowed.has('spell.firebreath')) ex.push('breathe_fire(name) - breathe a cone of fire at someone (it burns everyone in front of you; then you must rest about 20 seconds)');
   if(allowed.has('goal')) ex.push('goal(text) e.g. goal(get axe) - set what you are working toward');
   if(allowed.has('remember')) ex.push('remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later');
   if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
@@ -4532,6 +4537,7 @@ function simpleCommands(g){
   // "to throw fire at an enemy"); the scenario's prompt says when to use them
   if(allowed.has('spell.fireball')) out.push('fireball(name)');
   if(allowed.has('spell.lightning')) out.push('lightning(name)');
+  if(allowed.has('spell.firebreath')) out.push('breathe_fire(name)');
   if(allowed.has('spawn')) out.push('spawn(thing)');
   return out;
 }
