@@ -399,7 +399,7 @@
   function secretLines(g) {
     const cfg = getBrainConfig(g.id), m = mindOf(g), out = [];
     if (cfg.agenda) out.push(`What you are quietly after: ${cfg.agenda}`);
-    if (cfg.secret) out.push(m.mood.trust >= .85 && pfOf(g).talks >= 3 ? `Your secret (you trust ${pfOf(g).name || playerName()} enough to share it if they ask): ${cfg.secret}` : `Your secret (never tell it; change the subject if pressed): ${cfg.secret}`);
+    if (cfg.secret) out.push(m.mood.trust >= .85 && pfOf(g).talks >= 3 ? `Your secret (you trust ${pfOf(g).name || playerName()} enough to share it if they ask): ${cfg.secret}` : `Your secret (never tell it, never hint at it, not even as a joke, and never name the places or things in it; if pressed, deny and change the subject): ${cfg.secret}`);
     return out;
   }
 
