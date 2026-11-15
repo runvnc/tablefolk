@@ -66,7 +66,7 @@
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261108c'],
     ['mind.js?v=20261115f'],
-    ['uses.js?v=20261114a'],
+    ['uses.js?v=20261115a'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261115b'],
     ['animals.js?v=20261114c'],
