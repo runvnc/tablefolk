@@ -1053,7 +1053,7 @@
     w.state.workflows = scn.workflows || {};
     window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
-    window.tablefolkBooks?.load(scn.books);
+    window.tablefolkBooks?.load(scn.books, scn.agents);
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player';   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
@@ -1113,7 +1113,7 @@
         // mind.js: a fresh mind each run; who it is beyond the personality
         mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
         // mind.js: what it hides and what it is quietly after; how much the game helps it (expect)
-        secret: a.secret ? String(a.secret).slice(0, 300) : '', agenda: a.agenda ? String(a.agenda).slice(0, 300) : '', expect: ['basic', 'capable', 'ambitious'].includes(a.expect) ? a.expect : '', ...(a.reflexes === false ? { reflexes: false } : {}), hunts: a.hunts === 'everyone' ? 'everyone' : '',
+        secret: a.secret ? String(a.secret).slice(0, 300) : '', agenda: a.agenda ? String(a.agenda).slice(0, 300) : '', readsBooks: a.readsBooks === true || a.readsBooks === 'true', expect: ['basic', 'capable', 'ambitious'].includes(a.expect) ? a.expect : '', ...(a.reflexes === false ? { reflexes: false } : {}), hunts: a.hunts === 'everyone' ? 'everyone' : '',
         temperament: withRole(a).temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,

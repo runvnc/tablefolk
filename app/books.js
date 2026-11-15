@@ -26,7 +26,7 @@
  * The world builder (builder.js) uses the same file without the game:
  * extract(file), chunk(text), embedDocs(chunks), encode(vectors), image().
  *
- *   window.tablefolkBooks.load(books)        scenario.js, at the start
+ *   window.tablefolkBooks.load(books, agents) scenario.js, at the start (readers: model, vectors, re-ranker warmed up)
  *   window.tablefolkBooks.prepare(g, cfg)    before a turn: search
  *   window.tablefolkBooks.urgentLines(g)     after the speech in the prompt
  *   window.tablefolkBooks.search(book, query) -> [{ i, text, score }]
@@ -134,14 +134,16 @@
   }
 
   // ---- the books of this world ----
-  function load(defs) {
-    books = {}; found.clear();
+  let loads = 0;
+  function load(defs, agents = []) {
+    books = {}; found.clear(); const gen = ++loads;
     for (const [id, b] of Object.entries(defs && typeof defs === 'object' ? defs : {})) {
       if (!b || !Array.isArray(b.chunks) || !b.title) continue;
       const bk = { ...b, id, chunks: b.chunks.map(String) };
       try { if (b.vectors && (b.dim || DIM) === DIM && (!b.model || b.model === MODEL)) bk.vec = decode(b.vectors); if (bk.vec && bk.vec.length !== bk.chunks.length) bk.vec = null; } catch { bk.vec = null; }
       books[id] = bk;
     }
+    if (Object.keys(books).length && typeof state !== 'undefined') setTimeout(() => warm(gen, agents), 1000);
   }
   const all = () => Object.values(books);
   const byName = name => { const n = String(name || '').toLowerCase().trim(); return all().find(b => b.title.toLowerCase() === n || b.id.toLowerCase() === n) || null; };
@@ -217,7 +219,7 @@
     if (!mine.length || !q || !terms(q).length) { found.delete(g.id); return; }
     const E = window.tablefolkEmbed;
     if (E && E.state !== 'ready' && E.state !== 'off') E.start?.();
-    if (E?.state === 'ready') for (const b of mine) if (!b.vec) fillVectors(b);
+    if (E?.state === 'ready') await Promise.all(mine.map(fillVectors));
     const tierK = { basic: 2, capable: 3, ambitious: 4 }[window.tablefolkMind?.tier?.(g)] || 2;
     const per = await Promise.all(mine.map(b => search(b, q, tierK).then(hs => hs.map(h => ({ ...h, book: b }))).catch(() => [])));
     const hits = per.flat().sort((x, y) => y.score - x.score).slice(0, tierK);
@@ -233,10 +235,25 @@
     return [...by.entries()].map(([b, hs]) => `Your book "${b.title}"${b.author ? ' by ' + b.author : ''} says about this: ${hs.sort((x, y) => x.i - y.i).map(h => '"' + clip(h.text) + '"').join(' ... ')} Answer from it, in your own words and in character; say so if it does not cover the question.`);
   }
   // a hand-written book without vectors: worked out once the model is ready (16 at a time)
-  async function fillVectors(b) {
-    if (b.vec || b.filling) return; b.filling = true;
-    try { const out = []; for (let i = 0; i < b.chunks.length; i += 16) { const v = await window.tablefolkEmbed.vectors(b.chunks.slice(i, i + 16).map(D)); if (!v) return; out.push(...v); } b.vec = out; }
-    catch (e) { console.warn('[books] vectors', e); } finally { b.filling = false; }
+  function fillVectors(b) {
+    if (b.vec) return Promise.resolve();
+    return b.filling ||= (async () => {
+      try { const out = []; for (let i = 0; i < b.chunks.length; i += 16) { const v = await window.tablefolkEmbed.vectors(b.chunks.slice(i, i + 16).map(D)); if (!v) return; out.push(...v); } b.vec = out; }
+      catch (e) { console.warn('[books] vectors', e); } finally { b.filling = null; }
+    })();
+  }
+  // A world with readers gets the memory model, the books' vectors and the
+  // re-ranker ready at the start, not on the first question (which then fell
+  // back to keywords: "broke his arm" shares none with the comfrey passage).
+  async function warm(gen, agents) {
+    const E = window.tablefolkEmbed; if (!E || E.state === 'off') return;
+    for (let i = 0; i < 40 && !window.TABLEFOLK_LINK_OPENED && !window.TABLEFOLK_SCENE_READY; i++) await new Promise(r => setTimeout(r, 500));
+    if (!agents.some(a => reads(a))) return;
+    if (E.state !== 'ready') { await E.start?.(); }
+    if (E.state !== 'ready' || gen !== loads) return;
+    for (const b of all()) await fillVectors(b);
+    try { await E.rerank?.('warm up', ['the re-ranker']); } catch {}
+    window.tablefolkDiag?.note?.('books', `ready: ${all().map(b => b.title + ' (' + b.chunks.length + ' passages)').join(', ')}`);
   }
 
   // ---- pictures: a file downscaled to a JPEG data URL (cover 256x360, spine 64x360) ----

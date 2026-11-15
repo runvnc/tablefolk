@@ -150,7 +150,7 @@
   function booksPanel() {
     const bs = Object.entries(scn.books || {});
     const whereOpts = [['', '(nowhere yet)'], ['player', "in the player's pack"], ...(scn.agents || []).map(a => ['agent:' + a.id, `carried by ${a.id}`]), ['floor', 'lying on the floor (next to the player\'s start)']];
-    const img = (src, w, h) => src ? `<img src="${esc(src)}" alt="" style="width:${w}px;height:${h}px;object-fit:cover;border-radius:3px;border:1px solid var(--line)">` : `<span class="muted" style="display:inline-block;width:${w}px">(drawn from the title)</span>`;
+    const img = (src, w, h, b) => src ? `<img src="${esc(src)}" alt="" style="width:${w}px;height:${h}px;object-fit:cover;border-radius:3px;border:1px solid var(--line)">` : `<span title="drawn from the title and colour" style="display:inline-block;flex:none;width:${w}px;height:${h}px;border-radius:3px;background:${esc(/^#[0-9a-f]{6}$/i.test(b?.color || '') ? b.color : '#6b2d2d')}"></span>`;
     return `<p class="muted">A book is a knowledge base: a PDF or a text file, cut into passages and indexed in this browser with the memory model (EmbeddingGemma). A character that carries it and has <b>reads its books</b> on (Characters tab) looks up what is said to it and answers from the best passages. Books are items named by their title: they can be given, sold and put in chests. The book's text is stored in the world, so a big book makes a long link: share it as a file (download) for anything over a few pages.</p>
       ${bs.map(([id, b]) => { const w = whereIs(b); return `<fieldset class="agent" data-book="${esc(id)}"><legend>${esc(b.title)} <button type="button" class="ghost small" data-bookact="remove">remove</button></legend><div class="cols">
         <label><span>title (the item's name)</span><input data-bookfield="title" value="${esc(b.title)}"></label>
@@ -158,9 +158,9 @@
         <label class="wide"><span>what it is about (one line)</span><input data-bookfield="about" value="${esc(b.about || '')}"></label>
         <label><span>where it is</span><select data-bookfield="where">${whereOpts.map(([k, t]) => `<option value="${esc(k)}"${k === w ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
         <label><span>colour (drawn cover and back)</span><input type="color" data-bookfield="color" value="${esc(/^#[0-9a-f]{6}$/i.test(b.color || '') ? b.color : '#6b2d2d')}"></label>
-        <label><span>cover art ${b.cover ? '<button type="button" class="ghost small" data-bookact="nocover">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.cover, 52, 72)}<input type="file" accept="image/*" data-bookfile="cover"></span></label>
-        <label><span>spine art ${b.spine ? '<button type="button" class="ghost small" data-bookact="nospine">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.spine, 14, 72)}<input type="file" accept="image/*" data-bookfile="spine"></span></label>
-        <p class="muted wide">${(b.chunks || []).length} passages${b.source ? ' from ' + esc(b.source) : ''} · ${b.vectors ? 'indexed by meaning' : 'keywords only (index it below, or the game does it when the model is ready)'} · ${Math.round(JSON.stringify(b).length / 1024)} KB <span data-bookmsg>${esc(bookMsg[id] || '')}</span></p>
+        <label><span>cover art ${b.cover ? '<button type="button" class="ghost small" data-bookact="nocover">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.cover, 52, 72, b)}<input type="file" accept="image/*" data-bookfile="cover"></span></label>
+        <label><span>spine art ${b.spine ? '<button type="button" class="ghost small" data-bookact="nospine">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.spine, 14, 72, b)}<input type="file" accept="image/*" data-bookfile="spine"></span></label>
+        <p class="muted" style="grid-column:1/-1;margin:0">${(b.chunks || []).length} passages${b.source ? ' from ' + esc(b.source) : ''} · ${b.vectors ? 'indexed by meaning' : 'keywords only (index it below, or the game does it when the model is ready)'} · ${Math.round(JSON.stringify(b).length / 1024)} KB <span data-bookmsg>${esc(bookMsg[id] || '')}</span></p>
         <label class="wide"><span>replace the text (PDF, .txt, .md)</span><input type="file" accept=".pdf,.txt,.md,.markdown,text/plain,application/pdf" data-bookfile="text"></label>
         ${b.vectors ? '' : '<button type="button" data-bookact="index">index by meaning</button>'}
       </div></fieldset>`; }).join('')}
@@ -208,7 +208,7 @@
       const b = scn.books[id], f = el.dataset.bookfield, v = el.value.trim();
       if (f === 'where') { remember(); putBook(b, v); render(); mapSoon(); }
       else if (f === 'title') { if (!v) { el.value = b.title; return; } const w = whereIs(b); remember(); takeAway(b); b.title = v.slice(0, 80); if (w) putBook(b, w); render(); mapSoon(); }
-      else { if (v) b[f] = v; else delete b[f]; if (f === 'color') mapSoon(); }
+      else { if (v) b[f] = v; else delete b[f]; if (f === 'color') { render(); mapSoon(); } }
     }
   });
   document.addEventListener('click', e => {

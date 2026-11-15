@@ -340,9 +340,13 @@ every give/take/chest path moves it without special cases.
   turn: 2 basic, 3 capable, 4 ambitious.
 - A sentence-level embedding re-rank was tried first and dropped: single
   sentences match small talk (the weather -> a comfrey sentence at .725).
+- **Warm-up**: `load(books, agents)` with any `readsBooks` agent starts the
+  memory model, works out missing vectors and loads the re-ranker a second
+  after the world opens, so the first question gets the full search (it fell
+  back to keywords before: "broke his arm" shares no word with the comfrey
+  passage). `prepare` also awaits missing vectors.
 - **Vectors at run time**: a book without `vectors` gets them from
-  `tablefolkEmbed.vectors` (uncached, 16 at a time) on a reader's first turn
-  once the model is ready. The builder uses `embedDocs`, through the game's
+  `tablefolkEmbed.vectors` (uncached, 16 at a time) once the model is ready. The builder uses `embedDocs`, through the game's
   embed.js or a worker of its own (`/app/embed-worker.js`).
 - **3D** (`make`, from app.js makeObject for `type: "book"` with `book`): a
   prop proxy at the catalogue book's size (1.4x thick), a page block, and
