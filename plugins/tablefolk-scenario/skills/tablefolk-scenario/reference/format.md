@@ -47,7 +47,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "menus": {}, "flags": {}, "facts": {},   // characters.md (menus), story.md
   "brain": "none",                         // optional: no language model (characters.md)
   "lore": [], "needs": true, "mind": true, "food": [],
-  "gossip": true, "reflect": true, "reflexes": true, "expect": null, "monsters": "player", "remembers": true,   // characters.md
+  "gossip": true, "reflect": true, "reflexes": true, "expect": null, "monsters": "player", "remembers": true, "plans": true,   // characters.md
   "live": false, "pace": "calm", "director": 5, "events": [],
   "goal": { "text": "Get the magic sword.", "win": { "player_has": "magic sword" } }
 }

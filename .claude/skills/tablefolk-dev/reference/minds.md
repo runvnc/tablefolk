@@ -199,6 +199,15 @@ All in `app/mind.js` unless named.
 - **Monsters hunting everyone** (play.js `preyFor`): `state.monsters` or the
   agent's `hunts` = "everyone"; the nearest visible non-hostile, non-animal
   character or the player within 8 cells. live.js `monsterTurn` uses it too.
+- **Plans** (`planDay`, `advancePlan`): capable/ambitious, `state.plans`,
+  no goal and no quest, from its 2nd turn and then at most every 40 turns:
+  one call (agentId `<id>~plan`, 70 tokens) with job, agenda, things within
+  10 cells, places, 3 memories; up to 3 lines; the first becomes `goal`, the
+  rest `m.plan`, each advanced after 10 turns unless the character set its
+  own goal. `planning`/`reflecting` locks keep side calls one at a time.
+- **Fetching** (uses.js `take`): when the player's last words to it ask to
+  bring/fetch/get/give/hand/pass something matching what it took, `give()`
+  to the player 1.5 s later.
 - **Between visits** (`memKey`, `restore`, `persist`): localStorage
   `tablefolk-mind:<hash of title and agent ids>:<id>`, every 20 s and on
   pagehide: the player file (visits +1 on restore), up to 12 memories of

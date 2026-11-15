@@ -272,6 +272,12 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   then "you trust them enough to share it if they ask". `"agenda"` is what
   it is quietly after, every turn, and with nothing pressing it now and
   then wants to take a small step toward it.
+- **A plan for the day**: with Gemma 4 E4B or bigger, a character with no
+  goal or quest asks itself now and then (every 40 of its turns at most)
+  for three small things it means to do here, from its job, agenda, the
+  things and places around it and what it remembers; they become its goals
+  in turn (up to 10 turns each, or until it sets its own). `"plans": false`
+  turns it off.
 - **What it saw**: with a brain that sees (Gemma 4 E2B, E4B or 12B with
   sight, or an online model with vision on), what it saw when it looked
   stays in its memory.

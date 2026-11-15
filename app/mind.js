@@ -450,7 +450,7 @@
       if (basic && !reach && temperament(cfg) === 'timid') { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `keeps away from ${f.id}` }; }
       return null;
     }
-    if (needsOn(g) && m.hunger >= (basic ? .8 : .92)) { const fd = food(g); if (fd) return { line: `eat(${fd})`, why: `starving: eats the ${fd}` }; }
+    if (needsOn(g) && m.hunger >= (basic ? .8 : .92)) { const fd = food(g); if (fd) return { line: `eat(${fd})`, why: `starving: eats the ${fd}` }; const src = foodSource(g); if (src) return { line: src, why: `starving: gets food (${src})` }; }
     return null;
   }
 
@@ -552,6 +552,18 @@
   }
   function hpFrac(g) { const h = window.tablefolkCombat?.hpOf(g); return h && h.max ? h.hp / h.max : 1; }
   function food(g) { return (charInventory(g).items || []).find(i => isFood(i.name) && (i.qty ?? 1) > 0)?.name || null; }
+  // food it doesn't carry but can reach: a barrel or crate of food (use), or
+  // a chest it can see into with food in it (take)
+  function foodSource(g) {
+    const U = window.tablefolkUses; if (!U?.nearby) return null;
+    const near = U.nearby(g, 10);
+    const crate = near.find(o => o.k === 'food'); if (crate) return `use(${crate.type})`;
+    for (const o of near.filter(o => o.k === 'chest')) {
+      try { const c = meta(o.mesh)?.opts?.contents;   // only a chest someone has looked into: no peeking
+      const it = (c?.items || []).find(i => (i.qty ?? 1) > 0 && isFood(i.name)); if (it) return `take(${it.name}, ${o.type})`; } catch {}
+    }
+    return null;
+  }
   function bodyLine(g) {
     const m = mindOf(g), bits = [], hp = hpFrac(g);
     if (hp <= .35) bits.push('badly hurt'); else if (hp < .75) bits.push('hurt');
@@ -569,7 +581,7 @@
     if (threat && m.mood.anger >= .5) return `let ${threat} know you won't stand for it`;
     // just attacked: react to it before anything else
     if (fresh) return temperament(getBrainConfig(g.id)) === 'timid' ? `get away from ${threat}, or beg them to stop` : `tell ${threat} what you think of being attacked`;
-    if (needsOn(g) && m.hunger >= .55) { const f = food(g); return f ? `eat something: eat(${f})` : 'find something to eat (buy it, or ask for some)'; }
+    if (needsOn(g) && m.hunger >= .55) { const f = food(g); if (f) return `eat something: eat(${f})`; const src = foodSource(g); return src ? `get something to eat: ${src}` : 'find something to eat (buy it, or ask for some)'; }
     if (needsOn(g) && m.tired >= .7) { const bed = window.tablefolkUses?.nearby(g, 8).find(o => o.k === 'bed' || o.k === 'seat'); return bed ? `rest: use(${bed.type})` : 'rest: emote(sleep)'; }
     // nothing pressing: a small step toward what it is quietly after
     const ag = getBrainConfig(g.id).agenda; if (ag && m.turn % 3 === 0) return `take a small step toward what you are after (${ag})`;
