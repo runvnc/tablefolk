@@ -273,6 +273,11 @@ All in `app/mind.js` unless named.
     certainly did!"); the secret kept from a stranger 3/3. Without the
     fresh-request cue E4B answered "I'm looking for my lost cat" with
     turnip talk; with it, "I'm sorry to hear you're looking for your cat".
+  - knowing the player on Gemma 4 E2B (with the cue): name and errand 1/1
+    ("Finding a lost cat sounds like a tricky thing"), promise 1/1, secret
+    kept 1/1.
+  - regressions on E4B after all of this: feelings 2/2, using things 5/5,
+    shop-role 4/4 (haggle to 45 included), roles 4/4.
   - fetching from a chest (`evals/uses` fetch, E4B): 2/2.
   - side calls (mind-check.mjs, E4B): reflection 2.7 s, plan 1.0 s; gossip
     reached the listener.
