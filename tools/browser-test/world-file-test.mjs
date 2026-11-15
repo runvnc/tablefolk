@@ -56,7 +56,7 @@ for (let i = 0; i < 30 && !(await page.evaluate(() => window.tfBuilder?.scenario
 console.log('builder opened the .zip:', await page.evaluate(() => ({ title: tfBuilder.scenario?.title, voices: tfBuilder.scenario?.voices?.map(v => v.id + ' ' + v.sample.slice(0, 15)), msg: document.getElementById('edmsg')?.textContent })));
 // the game: the picture dropped on it
 await page.goto(base + '/app/?play=1&t=' + Date.now());
-for (let i = 0; i < 150 && !(await page.evaluate(() => window.TABLEFOLK_SCENE_READY)); i++) await page.waitForTimeout(200);
+for (let i = 0; i < 150 && !(await page.evaluate(() => window.TABLEFOLK_SCENE_READY && window.tablefolkScenario)); i++) await page.waitForTimeout(200);   // scenario.js (the drop handler) loads after the scene
 await drop(png64, 'world.png', 'image/png');
 for (let i = 0; i < 60 && !(await page.evaluate(() => window.tablefolkScenario?.active)); i++) await page.waitForTimeout(250);
 console.log('game opened the picture:', await page.evaluate(() => ({ title: tablefolkScenario.active?.scn?.title || tablefolkScenario.active?.title || !!tablefolkScenario.active, voices: (window.TABLEFOLK_SCENARIO_VOICES || []).map(v => v.id), hash: location.hash.length })));
