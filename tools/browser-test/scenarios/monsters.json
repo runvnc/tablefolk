@@ -1,0 +1,272 @@
+{
+ "v": 1,
+ "title": "Monster lineup",
+ "seed": 1,
+ "size": [
+  13,
+  9
+ ],
+ "base": "plain",
+ "lighting": "bright",
+ "floor": "grass",
+ "player": {
+  "name": "T",
+  "at": [
+   0,
+   3
+  ],
+  "facing": "n"
+ },
+ "agents": [
+  {
+   "id": "zombie",
+   "model": "zombie",
+   "at": [
+    -8,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "kobold",
+   "model": "kobold",
+   "at": [
+    -6,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "demon",
+   "model": "demon",
+   "at": [
+    -4,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "giant",
+   "model": "giant",
+   "at": [
+    -2,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "rat",
+   "model": "rat",
+   "at": [
+    0,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "spider",
+   "model": "spider",
+   "at": [
+    2,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "wyrmling",
+   "model": "wyrmling",
+   "at": [
+    4,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "imp",
+   "model": "imp",
+   "at": [
+    6,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "mushroom_warrior",
+   "model": "mushroom_warrior",
+   "at": [
+    8,
+    -4
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "bunny",
+   "model": "bunny",
+   "at": [
+    -8,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "snake",
+   "model": "snake",
+   "at": [
+    -6,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "wasp",
+   "model": "wasp",
+   "at": [
+    -4,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "frog",
+   "model": "frog",
+   "at": [
+    -2,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "bat",
+   "model": "bat",
+   "at": [
+    0,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "dragon",
+   "model": "dragon",
+   "at": [
+    2,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "ghost",
+   "model": "ghost",
+   "at": [
+    4,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "slime",
+   "model": "slime",
+   "at": [
+    6,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "goblin",
+   "model": "goblin",
+   "at": [
+    8,
+    -1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "orc",
+   "model": "orc",
+   "at": [
+    -8,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "troll",
+   "model": "troll",
+   "at": [
+    -6,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "skeleton",
+   "model": "skeleton",
+   "at": [
+    -4,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "mummy",
+   "model": "mummy",
+   "at": [
+    -2,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "werewolf",
+   "model": "werewolf",
+   "at": [
+    0,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "lizardman",
+   "model": "lizardman",
+   "at": [
+    2,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "minotaur",
+   "model": "minotaur",
+   "at": [
+    4,
+    2
+   ],
+   "facing": "s",
+   "hostile": false
+  }
+ ]
+}

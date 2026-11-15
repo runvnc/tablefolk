@@ -76,8 +76,9 @@
   // ---- memory ----
   function addMemory(g, text, w = 1, kind = 'event') {
     const m = mindOf(g); text = String(text || '').trim().slice(0, 160); if (!text) return;
-    const same = m.mem.find(e => e.text.toLowerCase() === text.toLowerCase());
-    if (same) { same.turn = m.turn; same.w = Math.max(same.w, w); return; }
+    const same = m.mem.find(e => e.text.toLowerCase() === text.toLowerCase() || e.src?.toLowerCase() === text.toLowerCase());
+    if (same?.src) { same.n++; same.turn = m.turn; same.text = PATTERNS[same.pi]?.[1](same.who, same.n) || same.text; return; }
+    if (same) { same.turn = m.turn; same.w = Math.max(same.w, w); same.n = (same.n || 1) + 1; if (same.n >= 3) consolidate(g); return; }
     m.mem.push({ text, w, kind, turn: m.turn });
     // keep the weightiest and the newest
     if (m.mem.length > 40) { m.mem.sort((a, b) => (b.w + b.turn * .05) - (a.w + a.turn * .05)); m.mem.length = 32; m.mem.sort((a, b) => a.turn - b.turn); }
@@ -120,7 +121,7 @@
   function recall(g, n = 3) {
     const m = mindOf(g), ctx = context(g);
     return m.mem.map(e => ({ e, s: score(e, ctx, m.turn, m) })).sort((a, b) => b.s - a.s).slice(0, n).map(x => x.e)
-      .sort((a, b) => a.turn - b.turn).map(e => e.text);
+      .sort((a, b) => a.turn - b.turn).map(shown);
   }
   // What it knows: its own facts ("knows") always, the most relevant first;
   // then world lore that fits what was said, or, when none does, one piece
@@ -141,6 +142,228 @@
     return [...own, ...fit];
   }
 
+  // ---- what it knows about the player (the "player file") ----
+  // A small model forgets the player's name and errand in a few turns, and
+  // what makes a character feel alive is that it doesn't. The game keeps,
+  // per character, what the player told it about themselves, what they
+  // asked for, what they promised, and how they treated it; two short lines
+  // on the card ("About Ana: ..."). Read from the player's own words with
+  // plain patterns, so it costs no model call.
+  function pfOf(g) { const m = mindOf(g); return m.pf ||= { met: m.turn, talks: 0, name: '', wants: [], promises: [], said: [], gifts: [], hits: 0 }; }
+  const clip = (t, n = 70) => String(t || '').replace(/\s+/g, ' ').replace(/[.!?,;:\s]+$/, '').trim().slice(0, n);
+  const keep = (list, t, n = 3) => { t = clip(t); if (!t || t.length < 3) return; const i = list.findIndex(x => x.toLowerCase() === t.toLowerCase()); if (i >= 0) list.splice(i, 1); list.push(t); if (list.length > n) list.shift(); };
+  // the player's words about themselves, as the character would put them
+  const theirs = t => String(t).replace(/\b(my|mine|me|myself|i'm|i am|i)\b/gi, w => ({ my: 'their', mine: 'theirs', me: 'them', myself: 'themselves', "i'm": "they're", 'i am': 'they are', i: 'they' })[w.toLowerCase()]).replace(/\byou\b/gi, 'you').replace(/\byour\b/gi, 'your');
+  function learnFromPlayer(g, text) {
+    const pf = pfOf(g), t = String(text || '').trim(); if (!t) return;
+    pf.talks++; pf.last = mindOf(g).turn;
+    let r;
+    if ((r = t.match(/\b(?:my name is|my name's|call me|i am called|name'?s)\s+([A-Z][\w'-]{1,20})/i)) || (r = t.match(/\b(?:i'?m|i am)\s+([A-Z][a-z'-]{1,20})\b(?![\w\s]*\b(?:years|tired|hungry|sorry|lost|looking|here|fine|good|ok))/))) pf.name = r[1];
+    for (const sent of t.split(/(?<=[.!?])\s+/)) {
+      if ((r = sent.match(/\b(i(?:'m| am) (?:looking|searching) for|i need to|i want to|i(?:'d| would) like to|i(?:'m| am) trying to|i came (?:here )?to|help me(?: to)?|i need|i want|i(?:'d| would) like|i came (?:here )?for)\s+(.{3,80})/i))) keep(pf.wants, (/looking|searching|for$/i.test(r[1]) ? 'find ' : /^i (need|want)$|like$/i.test(r[1]) ? 'get ' : '') + theirs(r[2]));
+      else if ((r = sent.match(/^(?:can|could|would|will) you\s+(.{3,80})\?/i))) keep(pf.wants, 'asked you to ' + theirs(r[1]));
+      if ((r = sent.match(/\b(?:i promise(?: to| that i'?ll)?|i swear(?: to| i'?ll)?|i'?ll|i will)\s+((?:bring|pay|give|come back|return|find|get|help|fetch|kill|deal with|save|protect|tell)\b.{0,70})/i))) keep(pf.promises, theirs(r[1]));
+      if ((r = sent.match(/\bi(?:'m| am) ((?:a|an|the)\s+[\w\s'-]{2,40}|from\s+[\w\s'-]{2,40})/i))) keep(pf.said, theirs(r[1]));
+      else if ((r = sent.match(/\bi (live|work|love|like|hate|fear|have)\s+([\w\s'-]{2,40})/i))) keep(pf.said, ({ have: 'has' }[r[1].toLowerCase()] || r[1].toLowerCase() + 's') + ' ' + theirs(r[2]));
+    }
+  }
+  // the player gave it something: a promise about that thing is kept
+  function promiseKept(g, what) {
+    const pf = pfOf(g), w = words(what); if (!w.length) return;
+    const i = pf.promises.findIndex(p => words(p).some(x => w.includes(x)) || (/gold|pay|coin/i.test(p) && /gold/i.test(what)));
+    if (i >= 0) { const p = pf.promises.splice(i, 1)[0]; addMemory(g, `${playerName()} kept their promise to ${p}.`, 2.5, 'saw'); pf.kept = (pf.kept || 0) + 1; mindOf(g).mood.trust = clamp01(mindOf(g).mood.trust + .15); }
+  }
+  function playerLines(g) {
+    const pf = mindOf(g).pf; if (!pf || (!pf.talks && !pf.gifts.length && !pf.hits)) return [];
+    const m = mindOf(g), who = pf.name || playerName(), ago = m.turn - pf.met, bits = [];
+    bits.push(pf.talks > 6 || ago > 30 ? 'you know them well by now' : pf.talks > 1 ? `you met ${ago <= 1 ? 'just now' : ago + ' turns ago'}, talked ${pf.talks} times` : 'you have only just met');
+    if (pf.said.length) bits.push(pf.said.join('; '));
+    if (pf.wants.length) bits.push('they want: ' + pf.wants.join('; '));
+    if (pf.promises.length) bits.push('they promised to ' + pf.promises.join('; ') + ' (not done yet)');
+    if (pf.kept) bits.push(`kept ${pf.kept === 1 ? 'a promise' : pf.kept + ' promises'} to you`);
+    if (pf.gifts.length) bits.push('gave you ' + pf.gifts.slice(-3).join(', '));
+    if (pf.hits) bits.push(pf.hits === 1 ? 'hit you once' : `hit you ${pf.hits} times`);
+    return ['About ' + who + ': ' + bits.map(b => b[0].toUpperCase() + b.slice(1)).join('. ') + '.'];
+  }
+
+  // ---- how much the game does for it, by the size of its brain ----
+  // basic: a 2B-class model. The game reacts for it when it matters (eats
+  //   when starving, hits back or runs from a monster: reflexes) and keeps
+  //   the card short.
+  // capable: a 4B-class model (Gemma 4 E4B). It is offered concrete choices
+  //   when in danger or hungry and decides itself; the game steps in only
+  //   when it lets things get bad. Reflection asks the model.
+  // ambitious: 12B and up, or an online model. No reflexes; longer memory.
+  // A scenario's "expect" (or an agent's) overrides the guess.
+  const TIERS = ['basic', 'capable', 'ambitious'];
+  function tier(g) {
+    const cfg = g ? getBrainConfig(g.id) : {}, set = cfg.expect || state.expect;
+    if (TIERS.includes(set)) return set;
+    const k = String(window.tablefolkBrainInfo?.()?.key || '');
+    if (/endpoint|12b|26b|27b|31b|9b/i.test(k)) return 'ambitious';
+    if (/e4b/i.test(k)) return 'capable';
+    return 'basic';
+  }
+
+  // ---- reflection: raw memories become a few lasting beliefs ----
+  // Each memory has a source (kind): event (it happened to it or it saw it),
+  // note (its own remember()), heard (someone told it: may be wrong), belief
+  // (the game's summary of many events), thought (the model's own reflection).
+  // consolidate() runs every 12 of its turns and when it has slept: repeated
+  // events about one person fold into one belief ("Ana has attacked you 3
+  // times"). reflectWithModel() (capable and ambitious brains, the
+  // scenario's "reflect" not false) asks the model, when it sleeps or every
+  // 30 turns, for one or two short lessons from what it remembers.
+  const PATTERNS = [
+    [/^(.+?) attacked you/i, (who, n) => `${who} has attacked you ${n} times: not to be trusted near you.`],
+    [/^(.+?) gave you /i, (who, n) => `${who} has given you things ${n} times: generous to you.`],
+    [/^You sold (.+?) /i, (who, n) => `${who} is a regular customer (${n} purchases).`],
+    [/^(.+?) attacked (?!you)/i, (who, n) => `${who} has attacked people ${n} times: violent.`],
+  ];
+  function consolidate(g) {
+    const m = mindOf(g);
+    for (const e of m.mem) {
+      if ((e.n || 1) < 3 || e.kind === 'belief' || e.kind === 'thought') continue;
+      for (const [pi, [re, fn]] of PATTERNS.entries()) { const r = e.text.match(re); if (r) { Object.assign(e, { src: e.text, who: r[1], pi, kind: 'belief', w: Math.max(e.w, 3) }); e.text = fn(r[1], e.n); break; } }
+    }
+    m.lastConsolidated = m.turn;
+  }
+  let reflecting = false;
+  async function reflectWithModel(g) {
+    const m = mindOf(g), cfg = getBrainConfig(g.id);
+    if (reflecting || state.reflect === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated) return;
+    const raw = m.mem.filter(e => e.kind !== 'thought').slice(-12).map(e => '- ' + e.text);
+    if (raw.length < 4) return;
+    reflecting = true; m.lastReflected = m.turn;
+    try {
+      const sys = `You are ${g.id}. ${String(cfg.personality || '').slice(0, 300)}`;
+      const user = `Things you remember:\n${raw.join('\n')}\n\nWhat do you make of all this? Write one or two short lessons or beliefs, in your own voice, about the people here or what you should do next. One per line, under 20 words each, no lists or numbering.`;
+      const r = await window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: 80, temperature: .7, agentId: g.id + '~reflect' });
+      const lines = String(r?.choices?.[0]?.message?.content || '').split('\n').map(t => t.replace(/^[-*\d.)\s]+/, '').replace(/^["']|["']$/g, '').trim()).filter(t => t.length > 8 && t.length < 160 && !/[{}()<>]/.test(t)).slice(0, 2);
+      m.mem = m.mem.filter(e => e.kind !== 'thought' || m.turn - e.turn < 60).slice(-40);
+      for (const t of lines) addMemory(g, t, 3, 'thought');
+      if (lines.length) console.log('[mind] ' + g.id + ' reflects:', lines.join(' | '));
+    } catch (e) { console.warn('[mind] reflect', e); }
+    finally { reflecting = false; }
+  }
+  // how a memory reads on the card: what it was told or thought is marked as such
+  const shown = e => e.kind === 'thought' ? `(you concluded) ${e.text}` : e.text;
+
+  // ---- gossip: news travels between characters ----
+  // When a character says something within earshot of another, and its
+  // words match something it remembers about someone else, the listener
+  // remembers it too, as hearsay: "pip told you: Ana attacked grub." The
+  // card offers a piece of news when someone it could tell is nearby, so
+  // the model has something true to chat about. Off with "gossip": false.
+  const juicy = (g, e) => (e.kind === 'event' || e.kind === 'belief' || e.kind === 'note') && e.w >= 1.5 && !/^You (sold|gave)/.test(e.text);
+  function asTold(teller, text) {
+    return String(text).replace(/\byour\b/gi, teller + "'s").replace(/\byou\b/gi, teller).replace(/^\w/, c => c.toUpperCase());
+  }
+  function hearGossip(listener, teller, text) {
+    const m = mindOf(listener); m.told ||= {};
+    const told = `${teller.id} told you: ${asTold(teller.id, text)}`;
+    if (m.mem.some(e => e.text.toLowerCase() === told.toLowerCase())) return false;
+    addMemory(listener, told, 1.8, 'heard');
+    const r = text.match(/^(.+?) attacked/i); if (r && !isPlayerName(r[1]) && r[1] !== listener.id) opinion(listener, r[1], -.15, 'heard they attacked someone');
+    return true;
+  }
+  function onSpoke(g, text) {
+    if (state.gossip === false || !state.characters.includes(g)) return;
+    const said = new Set(words(text)); if (said.size < 2) return;
+    const mine = mindOf(g).mem.filter(e => juicy(g, e) && overlap(e.text, said) >= 2);
+    if (!mine.length) return;
+    const p = g.root.position, R = state.earshot || 6;
+    for (const c of state.characters) {
+      if (c === g || c.defeated || getBrainConfig(c.id).defeated || UNDEAD.test(c.charModel || '')) continue;
+      if (Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) > R) continue;
+      for (const e of mine) if (hearGossip(c, g, e.text)) mindOf(g).shared = { ...(mindOf(g).shared || {}), [c.id + '|' + e.text]: 1 };
+    }
+  }
+  function gossipLine(g) {
+    if (state.gossip === false) return '';
+    const m = mindOf(g), p = g.root?.position; if (!p) return '';
+    const near = state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && !UNDEAD.test(c.charModel || '') && Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) <= 4);
+    if (!near.length) return '';
+    for (const c of near) {
+      const news = m.mem.filter(e => juicy(g, e) && !(m.shared || {})[c.id + '|' + e.text] && !e.text.toLowerCase().includes(c.id.toLowerCase())).sort((a, b) => b.w - a.w || b.turn - a.turn)[0];
+      if (news) return `News you could tell ${c.id}: ${news.text}`;
+    }
+    return '';
+  }
+  // what it hides and what it is after (agent "secret", "agenda")
+  function secretLines(g) {
+    const cfg = getBrainConfig(g.id), m = mindOf(g), out = [];
+    if (cfg.agenda) out.push(`What you are quietly after: ${cfg.agenda}`);
+    if (cfg.secret) out.push(m.mood.trust >= .85 && pfOf(g).talks >= 3 ? `Your secret (you trust ${pfOf(g).name || playerName()} enough to share it if they ask): ${cfg.secret}` : `Your secret (never tell it; change the subject if pressed): ${cfg.secret}`);
+    return out;
+  }
+
+  // ---- survival: danger, choices and reflexes ----
+  // A monster near it is put on the card with concrete choices (fight with
+  // the best weapon it carries, drink a potion, run to a named spot), so
+  // a 4B model picks one instead of inventing one. reflex() is the game
+  // acting for it when the model can't be trusted to (basic tier) or let
+  // things get bad (capable tier): it returns a command line, or null.
+  const POTION = /potion|elixir|tonic|salve|bandage/i;
+  const posOf2 = c => c.logicalPos || c.root.position;
+  const dist2 = (a, b) => Math.hypot(posOf2(a).x - posOf2(b).x, posOf2(a).z - posOf2(b).z);
+  function foes(g, R = 6) {
+    const P = window.tablefolkPlay; if (!P?.isHostile || !g.root) return [];
+    return state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && P.isHostile(c) && dist2(g, c) <= R && (window.tablefolk?.canSeeEachOther?.(g, c) ?? true))
+      .sort((a, b) => dist2(g, a) - dist2(g, b));
+  }
+  function dirWord(dx, dz) { const a = Math.atan2(dx, dz) * 180 / Math.PI; return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((a + 360) % 360) / 45) % 8]; }
+  function bestWeapon(g) {
+    const W = window.tablefolkCombat?.weaponFor; if (!W) return null;
+    return (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0).map(i => W(i.name)).filter(Boolean).sort((a, b) => b.dmg - a.dmg)[0] || null;
+  }
+  // a free cell about 4 steps straight away from the foe (else the player, an ally)
+  function fleeSpot(g, foe) {
+    const a = posOf2(g), b = posOf2(foe); let dx = a.x - b.x, dz = a.z - b.z; const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+    for (const k of [5, 4, 3]) for (const rot of [0, .5, -.5, 1, -1]) {
+      const c = Math.cos(rot), sn = Math.sin(rot), x = Math.round(a.x + (dx * c - dz * sn) * k), z = Math.round(a.z + (dx * sn + dz * c) * k);
+      try { if (cellPassable(x, z) && !occupantAt(x, z, g)) return `${x},${z}`; } catch { return null; }
+    }
+    return null;
+  }
+  function potion(g) { return (charInventory(g).items || []).find(i => POTION.test(i.name) && (i.qty ?? 1) > 0)?.name || null; }
+  function dangerLines(g) {
+    const fs = foes(g); if (!fs.length) return [];
+    const f = fs[0], C = window.tablefolkCombat, me = C?.hpOf(g) || { hp: 10, max: 10 }, fh = C?.hpOf(f) || { hp: 5, max: 5 };
+    const d = dist2(g, f), reach = d <= (C?.REACH ?? 1.6) + .05, dir = dirWord(posOf2(f).x - posOf2(g).x, posOf2(f).z - posOf2(g).z);
+    const held = getBrainConfig(g.id).wielding, w = bestWeapon(g), pot = potion(g), spot = fleeSpot(g, f);
+    const out = [`DANGER: ${f.id} (${String(f.charModel || 'monster').replace(/_/g, ' ')}, ${fh.hp}/${fh.max} health) is ${reach ? 'right next to you' : Math.round(d) + ' steps ' + dir}${fs.length > 1 ? `, with ${fs.length - 1} more nearby` : ''}. You have ${me.hp}/${me.max} health${held ? ', holding ' + held : ''}.`];
+    const ch = [], may = c => { try { return commandsFor(g).has(c); } catch { return true; } };
+    if (w && may('wield') && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) ch.push(`wield(${w.name}) - you carry it`);
+    if (may('attack')) ch.push(reach ? `attack(${f.id}) - it is in reach` : may('walk') ? `walk(${f.id}) then attack(${f.id})` : `attack(${f.id}) when it comes close`);
+    if (pot && me.hp < me.max * .6) ch.push(`eat(${pot}) - heals you`);
+    if (spot && may('walk')) ch.push(`walk("${spot}") - run away from it`);
+    if (may('say') && state.playerAvatar && !state.playerAvatar.defeated) ch.push(`say("Help! ${f.id} is attacking!") - call for help`);
+    if (ch.length) out.push('Choose one now: ' + ch.join(' | '));
+    return out;
+  }
+  function reflex(g) {
+    const cfg = getBrainConfig(g.id), t = tier(g);
+    if (cfg.defeated || t === 'ambitious' || state.reflexes === false || cfg.reflexes === false) return null;
+    const C = window.tablefolkCombat, m = mindOf(g), me = C?.hpOf(g) || { hp: 1, max: 1 }, frac = me.hp / me.max;
+    const fs = foes(g, 4), f = fs[0], reach = f && dist2(g, f) <= (C?.REACH ?? 1.6) + .05;
+    const brave = temperament(cfg) === 'brave', basic = t === 'basic';
+    if (f) {
+      const pot = potion(g);
+      if (pot && frac <= (basic ? .5 : .3)) return { line: `eat(${pot})`, why: `hurt (${me.hp}/${me.max}) with ${f.id} near: drinks the ${pot}` };
+      if (frac <= (basic ? .35 : .25) && !brave) { const spot = fleeSpot(g, f); if (spot) return { line: `walk("${spot}")`, why: `badly hurt: runs from ${f.id}` }; }
+      if (basic && reach) {
+        const w = bestWeapon(g), held = cfg.wielding;
+        if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
+        return { line: `attack(${f.id})`, why: `fights back against ${f.id}` };
+      }
+      if (basic && !reach && temperament(cfg) === 'timid') { const spot = fleeSpot(g, f); if (spot) return { line: `walk("${spot}")`, why: `keeps away from ${f.id}` }; }
+      return null;
+    }
+    if (needsOn(g) && m.hunger >= (basic ? .8 : .92)) { const fd = food(g); if (fd) return { line: `eat(${fd})`, why: `starving: eats the ${fd}` }; }
+    return null;
+  }
+
   // ---- mood ----
   function push(g, mood, by, why) {
     const m = mindOf(g);
@@ -157,7 +380,7 @@
       else if (t === 'timid') { push(g, 'fear', .55, why); push(g, 'anger', .1, why); }
       else { push(g, 'anger', .45, why); push(g, 'fear', .25, why); }
       push(g, 'joy', -.4);
-      if (me) m.mood.trust = clamp01(m.mood.trust - .35);
+      if (me) { m.mood.trust = clamp01(m.mood.trust - .35); pfOf(g).hits++; }
       m.threat = d.by; m.threatTurn = m.turn;
       if (!me) opinion(g, d.by, -.6, 'attacked you');
       addMemory(g, `${d.by} attacked you${d.hit === false ? ' (and missed)' : ''}.`, 3);
@@ -173,7 +396,7 @@
     } else if (kind === 'given') {
       push(g, 'joy', .35, `${d.who} gave you ${d.what}`); m.mood.anger *= .6;
       if (!me) opinion(g, d.who, .35, `gave you ${d.what}`);
-      if (me) m.mood.trust = clamp01(m.mood.trust + .25);
+      if (me) { m.mood.trust = clamp01(m.mood.trust + .25); keep(pfOf(g).gifts, d.what, 5); promiseKept(g, d.what); }
       addMemory(g, `${d.who} gave you ${d.what}.`, 2);
     } else if (kind === 'sold') {
       push(g, 'joy', .2, `you sold ${d.item}`);
@@ -183,6 +406,7 @@
       addMemory(g, `You gave ${d.to} ${d.item}.`, 1.5);
     } else if (kind === 'heard') {
       m.heard = String(d.text || '');
+      if (me) learnFromPlayer(g, d.text);
       if (me) m.mood.trust = clamp01(m.mood.trust + .004);
     }
   }
@@ -215,6 +439,9 @@
     // twice this a meal lasted three minutes ("Thistle keeps saying she's hungry")
     if (needsOn(g)) { m.hunger = clamp01(m.hunger + .012); m.tired = clamp01(m.tired + .007); }
     if (/emote\(\s*"?sleep/i.test(line)) m.tired = 0;
+    const slept = (m.prevTired ?? 0) - m.tired > .3; m.prevTired = m.tired;
+    if (slept || m.turn - (m.lastConsolidated ?? 0) >= 12) consolidate(g);
+    if (slept || m.turn - (m.lastReflected ?? 0) >= 30) setTimeout(() => reflectWithModel(g), 50);
     if ((cfg.goal || '') !== m.goal) { m.goal = cfg.goal || ''; m.goalTurn = m.turn; }
     if (m.feel && m.turn - m.feel.turn > 4) m.feel = null;
     if (m.threat && m.mood.fear < .3 && m.mood.anger < .3) m.threat = null;
@@ -257,7 +484,10 @@
   function cardLines(g) {
     if (!g) return [];
     const cfg = getBrainConfig(g.id), m = mindOf(g), out = [];
+    const danger = dangerLines(g);
     const f = feelLine(g); if (f) out.push(f);
+    out.push(...playerLines(g));
+    out.push(...secretLines(g));
     const rl = relLine(g); if (rl) out.push(rl);
     const b = bodyLine(g); if (b) out.push(b);
     const w = want(g), urgent = /^(stay safe|get your wounds|get away|tell .* attacked|let .* stand for)/.test(w);
@@ -265,6 +495,8 @@
     if (cfg.goal) { const n = m.turn - m.goalTurn; out.push(`Current goal: ${cfg.goal}` + (n >= 6 ? ` (${n} turns on it: what is the next step?)` : '')); }
     const mem = recall(g); if (mem.length) out.push('You remember: ' + mem.join(' | '));
     const kn = facts(g); if (kn.length) out.push('You know: ' + kn.join(' | '));
+    const gl = !danger.length && gossipLine(g); if (gl) out.push(gl);
+    out.push(...danger);
     return out;
   }
 
@@ -283,6 +515,7 @@
     if (window.tablefolkWorkflows?.active(g.id)) return true;
     const w = want(g);
     if (/^(stay safe|get away|tell .* attacked|let .* stand for)/.test(w)) return true;
+    if (foes(g, 5).length && since >= 1) return true;
     if ((cfg.goal || w) && since >= 2) return true;
     return since >= (+state.idleTurnEvery > 0 ? +state.idleTurnEvery : 5);
   }
@@ -309,6 +542,13 @@
     const inv = charInventory(g), items = (inv.items || []).filter(i => (i.qty ?? 1) > 0);
     const it = item ? findItem(items, item) : items.find(i => isFood(i.name));
     if (!it) return say(g, item ? `eat failed: ${g.id} has no ${item}` : 'eat failed: nothing to eat', false);
+    if (POTION.test(it.name)) {
+      it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
+      setBrainConfig(g.id, { inventory: inv });
+      const healed = window.tablefolkCombat?.heal(g, 4) || 0;
+      try { emitBadge(g, 'drinks ' + it.name); inventoryChanged(); } catch {}
+      return say(g, `${g.id} drinks the ${it.name}${healed ? ' and heals ' + healed : ''}`, false);
+    }
     const nourish = isFood(it.name);
     if (!nourish) return say(g, `eat failed: ${it.name} is not food`, false);
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
@@ -320,6 +560,7 @@
 
   // ---- events from the rest of the game ----
   window.addEventListener('tablefolk-agent-turn', e => { const g = state.characters.find(c => c.id === e.detail?.agentId); if (g) tick(g, e.detail.line || ''); });
+  window.addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (!d.voiced) return; const g = state.characters.find(c => c.id === d.agentId); if (g) onSpoke(g, d.text); });
   window.addEventListener('tablefolk-player-chat', e => { const g = state.characters.find(c => c.id === e.detail?.agentId); if (g) event(g, 'heard', { who: playerName(), text: e.detail.text }); });
   window.addEventListener('tablefolk-defeated', e => {
     const id = e.detail?.id, v = id === 'player' ? state.playerAvatar : state.characters.find(c => c.id === id); if (!v) return;
@@ -327,5 +568,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { prepare, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

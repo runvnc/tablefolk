@@ -71,8 +71,7 @@
     const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][Math.floor(Math.random() * 4)]; try { setCharacterFacing(c, new BABYLON.Vector3(d[0], 0, d[1])); } catch {}
   }
   async function monsterTurn(c) {
-    const pl = me();
-    const near = pl && !pl.defeated && Math.hypot(posOf(c).x - posOf(pl).x, posOf(c).z - posOf(pl).z) <= 8 && (W()?.canSeeEachOther?.(c, pl) ?? true);
+    const near = P()?.preyFor?.(c);
     if (near) await P()?.fighterTurn?.(c); else await wander(c);
   }
   // ---- pace ----

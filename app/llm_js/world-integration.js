@@ -1291,7 +1291,20 @@ async function main() {
   world.runAgentTurn = async g => {
     while (replying) await sleep(100);
     replying = true;
-    try { while (!world.isTurnReady()) await sleep(100); return await runOneAgentTurn(g); }
+    try {
+      while (!world.isTurnReady()) await sleep(100);
+      // mind.js reflexes: the game acts for a character in danger or starving
+      // when its brain is small (or let things get bad); no model call
+      const rx = window.tablefolkMind?.reflex?.(g), rcmd = rx && world.parseLLMCommandLine(rx.line);
+      if (rcmd) {
+        appendLog(`${g.id} (reflex: ${rx.why}): ${rx.line}`);
+        await world.stepAgentTurn(g.id, rcmd, 'reflex');
+        while (!world.isTurnReady()) await sleep(100);
+        try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line: rx.line, reflex: true } })); } catch {}
+        return;
+      }
+      return await runOneAgentTurn(g);
+    }
     finally { replying = false; }
   };
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };

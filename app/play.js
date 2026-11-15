@@ -413,20 +413,33 @@
 
   // A plain fighter: attack when next to the player, else close in (two
   // cells a turn) when it can see the player within 8 cells.
+  // Whom a monster goes after: the player, or with the scenario's
+  // "monsters": "everyone" (or the agent's "hunts": "everyone") also the
+  // characters, the nearest it can see within 8 cells (survival worlds).
+  function preyFor(c) {
+    const pl = me(), a = c.logicalPos || c.root.position, cfg = getBrainConfig(c.id);
+    const all = (cfg.hunts || state.monsters) === 'everyone';
+    const cand = [pl, ...(all ? state.characters.filter(o => o !== c && !isHostile(o) && !isAnimal(o)) : [])]
+      .filter(o => o && !o.defeated && !(o !== pl && getBrainConfig(o.id).defeated));
+    let best = null, bd = 1e9;
+    for (const o of cand) { const b = o.logicalPos || o.root.position, d = Math.hypot(b.x - a.x, b.z - a.z); if (d <= 8 && d < bd && (window.tablefolk?.canSeeEachOther?.(c, o) ?? true)) { best = o; bd = d; } }
+    return best;
+  }
   async function fighterTurn(c) {
-    const pl = me(); if (!pl || pl.defeated) return;
+    const pl = preyFor(c); if (!pl || pl.defeated) return;
+    const tgt = pl === me() ? 'player' : pl.id;
     const a = c.logicalPos || c.root.position, b = pl.logicalPos || pl.root.position, d = Math.hypot(b.x - a.x, b.z - a.z);
     const C = window.tablefolkCombat;
     if (d > 8) return;
     // an enemy with a mind says something as the fight starts (its LLM turn
     // runs alongside; the blows don't wait for it)
-    if (!c._taunted && talksToo(c) && sees(c)) {
+    if (!c._taunted && pl === me() && talksToo(c) && sees(c)) {
       c._taunted = true;
       const cfg = getBrainConfig(c.id);
       setBrainConfig(c.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${playerName()} has come within reach. You are going to fight them: say one short line to them first.`]).slice(-5) });
       window.tablefolk?.runAgentTurn?.(c)?.catch?.(() => {});
     }
-    if (d <= (C?.REACH ?? 1.6)) { C?.attack(c, 'player'); await sleep(900); return; }
+    if (d <= (C?.REACH ?? 1.6)) { C?.attack(c, tgt); await sleep(900); return; }
     const route = findRoute(new BABYLON.Vector3(a.x, 0, a.z), new BABYLON.Vector3(b.x, 0, b.z)); if (!route?.length) return;
     // walk two cells along the route, stopping short of the player
     const pts = [new BABYLON.Vector3(a.x, 0, a.z), ...route]; let left = Math.min(2, d - 1.2), end = pts[0];
@@ -440,7 +453,7 @@
     await sleep(c.turnMove.dur * 1000 + 120);
     // close enough now: strike in the same turn, like a charge
     const a2 = c.logicalPos || c.root.position;
-    if (Math.hypot(b.x - a2.x, b.z - a2.z) <= (C?.REACH ?? 1.6)) { C?.attack(c, 'player'); await sleep(900); }
+    if (Math.hypot(b.x - a2.x, b.z - a2.z) <= (C?.REACH ?? 1.6)) { C?.attack(c, tgt); await sleep(900); }
   }
 
   addEventListener('keydown', e => {
@@ -494,5 +507,5 @@
     }, 700);
   });
 
-  window.tablefolkPlay = { isAnimal, ANIMALS, giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, get busy() { return busy; } };
+  window.tablefolkPlay = { isAnimal, ANIMALS, giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, preyFor, get busy() { return busy; } };
 })();

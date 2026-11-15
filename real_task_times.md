@@ -17,3 +17,16 @@ add about 5 minutes per expected browser test round.
 | 2026-11-13 | Scripted worlds: `"brain": "none"` (no model), menu choices that act (`reply`, `act`, `set`, `take`, `workflow`, `if`, lists of menus), world flags and facts and inventory/gold conditions (`app/story.js`), workflows with world flags, `take` and conditions, run without a model; "did you mean" for close meanings; the generator taught menus; Willow Lane scenario and its 23-check play-through; docs | ~40 min (20-30 min given for menus + brain none, before flags and inventory were added) | 19 min 40 s (02:58:18-03:17:58) | Four test rounds: sell() needed the menu choice to count as the buyer's agreement; a close meaning (0.83 vs 0.80) with no model to decide (now asks "did you mean"); chat to the workflow needed the character selected; the model-free world first showed the download question. The haggle regression first hung on a full graphics card (a Breeze server started for the page beside the test Chrome), not the code. |
 | 2026-11-13 | `@tablefolk/script` (libs/script): one expression language (tokenizer), state, actions, step runner (step ids in saves, pause/resume, menu steps, choosers), triggers, validate(), headless tests; the game's story.js/workflows.js/menus.js as adapters | 25-30 min (after calibration; first instinct 60-90) | 27 min 25 s (03:36:18-04:03:43; includes an idle gap while the user re-logged in) | Headless tests first (35 checks, two fixes: the menus' older "workflow" field, validator false warnings). Browser: a botched edit duplicated menus.js once (header text matched the cut marker); a workflow's menu had to hand unmatched words back; "a chocolate one" was ambiguous by meaning (asks "did you mean", which is right). Haggle with Gemma passed first time. |
 | 2026-11-13 | Painting: `@tablefolk/paint` (Chitra Tiny 256 px and tiny-sd 512 px in the browser, chosen for the device) and a "painting" skill for artist characters (a paint(subject) command whose picture is pinned up as a note); a test world | ~45 min (25 code + 3 test rounds with model downloads) | 30 min 38 s (07:33:19-08:03:57) | Eleven test rounds, all on graphics memory: tiny-sd's own 512 px decoder ran the 6 GB card out (swapped for TAESD: 40 s -> 11 s a picture), stale GPU memory in a reused test Chrome, a room with no wall blocks, the skill needing the note command allowed, and beside Gemma E2B even Chitra did not fit (now the processor, ~40 s). A Breeze server started by a test page also held 2.3 GB. |
+
+## Session 2026-11-15 (unattended, 01:05-~04:05 CST)
+
+Estimates given before starting (calibrated: code at a quarter of instinct,
++5 min per browser test round):
+
+| task | estimate | real | notes |
+|---|---|---|---|
+| A. Player file (what each character knows about the player) | 10 min + 1 test round | | |
+| B. Reflection on sleep/every N turns, memories tagged saw/heard/guessed | 15 min + 1 round | | |
+| C. Gossip between characters, secrets and agendas | 15 min + 1 round | | |
+| D. Survival for E4B: monsters that hunt characters, hunger, fight/flee options, tiers by brain size, survival eval | 35 min + 3 rounds | | |
+| E. E4B and 12B with sight in the picker; sight feeds memory | 10 min (+ 3.7 GB download) | | |
