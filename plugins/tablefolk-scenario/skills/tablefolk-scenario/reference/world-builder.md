@@ -96,6 +96,27 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   by the app in a hidden frame first.
 - **Ask the AI for changes** (`POST /api/revise` with the same model choice;
   **undo** steps back through 20).
+- **Look it over and improve** (beside Ask; on the build form, **Look it
+  over**: 2, 3 or 5 rounds, `?improve=N`, for every way of building except
+  in this browser): an agent. Each round the map editor draws the whole map
+  at once (2D tiles, coordinates along the edges) and writes it out as text
+  (a glyph map, the rooms, who and what stands where); the model reviews it
+  with the scenario (the picture goes along to models that can see; others
+  read the text) and answers with problems, ideas and the changes to make,
+  which go through the same revision as Ask. It stops when the model calls
+  the world good or the rounds run out. The log shows each round's map
+  (click to enlarge), what it found and what changed; what a change lost
+  (a chest, a floor, a character) is marked and handed to the next round.
+  Then, with **then paint the pictures** ticked, the pictures it asked for
+  are painted.
+- **Pictures** ([things.md](things.md)): signs, paintings, tapestries, notes
+  with a picture and book covers are painted in this browser by a small
+  image model from their `prompt` (tiny-sd, 512 px, about 0.9 GB once; on a
+  full graphics card Chitra Tiny, then the processor). A bar above the tabs
+  counts the pictures still to paint and paints them all; in the map editor,
+  select a picture or note to write what it shows, paint it, paint it again
+  or upload a file; the Books tab paints a book's cover. The AI never sees
+  the pictures' data, only their prompts.
 - The story, player, characters, layout and raw JSON as forms.
 - **Play**, **play in dev mode**, **print / tabletop** (the `?tabletop=1`
   view in a frame), **copy link**, **download**.

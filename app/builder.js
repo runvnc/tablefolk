@@ -113,7 +113,7 @@
     box.innerHTML = `${canAsk ? `<fieldset class="ask"><legend>Ask the AI for changes</legend>
         <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
         <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div>
-        <div class="toolbar"><button type="button" data-act="${agent.running ? 'stopImprove' : 'improve'}" title="The AI looks at the whole map (as a picture, if the model can see, and as text), finds problems and things to improve, makes the changes, and looks again">${agent.running ? '■ Stop after this step' : '🔍 Look it over and improve'}</button><label class="muted">rounds <select id="aiRounds">${[1, 2, 3, 4, 5].map(n => `<option${n === agent.rounds ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="muted"><input type="checkbox" id="aiPaint" ${agent.paint ? 'checked' : ''}> then paint the pictures</label></div>
+        <div class="toolbar"><button type="button" data-act="${agent.running ? 'stopImprove' : 'improve'}" title="The AI looks at the whole map (as a picture, if the model can see, and as text), finds problems and things to improve, makes the changes, and looks again">${agent.running ? '■ Stop after this step' : '🔍 Look it over and improve'}</button><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0">rounds <select id="aiRounds">${[1, 2, 3, 4, 5].map(n => `<option${n === agent.rounds ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="muted" style="display:inline-flex;flex-direction:row;gap:6px;align-items:center;margin:0"><input type="checkbox" id="aiPaint" ${agent.paint ? 'checked' : ''} style="width:auto;margin:0"> then paint the pictures</label></div>
         ${agent.log.length ? `<ol class="agentlog">${agent.log.map(l => `<li class="${l.kind || ''}">${l.html}</li>`).join('')}</ol>` : ''}</fieldset>` : ''}
       ${paintBar()}
       <div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === tabNow ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
@@ -358,7 +358,7 @@
     const json = JSON.stringify(s).replace(/"data:image\/[^"]+"/g, m => { imgs.push(m); return `"[picture ${imgs.length - 1}]"`; });
     return { light: JSON.parse(json), heavy: next => JSON.parse(JSON.stringify(next).replace(/"\[picture (\d+)\]"/g, (m, i) => imgs[+i] || '""')) };
   }
-  const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
+  const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars || 0} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
   // one change by the AI: the new scenario replaces this one (undo steps back)
   async function reviseAI(req, say) {
     const { light, heavy } = lightImages(lightBooks(scn));
@@ -436,6 +436,19 @@
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     return { ...d, shot };
   }
+  // what a change did: things and characters added and removed, settings dropped
+  function diffWorlds(a, b) {
+    const count = s => { const m = {}; for (const o of s.objects || []) if (o && !['wall', 'door', 'light'].includes(o.type)) m[o.type] = (m[o.type] || 0) + 1; return m; };
+    const ca = count(a), cb = count(b), added = [], lost = [];
+    for (const t of new Set([...Object.keys(ca), ...Object.keys(cb)])) { const n = (cb[t] || 0) - (ca[t] || 0); if (n > 0) added.push((n > 1 ? n + ' ' : '') + t); else if (n < 0) lost.push((n < -1 ? -n + ' ' : '') + t); }
+    const ids = s => new Set((s.agents || []).map(x => x.id));
+    const ia = ids(a), ib = ids(b);
+    for (const id of ib) if (!ia.has(id)) added.push('character ' + id);
+    for (const id of ia) if (!ib.has(id)) lost.push('character ' + id);
+    for (const k of ['floor', 'base', 'lighting', 'walls', 'dark', 'goal', 'intro', 'books', 'generate', 'events']) if (a[k] != null && b[k] == null) lost.push(`"${k}"`);
+    const text = [added.length ? 'added ' + added.join(', ') : '', lost.length ? 'removed ' + lost.join(', ') : ''].filter(Boolean).join('; ');
+    return { added, lost, text };
+  }
   async function improve(rounds = agent.rounds) {
     if (agent.running || asking || revise.where === undefined) return;
     agent.running = true; agent.stop = false; agent.log = []; render();
@@ -451,9 +464,12 @@
         if (c.verdict === 'good' || !c.request) break;
         if (agent.stop) break;
         say(`round ${round}/${rounds}: making the changes…`);
+        const before = JSON.parse(JSON.stringify(scn));
         const done = await reviseAI(c.request, t => say(`round ${round}/${rounds}: ${t}`));
-        history.push(c.request.slice(0, 300));
-        logLine(`changed in ${Math.round((done.ms || 0) / 1000)} s${done.warnings?.length ? ' · notes: ' + esc(done.warnings.join('; ')) : ''}`, 'done');
+        const d = diffWorlds(before, scn);
+        // what the change lost goes to the next round, which can put it back
+        history.push(c.request.slice(0, 300) + (d.lost.length ? ` (this change also lost: ${d.lost.join(', ')}; put back what should stay)` : ''));
+        logLine(`changed in ${Math.round((done.ms || 0) / 1000)} s${d.text ? ': ' + esc(d.text) : ''}${d.lost.length ? ` <b>· lost: ${esc(d.lost.join(', '))}</b>` : ''}${done.warnings?.length ? ' · notes: ' + esc(done.warnings.join('; ')) : ''}`, d.lost.length ? 'warn' : 'done');
       }
       if (agent.paint && !agent.stop && pendingPictures().length) { logLine(`painting ${pendingPictures().length} picture${pendingPictures().length > 1 ? 's' : ''}…`); await paintPending(); }
       say(agent.stop ? 'stopped' : 'finished looking it over (undo steps back through each change)');

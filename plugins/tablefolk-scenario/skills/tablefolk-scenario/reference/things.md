@@ -23,7 +23,7 @@ truth is in files:
 |---|---|
 | model-based object types (sizes, aliases, tags, physics) | `assets/pack.json` (the core asset pack) |
 | scenery built in code (campfire, lantern, light, fence, signpost, lily pad, crystal ball, scrying pool, rune circle) | `app/scenery.js` |
-| props built in code (crate, barrel, mushroom, lamp, wall, door, note, counter) | `app/app.js` (`makeObject`) |
+| props built in code (crate, barrel, mushroom, lamp, wall, door, note, counter, picture) | `app/app.js` (`makeObject`) |
 | bodies | `FIGURES` in `app/app.js` ([format.md](format.md)) |
 | walk-in buildings and their furniture | `WALK_IN`, `WALK_IN_THINGS` in `app/procgen.js` |
 | pick-ups and body loot | `PICKUPS`, `BODY_LOOT` in `app/play.js` |
@@ -170,6 +170,36 @@ it and it lies on the floor again). A character's `note(text)` writes one
 (facing a wall, it is pinned to the wall); `carry(note)` picks one up and
 reads it. Map lines and grid legends take `note "text"`.
 
+A note can carry a picture above its words: `"image"` (a data URL or a URL)
+or, in the world builder, `"prompt"` (what it shows, painted for you): a
+wanted poster's face, a treasure map, a child's drawing.
+
+## Pictures (`picture`): signs, paintings, tapestries
+
+```jsonc
+{ "type": "picture", "style": "sign", "x": 3, "z": -4, "wall": "north",
+  "title": "The Sleeping Fox", "prompt": "a red fox asleep on a tankard",
+  "image": "data:image/jpeg;base64,..." }
+{ "type": "picture", "style": "tapestry", "in": "throne", "prompt": "a dragon coiled around a tower" }
+```
+
+- **style**: `painting` (a framed square picture, the default), `tapestry`
+  (tall, woven, a rod's worth of cloth) or `sign` (a wide board: the picture
+  above its `title`; with no picture, the title alone).
+- **Where**: `"wall"` hangs it on that side of its square, facing into it,
+  like a pinned note. Without `"wall"` it hangs on a wall beside its square
+  if there is one; `"wall": "none"` or no wall near: it stands on two posts
+  (an inn's sign outside, a painting on show). In a generated map, `"in":
+  "tavern"` puts it on a free square against a wall of that place.
+- **image**: the picture, a data URL or URL. **prompt**: what it shows, in a
+  few words (no text: the small image model cannot write letters; a sign's
+  name is `title`). The world builder paints every picture that has a
+  `prompt` and no `image` (tiny-sd in the browser: see
+  [world-builder.md](world-builder.md)), small JPEGs kept in the world.
+  Without an image the game draws a plain board with the title.
+- It is scenery: not carried, no physics. Map lines: `place picture against
+  north_wall` (also `painting`, `tapestry`, `portrait`).
+
 ## Books: knowledge bases characters read (`books`)
 
 A book is a document (a PDF, a text or Markdown file) a character can read
@@ -186,6 +216,7 @@ like anything else, and it is drawn in the world with its own cover and spine.
     "color": "#2d5b3a",                         // the drawn cover, back and spine
     "cover": "data:image/jpeg;base64,...",      // optional pictures (URL or data URL);
     "spine": "data:image/jpeg;base64,...",      //   without them the title is drawn
+    "coverPrompt": "a herb wreath around a mortar",   // the builder paints the cover from this
     "chunks": ["Willowbark eases fever ...", "Comfrey, called knitbone, ..."],
     "vectors": "<base64>", "dim": 256, "model": "embeddinggemma-2"   // written by the world builder
   }

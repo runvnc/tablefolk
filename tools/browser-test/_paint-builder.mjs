@@ -1,0 +1,24 @@
+// the builder paints the pictures a scenario asks for (tiny-sd must be cached: no download here)
+import { chromium } from 'playwright-core';
+import { readFileSync, writeFileSync } from 'node:fs';
+const out = process.argv[2] || '.';
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
+const page = await b.contexts()[0].newPage();
+const errs = []; page.on('pageerror', e => errs.push(String(e)));
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.goto('http://localhost:8000/world/?t=' + Date.now());
+const scn = JSON.parse(readFileSync(process.env.SCN_FILE, 'utf8')); delete scn._noTestPictures;
+await page.evaluate(s => { localStorage.setItem('tablefolk.paintOk', '1'); s.books = { herbal: { title: 'The Herbal', about: 'healing plants', coverPrompt: 'a green herb wreath around a mortar', chunks: ['Willowbark eases fever.'] } }; window.tfBuilder.show({ scenario: s, model: 'test', ms: 0 }, { revise: {} }); }, scn);
+await page.waitForTimeout(1200);
+const t0 = Date.now();
+const tick = setInterval(async () => { try { console.log(Math.round((Date.now() - t0) / 1000) + 's', await page.evaluate(() => document.querySelector('.paintbar span')?.textContent || '')); } catch {} }, 5000);
+await page.evaluate(() => window.tfBuilder.paintPending());
+clearInterval(tick);
+const r = await page.evaluate(() => ({ left: window.tfBuilder.pendingPictures().length, imgs: window.tfBuilder.scenario.objects.filter(o => o.type === 'picture').map(o => o.image), cover: window.tfBuilder.scenario.books.herbal.cover, msg: document.getElementById('edmsg')?.textContent }));
+console.log('left:', r.left, 'msg:', r.msg, 'seconds:', Math.round((Date.now() - t0) / 1000));
+r.imgs.forEach((u, i) => u && writeFileSync(`${out}/painted-${i}.jpg`, Buffer.from(u.split(',')[1], 'base64')));
+if (r.cover) writeFileSync(`${out}/painted-cover.jpg`, Buffer.from(r.cover.split(',')[1], 'base64'));
+const shot = await page.evaluate(async () => (await window.tfBuilder.editor.snapshot()).url);
+writeFileSync(`${out}/painted-map.jpg`, Buffer.from(shot.split(',')[1], 'base64'));
+console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'no page errors');
+await page.close(); process.exit(0);

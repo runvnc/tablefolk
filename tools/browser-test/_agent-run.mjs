@@ -1,0 +1,23 @@
+// the builder's agent on a real model: node _agent-run.mjs <where> <model> <rounds> [outdir]
+import { chromium } from 'playwright-core';
+import { writeFileSync } from 'node:fs';
+const [where = 'cloud', model = '', rounds = '2', out = '.'] = process.argv.slice(2);
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
+const page = await b.contexts()[0].newPage();
+const errs = []; page.on('pageerror', e => errs.push(String(e)));
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.goto('http://localhost:8000/world/?t=' + Date.now());
+await page.evaluate(async ([where, model, scn]) => { const s = await (await fetch(scn)).json(); window.tfBuilder.show({ scenario: s, model: 'test', ms: 0 }, { revise: { where, model } }); }, [where, model, process.env.SCN || '/scenarios/goblin-bakery.json']);
+await page.waitForTimeout(1500);
+const t0 = Date.now(); let last = '';
+const tick = setInterval(async () => { try { const m = await page.evaluate(() => document.getElementById('aiMsg')?.textContent || ''); if (m !== last) { last = m; console.log(Math.round((Date.now() - t0) / 1000) + 's', m); } } catch {} }, 2000);
+await page.evaluate(r => { window.tfBuilder.agent.paint = false; return window.tfBuilder.improve(+r); }, rounds);
+clearInterval(tick);
+const r = await page.evaluate(() => ({ log: window.tfBuilder.agent.log.map(l => l.html.replace(/<img[^>]*>/g, '[map]').replace(/<[^>]+>/g, '')), scn: window.tfBuilder.scenario }));
+console.log('---\n' + r.log.join('\n\n'));
+writeFileSync(out + '/agent-result.json', JSON.stringify(r.scn, null, 1));
+const shot = await page.evaluate(async () => (await window.tfBuilder.editor.snapshot()).url);
+writeFileSync(out + '/agent-after.jpg', Buffer.from(shot.split(',')[1], 'base64'));
+await page.screenshot({ path: out + '/agent-page.png', fullPage: true });
+console.log('seconds', Math.round((Date.now() - t0) / 1000), errs.length ? 'ERRORS:\n' + errs.join('\n') : 'no page errors');
+await page.close(); process.exit(0);

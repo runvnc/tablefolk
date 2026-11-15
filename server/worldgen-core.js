@@ -186,6 +186,7 @@ Look for problems first, then for room for improvement:
 - the story: characters with nothing to want or say, a villain without a reason, an intro that promises what the map does not have
 - empty or samey rooms, things blocking doors or corridors, a map much too big or too small for what happens in it, nothing to find
 - atmosphere: light in dark places; a sign on an inn or shop, paintings or tapestries in halls and chapels, a wanted poster, covers for books
+Use only the object types, bodies and fields the guide lists (no made-up types). A thing with "wall" hangs on that side of its own square: that is how pinned notes and pictures work, not a mistake. If an earlier round lost something that should stay (a chest, a floor, a character), ask for it back.
 Pictures are painted for the world after you finish: {"type": "picture", "style": "painting" | "tapestry" | "sign", "title": "words on it (signs)", "prompt": "what it shows, 5-15 words"} on a free square beside a wall (it hangs on that wall), or standing on its own; a note with "prompt" carries a picture; a book gets a cover with "coverPrompt". Pictures that are already painted are kept.
 
 Answer with one JSON object only:
@@ -310,7 +311,7 @@ button.primary{display:inline-flex;align-items:center;gap:7px;background:var(--a
 button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 #editor details summary{cursor:pointer;color:var(--muted);font-weight:600}#editor details textarea{width:100%;margin-top:6px}
 #editor fieldset.ask{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}#editor fieldset.ask textarea{width:100%}
-#editor .agentlog{margin:.5rem 0 0;padding-left:1.4rem;font-size:.86rem;line-height:1.4}#editor .agentlog li{margin:.35rem 0}#editor .agentlog li.done{color:var(--muted)}#editor .agentlog li.bad{color:#b5442e}
+#editor .agentlog{margin:.5rem 0 0;padding-left:1.4rem;font-size:.86rem;line-height:1.4}#editor .agentlog li{margin:.35rem 0}#editor .agentlog li.done{color:var(--muted)}#editor .agentlog li.bad{color:#b5442e}#editor .agentlog li.warn b{color:#b5442e}
 #editor .agentshot{float:right;width:96px;margin:0 0 .3rem .6rem;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}#editor .agentshot.big{float:none;display:block;width:100%;max-width:900px;margin:.4rem 0;cursor:zoom-out}#editor .agentlog li::after{content:'';display:block;clear:both}
 #editor .paintbar{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:.5rem .8rem;margin:0 0 10px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line))}
 #tableView{position:fixed;inset:0;z-index:11;background:var(--bg);display:flex;flex-direction:column}#tableView[hidden]{display:none}
@@ -323,7 +324,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115e"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115c"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/builder-paint.js?v=20261115b"></script><script src="/app/builder.js?v=20261115g"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

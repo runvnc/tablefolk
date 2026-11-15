@@ -52,6 +52,30 @@ is the scenario skill's `server.md`; this is how it works inside.
   Gemma 4 26B. Tested against a mock server (repair round, revision, a
   CORS refusal's message) and with intercepted OpenRouter requests.
 - Every result is saved in `generated/` (`recent` feeds the admin page).
+- **The builder's agent** ("look it over and improve", `app/builder.js`
+  improve()): `POST /api/critique {scenario, mapText, image, round, rounds,
+  history}` runs one review on the server's model (`critiqueRequest` /
+  `parseCritique` in `worldgen-core.js`) with the map's snapshot as an
+  `image_url` part, and asks again with the text only when the model refuses
+  images; `/api/worldgen/messages {critique: true, ...}` hands the same
+  prompt to the visitor's own model (`worldgen-own.js` critique(), which adds
+  the picture). The answer `{verdict, problems, ideas, request}` goes through
+  the normal revision. The snapshot and the text map come from the map
+  editor (`snapshot()`, `describe()`). The page strips every `data:image`
+  string before a model sees the scenario (`lightImages`) and puts them
+  back in the answer. Tested 2026-11-15 on the goblin bakery with Gemma 4 26B
+  and DeepSeek V4.1 Flash (2 rounds, about 1 minute): good reviews; Gemma's
+  revisions dropped the floor and a chest, hence the per-round diff
+  (`diffWorlds`) fed back to the next review.
+- **Pictures** (`app/builder-paint.js`, `window.tfPaint`): `@tablefolk/paint`
+  forced to tiny-sd (Chitra, then the processor, on a graphics-memory
+  error), JPEGs sized by kind (`SIZE`), prompts get a style suffix and a
+  negative prompt against text. The game draws `picture` objects in
+  `app.js` makePicture (a plane with a DynamicTexture on a PBR backing box;
+  `noteCell` so getObjects saves the square); `scenario.js` backToWalls
+  hangs a picture without `wall` on a wall beside it; `procgen.js` puts
+  pictures with `in` on a free square against a wall. Test:
+  `tools/browser-test/agent-builder-test.mjs` (snapshot, text, paint bar).
 
 **Keep `fast-skill.md` in step with the scenario skill**: a new field,
 object or command the generator should use goes in both (the skill in full,
