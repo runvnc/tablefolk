@@ -17,6 +17,8 @@ const hunger = +(flag('hunger') || .75);
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = ctx.pages()[0] || await ctx.newPage();
 page.on('console', m => { const t = m.text(); if (/reflex|reflects|\berror\b/i.test(t) && !/favicon|DEPRECATED/.test(t)) console.log('  [page]', t.slice(0, 200)); });
+// no voices: a remembered Breeze choice makes the server start Breeze (2 GB of the card)
+await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
 await page.goto(base + '/app/?norender=1' + (flag('model') ? '&model=' + flag('model') : ''));
 const t0 = Date.now();
 for (;;) {

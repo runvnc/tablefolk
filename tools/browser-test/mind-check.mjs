@@ -8,6 +8,8 @@ const page = b.contexts()[0].pages()[0];
 page.on('console', m => { if (/\[mind\]/.test(m.text())) console.log('  [page]', m.text().slice(0, 300)); });
 // a fresh page (the code on disk), on the model given (default E4B)
 const model = process.argv.find(a => a.startsWith('--model='))?.slice(8) || 'gemma4-e4b-litert', base = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:8000';
+// no voices: a remembered Breeze choice makes the server start Breeze (2 GB of the card)
+await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
 await page.goto(base + '/app/?norender=1&model=' + model);
 for (let t0 = Date.now(); ;) {
   const s = await page.evaluate(() => ({ ready: !!window.TABLEFOLK_SCENE_READY && !!window.tablefolkScenario, consent: !document.getElementById('modelConsent')?.hidden, brain: document.getElementById('brainStatus')?.textContent || '' }));

@@ -36,6 +36,9 @@
     // the characters' brain
     const b = window.tablefolkBrainInfo?.(), st = brainStatus();
     out.push(['Characters', b ? b.label : 'none yet', st || '', /fail|error/i.test(st) ? 'bad' : /ready/i.test(st) ? 'ok' : 'busy', window.tablefolkBrainWhy || '']);
+    // how much the game helps the characters (mind.js tiers)
+    const tier = window.tablefolkMind?.tier?.(null);
+    if (tier && b) out.push(['Character help', tier, { basic: 'the game fights back, drinks potions and eats for them in a pinch; short memory', capable: 'they choose from concrete options in danger; the game steps in at the brink; they plan, reflect and glance', ambitious: 'no reflexes; longer memory and conversation' }[tier], 'ok', 'by the brain\'s size; a world can set "expect"']);
     // the voice
     const tts = window.tablefolkTTS;
     if (tts) {
