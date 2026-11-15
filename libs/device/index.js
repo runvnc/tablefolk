@@ -135,7 +135,7 @@ export function setCardMemory(gpu, gb) { if (gpu) { if (gb) local.set(CARD_KEY +
 // card and browser like the bandwidth (CardProbe).
 const PROBE_KEY = 'CardProbe';
 export async function probeHolds(adapter, gb, sig, bwGBs = null) {
-  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && typeof c.holds === 'boolean') return c.holds; } catch {}
+  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || (c.holds === false && Date.now() - c.at < 864e5))) return c.holds; } catch {}   // a no again after a day: the card may only have been busy
   const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
   let dev = null, holds = null, lost = false;
   try {
@@ -276,7 +276,7 @@ export function detectHardware() {
         if (opts.includes(said)) { hw.vramGB = said; hw.memWhy = 'as you said (it comes with ' + opts.join(' or ') + ' GB)'; }
         else if (adapter && hw.cls === 'computer' && !noProbe() && typeof (held = await probeHolds(adapter, opts[0] + Math.min(1, (opts[1] - opts[0]) / 3), [hw.renderer, hw.adapter].join('|'), hw.bwGBs)) === 'boolean') {
           hw.vramGB = held ? opts[1] : opts[0]; hw.memProbed = true;
-          hw.memWhy = `measured: it ${held ? 'holds more than' : 'does not hold'} ${opts[0]} GB (it comes with ${opts.join(' or ')} GB)`;
+          hw.memWhy = held ? `measured: room for more than ${opts[0]} GB (it comes with ${opts.join(' or ')} GB)` : `measured: no room past ${opts[0]} GB, so ${opts[0]} (it comes with ${opts.join(' or ')} GB; or the card was busy: measured again tomorrow)`;
           if (opts.length > 2 && held) hw.vramAsk = true;
         }
         else if (bw && hw.bwGBs) { hw.vramGB = hw.bwGBs * 1.6 >= bw[0] ? bw[1] : opts[0]; hw.memWhy = `from its measured bandwidth (${hw.bwGBs} GB/s; it comes with ${opts.join(' or ')} GB)`; }
