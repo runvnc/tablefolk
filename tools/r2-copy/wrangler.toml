@@ -1,0 +1,10 @@
+# A throwaway Worker: deploy, copy, `npx wrangler delete` (tools/r2-copy/README.md)
+name = "tablefolk-r2-copy"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+[limits]
+cpu_ms = 300000
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "geebr-models"

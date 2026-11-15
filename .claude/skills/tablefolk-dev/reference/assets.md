@@ -211,12 +211,22 @@ for the five languages, `sentencepiece.js`, its README and licences) and
 both CC-BY-4.0. The 18M worker keeps the Hugging Face URLs as its cache keys. A copy already
 cached from Hugging Face stays in use (wllama and the Bonsai engine cache by URL).
 **Copying a public file from Hugging Face into R2 without the maintainer's
-line** (2026-11-12, 8.9 GB in about a minute): deploy a throwaway Worker bound
+line** (2026-11-12, 8.9 GB in about a minute; the tool is `tools/r2-copy/`): deploy a throwaway Worker bound
 to the bucket that, per 64 MiB part, fetches the range from Hugging Face and
 `uploadPart`s it (through a `FixedLengthStream`) into an R2 multipart upload,
 then `complete`s it; drive it from a script with a token header (and a
 User-Agent: Cloudflare answers Python's default with 403, error 1010), check the
 SHA-256 against Hugging Face's `x-linked-etag`, and `wrangler delete` the Worker.
+The painting models (2026-11-15, copied by `tools/r2-copy/`, 1.65 GB in
+137 s) are under `paint/hf/<repo>/resolve/<rev>/<path>` (Hugging Face's
+layout): tiny-sd (`danyalmalik/tiny-sd-ONNX-WebGPU`, with its LICENSE.md, the
+CreativeML Open RAIL-M that must travel with it), TAESD's decoder
+(`julienkay/taesd`), Chitra Tiny (`mrfakename/Chitra-Tiny-ONNX`) and the CLIP
+tokenizer (`Xenova/clip-vit-base-patch32`, tokenizer files only);
+`libs/paint/paint-worker.js` pins each to that revision (`REV`), tries the
+mirror first and keeps the pinned Hugging Face URL as the cache key; the
+tokenizers go through Transformers.js's `env.fetch` (its file probe asks for
+`main`, so every request is rewritten to the pinned revision).
 ZONOS3-Mini is under `zonos3-mini/d2d142a/web/` (2026-11-15; the Hugging Face
 revision's first seven characters): the part of Zyphra/ZONOS3-Mini's `web/`
 that `libs/voice/zonos-web-worker.js` uses (backbone, `zac`, `spk`,

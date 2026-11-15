@@ -35,7 +35,10 @@ The models come from Hugging Face:
   [TAESD](https://huggingface.co/julienkay/taesd) decoder (MIT, 5 MB) in place of SD's own. The
   512 px decoder ran a 6 GB card out of memory.
 
-They're kept in the browser's Cache API. The Chitra sampling follows mrfakename's
+Each is pinned to one revision. On tablefolk.world (where `@tablefolk/models`
+allows the mirror) they download from Tablefolk's R2 copy first, with Hugging
+Face as the fallback; elsewhere from Hugging Face. They're kept in the browser's
+Cache API under the Hugging Face URL, so the source doesn't matter on later visits. The Chitra sampling follows mrfakename's
 Apache-2.0 [WebGPU Space](https://huggingface.co/spaces/mrfakename/chitra-tiny-webgpu).
 
 Part of [Tablefolk](https://github.com/runvnc/tablefolk) (`libs/`). MIT.

@@ -7,10 +7,12 @@
 <script type="module">
 // Paints with @tablefolk/paint (libs/paint) and shows the pictures:
 //   /tools/browser-test/paint-test.html?model=chitra&prompt=a%20red%20apple&n=2
+//   &mirror=1: from Tablefolk's R2 mirror (as on tablefolk.world); &cpu: on the processor
 // window.RESULT: { model, why, loadSeconds, images: [{ seconds, size }] } or { error }
 const q = new URLSearchParams(location.search), out = document.getElementById('out');
 const log = s => { out.textContent += '\n' + s; };
 try {
+  if (q.get('mirror') === '1') (await import('/libs/models/index.js')).setMirror(true);
   const { createPainter } = await import('/libs/paint/index.js');
   const t0 = performance.now(); let last = '';
   const p = await createPainter({ model: q.get('model') || 'auto', cpu: q.has('cpu'), onStatus: s => { if (s.replace(/\d+%$/, '') !== last) { last = s.replace(/\d+%$/, ''); log(s); } } });

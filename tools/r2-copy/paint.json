@@ -1,0 +1,6 @@
+[
+  { "repo": "danyalmalik/tiny-sd-ONNX-WebGPU", "rev": "bcb34e52bbb548d5d4bbb3b210c9fa1cd248a9ed", "dest": "paint/hf/", "exclude": "^vae_decoder/|^\\.gitattributes$" },
+  { "repo": "julienkay/taesd", "rev": "c8a437fd0201c21c3bcd298fcf3181b063bcc1eb", "dest": "paint/hf/", "include": "^(README\\.md|vae_decoder/.*)$" },
+  { "repo": "mrfakename/Chitra-Tiny-ONNX", "rev": "863b251b80b7ed8f40b2396e23074c129cdf351a", "dest": "paint/hf/", "exclude": "^(tools/|\\.gitattributes$)" },
+  { "repo": "Xenova/clip-vit-base-patch32", "rev": "6b7c523703ae26e39be4b03774966f8571c7f523", "dest": "paint/hf/", "exclude": "^(onnx/|\\.gitattributes$)" }
+]

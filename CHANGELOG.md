@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **The picture painters download from Tablefolk's own mirror**: tiny-sd and Chitra Tiny (about 0.9 GB and 0.75 GB) now come from Tablefolk's R2 mirror on tablefolk.world, with Hugging Face as the fallback, and are pinned to one version, so a change on Hugging Face can't break them.
+
 - **Share a world as a picture or a .zip**: chat apps often cut long links short. The world builder (and the Scenario pane) can now save a world as a picture: a card with its title, characters and map, with the whole world hidden inside it (voices and pictures too). It still opens if a site strips the picture's metadata, though not if it is turned into a JPEG. A .zip holds the world as `world.json` with its voices and pictures as files. Drop either one on the game or the world builder to open it.
 
 - **Voices of a world's own**: the world builder has a Voices tab. Clone a voice from a file or record yourself, give it to a character, and try a line in it with ZONOS3-Mini. The voice travels inside the world as a short compressed clip (about 35 KB), so anyone who opens the link hears it, with ZONOS3-Mini, Pocket-TTS or Breeze TTS. "Save to my voices" keeps a voice in your browser for every world you make, and voices you cloned in the game's Voice pane show up there too. A character's voice list now also offers the 20 library voices and ZONOS3-Mini's ten built-in ones.

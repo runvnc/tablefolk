@@ -6,9 +6,10 @@
 //   tiny-sd  segmind/tiny-sd (a distilled Stable Diffusion 1.5) as ONNX by
 //            danyalmalik (CreativeML Open RAIL-M): CLIP encoder + UNet (fp16) + VAE;
 //            512x512, DPM-Solver++(2M) as its scheduler config asks; TAESD decodes.
-// Files are kept in the Cache API (one download per browser).
+// Files are kept in the Cache API (one download per browser), from Tablefolk's R2 mirror when
+// the page allows it (@tablefolk/models mirrorAllowed), else Hugging Face; pinned revisions (REV).
 //
-// in:  { type: 'load', model }                      -> progress ..., { type: 'ready', model }
+// in:  { type: 'load', model, cpu?, mirror? }       mirror: the R2 mirror's base URL (tablefolk.world)                      -> progress ..., { type: 'ready', model }
 //      { type: 'paint', id, prompt, negative, steps, guidance, seed }
 //                                                   -> step ..., { type: 'image', id, png: Blob, seconds }
 // out: { type: 'progress', note, got, total }, { type: 'step', id, done, total }, { type: 'error', id?, message }
@@ -20,6 +21,14 @@ ort.env.logLevel = 'error';
 ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
 env.allowLocalModels = false;
 
+// each repo pinned to the revision mirrored on R2 (tools/r2-copy/paint.json: paint/hf/<repo>/resolve/<rev>/<file>)
+const REV = {
+  'mrfakename/Chitra-Tiny-ONNX': '863b251b80b7ed8f40b2396e23074c129cdf351a',
+  'danyalmalik/tiny-sd-ONNX-WebGPU': 'bcb34e52bbb548d5d4bbb3b210c9fa1cd248a9ed',
+  'julienkay/taesd': 'c8a437fd0201c21c3bcd298fcf3181b063bcc1eb',
+  'Xenova/clip-vit-base-patch32': '6b7c523703ae26e39be4b03774966f8571c7f523',
+};
+const HF = 'https://huggingface.co/';
 export const MODELS = {
   chitra: {
     repo: 'mrfakename/Chitra-Tiny-ONNX', tokenizer: 'mrfakename/Chitra-Tiny-ONNX', size: 256, latent: 32, steps: 30, guidance: 7,
@@ -36,12 +45,15 @@ const CACHE = 'tablefolk-paint-1';
 let S = null, tok = null, which = null;
 const say = m => postMessage(m);
 
-async function fetchFile(url, onBytes) {
+// urls: where to download it, in order (the mirror, then Hugging Face); kept under the first
+// key (the pinned Hugging Face URL); older keys (before the pin) are still read
+async function fetchFile(urls, onBytes, keys) {
   const c = self.caches ? await caches.open(CACHE) : null;
-  const hit = c && await c.match(url);
-  if (hit) { const b = new Uint8Array(await hit.arrayBuffer()); onBytes(b.byteLength); return b; }
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`download failed (${r.status}): ${url.split('/').pop()}`);
+  for (const k of keys) { const hit = c && await c.match(k); if (hit) { const b = new Uint8Array(await hit.arrayBuffer()); onBytes(b.byteLength); return b; } }
+  let r = null, why = '';
+  for (const u of urls) { r = await fetch(u).catch(e => { why = e.message; return null; }); if (r?.ok) break; why = r ? 'HTTP ' + r.status : why; r = null; }
+  if (!r) throw new Error(`download failed (${why}): ${urls[0].split('/').pop()}`);
+  const url = keys[0];
   const size = Number(r.headers.get('content-length')) || 0, reader = r.body.getReader(), parts = [];
   let got = 0;
   for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); got += value.length; onBytes(value.length); }
@@ -51,17 +63,27 @@ async function fetchFile(url, onBytes) {
   return buf;
 }
 
-async function load(model, cpu = false) {
+async function load(model, cpu = false, mirror = null) {
   if (S && which === model) return;
   const M = MODELS[model]; if (!M) throw new Error('unknown painting model ' + model);
   if (!cpu && (!navigator.gpu || !(await navigator.gpu.requestAdapter().catch(() => null)))) throw new Error('no WebGPU in this browser');
   S = null; which = null;
+  // the tokenizer through Transformers.js, which asks Hugging Face for "main" (its file probe takes no
+  // revision): each request pinned to REV and tried on the mirror first (same layout), then Hugging Face
+  env.fetch = async (url, init) => {
+    const m = String(url).match(/^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\/[^/]+\/(.+)$/);
+    if (!m || !REV[m[1]]) return fetch(url, init);
+    const path = `${m[1]}/resolve/${REV[m[1]]}/${m[2]}`;
+    if (mirror) { const r = await fetch(mirror + 'paint/hf/' + path, init).catch(() => null); if (r?.ok) return r; }
+    return fetch(HF + path, init);
+  };
   tok = await AutoTokenizer.from_pretrained(M.tokenizer);
   const total = M.files.reduce((a, f) => a + f[2], 0); let got = 0, last = 0;
   const onBytes = n => { got += n; const now = performance.now(); if (now - last > 200) { last = now; say({ type: 'progress', note: 'downloading', got, total }); } };
   const s = {};
   for (const [k, f, , repo] of M.files) {   // one at a time: the WebGPU provider dislikes concurrent session creation
-    const buf = await fetchFile(`https://huggingface.co/${repo || M.repo}/resolve/main/${f}`, onBytes);
+    const r = repo || M.repo, path = `${r}/resolve/${REV[r]}/${f}`;
+    const buf = await fetchFile([...(mirror ? [mirror + 'paint/hf/' + path] : []), HF + path], onBytes, [HF + path, `${HF}${r}/resolve/main/${f}`]);
     say({ type: 'progress', note: 'preparing', got, total });
     // cpu: the processor (WASM), for a graphics card that has no room left beside the other models
     s[k] = await ort.InferenceSession.create(buf, { executionProviders: [cpu ? 'wasm' : 'webgpu'], graphOptimizationLevel: 'all' });
@@ -180,7 +202,7 @@ async function paintSD({ id, prompt, negative, steps, guidance, seed }) {
 
 self.onmessage = async ({ data }) => {
   try {
-    if (data.type === 'load') { await load(data.model, !!data.cpu); say({ type: 'ready', model: which }); return; }
+    if (data.type === 'load') { await load(data.model, !!data.cpu, data.mirror || null); say({ type: 'ready', model: which }); return; }
     if (data.type === 'paint') {
       if (!S) throw new Error('no painting model loaded');
       const M = MODELS[which], t0 = performance.now();

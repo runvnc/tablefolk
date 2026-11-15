@@ -16,9 +16,9 @@
 // 'auto' takes tiny-sd on a computer whose graphics card has 4 GB free (freeGB: the
 // memory your other models leave; default all of what @tablefolk/device finds),
 // Chitra on the card with 3.5 GB, else Chitra on the processor (~40 s a picture);
-// nothing without WebGPU... except the processor: cpu: true works anywhere. Files come from Hugging Face and are kept
-// in the browser's cache.
-import { createWorker, note } from '../models/index.js';
+// nothing without WebGPU... except the processor: cpu: true works anywhere. Files come from Tablefolk's
+// mirror on tablefolk.world (else Hugging Face), pinned to one revision, and are kept in the browser's cache.
+import { createWorker, note, mirrorAllowed, MIRROR } from '../models/index.js';
 import { detectHardware, usableGB } from '../device/index.js';
 
 export const PAINTERS = {
@@ -58,7 +58,7 @@ export async function createPainter({ model = 'auto', freeGB = null, cpu = false
     };
     w.onerror = e => reject(new Error(e.message || 'painting worker failed'));
   });
-  w.postMessage({ type: 'load', model: pick.model, cpu });
+  w.postMessage({ type: 'load', model: pick.model, cpu, mirror: mirrorAllowed() ? MIRROR : null });
   await ready;
   onStatus(`${PAINTERS[pick.model].label} ready`);
   let queue = Promise.resolve();
