@@ -312,6 +312,47 @@ q4 on WebGPU through Transformers.js 4.3.1, 256-d; int8 on WASM as fallback
 because q4 needs an operator WASM lacks). Raw cosines bunch at 0.6-0.8, so
 each is scored as standard deviations above the others.
 
+## Books (books.js)
+
+Knowledge bases in the scenario (`books`, normalizeScenario passes them
+through; `load()` at the start, scenario.js). A book is held when an
+inventory item's name is its title (or the carried mesh's `opts.book`), so
+every give/take/chest path moves it without special cases.
+
+- **Turn**: world-integration.js runs `tablefolkBooks.prepare(g, cfg)` after
+  `tablefolkMind.prepare` (4 s cap) for agents with `readsBooks`; the query is
+  the last two "X says:" lines of `pendingChat`. `urgentLines(g)` goes after
+  the speech in both prompt paths (`buildAgentMessages` urgent lines and
+  `buildSimpleMessages`), once.
+- **Search** (`search(book, q, k, { all, rerank })`): BM25 over stemmed
+  content words, cosine against the passage vectors (int8 base64, one scale
+  per passage, re-normalised on load; EmbeddingGemma Matryoshka 256), reciprocal
+  rank fusion (k 60, top 40 of each), the top 8 re-ranked by a cross-encoder
+  (`Xenova/ms-marco-MiniLM-L-6-v2` q8 on WASM, in embed-worker.js, loaded on the
+  first rerank; ~140 ms for 8 passages). Gate: logit > -1, or cosine >= .8, or
+  logit > -9.6 and 1.4 above the candidates' median with cosine >= .66
+  (indirect questions score -9..-3 against -11 for the rest). Without the
+  cross-encoder: cosine >= .70 and z >= 1.2, or >= .66 with half the query's
+  words, or >= .78; without vectors: half the words and BM25 > 1. Measured on
+  `tools/browser-test/scenarios/books.json` with `books-test.mjs`: 9 of 9
+  questions find their passage, 5 of 6 small-talk lines find nothing ("I will
+  bring you some bread" pulls the passage that mentions bread). Passages per
+  turn: 2 basic, 3 capable, 4 ambitious.
+- A sentence-level embedding re-rank was tried first and dropped: single
+  sentences match small talk (the weather -> a comfrey sentence at .725).
+- **Vectors at run time**: a book without `vectors` gets them from
+  `tablefolkEmbed.vectors` (uncached, 16 at a time) on a reader's first turn
+  once the model is ready. The builder uses `embedDocs`, through the game's
+  embed.js or a worker of its own (`/app/embed-worker.js`).
+- **3D** (`make`, from app.js makeObject for `type: "book"` with `book`): a
+  prop proxy at the catalogue book's size (1.4x thick), a page block, and
+  DynamicTexture planes for cover (+x), back (-x) and spine (+z), with a
+  little emissive so the art reads on the shaded side; the picture or the
+  title drawn on the colour. keepLoot keeps `book` in the saved opts.
+- The builder (builder.js) sends `lightBooks(scn)` (title, author, about,
+  passage count) to /api/revise and the own-key revise, and `heavyBooks`
+  puts the text back on the answer.
+
 ## Trade, roles, skills
 
 `app/trade.js` keeps the selling rules for every seller (wares and prices on

@@ -170,6 +170,57 @@ it and it lies on the floor again). A character's `note(text)` writes one
 (facing a wall, it is pinned to the wall); `carry(note)` picks one up and
 reads it. Map lines and grid legends take `note "text"`.
 
+## Books: knowledge bases characters read (`books`)
+
+A book is a document (a PDF, a text or Markdown file) a character can read
+and answer from: an herbal for the village healer, a ship's log, the rules of
+a game, a product manual for a shop assistant. It is an item, named by its
+title, so it is given, sold, put in chests and handed between characters
+like anything else, and it is drawn in the world with its own cover and spine.
+
+```jsonc
+"books": {
+  "herbal": {
+    "title": "The Herbalist's Companion",      // the item's name
+    "author": "Mother Elsa", "about": "healing plants and poisons",
+    "color": "#2d5b3a",                         // the drawn cover, back and spine
+    "cover": "data:image/jpeg;base64,...",      // optional pictures (URL or data URL);
+    "spine": "data:image/jpeg;base64,...",      //   without them the title is drawn
+    "chunks": ["Willowbark eases fever ...", "Comfrey, called knitbone, ..."],
+    "vectors": "<base64>", "dim": 256, "model": "embeddinggemma-2"   // written by the world builder
+  }
+},
+"agents": [{ "id": "mira", "readsBooks": true, "inventory": { "items": ["The Herbalist's Companion"] } }],
+"objects": [{ "type": "book", "book": "herbal", "x": 2, "z": 1 }]      // or lying on the floor
+```
+
+- **Making one**: the world builder's **Books** tab. Add a book from a file:
+  its text is taken out (PDFs with real text; a scanned PDF has none), cut
+  into passages of about 110 words and indexed in your browser with the
+  memory model (EmbeddingGemma, 175 MB once). Give it a title, author, a
+  line on what it is about, a colour, cover and spine pictures, and say where
+  it is: a character's pack, the player's pack, or on the floor.
+- **Reading**: a character with `"readsBooks": true` (Characters tab:
+  "reads its books") that carries a book looks up what was just said to it,
+  by the player or another character, in every book it carries: keywords and
+  meaning together, then the best passages re-read with the question by a
+  small re-ranking model (23 MB, loaded the first time). The passages that are
+  really about the question go into its prompt right after the words
+  ("Your book ... says about this: ..."), and it answers from them in its own
+  words. Small talk finds nothing and adds nothing. Give the book away and the
+  new owner can answer from it (if it reads); the old one can't.
+- Hand-written `chunks` without `vectors` work: keywords at once, meaning once
+  the game has worked the vectors out (a fraction of a second for a short
+  book).
+- The player can read a book's title and opening from the pack, give it, or
+  drop it (it lies on the floor again).
+- **Size**: the text is in the world, so a book of a few hundred pages makes
+  a long `#s=` link; share big worlds as a file (`?scenario=<url>`). Up to
+  3000 passages (about 300 pages). The AI that changes a world in the builder
+  sees only each book's title and summary.
+- Off when the world has `"memory": false` or smart memory is off in the
+  Graphics pane: then keywords only.
+
 ## Loot and pick-ups
 
 - `chest` and `iron_chest` take `"gold"` and `"items"`; the player opens one

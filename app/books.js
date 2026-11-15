@@ -16,9 +16,10 @@
  * A reader's turn (llm_js/world-integration.js): what was just said to it
  * (the player or another character) is the query; every book it carries is
  * searched by keywords (BM25) and by meaning (the passage vectors), the two
- * lists fused (reciprocal rank), the best few re-ranked by the closest single
- * sentence and how many of the query's words they hold, and the passages
- * that pass go right after the speech: "Your book "X" says about this: ...".
+ * lists fused (reciprocal rank), the best eight re-ranked by a cross-encoder
+ * (ms-marco MiniLM, embed-worker.js) whose score also decides whether a
+ * passage is about the question at all, and the passages that pass go right
+ * after the speech: "Your book "X" says about this: ...".
  * No vectors yet (a hand-written book) or no embedding model: keywords only,
  * and the vectors are worked out in the background once the model is ready.
  *
@@ -32,7 +33,7 @@
  *   window.tablefolkBooks.make(scene, x, z, opts)   app.js makeObject('book', ...)
  */
 (function () {
-  const DIM = 256, MODEL = 'embeddinggemma-2';
+  const DIM = 256, MODEL = 'embeddinggemma-2', CE_PASS = -1;
   const STOP = new Set('the and you your for are was were with that this have has had not but what who how why where when can will would could should about there their them they then than its it\'s i\'m me my mine our out all any some just very much more most into from over under also only does did doing been being here like want wants know think tell said says say yes okay please thanks hello hey book does which these those such each other one two use used using make made may might must shall upon onto off his her him she himself herself itself whose whom while because so too again further once same own both few nor'.split(' '));
   let books = {};            // id -> book (with .vec: Float32Array[], .idx: keyword index)
   const found = new Map();   // agent id -> { q, hits: [{ book, text }] }
@@ -63,7 +64,6 @@
     if (cur.length) out.push(cur.join(' '));
     return out.filter(c => c.replace(/\W/g, '').length > 20);
   }
-  const sentences = t => (String(t).match(/[^.!?]+(?:[.!?]+|$)/g) || [t]).map(s => s.trim()).filter(s => s.length > 12);
 
   // ---- text out of a file (PDF through pdf.js, else plain text) ----
   async function extract(file, onProgress) {
@@ -103,7 +103,7 @@
   let own = null, ownSeq = 0; const ownWait = new Map();
   function ownWorker(onProgress) {
     if (own) return own.ready;
-    const w = new Worker(new URL('/app/embed-worker.js?v=20261030a', location.href), { type: 'module' });
+    const w = new Worker(new URL('/app/embed-worker.js?v=20261115a', location.href), { type: 'module' });
     own = { w, ready: null };
     own.ready = new Promise(res => {
       w.onmessage = e => {
@@ -169,7 +169,7 @@
   const coverage = (text, qt) => { if (!qt.length) return 0; const have = new Set(terms(text)); return qt.filter(t => have.has(t)).length / qt.length; };
 
   // Search one book: keywords and meaning, fused, re-ranked. Each hit: { i, text, score }.
-  async function search(b, query, k = 3) {
+  async function search(b, query, k = 3, opts = {}) {
     const qt = [...new Set(terms(query))];
     const kw = bm25(b, qt), N = b.chunks.length;
     const E = window.tablefolkEmbed, semantic = !!(b.vec && E?.state === 'ready' && E.vectors);
@@ -185,24 +185,23 @@
     const rrf = new Map(), add = (order, w = 1) => order.slice(0, 40).forEach((i, r) => rrf.set(i, (rrf.get(i) || 0) + w / (60 + r)));
     add([...kw.keys()].filter(i => kw[i] > 0).sort((x, y) => kw[y] - kw[x]));
     if (cos) add([...cos.keys()].sort((x, y) => cos[y] - cos[x]));
-    const cands = [...rrf.entries()].sort((x, y) => y[1] - x[1]).slice(0, cos ? 8 : 6).map(([i]) => i);
+    const cands = [...rrf.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([i]) => i);
     if (!cands.length) return [];
-    // re-rank: the closest single sentence (finer than the whole passage) and the query's words it holds
-    let sentZ = new Map();
-    if (qv) {
-      const parts = cands.map(i => sentences(b.chunks[i]).slice(0, 6));
-      try {
-        const flat = parts.flat(), vs = flat.length ? await E.vectors(flat.map(D), { cache: true }) : [];
-        let p = 0; cands.forEach((i, j) => { let best = -1; for (const _ of parts[j]) best = Math.max(best, dot(qv, vs[p++])); sentZ.set(i, best < -0.5 ? null : (best - mu) / sd); });
-      } catch {}
-    }
-    const hits = cands.map(i => {
-      const zc = cos ? (cos[i] - mu) / sd : 0, zs = sentZ.get(i) ?? zc, cov = coverage(b.chunks[i], qt);
-      const score = cos ? .5 * zs + .3 * zc + 1.5 * cov : kw[i] / 4 + 2 * cov;
-      // passes when it is clearly about the question: close in meaning, or it holds most of the question's words
-      const pass = cos ? (Math.max(zc, zs) >= 1.6 || (cov >= .5 && qt.length >= 1 && Math.max(zc, zs) >= .5)) : (cov >= .5 && kw[i] > 1);
-      return { i, text: b.chunks[i], score, pass, zc: +zc.toFixed(2), zs: +(+zs).toFixed(2), cov: +cov.toFixed(2) };
-    }).filter(h => h.pass).sort((x, y) => y.score - x.score);
+    // re-rank: a cross-encoder reads the question with each passage (embed-worker.js);
+    // its logit is also the gate (> CE_PASS, or well above the other candidates)
+    let ce = null;
+    if (E?.rerank && E.state === 'ready' && opts.rerank !== false) { try { ce = await E.rerank(query, cands.map(i => b.chunks[i])); } catch (e) { console.warn('[books] rerank', e); } }
+    // indirect questions ("my son broke his arm" -> the comfrey passage) score low
+    // (-9 .. -3) but stand clear of the rest (-11): measured in books-test.mjs
+    const ceMid = ce ? [...ce].sort((x, y) => x - y)[Math.floor(ce.length / 2)] : 0;
+    const hits = cands.map((i, j) => {
+      const c = cos ? cos[i] : 0, zc = cos ? (c - mu) / sd : 0, cov = coverage(b.chunks[i], qt), x = ce ? ce[j] : null;
+      // without the cross-encoder: close in meaning (EmbeddingGemma at 256 numbers:
+      // passages about the question .70-.89, small talk below .65) or holding most of its words
+      const pass = x != null ? x > CE_PASS || c >= .8 || (x > -9.6 && x - ceMid >= 1.4 && c >= .66) : cos ? (c >= .70 && zc >= 1.2) || (c >= .66 && cov >= .5) || c >= .78 : cov >= .5 && kw[i] > 1;
+      const score = x != null ? x + .5 * zc : cos ? zc + 1.5 * cov : kw[i] / 4 + 2 * cov;
+      return { i, text: b.chunks[i], score, pass, cos: +c.toFixed(3), zc: +zc.toFixed(2), cov: +cov.toFixed(2), ce: x == null ? null : +x.toFixed(2) };
+    }).filter(h => h.pass || opts.all).sort((x, y) => y.score - x.score);
     return hits.slice(0, k);
   }
 
@@ -255,7 +254,7 @@
     const tex = new BABYLON.DynamicTexture(name, { width: Math.round(256 * Math.min(1, w / h) * 2) || 64, height: 512 }, scene, true);
     const ctx = tex.getContext(), W = tex.getSize().width, H = tex.getSize().height;
     draw(ctx, W, H, () => tex.update()); tex.update();
-    const mat = new BABYLON.StandardMaterial(name + '_m', scene); mat.diffuseTexture = tex; mat.specularColor = new BABYLON.Color3(.06, .06, .06);
+    const mat = new BABYLON.StandardMaterial(name + '_m', scene); mat.diffuseTexture = tex; mat.specularColor = new BABYLON.Color3(.06, .06, .06); mat.emissiveColor = new BABYLON.Color3(.3, .3, .3);   // the art still reads on the shaded side
     const p = BABYLON.MeshBuilder.CreatePlane(name, { width: w, height: h }, scene); p.material = mat; p.isPickable = false;
     return p;
   }

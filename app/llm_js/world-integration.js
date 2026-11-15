@@ -441,7 +441,9 @@ function buildSimpleMessages(world, g, cfg, built) {
   const speech = pending.filter(l => !isEvent(l)).map(l => { const x = String(l).match(/^(.+?)\s+says:\s*(.*)$/); return x ? `[${x[1].trim()}] ${x[2]}` : String(l); });
   const said = speech.map(words).join('\n'), chatSuffix = [...events.map(e => '[happened] ' + e), ...speech].join('\n');
   cfg.pendingChat = []; world.setBrainConfig(g.id, cfg);
-  const text = [built.commandReminder, ...events, said || (events.length ? 'What do you say?' : 'Say something.')].filter(Boolean).join('\n');
+  // books.js: what its books say about the words just heard, right after them
+  const book = window.tablefolkBooks?.urgentLines?.(g) || [];
+  const text = [built.commandReminder, ...events, said || (events.length ? 'What do you say?' : 'Say something.'), ...book].filter(Boolean).join('\n');
   const last = messages[messages.length - 1];
   if (last.role === 'user') last.content += '\n' + text; else messages.push({ role: 'user', content: text });
   return { messages, chatSuffix: chatSuffix ? '\n\n' + chatSuffix : '' };

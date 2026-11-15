@@ -15,6 +15,7 @@
  *   window.tablefolkEmbed.start()      begin loading (returns the ready promise)
  *   window.tablefolkEmbed.similar(query, texts) -> Map(text -> cosine 0..1), or null when not ready
  *   window.tablefolkEmbed.vectors(prefixedTexts, { cache }) -> [Float32Array(256)] (books.js)
+ *   window.tablefolkEmbed.rerank(query, passages) -> [logit] (books.js; a cross-encoder in the same worker)
  */
 (function () {
   const KEY = 'tablefolkEmbed';
@@ -30,7 +31,7 @@
     if (off()) { api.state = 'off'; return Promise.resolve(false); }
     api.state = 'loading';
     ready = new Promise(resolve => {
-      worker = new Worker(new URL('embed-worker.js?v=20261030a', location.href), { type: 'module' });
+      worker = new Worker(new URL('embed-worker.js?v=20261115a', location.href), { type: 'module' });
       // the "downloading" toast only for a real download: not when Transformers.js
       // already has the weights in Cache Storage (they still stream in with progress)
       let toasted = false;
@@ -40,7 +41,7 @@
         if (d.type === 'progress') { api.progress = d.total ? d.loaded / d.total : 0; if (!toasted && d.total > 5e6 && d.loaded < d.total * .5) { toasted = true; window.tablefolkToast?.('Downloading the memory model (EmbeddingGemma, 175 MB, once)…'); } api.progress = d.total ? d.loaded / d.total : 0; return; }
         if (d.type === 'ready') { api.state = 'ready'; api.device = device = d.device; console.log('[embed] ready on', d.device); resolve(true); return; }
         if (d.type === 'error') { api.state = 'error'; console.warn('[embed]', d.error); resolve(false); return; }
-        const w = waiting.get(d.id); if (w) { waiting.delete(d.id); d.error ? w.reject(new Error(d.error)) : w.resolve(d.vectors); }
+        const w = waiting.get(d.id); if (w) { waiting.delete(d.id); d.error ? w.reject(new Error(d.error)) : w.resolve(d.scores || d.vectors); }
       };
       worker.onerror = e => { api.state = 'error'; console.warn('[embed] worker failed', e.message); resolve(false); };
       worker.postMessage({ type: 'load', device: new URLSearchParams(location.search).get('embed') });
@@ -79,12 +80,18 @@
     const out = []; for (let i = 0; i < texts.length; i += 16) out.push(...await run(texts.slice(i, i + 16)));
     return out;
   }
+  // books.js: cross-encoder scores (ms-marco MiniLM, 23 MB on first use) for
+  // passages read with a question; null when the worker isn't running
+  function rerank(query, docs) {
+    if (api.state !== 'ready' || !docs.length) return Promise.resolve(null);
+    return new Promise((resolve, reject) => { const id = ++seq; waiting.set(id, { resolve, reject }); worker.postMessage({ id, rerank: { query, docs } }); });
+  }
   function setEnabled(on) {
     try { on ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, 'off'); } catch {}
     if (on && api.state === 'off') { if (api.device) api.state = 'ready'; else { api.state = 'idle'; ready = null; start(); } }
     if (!on) { api.state = 'off'; }
   }
-  Object.assign(api, { start, similar, vectors, setEnabled });
+  Object.assign(api, { start, similar, vectors, rerank, setEnabled });
   // Graphics pane checkbox and status
   function ui() {
     const box = document.getElementById('embedEnabled'), st = document.getElementById('embedStatus'); if (!box) return;

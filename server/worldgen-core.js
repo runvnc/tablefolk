@@ -152,10 +152,12 @@ export function reviseRequest(scenario, request) {
     + `Characters and the player move with "at": [x, z]. The board is ${scenario.size?.join(' x ') || 'unknown'} squares, x from west to east is decreasing, z grows to the south. Rooms: ${(scenario.places || []).map(p => p.id + (p.center ? ' at ' + JSON.stringify(p.center) : '')).join(', ') || 'none'}.`
     + `\nObjects by type: ${Object.entries((kept.objects).reduce((m, o) => (m[o.type] = (m[o.type] || 0) + 1, m), {})).map(([t, n]) => t + ' ' + n).join(', ')}.`
     + `\nNon-wall objects: ${kept.objects.filter(o => !['wall', 'door', 'light'].includes(o.type)).slice(0, 120).map(o => `${o.type} [${Math.round(o.x)},${Math.round(o.z)}]`).join(', ')}.` : '';
+  // books (app/books.js) arrive as summaries from the builder; their text stays there
+  const bookNote = shown.books && Object.keys(shown.books).length ? '\n\n"books" are knowledge bases shown as summaries: keep each entry as it is (you may change title, author, about). A character carries a book by having its title in inventory.items, and answers from the books it carries with "readsBooks": true; a book can lie on the floor as {"type": "book", "book": "<id>", "x", "z"}.' : '';
   const json = JSON.stringify(shown);
   const maxTokens = Math.min(24000, Math.max(17000, Math.ceil(json.length / 2.5) + 8000));
   return { kept, maxTokens,
-    user: `Here is a scenario:\n\n${json}${note}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.` };
+    user: `Here is a scenario:\n\n${json}${note}${bookNote}\n\nChange it as asked, and keep everything that the request does not touch exactly as it is (ids, positions, map method):\n${request}\n\nReply with the whole updated JSON object only.` };
 }
 
 export function mergeKept(s, kept) {
@@ -276,7 +278,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261114c"></script><script src="/app/map-editor.js?v=20261114b"></script><script src="/app/books.js?v=20261115a"></script><script src="/app/builder.js?v=20261115a"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261114c"></script><script src="/app/map-editor.js?v=20261114b"></script><script src="/app/books.js?v=20261115d"></script><script src="/app/builder.js?v=20261115a"></script><script src="/app/worldgen-own.js?v=20261108b"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

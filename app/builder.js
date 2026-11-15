@@ -228,8 +228,10 @@
   }
   function heavyBooks(next, before) {
     if (!before.books) return next;
+    // an answer without "books" at all forgot them: keep every one
+    if (!next.books || typeof next.books !== 'object') { next.books = before.books; return next; }
     const out = {};
-    for (const [id, b] of Object.entries(next.books || {})) { const old = before.books[id]; if (!old) continue; const { passages, ...light } = b; out[id] = { ...old, ...light }; }
+    for (const [id, b] of Object.entries(next.books)) { const old = before.books[id]; if (!old) continue; const { passages, ...light } = b; out[id] = { ...old, ...light }; }
     if (Object.keys(out).length) next.books = out; else delete next.books;
     return next;
   }
