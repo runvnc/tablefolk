@@ -35,3 +35,13 @@ Note: everything A-E was coded in about 10 minutes of wall clock; the
 time went to model evals (each survival run 1-3 minutes with E4B) and to
 a full disk (another session's 3D work filled /mnt/files at 01:17;
 freed at 01:19).
+
+Later in the session (all code minutes, the rest waiting on evals):
+
+| task | estimate | real | notes |
+|---|---|---|---|
+| Remembered between visits (localStorage) | not estimated | ~3 min | node check |
+| Danger estimate, earlier potion | not estimated | ~2 min | from eval transcripts |
+| Plans for the day | not estimated | ~3 min | E4B: plan in 1.0 s, reflection in 2.7 s (mind-check) |
+| Fetch hand-over, food sources, glances, reputation | not estimated | ~2-3 min each | |
+| Second test Chrome (port/profile) | not estimated | ~3 min | needed because another session shared 9223 and closed it mid-eval |
