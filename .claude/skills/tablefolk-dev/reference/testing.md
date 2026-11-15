@@ -29,6 +29,10 @@ node close.mjs                                         # always close it: it hol
   beside Gemma E4B on a 6 GB card the model then answers nothing (seen
   2026-11-15). `survival-test.mjs` and `mind-check.mjs` set
   `tablefolkTtsEnabled=0` before the page loads; `pgrep -fa breeze-server`.
+- **A fresh test Chrome per model**: after E4B ran in a test Chrome,
+  switching that Chrome to E2B (`?model=`) gave empty answers after ~50 s a
+  turn (2026-11-15; Breeze had also run beside it). Close and relaunch
+  between models.
 - Two sessions at once: `TEST_CDP_PORT=9225 TEST_PROFILE=~/.cache/tablefolk-test-chrome-d0`
   for `launch-chrome.sh` gives a second test Chrome (its own model cache: a
   download), and `CDP_PORT=9225` points the scripts at it. They share the

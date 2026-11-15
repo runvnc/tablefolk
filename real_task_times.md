@@ -45,3 +45,10 @@ Later in the session (all code minutes, the rest waiting on evals):
 | Plans for the day | not estimated | ~3 min | E4B: plan in 1.0 s, reflection in 2.7 s (mind-check) |
 | Fetch hand-over, food sources, glances, reputation | not estimated | ~2-3 min each | |
 | Second test Chrome (port/profile) | not estimated | ~3 min | needed because another session shared 9223 and closed it mid-eval |
+
+Where the time went after 01:30: evals, and keeping them valid. Another
+session shared the test Chrome (closed mid-run), a remembered Breeze voice
+made the test server start Breeze beside E4B (empty answers), a zsh
+word-split bug ran two queues on one page, and E2B after E4B in one Chrome
+answered nothing. Each cost a rerun of 5-15 minutes. Code changes stayed at
+2-5 minutes each.
