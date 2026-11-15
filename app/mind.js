@@ -458,7 +458,7 @@
     if (!pot && spot && may('walk') && me.hp <= risk) ch.unshift(`walk("${spot}") - run away now`);
     if (spot && may('walk') && me.hp > risk) ch.push(`walk("${spot}") - run away from it (it may follow)`);
     if (may('say') && state.playerAvatar && !state.playerAvatar.defeated) ch.push(`say("Help! ${f.id} is attacking!") - call for help`);
-    if (ch.length) out.push('Choose one now: ' + ch.join(' | '));
+    if (ch.length) out.push('Choose one now: ' + ch.join(' | ') + (food(g) ? ` (food such as ${food(g)} does not heal you: not now)` : ''));
     return out;
   }
   function reflex(g) {
