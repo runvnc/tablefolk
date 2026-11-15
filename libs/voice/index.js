@@ -1,6 +1,10 @@
 // @tablefolk/voice -- text to speech in the browser, nothing sent anywhere:
 //   pocket-18m   Pocket-TTS small (Kyutai, CC-BY-4.0): ~40 MB, English, on the processor; phones
 //   pocket-100m  Pocket-TTS (~120 MB, five languages), on the processor
+//   zonos-web    ZONOS3-Mini (Zyphra, Apache-2.0; WebGPU, ~1 GB download once): natural,
+//                43 languages, clones a voice from a sample; needs WebGPU and ~2 GB of
+//                graphics memory free: 1.45 GB measured, 1.7 with the voice encoder for cloning (no
+//                shader-f16, no JSPI). The first choice.
 //   breeze-web   Breeze TTS 2 (3B, WebGPU, a 2.5 GB download once): far better, needs a
 //                graphics card with ~3.5 GB free, shader-f16 and JSPI. Its weights are for
 //                research and non-commercial use only (BreezeBlue's licence).
@@ -15,9 +19,10 @@
 //   await v.cloneVoice('me', pcm24k, 'the words said in it')   // Pocket: audio alone; Breeze: with its transcript
 //   v.stop(); v.unload(); v.level()          // level: loudness now (for a talking mouth)
 //
-// 'auto': Breeze in the browser when the device has room for it beside what
-// else it runs (pass freeGB, the graphics memory left) and allowBreeze is
-// true (default; false for a commercial product); else Pocket-TTS small. The
+// 'auto': ZONOS3-Mini when the device has room for it beside what else it
+// runs (pass freeGB, the graphics memory left), else Breeze in the browser
+// when it fits and allowBreeze is true (default; false for a commercial
+// product: its weights are non-commercial), else Pocket-TTS small. The
 // models download from Hugging Face, or Tablefolk's mirror on tablefolk.world.
 import { createWorker, mirrorAllowed, note } from '../models/index.js';
 import { detectHardware, usableGB } from '../device/index.js';
@@ -25,6 +30,7 @@ import { detectHardware, usableGB } from '../device/index.js';
 export const ENGINES = {
   'pocket-18m': { label: 'Pocket-TTS small (18M, English)', worker: 'pocket18-worker.js', size: '~40 MB' },
   'pocket-100m': { label: 'Pocket-TTS (100M, 5 languages)', worker: 'pocket-worker.js', size: '~120 MB', languages: true },
+  'zonos-web': { label: 'ZONOS3-Mini (WebGPU, 43 languages; Apache-2.0)', worker: 'zonos-web-worker.js', size: '~1 GB', needGB: 2, languages: true },
   'breeze-web': { label: 'Breeze TTS 2 (3B, WebGPU; non-commercial licence)', worker: 'breeze-web-worker.js', size: '2.5 GB', needGB: 3.5, nonCommercial: true },
   'browser': { label: 'the browser\'s speech', size: 'none' },
 };
@@ -32,12 +38,23 @@ export const POCKET_VOICES = ['alba', 'azelma', 'cosette', 'eponine', 'fantine',
 
 // The engine for this device, and why. freeGB: graphics memory left beside
 // the page's other models (default: all of what @tablefolk/device finds usable).
-export async function chooseEngine({ allowBreeze = true, freeGB = null, preferBreeze = true } = {}) {
+export async function chooseEngine({ allowBreeze = true, freeGB = null, preferBreeze = true, allowZonos = true } = {}) {
   const hw = await detectHardware().catch(() => null);
   if (hw && (hw.cls === 'phone' || hw.cls === 'tablet')) return { engine: 'pocket-18m', why: 'a phone or tablet: the small model' };
+  const noZ = allowZonos ? await zonosWhyNot(hw, freeGB) : 'not allowed here';
+  if (!noZ) return { engine: 'zonos-web', why: 'the graphics card has room for ZONOS3-Mini' };
   if (!allowBreeze || !preferBreeze) return { engine: 'pocket-18m', why: allowBreeze ? 'the small model' : 'Breeze not allowed here (its licence is non-commercial)' };
   const no = await breezeWhyNot(hw, freeGB);
   return no ? { engine: 'pocket-18m', why: 'Breeze can\'t run here: ' + no } : { engine: 'breeze-web', why: 'the graphics card has room for Breeze' };
+}
+export async function zonosWhyNot(hw = null, freeGB = null) {
+  const a = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
+  if (!a) return 'no WebGPU';
+  hw ||= await detectHardware().catch(() => null);
+  const free = freeGB ?? usableGB(hw);
+  if (free == null) return 'the graphics memory is not known';
+  if (free < ENGINES['zonos-web'].needGB) return `${free} GB of graphics memory free; ZONOS3-Mini wants ${ENGINES['zonos-web'].needGB}`;
+  return '';
 }
 export async function breezeWhyNot(hw = null, freeGB = null) {
   if (typeof WebAssembly.Suspending !== 'function') return 'no JSPI in this browser';

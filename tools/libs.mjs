@@ -40,7 +40,10 @@ function check() {
     // test.mjs runs in Node (node:fs, the repository's scenarios): not checked, not published
     for (const f of walk(join(LIBS, n)).filter(f => /\.m?js$/.test(f) && !/(^|\/)test\.mjs$/.test(f))) {
       // without comments (their examples import the packages by name)
-      const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+      const raw = readFileSync(f, 'utf8');
+      // a bundle built elsewhere (its first line says so): its minified code fools these patterns
+      if (raw.startsWith('// vendored:')) continue;
+      const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
       for (let s of specs(src)) {
         if (/^(https?:|blob:|data:)/.test(s) || s.startsWith('${')) continue;
         if (/\?v=/.test(s)) say(f, `version string in ${s} (libs are served without them)`);

@@ -131,7 +131,7 @@ and send. The "to:" picker shows only when there is more than one character
 to talk to (the box says who listens: "Talk to Oracle…"), and a slim health
 bar only while you are hurt. All the keys work as before.
 
-**Downloads on screen.** While Breeze TTS 2 (the voice) or Underdog Bark
+**Downloads on screen.** While ZONOS3-Mini or Breeze TTS 2 (the voice) or Underdog Bark
 (speech input) downloads or loads, a small card under the top bar on the
 right shows what it is doing with a progress bar; it says "ready" for a few
 seconds and goes (an error stays a little longer; click to dismiss). The
@@ -174,7 +174,16 @@ is fast.
 ## Voices
 
 Speech is on by default (unless the player turned it off). Engines (Voice
-pane; the server's admin page sets the default): Pocket-TTS small (18M
+pane; the server's admin page sets the default): **ZONOS3-Mini** (Zyphra;
+natural and expressive, 43 languages, clones a voice from its sample; about a
+1 GB download once, asked first; runs on the graphics card through WebGPU in
+about 1.5 GB, with no special browser flags; on an RTX 2060 beside the
+characters' model it speaks about ten times faster than real time, its first
+sound in under a second). It is the first choice: offered when the graphics
+card has 2 GB left beside the characters' model, and picked by itself once
+downloaded. If it runs out of graphics memory it gives way to the default
+voice for a day. The library's voices are cloned for it ahead of time.
+Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
 languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs
 outside the browser in `breeze-server` on your own computer, about 3 GB of

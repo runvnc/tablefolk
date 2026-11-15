@@ -374,6 +374,49 @@ with `?trustSkills=1`, or after the player allows that package.
   the 100M model (`libs/voice/pocket-worker.js`, five languages). Stereo pan and
   distance gain place voices. On by default (`tablefolkTtsEnabled !== '0'`).
   `silence(agent)` stops a defeated character mid-line.
+- **ZONOS3-Mini** (engine `zonos-web`, the first choice since 2026-11-15;
+  `libs/voice/zonos-web-worker.js`): Zyphra's TTS (Apache-2.0 weights; sparse
+  MoE, 800M parameters, 100M active; 43 languages; 44.1 kHz) on Zyphra's own
+  hand-written WebGPU engine (MIT), vendored in `libs/voice/zonos-web/`
+  (`servers/web` of github.com/Zyphra/ZONOS3-Mini at 96d9e0e built with vite:
+  `npx pnpm@10.34.9 install --filter zonos3-web...` at the repo root, then
+  `pnpm build` in `servers/web`; copy `dist/worker.js` to `engine-worker.js`
+  and `dist/codec-worker.js`, each with the `// vendored:` first line that
+  `tools/libs.mjs check` skips). The adapter worker starts the engine and
+  codec workers as nested workers and talks to the engine's HTTP API
+  (`/v2/generate` streamed float32 PCM, `/v2/speakers`) over messages, as the
+  engine's `client.ts` does on a page; it resamples 44.1 kHz to 24 kHz
+  (windowed sinc) for the page's audio graph. Weights: the `web/` export of
+  Zyphra/ZONOS3-Mini on Hugging Face pinned to revision `d2d142a`, Zyphra's own
+  quant (Q4_0 experts, Q8_0 mixer, `output.weight` q8_0; 0.86 GB with the
+  `keep2_plain` decoder), cached by the engine in Cache Storage
+  (`zonos3-web-models-v6`). Other quants checked 2026-11-15 and not taken:
+  AtomicChat's AD-Q4_K_M GGUF (llama.cpp only; K-quants would need new WGSL
+  kernels), groxaxo's GPTQ INT4 (CUDA, slower, worse Spanish WER), the
+  `full_mr` decoder (+1.25 GB, ~3x slower decode). Voices: the ten English
+  built-ins by name (`savannah`, `rupert`...; reference codes shipped, no
+  encoder), Pocket names mapped onto them by sex (`FROM_POCKET`), and cloned
+  voices as a 192-number speaker embedding (`speaker_mode: embedding`; the
+  45 MB MECT encoder, never the 2.8 GB reference encoder). The library's are
+  precomputed in `assets/voices/zonos-embeddings.json`
+  (`tools/browser-test/zonos-web-test.mjs --embeddings`; rerun when a voice
+  sample changes); a player's own are kept in IndexedDB. Each line asks for
+  `laci` (alignment guard, ~+185 ms first audio) and a frame budget
+  (`max_tokens`, 15 frames/s for the text at 6 characters/s plus 3 s).
+  Measured on the RTX 2060 (2026-11-15): 0.86 GB download in 35 s; 1.45 GB of
+  graphics memory loaded (1.7 with the speaker encoder); alone ~10x realtime,
+  first audio ~150 ms (330 with LACI); beside Gemma 4 E2B and the drawn world
+  ~11x, first audio 0.45-0.75 s, no underruns, 28 fps while speaking; Bark's
+  transcripts of four lines (two built-in, two cloned voices) 0% WER. Out of
+  graphics memory (it happened with Bark loaded too on 6 GB) the engine only
+  logs failed buffers and makes endless silence: the worker gives up after
+  3 s of silence (`error` with `fatal: true`), the manager notes it
+  (`tablefolkZonosFailed`, no ZONOS3-Mini for a day) and switches to the
+  default voice. Chosen by itself when downloaded before
+  (`tablefolkZonosWebReady`) and 2 GB are left beside the chat model, else
+  offered (toast, twice at most; `upgradeTo('zonos-web')` downloads it
+  while the current voice talks). When it fits, an installed breeze-server is
+  not started (`breezeFits(false)`: only a running one is taken).
 - **Breeze TTS 2** (engine `breeze`, `app/tts/breeze-client.js`): BreezeBlue's
   3B model (English and Mandarin; weights research/non-commercial only) has
   no browser build (2026-10-30: no ONNX, WebGPU or Transformers.js port;

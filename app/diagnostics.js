@@ -57,7 +57,7 @@
   function renderRunning() {
     const box = document.getElementById('runningNow'); if (!box) return;
     const tts = window.tablefolkTTS;
-    const offer = tts?.canOfferBreeze?.() ? `<button type="button" class="diag-offer" data-diag="breeze">Get the better voice: Breeze TTS 2 (2.5 GB, runs on this graphics card)</button>` : '';
+    const offer = tts?.canOfferBreeze?.() ? `<button type="button" class="diag-offer" data-diag="breeze">Get the better voice: ${esc(tts.offerLabel?.() || 'Breeze TTS 2 (2.5 GB, runs on this graphics card)')}</button>` : '';
     box.innerHTML = rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + offer;
   }
   const gb = n => n == null ? '?' : (Math.round(n * 10) / 10) + ' GB';

@@ -98,7 +98,7 @@
       if ((feature === 'breezeWeb' || feature === 'breeze-web' || feature === 'barkGpu') && !f16) return noF16;
       return '';
     };
-    r.needs = { world: r.why('world'), breezeWeb: r.why('breezeWeb'), wllamaGpu: r.why('wllamaGpu'), barkGpu: r.why('barkGpu') };
+    r.needs = { world: r.why('world'), zonosWeb: r.why('zonosWeb'), breezeWeb: r.why('breezeWeb'), wllamaGpu: r.why('wllamaGpu'), barkGpu: r.why('barkGpu') };
 
     // the warnings worth a toast: a WebGPU browser too old for JSPI
     r.warnings = [];

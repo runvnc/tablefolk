@@ -44,7 +44,7 @@
   }
   function set(key, { label, text, state = 'loading' } = {}) {
     const old = jobs.get(key); clearTimeout(old?.timer);
-    const j = { label: label || old?.label || key, text: String(text || '').replace(/^Breeze TTS 2[:\s]*/, '').trim(), state };
+    const j = { label: label || old?.label || key, text: String(text || '').replace(/^(Breeze TTS 2|ZONOS3-Mini)[:\s]*/, '').trim(), state };
     if (state !== 'loading') j.timer = setTimeout(() => clear(key), state === 'error' ? 12000 : 4000);
     jobs.set(key, j); render();
   }
@@ -55,7 +55,7 @@
 
   const hook = () => {
     const tts = window.tablefolkTTS; if (!tts) return;
-    const breeze = () => /breeze/.test(tts.engine || '');
+    const breeze = () => /breeze|zonos/.test(tts.engine || '');
     const onStatus = ({ text, state }) => {
       if (!breeze()) return;
       if (state === 'loading' || state === 'ready' || state === 'error') set('voice', { label: '🔊 Voice', text: state === 'ready' ? tts.engineLabel() + ' ready' : String(text || '').replace(/\s*\([^)]*\)/g, ''), state });
