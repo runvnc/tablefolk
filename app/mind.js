@@ -455,8 +455,8 @@
     const risk = incoming(g, fs), dying = risk > 0 && me.hp <= Math.max(risk * 2, me.max * .35);
     if (dying) out[0] += ` You could die in the next round (they can do about ${Math.round(risk)} damage).`;
     if (pot && (dying || me.hp < me.max * .6)) ch[dying ? 'unshift' : 'push'](`eat(${pot}) - drink it, heals 4`);
-    if (dying && !pot && spot && may('walk')) ch.unshift(`walk("${spot}") - run away now`);
-    if (spot && may('walk')) ch.push(`walk("${spot}") - run away from it`);
+    if (!pot && spot && may('walk') && me.hp <= risk) ch.unshift(`walk("${spot}") - run away now`);
+    if (spot && may('walk') && me.hp > risk) ch.push(`walk("${spot}") - run away from it (it may follow)`);
     if (may('say') && state.playerAvatar && !state.playerAvatar.defeated) ch.push(`say("Help! ${f.id} is attacking!") - call for help`);
     if (ch.length) out.push('Choose one now: ' + ch.join(' | '));
     return out;
@@ -469,11 +469,11 @@
     const brave = temperament(cfg) === 'brave', basic = t === 'basic';
     if (f) {
       const pot = potion(g), risk = incoming(g, fs), spot = () => fleeSpot(g, f);
-      // in real danger of dying next round: the potion, else run (a basic
-      // brain sooner, a brave one stands its ground without a potion)
-      const brink = me.hp <= risk * (basic ? 2 : 1.6) + (basic ? 1 : 0) || frac <= (basic ? .4 : .3);
-      if (brink && pot && frac < .8) return { line: `eat(${pot})`, why: `${me.hp}/${me.max} health with ${f.id} near: drinks the ${pot}` };
-      if (brink && !brave) { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `about to fall: runs from ${f.id}` }; }
+      // in real danger of dying next round: the potion; running only when the
+      // next round would kill it and there is no potion (monsters chase, and
+      // a turn spent running is a free blow: seen in the survival eval)
+      if (pot && frac < .7 && (me.hp <= risk * (basic ? 1.6 : 1.3) || frac <= (basic ? .45 : .35))) return { line: `eat(${pot})`, why: `${me.hp}/${me.max} health with ${f.id} near: drinks the ${pot}` };
+      if (!pot && !brave && me.hp <= risk) { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `about to fall: runs from ${f.id}` }; }
       if (basic && reach) {
         const w = bestWeapon(g), held = cfg.wielding;
         if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
