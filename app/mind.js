@@ -358,7 +358,13 @@
     const told = `${teller.id} told you: ${asTold(teller.id, text)}`;
     if (m.mem.some(e => e.text.toLowerCase() === told.toLowerCase())) return false;
     addMemory(listener, told, 1.8, 'heard');
-    const r = text.match(/^(.+?) attacked/i); if (r && !isPlayerName(r[1]) && r[1] !== listener.id) opinion(listener, r[1], -.15, 'heard they attacked someone');
+    const r = text.match(/^(.+?) (attacked|struck down|gave|has attacked|has given|kept their promise)/i);
+    if (r && r[1] !== listener.id) {
+      const bad = /attack|struck/i.test(r[2]);
+      // the player's name travels too: a reputation
+      if (isPlayerName(r[1])) m.mood.trust = clamp01(m.mood.trust + (bad ? -.1 : .05));
+      else opinion(listener, r[1], bad ? -.15 : .1, bad ? 'heard they attacked someone' : 'heard they are generous');
+    }
     return true;
   }
   function onSpoke(g, text) {

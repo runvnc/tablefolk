@@ -265,6 +265,8 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Gossip**: when a character says something near another that matches
   what it remembers about someone, the listener remembers it as hearsay
   ("pip told you: Grub attacked bram"), and its opinion of a brawler drops.
+  News about you travels too: hearing that you attacked someone costs you
+  some of the listener's trust, and generosity earns a little.
   With someone to tell nearby, the card offers a piece of news. `"gossip":
   false` turns it off.
 - **Secrets and agendas**: an agent's `"secret"` is on its card with "never
