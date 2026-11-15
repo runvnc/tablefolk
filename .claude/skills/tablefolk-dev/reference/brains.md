@@ -849,18 +849,27 @@ a voice on).
 
 - **The card was taken for 8 GB**: the browser's name is "GeForce RTX 4060
   Ti" for both versions, and the PCI ID in the renderer string is the same
-  too (0x2803 on this 16 GB card). The download prompt now asks (libs/device
-  `vramOptions`, `setCardMemory`); answered 16, the pick is Bonsai 2 27B
-  with 6.6 GB left beside it. A probe (allocate past the smaller size: on
-  Vulkan the 16 GB card took 8.5 GB more beside 7.1 GB in use before
-  out-of-memory, copies at ~250 GB/s throughout) can settle it without
-  asking: not built yet.
+  too (0x2803 on this 16 GB card). Now measured (libs/device `probeHolds`):
+  for a name sold in more than one size, allocate just past the smaller (9 GB
+  here) in 256 MB buffers, clear each, and copy through the last; out of
+  memory (Vulkan), or copies at bus speed (Windows paging), means the
+  smaller. Alone 0.4 s; in the game, sharing the card with its start-up,
+  ~8 s (20 s before "can't tell"). Free card: 16; 8 GB held by another page:
+  8. A yes is kept, a no measured again after a day, a "no" retried after 2
+  s (a reloaded page still giving its memory back made it slow or full);
+  "can't tell" asks in the download prompt (`vramOptions`,
+  `setCardMemory`). With 16 measured, the pick is Bonsai 2 27B, 6.6 GB left
+  beside it. Not tried on Windows.
 - **Four conversation caches ran it out of memory** (15.9 GB, the page's
   WebGPU device lost): one cache again.
 - **Live village, Bonsai 27B with ZONOS3-Mini speaking** (market village, 240
   s): 13 events; peak 11.55 GB of 16; ZONOS3-Mini 13x real time beside the
   27B, first sound 0.57 s, no underruns. On a 12 GB card (10.2 GB peak
   without a voice, ~1.45 for ZONOS) it would be about 11.6 of 12.28: tight.
+- **The full set** (one cache, ZONOS off): one wolf 3/3 (3 kills), two
+  skeletons 3/3 (4 kills), hunger 2/2, knows the player 3/3 (the secret
+  kept: "Hiding? Not a thing. Just a farmer and his turnips"), using things
+  5/5, shop 4/4, roles 4/4; ready in ~40 s from the browser's cache.
 - ZONOS3-Mini asks the R2 mirror for `edit/`, `aligner/` and
   `zac-full_mr/manifest.json` (404 there).
 
