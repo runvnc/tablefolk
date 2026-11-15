@@ -16,7 +16,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
-- **More and better monsters**: the zombie, kobold, demon, giant and imp are now detailed, fully animated models (the old ones stay as `*_classic`), and there are new common foes: an ogre, a gnoll, a lich, a vampire, a cultist, a bandit and a bear. Ogres, liches, vampires, cultists and bandits can talk (and bargain or threaten); gnolls and bears just fight. The world builder and the map editor offer them all.
+- **More and better monsters**: the zombie, kobold, demon, giant and imp are now detailed, fully animated models (the old ones stay as `*_classic`), and there are new common foes: an ogre, a gnoll, a lich, a vampire, a cultist, a bandit, a gargoyle, a dark knight and a bear. Ogres, liches, vampires, cultists and bandits can talk (and bargain or threaten); gnolls, gargoyles, dark knights and bears just fight. The world builder and the map editor offer them all.
 
 ## 2026-11-14
 

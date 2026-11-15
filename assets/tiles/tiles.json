@@ -2071,6 +2071,24 @@
     94.2,
     148.8
    ]
+  },
+  "gargoyle": {
+   "file": "characters/gargoyle.png",
+   "w": 312,
+   "h": 379,
+   "anchor": [
+    155.6,
+    246.7
+   ]
+  },
+  "dark_knight": {
+   "file": "characters/dark_knight.png",
+   "w": 301,
+   "h": 366,
+   "anchor": [
+    150.5,
+    238.1
+   ]
   }
  },
  "floors": {

@@ -337,6 +337,26 @@
    ],
    "facing": "s",
    "hostile": false
+  },
+  {
+   "id": "gargoyle",
+   "model": "gargoyle",
+   "at": [
+    -7,
+    7
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "dark_knight",
+   "model": "dark_knight",
+   "at": [
+    -5,
+    7
+   ],
+   "facing": "s",
+   "hostile": false
   }
  ]
 }
