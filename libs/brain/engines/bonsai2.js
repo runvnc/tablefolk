@@ -63,13 +63,21 @@ function patchMirrorHead() {
 // The window can also come from the page: ?bonsaictx=4096 (or localStorage
 // tablefolk_bonsai2_context): its KV cache is most of the memory beyond the 5.95 GB
 // of weights, so a smaller window leaves room for a voice beside it.
+// How many sessions (speakers with their own cache): ?bonsaisessions=3 or
+// localStorage tablefolk_bonsai2_sessions; else what the caller passes.
+const pageSessions = () => {
+  let v = null;
+  try { v = new URLSearchParams(globalThis.location?.search || '').get('bonsaisessions') || globalThis.localStorage?.getItem('tablefolk_bonsai2_sessions'); } catch {}
+  const n = Math.round(Number(v));
+  return n >= 1 && n <= 6 ? n : null;
+};
 const pageContext = () => {
   let v = null;
   try { v = new URLSearchParams(globalThis.location?.search || '').get('bonsaictx') || globalThis.localStorage?.getItem('tablefolk_bonsai2_context'); } catch {}
   const n = Math.round(Number(v));
   return n >= 1024 && n <= 32768 ? n : null;
 };
-export async function loadBonsai2(onStatus = () => {}, { context = pageContext() ?? CONTEXT, size = '27B' } = {}) {
+export async function loadBonsai2(onStatus = () => {}, { context = pageContext() ?? CONTEXT, size = '27B', sessions = pageSessions() ?? 1 } = {}) {
   patchMirrorHead();
   const S = SIZES[size] || SIZES['27B'], key = LOADED + (size === '27B' ? '' : '_' + size);
   const E = await bonsai2Module();
@@ -92,7 +100,13 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
     },
   });
   local.set(key, source === S.mirror ? 'r2' : '1');
-  return { model, size, session: model.create_session(), queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
+  // A session per speaker (sessions > 1): each keeps its own cache, so a
+  // character's next turn reuses its own prompt prefix instead of reading the
+  // whole prompt again after someone else spoke (14 s cold, 1.4 s warm for a
+  // 2,000-token prompt on an RTX 4070). Each extra one holds a KV cache of the
+  // window (about 0.6 GB at 8192).
+  const first = model.create_session();
+  return { model, size, session: first, pool: new Map([['', first]]), maxSessions: Math.max(1, Math.min(6, sessions | 0)), queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
 // The answer without its reasoning. When the reasoning comes inline (the
@@ -109,6 +123,21 @@ export function answerOf(text, thinking) {
 
 const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
 
+// The session for a speaker: side calls (a plan, a reflection, a menu choice:
+// agent ids with "~", or not a character's) share one so they do not push a
+// character's cache out; the least recently used goes when the pool is full.
+function sessionFor(engine, agentId) {
+  if (!engine.pool || engine.maxSessions <= 1) return engine.session;
+  const id = String(agentId || ''), key = /~|^(menu|api|tf-|default$)/.test(id) || !id ? '~side' : id;
+  const pool = engine.pool;
+  if (pool.has(key)) { const s = pool.get(key); pool.delete(key); pool.set(key, s); return s; }
+  // the first speaker takes the session made at load
+  if (pool.has('') ) { const s = pool.get(''); pool.delete(''); pool.set(key, s); return s; }
+  if (pool.size >= engine.maxSessions) { const [oldKey, old] = pool.entries().next().value; pool.delete(oldKey); try { old.dispose?.(); } catch {} }
+  let s; try { s = engine.model.create_session(); } catch (e) { console.warn('[bonsai2] no extra session:', e?.message || e); engine.maxSessions = pool.size || 1; return pool.values().next().value || engine.session; }
+  pool.set(key, s); return s;
+}
+
 // One turn at a time (the engine leases its single cache); it reuses the
 // cached prefix when the next prompt starts the same way.
 // One turn at a time (one session; it reuses the cached prefix when the next
@@ -120,7 +149,7 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
     const t = opts.temperature ?? 0.7;
     const sampling = t > 0 ? { do_sample: true, temperature: t, top_p: opts.topP ?? 0.95, top_k: Math.min(64, opts.topK ?? 20), ...(opts.minP ? { min_p: opts.minP } : {}) } : {};
     let text = '';
-    const g = engine.session.generate(messages, { max_new_tokens: opts.maxTokens || 256, enable_thinking: !!opts.enableThinking, ...sampling });
+    const g = sessionFor(engine, opts.agentId).generate(messages, { max_new_tokens: opts.maxTokens || 256, enable_thinking: !!opts.enableThinking, ...sampling });
     for await (const e of g) {
       if (e.type !== 'text') continue;
       text += e.text ?? e.delta ?? '';

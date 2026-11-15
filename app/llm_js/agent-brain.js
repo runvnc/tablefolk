@@ -12,7 +12,7 @@ import { OpenAI, collect } from '../../libs/brain/engines/openai.js';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from '../../libs/brain/engines/bonsai2.js';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
-import { detectHardware, recommendModel, noteBrainSpeed } from '../../libs/device/index.js';
+import { detectHardware, recommendModel, noteBrainSpeed, usableGB } from '../../libs/device/index.js';
 import { samplingFor, withChaos } from '../../libs/brain/sampling.js';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired
@@ -189,7 +189,13 @@ export function createAgentBrainManager(config = {}) {
     }
     if (getEngineType() === 'bonsai2') {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
-      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B' });
+      // Sessions (each speaker keeps its own cache: libs/brain/engines/bonsai2.js):
+      // as many as the card holds beside the model and the game (0.8 GB each,
+      // 1.2 GB kept for the drawing), 1 to 4. A 12 GB card with the 27B: 2.
+      const hw = await detectHardware().catch(() => null), free = (usableGB(hw) ?? 0) - (SUPPORTED_MODELS[currentModelKey]?.memGB || 9.4) - 1.2;
+      const sessions = Math.max(1, Math.min(4, 1 + Math.floor(free / 0.8)));
+      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B', sessions });
+      window.tablefolkDiag?.note('brain', `Bonsai 2 keeps ${sessions} conversation cache${sessions > 1 ? 's' : ''} (${usableGB(hw) ?? '?'} GB usable)`);
       loaded = true;
       onStatus(`${SUPPORTED_MODELS[currentModelKey].label} ready`);
       return engine;
