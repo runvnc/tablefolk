@@ -420,7 +420,7 @@
     const ch = [], may = c => { try { return commandsFor(g).has(c); } catch { return true; } };
     if (w && may('wield') && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) ch.push(`wield(${w.name}) - you carry it`);
     if (may('attack')) ch.push(reach ? `attack(${f.id}) - it is in reach` : may('walk') ? `walk(${f.id}) then attack(${f.id})` : `attack(${f.id}) when it comes close`);
-    const risk = incoming(g, fs), dying = risk > 0 && me.hp <= risk * 1.5;
+    const risk = incoming(g, fs), dying = risk > 0 && me.hp <= Math.max(risk * 2, me.max * .35);
     if (dying) out[0] += ` You could die in the next round (they can do about ${Math.round(risk)} damage).`;
     if (pot && (dying || me.hp < me.max * .6)) ch[dying ? 'unshift' : 'push'](`eat(${pot}) - drink it, heals 4`);
     if (dying && !pot && spot && may('walk')) ch.unshift(`walk("${spot}") - run away now`);
@@ -439,7 +439,7 @@
       const pot = potion(g), risk = incoming(g, fs), spot = () => fleeSpot(g, f);
       // in real danger of dying next round: the potion, else run (a basic
       // brain sooner, a brave one stands its ground without a potion)
-      const brink = me.hp <= risk * (basic ? 2 : 1.2) + (basic ? 1 : 0) || frac <= (basic ? .4 : .25);
+      const brink = me.hp <= risk * (basic ? 2 : 1.6) + (basic ? 1 : 0) || frac <= (basic ? .4 : .3);
       if (brink && pot && frac < .8) return { line: `eat(${pot})`, why: `${me.hp}/${me.max} health with ${f.id} near: drinks the ${pot}` };
       if (brink && !brave) { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `about to fall: runs from ${f.id}` }; }
       if (basic && reach) {
