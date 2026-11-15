@@ -38,6 +38,8 @@ export const MODELS = {
   'gemma4-e2b': { engine: 'litert', id: 'gemma4-e2b-litert', label: 'Gemma 4 E2B', size: '2 GB', needGB: 3, readGB: 1.3 },
   'gemma4-e4b': { engine: 'litert', id: 'gemma4-e4b-litert', label: 'Gemma 4 E4B', size: '3 GB', needGB: 6, readGB: 2.3 },
   'gemma4-e2b-vision': { engine: 'litert', id: 'gemma4-e2b-vision', label: 'Gemma 4 E2B with sight', size: '2.6 GB', vision: true, hidden: true },
+  'gemma4-e4b-vision': { engine: 'litert', id: 'gemma4-e4b-vision', label: 'Gemma 4 E4B with sight', size: '3.7 GB', vision: true, hidden: true },
+  'gemma4-12b-vision': { engine: 'litert', id: 'gemma4-12b-vision', label: 'Gemma 4 12B with sight', size: '6 GB', vision: true, hidden: true },
   'bonsai2-27b': { engine: 'bonsai2', id: 'bonsai2-27b', label: 'Bonsai 2 27B', size: '5.9 GB', needGB: 10, readGB: 5.9 },
   'gemma4-12b': { engine: 'litert', id: 'gemma4-12b-litert', label: 'Gemma 4 12B', size: '5.6 GB', needGB: 10, readGB: 5.6 },
   'bonsai2-9b': { engine: 'bonsai2', size9: true, id: 'bonsai2-9b', label: 'Bonsai 2 9B', size: '1.9 GB', needGB: 6, readGB: 1.9 },

@@ -156,6 +156,53 @@ writing `"role": "shopkeeper"`, and free conversation stays with the model.
 - Not yet: roles starting workflows on cue, schedules. (Opinions between
   characters were added on 2026-10-24.)
 
+## Built (2026-11-15): the player file, beliefs, gossip, survival
+
+All in `app/mind.js` unless named.
+
+- **Player file** (`pfOf`, `learnFromPlayer`, `playerLines`): plain regexes
+  over the player's words (`heard` events): name ("my name is", "call me",
+  "I'm <Capital>"), wants ("I'm looking for", "I need", "can you ...?"),
+  promises ("I'll bring/pay/...", "I promise"), self-facts ("I'm a/from",
+  "I love/live/have"); `theirs()` turns first person into third. Gifts and
+  hits come from `given`/`attacked`. A gift that matches a promise's words
+  (or gold for "pay") marks it kept: a memory, trust +.15.
+- **Beliefs**: `addMemory` counts repeats (`n`); at 3, `consolidate` rewrites
+  a memory matching `PATTERNS` into a belief and keeps counting (`src` is the
+  original text, `pi` the pattern index: no functions in saved state).
+- **Model reflection** (`reflectWithModel`): tier capable or ambitious,
+  `state.reflect`; on sleep (tiredness falls by .3 in a tick) or every 30
+  turns, one `tablefolkLLM` call (agentId `<id>~reflect`, 80 tokens) over the
+  last 12 memories; up to two lines kept as `thought` memories, shown as
+  "(you concluded) ...". Untested with the model at the time of writing.
+- **Memory kinds**: event, note, heard (gossip), belief, thought, saw (the
+  sight model's answer, world-integration.js `lookFor`).
+- **Gossip** (`onSpoke` on `tablefolk-say` voiced lines, `gossipLine`): words
+  of the spoken line overlapping a "juicy" memory by 2+ content words pass
+  it to everyone in earshot as "X told you: ..." (`asTold` swaps you/your for
+  the teller's name); the card offers news when someone is within 4 cells.
+- **Secrets, agendas**: agent `secret`, `agenda` (scenario.js) on the card;
+  the secret may be shared at trust >= .85 and 3+ talks.
+- **Tiers** (`tier(g)`): agent `expect`, else scenario `expect`, else by the
+  brain key: endpoint, 9B, 12B, 26B, 27B, 31B ambitious; E4B capable; the rest
+  basic.
+- **Danger** (`foes`, `dangerLines`): hostile characters (play.js
+  `isHostile`) within 6 cells in sight; a DANGER line and "Choose one now"
+  with only the commands the character may use (`commandsFor`). `fleeSpot`
+  finds a free cell 3-5 steps away from the foe.
+- **Reflexes** (`reflex`, called first in world-integration.js
+  `runAgentTurn`; the command goes through `stepAgentTurn` with source
+  `reflex`, and the `tablefolk-agent-turn` event carries `reflex: true`):
+  basic tier potion at 50% health, flee at 35% (not brave), wield the best
+  weapon then attack a foe in reach, timid ones keep away, eat at hunger .8;
+  capable tier only potion at 30%, flee at 25%, eat at .92; ambitious none.
+- **Monsters hunting everyone** (play.js `preyFor`): `state.monsters` or the
+  agent's `hunts` = "everyone"; the nearest visible non-hostile, non-animal
+  character or the player within 8 cells. live.js `monsterTurn` uses it too.
+- **Eval**: `tools/browser-test/survival-test.mjs` (evals/survival.json: a
+  woodcutter with an axe, bread and a potion, two skeletons, hunger .75; the
+  player waits each round).
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

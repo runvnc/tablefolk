@@ -516,6 +516,15 @@ async function linkedScenario(world) {
   return null;
 }
 
+// cfg was read before the model ran (seconds ago); what the world changed
+// meanwhile (a blow landed, a weapon drawn by its own command, food eaten,
+// an event told) must not be undone when the turn saves it back.
+function freshen(world, g, cfg) {
+  const now = world.getBrainConfig(g.id);
+  for (const k of ['hp', 'maxHp', 'wielding', 'inventory', 'defeated', 'goal', 'mind', 'looted', 'wf', 'quest']) if (k in now) cfg[k] = now[k];
+  const mine = cfg.pendingChat || [], theirs = now.pendingChat || [];
+  cfg.pendingChat = [...theirs, ...mine.filter(x => !theirs.includes(x))].slice(-5);
+}
 async function main() {
   const world = await waitForWorld();
   el('dismissModelLoad')?.addEventListener('click', () => {
@@ -1090,6 +1099,7 @@ async function main() {
       const histLine = saidPlain ? histParts.join('\n') : line;
       cfg.messages = (cfg.messages || []).concat([{ role: 'assistant', content: histLine || 'look()' }]);
       cfg.recent = (cfg.recent || []).concat(`chose ${line || 'nothing'}`).slice(-6);
+      freshen(world, g, cfg);
       world.setBrainConfig(g.id, cfg);
       appendLog(`${g.id} brain -> ${line || 'look()'}`);
       // One brain decision = one scenario turn (scenario.js counts these).
@@ -1122,6 +1132,7 @@ async function main() {
       if (saidPlain && !simple) cfg.messages = cfg.messages.concat([{ role: 'user', content: 'SYSTEM: Your plain text was spoken for you. Write speech as say("...") and actions as commands.' }]);
       // Retain enough ordinary conversation for multi-turn instructions to remain salient.
       if (cfg.messages.length > 40) cfg.messages = cfg.messages.slice(-40);
+      freshen(world, g, cfg);
       world.setBrainConfig(g.id, cfg);
       // Tell every other character what this one did, once, in readable form
       // ("hale says ..."); the raw command line ("hale say(...)") used to go
@@ -1360,6 +1371,8 @@ async function main() {
       const c2 = world.getBrainConfig(g.id);
       world.setBrainConfig(g.id, { pendingChat: (c2.pendingChat || []).concat([`[you looked] What you see: ${text}`]).slice(-5) });
       appendLog(`${g.id} sees: ${text}`);
+      // what it saw stays in its memory (mind.js recall), not only the next turn
+      try { window.tablefolkMind?.addMemory(g, `When you looked: ${text}`, 1.6, 'saw'); } catch {}
       state0().globalHistory = (state0().globalHistory || []).concat([`T${state0().turn?.index ?? 0} ${g.id}: ${g.id} sees -> ${text}`]).slice(-20);
       showSight(g.id, img, text);
       return text;

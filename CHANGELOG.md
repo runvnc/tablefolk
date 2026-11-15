@@ -4,6 +4,13 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-15
+
+- **Characters know you**: each one keeps what you told it about yourself, what you asked for, what you promised (and notices when you keep it), what you gave it and how often you hit it, and it is on its mind every turn.
+- **Beliefs, reflection and gossip**: things that keep happening become beliefs ("grub has attacked you 4 times"); with Gemma 4 E4B or bigger, characters think over what they remember when they sleep and keep a lesson or two; news a character mentions near another spreads as hearsay. Agents can have a `secret` (told only to someone it trusts a lot) and an `agenda`.
+- **Survival**: a monster nearby puts concrete choices in front of the character (draw its best weapon, attack, drink a potion, run, call for help). Smaller brains get reflexes (the game fights back, runs and eats for them); Gemma 4 E4B decides itself with the game stepping in only at the brink; big brains get no help (`expect`, `reflexes`). Monsters can hunt everyone, not only the player (`"monsters": "everyone"`), and characters drink potions with `eat()`. A survival eval: `tools/browser-test/survival-test.mjs`.
+- **Gemma 4 E4B and 12B with sight** are model choices (the full multimodal files, for 8 GB and 12 GB cards), and what a character sees when it looks stays in its memory.
+
 ## 2026-11-14
 
 - **Real voices**: characters cry out, groan and die with recorded voices instead of synthesized ones, and they differ by body: men and women, big monsters (a troll, a dragon, a minotaur roar and bellow), small ones (goblins, imps, rats squeal), the undead (rattling breaths), insects and snakes. Monsters and beasts growl, hiss or bark as they attack, and bites land with a wet crunch. Animals have their own calls (moo, bellow, oink, whinny, bray, baa, howl, bark, croak, buzz), heard now and then as they graze and whenever you speak to them. 92 CC0 clips from OpenGameArt and Freesound, picked and checked by ear with Gemini 4 Argon.

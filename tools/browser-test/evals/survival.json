@@ -1,4 +1,4 @@
-{"v":1,"title":"Eval: survival","base":"plain","size":[15,13],"lighting":"bright","earshot":12,"monsters":"everyone",
+{"v":1,"title":"Eval: survival","base":"plain","size":[15,13],"lighting":"bright","earshot":20,"monsters":"everyone",
  "player":{"name":"Ana","gold":0,"items":[],"at":[6,5],"hp":20},
  "allowed":["say","walk","emote","attack","wield","eat","remember","goal"],
  "agents":[

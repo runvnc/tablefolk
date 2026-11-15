@@ -42,7 +42,7 @@ for (let run = 1; run <= runs; run++) {
     await page.evaluate(() => window.tablefolkPlay.acted('wait'));
     const tw = Date.now();
     await new Promise(r => setTimeout(r, 400));
-    while (Date.now() - tw < 90000 && await page.evaluate(() => window.tablefolkPlay.busy || /thinking/.test(document.getElementById('npcThinking')?.textContent || ''))) await new Promise(r => setTimeout(r, 300));
+    while (Date.now() - tw < 90000 && await page.evaluate(() => window.tablefolkPlay.busy || document.getElementById('npcThinking')?.classList.contains('show'))) await new Promise(r => setTimeout(r, 300));
     await new Promise(r => setTimeout(r, 300));
     out = await page.evaluate(() => {
       const C = window.tablefolkCombat, M = window.tablefolkMind, A = tablefolk.getAgents(), g = A.find(a => a.id === 'tam'), cfg = tablefolk.getBrainConfig('tam');

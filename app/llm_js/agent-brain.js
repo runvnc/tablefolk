@@ -53,6 +53,10 @@ const SUPPORTED_MODELS = {
   // download, ~3.4 GB on the card at an 8192 window, ~107 tokens/s on an RTX 4070
   'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU kernels; needs a 6 GB graphics card)', engine: 'bonsai2', bonsaiSize: '9B', size: '~1.9 GB', needGB: 6, readGB: 1.9, memGB: 3.4 },
   // The full multimodal E2B: characters really see when they look
+  // E4B and 12B with sight (the full multimodal files, from Hugging Face): untested on
+  // an 8 GB card; not picked for a device by default (no needGB), chosen by hand
+  'gemma4-e4b-vision': { label: 'Gemma 4 E4B with sight: smarter, and sees when it looks (needs an 8 GB graphics card)', engine: 'litert-lm', size: '~3.7 GB', vision: true },
+  'gemma4-12b-vision': { label: 'Gemma 4 12B with sight (needs a 12 GB+ graphics card)', engine: 'litert-lm', size: '~6 GB', vision: true },
   'gemma4-e2b-vision': { label: 'Gemma 4 E2B with sight: characters see when they look (needs a 6 GB graphics card)', engine: 'litert-lm', size: '~2.6 GB', vision: true },
   // The newest official 0.5B Qwen (Qwen2.5-0.5B-Instruct; Qwen3 starts at 0.6B), Q4_K_M GGUF
   // on wllama. simple: simple-mode prompts (app.js buildSimplePrompt) unless a

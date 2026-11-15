@@ -171,7 +171,7 @@
   function promiseKept(g, what) {
     const pf = pfOf(g), w = words(what); if (!w.length) return;
     const i = pf.promises.findIndex(p => words(p).some(x => w.includes(x)) || (/gold|pay|coin/i.test(p) && /gold/i.test(what)));
-    if (i >= 0) { const p = pf.promises.splice(i, 1)[0]; addMemory(g, `${playerName()} kept their promise to ${p}.`, 2.5, 'saw'); pf.kept = (pf.kept || 0) + 1; mindOf(g).mood.trust = clamp01(mindOf(g).mood.trust + .15); }
+    if (i >= 0) { const p = pf.promises.splice(i, 1)[0]; addMemory(g, `${playerName()} kept their promise to ${p}.`, 2.5, 'event'); pf.kept = (pf.kept || 0) + 1; mindOf(g).mood.trust = clamp01(mindOf(g).mood.trust + .15); }
   }
   function playerLines(g) {
     const pf = mindOf(g).pf; if (!pf || (!pf.talks && !pf.gifts.length && !pf.hits)) return [];

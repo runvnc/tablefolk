@@ -240,6 +240,48 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Turns**: after each player action, nearby characters take a model turn
   only when spoken to, when something happened to them, when a want is
   pressing, every other round on a goal, else every fifth round.
+- **About the player**: each character keeps what you told it about
+  yourself (your name, where you're from, what you love), what you asked
+  for or are looking for, what you promised (and whether you kept it: a
+  promise to bring gold is kept when you hand gold over, and it trusts you
+  more), what you gave it and how often you hit it. Two short lines on its
+  card: "About Ana: You met 12 turns ago, talked 5 times. A travelling bard
+  from Eastvale. They want: find their lost cat. They promised to bring you
+  5 gold (not done yet)."
+- **Beliefs and reflection**: the same thing happening again and again
+  folds into one belief ("grub has attacked you 4 times: not to be trusted
+  near you"). With a bigger brain (Gemma 4 E4B and up; `"reflect": false`
+  turns it off), a character that sleeps, or every 30 of its turns, asks
+  itself what it makes of what it remembers and keeps one or two lessons
+  ("(you concluded) Ana talks sweet but her friends start fights").
+- **Gossip**: when a character says something near another that matches
+  what it remembers about someone, the listener remembers it as hearsay
+  ("pip told you: Grub attacked bram"), and its opinion of a brawler drops.
+  With someone to tell nearby, the card offers a piece of news. `"gossip":
+  false` turns it off.
+- **Secrets and agendas**: an agent's `"secret"` is on its card with "never
+  tell it" until it trusts you a lot (after a few talks and some kindness),
+  then "you trust them enough to share it if they ask". `"agenda"` is what
+  it is quietly after, every turn.
+- **What it saw**: with a brain that sees (Gemma 4 E2B, E4B or 12B with
+  sight, or an online model with vision on), what it saw when it looked
+  stays in its memory.
+- **Danger and reflexes**: a monster close by puts a DANGER line on the
+  card with concrete choices (wield the best weapon it carries, attack,
+  drink a potion when hurt, run to a free square, call for help). How much
+  the game does for it depends on the brain (`"expect"` on the scenario or
+  an agent overrides the guess):
+  - `basic` (2B-class, Gemma 4 E2B): the game fights back, draws a weapon,
+    drinks a potion, runs when badly hurt, and eats when starving, without
+    asking the model.
+  - `capable` (Gemma 4 E4B): the model chooses from the danger choices; the
+    game steps in only when it is nearly dead or starving.
+  - `ambitious` (12B and up, online models): no help.
+  `"reflexes": false` (scenario or agent) turns the help off. `eat()` with a
+  healing potion drinks it (4 health).
+- **Monsters that hunt everyone**: `"monsters": "everyone"` (or a monster's
+  `"hunts": "everyone"`) sends monsters after the nearest character they
+  can see, not only the player: villages under attack, survival worlds.
 - `"mind": false` turns the whole mind off.
 
 Each turn's prompt ends with "Stay yourself: ..." and one sentence of the

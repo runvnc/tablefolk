@@ -49,6 +49,24 @@ const MODEL_CONFIG = {
     lib: '0.19.0-nightly.20261023',   // the build it was tested with; 0.19.0 stable not tried with it yet
     vision: true,
   },
+  // Gemma 4 E4B and 12B with sight: the full multimodal files (vision on the
+  // GPU like the E2B's). Not mirrored on R2 yet: Hugging Face only.
+  'gemma4-e4b-vision': {
+    label: 'Gemma 4 E4B with sight (LiteRT-LM)',
+    modelUrl: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm',
+    vram: '~3 GB',
+    lib: '0.19.0-nightly.20261023',
+    vision: true,
+  },
+  'gemma4-12b-vision': {
+    label: 'Gemma 4 12B with sight (LiteRT-LM)',
+    modelUrl: 'https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/resolve/main/gemma-4-12B-it.litertlm',
+    fallbackUrl: 'https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/resolve/main/gemma-4-12B-it.litertlm',
+    vram: '~7 GB',
+    lib: '0.19.0-nightly.20261023',
+    vision: true,
+  },
   'gemma4-e4b-litert': {
     label: 'Gemma 4 E4B (LiteRT-LM)',
     // Larger sibling (~3.0 GB web build), mirrored on R2 like E2B: same bytes
