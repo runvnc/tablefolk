@@ -1282,6 +1282,8 @@ function makeObject(type,x,z,opts={}){
   if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'),opts);
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
   if(type==='door') return makeDoor(sc,x,z,opts);
+  // books.js: a scenario's book, with its cover and spine
+  if(type==='book' && opts.book && window.tablefolkBooks){ const b=window.tablefolkBooks.make(sc,x,z,opts); if(b) return b; }
   if(window.tablefolkScenery?.types.includes(type)) return window.tablefolkScenery.make(type,x,z,opts);
   if(ITEM_CATALOG[type]) return keepLoot(makeCatalogItem(sc,type,x,z,opts),opts);
   return makeCrate(sc,x,z);
@@ -1290,7 +1292,7 @@ function makeObject(type,x,z,opts={}){
 // the object's opts, which saves and restores with it.
 function keepLoot(m,opts){
   const mm=m&&meta(m); if(!mm) return m;
-  const o={}; for(const k of ['gold','items','name','opened','left']) if(opts?.[k]!=null) o[k]=opts[k];
+  const o={}; for(const k of ['gold','items','name','opened','left','book']) if(opts?.[k]!=null) o[k]=opts[k];
   if(Object.keys(o).length) mm.opts={...(mm.opts||{}),...o};
   return m;
 }

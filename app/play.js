@@ -211,6 +211,9 @@
     if (state.player.wielding && state.player.wielding.toLowerCase() === it.name.toLowerCase()) window.tablefolkCombat?.wield(g, 'none');
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) state.player.items.splice(state.player.items.indexOf(it), 1);
     // a note goes back on the floor, words and all
+    // a book (books.js) goes back on the floor with its cover
+    const bk = window.tablefolkBooks?.byName(it.name);
+    if (bk && g) { const p = myPos(); try { makeObject('book', Math.round(p.x + (g.dir?.x || 0)), Math.round(p.z + (g.dir?.z || 1)), { book: bk.id }); } catch (e) { console.warn('[play] book drop', e); } }
     if (it.text != null && g) { const p = myPos(); try { makeObject('note', Math.round(p.x + (g.dir?.x || 0)), Math.round(p.z + (g.dir?.z || 1)), it.html ? { html: it.html } : { text: it.text }); } catch (e) { console.warn('[play] note drop', e); } }
     note(`${playerName()} drops the ${it.name}`);
     inventoryChanged(); render();
@@ -235,6 +238,7 @@
           <button data-act="give" data-item="${n}" title="give to the nearest character (or drag the item onto one)">give</button>
           ${POTION.test(i.name) ? `<button data-act="drink" data-item="${n}">drink</button>` : ''}
           ${i.text != null ? `<button data-act="read" data-item="${n}">read</button>` : ''}
+          ${i.text == null && window.tablefolkBooks?.byName(i.name) ? `<button data-act="read" data-item="${n}">read</button>` : ''}
           ${weapon ? `<button data-act="${held ? 'unwield' : 'wield'}" data-item="${n}">${held ? 'put away' : 'wield'}</button>` : ''}
           <button data-act="drop" data-item="${n}" title="drop">✕</button></span></li>`;
       }).join('')}</ul>` : '<p class="pane-note">Nothing yet. Open chests (E) and pick things up.</p>'}`;
@@ -244,7 +248,7 @@
     const b = e.target.closest?.('#advPane button[data-act]'); if (!b) return;
     const name = b.dataset.item, act = b.dataset.act, g = me();
     if (act === 'drink') drink(name);
-    if (act === 'read') { const it = findItem(state.player.items, name); toast('The note says: ' + (it?.text || '(blank)')); }
+    if (act === 'read') { const it = findItem(state.player.items, name), bk = it?.text == null && window.tablefolkBooks?.byName(name); toast(bk ? `${bk.title}${bk.author ? ' by ' + bk.author : ''}${bk.about ? ': ' + bk.about : ''}. It opens at: "${String(bk.chunks[0] || '').slice(0, 220)}…" (give it to someone who reads, and they can answer from it)` : 'The note says: ' + (it?.text || '(blank)')); }
     else if (act === 'drop') drop(name);
     else if (act === 'wield' && g) { window.tablefolkCombat?.wield(g, name); render(); }
     else if (act === 'unwield' && g) { window.tablefolkCombat?.wield(g, 'none'); render(); }

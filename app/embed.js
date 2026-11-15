@@ -14,6 +14,7 @@
  *   window.tablefolkEmbed.state        'off' | 'idle' | 'loading' | 'ready' | 'error'
  *   window.tablefolkEmbed.start()      begin loading (returns the ready promise)
  *   window.tablefolkEmbed.similar(query, texts) -> Map(text -> cosine 0..1), or null when not ready
+ *   window.tablefolkEmbed.vectors(prefixedTexts, { cache }) -> [Float32Array(256)] (books.js)
  */
 (function () {
   const KEY = 'tablefolkEmbed';
@@ -69,12 +70,21 @@
     texts.forEach((t, i) => out.set(t, dot(q, ds[i])));
     return out;
   }
+  // raw vectors for texts that already carry their prefix (books.js): cached
+  // like recall's when asked, else straight from the model (a book's passages
+  // would push everything else out of the cache)
+  async function vectors(texts, opts = {}) {
+    if (api.state !== 'ready' || !texts.length) return null;
+    if (opts.cache) return vectorsFor(texts);
+    const out = []; for (let i = 0; i < texts.length; i += 16) out.push(...await run(texts.slice(i, i + 16)));
+    return out;
+  }
   function setEnabled(on) {
     try { on ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, 'off'); } catch {}
     if (on && api.state === 'off') { if (api.device) api.state = 'ready'; else { api.state = 'idle'; ready = null; start(); } }
     if (!on) { api.state = 'off'; }
   }
-  Object.assign(api, { start, similar, setEnabled });
+  Object.assign(api, { start, similar, vectors, setEnabled });
   // Graphics pane checkbox and status
   function ui() {
     const box = document.getElementById('embedEnabled'), st = document.getElementById('embedStatus'); if (!box) return;

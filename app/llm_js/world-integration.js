@@ -491,7 +491,7 @@ function buildAgentMessages(world, g, cfg) {
     // give()). The system prompt already lists the commands.
     chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.map(e => '- ' + e).join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
     // skills' urgent cues (trade: what this offer means) right after the words
-    const urgent = [...(window.tablefolkSkills?.urgentLines?.(g) || []), ...(window.tablefolkMind?.urgentLines?.(g) || [])];
+    const urgent = [...(window.tablefolkSkills?.urgentLines?.(g) || []), ...(window.tablefolkMind?.urgentLines?.(g) || []), ...(window.tablefolkBooks?.urgentLines?.(g) || [])];
     if (urgent.length) chatSuffix += '\n\n' + urgent.map(l => '-> ' + l).join('\n');
     // The player is right there: a 2B model sometimes talked about "Ana over
     // there" to Ana.
@@ -911,6 +911,8 @@ async function main() {
         // mind.js + embed.js: score memories and facts by meaning against what
         // was just said (at most 2.5 s; keyword-only if the model isn't ready)
         await Promise.race([window.tablefolkMind?.prepare?.(g), new Promise(r => setTimeout(r, 2500))]).catch(() => {});
+        // books.js: a reader looks up what was just said in the books it carries (at most 4 s)
+        await Promise.race([window.tablefolkBooks?.prepare?.(g, cfg), new Promise(r => setTimeout(r, 4000))]).catch(() => {});
         const built = buildAgentMessages(world, g, cfg);
         messages = built.messages;
         chatSuffix = built.chatSuffix;
