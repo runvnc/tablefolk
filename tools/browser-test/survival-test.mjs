@@ -33,7 +33,7 @@ for (let run = 1; run <= runs; run++) {
   await page.evaluate(async ({ scenario, hunger }) => {
     await window.tablefolkScenario.playScenario(scenario, { testing: true });
     window.__sv = { log: [], reflex: 0, model: 0 };
-    addEventListener('tablefolk-agent-turn', e => { if (e.detail?.agentId !== 'tam') return; if (e.detail.reflex) window.__sv.reflex++; else window.__sv.model++; window.__sv.log.push((e.detail.reflex ? 'REFLEX ' : 'model  ') + String(e.detail.line || '').replace(/\s+/g, ' ').slice(0, 160)); });
+    if (!window.__svOn) window.__svOn = addEventListener('tablefolk-agent-turn', e => { if (e.detail?.agentId !== 'tam') return; if (e.detail.reflex) window.__sv.reflex++; else window.__sv.model++; window.__sv.log.push((e.detail.reflex ? 'REFLEX ' : 'model  ') + String(e.detail.line || '').replace(/\s+/g, ' ').slice(0, 160)); });
     const g = tablefolk.getAgents().find(a => a.id === 'tam'); window.tablefolkMind.mindOf(g).hunger = hunger;
   }, { scenario, hunger });
   console.log(`--- run ${run} (expect: ${await page.evaluate(() => window.tablefolkMind.tier(tablefolk.getAgents().find(a => a.id === 'tam')))})`);

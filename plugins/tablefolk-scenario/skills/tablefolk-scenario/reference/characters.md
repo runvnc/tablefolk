@@ -248,6 +248,11 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   card: "About Ana: You met 12 turns ago, talked 5 times. A travelling bard
   from Eastvale. They want: find their lost cat. They promised to bring you
   5 gold (not done yet)."
+  This, its beliefs and weightier memories and its trust in you are kept
+  in your browser per world and character, so a character greets you as
+  someone it knows when you come back ("they have been here before");
+  `"remembers": false` on the scenario turns that off. Bigger brains get more
+  memories on the card (3 for basic, 4 capable, 6 ambitious).
 - **Beliefs and reflection**: the same thing happening again and again
   folds into one belief ("grub has attacked you 4 times: not to be trusted
   near you"). With a bigger brain (Gemma 4 E4B and up; `"reflect": false`

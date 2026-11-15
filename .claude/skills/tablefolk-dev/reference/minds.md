@@ -199,6 +199,16 @@ All in `app/mind.js` unless named.
 - **Monsters hunting everyone** (play.js `preyFor`): `state.monsters` or the
   agent's `hunts` = "everyone"; the nearest visible non-hostile, non-animal
   character or the player within 8 cells. live.js `monsterTurn` uses it too.
+- **Between visits** (`memKey`, `restore`, `persist`): localStorage
+  `tablefolk-mind:<hash of title and agent ids>:<id>`, every 20 s and on
+  pagehide: the player file (visits +1 on restore), up to 12 memories of
+  weight 2+ or kind belief/thought/note, opinions, trust (faded 30% toward
+  neutral). Not for test runs; scenario `"remembers": false` off.
+- **world-integration.js `freshen`**: a turn reads cfg before the model runs
+  and saved it back twice afterwards, undoing what happened meanwhile (hp
+  lost to a blow, wield() from its own commands, food eaten, events told).
+  Now hp, wielding, inventory, defeated, goal, mind, wf, quest are re-read and
+  pendingChat merged before each save.
 - **Eval**: `tools/browser-test/survival-test.mjs` (evals/survival.json: a
   woodcutter with an axe, bread and a potion, two skeletons, hunger .75; the
   player waits each round).

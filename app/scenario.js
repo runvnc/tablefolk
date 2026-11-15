@@ -953,6 +953,7 @@
       onlySpokenTo: typeof s.onlySpokenTo === 'boolean' ? s.onlySpokenTo : null,   // app.js onlySpokenTo
       showIntro: s.showIntro === false ? false : null,   // false: straight into the world (wantIntro)
       speech: s.speech === false ? false : null,
+      remembers: s.remembers === false ? false : null,   // mind.js: characters remember the player between visits (this browser)
       memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
       surroundings: ['forest', 'fields', 'none'].includes(s.surroundings) ? s.surroundings : null,   // surroundings.js: beyond the board's edge
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)

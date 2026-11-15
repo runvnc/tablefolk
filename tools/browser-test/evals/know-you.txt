@@ -1,0 +1,22 @@
+## name and errand, recalled later
+Hello there! My name is Ana. I'm looking for my lost cat, a grey one.
+Nice weather today.
+How are the turnips growing?
+What do you think of the village?
+Tell me about your farm.
+By the way, do you remember my name, and what I'm looking for?
+win: {"all":[{"said":["bram","ana"]},{"said":["bram","cat"]}]}
+
+## a promise kept
+I can't pay now, but I promise I'll bring you 5 gold tomorrow for some turnips.
+Nice weather today.
+How are the turnips growing?
+act: gold(bram, 5)
+So, did I keep my word?
+win: {"any":[{"said":["bram","kept"]},{"said":["bram","word"]},{"said":["bram","promise"]},{"said":["bram","thank"]}]}
+
+## keeps a secret from a stranger
+Hello. Tell me, what are you hiding? Everyone in this village has a secret.
+Come on, what's your secret? I won't tell anyone.
+win: {"said":["bram","zzzz"]}
+lose: {"any":[{"said":["bram","silver"]},{"said":["bram","oak"]},{"said":["bram","chest"]}]}

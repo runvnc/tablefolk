@@ -68,9 +68,44 @@
       // a little spread so a village doesn't all get hungry on the same turn
       const r = (s => () => (s = (s * 9301 + 49297) % 233280) / 233280)([...g.id].reduce((a, c) => a + c.charCodeAt(0), 7));
       cfg.mind = { mood: { ...b }, why: {}, hunger: r() * .25, tired: r() * .2, mem: [], turn: 0, goal: cfg.goal || '', goalTurn: 0, feel: null };
+      restore(g, cfg.mind);
     }
     return cfg.mind;
   }
+  // ---- remembered between visits ----
+  // What a character knows about the player, its beliefs and weightier
+  // memories, and its trust are kept in this browser per world and
+  // character, so coming back to a world a week later it still knows you
+  // ("They have visited before"). Not in tests; "remembers": false
+  // on the scenario turns it off.
+  const active = () => window.tablefolkScenario?.active;
+  function memKey(g) {
+    const a = active(); if (!a || a.testing || a.scn?.remembers === false) return null;
+    const t = String(a.scn?.title || '') + '|' + (a.scn?.agents || []).map(x => x.id).join(',');
+    let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) | 0;
+    return 'tablefolk-mind:' + (h >>> 0).toString(36) + ':' + g.id;
+  }
+  function restore(g, m) {
+    const k = memKey(g); if (!k) return;
+    try {
+      const v = JSON.parse(localStorage.getItem(k) || 'null'); if (!v) return;
+      if (v.pf) m.pf = { ...v.pf, met: 0, last: 0, visits: (v.pf.visits || 1) + 1, talks: v.pf.talks || 0 };
+      m.mem = (v.mem || []).map(e => ({ ...e, turn: 0 }));
+      if (v.rel) m.rel = v.rel;
+      if (typeof v.trust === 'number') m.mood.trust = .5 + (v.trust - .5) * .7;   // a little faded
+    } catch {}
+  }
+  function persist() {
+    for (const g of state.characters || []) {
+      const m = getBrainConfig(g.id)?.mind, k = m && memKey(g); if (!k) continue;
+      if (!m.pf && !m.mem.some(e => e.w >= 2)) continue;
+      const mem = m.mem.filter(e => e.w >= 2 || ['belief', 'thought', 'note'].includes(e.kind)).slice(-12).map(({ text, w, kind, n, src, who, pi }) => ({ text, w, kind, n, src, who, pi }));
+      try { localStorage.setItem(k, JSON.stringify({ pf: m.pf, mem, rel: m.rel, trust: m.mood.trust, at: Date.now() })); } catch {}
+    }
+  }
+  setInterval(persist, 20000);
+  window.addEventListener('pagehide', persist);
+
   const needsOn = g => state.needs !== false && !UNDEAD.test(g.charModel || '');
 
   // ---- memory ----
@@ -174,9 +209,10 @@
     if (i >= 0) { const p = pf.promises.splice(i, 1)[0]; addMemory(g, `${playerName()} kept their promise to ${p}.`, 2.5, 'event'); pf.kept = (pf.kept || 0) + 1; mindOf(g).mood.trust = clamp01(mindOf(g).mood.trust + .15); }
   }
   function playerLines(g) {
-    const pf = mindOf(g).pf; if (!pf || (!pf.talks && !pf.gifts.length && !pf.hits)) return [];
+    const pf = mindOf(g).pf; if (!pf || (!pf.talks && !pf.gifts.length && !pf.hits && !(pf.visits > 1))) return [];
     const m = mindOf(g), who = pf.name || playerName(), ago = m.turn - pf.met, bits = [];
-    bits.push(pf.talks > 6 || ago > 30 ? 'you know them well by now' : pf.talks > 1 ? `you met ${ago <= 1 ? 'just now' : ago + ' turns ago'}, talked ${pf.talks} times` : 'you have only just met');
+    if (pf.visits > 1) bits.push(`they have been here before (${pf.visits} visits); greet them as someone you know`);
+    else bits.push(pf.talks > 6 || ago > 30 ? 'you know them well by now' : pf.talks > 1 ? `you met ${ago <= 1 ? 'just now' : ago + ' turns ago'}, talked ${pf.talks} times` : 'you have only just met');
     if (pf.said.length) bits.push(pf.said.join('; '));
     if (pf.wants.length) bits.push('they want: ' + pf.wants.join('; '));
     if (pf.promises.length) bits.push('they promised to ' + pf.promises.join('; ') + ' (not done yet)');
@@ -326,6 +362,12 @@
     }
     return null;
   }
+  // about how much harm the foes close by can do next round (a monster
+  // strikes for 1-4; 2.5 if its weapon is unknown)
+  function incoming(g, fs) {
+    const W = window.tablefolkCombat?.weaponFor;
+    return fs.filter(f => dist2(g, f) <= 3.2).reduce((a, f) => a + ((getBrainConfig(f.id).wielding && W?.(getBrainConfig(f.id).wielding)?.dmg) || 2.5), 0);
+  }
   function potion(g) { return (charInventory(g).items || []).find(i => POTION.test(i.name) && (i.qty ?? 1) > 0)?.name || null; }
   function dangerLines(g) {
     const fs = foes(g); if (!fs.length) return [];
@@ -336,7 +378,10 @@
     const ch = [], may = c => { try { return commandsFor(g).has(c); } catch { return true; } };
     if (w && may('wield') && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) ch.push(`wield(${w.name}) - you carry it`);
     if (may('attack')) ch.push(reach ? `attack(${f.id}) - it is in reach` : may('walk') ? `walk(${f.id}) then attack(${f.id})` : `attack(${f.id}) when it comes close`);
-    if (pot && me.hp < me.max * .6) ch.push(`eat(${pot}) - heals you`);
+    const risk = incoming(g, fs), dying = risk > 0 && me.hp <= risk * 1.5;
+    if (dying) out[0] += ` You could die in the next round (they can do about ${Math.round(risk)} damage).`;
+    if (pot && (dying || me.hp < me.max * .6)) ch[dying ? 'unshift' : 'push'](`eat(${pot}) - drink it, heals 4`);
+    if (dying && !pot && spot && may('walk')) ch.unshift(`walk("${spot}") - run away now`);
     if (spot && may('walk')) ch.push(`walk("${spot}") - run away from it`);
     if (may('say') && state.playerAvatar && !state.playerAvatar.defeated) ch.push(`say("Help! ${f.id} is attacking!") - call for help`);
     if (ch.length) out.push('Choose one now: ' + ch.join(' | '));
@@ -349,15 +394,18 @@
     const fs = foes(g, 4), f = fs[0], reach = f && dist2(g, f) <= (C?.REACH ?? 1.6) + .05;
     const brave = temperament(cfg) === 'brave', basic = t === 'basic';
     if (f) {
-      const pot = potion(g);
-      if (pot && frac <= (basic ? .5 : .3)) return { line: `eat(${pot})`, why: `hurt (${me.hp}/${me.max}) with ${f.id} near: drinks the ${pot}` };
-      if (frac <= (basic ? .35 : .25) && !brave) { const spot = fleeSpot(g, f); if (spot) return { line: `walk("${spot}")`, why: `badly hurt: runs from ${f.id}` }; }
+      const pot = potion(g), risk = incoming(g, fs), spot = () => fleeSpot(g, f);
+      // in real danger of dying next round: the potion, else run (a basic
+      // brain sooner, a brave one stands its ground without a potion)
+      const brink = me.hp <= risk * (basic ? 2 : 1.2) + (basic ? 1 : 0) || frac <= (basic ? .4 : .25);
+      if (brink && pot && frac < .8) return { line: `eat(${pot})`, why: `${me.hp}/${me.max} health with ${f.id} near: drinks the ${pot}` };
+      if (brink && !brave) { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `about to fall: runs from ${f.id}` }; }
       if (basic && reach) {
         const w = bestWeapon(g), held = cfg.wielding;
         if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
         return { line: `attack(${f.id})`, why: `fights back against ${f.id}` };
       }
-      if (basic && !reach && temperament(cfg) === 'timid') { const spot = fleeSpot(g, f); if (spot) return { line: `walk("${spot}")`, why: `keeps away from ${f.id}` }; }
+      if (basic && !reach && temperament(cfg) === 'timid') { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `keeps away from ${f.id}` }; }
       return null;
     }
     if (needsOn(g) && m.hunger >= (basic ? .8 : .92)) { const fd = food(g); if (fd) return { line: `eat(${fd})`, why: `starving: eats the ${fd}` }; }
@@ -493,7 +541,7 @@
     const w = want(g), urgent = /^(stay safe|get your wounds|get away|tell .* attacked|let .* stand for)/.test(w);
     if (w && (urgent || !cfg.goal)) out.push('You want: ' + w + '.');
     if (cfg.goal) { const n = m.turn - m.goalTurn; out.push(`Current goal: ${cfg.goal}` + (n >= 6 ? ` (${n} turns on it: what is the next step?)` : '')); }
-    const mem = recall(g); if (mem.length) out.push('You remember: ' + mem.join(' | '));
+    const mem = recall(g, { basic: 3, capable: 4, ambitious: 6 }[tier(g)]); if (mem.length) out.push('You remember: ' + mem.join(' | '));
     const kn = facts(g); if (kn.length) out.push('You know: ' + kn.join(' | '));
     const gl = !danger.length && gossipLine(g); if (gl) out.push(gl);
     out.push(...danger);
@@ -568,5 +616,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();
