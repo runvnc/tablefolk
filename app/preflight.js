@@ -65,7 +65,7 @@
     ['senses.js?v=20261108b'],
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261108c'],
-    ['mind.js?v=20261115l'],
+    ['mind.js?v=20261115m'],
     ['uses.js?v=20261115a'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261115b'],
@@ -85,7 +85,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261115c', 'module'],
+    ['llm_js/world-integration.js?v=20261115d', 'module'],
   ];
 
   function browserSummary() {

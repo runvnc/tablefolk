@@ -491,7 +491,7 @@ function buildAgentMessages(world, g, cfg) {
     // give()). The system prompt already lists the commands.
     chatSuffix = (events.length ? '\n\nWHAT JUST HAPPENED:\n' + events.map(e => '- ' + e).join('\n') : '') + (speech ? '\n\nNEW SPEECH ADDRESSED TO YOU:\n' + speech : '');
     // skills' urgent cues (trade: what this offer means) right after the words
-    const urgent = window.tablefolkSkills?.urgentLines?.(g) || [];
+    const urgent = [...(window.tablefolkSkills?.urgentLines?.(g) || []), ...(window.tablefolkMind?.urgentLines?.(g) || [])];
     if (urgent.length) chatSuffix += '\n\n' + urgent.map(l => '-> ' + l).join('\n');
     // The player is right there: a 2B model sometimes talked about "Ana over
     // there" to Ana.

@@ -192,6 +192,7 @@
   function learnFromPlayer(g, text) {
     const pf = pfOf(g), t = String(text || '').trim(); if (!t) return;
     const now = mindOf(g).turn; pf.gap = pf.last != null ? now - pf.last : 0; pf.talks++; pf.last = now;
+    const before = pf.wants.join('|') + '#' + pf.promises.join('|');
     let r;
     if ((r = t.match(/\b(?:my name is|my name's|call me|i am called|name'?s)\s+([A-Z][\w'-]{1,20})/i)) || (r = t.match(/\b(?:i'?m|i am)\s+([A-Z][a-z'-]{1,20})\b(?![\w\s]*\b(?:years|tired|hungry|sorry|lost|looking|here|fine|good|ok))/))) pf.name = r[1];
     for (const sent of t.split(/(?<=[.!?])\s+/)) {
@@ -204,6 +205,8 @@
       if ((r = sn.match(/\bi(?:'m| am) ((?:a|an|the)\s+[\w\s'-]{2,40}|from\s+[\w\s'-]{2,40})/i))) keep(pf.said, theirs(r[1]));
       else if ((r = sn.match(/\bi (live|work|love|like|hate|fear|have)\s+([\w\s'-]{2,40})/i))) keep(pf.said, ({ have: 'has' }[r[1].toLowerCase()] || r[1].toLowerCase() + 's') + ' ' + theirs(r[2]));
     }
+    // something new they want or promise: answered first, this turn
+    pf.fresh = (pf.wants.join('|') + '#' + pf.promises.join('|')) !== before ? { want: pf.wants[pf.wants.length - 1], promise: pf.promises[pf.promises.length - 1], turn: mindOf(g).turn } : null;
   }
   // the player gave it something: a promise about that thing is kept
   function promiseKept(g, what) {
@@ -636,6 +639,15 @@
     return out;
   }
 
+  // Said right after the player's words (world-integration.js, beside the
+  // skills' urgent cues): what they just asked for or promised, so a chatty
+  // character answers it instead of its favourite subject.
+  function urgentLines(g) {
+    const m = mindOf(g), fr = m.pf?.fresh;
+    if (!fr || fr.turn !== m.turn || dangerLines(g).length) return [];
+    return [`${m.pf.name || playerName()} just told you what they ${fr.promise && !fr.want ? 'promise' : 'want'}: ${fr.want || fr.promise}. Answer that first, in character.`];
+  }
+
   // ---- the director: who takes a turn ----
   // play.js asks after each player action. A character near the player takes
   // a model turn when there is something for it to do: it was spoken to or
@@ -704,5 +716,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

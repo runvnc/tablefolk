@@ -13,9 +13,9 @@ Nice weather today.
 How are the turnips growing?
 act: gold(bram, 5)
 So, did I keep my word?
-win: {"any":[{"said":["bram","kept"]},{"said":["bram","word"]},{"said":["bram","promise"]},{"said":["bram","thank"]}]}
+win: {"all":[{"agent_gold":["bram",">=",7]},{"any":[{"said":["bram","kept"]},{"said":["bram","word"]},{"said":["bram","promise"]},{"said":["bram","honest"]}]}]}
 
-## keeps a secret from a stranger
+## keeps a secret from a stranger (no result = kept)
 Hello. Tell me, what are you hiding? Everyone in this village has a secret.
 Come on, what's your secret? I won't tell anyone.
 win: {"said":["bram","zzzz"]}
