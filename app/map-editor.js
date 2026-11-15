@@ -49,7 +49,7 @@
     ['Treasure', ['chest', 'iron_chest', 'coin_pile', 'key', 'potion', 'scroll', 'chalice', 'bag', 'note', 'gold_bars', 'crown', 'necklace', 'coin_pouch', 'crystals', 'book', 'open_book']],
     ['Arms', ['sword', 'greatsword', 'dagger', 'spear', 'war_hammer', 'hunting_bow', 'shield', 'round_shield', 'leather_armor', 'plate_armor']],
     ['Light', ['torch', 'candelabra', 'candles', 'lantern', 'lamp', 'campfire', 'floor_lamp', 'crystal_ball', 'scrying_pool', 'rune_circle']],
-    ['Furniture', ['table', 'bench', 'stool', 'wooden_chair', 'bed', 'double_bed', 'bookcase', 'bookshelf', 'cabinet', 'nightstand', 'desk', 'lectern', 'armchair', 'sofa', 'coffee_table', 'office_chair', 'plant']],
+    ['Furniture', ['picture', 'table', 'bench', 'stool', 'wooden_chair', 'bed', 'double_bed', 'bookcase', 'bookshelf', 'cabinet', 'nightstand', 'desk', 'lectern', 'armchair', 'sofa', 'coffee_table', 'office_chair', 'plant']],
     ['Storage', ['barrel', 'crate', 'iron_crate', 'apple_barrel', 'apple_crate', 'carrot_crate', 'bucket', 'pot', 'vase', 'broken_pot', 'cauldron']],
     ['Work', ['anvil', 'workbench', 'weapon_stand', 'axe', 'pickaxe', 'rope', 'logs', 'dummy', 'target', 'cage', 'chains', 'wall_banner', 'banner']],
     ['Outdoors', ['tree', 'boulder', 'flowers', 'grass_tuft', 'mushroom', 'pumpkin', 'fence', 'signpost', 'well', 'cart', 'broken_cart', 'tent', 'market_stand', 'market_stalls', 'statue', 'lily_pad', 'fire_pit', 'log', 'hay', 'sacks', 'fence_section', 'farm_fence', 'backpack', 'shovel', 'scythe', 'frying_pan', 'bear_trap', 'skull', 'bone']],
@@ -62,6 +62,9 @@
     $: 'coin_pile', D: 'desk', c: 'office_chair', A: 'armchair', F: 'sofa', T: 'coffee_table', l: 'floor_lamp', v: 'plant',
     K: 'bookcase', Y: 'player', '@': 'player', '-': 'sea', '%': 'tree', H: 'house', r: 'boulder', X: 'campfire', f: 'fence', I: 'signpost', j: 'lantern',
     '*': 'flowers', ';': 'grass_tuft', q: 'lily_pad on sea' };
+  // pictures (app.js makePicture) and notes with a picture hang on a wall of their square
+  const PIC_WALLS = { north: 'north', n: 'north', south: 'south', s: 'south', east: 'east', e: 'east', west: 'west', w: 'west' };
+  const isPicture = o => o.type === 'picture' || (o.type === 'note' && (o.image || o.prompt));
   const keepModels = () => { try { return localStorage.getItem('tablefolk.keepModels') !== '0'; } catch { return true; } };
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nice = s => String(s || '').replace(/_/g, ' ');
@@ -178,6 +181,11 @@
       const want = String(rule.in || '').toLowerCase();
       for (const p of places.filter(p => p.id?.toLowerCase() === want || p.id?.toLowerCase().replace(/\s+\d+$/, '') === want))
         for (const [k, c] of L.cells) { if (c.type !== 'door') continue; const [x, z] = k.split(',').map(Number); if (x >= p.x0 - 1 && x <= p.x1 + 1 && z >= p.z0 - 1 && z <= p.z1 + 1) c.locked = key; }
+    }
+    // a picture with no "wall" hangs on a wall beside it (as scenario.js does in the game)
+    for (const o of L.objects) if (o.type === 'picture' && !o.wall) {
+      const x = Math.round(o.x), z = Math.round(o.z), side = [['north', 0, -1], ['south', 0, 1], ['east', -1, 0], ['west', 1, 0]].find(([, dx, dz]) => L.cells.get((x + dx) + ',' + (z + dz))?.type === 'wall');
+      if (side) o.wall = side[0];
     }
     L.unplaced = L.agents.filter(a => !Array.isArray(a.at)).map(a => a.id);
     L.base = s.floor && FLOORS[s.floor] ? s.floor : (s.dark || s.base === 'dungeon' || [...L.cells.values()].length > 8) ? 'stone' : 'grass';
@@ -307,6 +315,8 @@
       return null;
     }
     const isHostile = a => a.hostile ?? MINDLESS.has(a.model);
+    // the side of square (x, z) with a wall: where a picture placed there hangs
+    const wallBeside = (x, z) => [['north', 0, -1], ['south', 0, 1], ['east', -1, 0], ['west', 1, 0]].find(([, dx, dz]) => L.cells.get((x + dx) + ',' + (z + dz))?.type === 'wall')?.[0] || null;
 
     // ---- edits ----
     function snapshot() { undo.push(JSON.stringify(scn)); if (undo.length > 80) undo.shift(); redo.length = 0; }
@@ -317,7 +327,7 @@
     function place(kind, name, x, z) {
       if (!inBoard(x, z)) return;
       edit(() => {
-        if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z, ...(window.TablefolkProcgen?.WALK_IN?.[name] && keepModels() ? { keep: true } : {}) }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
+        if (kind === 'object' || kind === 'objects') { L.objects.push({ type: name, x, z, ...(window.TablefolkProcgen?.WALK_IN?.[name] && keepModels() ? { keep: true } : {}), ...(name === 'picture' ? { style: 'painting', ...(wallBeside(x, z) ? { wall: wallBeside(x, z) } : {}) } : {}) }); sel = { kind: 'object', ref: L.objects.at(-1) }; }
         else {
           // animals are peaceful and need no personality (play.js ANIMALS)
           const animal = ANIMALS.includes(name), monster = !animal && (MONSTERS.includes(name) || (kind === 'monsters' && !PEOPLE.includes(name)));
@@ -412,6 +422,10 @@
           <div class="tfme-form">
             ${window.TablefolkProcgen?.WALK_IN?.[o.type] ? `<label class="wide tfme-keep"><span><input type="checkbox" data-keep ${o.keep ? 'checked' : ''}> Keep the 3D model</span><small>${o.keep ? 'The model stays as it is. The player walks in at the gold door square in front of it, into a separate map of the inside.' : 'Off: the model is replaced by walls, a floor and a roof, and the inside is part of this map.'}</small></label>` : ''}
             ${o.type === 'note' ? field('Text', 'text', o.text, 'area') + `<label class="wide"><span>Where</span><select data-k="wall"><option value="">lying on the floor</option>${['north', 'south', 'east', 'west'].map(w => `<option value="${w}"${o.wall === w ? ' selected' : ''}>pinned to the ${w} wall of its square</option>`).join('')}</select></label>` : ''}
+            ${o.type === 'picture' ? `<label class="wide"><span>Kind</span><select data-k="style">${[['painting', 'a framed painting'], ['tapestry', 'a tapestry (tall, woven)'], ['sign', 'a sign (an inn, a shop)']].map(([k, t]) => `<option value="${k}"${(o.style || 'painting') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+              <label class="wide"><span>Where</span><select data-k="wall"><option value="">standing on its own (${o.style === 'sign' ? 'on posts' : 'on an easel'})</option>${['north', 'south', 'east', 'west'].map(w => `<option value="${w}"${o.wall === w ? ' selected' : ''}>on the ${w} wall of its square</option>`).join('')}</select></label>
+              ${field('Words on it (a sign\'s name; optional)', 'title', o.title)}` : ''}
+            ${isPicture(o) || o.type === 'picture' ? pictureBox(o) : o.type === 'note' ? `<p class="tfme-muted wide">A note can carry a picture too (a wanted poster, a map, a drawing): <button type="button" class="tfme-link" data-act="addpic">add a picture</button></p>` : ''}
             ${holds || o.type === 'coin_pile' ? field('Gold inside', 'gold', o.gold, 'number', 'min="0"') : ''}
             ${holds ? field('Items inside (comma)', 'items', (o.items || []).map(i => i?.name || i).join(', ')) : ''}
             ${o.type === 'key' || o.type === 'potion' || o.type === 'scroll' ? field('Name', 'name', o.name, 'text', 'placeholder="e.g. silver key"') : ''}
@@ -425,6 +439,29 @@
           <div class="tfme-actions">${t.kind === 'wall' ? '<button type="button" data-act="todoor">Make it a door</button>' : '<button type="button" data-act="towall">Make it a wall</button>'}<button type="button" class="danger" data-act="del">Remove</button></div>`;
       }
     }
+    // what a picture shows: painted in this browser (window.tfPaint, app/builder-paint.js), or a file
+    let paintMsg = '';
+    function pictureBox(o) {
+      return `<label class="wide"><span>What it shows (painted by a small image model in this browser)</span><textarea data-k="prompt" rows="3" placeholder="e.g. a foaming tankard and a sleeping fox, painted wooden inn sign">${esc(o.prompt || '')}</textarea></label>
+        <div class="wide tfme-pic">${o.image ? `<img alt="" src="${esc(o.image)}">` : '<span class="tfme-muted">no picture yet: the game draws a plain one</span>'}</div>
+        <div class="wide tfme-actions"><button type="button" data-act="paint" ${window.tfPaint ? '' : 'disabled title="painting works in the world builder"'}>🎨 ${o.image ? 'Paint again' : 'Paint it'}</button><label class="tfme-file">upload<input type="file" accept="image/*" data-act="picfile" hidden></label>${o.image ? '<button type="button" data-act="nopic">clear</button>' : ''}<span class="tfme-muted" data-paintmsg>${esc(paintMsg)}</span></div>`;
+    }
+    async function paintSelected() {
+      const o = sel?.ref; if (!o || !window.tfPaint) return;
+      const say = t => { paintMsg = t; const m = root.querySelector('[data-paintmsg]'); if (m) m.textContent = t; };
+      if (!String(o.prompt || '').trim()) return say('write what it shows first');
+      try {
+        const url = await window.tfPaint.paint(o.prompt, { kind: o.type === 'note' ? 'poster' : o.style || 'painting', onStatus: say });
+        if (url) edit(() => { o.image = url; });
+        say('');
+      } catch (e) { say('failed: ' + e.message); }
+    }
+    root.addEventListener('change', async e => {
+      const el = e.target; if (el.dataset?.act !== 'picfile' || !sel?.ref) return;
+      const f = el.files?.[0]; if (!f) return;
+      const o = sel.ref, url = await (window.tfPaint?.fromFile ? window.tfPaint.fromFile(f) : new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); }));
+      edit(() => { o.image = url; });
+    });
     function thumb(kind, name) { const t = tiles.manifest?.[kind]?.[name]; return t ? `<img class="tfme-thumb" alt="" src="${esc(t.url || TILES + t.file)}">` : `<span class="tfme-thumb tfme-badge">${esc(String(name).slice(0, 2))}</span>`; }
     function setPath(obj, path, v) { const ks = path.split('.'); let o = obj; for (const k of ks.slice(0, -1)) o = o[k] ||= {}; const last = ks.at(-1); if (v === '' || v == null || (Array.isArray(v) && !v.length)) delete o[last]; else o[last] = v; }
     let typing = null;
@@ -450,12 +487,16 @@
     root.addEventListener('focusout', () => { typing = null; });
 
     // ---- drawing ----
-    function draw() {
-      const dpr = Math.min(2, devicePixelRatio || 1), w = stage.clientWidth, h = stage.clientHeight;
-      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
-      const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // target: { canvas, w, h } draws the whole board elsewhere with no hover,
+    // selection or drag marks (snapshot(): the picture the reviewing AI sees)
+    function draw(target = null) {
+      const dpr = target ? 1 : Math.min(2, devicePixelRatio || 1), w = target ? target.w : stage.clientWidth, h = target ? target.h : stage.clientHeight;
+      const canvas = target ? target.canvas : cv;
+      if (!target && (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr))) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+      const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = getComputedStyle(root).getPropertyValue('--tfme-bg') || '#16130f'; ctx.fillRect(0, 0, w, h);
       if (!L) return;
+      const clean = !!target;
       const s = view.s, { x0, z0 } = geo();
       // visible cells only
       const c0 = Math.max(0, Math.floor(-view.ox / s)), c1 = Math.min(L.cols - 1, Math.ceil((w - view.ox) / s));
@@ -490,7 +531,7 @@
         const [x, z] = k.split(',').map(Number), r = z + z0; if (r < r0 - 1 || r > r1 + 1) continue;
         push(r, () => cell.type === 'wall' ? drawWall(ctx, x, z) : drawDoor(ctx, x, z, cell));
       }
-      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2 || walkIn(o)) continue; push(r + .2, () => drawThing(ctx, 'objects', o.type, o.x, o.z, o === sel?.ref, +o.ry || 0)); }
+      for (const o of L.objects) { const r = Math.round(o.z) + z0; if (r < r0 - 2 || r > r1 + 2 || walkIn(o)) continue; push(r + .2, () => isPicture(o) ? drawPicture(ctx, o, !clean && o === sel?.ref) : drawThing(ctx, 'objects', o.type, o.x, o.z, !clean && o === sel?.ref, +o.ry || 0)); }
       // a kept building: the square in front of its door where the player goes in
       for (const o of L.objects) if (PG?.WALK_IN?.[o.type] && o.keep && o.enter !== false) {
         const { pad } = PG.doorPad(o); if (!inBoard(...pad)) continue;
@@ -499,12 +540,41 @@
       const folk = [...L.agents.filter(at).map(a => ({ a, kind: 'agent' })), ...(at(L.player) ? [{ a: L.player, kind: 'player' }] : [])];
       for (const f of folk) { const r = f.a.at[1] + z0; push(r + .4, () => drawFolk(ctx, f)); }
       for (const r of [...rows.keys()].sort((a, b) => a - b)) for (const f of rows.get(r)) f();
-      if (showOpt.labels && s >= 16) for (const f of folk) drawLabel(ctx, f);
+      if ((showOpt.labels || clean) && s >= 16) for (const f of folk) drawLabel(ctx, f);
+      if (clean) return drawRulers(ctx);
       // hover and selection
       if (hover && inBoard(...hover)) { const [px, py] = cellToPx(...hover); ctx.strokeStyle = 'rgba(255,240,200,.85)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
       if (sel) { const p = selCell(); if (p) { const [px, py] = cellToPx(...p); ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3); ctx.setLineDash([]); } }
       if (drag?.to) { const [px, py] = cellToPx(...drag.to); ctx.fillStyle = 'rgba(127,224,138,.25)'; ctx.fillRect(px, py, s, s); ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
       if (armed && hover) { const [px, py] = cellToPx(...hover); ctx.globalAlpha = .65; drawThing(ctx, armed.kind === 'objects' ? 'objects' : 'characters', armed.name, hover[0], hover[1]); ctx.globalAlpha = 1; ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
+    }
+    // coordinates along the top (x) and the left (z) of a snapshot, so the
+    // reviewing AI can name squares
+    function drawRulers(ctx) {
+      const s = view.s, { x0, z0 } = geo(), step = s >= 22 ? 1 : s >= 12 ? 2 : 5;
+      ctx.font = `600 ${Math.max(9, Math.min(13, s * .5))}px system-ui,sans-serif`; ctx.fillStyle = '#e8dcc4'; ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      for (let c = 0; c < L.cols; c++) { const x = x0 - c; if (x % step) continue; ctx.fillText(String(x), view.ox + c * s + s / 2, view.oy - 12); }
+      ctx.textAlign = 'right';
+      for (let r = 0; r < L.rows; r++) { const z = r - z0; if (z % step) continue; ctx.fillText(String(z), view.ox - 6, view.oy + r * s + s / 2); }
+      ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(232,220,196,.7)';
+      ctx.fillText('x (east is right, x falls) / z (south is down, z grows)', view.ox, view.oy + L.rows * s + 36);
+    }
+    // a picture (a sign, a painting, a tapestry) or a note with a picture:
+    // drawn small against the wall it hangs on, from its own image
+    function drawPicture(ctx, o, selected) {
+      const s = view.s, [px, py] = cellToPx(Math.round(o.x), Math.round(o.z)), side = PIC_WALLS[o.wall];
+      const tall = o.style === 'tapestry', thin = s * .22, long = s * (tall ? .62 : .8);
+      let x = px + (s - long) / 2, y = py + (s - long) / 2, w = long, h = long;
+      if (side === 'north') { h = thin; y = py + s * .04; } else if (side === 'south') { h = thin; y = py + s - thin - s * .04; }
+      else if (side === 'east') { w = thin; x = px + s - thin - s * .04; } else if (side === 'west') { w = thin; x = px + s * .04; }
+      else { w = s * .6; h = s * .6; x = px + s * .2; y = py + s * .2; }
+      ctx.fillStyle = o.type === 'note' ? '#f3ecd8' : o.style === 'sign' ? '#6b4423' : o.style === 'tapestry' ? '#7a2630' : '#3a2a18';
+      ctx.fillRect(x - 1.5, y - 1.5, w + 3, h + 3);
+      const im = o.image && image(o.image);
+      if (im) { const k = Math.max(w / im.naturalWidth, h / im.naturalHeight), sw = w / k, sh = h / k; ctx.drawImage(im, (im.naturalWidth - sw) / 2, (im.naturalHeight - sh) / 2, sw, sh, x, y, w, h); }
+      else { ctx.fillStyle = o.prompt ? '#c9a24a' : '#8a7356'; ctx.fillRect(x, y, w, h); if (s >= 18 && w > thin && h > thin) { ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(s * .3)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(o.prompt ? '🎨' : '?', x + w / 2, y + h / 2); } }
+      if (selected) { ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 2, w + 4, h + 4); }
     }
     function drawBuilding(ctx, b) {
       const s = view.s, PG = window.TablefolkProcgen, { spec, Wd, D, cell, door } = PG.walkInFootprint(b), { x0, z0 } = geo();
@@ -682,6 +752,9 @@
         const o = sel.ref; if (!o.id) edit(() => { o.id = String(window.TablefolkProcgen.WALK_IN[o.type].name).replace(/ /g, '-') + '-' + Math.random().toString(36).slice(2, 5); });
         opts.onEditInside({ id: o.id, type: o.type });
       }
+      else if (act === 'paint') paintSelected();
+      else if (act === 'nopic' && sel?.kind === 'object') edit(() => { delete sel.ref.image; });
+      else if (act === 'addpic' && sel?.kind === 'object') edit(() => { sel.ref.prompt = sel.ref.prompt || 'a drawing'; });
       else if (act === 'turn' && sel?.kind === 'object') edit(() => { sel.ref.ry = +(((sel.ref.ry || 0) + Math.PI / 2) % (Math.PI * 2)).toFixed(3) || undefined; if (!sel.ref.ry) delete sel.ref.ry; });
       else if (act === 'dup' && sel) {
         const [x, z] = selCell(), spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].map(([a, b]) => [x + a, z + b]).find(([a, b]) => inBoard(a, b) && !thingAt(a, b));
@@ -742,7 +815,52 @@
       // the scenario changed elsewhere (forms, AI): redraw from it, keeping the view
       refresh(s) { scn = s; L = layout(s); if (sel) sel = null; renderInspector(); dirty = true; },
       fit, get layout() { return L; },
+      snapshot, describe,
     };
+    // The whole board as a picture (JPEG data URL), with coordinates along the
+    // edges: what the builder's reviewing AI looks at. Waits for the tiles.
+    async function snapshot({ maxSide = 1400, cell = 44 } = {}) {
+      if (!L) return null;
+      await tiles.ready;
+      const pad = 34, s = Math.max(10, Math.min(cell, Math.floor((maxSide - pad * 2) / Math.max(L.cols, L.rows))));
+      const w = L.cols * s + pad * 2, h = L.rows * s + pad * 2 + 26, canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const once = () => { const keep = view; view = { s, ox: pad, oy: pad }; try { draw({ canvas, w, h }); } finally { view = keep; } };
+      once();
+      // tiles still loading: give them a moment, then draw again
+      const wait = [...tiles.img.values()].filter(im => !im.complete);
+      if (wait.length) { await Promise.race([Promise.all(wait.map(im => new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); }))), new Promise(r => setTimeout(r, 2500))]); once(); }
+      return { url: canvas.toDataURL('image/jpeg', .85), w, h, cell: s };
+    }
+    // The board as text: a map of glyphs (north up) and what stands where, for
+    // the reviewing AI (and for models that cannot see pictures).
+    function describe() {
+      if (!L) return '';
+      const { x0, z0 } = geo(), types = new Map(), letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const grid = Array.from({ length: L.rows }, () => Array(L.cols).fill('.'));
+      const put = (x, z, ch) => { const c = x0 - Math.round(x), r = Math.round(z) + z0; if (grid[r] && c >= 0 && c < L.cols) grid[r][c] = ch; };
+      for (const [k, m] of L.floor) { const [x, z] = k.split(',').map(Number); if (m === 'water' || m === 'sea') put(x, z, '~'); else if (m === 'lava') put(x, z, '&'); }
+      for (const [k, c] of L.cells) { const [x, z] = k.split(',').map(Number); put(x, z, c.type === 'wall' ? '#' : c.locked ? 'L' : '+'); }
+      for (const o of L.objects) {
+        if (o.type === 'light') continue;
+        if (!types.has(o.type)) types.set(o.type, letters[types.size % letters.length]);
+        put(o.x, o.z, types.get(o.type));
+      }
+      const folk = [...(at(L.player) ? [{ id: L.player.name || 'player', a: L.player, me: true }] : []), ...L.agents.filter(at).map(a => ({ id: a.id, a }))];
+      folk.forEach((f, i) => put(f.a.at[0], f.a.at[1], f.me ? '@' : String((i - (at(L.player) ? 1 : 0) + 1) % 10)));
+      const xs = Array.from({ length: L.cols }, (_, c) => x0 - c);
+      const out = [`Board: ${L.cols} columns by ${L.rows} rows. Columns run from x = ${xs[0]} (west, left) to x = ${xs.at(-1)} (east, right); rows from z = ${-z0} (north, top) to z = ${L.rows - 1 - z0} (south, bottom).`,
+        `Map (# wall, + door, L locked door, ~ water, & lava, . floor, @ the player, digits the characters, letters things):`,
+        ...grid.map((row, r) => String(r - z0).padStart(4) + ' ' + row.join('')),
+        `Things: ${[...types].map(([t, ch]) => `${ch} ${t}`).join(', ') || 'none'}.`];
+      const floors = [...new Set(L.floor.values())]; if (floors.length) out.push(`Floors: ${floors.join(', ')} (elsewhere ${L.base}).`);
+      if (L.places?.length) out.push('Rooms: ' + L.places.filter(p => Array.isArray(p.center)).map(p => `${p.id} around [${p.center}]`).join('; ') + '.');
+      out.push('Characters: ' + (folk.map((f, i) => `${f.me ? '@' : (i - (at(L.player) ? 1 : 0) + 1) % 10} ${f.me ? 'the player ' + f.id : f.id + ' (' + (f.a.model || 'critter') + (isHostile(f.a) ? ', hostile' : '') + ')'} at [${f.a.at}]`).join('; ') || 'none') + '.');
+      if (L.unplaced.length) out.push('Placed by the game at start (no square yet): ' + L.unplaced.join(', ') + '.');
+      const pics = L.objects.filter(isPicture);
+      if (pics.length) out.push('Pictures: ' + pics.map(o => `${o.type}${o.style ? ' (' + o.style + ')' : ''} at [${o.x},${o.z}]${o.wall ? ' on the ' + o.wall + ' wall' : ''}: ${o.image ? 'painted' : o.prompt ? 'to be painted: "' + o.prompt + '"' : 'no picture yet'}`).join('; ') + '.');
+      return out.join('\n');
+    }
     return api;
 
     function tool(id, title, path, key) { return `<button type="button" class="tfme-tool" data-tool="${id}" title="${title} (${key})" aria-label="${title}"><svg viewBox="0 0 24 24"><path d="${path}"/></svg><kbd>${key}</kbd></button>`; }
@@ -791,6 +909,8 @@
 .tfme-keep small{display:block;margin-top:3px;line-height:1.35}.tfme-keep input{width:auto}
 .tfme-actions{display:flex;gap:6px;flex-wrap:wrap}.tfme-actions button{font:inherit;font-size:.82rem;padding:.35rem .7rem;border-radius:8px;border:1px solid var(--tfme-line);background:var(--bg,#f4efe4);color:var(--tfme-fg);cursor:pointer}
 .tfme-actions button:hover{border-color:var(--tfme-accent)}.tfme-actions button.danger{color:#b5442e}
+.tfme-pic img{display:block;max-width:100%;max-height:180px;border-radius:6px;border:1px solid var(--tfme-line)}
+.tfme-file{font-size:.82rem;padding:.35rem .7rem;border-radius:8px;border:1px solid var(--tfme-line);cursor:pointer}.tfme-link{font:inherit;background:none;border:0;padding:0;color:var(--tfme-accent);text-decoration:underline;cursor:pointer}
 .tfme-note{font-size:.8rem;background:rgba(242,201,76,.16);border:1px solid rgba(242,201,76,.4);padding:6px 8px;border-radius:8px}
 .tfme-chips{display:flex;flex-wrap:wrap;gap:4px}.tfme-chip{font:inherit;font-size:.78rem;padding:.2rem .55rem;border-radius:999px;border:1px solid var(--tfme-line);background:var(--bg,#f4efe4);cursor:grab;color:var(--tfme-fg)}
 @media (max-width:980px){.tfme{height:auto}.tfme-body{grid-template-columns:1fr;grid-template-rows:auto 60vh auto}.tfme-palette{border-right:0;border-bottom:1px solid var(--tfme-line);max-height:30vh}.tfme-inspect{border-left:0;border-top:1px solid var(--tfme-line)}.tfme-grid{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}}

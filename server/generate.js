@@ -22,7 +22,7 @@ import { OpenAI, collect } from '../libs/brain/engines/openai.js';
 import { config, ROOT, endpoint, LITERT_URL } from './config.js';
 import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';
-import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
+import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, critiqueRequest, parseCritique, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
 export { encodeScenario };
 export const checkScenario = s => checkCore(s, packVoices());
 
@@ -171,6 +171,36 @@ export async function handleGenerate(req, url) {
   return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' } });
 }
 
+// POST /api/critique {scenario, mapText, image?, round, rounds, history}: one
+// round of the builder's "look it over and improve" agent (app/builder.js) on
+// the server's model: {verdict, problems, ideas, request, sawImage, ms}. The
+// map's picture goes along as an image; a model that cannot take images is
+// asked again with the text map only.
+export async function handleCritique(req, url) {
+  if (req.method !== 'POST') return Response.json({ error: 'POST {scenario, mapText, image}' }, { status: 405 });
+  const text = await req.text().catch(() => '');
+  if (text.length > 3000000) return Response.json({ error: 'too large' }, { status: 413 });
+  let b = {}; try { b = JSON.parse(text) || {}; } catch { return Response.json({ error: 'bad JSON' }, { status: 400 }); }
+  if (!b.scenario || typeof b.scenario !== 'object') return Response.json({ error: 'scenario required' }, { status: 400 });
+  let ep = pickEndpoint(url, req);
+  if (!ep.error && overLimit(req, 'critique', 30, 3600e3)) ep = { error: 'too many reviews this hour: try again later' };
+  if (ep.error) return Response.json({ error: ep.error }, { status: 403 });
+  const t0 = Date.now(), image = typeof b.image === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(b.image) ? b.image : null;
+  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 300000 });
+  const ask = async withImage => {
+    const { user, maxTokens } = critiqueRequest({ ...b, withImage });
+    const content = withImage ? [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: image } }] : user;
+    const out = await collect(await client.chat.completions.create({ model: ep.model, messages: [{ role: 'system', content: systemPrompt() }, { role: 'user', content }], stream: true, temperature: 0.4, max_tokens: maxTokens }));
+    return out.text;
+  };
+  try {
+    let answer, saw = !!image;
+    try { answer = await ask(saw); }
+    catch (e) { if (!saw) throw e; saw = false; answer = await ask(false); }   // a model without sight
+    return Response.json({ ...parseCritique(answer), sawImage: saw, ms: Date.now() - t0, model: ep.model });
+  } catch (e) { return Response.json({ error: e.message }, { status: 502 }); }
+}
+
 // POST /api/worldgen/messages {prompt, mode} or {scenario, request}: the
 // messages this server would send its own model, for the visitor's own key or
 // server ("Your own key" in the builder): the page calls the model itself and
@@ -184,6 +214,8 @@ export async function handleWorldgenMessages(req) {
   if (!isAdmin(req) && !guestMay.build('own')) return Response.json({ error: 'building with your own key is not open here' }, { status: 403, headers: cors });
   let b = {}; try { b = JSON.parse(text) || {}; } catch {}
   const system = { role: 'system', content: systemPrompt() };
+  // a review round of the builder's agent: the page adds the map's picture itself
+  if (b.critique && b.scenario && typeof b.scenario === 'object') { const { user, maxTokens } = critiqueRequest(b); return Response.json({ messages: [system, { role: 'user', content: user }], maxTokens, temperature: 0.4 }, { headers: cors }); }
   if (b.scenario && typeof b.scenario === 'object') {
     const request = String(b.request || '').trim().slice(0, 2000); if (!request) return Response.json({ error: 'request required' }, { status: 400, headers: cors });
     const { kept, maxTokens, user } = reviseRequest(b.scenario, request);

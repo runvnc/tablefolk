@@ -43,9 +43,9 @@
   // refreshThings() rebuilds the lists whenever a pack loads.
   const MODERN = ['desk', 'office_chair', 'armchair', 'sofa', 'coffee_table', 'floor_lamp', 'plant', 'bookshelf'];
   // Procedural objects (app.js, scenery.js); models come from the packs.
-  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad', 'crystal_ball', 'scrying_pool', 'rune_circle'];
+  const BASE_THINGS = ['crate', 'barrel', 'mushroom', 'lamp', 'wall', 'door', 'note', 'counter', 'campfire', 'lantern', 'light', 'fence', 'signpost', 'lily_pad', 'crystal_ball', 'scrying_pool', 'rune_circle', 'picture'];
   let ITEMS = [], THINGS = [], WIDE_ITEMS = new Set();
-  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence',
+  const ALIASES = { box: 'crate', boxes: 'crate', keg: 'barrel', lamp_post: 'lantern', lily: 'lily_pad', lilypad: 'lily_pad', sign_post: 'signpost', fencing: 'fence', painting: 'picture', tapestry: 'picture', portrait: 'picture', artwork: 'picture',
     sign: 'note', letter: 'note', paper: 'note', block: 'wall', stone: 'wall', rocks: 'boulder',
     shroom: 'mushroom', toadstool: 'mushroom', stall: 'counter', bar: 'counter',
     chair: 'office_chair', couch: 'sofa', settee: 'sofa', floorlamp: 'floor_lamp', houseplant: 'plant', fern: 'plant', shelf: 'bookshelf', bookshelves: 'bookcase',
@@ -1006,6 +1006,14 @@
   function backToWalls(objs, existing = []) {
     const key = (x, z) => Math.round(+x) + ',' + Math.round(+z);
     const wall = new Set([...objs, ...existing].filter(o => o.type === 'wall' || o.type === 'door').map(o => key(o.x, o.z)));
+    // a picture with no "wall" hangs on a wall beside its square, if there is one
+    // (else it stands on posts); "wall": "none" keeps it standing
+    for (const o of objs) {
+      if (o.type !== 'picture' || o.wall) continue;
+      const x = Math.round(+o.x), z = Math.round(+o.z);
+      const side = [['north', 0, -1], ['south', 0, 1], ['east', -1, 0], ['west', 1, 0]].find(([, dx, dz]) => wall.has(key(x + dx, z + dz)));
+      if (side) o.wall = side[0];
+    }
     for (const o of objs) {
       if (!WALL_BACKED.has(o.type)) continue;
       const x = Math.round(+o.x), z = Math.round(+o.z), ry = +o.ry || 0;

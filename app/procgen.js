@@ -699,6 +699,11 @@
     return null;
   }
 
+  // a wall glyph next to board square (x, z)
+  function besideWall(gen, x, z) {
+    const x0 = Math.floor((gen.size[0] - 1) / 2), z0 = Math.floor((gen.size[1] - 1) / 2), c = x0 - x, r = z + z0;
+    return [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dc, dr]) => gen.grid[r + dr]?.[c + dc] === '#');
+  }
   // Free standing cells in a place, centre first: grid cells that are floor
   // (no object glyph), not taken by another character.
   const FLOOR_GLYPHS = new Set([',', ':', '^', '=', '_', 'R', 'E', 'Q', 'U']);
@@ -749,7 +754,11 @@
       if (o.in == null || (Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.x !== '' && o.z !== '')) return o;
       const p = findPlace(o.in, gen.places, new Set());
       if (!p) { warnings.push(`object ${o.type}: no place "${o.in}"`); return null; }
-      const spot = freeCells(gen, p, occupied).reverse()[0] || p.center;
+      const free = freeCells(gen, p, occupied).reverse();
+      // a picture goes on a wall: a free square with a wall beside it
+      // (scenario.js hangs it on that wall)
+      const walled = o.type === 'picture' ? free.find(([x, z]) => besideWall(gen, x, z)) : null;
+      const spot = walled || free[0] || p.center;
       occupied.add(spot[0] + ',' + spot[1]);
       return { ...o, x: spot[0], z: spot[1] };
     }).filter(Boolean);

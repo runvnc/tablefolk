@@ -11,7 +11,7 @@ changes. Versions look like 20261025a: today's date and a letter.
 """
 import re, sys, os, datetime
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REFS = ['app/preflight.js', 'app/index.html', 'server/generate.js', 'app/worldgen-browser.js'] + \
+REFS = ['app/preflight.js', 'app/index.html', 'server/generate.js', 'server/worldgen-core.js', 'app/worldgen-browser.js'] + \
        ['app/llm_js/' + f for f in os.listdir(os.path.join(ROOT, 'app/llm_js')) if f.endswith('.js')]
 today = datetime.date.today().strftime('%Y%m%d')
 def nextv(cur):

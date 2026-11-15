@@ -14,7 +14,7 @@
 //   /<world>                    short links to scenarios/<world>.json (as server.js)
 //   /api/generate, /api/revise, /api/llm, /api/local, /api/transcribe, /api/tts, /admin
 //                               not here: a refusal that says what to use instead
-import { worldPage, finishScenario, systemPrompt, generateUser, reviseRequest, BROWSER_MODELS, OWN_MODELS } from '../server/worldgen-core.js';
+import { worldPage, finishScenario, systemPrompt, generateUser, reviseRequest, critiqueRequest, BROWSER_MODELS, OWN_MODELS } from '../server/worldgen-core.js';
 import DATA from './data.js';
 
 const ISOLATE = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Referrer-Policy': 'no-referrer' };   // (no Referer: see build.mjs)
@@ -37,6 +37,7 @@ async function messages(req) {
   if (text.length > 400000) return json({ error: 'scenario too large' }, 413);
   let b = {}; try { b = JSON.parse(text) || {}; } catch {}
   const system = { role: 'system', content: systemPrompt(DATA.skill, DATA.voicesText) };
+  if (b.critique && b.scenario && typeof b.scenario === 'object') { const { user, maxTokens } = critiqueRequest(b); return json({ messages: [system, { role: 'user', content: user }], maxTokens, temperature: 0.4 }); }
   if (b.scenario && typeof b.scenario === 'object') {
     const request = String(b.request || '').trim().slice(0, 2000); if (!request) return json({ error: 'request required' }, 400);
     const { kept, maxTokens, user } = reviseRequest(b.scenario, request);
@@ -85,7 +86,7 @@ export default {
     if (p === '/api/generate') return url.searchParams.get('stream') === '1'
       ? new Response(`event: failed\ndata: ${JSON.stringify({ error: NO_SERVER_AI })}\n\n`, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', ...CORS } })
       : json({ error: NO_SERVER_AI }, 403);
-    if (p === '/api/revise') return json({ error: NO_SERVER_AI }, 403);
+    if (p === '/api/revise' || p === '/api/critique') return json({ error: NO_SERVER_AI }, 403);
     if (p.startsWith('/api/llm/') || p.startsWith('/api/local/')) return json({ error: { message: 'this site does not run AI models: use a model in your browser, or your own key or server (Brain options)' } }, 403);
     if (p === '/api/transcribe' || p.startsWith('/api/tts/') || p.startsWith('/api/admin')) return json({ error: 'not available on this site' }, 404);
     if (p === '/admin' || p === '/admin/') return new Response('The admin page is on your own Tablefolk server, not on tablefolk.world.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });

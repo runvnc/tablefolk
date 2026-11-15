@@ -12,6 +12,17 @@
  * print, show on a flat screen, or move things; "use this layout" sends the
  * scenario back with every position fixed.
  *
+ * Look it over and improve (the agent): rounds of review and change. The map
+ * editor draws the whole map (snapshot(), describe()); the model reviews it
+ * (POST /api/critique, or the visitor's own model) and asks for changes, which
+ * go through the same revision as "Ask". See improve().
+ *
+ * Pictures (app/builder-paint.js, @tablefolk/paint with tiny-sd): signs,
+ * paintings, tapestries ("picture" objects), notes with a picture and book
+ * covers, painted in this browser from their "prompt" ("coverPrompt" for a
+ * book); the AI writes prompts, the paint bar or the map editor paints them.
+ * The AI never sees picture data (lightImages).
+ *
  * Books (app/books.js): a PDF or text file becomes a knowledge base in the
  * scenario ("books"), indexed with EmbeddingGemma in this browser; the AI
  * that changes the world sees only each book's title and summary.
@@ -101,7 +112,10 @@
     const tabs = [['story', 'Story'], ['player', 'Player'], ['characters', `Characters (${(scn.agents || []).length})`], ['layout', 'Layout'], ['books', `Books (${Object.keys(scn.books || {}).length})`], ['raw', 'JSON']];
     box.innerHTML = `${canAsk ? `<fieldset class="ask"><legend>Ask the AI for changes</legend>
         <textarea id="aiReq" rows="2" placeholder="e.g. make the goblin a nervous shopkeeper who sells potions; add a locked treasure room with a dragon"></textarea>
-        <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div></fieldset>` : ''}
+        <div class="toolbar"><button type="button" class="go" data-act="ask">Ask</button><button type="button" data-act="undo" ${past.length ? '' : 'disabled'}>Undo${past.length ? ' (' + past.length + ')' : ''}</button><span id="aiMsg" class="muted"></span></div>
+        <div class="toolbar"><button type="button" data-act="${agent.running ? 'stopImprove' : 'improve'}" title="The AI looks at the whole map (as a picture, if the model can see, and as text), finds problems and things to improve, makes the changes, and looks again">${agent.running ? '■ Stop after this step' : '🔍 Look it over and improve'}</button><label class="muted">rounds <select id="aiRounds">${[1, 2, 3, 4, 5].map(n => `<option${n === agent.rounds ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="muted"><input type="checkbox" id="aiPaint" ${agent.paint ? 'checked' : ''}> then paint the pictures</label></div>
+        ${agent.log.length ? `<ol class="agentlog">${agent.log.map(l => `<li class="${l.kind || ''}">${l.html}</li>`).join('')}</ol>` : ''}</fieldset>` : ''}
+      ${paintBar()}
       <div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === tabNow ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
       <div data-panel="story" ${tabNow === 'story' ? '' : 'hidden'}><fieldset><legend>Story</legend><div class="cols">${field('title', 'title')}${field('subtitle', 'subtitle')}
         ${field('lighting', 'lighting', 'select', { options: [['', '(default)'], 'bright', 'night', 'dim'] })}${field('walls', 'walls', 'select', { options: [['', '(default)'], 'stone', 'tabletop', 'block', 'modern'] })}
@@ -159,6 +173,7 @@
         <label><span>where it is</span><select data-bookfield="where">${whereOpts.map(([k, t]) => `<option value="${esc(k)}"${k === w ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
         <label><span>colour (drawn cover and back)</span><input type="color" data-bookfield="color" value="${esc(/^#[0-9a-f]{6}$/i.test(b.color || '') ? b.color : '#6b2d2d')}"></label>
         <label><span>cover art ${b.cover ? '<button type="button" class="ghost small" data-bookact="nocover">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.cover, 52, 72, b)}<input type="file" accept="image/*" data-bookfile="cover"></span></label>
+        <label class="wide"><span>cover picture: what it shows (painted in this browser)</span><span style="display:flex;gap:8px;align-items:center"><input data-bookfield="coverPrompt" value="${esc(b.coverPrompt || '')}" placeholder="${esc([b.title, b.about].filter(Boolean).join(', '))}" style="flex:1"><button type="button" data-bookact="paintCover" ${window.tfPaint ? '' : 'disabled'}>🎨 paint the cover</button></span></label>
         <label><span>spine art ${b.spine ? '<button type="button" class="ghost small" data-bookact="nospine">clear</button>' : ''}</span><span style="display:flex;gap:8px;align-items:center">${img(b.spine, 14, 72, b)}<input type="file" accept="image/*" data-bookfile="spine"></span></label>
         <p class="muted" style="grid-column:1/-1;margin:0">${(b.chunks || []).length} passages${b.source ? ' from ' + esc(b.source) : ''} · ${b.vectors ? 'indexed by meaning' : 'keywords only (index it below, or the game does it when the model is ready)'} · ${Math.round(JSON.stringify(b).length / 1024)} KB <span data-bookmsg>${esc(bookMsg[id] || '')}</span></p>
         <label class="wide"><span>replace the text (PDF, .txt, .md)</span><input type="file" accept=".pdf,.txt,.md,.markdown,text/plain,application/pdf" data-bookfile="text"></label>
@@ -219,19 +234,32 @@
     if (act === 'remove') { remember(); takeAway(b); delete scn.books[id]; if (!Object.keys(scn.books).length) delete scn.books; render(); mapSoon(); }
     else if (act === 'nocover' || act === 'nospine') { remember(); delete b[act.slice(2)]; render(); mapSoon(); }
     else if (act === 'index') indexBook(id).catch(err => bookSay(id, 'failed: ' + err.message));
+    else if (act === 'paintCover') paintCover(id);
   }, true);
+  // a cover painted from "coverPrompt" (or the title and what it is about)
+  async function paintCover(id) {
+    const b = scn.books?.[id]; if (!b || !window.tfPaint) return;
+    const prompt = String(b.coverPrompt || '').trim() || [b.title, b.about].filter(Boolean).join(', ');
+    try {
+      const url = await window.tfPaint.paint(prompt, { kind: 'cover', onStatus: t => bookSay(id, t) });
+      remember(); b.cover = url; if (!b.coverPrompt) b.coverPrompt = prompt; bookMsg[id] = ''; render(); mapSoon();
+    } catch (e) { bookSay(id, 'painting failed: ' + e.message); }
+  }
+  // the agent's log: a map snapshot grows when clicked; its options are kept
+  document.addEventListener('click', e => { const im = e.target.closest?.('.agentshot'); if (im) im.classList.toggle('big'); });
+  document.addEventListener('change', e => { if (e.target.id === 'aiRounds') agent.rounds = +e.target.value; if (e.target.id === 'aiPaint') agent.paint = e.target.checked; });
   // The AI that changes the world sees each book as a short summary (title,
   // author, what it is about), not its text; its answer gets the text back.
   function lightBooks(s) {
     if (!s.books) return s;
-    return { ...s, books: Object.fromEntries(Object.entries(s.books).map(([id, b]) => [id, { title: b.title, ...(b.author ? { author: b.author } : {}), ...(b.about ? { about: b.about } : {}), passages: (b.chunks || []).length }])) };
+    return { ...s, books: Object.fromEntries(Object.entries(s.books).map(([id, b]) => [id, { title: b.title, ...(b.author ? { author: b.author } : {}), ...(b.about ? { about: b.about } : {}), ...(b.coverPrompt ? { coverPrompt: b.coverPrompt } : {}), ...(b.cover ? { hasCover: true } : {}), passages: (b.chunks || []).length }])) };
   }
   function heavyBooks(next, before) {
     if (!before.books) return next;
     // an answer without "books" at all forgot them: keep every one
     if (!next.books || typeof next.books !== 'object') { next.books = before.books; return next; }
     const out = {};
-    for (const [id, b] of Object.entries(next.books)) { const old = before.books[id]; if (!old) continue; const { passages, ...light } = b; out[id] = { ...old, ...light }; }
+    for (const [id, b] of Object.entries(next.books)) { const old = before.books[id]; if (!old) continue; const { passages, hasCover, ...light } = b; out[id] = { ...old, ...light }; }
     if (Object.keys(out).length) next.books = out; else delete next.books;
     return next;
   }
@@ -315,47 +343,156 @@
     else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); mapSoon(); }
     else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); loadMap(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'ask') ask();
+    else if (act === 'improve') { agent.rounds = +($('aiRounds')?.value || 3); agent.paint = !!$('aiPaint')?.checked; improve(); }
+    else if (act === 'stopImprove') { agent.stop = true; b.disabled = true; b.textContent = 'stopping after this step…'; }
+    else if (act === 'paintAll') paintPending();
     else if (act === 'undo' && past.length) { scn = JSON.parse(past.pop()); render(); loadMap(); msg('undone'); }
     else if (act === 'table') showTable();
   });
 
   // ---- ask the AI for changes ----
-  let asking = false;
-  async function ask() {
-    const req = $('aiReq')?.value.trim(); if (!req || asking) return;
-    const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
-    asking = true; say('asking…');
-    try {
-      // the visitor's own key or server: this page calls it (app/worldgen-own.js)
-      if (revise.where === 'own' && window.tfOwnModel) {
-        const done = await new Promise((res, rej) => window.tfOwnModel.revise(lightBooks(scn), req, (ev, d) => {
-          if (ev === 'progress') say(d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`);
-          else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error));
-        }));
-        remember(); scn = heavyBooks(done.scenario, scn); render(); loadMap();
-        $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s`);
-        return;
-      }
+  // Pictures travel as data URLs inside the world; the AI never sees them: each
+  // becomes "[picture N]" on the way out and is put back in its answer.
+  function lightImages(s) {
+    const imgs = [];
+    const json = JSON.stringify(s).replace(/"data:image\/[^"]+"/g, m => { imgs.push(m); return `"[picture ${imgs.length - 1}]"`; });
+    return { light: JSON.parse(json), heavy: next => JSON.parse(JSON.stringify(next).replace(/"\[picture (\d+)\]"/g, (m, i) => imgs[+i] || '""')) };
+  }
+  const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
+  // one change by the AI: the new scenario replaces this one (undo steps back)
+  async function reviseAI(req, say) {
+    const { light, heavy } = lightImages(lightBooks(scn));
+    let done = null;
+    // the visitor's own key or server: this page calls it (app/worldgen-own.js)
+    if (revise.where === 'own' && window.tfOwnModel) {
+      done = await new Promise((res, rej) => window.tfOwnModel.revise(light, req, (ev, d) => {
+        if (ev === 'progress') say(progressText(d)); else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error));
+      }));
+    } else {
       const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
-      const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: lightBooks(scn), request: req }) });
+      const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: light, request: req }) });
       if (!r.ok || !r.body) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
-      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', done = null;
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
       for (;;) {
         const { value, done: end } = await rd.read(); if (end) break;
         buf += dec.decode(value, { stream: true });
         let i; while ((i = buf.indexOf('\n\n')) >= 0) {
           const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
           const ev = chunk.match(/^event: (.*)$/m)?.[1], data = JSON.parse(chunk.match(/^data: (.*)$/m)?.[1] || '{}');
-          if (ev === 'progress') say(data.stage === 'writing' || data.stage === 'repairing' ? `${data.stage}… ${data.chars} characters` : data.stage === 'problems' ? 'fixing: ' + data.problems.join('; ').slice(0, 160) : data.stage === 'thinking' ? 'thinking…' : `asking ${data.model || ''}…`);
+          if (ev === 'progress') say(progressText(data));
           else if (ev === 'failed') throw new Error(data.error);
           else if (ev === 'done') done = data;
         }
       }
       if (!done) throw new Error('no answer');
-      remember(); scn = heavyBooks(done.scenario, scn); render(); loadMap();
+    }
+    remember(); scn = heavyBooks(heavy(done.scenario), scn); render(); loadMap();
+    return done;
+  }
+  let asking = false;
+  async function ask() {
+    const req = $('aiReq')?.value.trim(); if (!req || asking || agent.running) return;
+    const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
+    asking = true; say('asking…');
+    try {
+      const done = await reviseAI(req, say);
       $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
+      if (pendingPictures().length) render();
     } catch (e) { say('failed: ' + e.message); }
     finally { asking = false; }
+  }
+
+  // ---- look it over and improve: the agent ----
+  // Each round: the whole map is drawn by the map editor (instant, 2D tiles)
+  // and described as text; the model reviews it with the scenario (POST
+  // /api/critique, or the visitor's own model) and answers with problems and
+  // one change request; the request goes through the same revision as "Ask";
+  // the new map is drawn again and looked at in the next round, until the
+  // model calls it good or the rounds run out. Then the pictures it asked for
+  // are painted (builder-paint.js) when "then paint the pictures" is ticked.
+  const agent = { running: false, stop: false, rounds: 3, paint: true, log: [] };
+  const logLine = (html, kind = '') => { agent.log.push({ html, kind }); render(); };
+  async function mapLaidOut() {
+    // "map" lines are laid out by the tabletop page first (layOut)
+    for (let t = 0; layingOut && t < 120; t++) await new Promise(r => setTimeout(r, 250));
+    if (inside) { const p = inside.parent; inside = null; insideBar(); ed?.load(p); }
+    await new Promise(r => requestAnimationFrame(() => r()));
+  }
+  async function critique(round, rounds, history, say) {
+    await mapLaidOut();
+    const shot = await ed?.snapshot?.(), mapText = ed?.describe?.() || '';
+    const { light } = lightImages(lightBooks(scn));
+    const body = { scenario: light, mapText, round, rounds, history };
+    if (revise.where === 'own' && window.tfOwnModel) {
+      const r = await window.tfOwnModel.critique(body, shot?.url, say);
+      let c; try { c = window.tfOwnModel.parseJSON(r.text); } catch (e) { throw new Error('the review was not JSON: ' + e.message); }
+      const request = String(c.request || '').trim();
+      const verdict = /good/i.test(String(c.verdict || '')) || !request ? 'good' : 'improve';
+      return { verdict, problems: [].concat(c.problems || []).map(String), ideas: [].concat(c.ideas || []).map(String), request: verdict === 'good' ? '' : request, sawImage: r.sawImage, shot };
+    }
+    const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
+    const r = await fetch('/api/critique?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, image: shot?.url }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    return { ...d, shot };
+  }
+  async function improve(rounds = agent.rounds) {
+    if (agent.running || asking || revise.where === undefined) return;
+    agent.running = true; agent.stop = false; agent.log = []; render();
+    const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
+    const history = [];
+    try {
+      for (let round = 1; round <= rounds && !agent.stop; round++) {
+        say(`round ${round}/${rounds}: looking at the map…`);
+        const c = await critique(round, rounds, history, say);
+        const thumb = c.shot ? `<img class="agentshot" title="the map it looked at (click to enlarge)" alt="map, round ${round}" src="${c.shot.url}">` : '';
+        const list = (t, xs) => xs?.length ? `<br><b>${t}:</b> ${xs.map(esc).join(' · ')}` : '';
+        logLine(`${thumb}<b>Round ${round}</b> (${c.sawImage ? 'saw the map as a picture and as text' : 'read the map as text: this model takes no pictures'}): ${c.verdict === 'good' ? 'looks good' : 'wants changes'}${list('problems', c.problems)}${list('ideas', c.ideas)}${c.request ? `<br><b>asks for:</b> ${esc(c.request)}` : ''}`);
+        if (c.verdict === 'good' || !c.request) break;
+        if (agent.stop) break;
+        say(`round ${round}/${rounds}: making the changes…`);
+        const done = await reviseAI(c.request, t => say(`round ${round}/${rounds}: ${t}`));
+        history.push(c.request.slice(0, 300));
+        logLine(`changed in ${Math.round((done.ms || 0) / 1000)} s${done.warnings?.length ? ' · notes: ' + esc(done.warnings.join('; ')) : ''}`, 'done');
+      }
+      if (agent.paint && !agent.stop && pendingPictures().length) { logLine(`painting ${pendingPictures().length} picture${pendingPictures().length > 1 ? 's' : ''}…`); await paintPending(); }
+      say(agent.stop ? 'stopped' : 'finished looking it over (undo steps back through each change)');
+    } catch (e) { logLine('failed: ' + esc(e.message), 'bad'); say('failed: ' + e.message); }
+    finally { agent.running = false; render(); }
+  }
+
+  // ---- pictures: painted in this browser (builder-paint.js) ----
+  // Pictures, notes with a picture and book covers the AI (or a person) asked
+  // for with a "prompt" and that have no image yet.
+  function pendingPictures() {
+    const out = [], isPic = o => o && (o.type === 'picture' || o.type === 'note') && String(o.prompt || '').trim() && !o.image;
+    const walk = s => { for (const o of s?.objects || []) if (isPic(o)) out.push({ o, kind: o.type === 'note' ? 'poster' : o.style || 'painting', prompt: o.prompt }); for (const sub of Object.values(s?.subworlds || {})) walk(sub); };
+    walk(scn);
+    for (const b of Object.values(scn?.books || {})) if (String(b.coverPrompt || '').trim() && !b.cover) out.push({ o: b, kind: 'cover', prompt: b.coverPrompt, key: 'cover' });
+    return out;
+  }
+  let painting = false, paintMsg = '';
+  function paintBar() {
+    const n = scn ? pendingPictures().length : 0;
+    if (!n && !painting) return '';
+    return `<div class="paintbar"><span>🎨 ${painting ? esc(paintMsg) : `${n} picture${n > 1 ? 's' : ''} to paint (signs, paintings, tapestries, notes, book covers): a small image model in this browser paints them`}</span>${painting ? '' : `<button type="button" data-act="paintAll" ${window.tfPaint ? '' : 'disabled'}>Paint ${n > 1 ? 'them' : 'it'}</button>`}</div>`;
+  }
+  async function paintPending() {
+    if (painting || !window.tfPaint) return;
+    painting = true;
+    const say = t => { paintMsg = t; const el = document.querySelector('.paintbar span'); if (el) el.textContent = '🎨 ' + t; };
+    try {
+      const todo = pendingPictures();
+      for (let i = 0; i < todo.length; i++) {
+        const p = todo[i], head = `picture ${i + 1} of ${todo.length} (${p.prompt.slice(0, 50)}): `;
+        say(head + 'starting…'); render();
+        const url = await window.tfPaint.paint(p.prompt, { kind: p.kind, onStatus: t => say(head + t) });
+        p.o[p.key || 'image'] = url;
+        ed?.refresh?.(inside ? inside.parent.subworlds[inside.id] : scn);
+      }
+      paintMsg = '';
+    } catch (e) { paintMsg = ''; msg('painting failed: ' + e.message); }
+    finally { painting = false; render(); }
   }
 
   // ---- tabletop map (the app's ?tabletop=1 view in a frame) ----
@@ -379,7 +516,12 @@
   });
 
   window.tfBuilder = {
-    show(result, opts = {}) { scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+    show(result, opts = {}) {
+      scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // the form's "look it over" (?improve=N): the agent starts on the new world
+      if (opts.improve > 0 && revise.where !== undefined) { agent.rounds = Math.min(5, +opts.improve); setTimeout(() => improve(agent.rounds), 600); }
+    },
+    improve, paintPending, pendingPictures, get agent() { return agent; }, get editor() { return ed; },
     get scenario() { return scn; },
     encode,
   };

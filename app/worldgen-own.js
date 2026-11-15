@@ -13,6 +13,7 @@
  *     run(prompt, mode, emit)  build a world; emit like the server's stream: 'progress'
  *                              {stage, chars, thought, preview, model}, 'done' {scenario, code, link, ms, model}, 'failed' {error}
  *     revise(scenario, request, emit)   the same for "ask the AI for changes"
+ *     critique(body, image, say)  one review round of the builder's agent: {text, sawImage, ms, model}
  *   }
  *
  * "Also for the characters" (useForPlay) points the game's endpoint brain
@@ -127,8 +128,32 @@
       throw new Error('the model did not produce a usable world (try another model)');
     } catch (e) { emit('failed', { error: String(e.message || e) }); }
   }
+  // One review round of the builder's agent (app/builder.js): the server's
+  // review prompt, the map's picture added here (a model without sight is
+  // asked again with the text map only); the answer as /api/critique gives it.
+  async function critique(body, image, say = () => {}) {
+    const cfg = get(), t0 = Date.now();
+    if (cfg.provider === 'openrouter' && !cfg.apiKey) throw new Error('no OpenRouter key yet: sign in with OpenRouter or paste a key');
+    if (!cfg.model) throw new Error('no model chosen');
+    const { OpenAI, collect } = await import(CLIENT);
+    const client = new OpenAI({ baseURL: cfg.baseURL, apiKey: cfg.apiKey, timeout: 300000,
+      defaultHeaders: cfg.provider === 'openrouter' ? { 'HTTP-Referer': location.origin, 'X-Title': 'Tablefolk' } : {} });
+    const ask = async withImage => {
+      const spec = await post('/api/worldgen/messages', { ...body, critique: true, withImage });
+      const m = spec.messages, last = m[m.length - 1];
+      if (withImage) last.content = [{ type: 'text', text: last.content }, { type: 'image_url', image_url: { url: image } }];
+      let chars = 0;
+      const out = await collect(await client.chat.completions.create({ model: cfg.model, messages: m, stream: true, temperature: spec.temperature ?? 0.4, max_tokens: spec.maxTokens || 6000 }),
+        t => { if (t.length - chars > 200) { chars = t.length; say(`reviewing… ${chars} characters`); } }, () => say('thinking…'));
+      return out.text;
+    };
+    let text, saw = !!image;
+    try { text = await ask(saw); }
+    catch (e) { if (!saw) throw new Error(explain(e, cfg)); saw = false; text = await ask(false).catch(e2 => { throw new Error(explain(e2, cfg)); }); }
+    return { text, sawImage: saw, ms: Date.now() - t0, model: cfg.model };
+  }
   const run = (prompt, mode, emit) => runWith({ prompt, mode }, prompt, emit);
   const revise = (scenario, request, emit) => runWith({ scenario, request }, 'change: ' + request, emit);
 
-  window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, PLAY_MODEL };
+  window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, critique, parseJSON, PLAY_MODEL };
 })();

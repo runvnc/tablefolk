@@ -72,6 +72,14 @@ food, note to write notes others can find (written facing a wall, it is
 pinned there). A note object: {"type": "note", "x": 2, "z": -3, "text":
 "..."}; add "wall": "north" (or south/east/west) to pin it, big and upright,
 on that wall of its square: signs, wanted posters, rules, menus.
+Pictures make places feel real: {"type": "picture", "style": "sign" (an inn's
+or shop's sign; "title" is the name written on it) | "painting" | "tapestry",
+"in": "tavern" (or "x", "z" on a square beside a wall: it hangs on that wall;
+"wall": "north" to choose), "title": "The Sleeping Fox", "prompt": "a sleeping
+red fox curled on a tankard"} (prompt: what it shows, 5-15 words, no text;
+the builder paints it). A note gets a picture with "prompt" too (a wanted
+poster's face, a treasure map). Use 1-4 per world: a sign for each inn or
+shop, a portrait or tapestry in a hall, throne room or chapel.
 Monsters: skeletons, zombies, rats, spiders, wolves, bats, slimes, ghosts are
 hostile by default: when the player is near they close in and attack (no
 LLM, no personality needed). Goblins, kobolds and orcs talk unless "hostile":
@@ -201,7 +209,7 @@ against north_wall (any side), beside X, near X, behind X, in_front_of X,
 around X (X = anything placed earlier, an agent id, player).
 Things: crate barrel chest table bench stool workbench cauldron anvil
 weapon_stand axe pickaxe bucket bag potion scroll coin_pile mushroom lamp
-note wall counter tree house boulder campfire lantern fence signpost flowers
+note picture wall counter tree house boulder campfire lantern fence signpost flowers
 bookshelf desk armchair sofa plant. Optional "size": [cols, rows] (odd, 9-41).
 
 Choose: dungeons, caves, mines, castles, villages, towns, forests, woods,

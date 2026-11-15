@@ -12,6 +12,7 @@
 //                       a plain loading screen; ?view= overrides per link)
 //   /api/generate       the generator itself (JSON or a server-sent-event stream)
 //   /api/revise         POST {scenario, request}: the generator changes a scenario
+//   /api/critique       POST {scenario, mapText, image}: one review round of the builder's agent
 //   /api/worldgen/messages  POST: the generator's prompt, for a visitor's own model
 //                       (their browser calls it; /api/finish checks the answer)
 //   --byo-model / BYO_MODEL=1: visitors bring their own model (settings.js guestMay)
@@ -26,7 +27,7 @@
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync, readdirSync, openSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL, BREEZE_URL } from './config.js';
-import { handleWorld, handleGenerate, handleRevise, handleFinish, handleWorldgenMessages, worldgenOptions } from './generate.js';
+import { handleWorld, handleGenerate, handleRevise, handleCritique, handleFinish, handleWorldgenMessages, worldgenOptions } from './generate.js';
 import { guestMay } from './settings.js';
 import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
 
@@ -265,6 +266,7 @@ const server = Bun.serve({
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
     if (p === '/api/revise') return handleRevise(req, url);
+    if (p === '/api/critique') return handleCritique(req, url);
     if (p === '/api/finish') return handleFinish(req);
     if (p === '/api/worldgen/messages') return handleWorldgenMessages(req);
     if (p === '/api/transcribe' && req.method === 'POST') {

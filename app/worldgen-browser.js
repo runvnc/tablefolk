@@ -34,7 +34,7 @@
   const CAVE = 'entrance lair crystals grotto pool treasure bones camp mine chamber'.split(' ');
   const GENERATED = { dungeon: DUNGEON, village: VILLAGE, forest: FOREST, farm: FARM, cave: CAVE };
   const placesOf = kind => GENERATED[kind] || DUNGEON;
-  const THINGS = 'chest coin_pile note potion scroll key chalice rope torch barrel crate candles candelabra cage chains statue bookcase lectern cabinet well market_stand cart tent logs campfire banner sword shield crown book coin_pouch gold_bars crystals bear_trap hunting_bow dagger necklace skull hay sacks'.split(' ');
+  const THINGS = 'chest coin_pile note potion scroll key chalice rope torch barrel crate candles candelabra cage chains statue bookcase lectern cabinet well market_stand cart tent logs campfire banner sword shield crown book coin_pouch gold_bars crystals bear_trap hunting_bow dagger necklace skull hay sacks picture'.split(' ');
   const OUTDOOR_THINGS = 'campfire tree boulder tent cart logs crate barrel chest well fence signpost flowers lantern bench table mushroom coin_pile note'.split(' ');
   const ENEMY = /\b(villain|necromancer|evil|cultist|cult leader|bandit|brigand|captor|kidnapp\w*|warlord|tyrant|dark lord|lich|enemy|boss|raider|marauder|assassin|monster|warlock)\b/i;
   const HOSTILE_INTENT = /\b(attacks? (anyone|intruders|strangers|the player|on sight)|kills? (anyone|intruders|strangers|the player)|despises (the living|intruders|strangers)|wants (the player|intruders|them) dead)\b/i;
@@ -148,6 +148,8 @@
       if (o.gold != null && /chest|coin/.test(o.type)) out.gold = Math.max(0, Math.min(500, Math.round(+o.gold) || 0));
       if (Array.isArray(o.items) && o.type === 'chest') out.items = o.items.map(String).slice(0, 4);
       if (o.type === 'note' && o.text) out.text = String(o.text).slice(0, 200);
+      // a picture (a sign, a painting, a tapestry): the builder paints its prompt
+      if (o.type === 'picture') { out.style = ['sign', 'painting', 'tapestry'].includes(o.style) ? o.style : 'painting'; if (o.title) out.title = String(o.title).slice(0, 40); out.prompt = String(o.prompt || o.text || o.title || 'an old portrait').slice(0, 160); }
       return out;
     });
     if (plan.kind === 'outdoor') {
@@ -287,7 +289,7 @@
       const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
       const mapAsk = plan.kind === 'outdoor'
         ? `Write the outdoor map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "map": ["place campfire at center", "place tree x6 scattered at north", "paint water x8 cluster at east", "place player at south"], "objects": [{"type": "chest", "gold": 30, "items": ["silver key"]}]}\nMap lines: place <thing> [xN] [scattered|cluster|row] at center|north|south|east|west|random, or near/beside <thing>. Things: ${OUTDOOR_THINGS.join(', ')}. No characters yet.`
-        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${placesOf(plan.kind).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). No characters yet.`;
+        : `Write the map as JSON only:\n{"title": "...", "subtitle": "one line hook", "intro": "2-3 sentences for the player", "lighting": "bright or night", "${plan.kind === 'village' ? 'buildings' : 'rooms'}": ${plan.places.length + 2} (a number), "objects": [{"type": "chest", "in": "treasure", "gold": 30, "items": ["silver key"]}, {"type": "note", "in": "library", "text": "..."}]}\nPlaces for "in": ${placesOf(plan.kind).join(', ')}. Object types: ${things.join(', ')}. Rooms are furnished on their own: list only what matters to the story (2-8 objects). A picture is painted for the world: {"type": "picture", "in": "tavern", "style": "sign" or "painting" or "tapestry", "title": "words on a sign", "prompt": "what it shows, 5-15 words"}. No characters yet.`;
       let mapOut = {};
       try { mapOut = json(await ask(emit, 'map', 'step 2/5: drawing the map', 'You turn adventure plans into game data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${mapAsk}`)); }
       catch (e) { emit('progress', { stage: 'map', label: 'the map answer was not JSON; using the plan' }); }

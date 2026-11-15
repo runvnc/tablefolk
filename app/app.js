@@ -1279,7 +1279,9 @@ function makeObject(type,x,z,opts={}){
   if(type==='barrel') return makeBarrel(sc,x,z);
   if(type==='mushroom') return makeMushroom(sc,x,z);
   if(type==='lamp') return makeLamp(sc,x,z);
-  if(type==='note') return makeNote(sc,x,z,opts.html || (opts.text ? '<p>'+String(opts.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '<p>...</p>'),opts);
+  // a note with a picture ("image": a wanted poster, a map, a drawing) shows it above its words
+  if(type==='note') return makeNote(sc,x,z,opts.html || noteHtmlWithImage(opts),opts);
+  if(type==='picture') return makePicture(sc,x,z,opts);
   if(type==='wall') return makeBlock(sc,x,z,!!opts.cracked);
   if(type==='door') return makeDoor(sc,x,z,opts);
   // books.js: a scenario's book, with its cover and spine
@@ -2125,6 +2127,87 @@ function layNote(m,x,z){
   // on top of the floor tiles (painted floors stand a little above the ground)
   m.position.set(x,(state.terrainTopY??0)+.075,z);
   const mm=meta(m); delete mm.wall; delete mm.noteCell; if(mm.opts) delete mm.opts.wall;
+}
+
+function noteHtmlWithImage(o){
+  const words=o.text ? '<p>'+String(o.text).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]))+'</p>' : '';
+  const src=typeof o.image==='string' && /^(data:image\/|https?:\/\/|\/)/.test(o.image) ? o.image.replace(/"/g,'%22') : '';
+  return src ? `<img src="${src}" style="width:100%;display:block"/>${words.replace('<p>','<p style="font-size:24px;line-height:1.2;margin:10px 0 0;text-align:center">')}` : (words||'<p>...</p>');
+}
+// A picture: a framed painting, a woven tapestry or an inn's sign, on the
+// wall of its square ("wall": north, south, east, west; facing into the
+// square, like a pinned note) or, without a wall, standing on two posts.
+//   {"type": "picture", "style": "painting|tapestry|sign", "wall": "north",
+//    "image": "data:image/jpeg;base64,...", "title": "The Foaming Tankard", "prompt": "..."}
+// "image" is painted in the world builder (app/builder-paint.js) from
+// "prompt"; without one the board shows its title (or a plain canvas). Static,
+// not carried, no physics body.
+const PICTURE_STYLES={
+  painting:{w:.8,h:.8,frame:'#4a3218',edge:.06,cloth:false},
+  tapestry:{w:.8,h:1.45,frame:'#7a2630',edge:.035,cloth:true},
+  sign:{w:1.15,h:.7,frame:'#6b4423',edge:.05,cloth:false},
+};
+function pictureTexture(scene,st,w,h,o){
+  const W=512, H=Math.round(512*h/w), cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const tex=new BABYLON.DynamicTexture('picture_tex',cv,scene,true); tex.hasAlpha=false;
+  const title=String(o.title||'').trim().slice(0,60), e=Math.round(W*st.edge/w*1.2);
+  const paint=img=>{
+    const c=cv.getContext('2d');
+    c.fillStyle=st.frame; c.fillRect(0,0,W,H);
+    if(st.cloth){ c.fillStyle='rgba(255,255,255,.06)'; for(let y=0;y<H;y+=4) c.fillRect(0,y,W,1); }
+    const band=title ? Math.round(H*(st===PICTURE_STYLES.sign ? (img ? .26 : 1) : .14)) : 0;
+    const ix=e, iy=e, iw=W-2*e, ih=H-2*e-(img ? band : 0);
+    if(img && ih>20){
+      const k=Math.max(iw/img.naturalWidth,ih/img.naturalHeight), sw=iw/k, sh=ih/k;
+      c.drawImage(img,(img.naturalWidth-sw)/2,(img.naturalHeight-sh)/2,sw,sh,ix,iy,iw,ih);
+      if(st.cloth){ c.globalAlpha=.18; c.fillStyle='#000'; for(let y=iy;y<iy+ih;y+=3) c.fillRect(ix,y,iw,1); c.globalAlpha=1; }
+      c.strokeStyle='rgba(0,0,0,.45)'; c.lineWidth=3; c.strokeRect(ix,iy,iw,ih);
+    } else if(!title){ c.fillStyle=st.cloth?'#b88a4a':'#d9cfb8'; c.fillRect(ix,iy,iw,ih); }
+    if(title){
+      const by=img ? H-e-band : e, bh=img ? band : H-2*e;
+      let fs=Math.round(Math.min(bh*.62,W*.14)); c.font=`700 ${fs}px Georgia,serif`;
+      while(fs>14 && c.measureText(title).width>W-2*e-16){ fs-=2; c.font=`700 ${fs}px Georgia,serif`; }
+      c.textAlign='center'; c.textBaseline='middle'; c.fillStyle=st.cloth?'#f1d48a':'#f6e7c4';
+      c.shadowColor='rgba(0,0,0,.6)'; c.shadowBlur=4; c.fillText(title,W/2,by+bh/2); c.shadowBlur=0;
+    }
+    tex.update();
+  };
+  paint(null);
+  const src=typeof o.image==='string' ? o.image : '';
+  if(/^(data:image\/|https?:\/\/|\/)/.test(src)){ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{ try{ paint(img); }catch(e){ console.warn('[picture]',e); } }; img.src=src; }
+  return tex;
+}
+function makePicture(scene,x,z,opts={}){
+  const st=PICTURE_STYLES[opts.style]||PICTURE_STYLES.painting;
+  const wall=NOTE_WALLS[String(opts.wall||'').toLowerCase()];
+  const top=state.terrainTopY??0, H=wallH();
+  let w=st.w, h=st.h;
+  if(wall && h>H-.3){ const k=(H-.3)/h; w*=k; h*=k; }
+  const back=BABYLON.MeshBuilder.CreateBox('picture',{width:w,height:h,depth:.05},scene);
+  const bm=colorMat(scene,'picture_back',BABYLON.Color3.FromHexString(st.frame).scale(.8)); back.material=bm;
+  const face=BABYLON.MeshBuilder.CreatePlane('picture_face',{width:w,height:h},scene);
+  const fm=new BABYLON.StandardMaterial('picture_mat',scene); fm.diffuseTexture=pictureTexture(scene,st,w,h,opts);
+  fm.specularColor=new BABYLON.Color3(.06,.06,.06); fm.emissiveColor=new BABYLON.Color3(.12,.11,.1); face.material=fm;
+  face.parent=back; face.position.z=-.027; face.isPickable=false;
+  back.receiveShadows=true; face.receiveShadows=true;
+  tag(back,'picture',{health:2,material:st.cloth?'cloth':'wood',flammable:true});
+  const mm=meta(back); mm.ownsMaterial=true;
+  mm.opts={}; for(const k of ['style','wall','image','title','prompt']) if(opts[k]!=null && opts[k]!=='') mm.opts[k]=opts[k];
+  if(wall){
+    // facing into the square: the plane's front looks along -wall
+    back.rotation.set(0,Math.atan2(-wall[0],-wall[1])+Math.PI,0);
+    const cy=top+Math.min(H-.12-h/2,.15+h/2+(H-h)*.5);
+    back.position.set(x+wall[0]*.46,cy,z+wall[1]*.46);
+    mm.noteCell=[x,z];   // saved (getObjects) by its square, not its spot on the wall
+    mm.opts.wall=wall[1]<0?'north':wall[1]>0?'south':wall[0]<0?'east':'west';
+  } else {
+    // on two posts, facing south (toward the usual camera) unless turned
+    back.rotation.set(0,Math.PI+(+opts.ry||0),0);
+    back.position.set(x,top+1.15+h/2-.3,z);
+    for(const sx of [-1,1]){ const p=BABYLON.MeshBuilder.CreateBox('picture_post',{height:back.position.y-top+h/2-.05,width:.07,depth:.07},scene); p.material=bm; p.parent=back; p.position.set(sx*(w/2-.06),-(back.position.y-top)/2+h/4-.02,.05); p.isPickable=false; }
+  }
+  state.props.push(back);
+  return back;
 }
 
 function makeShrine(scene){ const plinth=makeBlock(scene,4.5,-6.5,true); plinth.name='cracked_shrine_plinth'; plinth.scaling.set(1.2,.72,1.2); const c=createCrystal('hero_crystal',scene,1.35,.32); c.position.set(4.5,1.25,-6.5); c.material=state.materials.magic; addShadow(c); tag(c,'crystal',{health:3,material:'crystal'}); state.props.push(c); const l=new BABYLON.PointLight('shrine_glow',new BABYLON.Vector3(4.5,1.1,-6.5),scene); l.diffuse=new BABYLON.Color3(.25,.9,.85); l.intensity=.38; l.range=4.2; }
@@ -3689,7 +3772,7 @@ function carry(g,name=''){
   }
   return carryMesh(g,nearestTarget(g,1.8));
 }
-function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','crystal_ball','scrying_pool','rune_circle','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
+function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','picture','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','crystal_ball','scrying_pool','rune_circle','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot
