@@ -44,7 +44,7 @@
     ['tts/breeze-client.js?v=20261115a'],
     ['world-file.js?v=20261115b'],
     ['tts/voice-sample.js?v=20261115b'],
-    ['tts/pocket-tts-manager.js?v=20261115d'],
+    ['tts/pocket-tts-manager.js?v=20261115e'],
     ['tts/tts-ui.js?v=20261115c'],
     ['load-status.js?v=20261115a'],
     ['look.js?v=20261018b'],

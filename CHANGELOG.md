@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-15
 
+- **Breeze TTS only when you choose it**: the game no longer switches to Breeze TTS by itself (it did when breeze-server was installed and ZONOS3-Mini wasn't downloaded yet). Without ZONOS3-Mini you get the default voice, with ZONOS3-Mini offered; Breeze is used only after you pick it in the Voice pane.
+
 - **Paintings and tapestries look like paint and cloth**: no more shine on them. In the world builder, a painting's description now starts with "painting" and a tapestry's with "woven tapestry" (the painter pays most attention to the first words), and switching a picture's kind swaps them.
 
 - **The picture painters download from Tablefolk's own mirror**: tiny-sd and Chitra Tiny (about 0.9 GB and 0.75 GB) now come from Tablefolk's R2 mirror on tablefolk.world, with Hugging Face as the fallback, and are pinned to one version, so a change on Hugging Face can't break them.

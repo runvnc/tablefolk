@@ -428,8 +428,10 @@ with `?trustSkills=1`, or after the player allows that package.
   default voice. Chosen by itself when downloaded before
   (`tablefolkZonosWebReady`) and 2 GB are left beside the chat model, else
   offered (toast, twice at most; `upgradeTo('zonos-web')` downloads it
-  while the current voice talks). When it fits, an installed breeze-server is
-  not started (`breezeFits(false)`: only a running one is taken).
+  while the current voice talks). Breeze is never chosen by itself
+  (2026-11-15: an installed breeze-server was started and picked on a visit
+  before ZONOS3-Mini was downloaded): without ZONOS3-Mini, the site's
+  default (Pocket-TTS).
 - **Breeze TTS 2** (engine `breeze`, `app/tts/breeze-client.js`): BreezeBlue's
   3B model (English and Mandarin; weights research/non-commercial only) has
   no browser build (2026-10-30: no ONNX, WebGPU or Transformers.js port;
@@ -459,11 +461,8 @@ with `?trustSkills=1`, or after the player allows that package.
   `/health` (about 35 s warming up on the RTX 2060), logs to
   `server.log` there, stops it after `BREEZE_IDLE_MIN` (30) minutes without
   speech and with the server; `--no-breeze` or `BREEZE_AUTOSTART=0` turns
-  it off. Choosing Breeze in the Voice pane starts it the same way. Chosen
-  by itself when nothing is picked in this browser, it runs or is installed,
-  `freeGB` (usable graphics memory minus the chat model's `needGB`) is at
-  least its `vramGB` + 0.5, and its measured speed here is 0.9x real time or
-  better. Every engine's speed (`generation_metrics` rtfx, smoothed,
+  it off. Choosing Breeze in the Voice pane starts it the same way; it is
+  never chosen by itself (only in the Voice pane). Every engine's speed (`generation_metrics` rtfx, smoothed,
   `localStorage.tablefolkTtsRtfx`) also sizes the audio held before a line
   plays (`holdFor`: (1 - r/1.1) of the line's estimated length at 14
   characters a second, at most 8 s), so a slow engine waits instead of

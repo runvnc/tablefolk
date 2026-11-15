@@ -196,9 +196,8 @@ outside the browser in `breeze-server` on your own computer, about 3 GB of
 graphics memory: install it once with `tools/breeze-server.sh` (Windows:
 `tools/breeze-server.ps1`; no Mac build yet); after that the Tablefolk
 server starts it by itself when it is wanted and stops it after half an
-hour of quiet. It is picked by itself when the card has room beside the
-chat model and it speaks faster than real time on this computer; or pick it
-under Engine. Its weights are for non-commercial use). **Breeze TTS 2 in this
+hour of quiet. It is used only when you pick it under Engine, never by
+itself. Its weights are for non-commercial use). **Breeze TTS 2 in this
 browser** is the same model with no server: a 2.5 GB download once (asked
 first), on the graphics card through WebGPU (it needs JSPI (see "Browsers") and the `shader-f16`
 feature, which Chrome on Linux with NVIDIA hides unless it is started with

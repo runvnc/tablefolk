@@ -37,23 +37,8 @@
     'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'/libs/voice/breeze-web-worker.js',languages:false,cloneByText:true,progress:true},
     'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
-  // Breeze is picked by itself (nothing chosen in this browser) when it is
-  // running or installed on this machine (the Tablefolk server then starts
-  // it: breeze-client.js start) and the graphics card has room for it beside
-  // the chat model (libs/device/index.js freeGB): its own graphics memory (2.1 GB for
-  // tools/breeze-server/build.sh's build, which keeps the text encoder on the
-  // processor, else 3) plus half a gigabyte. A 6 GB card with Gemma E2B (3 GB
-  // free) takes the 2.1 GB build; Pocket-TTS on the processor is the fallback.
-  // start: false (ZONOS3-Mini fits this card) takes Breeze only when it is already running
-  async function breezeFits(start=true){
-    const B=window.tablefolkBreeze; if(!B) return false;
-    const st=await B.status(); if(!st.running && (!st.installed || !start)) return false;
-    for(let i=0;i<40&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
-    if((window.tablefolkDevice?.freeGB??0) < (st.vramGB||3)+.5) return false;
-    // measured slower than speech here (an RTX 2060 beside Gemma: 0.4-0.9x) -> Pocket-TTS
-    if((speeds().breeze??1) < .9) return false;
-    return st.running || await B.start();
-  }
+  // Breeze (breeze-server on this computer, or in the browser) is never picked by itself: only when
+  // the player chooses it in the Voice pane (the Tablefolk server then starts breeze-server on demand).
   // Each engine's measured speed on this machine (seconds of speech per second
   // of work, smoothed), kept across visits: it sizes the buffer before a line
   // starts (an engine slower than speech would stutter) and rules Breeze out.
@@ -126,11 +111,10 @@
     const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine]) return {id:mine,why:'chosen in the voice settings'};
     const noZ=await zonosWhyNot();
     if(!noZ && localStorage.getItem(ZONOS_READY)==='1') return {id:'zonos-web',why:'the best voice this graphics card holds (downloaded before)'};
-    if(await breezeFits(!!noZ)) return {id:'breeze',why:'Breeze is running on this computer'};
-    const no=await breezeWebWhyNot();
-    if(!no && localStorage.getItem(BREEZE_WEB_READY)==='1') return {id:'breeze-web',why:'the best voice this graphics card holds (downloaded before)'};
-    const def=await serverDefault(), id=ENGINES[def]?def:'pocket-18m';
-    return {id,why:(!noZ?'ZONOS3-Mini would fit here: not downloaded yet':'ZONOS3-Mini can\'t run here: '+noZ+(no?'':'; Breeze would fit: not downloaded yet'))+'; this is '+(ENGINES[def]?'the site\'s default voice':'the default voice')};
+    // Breeze (on this computer or in the browser) only when chosen in the Voice pane: never by itself
+    // (2026-11-15: an installed breeze-server was started and picked on a visit before ZONOS3-Mini was downloaded)
+    const def=await serverDefault(), id=ENGINES[def]&&!/^breeze/.test(def)?def:'pocket-18m';
+    return {id,why:(!noZ?'ZONOS3-Mini would fit here: not downloaded yet':'ZONOS3-Mini can\'t run here: '+noZ)+'; this is '+(id===def?'the site\'s default voice':'the default voice')};
   }
   async function chosenEngine(){ return (await chooseEngine()).id; }
   const DB='tablefolk-pocket-tts', STORE='voices';
@@ -252,7 +236,7 @@
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
       if(m.type==='warmed'){ const p=this.pending.get('warmup'); if(p){this.pending.delete('warmup');p.resolve();} }
       // the engine is broken for good (ZONOS3-Mini out of graphics memory): the default voice for now
-      if(m.type==='error'&&m.fatal&&this.engine==='zonos-web'){ localStorage.setItem('tablefolkZonosFailed',String(Date.now())); window.tablefolkDiag?.note('voice','ZONOS3-Mini failed: '+m.error+'; back to the default voice'); queueMicrotask(async()=>{ const def=await serverDefault(); await this.switchEngine(ENGINES[def]&&def!=='zonos-web'?def:'pocket-18m',false); }); }
+      if(m.type==='error'&&m.fatal&&this.engine==='zonos-web'){ localStorage.setItem('tablefolkZonosFailed',String(Date.now())); window.tablefolkDiag?.note('voice','ZONOS3-Mini failed: '+m.error+'; back to the default voice'); queueMicrotask(async()=>{ const def=await serverDefault(); await this.switchEngine(ENGINES[def]&&!/^(zonos|breeze)/.test(def)?def:'pocket-18m',false); }); }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     // for engines that design a voice from words (Breeze) when there is no sample to clone
     designFor(voice){ const id=String(voice).replace(/^(builtin|custom):/,''), v=(window.TABLEFOLK_VOICES||[]).find(x=>x.id===id)||packVoice(String(voice).split('@')[0]); return v?`A ${v.gender||''} voice: ${v.description||'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g,' '):'A warm, natural speaking voice. Speak clearly and naturally.'; }
