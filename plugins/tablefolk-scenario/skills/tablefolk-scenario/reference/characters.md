@@ -280,7 +280,9 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   turns it off.
 - **What it saw**: with a brain that sees (Gemma 4 E2B, E4B or 12B with
   sight, or an online model with vision on), what it saw when it looked
-  stays in its memory.
+  stays in its memory. Characters with E4B-class or bigger brains also look
+  on their own when someone new comes into view, or every 12 of their
+  turns (`"glances": false` turns that off).
 - **Danger and reflexes**: a monster close by puts a DANGER line on the
   card with concrete choices (wield the best weapon it carries, attack,
   drink a potion when hurt, run to a free square, call for help). How much

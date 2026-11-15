@@ -321,6 +321,25 @@
     if (m.turn - m.goalTurn >= 10) { const next = (m.plan || []).shift(); m.planGoal = next || null; setBrainConfig(g.id, { goal: next || '' }); }
   }
 
+  // ---- glancing (brains that see) ----
+  // With a model that sees (tablefolkVision.available()), a capable or
+  // ambitious character looks on its own when someone new comes into view,
+  // or every 12 of its turns, so what it sees becomes memory without the
+  // model having to think of look(). One picture at a time.
+  let glancing = false;
+  function maybeGlance(g) {
+    const V = window.tablefolkVision, m = mindOf(g);
+    if (glancing || planning || reflecting || !V?.available?.() || tier(g) === 'basic' || state.glances === false || getBrainConfig(g.id).defeated) return;
+    const p = g.root?.position; if (!p) return;
+    const seen = state.characters.filter(c => c !== g && !c.defeated && Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) <= 6 && (window.tablefolk?.canSeeEachOther?.(g, c) ?? true)).map(c => c.id);
+    const pl = state.playerAvatar; if (pl && Math.hypot(pl.root.position.x - p.x, pl.root.position.z - p.z) <= 6) seen.push('player');
+    const fresh = seen.filter(id => !(m.seenIds || []).includes(id));
+    m.seenIds = seen;
+    if (!fresh.length && m.turn - (m.lastGlance ?? -99) < 12) return;
+    m.lastGlance = m.turn; glancing = true;
+    setTimeout(() => Promise.resolve(V.lookFor(g)).catch(e => console.warn('[mind] glance', e)).finally(() => { glancing = false; }), 300);
+  }
+
   // how a memory reads on the card: what it was told or thought is marked as such
   const shown = e => e.kind === 'thought' ? `(you concluded) ${e.text}` : e.text;
 
@@ -537,6 +556,7 @@
     if (slept || m.turn - (m.lastConsolidated ?? 0) >= 12) consolidate(g);
     if (slept || m.turn - (m.lastReflected ?? 0) >= 30) setTimeout(() => reflectWithModel(g), 50);
     advancePlan(g);
+    maybeGlance(g);
     if (!getBrainConfig(g.id).goal && m.turn >= 2 && m.turn - (m.lastPlanned ?? -99) >= 40) setTimeout(() => planDay(g), 400);
     if ((cfg.goal || '') !== m.goal) { m.goal = cfg.goal || ''; m.goalTurn = m.turn; }
     if (m.feel && m.turn - m.feel.turn > 4) m.feel = null;

@@ -205,6 +205,11 @@ All in `app/mind.js` unless named.
   10 cells, places, 3 memories; up to 3 lines; the first becomes `goal`, the
   rest `m.plan`, each advanced after 10 turns unless the character set its
   own goal. `planning`/`reflecting` locks keep side calls one at a time.
+- **Glances** (`maybeGlance`, each tick): `tablefolkVision.available()`,
+  capable/ambitious, `state.glances`; someone new within 6 cells in sight
+  (or the player), or 12 turns since the last: `lookFor(g)` (its answer goes
+  to pendingChat and memory, kind `saw`). One at a time; not while a plan or
+  reflection call runs.
 - **Fetching** (uses.js `take`): when the player's last words to it ask to
   bring/fetch/get/give/hand/pass something matching what it took, `give()`
   to the player 1.5 s later.
