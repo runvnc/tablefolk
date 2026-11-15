@@ -45,6 +45,14 @@ tip = max(headv, key=lambda i: (P[i] - H).dot(f0))
 fwd = (P[tip] - H); fwd = (fwd - up * fwd.dot(up)).normalized()
 side = fwd.cross(up).normalized(); up2 = side.cross(fwd).normalized()
 L = (P[tip] - H).dot(fwd)
+# then the whole snout, by shape: everything ahead of the bone up to the tip
+# and near the snout's axis (the weights alone missed much of it on a body
+# wider than its rig)
+def _ax(i):
+    d = P[i] - H; return (d - fwd * d.dot(fwd)).length
+far = [i for i in range(len(me.vertices)) if 0 < (P[i] - H).dot(fwd) < L * 1.04 and _ax(i) < .75 * L]
+if len(far) > len(headv) * .8:
+    headv = sorted(set(headv) | set(far)); tip = max(headv, key=lambda i: (P[i] - H).dot(fwd)); L = (P[tip] - H).dot(fwd)
 s = {i: (P[i] - H).dot(fwd) for i in headv}; h = {i: (P[i] - H).dot(up2) for i in headv}; w = {i: (P[i] - H).dot(side) for i in headv}
 # the mouth line: per slice along the snout, LINE of the way up its height
 N = 12; s0 = HINGE * L
@@ -61,18 +69,27 @@ def mouth(sv):
 jaw = set(i for i in headv if s[i] > s0 and h[i] < mouth(s[i]))
 print('[jaw] head', len(headv), 'jaw', len(jaw), 'snout length', round(L, 3))
 
+mid_s = (s0 + L) / 2
+# sized and centred from the snout around the mouth line at its middle (not
+# the whole head: horns and frills made it poke out of a cheek)
+band = [i for i in headv if abs(s[i] - mid_s) < .12 * (L - s0) and abs(h[i] - mouth(s[i])) < .25 * L]
+if len(band) < 8: band = [i for i in headv if s[i] > s0]
+wc = sum(w[i] for i in band) / len(band)
+inner_w = max(1e-3, .45 * (max(w[i] for i in band) - min(w[i] for i in band)) / 2)
+hs = [h[i] for i in headv if abs(s[i] - mid_s) < .12 * (L - s0)]
+inner_h = max(1e-3, .16 * (max(hs) - min(hs)))
+c_arm = H + fwd * mid_s + up2 * mouth(mid_s) + side * wc
+snout_half = (max(w[i] for i in band) - min(w[i] for i in band)) / 2
+jaw = set(i for i in jaw if abs(w[i] - wc) < 1.3 * snout_half)   # the jaw only, not cheeks and frills beside it
 # cut the lips: faces ahead of the hinge with corners on both sides of the line
 bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
 cut = [f for f in bm.faces if all(v.index in s for v in f.verts) and min(s[v.index] for v in f.verts) > s0 + .08 * L
+       and all(abs(w[v.index] - wc) < 1.15 * snout_half for v in f.verts)
        and any(v.index in jaw for v in f.verts) and not all(v.index in jaw for v in f.verts)]
 bmesh.ops.delete(bm, geom=cut, context='FACES_ONLY'); bm.to_mesh(me); bm.free()
 print('[jaw] cut', len(cut), 'faces')
 
 # the dark mouth inside, on the head bone
-mid_s = (s0 + L) / 2
-inner_w = max(1e-3, .3 * max(abs(w[i]) for i in headv if s[i] > s0))
-inner_h = max(1e-3, .16 * (max(h[i] for i in headv if s[i] > s0) - min(h[i] for i in headv if s[i] > s0)))
-c_arm = H + fwd * mid_s + up2 * mouth(mid_s)
 bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=1)
 inner = bpy.context.active_object; inner.name = 'MouthInside'
 M = Matrix.Identity(4); M.col[0][:3] = fwd * ((L - s0) * .36); M.col[1][:3] = side * inner_w; M.col[2][:3] = up2 * inner_h; M.col[3][:3] = c_arm

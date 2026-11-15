@@ -74,6 +74,14 @@ if '--tip' in argv or '--tip-back' in argv:
 print('[reskin] old axis', 'XY'[oax], 'head', head_sign(ov, oax), 'turned', rot, 'old box', tuple(round(x, 3) for x in (ohi - olo)), 'new box', tuple(round(x, 3) for x in (nhi - nlo)))
 # per-axis fit to the old body's box
 s = Vector(((ohi.x - olo.x) / (nhi.x - nlo.x), (ohi.y - olo.y) / (nhi.y - nlo.y), (ohi.z - olo.z) / (nhi.z - nlo.z)))
+# --keep-width: the new body's own width for its length (a dragon with its
+# wings out is far wider than the horse rig it rides: fitted to the horse's
+# width it looked squashed from the front and above); centred on the old body
+if '--keep-width' in argv:
+    lax = 1 if (ohi.y - olo.y) >= (ohi.x - olo.x) else 0; wax = 1 - lax
+    s[wax] = s[lax]
+    c = (olo[wax] + ohi[wax]) / 2; half = (nhi[wax] - nlo[wax]) * s[wax] / 2
+    olo[wax] = c - half
 for v in new.data.vertices:
     p = v.co - nlo
     v.co = olo + Vector((p.x * s.x, p.y * s.y, p.z * s.z))
