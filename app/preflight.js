@@ -65,7 +65,7 @@
     ['senses.js?v=20261108b'],
     ['packages.js?v=20261024a'],
     ['embed.js?v=20261108c'],
-    ['mind.js?v=20261115p'],
+    ['mind.js?v=20261115q'],
     ['uses.js?v=20261115a'],
     ['roles.js?v=20261024a'],
     ['play.js?v=20261115c'],

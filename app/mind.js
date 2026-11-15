@@ -479,6 +479,10 @@
       const w = bestWeapon(g), held = cfg.wielding;
       if (w && (!held || (C.weaponFor(held)?.dmg || 0) < w.dmg) && (basic || reach)) return { line: `wield(${w.name})`, why: `draws the ${w.name} against ${f.id}` };
       if (basic && reach) return { line: `attack(${f.id})`, why: `fights back against ${f.id}` };
+      // capable: it chose something other than a blow last turn while the
+      // monster stood in reach and it is not about to fall: strike back
+      // (E4B ran from a faster wolf and never hit it: 0/3)
+      if (reach && me.hp > risk * 1.3 && !/attack\(|eat\(|wield\(/.test(m.lastLine || '')) return { line: `attack(${f.id})`, why: `strikes back at ${f.id}` };
       if (basic && !reach && temperament(cfg) === 'timid') { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `keeps away from ${f.id}` }; }
       return null;
     }
@@ -552,7 +556,7 @@
   function tick(g, line = '') {
     const cfg = getBrainConfig(g.id); if (cfg.defeated) return;
     const m = mindOf(g), b = baseline(cfg);
-    m.turn++; m.lastRound = round;
+    m.turn++; m.lastRound = round; m.lastLine = String(line || '');
     // feelings fade over a few turns (a punch is still felt five turns on), trust over many
     for (const k of MOODS) m.mood[k] += (b[k] - m.mood[k]) * .07;
     m.mood.trust += (b.trust - m.mood.trust) * .015;
