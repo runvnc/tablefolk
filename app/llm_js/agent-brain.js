@@ -191,8 +191,10 @@ export function createAgentBrainManager(config = {}) {
       if (!navigator.gpu) throw new Error('WebGPU unavailable; use Chrome/Edge with WebGPU enabled.');
       // Sessions (each speaker keeps its own cache: libs/brain/engines/bonsai2.js):
       // as many as the card holds beside the model and the game (0.8 GB each,
-      // 1.2 GB kept for the drawing), 1 to 4. A 12 GB card with the 27B: 2.
-      const hw = await detectHardware().catch(() => null), free = (usableGB(hw) ?? 0) - (SUPPORTED_MODELS[currentModelKey]?.memGB || 9.4) - 1.2;
+      // 2.5 GB kept for the drawing and a voice), 1 to 4: a 12 GB card with the
+      // 27B keeps one (no gain measured there in a live village, 2026-11-15:
+      // turns were 5.7 s with one, 6.1 s with two), a 16 GB card four.
+      const hw = await detectHardware().catch(() => null), free = (usableGB(hw) ?? 0) - (SUPPORTED_MODELS[currentModelKey]?.memGB || 9.4) - 2.5;
       const sessions = Math.max(1, Math.min(4, 1 + Math.floor(free / 0.8)));
       engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B', sessions });
       window.tablefolkDiag?.note('brain', `Bonsai 2 keeps ${sessions} conversation cache${sessions > 1 ? 's' : ''} (${usableGB(hw) ?? '?'} GB usable)`);
