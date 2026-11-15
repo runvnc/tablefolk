@@ -223,6 +223,30 @@ All in `app/mind.js` unless named.
   lost to a blow, wield() from its own commands, food eaten, events told).
   Now hp, wielding, inventory, defeated, goal, mind, wf, quest are re-read and
   pendingChat merged before each save.
+- **Measured 2026-11-15** (RTX 2060 6 GB, `?norender=1`, small samples:
+  read them as direction, not proof):
+  - survival (`evals/survival.json`, two skeletons; survived, monsters
+    killed):
+    - E4B capable (latest thresholds): 1/4, 4 kills
+    - E4B forced basic (full reflexes): 2/4, 3 kills
+    - E4B with no help: 1/3, 1 kill
+    - E2B basic: 2/3, 2 kills
+
+    The fight is hard by design (about 4 damage a round from two skeletons
+    against 10 health). What decided runs: drinking the potion in time (E4B
+    alone attacked at 4/10 and died) and not running away at 8/10 (an
+    earlier flee rule gave the skeletons free blows: 0/3).
+  - hunger (`evals/hunger.json`, an apple barrel, no food carried, hunger
+    0.85): E4B 3/3 walked over, took an apple and ate it by itself (about 12
+    rounds); E2B 3/3, by reflexes alone.
+  - knowing the player (`evals/know-you`, E4B): name and errand recalled
+    after 5 turns 3/3; the promise acknowledged after the gold 1/1 ("You
+    certainly did!"); the secret kept from a stranger 3/3. Without the
+    fresh-request cue E4B answered "I'm looking for my lost cat" with
+    turnip talk; with it, "I'm sorry to hear you're looking for your cat".
+  - fetching from a chest (`evals/uses` fetch, E4B): 2/2.
+  - side calls (mind-check.mjs, E4B): reflection 2.7 s, plan 1.0 s; gossip
+    reached the listener.
 - **Eval**: `tools/browser-test/survival-test.mjs` (evals/survival.json: a
   woodcutter with an axe, bread and a potion, two skeletons, hunger .75; the
   player waits each round).
