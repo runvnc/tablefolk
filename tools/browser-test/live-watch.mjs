@@ -12,9 +12,11 @@ const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close();
 const errors = [];
 page.on('pageerror', e => errors.push(String(e).slice(0, 300)));
+page.on('console', m => { if (/\[mind\]|\(reflex/.test(m.text())) console.log('  ' + m.text().slice(0, 300)); });
 page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 300)); });
 page.on('response', r => { if (r.status() >= 400) errors.push(r.status() + ' ' + r.url().slice(0, 200)); });
-await page.goto(`${base}/app/?play=1&scenario=${encodeURIComponent(src)}&t=${Date.now()}`);
+await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
+await page.goto(`${base}/app/?play=1&model=${process.env.MODEL || ''}&scenario=${encodeURIComponent(src)}&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
   const s = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.(), consent: !document.getElementById('modelConsent')?.hidden, st: document.getElementById('brainStatus')?.textContent }));
