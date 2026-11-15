@@ -1185,7 +1185,7 @@ async function main() {
         if (other.id === g.id || !resultMsg || !within(other.root.position, g.root.position, r)) continue;
         const ocfg = world.getBrainConfig(other.id);
         ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: resultMsg }]);
-        if (ocfg.messages.length > 40) ocfg.messages = ocfg.messages.slice(-40);
+        if (ocfg.messages.length > 40) ocfg.messages = ocfg.messages.slice(-32);
         world.setBrainConfig(other.id, ocfg);
       }
       return true;
