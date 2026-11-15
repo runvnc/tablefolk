@@ -252,7 +252,10 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
   in your browser per world and character, so a character greets you as
   someone it knows when you come back ("they have been here before");
   `"remembers": false` on the scenario turns that off. Bigger brains get more
-  memories on the card (3 for basic, 4 capable, 6 ambitious).
+  memories on the card (3 for basic, 4 capable, 6 ambitious), and the
+  ambitious keep twice as much of the conversation. Coming back after a
+  while (or on a later visit) with an errand still open, the card suggests
+  asking how it is going.
 - **Beliefs and reflection**: the same thing happening again and again
   folds into one belief ("grub has attacked you 4 times: not to be trusted
   near you"). With a bigger brain (Gemma 4 E4B and up; `"reflect": false`
@@ -267,7 +270,8 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Secrets and agendas**: an agent's `"secret"` is on its card with "never
   tell it" until it trusts you a lot (after a few talks and some kindness),
   then "you trust them enough to share it if they ask". `"agenda"` is what
-  it is quietly after, every turn.
+  it is quietly after, every turn, and with nothing pressing it now and
+  then wants to take a small step toward it.
 - **What it saw**: with a brain that sees (Gemma 4 E2B, E4B or 12B with
   sight, or an online model with vision on), what it saw when it looked
   stays in its memory.

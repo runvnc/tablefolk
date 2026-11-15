@@ -463,7 +463,9 @@ function buildAgentMessages(world, g, cfg) {
   // Only the recent exchange: what matters for longer (feelings, memories,
   // goal) is in the state card (mind.js), so a small model isn't asked to
   // dig it out of a long history.
-  for (const m of hist.slice(-HISTORY_KEEP)) {
+  // a big brain (mind.js tier "ambitious": 9B and up, online models) keeps twice as much
+  const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
+  for (const m of hist.slice(-keep)) {
     const last = messages[messages.length - 1];
     if (last && last.role === m.role) {
       last.content += '\n' + m.content;

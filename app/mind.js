@@ -539,6 +539,8 @@
     if (fresh) return temperament(getBrainConfig(g.id)) === 'timid' ? `get away from ${threat}, or beg them to stop` : `tell ${threat} what you think of being attacked`;
     if (needsOn(g) && m.hunger >= .55) { const f = food(g); return f ? `eat something: eat(${f})` : 'find something to eat (buy it, or ask for some)'; }
     if (needsOn(g) && m.tired >= .7) { const bed = window.tablefolkUses?.nearby(g, 8).find(o => o.k === 'bed' || o.k === 'seat'); return bed ? `rest: use(${bed.type})` : 'rest: emote(sleep)'; }
+    // nothing pressing: a small step toward what it is quietly after
+    const ag = getBrainConfig(g.id).agenda; if (ag && m.turn % 3 === 0) return `take a small step toward what you are after (${ag})`;
     return '';
   }
   function cardLines(g) {
