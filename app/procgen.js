@@ -660,10 +660,11 @@
   // Which place suits a character: words in its id/style/personality.
   const ROLE_PLACES = [
     [/\b(king|queen|lord|lady|boss|warlord|chief|chieftain|emperor|sorcer|necromancer|lich|overlord|dragon|tyrant|throne)/i, ['throne', 'lair', 'temple', 'square']],
-    [/\b(goblin|orc|ogre|troll|kobold|bandit|brute|beast|wolf|werewolf|minotaur|lizardman|lizard|rat|spider|monster|minion)/i, ['lair', 'barracks', 'storage', 'room', 'camp', 'ruins']],
+    [/\b(goblin|orc|ogre|troll|kobold|gnoll|bandit|brute|beast|bear|wolf|werewolf|minotaur|lizardman|lizard|rat|spider|monster|minion)/i, ['lair', 'barracks', 'storage', 'room', 'camp', 'ruins']],
     [/\b(guard|soldier|knight|sentry|captain|warden|watch)/i, ['barracks', 'guardhouse', 'entrance', 'prison', 'square']],
     [/\b(prisoner|captive|hostage|chained|jailed)/i, ['prison', 'storage', 'room']],
     [/\b(priest|priestess|monk|nun|cleric|oracle|acolyte|shaman|druid)/i, ['shrine', 'temple', 'crypt']],
+    [/\b(cultist|cult|zealot|fanatic)/i, ['shrine', 'crypt', 'temple', 'ruins']],
     [/\b(wizard|mage|witch|warlock|alchemist|scholar|sage|librarian|scribe)/i, ['library', 'alchemy', 'alchemist', 'shrine']],
     [/\b(ghost|skeleton|zombie|undead|wraith|mummy|vampire)/i, ['crypt', 'shrine', 'room']],
     [/\b(cook|chef|baker)/i, ['kitchen', 'tavern']],

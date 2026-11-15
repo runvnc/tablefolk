@@ -272,7 +272,7 @@
       return { bank: kind === 'death' ? 'big_die' : kind === 'attack' || kind === 'call' ? 'big_roar' : 'mon_hurt', rate: kind === 'hurt' ? rate * .85 : rate };
     }
     if (/goblin|kobold|imp|mushroom|slime/.test(m)) return { bank: kind === 'death' ? 'mon_die' : kind === 'attack' ? 'mon_attack' : 'small_hurt', rate: 1.15 + .15 * r };
-    if (/orc|lizard|monster|beast|serpent|wyrm/.test(m) || !(window.tablefolk?.isPersonModel?.(m) ?? true)) return { bank: kind === 'death' ? 'mon_die' : kind === 'attack' || kind === 'call' ? 'mon_attack' : 'mon_hurt', rate: .95 + .1 * r };
+    if (/orc|lizard|gnoll|monster|beast|serpent|wyrm/.test(m) || !(window.tablefolk?.isPersonModel?.(m) ?? true)) return { bank: kind === 'death' ? 'mon_die' : kind === 'attack' || kind === 'call' ? 'mon_attack' : 'mon_hurt', rate: .95 + .1 * r };
     if (kind === 'attack' || kind === 'call') return null;   // people don't growl as they swing
     const cfg = !isPlayer(g) && g.id ? (getBrainConfig(g.id) || {}) : {};
     if (FEM.test(String(cfg.ttsVoiceId || '') + ' ' + m) || window.tablefolk?.isFemaleModel?.(m)) return { bank: 'hurt_f', rate: (kind === 'death' ? .86 : 1) * (.96 + .08 * r) };

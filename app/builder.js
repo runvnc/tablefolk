@@ -19,10 +19,10 @@
  */
 (function () {
   const PEOPLE = ['woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer', 'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer', 'villager_woman', 'dwarf', 'elf', 'priest', 'guard', 'merchant'];
-  const MONSTERS = ['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'rat', 'spider', 'wolf', 'bat', 'ghost', 'slime', 'demon', 'giant', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy'];
+  const MONSTERS = ['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'goblin', 'kobold', 'orc', 'rat', 'spider', 'wolf', 'bat', 'ghost', 'slime', 'demon', 'giant', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy', 'ogre', 'gnoll', 'lich', 'vampire', 'bear', 'bandit', 'cultist', 'zombie_classic', 'kobold_classic', 'demon_classic', 'giant_classic', 'imp_classic'];
   const ANIMALS = ['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep'];
   const OLDER = ['critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian'];
-  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy']);
+  const MINDLESS = new Set(['skeleton', 'skeleton_classic', 'skeleton_warrior', 'skeleton_warrior_classic', 'skeleton_farmer', 'zombie', 'rat', 'spider', 'wolf', 'bat', 'slime', 'ghost', 'giant', 'demon', 'dragon', 'troll', 'wyrmling', 'imp', 'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy', 'bear', 'gnoll', 'zombie_classic', 'kobold_classic', 'demon_classic', 'giant_classic', 'imp_classic']);
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let scn = null, meta = {}, voices = [], appLink = l => l, revise = {}, ed = null, tabNow = 'story';

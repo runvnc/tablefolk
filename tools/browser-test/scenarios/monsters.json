@@ -22,8 +22,8 @@
    "id": "zombie",
    "model": "zombie",
    "at": [
-    -8,
-    -4
+    -7,
+    -5
    ],
    "facing": "s",
    "hostile": false
@@ -32,8 +32,8 @@
    "id": "kobold",
    "model": "kobold",
    "at": [
-    -6,
-    -4
+    -5,
+    -5
    ],
    "facing": "s",
    "hostile": false
@@ -42,8 +42,8 @@
    "id": "demon",
    "model": "demon",
    "at": [
-    -4,
-    -4
+    -3,
+    -5
    ],
    "facing": "s",
    "hostile": false
@@ -52,38 +52,8 @@
    "id": "giant",
    "model": "giant",
    "at": [
-    -2,
-    -4
-   ],
-   "facing": "s",
-   "hostile": false
-  },
-  {
-   "id": "rat",
-   "model": "rat",
-   "at": [
-    0,
-    -4
-   ],
-   "facing": "s",
-   "hostile": false
-  },
-  {
-   "id": "spider",
-   "model": "spider",
-   "at": [
-    2,
-    -4
-   ],
-   "facing": "s",
-   "hostile": false
-  },
-  {
-   "id": "wyrmling",
-   "model": "wyrmling",
-   "at": [
-    4,
-    -4
+    -1,
+    -5
    ],
    "facing": "s",
    "hostile": false
@@ -92,68 +62,98 @@
    "id": "imp",
    "model": "imp",
    "at": [
-    6,
-    -4
+    1,
+    -5
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "mushroom_warrior",
-   "model": "mushroom_warrior",
+   "id": "ogre",
+   "model": "ogre",
    "at": [
-    8,
-    -4
+    3,
+    -5
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "bunny",
-   "model": "bunny",
+   "id": "gnoll",
+   "model": "gnoll",
    "at": [
-    -8,
-    -1
+    5,
+    -5
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "snake",
-   "model": "snake",
+   "id": "lich",
+   "model": "lich",
    "at": [
-    -6,
-    -1
+    7,
+    -5
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "wasp",
-   "model": "wasp",
+   "id": "vampire",
+   "model": "vampire",
    "at": [
-    -4,
-    -1
+    -7,
+    -2
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "frog",
-   "model": "frog",
+   "id": "cultist",
+   "model": "cultist",
    "at": [
-    -2,
-    -1
+    -5,
+    -2
    ],
    "facing": "s",
    "hostile": false
   },
   {
-   "id": "bat",
-   "model": "bat",
+   "id": "bandit",
+   "model": "bandit",
    "at": [
-    0,
-    -1
+    -3,
+    -2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "bear",
+   "model": "bear",
+   "at": [
+    -1,
+    -2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "rat",
+   "model": "rat",
+   "at": [
+    1,
+    -2
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "spider",
+   "model": "spider",
+   "at": [
+    3,
+    -2
    ],
    "facing": "s",
    "hostile": false
@@ -162,8 +162,8 @@
    "id": "dragon",
    "model": "dragon",
    "at": [
-    2,
-    -1
+    5,
+    -2
    ],
    "facing": "s",
    "hostile": false
@@ -172,8 +172,8 @@
    "id": "ghost",
    "model": "ghost",
    "at": [
-    4,
-    -1
+    7,
+    -2
    ],
    "facing": "s",
    "hostile": false
@@ -182,8 +182,78 @@
    "id": "slime",
    "model": "slime",
    "at": [
-    6,
-    -1
+    -7,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "bat",
+   "model": "bat",
+   "at": [
+    -5,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "wyrmling",
+   "model": "wyrmling",
+   "at": [
+    -3,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "mushroom_warrior",
+   "model": "mushroom_warrior",
+   "at": [
+    -1,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "bunny",
+   "model": "bunny",
+   "at": [
+    1,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "snake",
+   "model": "snake",
+   "at": [
+    3,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "wasp",
+   "model": "wasp",
+   "at": [
+    5,
+    1
+   ],
+   "facing": "s",
+   "hostile": false
+  },
+  {
+   "id": "frog",
+   "model": "frog",
+   "at": [
+    7,
+    1
    ],
    "facing": "s",
    "hostile": false
@@ -192,8 +262,8 @@
    "id": "goblin",
    "model": "goblin",
    "at": [
-    8,
-    -1
+    -7,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -202,8 +272,8 @@
    "id": "orc",
    "model": "orc",
    "at": [
-    -8,
-    2
+    -5,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -212,8 +282,8 @@
    "id": "troll",
    "model": "troll",
    "at": [
-    -6,
-    2
+    -3,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -222,8 +292,8 @@
    "id": "skeleton",
    "model": "skeleton",
    "at": [
-    -4,
-    2
+    -1,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -232,8 +302,8 @@
    "id": "mummy",
    "model": "mummy",
    "at": [
-    -2,
-    2
+    1,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -242,8 +312,8 @@
    "id": "werewolf",
    "model": "werewolf",
    "at": [
-    0,
-    2
+    3,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -252,8 +322,8 @@
    "id": "lizardman",
    "model": "lizardman",
    "at": [
-    2,
-    2
+    5,
+    4
    ],
    "facing": "s",
    "hostile": false
@@ -262,8 +332,8 @@
    "id": "minotaur",
    "model": "minotaur",
    "at": [
-    4,
-    2
+    7,
+    4
    ],
    "facing": "s",
    "hostile": false
