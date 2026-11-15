@@ -4484,7 +4484,7 @@ function buildAgentPrompt(g, cfg) {
     'Reply with commands only, one per line. When someone speaks to you, always answer with say(...); if you also act, put the action on the next line.',
     // Thinking on (Character setup, or "thinking": true in a scenario): small
     // reasoning models (LFM3 1.7B) otherwise spend hundreds of tokens per turn
-    ...(getBrainConfig(g.id).thinking === true ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),
+    ...((getBrainConfig(g.id).thinking === true || window.tablefolkMind?.thinkNow?.(g)) ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),
     'Talk like a real person: one or two short sentences at a time.',
     '',
     `Character: ${g.id}`,

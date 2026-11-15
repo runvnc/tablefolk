@@ -968,9 +968,15 @@ async function main() {
           // quick-start budget (its agent eval ran at 1024 a turn; at 256 all
           // of it went into reasoning and no answer came).
           enableThinking: thinking,
-          maxTokens: thinking ? 4096 : simple ? 70 : undefined,
+          // a turn the game chose to think on (mind.js thinkNow) gets less room
+          maxTokens: thinking ? (cfg.thinking === true ? 4096 : 1536) : simple ? 70 : undefined,
           chaos: cfg.chaos ?? 1,   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
         });
+        // thought and never answered (out of room): answer at once without thinking
+        if (thinking && !String(line || '').trim()) {
+          console.warn('[tablefolk-world] thinking gave no answer; asking again without thinking');
+          line = await manager.decide({ agentId: g.id, messages: sendMessages, useGrammar: !chatTestMode, allowedCommands: allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper')), enableThinking: false, maxTokens: simple ? 70 : undefined, chaos: cfg.chaos ?? 1 });
+        }
       } finally {
         world.clearPendingThought?.(g.id);
         window.TABLEFOLK_PAUSE_RENDER = false;
