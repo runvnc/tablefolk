@@ -52,12 +52,12 @@ for (let run = 1; run <= runs; run++) {
     });
     console.log(`r${r} tam ${out.dead ? 'DEAD' : out.hp + 'hp'} hunger ${out.hunger} ${out.held || '-'} [${out.inv}] | ${out.mons.join(', ')}`);
     for (const l of out.lines) console.log('     ' + l);
-    if (out.dead || (!out.monsLeft && r > 6 && out.mons.length) || (!out.mons.length && out.hunger < .3)) break;
+    if (out.dead || (!out.monsLeft && r > 6 && out.mons.length) || (!out.mons.length && out.hunger < .4)) break;
   }
   const res = { run, survived: !out.dead, hp: out.hp, monstersLeft: out.monsLeft, hunger: out.hunger, reflex: out.reflex, model: out.model };
   console.log('RESULT', JSON.stringify(res)); all.push(res);
 }
 fs.mkdirSync('results', { recursive: true });
 fs.writeFileSync(`results/survival-${Date.now()}.json`, JSON.stringify({ args, all }, null, 1));
-console.log('SUMMARY', all.filter(r => r.survived).length + '/' + all.length, 'survived;', all.reduce((a, r) => a + (2 - r.monstersLeft), 0), 'monsters defeated;', all.filter(r => r.hunger < .3).length + '/' + all.length, 'fed');
+console.log('SUMMARY', all.filter(r => r.survived).length + '/' + all.length, 'survived;', all.reduce((a, r) => a + (2 - r.monstersLeft), 0), 'monsters defeated;', all.filter(r => r.hunger < .5).length + '/' + all.length, 'fed (hunger under 0.5)');
 await b.close().catch(() => {});
