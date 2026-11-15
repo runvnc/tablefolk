@@ -142,12 +142,12 @@ export async function probeHolds(adapter, gb, sig, bwGBs = null) {
   // giving its memory back, its GPU work still running
   let holds = await probeOnce(adapter, gb, bwGBs);
   if (holds !== true) { await new Promise(r => setTimeout(r, 2000)); holds = await probeOnce(adapter, gb, bwGBs); }
-  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why: lastProbe?.why || '', at: Date.now() });
+  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why: lastProbe?.why || '', ms: lastProbe?.ms, at: Date.now() });
   return holds;
 }
 async function probeOnce(adapter, gb, bwGBs) {
   const CH = 256 * 2 ** 20, n = Math.ceil(gb * 2 ** 30 / CH), bufs = [];
-  let dev = null, holds = null, lost = false, why = '', gbs = null;
+  let dev = null, holds = null, lost = false, why = '', gbs = null; const start = performance.now();
   try {
     dev = await adapter.requestDevice();
     dev.lost.then(() => { lost = true; });
@@ -160,7 +160,7 @@ async function probeOnce(adapter, gb, bwGBs) {
       bufs.push(b);
       if (await dev.popErrorScope() || lost) { holds = false; why = lost ? 'device lost' : 'out of memory at ' + ((i + 1) / 4) + ' GB'; break; }
       if (i % 8 === 7) await dev.queue.onSubmittedWorkDone();
-      if (performance.now() - t0 > 6000) { holds = null; why = 'over 6 s at ' + ((i + 1) / 4) + ' GB: the card busy, or paging'; break; }   // can't tell: other work on the card, or paging out
+      if (performance.now() - t0 > 20000) { holds = null; why = 'over 20 s at ' + ((i + 1) / 4) + ' GB: the card busy, or paging'; break; }   // can't tell (the page's own start-up shares the card: 5-10 s seen)
     }
     if (holds) {
       await dev.queue.onSubmittedWorkDone();
@@ -173,7 +173,7 @@ async function probeOnce(adapter, gb, bwGBs) {
     }
   } catch (e) { console.warn('[hardware] memory probe:', e?.message); holds = lost ? false : null; }
   finally { for (const b of bufs) try { b.destroy(); } catch {} try { dev?.destroy(); } catch {} }
-  lastProbe = { gb, holds, why, gbs };
+  lastProbe = { gb, holds, why, gbs, ms: Math.round(performance.now() - start) };
   return holds;
 }
 
