@@ -73,7 +73,12 @@ export function parseRenderer(renderer) {
 // need no table entry: Ultra 64, Max 32, Pro 16, plain 16 from the M4 (8 before).
 // An NVIDIA GPU on an Arm computer is taken for a Spark whatever its name
 // (memoryEstimate), so a renamed or newer one is still seen.
-const SHARED_CHIPS = [[/\bRTX Spark\b|\bN1X\b/i, 24], [/\bGB10\b|\bDGX Spark\b/i, 128], [/\bRadeon 80[56]0S\b/i, 32], [/\bArc 1[34]0V\b/i, 16]];
+// Also integrated graphics missing from the table, which would otherwise pass
+// for a small dedicated card: AMD Radeon 840M-890M (Strix Point, Krackan, 16)
+// and 740M-780M (Phoenix, Hawk Point, 8); Intel Arc 130T/140T (Arrow Lake, 16)
+// and Arc B370/B390 (Panther Lake, 16).
+const SHARED_CHIPS = [[/\bRTX Spark\b|\bN1X?\b/i, 24], [/\bGB10\b|\bDGX Spark\b/i, 128], [/\bRadeon 80[56]0S\b/i, 32], [/\bArc 1[34]0V\b/i, 16],
+  [/\bRadeon 8[4-9]0M\b/i, 16], [/\bRadeon 7[4-8]0M\b/i, 8], [/\bArc 1[34]0T\b/i, 16], [/\bArc B3[0-9]0\b/i, 16]];
 export function sharedChipGB(name) {
   for (const [re, gb] of SHARED_CHIPS) if (re.test(name || '')) return gb;
   const m = String(name || '').match(/\bApple M(\d+)(?:\s+(Pro|Max|Ultra))?\b/i); if (!m) return null;
@@ -102,7 +107,7 @@ export function lookupVram(name, t) {
 // 16): the table's "<name> <n> GB" entries and the plain name's. [] when the
 // name settles it. No browser reports a card's memory.
 export function cardVariants(name, t) {
-  const lower = String(name || '').toLowerCase(); if (!lower || !t?.vram) return [];
+  const lower = String(name || '').toLowerCase().replace(/(\s*\([^)]*\))+$/, ''); if (!lower || !t?.vram) return [];   // "... (RADV GFX1200)" on Linux
   const gbs = new Set(), is = b => lower === b || lower.endsWith(' ' + b);   // "NVIDIA GeForce RTX 3060" is "GeForce RTX 3060"
   for (const [k, v] of Object.entries(t.vram)) {
     const kl = k.toLowerCase(), base = kl.replace(/ \d+ gb( [a-z]{2}\d{3})?$/, '');
