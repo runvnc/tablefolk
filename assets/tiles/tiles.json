@@ -2092,11 +2092,11 @@
   },
   "red_dragon": {
    "file": "characters/red_dragon.png",
-   "w": 1028,
-   "h": 1253,
+   "w": 752,
+   "h": 916,
    "anchor": [
-    514,
-    816.8
+    375.8,
+    597
    ]
   }
  },

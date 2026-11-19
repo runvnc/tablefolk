@@ -1,11 +1,14 @@
 # Put a detailed mesh on a rigged low-poly animal, keeping its skeleton and clips.
-#   blender -b -P tools/blender/reskin-animal.py -- old_rigged.glb new_mesh.glb out.glb [--flip] [--turn] [--auto]
+#   blender -b -P tools/blender/reskin-animal.py -- old_rigged.glb new_mesh.glb out.glb [--flip] [--turn] [--auto] [--bones [--tail]] [--keep-width]
 # The new mesh (Meshy image-to-3D, no rig) is turned to lie along the old
 # body's length with its head the same way (guessed: the head end is the
 # taller one; --flip turns it round, --turn 90 degrees), scaled per axis to
-# the old body's bounding box, then takes the old mesh's skin weights from
-# the nearest point of its surface (Data Transfer, in the rest pose). The
-# old mesh is dropped; textures are cut to 1024 px. 2026-11-14.
+# the old body's bounding box (its skinned meshes only), then takes the old
+# mesh's skin weights from the nearest point of its surface (Data Transfer,
+# in the rest pose), or with --bones by distance to the nearest bones; with
+# --tail as well, the rig's tail chain is moved onto the new body's own tail
+# and weights it along its length. The old mesh is dropped; textures are cut
+# to 1024 px. 2026-11-14 (--tail 2026-11-19).
 import bpy, sys, math, re
 from mathutils import Vector, Matrix
 
@@ -16,7 +19,12 @@ FLIP, TURN, AUTO = '--flip' in argv, '--turn' in argv, '--auto' in argv
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=OLD)
 arm = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
-olds = [o for o in bpy.data.objects if o.type == 'MESH']
+# the old body: its skinned meshes only (Blender's glTF import adds an
+# Icosphere of radius 1 at the origin, the bones' display shape; counted in
+# the box, it sank a fitted dragon a unit below the rig, its tail far under
+# the tail bones, and turned the head guess round, 2026-11-19)
+olds = [o for o in bpy.data.objects if o.type == 'MESH' and any(m.type == 'ARMATURE' for m in o.modifiers)] or [o for o in bpy.data.objects if o.type == 'MESH']
+for o in [o for o in bpy.data.objects if o.type == 'MESH' and o not in olds]: bpy.data.objects.remove(o, do_unlink=True)
 arm.data.pose_position = 'REST'
 bpy.context.view_layer.update()
 before = set(bpy.data.objects)
@@ -108,13 +116,97 @@ bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 # their weights and smeared into a sheet as the legs walked), gets weights by
 # distance to the nearest bone segments instead (--no-fix skips this).
 BONES = '--bones' in argv   # every vertex by distance to the nearest bones (no copy from the old surface)
+# --tail (with --bones): the new body's own tail drives the rig's tail chain.
+# The tail is the part of the mesh nearer (along the surface) to its far end
+# than the plane of the chain's first bone; its length is measured along the
+# surface from where it joins the body (so a curled tip counts as the end),
+# the chain's bones are moved onto its centre line at the old chain's
+# proportions, and each tail vertex is weighted to the two chain bones either
+# side of it by that length (never to legs). Without it a dragon's tail lying
+# low behind the wolf rig's raised tail bones took the hind legs' weights and
+# kinked as they walked (2026-11-19).
+TAIL = {}
+if BONES and '--tail' in argv:
+    import heapq
+    tb = set(b.name for b in arm.data.bones if 'tail' in b.name.lower() and b.use_deform)
+    chain = [b for b in arm.data.bones if b.name in tb and not (b.parent and b.parent.name in tb)][:1]
+    while chain and any(c.name in tb for c in chain[-1].children): chain.append(next(c for c in chain[-1].children if c.name in tb))
+    assert len(chain) >= 2, 'no tail chain in the rig'
+    par = chain[0].parent.name if chain[0].parent else None
+    chain = [b.name for b in chain]   # names: edit mode rebuilds the bones (old references read other bones)
+    H = [arm.matrix_world @ arm.data.bones[n].head_local for n in chain]
+    me = new.data; nv_ = len(me.vertices); P = [new.matrix_world @ v.co for v in me.vertices]
+    # vertices split at UV seams are joined (else the tail is islands)
+    can = {}; rep = [can.setdefault(tuple(round(x, 5) for x in P[i]), i) for i in range(nv_)]
+    adj = [[] for _ in range(nv_)]
+    for e in me.edges:
+        a_, b_ = rep[e.vertices[0]], rep[e.vertices[1]]; d_ = (P[a_] - P[b_]).length; adj[a_].append((b_, d_)); adj[b_].append((a_, d_))
+    for i in range(nv_):
+        if rep[i] != i: adj[i].append((rep[i], 0.0)); adj[rep[i]].append((i, 0.0))
+    def dijkstra(seeds, allowed=None):
+        g = {i: 0.0 for i in seeds}; q = [(0.0, i) for i in seeds]
+        while q:
+            d_, i = heapq.heappop(q)
+            if d_ > g.get(i, 1e9): continue
+            for j, w_ in adj[i]:
+                if allowed is not None and j not in allowed: continue
+                if d_ + w_ < g.get(j, 1e9): g[j] = d_ + w_; heapq.heappush(q, (d_ + w_, j))
+        return g
+    ax = oax; sg = 1 if H[-1][ax] > H[0][ax] else -1
+    end = max(range(nv_), key=lambda i: sg * P[i][ax])
+    gT = dijkstra([end])
+    g0 = min((d_ for i, d_ in gT.items() if sg * P[i][ax] <= sg * H[0][ax]), default=None)
+    assert g0, 'the tail does not reach the first tail bone'
+    tail = set(i for i, d_ in gT.items() if d_ < g0)
+    ring = [i for i in tail if any(j not in tail for j, _ in adj[i])]
+    D = dijkstra(ring, tail); dmax = max(D.values())
+    # bones along the surface length at the old chain's proportions (the last one as long as the one before)
+    seg = [(H[k + 1] - H[k]).length for k in range(len(H) - 1)]; seg.append(seg[-1])
+    cum = [0.0]
+    for x in seg: cum.append(cum[-1] + x)
+    Dk = [c / cum[-1] * dmax for c in cum]   # bone k's head at Dk[k]; the tip at Dk[-1]
+    # the centre line: mean position of the tail's vertices at each length
+    NB = 40; acc = [[Vector(), 0] for _ in range(NB)]
+    for i, d_ in D.items():
+        k = min(NB - 1, int(d_ / dmax * NB)); acc[k][0] += P[i]; acc[k][1] += 1
+    cl = [(k + .5) / NB * dmax for k in range(NB) if acc[k][1]]; cp = [acc[k][0] / acc[k][1] for k in range(NB) if acc[k][1]]
+    def along(d_):
+        if d_ <= cl[0]: return cp[0]
+        for k in range(len(cl) - 1):
+            if d_ <= cl[k + 1]: f = (d_ - cl[k]) / (cl[k + 1] - cl[k]); return cp[k].lerp(cp[k + 1], f)
+        return cp[-1]
+    inv = arm.matrix_world.inverted()
+    bpy.ops.object.select_all(action='DESELECT'); bpy.context.view_layer.objects.active = arm; arm.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    for k, n in enumerate(chain):
+        eb = arm.data.edit_bones[n]; eb.use_connect = False
+        off = eb.tail - eb.head; eb.head = inv @ along(Dk[k]); eb.tail = eb.head + off
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.objects.active = new; new.select_set(True)
+    # hat functions over the bones' middles; the first bone shares its root with its parent
+    mids = [(Dk[k] + Dk[k + 1]) / 2 for k in range(len(chain))]
+    for i, d_ in D.items():
+        ws = {}
+        if d_ <= mids[0]:
+            f = d_ / mids[0]; ws[chain[0]] = .5 + .5 * f
+            if par: ws[par] = .5 - .5 * f
+        elif d_ >= mids[-1]: ws[chain[-1]] = 1
+        else:
+            k = max(j for j in range(len(mids)) if mids[j] <= d_); f = (d_ - mids[k]) / (mids[k + 1] - mids[k])
+            ws[chain[k]] = 1 - f; ws[chain[k + 1]] = f
+        TAIL[i] = ws
+    print('[reskin] tail:', len(tail), 'vertices,', round(dmax, 3), 'long; chain', ' '.join(chain), 'moved onto it')
 if BONES:
     from mathutils.geometry import intersect_point_line
     segs = {b.name: (arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and b.name in new.vertex_groups and not re.match(r'(IK|Pole|FF)', b.name)}   # not the leg controls
+    if TAIL: segs = {n: ab for n, ab in segs.items() if n not in chain}   # the chain drives the tail only (moved to the hips, its first bone took them)
     def segd(p, ab):
         a, b = ab; q, t = intersect_point_line(p, a, b); t = min(1, max(0, t)); return (p - (a + (b - a) * t)).length
     for vg in new.vertex_groups: vg.remove(list(range(len(new.data.vertices))))
     for v in new.data.vertices:
+        if v.index in TAIL:
+            for n, w in TAIL[v.index].items(): new.vertex_groups[n].add([v.index], w, 'REPLACE')
+            continue
         p = new.matrix_world @ v.co
         ds = sorted((segd(p, ab), n) for n, ab in segs.items())[:3]
         inv = [(1 / max(d, 1e-4) ** 6, n) for d, n in ds]; tot = sum(w for w, _ in inv)
