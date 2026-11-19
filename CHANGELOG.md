@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-19
+
+- **The red dragon's tail and mouth fixed**: its tail no longer snaps and kinks as it walks (it was moving with the hind legs; it now has its own bones along its whole length), and its mouth closes to a clean line and opens dark inside, the same on both sides (a spike of big triangles and see-through gaps are gone). It stands a little lower and longer, closer to its picture, and takes the same room as before. It already turned its head to whoever talks to it.
+
 ## 2026-11-15
 
 - **Breeze TTS only when you choose it**: the game no longer switches to Breeze TTS by itself (it did when breeze-server was installed and ZONOS3-Mini wasn't downloaded yet). Without ZONOS3-Mini you get the default voice, with ZONOS3-Mini offered; Breeze is used only after you pick it in the Voice pane.

@@ -162,21 +162,50 @@ in Blender), alpaca. Steps:
 The old rigs must be uncompressed (Blender here has no meshopt decoder): the
 re-exported ones of 2026-11-13 and the Poly Pizza originals were used.
 
-A mouth for a creature that talks (2026-11-15): `blender -b -P
-tools/blender/add-jaw.py -- fitted.glb out.glb [--angle .5] [--line .42]
-[--hinge .35] [--bone Head]` adds a `mouth_open` shape key (app.js drives any
-`mouth_open` morph from the voice, updateMouth): the head is the vertices the
-Head bone moves most, the snout runs along the neck-to-head direction to its
-farthest vertex, the faces across the mouth line ahead of the hinge are cut,
-a dark squashed sphere inside fills the gap, and the lower jaw turns down
-about a sideways axis at the hinge. The cut stops short of the corners and
-the tip (holes showed there), the head counts the rig's ear bones, and the
-mouth inside takes the surrounding skin's weights and starts at 45% size (a
-ball poked out of the nose otherwise). Used for `red_dragon`: a prowling
-concept, Hunyuan3D, on the wolf rig with `--bones --keep-width --flip`
-(reskin: `--keep-width` keeps the new body's own width for its length;
-`--flip` overrides the head-direction guess, which raised wings fooled;
-the rig's IK and pole control bones never take weights).
+A mouth for a creature that talks (2026-11-15, plane cut 2026-11-19):
+`blender -b -P tools/blender/add-jaw.py -- fitted.glb out.glb [--angle .5]
+[--line .42] [--hinge .35] [--bone Head]` adds a `mouth_open` shape key
+(app.js drives any `mouth_open` morph from the voice, updateMouth): the head
+is the vertices the Head bone moves most (and the rig's ear bones), the snout
+runs along the neck-to-head direction to its farthest vertex. The mouth is a
+plane, level sideways, sloped like the jaw's underside and `--line` of the
+snout's height at its front third; the snout's faces ahead of the hinge are
+cut along it (`bmesh.ops.bisect_plane`) and parted along the new edge back to
+the same corners on both sides, so the lips are a straight, symmetric line
+whatever the triangles (cutting along existing edges, as first done, left a
+jagged lip with a spike of big triangles on one side and see-through holes).
+The lips keep the unparted skin's normals (custom normals: no crease when
+closed). Dark double-sided faces line the mouth (palate and floor fill the
+lip line, and a strip runs from each lip in to a line set toward the middle,
+which opens half as far), on the body mesh with its weights, so they follow
+the skin and stay inside; the lower jaw turns down about a sideways axis at
+the hinge.
+
+Used for `red_dragon`: a prowling concept, Hunyuan3D, on the wolf rig with
+`--bones --keep-width --tail` (reskin: `--keep-width` keeps the new body's
+own width for its length; the rig's IK and pole control bones never take
+weights; `--tail` moves the rig's tail chain onto the new body's tail and
+weights the tail along it, below). Rebuilt 2026-11-19: `h` 3.65 (was 5) keeps
+its length in squares, now that its height is its own.
+
+**The old body's box counts only its skinned meshes** (2026-11-19). Blender's
+glTF import adds an `Icosphere` (radius 1, at the origin: the bones' display
+shape); reskin counted it in the old body's bounding box, so every body fitted
+before then sits too low against its rig (the box reached a unit below the
+feet) and, if narrower than the sphere, too wide. For the red dragon this put
+the tail far under the wolf's tail bones (its weights went to the hind legs:
+it kinked and tore walking) and turned the head guess round (hence the old
+`--flip`). The other reskinned animals were not rebuilt.
+
+`--tail` (with `--bones`, 2026-11-19): the tail is the part of the mesh
+nearer along the surface to its far end than the plane of the chain's first
+bone (Dijkstra over the edges, seam-split vertices joined); its length is
+measured along the surface from the ring where it meets the body, so a curled
+tip still counts as the end. The chain's bones (names containing `tail`) move
+onto its centre line at the old chain's proportions (edit mode; only their
+heads move, so the clips' rotations keep their meaning), each tail vertex
+takes the two chain bones either side of it (the first shares with its
+parent), and no other vertex takes any chain bone.
 
 Big bodies block every square under them (app.js bigBodyAt, g.footHalf: half
 length and width of the model and its centre offset, set at spawn for

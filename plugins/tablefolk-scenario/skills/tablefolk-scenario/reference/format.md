@@ -176,7 +176,7 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   imp_classic`), and `ogre`, `gnoll` (hyena-headed), `lich` (a crowned undead
   sorcerer), `vampire`, `cultist` (red-robed, masked), `bandit`, `gargoyle`, `dark_knight`;
   and `bear` (a grizzly). Gargoyles and dark knights are mindless.
-  `red_dragon`: a great red dragon (about five squares tall, seven long, low
+  `red_dragon`: a great red dragon (about three and a half squares tall, seven and a half long, low
   and prowling, blocking every square under it) that talks: its
   jaw opens and closes with its voice (a deep voice suits it, e.g.
   `"ttsVoiceId": "pack:villain_m"`); it walks, attacks and dies like the
