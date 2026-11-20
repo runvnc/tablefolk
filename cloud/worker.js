@@ -53,7 +53,7 @@ async function finish(req) {
   let body = {}; try { body = JSON.parse(text) || {}; } catch {}
   const r = finishScenario(body, DATA.packVoices);
   if (r.problems) return json({ problems: r.problems });
-  return json({ scenario: r.scenario, code: r.code, link: '/app/#s=' + r.code, ms: body.ms || 0, model: body.model || 'browser', warnings: [] });
+  return json({ scenario: r.scenario, code: r.code, link: '/app/#s=' + r.code, ms: body.ms || 0, model: body.model || 'browser', warnings: [], repairs: r.repairs });
 }
 
 // /oracle, /goblin-bakery: scenarios/<word>.json or scenarios/the-<word>.json

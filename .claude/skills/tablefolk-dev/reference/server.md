@@ -32,6 +32,27 @@ is the scenario skill's `server.md`; this is how it works inside.
   doors, goals are checked against what exists. Villains are made hostile by
   the `ENEMY` / `HOSTILE_INTENT` patterns (personality text gave false
   positives, so only intent words count).
+- **Living worlds by code** (`server/worldgen-living.js` `livingWorld`,
+  called at the end of `checkScenario(s, packVoices, { prompt, fresh,
+  notes })` when there are no other problems): a new world (`fresh`: the
+  generate path, `/api/finish` with a prompt) that is not talk-only
+  (`TALK_ONLY` on the request, or `"talk": true`) gets `live`, `time`,
+  `dayMinutes`; a minimum size; for each talking character a job (the
+  jobs' match regexes, `server/jobs-table.js`, generated from
+  `jobs/*/job.json` by `node tools/jobs-table.mjs`: run it after editing a
+  job), a workplace and a home on the map, its station (anvil, cauldron,
+  target, trees, rocks, fields: `KIND_TYPES`/`ADD_TYPE`) and a store beside
+  its work, a bed per resident, a food source, a pressure (the archetype's
+  mild default threat when none: `DEFAULT_THREAT`), a goal the engine checks
+  (`survived_days` + `agents_alive` by default), `allowed` for fighters and
+  sellers, and a reachability pass from the player's start (`reach`:
+  unreachable homes or workplaces are problems for the model; unreachable
+  beds, stores and stations are moved to a free cell of their place). Each
+  repair is a line in `notes`, returned as `repairs` (and saved with the
+  generation). Without `generate` a living world is a problem for the model
+  (one room); an edit (`fresh` false) only touches a world that is already
+  living and generated. procgen.js `safeCell` places objects with `"in"`
+  where they block no doorway and leave the room connected.
 - `reviseScenario` (`POST /api/revise`): big fixed layouts keep their
   objects on the server (`mergeKept`); the model answers with edit
   commands (`remove_objects`/`move_objects`/`add_objects`, `paint_area`/

@@ -57,6 +57,7 @@ node close.mjs                                         # always close it: it hol
 | `run-evals.sh` | all evals in `evals/` (run it with `bash -c` from fish) |
 | `live-watch.mjs <scenario> [seconds]` | play a scenario live and keep the transcript |
 | `live-eval.mjs <scenario> [--minutes=6] [--provoke=<id>]` | a living world scored: speech share, replies to overheard talk, trades, tasks, failures, malformed replies; or K insults to one character and when it refuses, calls for help or attacks (README) |
+| `gen-eval.mjs [--browser] [--only=village,talk] [--label=]` | the world builder on 8 one-line requests (village, outpost, dungeon, forest, mine, market, farm, a talk scene) through `/api/generate` (the server's cloud model) or the in-browser step-by-step path; per world: places, people with job/home/workplace set and reachable, pressure, goal predicates, live/time, repairs; saves `results/gen-<label>-<key>.json` to play with live-eval |
 | `live-pending-test.mjs` | a monster told something must not starve the others' live turns |
 | `editor-test.mjs` | the world builder's map editor: every tool against the scenario it writes (18 checks) |
 | `render-tiles.mjs [base] [only=a,b] [ppu]` | render the 2D tiles into `assets/tiles/` (about 4 minutes) |

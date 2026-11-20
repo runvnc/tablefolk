@@ -14,9 +14,19 @@ BASES = {'island', 'clearing', 'dungeon', 'plain'}
 # procgen.js places ("in"): dungeon rooms, village buildings and spots.
 ROOMS = {'entrance', 'throne', 'lair', 'treasure', 'library', 'shrine', 'barracks', 'storage', 'kitchen', 'prison', 'crypt', 'alchemy', 'room'}
 BUILDINGS = {'tavern', 'smithy', 'shop', 'temple', 'alchemist', 'guardhouse', 'library', 'house', 'stable', 'square', 'pond', 'garden'}
+FOREST = {'clearing', 'camp', 'ruins', 'grove', 'shrine', 'pond', 'hut', 'cave', 'meadow'}
+FARM = {'yard', 'farmhouse', 'barn', 'pasture', 'field', 'orchard', 'coop'}
+CAVE = {'entrance', 'lair', 'crystals', 'grotto', 'pool', 'treasure', 'bones', 'camp', 'mine', 'chamber'}
+# procgen.js applyToScenario KINDS: kind (and its other names) -> its places
+GEN_KINDS = {'dungeon': ROOMS, 'castle': ROOMS, 'keep': ROOMS, 'fortress': ROOMS, 'crypt': ROOMS, 'tomb': ROOMS, 'catacombs': ROOMS,
+             'village': BUILDINGS, 'town': BUILDINGS, 'hamlet': BUILDINGS, 'forest': FOREST, 'woods': FOREST, 'wilds': FOREST, 'wilderness': FOREST,
+             'farm': FARM, 'farmstead': FARM, 'cave': CAVE, 'caves': CAVE, 'cavern': CAVE, 'mine': CAVE}
+# jobs/<id>/job.json (built in); a package or a URL may bring others
+JOBS = {'farmer', 'baker', 'innkeeper', 'cook', 'smith', 'woodcutter', 'miner', 'hunter', 'fisher', 'herder', 'merchant', 'guard', 'healer', 'ratcatcher', 'scholar', 'child', 'labourer', 'idler'}
+THREAT_KINDS = {'raid', 'rats', 'bandits'}
 COMMANDS = {'say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
             'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing',
-            'spell.firebreath', 'spell.lightning', 'spawn', 'remember', 'feel', 'eat', 'use', 'put', 'take', 'close'}
+            'spell.firebreath', 'spell.lightning', 'spawn', 'remember', 'feel', 'eat', 'drink', 'use', 'put', 'take', 'close', 'paint'}
 
 
 def encode(obj):
@@ -72,12 +82,25 @@ def check(obj):
     gen = obj.get('generate')
     if gen is not None:
         kind = str((gen or {}).get('kind', 'dungeon')).lower() if isinstance(gen, dict) else None
-        if kind not in ('dungeon', 'village', 'town'): problems.append('"generate" must be {"kind": "dungeon" | "village", ...}')
-        known = ROOMS if kind == 'dungeon' else BUILDINGS
+        if kind not in GEN_KINDS: problems.append('"generate" must be {"kind": "dungeon" | "village" | "forest" | "farm" | "cave", ...}')
+        known = GEN_KINDS.get(kind, ROOMS)
         for thing in obj.get('agents', []) + obj.get('objects', []) + [obj.get('player') or {}]:
-            where = thing.get('in')
-            if where is not None and re.sub(r'\s+\d+$', '', str(where).lower()) not in known:
-                problems.append(f'"in": {where!r} is not a {kind} place ({" ".join(sorted(known))})')
+            for key in ('in', 'home', 'workplace'):
+                where = thing.get(key)
+                if where is not None and re.sub(r'\s+\d+$', '', str(where).lower()) not in known and not (key != 'in' and re.sub(r'\s+\d+$', '', str(where).lower()) in ('house',)):
+                    problems.append(f'"{key}": {where!r} is not a {kind} place ({" ".join(sorted(known))})')
+    has_packages = bool(obj.get('packages'))
+    for a in obj.get('agents', []):
+        j = a.get('job')
+        if isinstance(j, str) and j.lower() not in JOBS and not j.startswith(('http://', 'https://', 'npm:', 'gh:')) and not has_packages:
+            problems.append(f'agent {a.get("id")!r} "job": {j!r} is not a built-in job ({" ".join(sorted(JOBS))}); a package or a URL can bring one')
+        if a.get('temper') is not None and a.get('temper') not in ('short', 'normal', 'long'):
+            problems.append(f'agent {a.get("id")!r} "temper" must be short, normal or long')
+    for t in obj.get('threats', []) or []:
+        if not isinstance(t, dict) or not isinstance(t.get('kind'), str): problems.append(f'threat {t!r} needs a "kind"')
+        elif t['kind'] not in THREAT_KINDS and not has_packages: problems.append(f'threat kind {t["kind"]!r}: built in are raid, rats, bandits (a package can add more)')
+    tm = obj.get('time')
+    if tm is not None and not (isinstance(tm, str) and re.fullmatch(r'\d{1,2}:\d{2}', tm)): problems.append('"time" must be "HH:MM", e.g. "07:00"')
     for o in obj.get('objects', []):
         if gen is not None and o.get('in') is not None and o.get('type'): continue
         if not all(isinstance(o.get(k), (int, float)) for k in ('x', 'z')) or not o.get('type'):

@@ -14,6 +14,7 @@
 import { deflateRawSync } from 'node:zlib';
 import '../app/procgen.js';
 import { validate as validateScript } from '../libs/script/validate.js';
+import { livingWorld } from './worldgen-living.js';
 const Procgen = globalThis.TablefolkProcgen;
 
 export function encodeScenario(obj) {
@@ -22,14 +23,16 @@ export function encodeScenario(obj) {
 export const systemPrompt = (skill, voices) => skill + `\n\nVoices (ttsVoiceId as written here; match the character's age, gender and manner, and give different characters different voices): ${voices}.`;
 // POST /api/finish's work: a scenario made by a model in the browser or the
 // visitor's own model, merged (a big map's change) and checked.
+// (a new world, with its request: the living-world rules apply, worldgen-living.js; repairs lists what code filled in)
 export function finishScenario(body, packVoices = []) {
-  let { scenario, kept = null } = body || {}, problems;
+  let { scenario, kept = null, prompt = '' } = body || {}, problems;
+  const repairs = [];
   try {
     if (scenario && typeof scenario === 'object') scenario = mergeKept(scenario, kept && Array.isArray(kept.objects) && Array.isArray(kept.paint) ? kept : null);
-    problems = checkScenario(scenario, packVoices);
+    problems = checkScenario(scenario, packVoices, { prompt, fresh: !!prompt && !kept, notes: repairs });
   } catch (e) { problems = [e.message]; }
-  if (problems.length) return { problems };
-  return { scenario, code: encodeScenario(scenario) };
+  if (problems.length) return { problems, repairs };
+  return { scenario, code: encodeScenario(scenario), repairs };
 }
 
 export const COMMANDS = new Set(['say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
@@ -66,7 +69,10 @@ export function parseJSON(text) {
 
 // Problems the model can fix (returned as text for a repair round), plus
 // harmless fixes applied in place.
-export function checkScenario(s, packVoices = []) {
+// opts { prompt, fresh, notes }: a new world from a request gets the living-world
+// rules (worldgen-living.js: jobs, homes, stations, food, a pressure, a goal,
+// reachability), each repair told in notes; an edit keeps a living world so.
+export function checkScenario(s, packVoices = [], opts = {}) {
   const problems = [];
   if (!s || typeof s !== 'object' || Array.isArray(s)) return ['the answer must be one JSON object'];
   s.v = 1;
@@ -130,6 +136,7 @@ export function checkScenario(s, packVoices = []) {
   const lying = new Set((s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]).filter(Boolean).map(i => String(i).toLowerCase()));
   const want = String(s.goal?.win?.player_has || '').toLowerCase();
   if (want && !lying.has(want) && !(s.allowed || []).concat(...(s.agents || []).map(a => a.allowed || [])).some(c => c === 'give' || c === 'sell')) problems.push('a player_has goal needs some character allowed "give" or "sell" (or the item in a chest)');
+  if (!problems.length) try { problems.push(...livingWorld(s, opts)); } catch (e) { (opts.notes || []).push('living-world checks failed: ' + e.message); }
   return problems;
 }
 
@@ -388,7 +395,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261115a"></script><script src="/app/map-editor.js?v=20261115e"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261115l"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261120a"></script><script src="/app/map-editor.js?v=20261115e"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120a"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -519,7 +526,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261115a').then(()=>load('/app/worldgen-browser.js?v=20261115c')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261120a').then(()=>load('/app/worldgen-browser.js?v=20261120a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261115a'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))
