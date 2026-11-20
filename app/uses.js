@@ -594,6 +594,10 @@
     const p = posOf(g), seen = new Set(), out = [];
     for (const o of getObjects()) {
       const k = kindOf(o.type); if (!k) continue;
+      // a package item whose only use is its E action is offered in the prompt only when it says what the use is
+      // ("use": {"what": "pump the bellows"}): the smithy's anvil (alias forge) listed as use() made E2B write
+      // use(forge, iron_bar) instead of its forge(dagger) skill (smithy commission 2/2 -> 0/2)
+      if (k === 'pack' && !packItem(o.type)?.use?.what) continue;
       const d = Math.hypot(o.x - p.x, o.z - p.z); if (d > radius) continue;
       out.push({ ...o, d, k });
     }

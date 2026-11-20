@@ -76,7 +76,10 @@ Every section is optional; paths are relative to the file.
     `uses`): characters use it like that thing.
   - `use` data (`text`, `anim`, `give`, `gold`, `state`) works for
     characters too: `use(well_of_wishes)` gives the character what it gives
-    the player.
+    the player. Give it a `"what"` ("make a wish") to have it offered in the
+    characters' prompt ("You could, right here: use(well_of_wishes)"); without
+    one it works when named but is not suggested (a suggested `use(anvil)`
+    beat a smith's own `forge(dagger)` skill).
 - `jobs`: job manifests keyed by id, or a list of `job.json` paths
   ([skills-and-roles.md](skills-and-roles.md#jobs)).
 - `threats`: threat kinds keyed by name, in data: `who` (a body or a
