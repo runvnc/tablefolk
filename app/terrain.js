@@ -460,7 +460,8 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const m = new BABYLON.PBRMaterial('board_rock_mat', state.scene);
     m.albedoTexture = envTex('stone_wall_rubble', 'color', true); m.bumpTexture = envTex('stone_wall_rubble', 'normal'); m.bumpTexture.level = 1.2;
     m.invertNormalMapX = true; m.invertNormalMapY = false;
-    m.albedoColor = new BABYLON.Color3(.42, .4, .38); m.metallic = 0; m.roughness = .95; m.backFaceCulling = false; m.environmentIntensity = .3; m.maxSimultaneousLights = 8; m._tfMatte = true;
+    m.albedoColor = new BABYLON.Color3(.42, .4, .38); m.metallic = 0; m.roughness = .95; m.backFaceCulling = true;   // single-sided: a close camera behind the player can sit inside the rock
+    window.tablefolkCutaway?.attach(m);   // cut like a wall between the follow camera and the player m.environmentIntensity = .3; m.maxSimultaneousLights = 8; m._tfMatte = true;
     return (T.rockMat = m);
   }
   // open water around an island (and under sea cells)
