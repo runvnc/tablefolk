@@ -188,6 +188,21 @@ neutral vignette, FXAA, mild sharpen; SSAO (strength 1.6) only at high.
   once took the first 8 lights in scene order and lava's light vanished: that
   is why the nearest-4 rule exists. Hidden meshes keep their nearby lights.
 
+### Start-up (look pass 3)
+
+Measured with `startup.mjs`-style timing (scene ready, world active =
+scenario and player avatar, dressed = mesh count steady 3 s; hearthvale,
+light, this machine): control maps at 4 texels a cell (8 cost ~470 ms of
+main thread a build), terrain rebuilds coalesced (120 ms) and skipped when
+size, mode, paint, walls and grid are unchanged, ground texture arrays
+decoded once after `tablefolk-scenario-started` (vertex mean colours until
+then), roofs one a frame, the post-start wall rebuild skipped when every
+wall's look is unchanged, surroundings trees loaded in parallel, static
+props as hardware instances (`loadModelInstance`). `window.__tfMarks`
+holds the summed ms and counts of terrain control/arrays/build/cover, walls,
+roofs and surroundings. Most of what is left is Babylon's shader
+preprocessing, as on main.
+
 ### The edge of the world (terrain.js, surroundings.js)
 
 `tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |
@@ -210,10 +225,12 @@ the ground is outside them (a world that is all one building); else land.
   the rooms (roofs.js `findRooms().outside`, minus painted floors) and the
   outer half of every wall cell facing it (half-cell quads; corners by the
   diagonal rule), 10 cells past the board, with vertical faces where it
-  meets floor; stone_wall_rubble darkened, world UVs. Underground light
-  (sky.js), black fog. `tablefolkTerrain.isRock(x, z)`: darkness.js puts no
-  fog box on rock squares (the rock fades into the black fog instead) and the
-  boxes over unexplored rooms are a dark tone close to the rock's.
+  meets floor; stone_wall_rubble darkened, world UVs, single-sided, never
+  cut by the cutaway. Underground light (sky.js), black fog. In a dark world
+  the unexplored squares are rock too (darkness.js `known`): the rock is
+  rebuilt (throttled 350 ms, `refreshRock`) as the player explores, and
+  darkness.js draws no fog boxes in rock worlds. No sea plane in rock worlds
+  (the dungeon generator's "sea" squares are under the rock, dark stone).
 - street: cobblestone past the walls, fog at 3-29 m, the sky stays.
 - sea: sand under shallow water at the edge, the sea floor falling to
   -2.6 m, open water to the horizon.
@@ -314,7 +331,26 @@ ridge, `wAng`), plaster_aged gables (UVs given to the triangles),
 timber_dark, rubble chimneys. Materials are shared by every roof of a kind,
 so the fade is per roof through each mesh's `visibility` (and roofs are
 disposed without their materials). Pieces are merged per material with
-`BABYLON.Mesh.MergeMeshes`. `planned()` lists the rooms that get (or will
+`BABYLON.Mesh.MergeMeshes`; one roof a frame, nearest the player first (all
+at once took ~2.5 s of one frame in a big village).
+
+Building shells (look pass 3): homes and workplaces stay walk-in rooms
+(jobs.js needs their beds and stations on the same map), but outside a room
+gets the matching env building model as its exterior instead of a code roof
+(`planShell`, `buildShell`): chosen by the room's role from `state.places`
+(tavern/inn: inn, smithy: blacksmith, stable/barn, guardhouse: barracks,
+mill, homes and shops: house, fantasy, stone or tall house; a home or
+farmhouse too big for those: inn, mill house, barracks), seeded, the last
+choice avoided; turned so its +z front faces the room's door side; scaled
+non-uniformly to the room's outer size when within 0.75-1.25 on both axes
+(else the code roof). A shell is a roof entry: it fades with the same rule
+(gone while the player is in the room or its doorway, also in first person;
+see-through when the follow camera's ray to the player crosses its bounding
+box), and while it stands the characters inside are hidden (`g._shellHidden`,
+kept apart from the fog of war's `_fogHidden`). Visual only: walls, door,
+sight and paths are the room's; the room's code walls sit inside the model's
+walls. `"shells": false` (scenario or `generate`) keeps code roofs.
+`tablefolkRoofs.shells()` lists them. `planned()` lists the rooms that get (or will
 get) a roof (walls.js), `findRooms()` the rooms and the outside squares
 (terrain.js). Fade rule: 0 when the player is inside (or roofs are lifted by
 `tablefolkRoofs.toggle()` in tests), .22 when the follow camera's ray hits

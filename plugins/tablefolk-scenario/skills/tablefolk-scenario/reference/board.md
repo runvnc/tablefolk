@@ -209,6 +209,17 @@ drawn grids and hand-edited maps all get them. Not in dark worlds, dungeons,
 or a world that is all one building (the roof would be the whole sky).
 `"roofs": false` turns them off, `true` forces them on.
 
+Outside, a room someone lives or works in wears a real building (a house,
+the inn, the blacksmith, a stable or barn, the barracks, the mill) over its
+walls, chosen by what the room is and fitted to its size; step in (or walk a
+character in) and the building lifts to show the room, and whoever is inside
+is hidden while it stands. It is only a picture: the room's walls and door
+are what count. `"shells": false` keeps the plain roofs.
+
+Lanterns outdoors stand on timber posts; indoors and underground they hang
+on the nearest wall (or stand on a short iron stand in the middle of a
+room).
+
 The roof of the room the player is in (or whose doorway they stand in) fades
 away; with the follow camera, a roof between the camera and the player turns
 see-through. The free camera never peeks: roofs stay on.
