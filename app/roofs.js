@@ -25,7 +25,8 @@
  */
 (function () {
   if (window.TABLEFOLK_TABLETOP) return;
-  const OVER = .35, THICK = .16, PITCH = .85;
+  // pass 2: a thicker eave edge (.22) and a little more overhang; the pitch varies per house
+  const OVER = .45, THICK = .22, PITCH = .85;
   let roofs = [], sig = '', lifted = false, enabled = false;
 
   const cellKey = (x, z) => x + ',' + z;
@@ -176,12 +177,13 @@
     const xa = room.x0 - 1.5, xb = room.x1 + 1.5, za = room.z0 - 1.5, zb = room.z1 + 1.5;
     const alongX = (xb - xa) >= (zb - za), cx = (xa + xb) / 2, cz = (za + zb) / 2;
     const Lw = alongX ? xb - xa : zb - za, L = Lw + 2 * OVER, w = (alongX ? zb - za : xb - xa) / 2, half = w + OVER;
-    const rise = Math.min(1.8, Math.max(.7, w * PITCH)), ridgeY = eave + rise, ang = Math.atan2(rise, w);
-    const slope = half / Math.cos(ang);
-    // a little different straw on each house
+    // a little different on each house: roofing, pitch, tint (seeded by the room)
     const hsh = Math.abs(Math.sin(room.x0 * 12.9898 + room.z0 * 78.233) * 43758.5453) % 1;
+    const pitch = PITCH * (.8 + ((hsh * 11) % 1) * .45);
+    const rise = Math.min(2.2, Math.max(.8, w * pitch)), ridgeY = eave + rise, ang = Math.atan2(rise, w);
+    const slope = half / Math.cos(ang);
     // thatch on small houses, clay tiles or slate on bigger ones (seeded by the room)
-    const area = (room.x1 - room.x0 + 1) * (room.z1 - room.z0 + 1), kind = area <= 16 || hsh < .3 ? 'thatch' : ((hsh * 7) % 1) < .55 ? 'clay_roof_tiles' : 'slate_roof';
+    const kind = hsh < .4 ? 'thatch' : ((hsh * 7) % 1) < .6 ? 'clay_roof_tiles' : 'slate_roof';
     const M = mats(sc, [.94 + ((hsh * 3) % 1) * .1, .94 + ((hsh * 7) % 1) * .08, .94 + ((hsh * 13) % 1) * .08], kind);
     const root = new BABYLON.TransformNode('roof', sc);
     const frame = new BABYLON.TransformNode('roof_frame', sc); frame.parent = root;

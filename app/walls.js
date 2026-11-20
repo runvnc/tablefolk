@@ -233,6 +233,8 @@
       for (const e of [-.5 + jw / 2, .5 - jw / 2]) putF(c + e, top + (DH + .12) / 2, jw, DH + .12, T + .06);   // jambs
       putF(c, top + DH + .06, 1, .14, T + .07);                                                             // lintel
       timber.add(alongX ? x : x, top + .015, alongX ? z : z, alongX ? .9 : T + .1, .03, alongX ? T + .1 : .9, col);   // threshold
+      // a stone doorstep on the outside of a house door
+      if (house) { const side = outsideSide(houses.inside, x, z, alongX); if (side) { const d = T / 2 + .2; alongX ? stone.add(x, top + .06, z + side * d, 1.05, .12, .38, col) : stone.add(x + side * d, top + .06, z, .38, .12, 1.05, col); } }
       const g = buildDoorLeaf(state.scene, x, z, alongX, top, DH); g.door = w;
       for (const m of g.pivot.getChildMeshes(false)) {
         m.metadata = { proxy: w }; m.isPickable = true; state.wallVisuals.push(m);
@@ -247,5 +249,5 @@
 
   // the world finished building (rooms, the outside known): draw the walls again
   addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { scheduleWallRebuild(); } catch {} }, 650));
-  window.tablefolkWalls = { build, setNight };
+  window.tablefolkWalls = { build, setNight, timber: () => materials().timber };
 })();

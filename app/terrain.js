@@ -101,6 +101,12 @@
   const hash = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
   function vnoise(x, z) { const xi = Math.floor(x), zi = Math.floor(z), fx = x - xi, fz = z - zi, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
     const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1); return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v; }
+  // the shader's hash and value noise, the same in JS (ground cover takes the grass patches' tint)
+  const sHash = (x, z) => { const v = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const sNoise = (x, z) => { const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz); const a = sHash(ix, iz), b = sHash(ix + 1, iz), c = sHash(ix, iz + 1), d = sHash(ix + 1, iz + 1); return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v; };
+  const patchAt = (x, z) => sNoise(x * .085 + 17, z * .085 + 3) * .7 + sNoise(x * .19 + 2, z * .19 + 9) * .3;
+  const sm = (a, b, t) => { const k = Math.max(0, Math.min(1, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
+  const kindFor = () => window.tablefolkSurroundings?.kindFor?.(scn()) || 'fields';
   const fbm = (x, z) => vnoise(x, z) * .55 + vnoise(x * 2.1 + 7, z * 2.1 + 3) * .28 + vnoise(x * 4.3 + 1, z * 4.3 + 9) * .17;
 
   // ---- heights ----
@@ -116,7 +122,7 @@
     if (m === 'sea' || (d > 0 && (m === 'land' || m === 'street') && rimSea(x, z))) { if (d <= 0) return 0; return -Math.min(2.6, .8 + d * .5); }
     if (m !== 'land' || d < 4) return 0;
     const k = Math.min(1, (d - 4) / 40), r = k * k * (3 - 2 * k);
-    return r * (fbm(x * .011 + 3, z * .011 + 5) * 16 - 3 + fbm(x * .05, z * .05) * 3) * (.4 + .6 * Math.min(1, d / 90));
+    return r * (fbm(x * .011 + 3, z * .011 + 5) * 16 - 3 + vnoise(x * .028, z * .028) * 2) * (.4 + .6 * Math.min(1, d / 90));
   }
 
   // ---- texture arrays ----
@@ -186,13 +192,13 @@ float tfNoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (
       prepareDefines(d) { d.TFTERRAIN = true; }
       getSamplers(s) { s.push('tfCtrl0Sampler', 'tfCtrl1Sampler', 'tfAlbSampler', 'tfNrmSampler'); }
       getUniforms(lang) {
-        const ubo = ['tfCtrl', 'tfTile0', 'tfTile1', 'tfParams', 'tfFlags'].map(name => ({ name, size: 4, type: 'vec4' }));
-        return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfCtrl;uniform vec4 tfTile0;uniform vec4 tfTile1;uniform vec4 tfParams;uniform vec4 tfFlags;\n' };
+        const ubo = ['tfCtrl', 'tfTile0', 'tfTile1', 'tfParams', 'tfFlags', 'tfKind0', 'tfKind1', 'tfExtra'].map(name => ({ name, size: 4, type: 'vec4' }));
+        return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfCtrl;uniform vec4 tfTile0;uniform vec4 tfTile1;uniform vec4 tfParams;uniform vec4 tfFlags;uniform vec4 tfKind0;uniform vec4 tfKind1;uniform vec4 tfExtra;\n' };
       }
       bindForSubMesh(ubo) {
         const u = this.u;
         ubo.updateFloat4('tfCtrl', ...u.ctrl); ubo.updateFloat4('tfTile0', ...u.t0); ubo.updateFloat4('tfTile1', ...u.t1);
-        ubo.updateFloat4('tfParams', T.grid ? 1 : 0, u.p[1], u.p[2], u.p[3]); ubo.updateFloat4('tfFlags', ...u.f);
+        ubo.updateFloat4('tfParams', T.grid ? 1 : 0, u.p[1], u.p[2], u.p[3]); ubo.updateFloat4('tfFlags', ...u.f); ubo.updateFloat4('tfKind0', ...(u.k0 || [1, 1, 1, 1])); ubo.updateFloat4('tfKind1', ...(u.k1 || [1, 1, 1, 1])); ubo.updateFloat4('tfExtra', ...(u.x || [0, 0, 0, 0]));
         for (const k of ['tfCtrl0Sampler', 'tfCtrl1Sampler', 'tfAlbSampler', 'tfNrmSampler']) if (this.tex[k]) ubo.setTexture(k, this.tex[k]);
       }
       getCustomCode(type, lang) {
@@ -222,6 +228,23 @@ var tfRough: f32 = uniforms.tfFlags.y; var tfAO: f32 = 1.0;
     let tfMac = tfNoise(tfP * 0.09) * 0.6 + tfNoise(tfP * 0.23 + vec2f(3.0, 7.0)) * 0.4;
     var col = tfAcc / tfSum;
     col = col * (1.0 + (tfMac - 0.5) * uniforms.tfFlags.w * 2.0);
+    // natural ground: patches of drier/yellower and lusher grass, 6-15 m across
+    var tfNat = 0.0; var tfPath = 0.0;
+    for (var i = 0; i < 4; i++) { tfNat += tfW[i] * step(0.5, uniforms.tfKind0[i]); tfPath += tfW[i] * step(1.5, uniforms.tfKind0[i]); tfNat += tfW[i + 4] * step(0.5, uniforms.tfKind1[i]); tfPath += tfW[i + 4] * step(1.5, uniforms.tfKind1[i]); }
+    let tfPat = tfNoise(tfP * 0.085 + vec2f(17.0, 3.0)) * 0.7 + tfNoise(tfP * 0.19 + vec2f(2.0, 9.0)) * 0.3;
+    col = mix(col, col * vec3f(1.2, 1.12, 0.74), smoothstep(0.5, 0.8, tfPat) * 0.75 * tfNat);
+    col = mix(col, col * vec3f(0.86, 1.04, 0.86), smoothstep(0.5, 0.82, 1.0 - tfPat) * 0.5 * tfNat);
+    // paths: a lighter worn centre, darker damp edges
+    let tfWear = mix(0.84, 1.1, smoothstep(0.45, 0.95, tfPath));
+    col = col * mix(1.0, tfWear, min(1.0, tfPath * 2.2));
+    // far fields: a patchwork of crops and meadows outside the board (land worlds)
+    let tfOut = max(abs(tfP.x) - uniforms.tfParams.z, abs(tfP.y) - uniforms.tfParams.w);
+    if (uniforms.tfExtra.x > 0.5) {
+      let q = vec2f(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + (n1 * 3.0);
+      let cell = floor(q / vec2f(26.0, 17.0)); let h = tfHash(cell);
+      let tint = select(select(vec3f(1.35, 1.18, 0.62), vec3f(1.12, 1.16, 0.84), h > 0.33), vec3f(0.95, 0.82, 0.62), h > 0.72);
+      col = mix(col, col * tint, smoothstep(10.0, 28.0, tfOut) * 0.85);
+    }
     surfaceAlbedo = pow(max(col, vec3f(0.0)), vec3f(2.2));
     let tn = tfAccN / tfSum; let tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
     let N = normalize(fragmentInputs.vNormalW);
@@ -257,6 +280,19 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
   if (tfSum > 0.0001) {
     float tfMac = tfNoise(tfP * 0.09) * 0.6 + tfNoise(tfP * 0.23 + vec2(3.0, 7.0)) * 0.4;
     vec3 col = tfAcc / tfSum; col *= 1.0 + (tfMac - 0.5) * tfFlags.w * 2.0;
+    float tfNat = 0.0; float tfPath = 0.0;
+    for (int i = 0; i < 4; i++) { tfNat += tfW[i] * step(0.5, tfKind0[i]) + tfW[i + 4] * step(0.5, tfKind1[i]); tfPath += tfW[i] * step(1.5, tfKind0[i]) + tfW[i + 4] * step(1.5, tfKind1[i]); }
+    float tfPat = tfNoise(tfP * 0.085 + vec2(17.0, 3.0)) * 0.7 + tfNoise(tfP * 0.19 + vec2(2.0, 9.0)) * 0.3;
+    col = mix(col, col * vec3(1.2, 1.12, 0.74), smoothstep(0.5, 0.8, tfPat) * 0.75 * tfNat);
+    col = mix(col, col * vec3(0.86, 1.04, 0.86), smoothstep(0.5, 0.82, 1.0 - tfPat) * 0.5 * tfNat);
+    col *= mix(1.0, mix(0.84, 1.1, smoothstep(0.45, 0.95, tfPath)), min(1.0, tfPath * 2.2));
+    float tfOut = max(abs(tfP.x) - tfParams.z, abs(tfP.y) - tfParams.w);
+    if (tfExtra.x > 0.5) {
+      vec2 q = vec2(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + n1 * 3.0;
+      float h = tfHash(floor(q / vec2(26.0, 17.0)));
+      vec3 tint = h > 0.72 ? vec3(0.95, 0.82, 0.62) : h > 0.33 ? vec3(1.12, 1.16, 0.84) : vec3(1.35, 1.18, 0.62);
+      col = mix(col, col * tint, smoothstep(10.0, 28.0, tfOut) * 0.85);
+    }
     surfaceAlbedo = pow(max(col, vec3(0.0)), vec3(2.2));
     vec3 tn = tfAccN / tfSum; float tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
     vec3 N = normalize(vNormalW); vec3 Tg = normalize(vec3(1.0, 0.0, 0.0) - N * N.x); vec3 Bg = cross(N, Tg);
@@ -456,12 +492,14 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     let seed = 7919 + ((scn().seed | 0) * 131);
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const green = L => L === 'grass_meadow' || L === 'forest_floor' || L === 'grass_dry';
-    const push = (kind, mi, x, z, s, ry) => { const k = kind + ':' + mi; if (!lists.has(k)) lists.set(k, []); lists.get(k).push(BABYLON.Matrix.Compose(new BABYLON.Vector3(s, s, s), BABYLON.Quaternion.RotationYawPitchRoll(ry, 0, 0), new BABYLON.Vector3(x, 0, z))); };
+    const push = (kind, mi, x, z, s, ry) => { const k = kind + ':' + mi; if (!lists.has(k)) lists.set(k, []); const pt = patchAt(x, z), dry = sm(.5, .8, pt) * .75, lush = sm(.5, .82, 1 - pt) * .5;
+      const col = kind === 'grass_tufts' ? [(1 + .2 * dry - .14 * lush) * 1.06, (1 + .12 * dry + .04 * lush) * 1.06, (1 - .26 * dry - .14 * lush) * 1.0] : kind === 'pebbles' ? [1.25, 1.22, 1.18] : [1, 1, 1];
+      lists.get(k).push([BABYLON.Matrix.Compose(new BABYLON.Vector3(s, s, s), BABYLON.Quaternion.RotationYawPitchRoll(ry, 0, 0), new BABYLON.Vector3(x, 0, z)), col]); };
     let total = 0; const CAP = lite ? 500 : 3500;
     for (let z = -bz - 3; z <= bz + 3; z++) for (let x = -bx - 3; x <= bx + 3; x++) {
       const k = x + ',' + z; if (blocked.has(k) || inRoom.has(k) || seaCell(x, z)) continue;
       const L = C.at(x, z), onBoard = Math.abs(x) <= bx && Math.abs(z) <= bz;
-      if (!green(L)) { if (NATURAL.has(L) && rnd() < .25) push('pebbles', (rnd() * 5) | 0, x + rnd() - .5, z + rnd() - .5, .7 + rnd() * .6, rnd() * 6.28); continue; }
+      if (!green(L)) { if (NATURAL.has(L) && rnd() < .08) push('pebbles', (rnd() * 5) | 0, x + rnd() - .5, z + rnd() - .5, .7 + rnd() * .6, rnd() * 6.28); continue; }
       // edges: next to a path, a wall or a built floor
       // edges: next to a path, a wall or a built floor. Tufts gather toward
       // a wall's foot but keep off a path (the blend wanders ~.3 cell into it)
@@ -472,17 +510,17 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
         if (!green(n) && !wall) { if (dx > 0) lim.x1 = .05; if (dx < 0) lim.x0 = -.05; if (dz > 0) lim.z1 = .05; if (dz < 0) lim.z0 = -.05; }
       }
       const px = () => x + lim.x0 + rnd() * (lim.x1 - lim.x0), pz = () => z + lim.z0 + rnd() * (lim.z1 - lim.z0);
-      const busy = objs.has(k) ? .5 : 1, n = lite ? 0 : Math.round((1.2 + edge * 1.4) * busy * (onBoard ? 1 : .8));
+      const busy = objs.has(k) ? .5 : 1, n = lite ? 0 : Math.round((.7 + edge * 1.5) * busy * (onBoard ? 1 : .7));
       for (let i = 0; i < n; i++) push('grass_tufts', (rnd() * 4) | 0, px(), pz(), .6 + rnd() * .6, rnd() * 6.28);
       if (!lite && rnd() < .22 + edge * .08) push('flowers', (rnd() * 3) | 0, px(), pz(), .8 + rnd() * .5, rnd() * 6.28);
-      if (rnd() < .18) push('pebbles', (rnd() * 5) | 0, x + rnd() - .5, z + rnd() - .5, .7 + rnd() * .6, rnd() * 6.28);
+      if ((edge || objs.has(k)) && rnd() < .14) push('pebbles', (rnd() * 5) | 0, x + rnd() - .5, z + rnd() - .5, .7 + rnd() * .6, rnd() * 6.28);
     }
     for (const [k, list] of lists) {
       const [kind, mi] = k.split(':'), src = models.find(m => m.kind === kind)?.meshes[+mi]; if (!src) continue;
       const use = list.slice(0, Math.max(0, CAP - total)); total += use.length; if (!use.length) continue;
       const m = src.clone('board_cover_' + kind + '_' + mi); m.makeGeometryUnique(); m.setEnabled(true);
-      const buf = new Float32Array(use.length * 16); use.forEach((mx, i) => mx.copyToArray(buf, i * 16));
-      m.thinInstanceSetBuffer('matrix', buf, 16, true); m.thinInstanceRefreshBoundingInfo(false); m.isPickable = false;
+      const buf = new Float32Array(use.length * 16), cb = new Float32Array(use.length * 4); use.forEach(([mx, c], i) => { mx.copyToArray(buf, i * 16); cb.set([c[0], c[1], c[2], 1], i * 4); });
+      m.thinInstanceSetBuffer('matrix', buf, 16, true); m.thinInstanceSetBuffer('color', cb, 4, true); m.thinInstanceRefreshBoundingInfo(false); m.isPickable = false;
       T.cover.push(m);
     }
     window.tablefolkDiag?.note?.('terrain', `ground cover: ${total} tufts, flowers and pebbles`);
@@ -511,7 +549,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       for (const m of [T.mesh, T.far, T.sea]) try { m?.dispose(); } catch {}
       T.sig = sig;
       T.mesh = gridMesh('board_terrain', I.x0, I.x1, I.z0, I.z1, .5, null, boardHeight, C.colorAt);
-      const step = lite ? 4 : 3, F = Math.ceil(FAR / step) * step;
+      const step = lite ? 4 : 2, F = Math.ceil(FAR / step) * step;   // 2 m below light: 3 m faceted the hills in the haze
       const far = T.mode === 'none' ? null : T.mode === 'rock' ? 24 : T.mode === 'street' ? 40 : F;
       T.far = far ? gridMesh('board_terrain_far', -far - WORLD.halfW, far + WORLD.halfW, -far - WORLD.halfH, far + WORLD.halfH, step,
         (x, z) => x > I.x0 + step && x < I.x1 - step && z > I.z0 + step && z < I.z1 - step,
@@ -555,6 +593,8 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       P.u.ctrl = C.ctrl; P.u.t0 = tiles.slice(0, 4); P.u.t1 = tiles.slice(4, 8);
       P.u.p = [0, .32, WORLD.halfW - .5, WORLD.halfH - .5];
       P.u.f = [lite ? 0 : 1, .9, lite ? .8 : 1, .16];
+      const kindOf = n => !n ? 1 : n === 'dirt_path' ? 2 : NATURAL.has(n) ? 1 : 0, ks = [0, 1, 2, 3, 4, 5, 6, 7].map(i => kindOf(C.names[i]));
+      P.u.k0 = ks.slice(0, 4); P.u.k1 = ks.slice(4); P.u.x = [T.mode === 'land' && kindFor() !== 'forest' ? 1 : 0, 0, 0, 0];
       P.tex = { tfCtrl0Sampler: C.tex[0], tfCtrl1Sampler: C.tex[1], tfAlbSampler: T.arrays.alb, tfNrmSampler: T.arrays.nrm };
     }
     buildCover(C).catch(e => console.warn('[terrain] cover', e));
