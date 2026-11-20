@@ -112,6 +112,8 @@ await page.evaluate(() => {
   // jobs.js and world-integration.js name each model call's kind (absent before the jobs change)
   addEventListener('tablefolk-model-call', e => (C.calls ||= []).push({ t: now(), agent: e.detail?.agentId, kind: e.detail?.kind }));
   addEventListener('tablefolk-attacked', e => (C.hits ||= []).push({ t: now(), agent: e.detail?.agentId }));
+  // the narrator's lines (director events, threats), for the transcript
+  { const el = () => document.getElementById('narration'); setInterval(() => { const t = el()?.textContent; if (t && t !== C.lastNarr) { C.lastNarr = t; (C.narr ||= []).push({ t: now(), text: t }); } }, 500); }
   // the history keeps 20 entries and results are appended to them: keep the fullest text of each
   setInterval(() => { for (const e of TABLEFOLK_STATE.globalHistory || []) { const k = e.split(' -> ')[0].slice(0, 90); if (!(k in C.hist)) { C.order.push(k); C.hist[k] = { t: now(), e }; } else if (e.length > C.hist[k].e.length) C.hist[k].e = e; } }, 400);
   document.querySelectorAll('.scn-intro, #scenarioIntro').forEach(e => e.remove());
@@ -190,7 +192,7 @@ if (provoke) {
   }
 }
 const dayCap = dayMode ? await page.evaluate(() => { clearInterval(__cap.sampler); return { samples: __cap.samples, acts: __cap.acts || [], calls: __cap.calls || [], hits: __cap.hits || [], initial: [...__cap.initial], storesStart: __cap.storesStart, storesEnd: __cap.stores(), startMin: __cap.startMin, endMin: __cap.gameMin(), stats: window.tablefolkJobs?.stats?.() || null, ticks: window.tablefolkLive?.ticks ?? null, alive: TABLEFOLK_STATE.characters.filter(c => !c.defeated).length }; }) : null;
-const cap = await page.evaluate(() => ({ prompts: __cap.prompts, turns: __cap.turns, says: __cap.says, hist: __cap.order.map(k => __cap.hist[k]), round: window.tablefolkLive.round, t: +((performance.now() - __cap.t0) / 1000).toFixed(1) }));
+const cap = await page.evaluate(() => ({ prompts: __cap.prompts, turns: __cap.turns, says: __cap.says, acts: __cap.acts || [], narr: __cap.narr || [], hist: __cap.order.map(k => __cap.hist[k]), round: window.tablefolkLive.round, t: +((performance.now() - __cap.t0) / 1000).toFixed(1) }));
 await page.evaluate(() => window.tablefolkLive.stop());
 const minds = {}; for (const id of agents) minds[id] = await mindOf(id);
 const elapsed = cap.t;   // seconds since the hooks went in
@@ -330,7 +332,12 @@ if (dayMode) {
 }
 fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
-fs.writeFileSync(out, JSON.stringify({ summary, url, day: dayCap, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
+// the transcript as a player reads it: who said and did what, with the game clock when there is one
+const clockAt = t => { const S = dayCap?.samples; if (!S?.length) return ''; const s = S.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a); const m = Math.floor(((s.gm % 1440) + 1440) % 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + ' '; };
+const transcript = [...cap.says.map(x => ({ t: x.t, line: `${x.agent}: "${x.text}"` })), ...cap.acts.filter(x => !/^arrived at|walks toward|walks to /.test(x.text)).map(x => ({ t: x.t, line: `${x.agent}: ${x.text}` })), ...cap.narr.map(x => ({ t: x.t, line: `* ${x.text}` }))].sort((a, b) => a.t - b.t).map(x => `[${x.t.toFixed(0).padStart(4)} s] ${clockAt(x.t)}${x.line}`);
+fs.mkdirSync('results', { recursive: true });
+fs.writeFileSync(`results/live-${name}-${label}-transcript.txt`, transcript.join('\n') + '\n');
+fs.writeFileSync(out, JSON.stringify({ summary, url, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
 console.log('saved', out);
 await page.close().catch(() => {}); await b.close().catch(() => {});
 process.exit(0);

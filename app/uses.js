@@ -146,6 +146,8 @@
   // the nearest usable thing called `name` within sight
   function find(g, name) {
     const o = find0(g, name); if (!o) return o;
+    // a bed or seat someone is on: a free one of the same kind close by
+    if (['bed', 'seat'].includes(kindOf(o.type)) && occupied(o, g)) { const p = posOf(g); let best = null; for (const t of getObjects()) if (t.type === o.type && t.mesh !== o.mesh && !occupied(t, g)) { const d = Math.hypot(t.x - p.x, t.z - p.z); if (d <= 10 && (!best || d < best.d)) best = { ...t, d }; } if (best) return best; }
     // a spent tree or barrel: another of the same kind close by that still has some
     const st = stockOf(o);
     if (st && st.left <= 0) { const p = posOf(g); let best = null; for (const t of getObjects()) if (t.type === o.type && t.mesh !== o.mesh) { const s2 = stockOf(t); const d = Math.hypot(t.x - p.x, t.z - p.z); if (s2 && s2.left > 0 && d <= 10 && (!best || d < best.d)) best = { ...t, d }; } if (best) return best; }

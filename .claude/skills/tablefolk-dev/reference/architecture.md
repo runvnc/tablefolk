@@ -149,6 +149,8 @@ is silently dropped.
 | event | fired by | used for |
 |---|---|---|
 | `tablefolk-scene-ready` | app.js | start-up |
+| `tablefolk-clock` | clock.js, every game quarter hour ({min, day, hour}) | regrowth (uses.js), threats, jobs' daily tallies |
+| `tablefolk-model-call` | jobs.js, world-integration.js ({agentId, kind}) | live-eval --day counts the model calls by kind |
 | `tablefolk-scenario-started` | scenario.js | live.js, roofs, director, welcome |
 | `tablefolk-player-turn` | play.js | nearby characters act; companions follow; pacing |
 | `tablefolk-player-chat` | world-integration | pacing |
