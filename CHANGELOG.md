@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Fights in a living world go at fight speed**: a fighter with someone to fight in sight acts every 1.5-2.5 s, whatever the pace. `?pace=lively` in the page address sets the pace for that page.
+
 - **Hunger and tiredness grow with real time in a living world**: hungry after about 8 minutes, tired after about 12, whatever the pace; a hungry or tired character counts as having something to do.
 
 - **Characters trade with each other**: `sell(bread, 2, pip)` (or to whoever it is talking with); the buyer pays when it has the gold and wants it (hungry for food, asked for it, or it is on its goal) and says no otherwise. A character with food next to someone hungry is offered the sale or the gift.

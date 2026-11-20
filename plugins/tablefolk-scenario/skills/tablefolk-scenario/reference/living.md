@@ -58,7 +58,8 @@ Pacing runs on real time:
 `"pace"`: `calm` (default: turns 20-36 s apart, 13 s quiet after a line, an
 event about every two minutes), `lively` (7-14 s, 4 s, 45-80 s), `busy`
 (1-3 s, no gap, 20-30 s). The player's own choice in the select by the live
-button wins and is remembered in the browser. Mindless monsters come for the
+button wins and is remembered in the browser; `?pace=lively` in the page
+address sets it for that page only (tests). Mindless monsters come for the
 player (when near and in sight) or wander.
 
 ## The director (`director`, `events`)

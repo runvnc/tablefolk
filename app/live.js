@@ -74,13 +74,18 @@
     const near = P()?.preyFor?.(c);
     if (near) await P()?.fighterTurn?.(c); else await wander(c);
   }
+  // a fighter with someone to fight in sight: a monster with prey, or a
+  // character pushed too far (mind.js tempers, play.js hostileTarget)
+  const fighting = c => !!((P()?.isHostile?.(c) || P()?.hostileTarget?.(c)) && P()?.preyFor?.(c));
   // ---- pace ----
   const PACES = {
     calm: { turn: [20, 36], quiet: 13, idle: .7, event: [100, 160] },
     lively: { turn: [7, 14], quiet: 4, idle: .35, event: [45, 80] },
     busy: { turn: [1, 3], quiet: 0, idle: 0, event: [20, 30] },
   };
-  let pace = (() => { try { return PACES[localStorage.getItem('tablefolk.pace')] ? localStorage.getItem('tablefolk.pace') : 'calm'; } catch { return 'calm'; } })();
+  // ?pace=lively (tests): this page only, over the remembered choice and the world's
+  const urlPace = PACES[new URLSearchParams(location.search).get('pace')] ? new URLSearchParams(location.search).get('pace') : null;
+  let pace = urlPace || (() => { try { return PACES[localStorage.getItem('tablefolk.pace')] ? localStorage.getItem('tablefolk.pace') : 'calm'; } catch { return 'calm'; } })();
   let lastPlayerAt = performance.now(), lastSpeechAt = 0;
   const nextAt = new Map();
   const P0 = () => PACES[pace] || PACES.calm;
@@ -90,6 +95,8 @@
   function schedule(c, first = false) {
     // a follower (animals.js) keeps up: a turn every second or two
     if (window.tablefolkAnimals?.following(c)) { nextAt.set(c, performance.now() + 900 + Math.random() * 700); return; }
+    // a fight goes at its own speed, whatever the pace: a blow every 1.5-2.5 s
+    if (fighting(c)) { nextAt.set(c, performance.now() + 1500 + Math.random() * 1000); return; }
     const k = (seenByPlayer(c) ? 1 : 2) * tempo();
     nextAt.set(c, performance.now() + rand(P0().turn) * 1000 * k * (first ? Math.random() : 1));
   }
@@ -121,6 +128,9 @@
     // even an answer waits a little after the last line (a third of the quiet gap)
     const pend = all.filter(c => reason(c) === 'pending' && now - lastSpeechAt >= Math.max(1500, P0().quiet * 333 * tempo()));
     if (pend.length) return pend.sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
+    // fighters don't wait for a quiet moment
+    const fight = all.filter(c => nextAt.get(c) <= now && fighting(c)).sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
+    if (fight) return fight;
     if (!quietOk) return null;
     const ready = all.filter(c => nextAt.get(c) <= now).sort((a, b) => nextAt.get(a) - nextAt.get(b));
     return ready[0] || null;
@@ -186,7 +196,7 @@
   });
   addEventListener('click', e => { if (e.target.closest?.('#liveBtn')) toggle(); });
   addEventListener('change', e => { if (e.target.id === 'paceSel') setPace(e.target.value); });
-  addEventListener('tablefolk-scenario-started', () => { const p = window.tablefolkScenario?.active?.scn?.pace; let mine = null; try { mine = localStorage.getItem('tablefolk.pace'); } catch {} if (!mine && PACES[p]) setPace(p); const sel = document.getElementById('paceSel'); if (sel) sel.value = pace; });
+  addEventListener('tablefolk-scenario-started', () => { const p = window.tablefolkScenario?.active?.scn?.pace; let mine = null; try { mine = localStorage.getItem('tablefolk.pace'); } catch {} if (!urlPace && !mine && PACES[p]) setPace(p); const sel = document.getElementById('paceSel'); if (sel) sel.value = pace; });
   // a new scenario starts paused (its settings may start it: "live": true)
   addEventListener('tablefolk-scenario-started', e => { stop(); turns = 0; if (e.detail?.live) setTimeout(start, 1500); });
   window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; },
