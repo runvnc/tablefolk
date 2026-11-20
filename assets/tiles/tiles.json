@@ -2107,6 +2107,60 @@
     375.8,
     597
    ]
+  },
+  "knight_classic": {
+   "file": "characters/knight_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "mage_classic": {
+   "file": "characters/mage_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "rogue_classic": {
+   "file": "characters/rogue_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "ranger_classic": {
+   "file": "characters/ranger_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "barbarian_classic": {
+   "file": "characters/barbarian_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
+  },
+  "woman_classic": {
+   "file": "characters/woman_classic.png",
+   "w": 261,
+   "h": 317,
+   "anchor": [
+    130,
+    206.4
+   ]
   }
  },
  "floors": {
