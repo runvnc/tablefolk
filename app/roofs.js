@@ -130,7 +130,32 @@
     return [(thatchTex = t), n];
   }
   const pbr = (name, sc, col, rough = .92) => { const m = new BABYLON.PBRMaterial(name, sc); m.albedoColor = col; m.metallic = 0; m.roughness = rough; m.maxSimultaneousLights = 8; return m; };
-  function mats(sc, tint) {
+  // The env textures (2026-11-20): thatch, clay tiles or slate by house,
+  // plaster gables, dark timber, rubble chimneys. One material set per roof
+  // kind and tint, shared by every roof that uses it.
+  const ENV = () => (window.tablefolkPacks?.base || '/assets/') + 'textures/env/';
+  const TILE = { thatch: 2.0, clay_roof_tiles: 2.5, slate_roof: 1.5, plaster_aged: 4.0, timber_dark: 1.0, stone_wall_rubble: 2.0 };
+  const envMats = new Map();
+  function envTex(sc, name, kind, srgb, rot) {
+    const hi = window.TABLEFOLK_GFX?.quality === 'high';
+    const t = new BABYLON.Texture(ENV() + name + '_' + kind + (hi ? '' : '_1k') + '.webp', sc, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+    t.gammaSpace = !!srgb; t.wrapU = t.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; if (rot) t.wAng = Math.PI / 2;
+    return t;
+  }
+  function envMat(sc, name, env, tint, rot) {
+    const key = name + env + tint.map(v => v.toFixed(2)).join();
+    if (envMats.has(key) && !envMats.get(key).isDisposed?.()) return envMats.get(key);
+    const m = new BABYLON.PBRMaterial(name, sc);
+    m.albedoTexture = envTex(sc, env, 'color', true, rot); m.bumpTexture = envTex(sc, env, 'normal', false, rot); m.invertNormalMapX = true; m.invertNormalMapY = false;
+    m.metallicTexture = envTex(sc, env, 'rough', false, rot); m.useRoughnessFromMetallicTextureGreen = true; m.useMetallnessFromMetallicTextureBlue = false; m.metallic = 0; m.roughness = 1;
+    m.albedoColor = new BABYLON.Color3(...tint); m.environmentIntensity = .4; m.maxSimultaneousLights = 8; m._tfMatte = true; m._tfTile = TILE[env] || 2;
+    envMats.set(key, m); return m;
+  }
+  function mats(sc, tint, kind = 'thatch') {
+    const roof = envMat(sc, 'roof_' + kind, kind, tint, true);
+    return { straw: roof, timber: envMat(sc, 'roof_timber', 'timber_dark', [1, 1, 1]), plaster: envMat(sc, 'roof_plaster', 'plaster_aged', [.95, .92, .86]), stone: envMat(sc, 'roof_stone', 'stone_wall_rubble', [.85, .83, .8]) };
+  }
+  function oldMats(sc, tint) {
     const [tex, nrm] = thatch(sc);
     const straw = pbr('roof_straw', sc, new BABYLON.Color3(.8 * tint[0], .74 * tint[1], .66 * tint[2]), .95);
     straw.albedoTexture = tex; straw.bumpTexture = nrm; straw.bumpTexture.level = .9; straw.environmentIntensity = .35;
@@ -154,7 +179,9 @@
     const slope = half / Math.cos(ang);
     // a little different straw on each house
     const hsh = Math.abs(Math.sin(room.x0 * 12.9898 + room.z0 * 78.233) * 43758.5453) % 1;
-    const M = mats(sc, [.92 + hsh * .16, .9 + ((hsh * 7) % 1) * .16, .88 + ((hsh * 13) % 1) * .2]);
+    // thatch on small houses, clay tiles or slate on bigger ones (seeded by the room)
+    const area = (room.x1 - room.x0 + 1) * (room.z1 - room.z0 + 1), kind = area <= 16 || hsh < .3 ? 'thatch' : ((hsh * 7) % 1) < .55 ? 'clay_roof_tiles' : 'slate_roof';
+    const M = mats(sc, [.94 + ((hsh * 3) % 1) * .1, .94 + ((hsh * 7) % 1) * .08, .94 + ((hsh * 13) % 1) * .08], kind);
     const root = new BABYLON.TransformNode('roof', sc);
     const frame = new BABYLON.TransformNode('roof_frame', sc); frame.parent = root;
     frame.position.set(cx, 0, cz); if (!alongX) frame.rotation.y = Math.PI / 2;
@@ -172,7 +199,7 @@
         // the one above overlaps them, not the other way round
         const c = new BABYLON.TransformNode('roof_course', sc); c.parent = sl; c.position.set(0, k * .012, side * k * step); c.rotation.x = side * TIP;
         const cd = step + .16;
-        box('straw', { width: L, height: THICK, depth: cd }, [0, 0, side * cd / 2], c, [Math.max(.5, cd / 1.8), Math.max(1, L / 2.4)]);
+        box('straw', { width: L, height: THICK, depth: cd }, [0, 0, side * cd / 2], c, [cd / M.straw._tfTile, L / M.straw._tfTile]);
       }
       // the rolled eave and the barge boards along the gable edges
       const roll = BABYLON.MeshBuilder.CreateCylinder('roof_straw', { diameter: .24, height: L + .04, tessellation: 10 }, sc);
@@ -184,7 +211,7 @@
     // plaster gables on the end walls, a tie beam and a king post on each
     for (const end of [-1, 1]) {
       const g = new BABYLON.Mesh('roof_plaster', sc), tri = [0, 0, -w, 0, 0, w, 0, rise, 0], vd = new BABYLON.VertexData();
-      vd.positions = tri.concat(tri); vd.indices = [0, 1, 2, 5, 4, 3];   // both faces, each lit from its own side
+      vd.positions = tri.concat(tri); const tuv = [-w / 4, 0, w / 4, 0, 0, rise / 4]; vd.uvs = tuv.concat(tuv); vd.indices = [0, 1, 2, 5, 4, 3];   // both faces, each lit from its own side
       const nrm = []; BABYLON.VertexData.ComputeNormals(vd.positions, vd.indices, nrm); vd.normals = nrm; vd.applyToMesh(g);
       g.parent = frame; g.position.set(end * Lw / 2, eave, 0); by.plaster.push(g);
       box('timber', { width: .08, height: .12, depth: 2 * w }, [end * (Lw / 2 + .03), eave + .06, 0]);
@@ -212,7 +239,7 @@
   }
 
   function clear() {
-    for (const r of roofs) { r.root.dispose(false, true); }
+    for (const r of roofs) { r.root.dispose(false, false); }
     roofs = [];
   }
   function rebuild() {
@@ -251,7 +278,8 @@
       r.target = lifted || (inside && !state.firstPerson) ? 0 : blocks ? .22 : 1;
       if (Math.abs(r.alpha - r.target) > .005) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7);
-        for (const m of r.mats) { m.alpha = r.alpha; if (m instanceof BABYLON.PBRMaterial) m.transparencyMode = r.alpha < .99 ? BABYLON.PBRMaterial.PBRMATERIAL_ALPHABLEND : BABYLON.PBRMaterial.PBRMATERIAL_OPAQUE; }
+        // per roof (the materials are shared between roofs): the meshes' visibility
+        for (const m of r.parts) m.visibility = r.alpha > .99 ? 1 : r.alpha;
         r.root.setEnabled(r.alpha > .02);
       }
     }

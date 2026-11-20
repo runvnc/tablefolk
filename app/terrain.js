@@ -230,7 +230,7 @@ var tfRough: f32 = uniforms.tfFlags.y; var tfAO: f32 = 1.0;
     if (uniforms.tfFlags.x > 0.5) { tfRough = clamp(tfAccR / tfSum, 0.55, 1.0); tfAO = mix(1.0, tfAccAO / tfSum, 0.8); }
   }
   if (uniforms.tfParams.x > 0.5 && abs(wp.x) < uniforms.tfParams.z && abs(wp.z) < uniforms.tfParams.w) {
-    let g = abs(fract(tfP + vec2f(0.5)) - vec2f(0.5)); let fw = fwidth(tfP) * 1.2;
+    let g = abs(fract(tfP + vec2f(0.5)) - vec2f(0.5)); let fw = (abs(tfDx) + abs(tfDy)) * 1.2;
     let line = 1.0 - min(smoothstep(vec2f(0.0), fw, g).x, smoothstep(vec2f(0.0), fw, g).y);
     surfaceAlbedo = surfaceAlbedo * (1.0 - line * 0.45);
   }
