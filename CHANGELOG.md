@@ -6,6 +6,18 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Quieter rooms**: two characters stop talking after four lines (for two minutes) and get back to work; while two talk, the others nearby do not start a conversation of their own (you are always answered). A line under four words ("Hush.") is an emote instead unless it answers a yes/no question.
+
+- **Evening talk with something to say**: each character is handed one concrete thing from the day (what was made, sold or bought, who ran out of what, a raid and who fought, a quarrel, an event) to tell or ask its neighbour, once per pair; rumours never reach the one they are about. Evening turns only talk, eat, drink, give, sell or sit.
+
+- **`drink`**: drink(ale) drinks it ("drinks the ale", not "eats"); a scenario's food entry can say `"drink": true`.
+
+- **Jobs that run out keep going**: a job's `fallback` buys the missing input, else gathers it itself (the smith from the ore rock and the trees, the baker from the field), else keeps busy (tidying, pacing, looking out); recipes take alternatives (bread from wheat or a flour sack). The villager job (`idler`) sits, tidies, paces, looks out of the door and reads, so a single room still moves. No more stirring the cauldron eight times running.
+
+- **Guards on patrol** stop at each place, look about and greet people by name (once an hour each).
+
+- **The log**: "facing west" lines are gone from the player's log, and a repeated action shows once with a count ("stirs the cauldron (x8)").
+
 - **A world clock**: living worlds have a time of day (`"time"`, `"dayMinutes"`, `"clock": false`), shown at the top of the screen and saved with the world; the light dims at dusk and comes back at dawn (dark worlds keep theirs).
 
 - **Things run out and grow back**: trees, rocks, crystals, food barrels, fields (`tall_grass`: wheat, `pumpkin`), snares (`bear_trap`) and fishing spots hold stock; barrels and crates are stores for `put`/`take`; a pack or package item can say the same (`"stock"`, `"gather"`, `"station"`), and package items' `use` works for characters too.

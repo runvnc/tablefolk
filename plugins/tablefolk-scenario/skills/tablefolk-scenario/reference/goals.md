@@ -37,6 +37,10 @@ can't run code). `"maxTurns": 12` is short for a `turns_over` lose.
 | `agent_defeated` | `"grub"` |
 | `agent_hp` / `player_hp` | `["grub", "<=", 3]` / `["<", 5]` |
 | `player_defeated` | `true` |
+| `survived_days` | `2` (living worlds: the clock has reached 06:00 after the 2nd night) |
+| `stock_at_least` | `["wheat", 10]` (that many in all the stores: chests, barrels, crates; `"gold"` counts coins) |
+| `threat_defeated` | `"wolf"` or `["wolf", 3]` (that many raiders of that threat kind, body or name struck down; `"any"`) |
+| `agents_alive` | `4` or `"all"` (characters with a mind still standing; monsters, raiders and animals not counted) |
 | combinators | `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` |
 
 - Item names match loosely, the same way as `sell()` ("potion" matches
@@ -47,4 +51,8 @@ can't run code). `"maxTurns": 12` is short for a `turns_over` lose.
   on the end screen and in the share text.
 - A `player_has` goal needs a way to get the item: `give`, `sell`, a chest, a
   pick-up, or loot.
+- A living world's goal is about its pressure: hold out (`"win":
+  {"survived_days": 2}, "lose": {"not": {"agents_alive": 4}}`), restock
+  (`stock_at_least`), stop the raiders (`threat_defeated`), bring someone
+  back (`agent_near` with the place), hunt a beast (`agent_defeated`).
 - The checker is `checkGoal` (and the predicate switch above it) in `app/scenario.js`.

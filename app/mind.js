@@ -40,8 +40,18 @@
     const it = items[type] || Object.values(items).find(i => i.aliases?.includes(type));
     if (it?.tags?.includes('food')) return it.nourish ?? .6;
     const own = (state.food || []).find(f => n === String(f.name ?? f).toLowerCase() || n.includes(String(f.name ?? f).toLowerCase()));
-    if (own) return +(own.nourish ?? .6);
-    return FOOD.test(n) ? .6 : 0;
+    if (own) return +(own.nourish ?? (own.drink ? .25 : .6));
+    return FOOD.test(n) ? .6 : DRINK.test(n) && !POTION.test(n) ? .25 : 0;
+  }
+  // drinks: drunk, not eaten (drink(ale) is eat's alias); a scenario food entry's "drink": true, a pack item tagged "drink", or the words below
+  const DRINK = /\b(ale|beer|wine|mead|cider|water|milk|tea|juice|grog|brew|potion|elixir|tonic)\b/i;
+  function isDrink(name) {
+    const n = String(name || '').toLowerCase().trim(), type = n.replace(/\s+/g, '_');
+    const it = window.tablefolkPacks?.items?.[type];
+    if (it?.tags?.includes('drink')) return true;
+    const own = (state.food || []).find(f => typeof f === 'object' && n === String(f.name).toLowerCase());
+    if (own) return !!own.drink;
+    return DRINK.test(n);
   }
   const STOP = new Set('the and you your for are was were with that this have has had not but what who how why where when can will would could should about there their them they then than its it\'s i\'m me my mine our out all any some just very much more most into from over under also only does did doing been being here like want wants know think tell said says say yes okay please thanks'.split(' '));
   const playerName = () => document.getElementById('chatName')?.value.trim() || 'the player';
@@ -590,6 +600,8 @@
     push(g, 'anger', da, why); if (df) push(g, 'fear', df, why);
     if (key === 'player') m.mood.trust = clamp01(m.mood.trust - .08); else opinion(g, key, -.2, 'insulted you');
     addMemory(g, why + '.', 2);
+    // the day's news (jobs.js topics: who insulted whom)
+    try { window.tablefolkJobs?.addNews?.('', `${key === 'player' ? playerName() : who} insulted ${g.id}`, 'insult'); } catch {}
     // someone watching for this troublemaker (a guard called over) steps in
     watchers(key, 'insulted ' + g.id);
     // told to leave already (calm, level 4): now it calls for help
@@ -700,7 +712,7 @@
     addMemory(g, how === 'ran' ? `${name} ran from you.` : `You beat ${name} and sent them away.`, 2.5);
     if (o && key !== 'player') { const oc = getBrainConfig(key); addMemory(o, `${g.id} beat you and told you to leave.`, 3); setBrainConfig(key, { pendingChat: (oc.pendingChat || []).concat([`[event] ${g.id} stops hitting you and tells you to leave.`]).slice(-5) }); }
     if (key === 'player') window.tablefolkToast?.(`${g.id} stops: "${line}"`, { type: 'warn' });
-    try { window.tablefolkJobs?.addNews?.(g.id, how === 'ran' ? `${name} ran from ${g.id}` : `${g.id} beat ${name} in a quarrel`); } catch {}
+    try { window.tablefolkJobs?.addNews?.(g.id, how === 'ran' ? `${name} ran from ${g.id}` : `${g.id} beat ${name} in a quarrel`, 'quarrel'); } catch {}
   }
   // will it deal with them? (app.js sell, give, give_quest; trade)
   function refuses(g, who) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn(); }
@@ -1037,13 +1049,13 @@
       try { emitBadge(g, 'drinks ' + it.name); inventoryChanged(); } catch {}
       return say(g, `${g.id} drinks the ${it.name}${healed ? ' and heals ' + healed : ''}`, false);
     }
-    const nourish = isFood(it.name);
-    if (!nourish) return fail(g, `eat failed: ${it.name} is not food`, false);
+    const nourish = isFood(it.name), drunk = isDrink(it.name);
+    if (!nourish) return fail(g, `${drunk ? 'drink' : 'eat'} failed: ${it.name} is not ${drunk ? 'something to drink' : 'food'}`, false);
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
     setBrainConfig(g.id, { inventory: inv });
     const m = mindOf(g); m.hunger = Math.max(0, m.hunger - nourish); push(g, 'joy', .1);
-    try { emitBadge(g, 'eats ' + it.name); inventoryChanged(); } catch {}
-    return say(g, `${g.id} eats the ${it.name}`, false);
+    try { emitBadge(g, (drunk ? 'drinks ' : 'eats ') + it.name); inventoryChanged(); } catch {}
+    return say(g, `${g.id} ${drunk ? 'drinks' : 'eats'} the ${it.name}`, false);
   }
 
   // ---- events from the rest of the game ----
@@ -1056,5 +1068,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

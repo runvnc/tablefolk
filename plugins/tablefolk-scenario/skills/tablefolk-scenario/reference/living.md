@@ -44,8 +44,12 @@ Pacing runs on real time:
 - someone spoken to, or told of an event, goes after a short pause; a line
   one character says to another counts as spoken to (see
   [characters.md](characters.md#hearing-seeing-and-talking): the others
-  only overhear it, and after three exchanges the two have said their
-  piece for 90 s);
+  only overhear it; after four lines the two have said their piece for
+  120 s and talk with nobody but the player for 90 s, back at their
+  work; while two characters talk, others within earshot of them start no
+  conversation of their own (the player is always answered);
+- a line under four words ("Hush.", "It is.") is not spoken unless it
+  answers a yes/no question: the character nods, shrugs or huffs instead;
 - a character with nothing said to it talks only for a reason (news, a want
   that needs someone, a goal naming someone near, a temper); otherwise it
   does things;
@@ -92,12 +96,23 @@ The day, by the clock:
   tree or a field, fetch materials from a store, make bread at the oven, put
   it in its store, sell it to someone hungry, patrol...), each done with the
   ordinary commands, so results, sounds and memories are as if it chose
-  them. A step that fails twice is skipped for an hour;
+  them. A step that fails twice is skipped for an hour. Out of an input it
+  falls back on its job's `fallback`: buys it, else gathers it itself (the
+  smith to the ore rock or a tree, the baker to the field), else keeps busy
+  (tidying, pacing); a guard stops at each place on its round, looks about
+  and greets people by name (once an hour each);
 - **eating** when hungry: its own food, its store, the village store,
   buying from a seller, foraging (an apple tree, a food barrel), or asking
   someone;
-- **the evening** (18-21) at the tavern, or the square: the time for talk,
-  about what happened that day (what was made and sold, raids, quarrels);
+- **the evening** (18-21) at the tavern, or the square: the time for talk.
+  A character with someone beside it is handed one concrete thing from the
+  day's log, chosen by the game: "Tell wren about: you baked 4 bread" or
+  "Ask wren about: wren sold rosa meat for 3 gold" (made, sold, bought, who
+  ran out of what, a raid and who fought, who insulted whom, a director
+  event), each topic once per pair; news about someone is never told to
+  them as news, and a rumour is never overheard by the one it is about.
+  Only words go with it (say, whisper, emote, eat or drink, give, sell, a
+  seat);
 - **night**: home to its bed, up at dawn (a guard on night watch sleeps by
   day instead);
 - **threats**: fighters (guards, hunters) go to raiders; the others run

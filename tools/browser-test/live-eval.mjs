@@ -334,9 +334,12 @@ fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
 // the transcript as a player reads it: who said and did what, with the game clock when there is one
 const clockAt = t => { const S = dayCap?.samples; if (!S?.length) return ''; const s = S.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a); const m = Math.floor(((s.gm % 1440) + 1440) % 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + ' '; };
-const transcript = [...cap.says.map(x => ({ t: x.t, line: `${x.agent}: "${x.text}"` })), ...cap.acts.filter(x => !/^arrived at|walks toward|walks to /.test(x.text)).map(x => ({ t: x.t, line: `${x.agent}: ${x.text}` })), ...cap.narr.map(x => ({ t: x.t, line: `* ${x.text}` }))].sort((a, b) => a.t - b.t).map(x => `[${x.t.toFixed(0).padStart(4)} s] ${clockAt(x.t)}${x.line}`);
+const transcript = [...cap.says.map(x => ({ t: x.t, line: `${x.agent}: "${x.text}"` })), ...cap.acts.filter(x => !/^arrived at|walks toward|walks to |^facing \w+$/.test(x.text)).map(x => ({ t: x.t, line: `${x.agent}: ${x.text}` })), ...cap.narr.map(x => ({ t: x.t, line: `* ${x.text}` }))].sort((a, b) => a.t - b.t).map(x => `[${x.t.toFixed(0).padStart(4)} s] ${clockAt(x.t)}${x.line}`);
 fs.mkdirSync('results', { recursive: true });
-fs.writeFileSync(`results/live-${name}-${label}-transcript.txt`, transcript.join('\n') + '\n');
+// as the player's log shows them: the same action line from the same character again and again is one line with a count
+const shown = [];
+for (const l of transcript) { const body = l.replace(/^\[[^\]]*\]\s*(\d\d:\d\d\s+)?/, ''), prev = shown.at(-1); if (prev && prev.body === body && !/: "/.test(body)) { prev.n++; continue; } shown.push({ l, body, n: 1 }); }
+fs.writeFileSync(`results/live-${name}-${label}-transcript.txt`, shown.map(x => x.n > 1 ? `${x.l} (x${x.n})` : x.l).join('\n') + '\n');
 fs.writeFileSync(out, JSON.stringify({ summary, url, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
 console.log('saved', out);
 await page.close().catch(() => {}); await b.close().catch(() => {});

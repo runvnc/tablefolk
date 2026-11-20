@@ -93,7 +93,7 @@
     const text = String(spec.announce || `{name}s are coming!`).replace(/\{name\}s\b/g, plural(name)).replace(/\{name\}/g, name).replace(/^\w/, c => c.toUpperCase());
     try { window.tablefolkDirector?.narrate?.(text); } catch {}
     try { log('[threat] ' + text); } catch {}
-    J()?.addNews?.('', text);
+    J()?.addNews?.('', text, 'raid');
     for (const c of state.characters) if (!c._threat && !c.defeated && !P()?.isAnimal?.(c)) try { window.tablefolkMind?.addMemory?.(c, text, 1.5, 'event'); } catch {}
     console.info('[threats] spawned', gr.ids.join(', '), 'at', at);
     return gr;
@@ -149,7 +149,7 @@
     const down = gr.ids.filter(id => state.characters.find(c => c.id === id)?.defeated).length;
     const what = gr.spec.behaviour === 'pilfer' ? ` (they ate ${gr.ate} from the stores)` : gr.spec.behaviour === 'rob' ? ` (they stole ${gr.stole} gold)` : '';
     const text = `${gr.startAlive} ${gr.startAlive > 1 ? plural(gr.spec.name) : gr.spec.name} came${gr.spec.when === 'night' ? ' in the night' : ''}${what}; ${names.length ? names.join(' and ') + ' drove them off' : 'they left on their own'}${down ? ` (${down} struck down)` : ''}.`;
-    J()?.addNews?.('', text);
+    J()?.addNews?.('', text, 'raid');
     for (const c of state.characters) {
       if (c._threat || c.defeated || P()?.isAnimal?.(c)) continue;
       try { window.tablefolkMind?.addMemory?.(c, text, 2, 'event'); } catch {}

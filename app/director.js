@@ -89,7 +89,8 @@
     for (const o of state.characters) {
       if (o === c || o.defeated) continue;
       const e = (M.mindOf(o).mem || []).filter(x => (x.kind === 'event' || x.kind === 'belief') && x.w >= 1.5 && !/^You (sold|gave)/.test(x.text)).pop();
-      if (e) { const said = String(e.text).replace(/\byour\b/gi, o.id + "'s").replace(/\byou\b/gi, o.id); out.push({ text: `{who} overhears a rumour: ${said}`, rumour: said }); }
+      // (never a rumour about the one who overhears it: "odo overhears a rumour: odo bought wheat")
+      if (e) { const said = String(e.text).replace(/\byour\b/gi, o.id + "'s").replace(/\byou\b/gi, o.id); if (!new RegExp('\\b' + c.id + '\\b', 'i').test(said)) out.push({ text: `{who} overhears a rumour: ${said}`, rumour: said }); }
     }
     const fresh = out.filter(e => !used.has(e.text.replace(/\{who\}/g, c.id)) && !used.has(e.text));
     return fresh.length && Math.random() < .33 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
@@ -132,6 +133,8 @@
       if (o.defeated) continue;
       const q = posOf(o), d = Math.hypot(q.x - p.x, q.z - p.z);
       if (o !== c && d > 4) continue;
+      // a rumour is not told to the one it is about
+      if (o !== c && ev.rumour && new RegExp('\\b' + o.id + '\\b', 'i').test(ev.rumour)) continue;
       const cfg = getBrainConfig(o.id);
       setBrainConfig(o.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${o === c ? toYou(text, who) : text}`]).slice(-5) });
     }
@@ -139,6 +142,8 @@
     state.globalHistory = (state.globalHistory || []).concat([`T${state.turn?.index ?? 0} event: ${text}`]).slice(-20);
     narrate(text);
     log('[director] ' + text);
+    // the day's news for the evening's talk (jobs.js topics); a rumour stays hearsay
+    if (!ev.rumour) try { window.tablefolkJobs?.addNews?.('', text.replace(/[.!]+$/, ''), 'event'); } catch {}
     return text;
   }
   // "grub's stomach growls" -> "your stomach growls", to the one it happens to

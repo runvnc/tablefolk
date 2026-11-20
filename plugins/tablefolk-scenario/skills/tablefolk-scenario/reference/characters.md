@@ -102,9 +102,13 @@ a ring in, and the player finds it there. The player does the same with E.
   soon; everyone else in earshot overhears it ("You overhear grub telling
   pip: ...", "grub says to nobody in particular: ..."), which needs no
   answer. The player's words always count as said to the one they talk to.
-- **Conversations end**: after three exchanges between two characters
-  without the player, their lines count as overheard for 90 s and each is
-  told it has said its piece.
+- **Conversations end**: after four lines between two characters without
+  the player, their lines count as overheard for 120 s, each is told it has
+  said its piece, and both talk with nobody but the player for 90 s.
+  One conversation at a time within earshot: while two characters talk,
+  the others nearby start none (the player is always answered).
+- **Short lines**: a character's line under four words is not spoken
+  unless it answers a yes/no question; it nods, shrugs or huffs instead.
 - **Talking needs a reason**: a character nobody has spoken to (and to whom
   nothing happened) may only speak when it has news to tell someone near, a
   want that needs a person (food it has to ask or pay for), a goal naming

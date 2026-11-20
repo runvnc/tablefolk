@@ -586,6 +586,32 @@
       case 'agent_hp': { const cfg = ctx.w.getBrainConfig(v[0]); return cmp(v[1], cfg.hp ?? cfg.maxHp ?? 10, +v[2]); }
       case 'player_hp': return cmp(v[0], ctx.player.hp ?? ctx.player.maxHp ?? 10, +v[1]);
       case 'player_defeated': return !!W().getPlayerAvatar?.()?.defeated === (v !== false);
+      // living worlds (clock.js, threats.js, uses.js stores):
+      // survived_days: 2 = the clock has reached dawn (06:00) after the 2nd night
+      case 'survived_days': { const k = window.tablefolkClock?.now?.(); return !!k && ((k.day - 1) * 1440 + k.min) >= (+v || 1) * 1440 + 360; }
+      // stock_at_least: ["wheat", 10]: that many in the stores (chests, barrels, crates) put together
+      case 'stock_at_least': {
+        const [name, n = 1] = Array.isArray(v) ? v : [v, 1]; let total = 0;
+        for (const o of ctx.objects) { const c = o.opts?.contents || (window.tablefolkUses?.contents && o.mesh ? (() => { try { return window.tablefolkUses.contents(o.mesh); } catch { return null; } })() : null); if (c) total += /^gold$/i.test(name) ? (+c.gold || 0) : itemCount(c.items, name); }
+        return total >= +n;
+      }
+      // threat_defeated: "wolf" or ["wolf", 3]: that many raiders of that kind or body struck down ("any" for all kinds)
+      case 'threat_defeated': {
+        const [what, n = 1] = Array.isArray(v) ? v : [v, 1], w = String(what || 'any').toLowerCase();
+        let down = 0;
+        for (const gr of window.tablefolkThreats?.groups || []) {
+          const tag = [gr.spec?.kind, gr.spec?.who, gr.spec?.name].flat().filter(Boolean).map(x => String(x).toLowerCase());
+          if (w !== 'any' && !tag.some(t => t === w || t.replace(/s$/, '') === w.replace(/s$/, ''))) continue;
+          down += gr.ids.filter(id => ctx.w.getBrainConfig(id)?.defeated).length;
+        }
+        return down >= +n;
+      }
+      // agents_alive: 4 (or "all"): that many characters with a mind still standing (monsters, raiders and animals not counted)
+      case 'agents_alive': {
+        const folk = (active?.scn?.agents || []).filter(a => !a.hostile && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/.test(a.model || ''));
+        const up = folk.filter(a => !ctx.w.getBrainConfig(a.id)?.defeated).length;
+        return v === 'all' ? up >= folk.length : up >= +v;
+      }
       default: return false;
     }
   }
@@ -947,6 +973,8 @@
       gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: ['everyone', 'player'].includes(s.monsters) ? s.monsters : null,   // unset: everyone in a living world, the player otherwise (play.js preyFor)
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
       // mind.js tempers: insults anger characters and push them to refuse, order out, call for help or fight ("tempers": false: off); how quickly ("temper": short | normal | long, agents may override)
+      // "talk": true: a talk-only scene (the world builder leaves out jobs, threats and the living-world rules)
+      talk: s.talk === true ? true : null,
       tempers: s.tempers !== false, temper: ['short', 'normal', 'long'].includes(s.temper) ? s.temper : null,
       // clock.js: the time of day ("time": "08:00", "dayMinutes": 12 real minutes a day, 0 frozen; "clock": false: none)
       time: typeof s.time === 'string' && /^\d{1,2}:\d{2}$/.test(s.time) ? s.time : null, dayMinutes: Number.isFinite(+s.dayMinutes) && s.dayMinutes !== null && s.dayMinutes !== '' ? Math.max(0, Math.min(240, +s.dayMinutes)) : null, clock: s.clock === false ? false : null,
@@ -972,7 +1000,7 @@
       defaultModel: s.brain === 'none' ? 'none' : typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
       systemPrompt: typeof s.systemPrompt === 'string' && s.systemPrompt.trim() ? s.systemPrompt : null,
-      food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || .6 }).filter(f => f.name ?? f) : [],
+      food: Array.isArray(s.food) ? s.food.slice(0, 64).map(f => typeof f === 'string' ? f : { name: String(f?.name || ''), nourish: +f?.nourish || (f?.drink ? .25 : .6), ...(f?.drink ? { drink: true } : {}) }).filter(f => f.name ?? f) : [],
       paint: Array.isArray(s.paint) ? s.paint.filter(c => c && Number.isFinite(+c.x) && Number.isFinite(+c.z) && (PAINT_MATS.includes(c.mat) || c.mat === 'none')) : [] };
     if (!out.agents.length && !s._sub) out.agents = [{ id: 'folk1', personality: 'helpful and friendly' }];
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
