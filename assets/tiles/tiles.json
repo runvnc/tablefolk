@@ -93,28 +93,28 @@
   "chest": {
    "file": "objects/chest.png",
    "w": 133,
-   "h": 113,
+   "h": 151,
    "anchor": [
     66,
-    56.7
+    94.7
    ]
   },
   "table": {
    "file": "objects/table.png",
-   "w": 267,
-   "h": 141,
+   "w": 185,
+   "h": 159,
    "anchor": [
-    133.3,
-    84.7
+    92.2,
+    102.7
    ]
   },
   "bench": {
    "file": "objects/bench.png",
-   "w": 317,
-   "h": 115,
+   "w": 184,
+   "h": 113,
    "anchor": [
-    158.4,
-    58.7
+    91.6,
+    56.7
    ]
   },
   "stool": {
@@ -147,10 +147,10 @@
   "anvil": {
    "file": "objects/anvil.png",
    "w": 133,
-   "h": 113,
+   "h": 146,
    "anchor": [
     66,
-    56.7
+    89.7
    ]
   },
   "weapon_stand": {
@@ -245,20 +245,20 @@
   },
   "tree": {
    "file": "objects/tree.png",
-   "w": 185,
-   "h": 326,
+   "w": 652,
+   "h": 875,
    "anchor": [
-    92.4,
-    244.7
+    325.8,
+    596
    ]
   },
   "house": {
    "file": "objects/house.png",
-   "w": 299,
-   "h": 422,
+   "w": 606,
+   "h": 854,
    "anchor": [
-    149.2,
-    303.7
+    302.7,
+    581.2
    ]
   },
   "boulder": {
@@ -290,20 +290,20 @@
   },
   "well": {
    "file": "objects/well.png",
-   "w": 133,
-   "h": 275,
+   "w": 222,
+   "h": 304,
    "anchor": [
-    66,
-    197
+    110.8,
+    209.8
    ]
   },
   "market_stand": {
    "file": "objects/market_stand.png",
-   "w": 189,
-   "h": 308,
+   "w": 248,
+   "h": 328,
    "anchor": [
-    94.1,
-    208.3
+    123.6,
+    239.6
    ]
   },
   "market_stalls": {
@@ -317,11 +317,11 @@
   },
   "cart": {
    "file": "objects/cart.png",
-   "w": 133,
-   "h": 321,
+   "w": 241,
+   "h": 210,
    "anchor": [
-    66,
-    215.9
+    120.4,
+    137
    ]
   },
   "broken_cart": {
@@ -354,10 +354,10 @@
   "bed": {
    "file": "objects/bed.png",
    "w": 133,
-   "h": 255,
+   "h": 263,
    "anchor": [
     66,
-    149.9
+    155.2
    ]
   },
   "double_bed": {
@@ -372,10 +372,10 @@
   "bookcase": {
    "file": "objects/bookcase.png",
    "w": 133,
-   "h": 200,
+   "h": 217,
    "anchor": [
     66,
-    143.7
+    160.7
    ]
   },
   "banner": {
@@ -435,10 +435,10 @@
   "torch": {
    "file": "objects/torch.png",
    "w": 414,
-   "h": 447,
+   "h": 352,
    "anchor": [
     206.8,
-    271.3
+    178
    ]
   },
   "iron_chest": {
@@ -452,20 +452,20 @@
   },
   "fantasy_house": {
    "file": "objects/fantasy_house.png",
-   "w": 314,
-   "h": 590,
+   "w": 701,
+   "h": 923,
    "anchor": [
-    156.8,
-    425.2
+    350.2,
+    649.7
    ]
   },
   "stable": {
    "file": "objects/stable.png",
-   "w": 440,
-   "h": 388,
+   "w": 907,
+   "h": 772,
    "anchor": [
-    219.6,
-    255.4
+    453.2,
+    519.4
    ]
   },
   "windmill": {
@@ -740,29 +740,29 @@
   },
   "stone_house": {
    "file": "objects/stone_house.png",
-   "w": 355,
-   "h": 433,
+   "w": 494,
+   "h": 923,
    "anchor": [
-    177.1,
-    268.2
+    246.6,
+    621.4
    ]
   },
   "tall_house": {
    "file": "objects/tall_house.png",
-   "w": 221,
-   "h": 454,
+   "w": 476,
+   "h": 1087,
    "anchor": [
-    110,
-    310.9
+    237.6,
+    758.8
    ]
   },
   "barracks": {
    "file": "objects/barracks.png",
-   "w": 401,
-   "h": 600,
+   "w": 967,
+   "h": 1051,
    "anchor": [
-    200.5,
-    413.5
+    483.3,
+    781.7
    ]
   },
   "sawmill": {
@@ -776,29 +776,29 @@
   },
   "blacksmith": {
    "file": "objects/blacksmith.png",
-   "w": 465,
-   "h": 523,
+   "w": 893,
+   "h": 1129,
    "anchor": [
-    232.4,
-    356.1
+    446.2,
+    800.9
    ]
   },
   "mill_house": {
    "file": "objects/mill_house.png",
-   "w": 389,
-   "h": 554,
+   "w": 606,
+   "h": 1068,
    "anchor": [
-    194,
-    421.1
+    303,
+    794.6
    ]
   },
   "inn": {
    "file": "objects/inn.png",
-   "w": 568,
-   "h": 740,
+   "w": 863,
+   "h": 1310,
    "anchor": [
-    283.6,
-    499.7
+    431.4,
+    873.8
    ]
   },
   "gazebo": {
@@ -812,11 +812,11 @@
   },
   "hay": {
    "file": "objects/hay.png",
-   "w": 133,
-   "h": 196,
+   "w": 250,
+   "h": 324,
    "anchor": [
-    66,
-    139.7
+    124.9,
+    220.4
    ]
   },
   "fire_pit": {
@@ -875,11 +875,11 @@
   },
   "barn": {
    "file": "objects/barn.png",
-   "w": 510,
-   "h": 669,
+   "w": 838,
+   "h": 1458,
    "anchor": [
-    254.6,
-    439
+    418.5,
+    967.5
    ]
   },
   "silo_barn": {
@@ -929,83 +929,83 @@
   },
   "pine_tree": {
    "file": "objects/pine_tree.png",
-   "w": 281,
-   "h": 437,
+   "w": 490,
+   "h": 825,
    "anchor": [
-    140.4,
-    327.3
+    244.8,
+    626.8
    ]
   },
   "tall_pine": {
    "file": "objects/tall_pine.png",
-   "w": 324,
-   "h": 554,
+   "w": 493,
+   "h": 1014,
    "anchor": [
-    161.6,
-    426.7
+    246,
+    818.1
    ]
   },
   "dead_tree": {
    "file": "objects/dead_tree.png",
-   "w": 260,
-   "h": 432,
+   "w": 617,
+   "h": 620,
    "anchor": [
-    129.7,
-    324.8
+    308.2,
+    445.4
    ]
   },
   "autumn_tree": {
    "file": "objects/autumn_tree.png",
-   "w": 377,
-   "h": 519,
+   "w": 661,
+   "h": 988,
    "anchor": [
-    188.2,
-    382.1
+    330.4,
+    656.8
    ]
   },
   "oak_tree": {
    "file": "objects/oak_tree.png",
-   "w": 214,
-   "h": 448,
+   "w": 873,
+   "h": 904,
    "anchor": [
-    106.8,
-    353.2
+    436,
+    623.3
    ]
   },
   "tall_tree": {
    "file": "objects/tall_tree.png",
-   "w": 318,
-   "h": 544,
+   "w": 575,
+   "h": 926,
    "anchor": [
-    159,
-    414.5
+    287.4,
+    689.6
    ]
   },
   "red_bush": {
    "file": "objects/red_bush.png",
-   "w": 133,
-   "h": 168,
+   "w": 200,
+   "h": 275,
    "anchor": [
-    66,
-    111.7
+    99.7,
+    180.3
    ]
   },
   "flower_bush": {
    "file": "objects/flower_bush.png",
-   "w": 133,
-   "h": 168,
+   "w": 222,
+   "h": 279,
    "anchor": [
-    66,
-    111.7
+    110.7,
+    184
    ]
   },
   "fern": {
    "file": "objects/fern.png",
-   "w": 133,
-   "h": 130,
+   "w": 161,
+   "h": 191,
    "anchor": [
-    66,
-    73.7
+    80.2,
+    121.1
    ]
   },
   "mushroom_cluster": {
@@ -1285,6 +1285,15 @@
    "anchor": [
     66,
     121.7
+   ]
+  },
+  "bar_counter": {
+   "file": "objects/bar_counter.png",
+   "w": 388,
+   "h": 186,
+   "anchor": [
+    194,
+    129.7
    ]
   }
  },
