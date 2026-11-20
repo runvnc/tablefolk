@@ -29,7 +29,7 @@
   const hex = h => BABYLON.Color3.FromHexString(h);
   const GFX = () => window.TABLEFOLK_GFX || {};
   let sc = null, cam = null, sun = null, hemi = null, shadow = null, dome = null, domeTex = null, clouds = null, cloudMat = null, disc = null, discMat = null;
-  let hours = 10, world = { underground: false, fogNear: 6, fogFar: 140, sky: true }, painted = '', cur = null;
+  let hours = 10, world = { underground: false, fogNear: 6, fogFar: 140, sky: true }, painted = '', cur = null, cloudsOn = true, hills = null, hillMat = null;
 
   // keyframes: hour, sun colour, sun intensity, moon intensity, sky top, horizon, hemi sky, hemi ground, hemi intensity, environment, exposure, clouds, stars
   const K = (h, sunC, sunI, moonI, top, hor, hs, hg, hi, env, exp, cl, stars) => ({ h, sunC: hex(sunC), sunI, moonI, top: hex(top), hor: hex(hor), hs: hex(hs), hg: hex(hg), hi, env, exp, cl: hex(cl), stars });
@@ -39,8 +39,8 @@
     K(4.6, '#ffffff', 0, .7, '#0e1834', '#2c3a62', '#6a82c0', '#1a1c26', .52, .18, 1.3, '#303a5a', .9),
     K(5.7, '#ffa47a', .8, .1, '#4a6094', '#e6b49c', '#a0a4c0', '#4a4038', .5, .3, 1.15, '#e0a898', .25),
     K(7, '#ffe2c0', 3.2, 0, '#5a8ad0', '#d6dfe8', '#b4c4de', '#5a5040', .66, .5, 1.28, '#f6eee6', 0),
-    K(10, '#fff4e4', 3.8, 0, '#4a82d0', '#d2e0ee', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
-    K(15, '#fff2e0', 3.8, 0, '#4a82d0', '#d4e0ec', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
+    K(10, '#fff0d2', 3.8, 0, '#4a82d0', '#d2e0ee', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
+    K(15, '#ffeed0', 3.8, 0, '#4a82d0', '#d4e0ec', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
     K(16.6, '#ffe0b4', 3.4, 0, '#5684cc', '#e2dccc', '#c0c4d4', '#5e5040', .68, .5, 1.26, '#fff0e0', 0),
     K(17.5, '#ffb468', 3.0, 0, '#6a88c0', '#f4c48c', '#d0bcb0', '#5a4434', .6, .45, 1.24, '#ffd2a0', 0),
     K(18.6, '#ff8a52', 1.2, 0, '#46508a', '#e09a78', '#a69cb8', '#3a3036', .5, .32, 1.2, '#d89a88', .1),
@@ -78,6 +78,16 @@
     // v runs up the sphere: the canvas top is the zenith
     g.addColorStop(0, top); g.addColorStop(.32, mid); g.addColorStop(.47, hor); g.addColorStop(1, hor);
     c.fillStyle = g; c.fillRect(0, 0, W, H);
+    // soft clouds along the horizon band (the follow camera sees the sky only near the horizon)
+    if (L.cl && cloudsOn) {
+      let s2 = 4211; const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647, cc = L.cl;
+      for (let i = 0; i < 46; i++) {
+        const x = r2() * W, y = H * (.3 + r2() * .14), rw = 18 + r2() * 46, rh = 5 + r2() * 9, a = (.25 + r2() * .35) * Math.min(1, .3 + L.sunI * .3 + L.moonI * .4);
+        const g2 = c.createRadialGradient(x, y, 0, x, y, rw);
+        g2.addColorStop(0, `rgba(${cc.r * 255 | 0},${cc.g * 255 | 0},${cc.b * 255 | 0},${a.toFixed(3)})`); g2.addColorStop(1, 'rgba(255,255,255,0)');
+        c.save(); c.translate(x, y); c.scale(1, rh / rw); c.translate(-x, -y); c.fillStyle = g2; c.fillRect(x - rw, y - rw, rw * 2, rw * 2); c.restore();
+      }
+    }
     if (L.stars > .02) {
       let s = 9137; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
       for (let i = 0; i < 420; i++) { const x = r() * W, y = r() * H * .44, a = (.25 + r() * .75) * L.stars * (1 - y / (H * .5)); c.fillStyle = `rgba(255,250,240,${a.toFixed(3)})`; c.fillRect(x, y, r() < .1 ? 1.6 : 1, r() < .1 ? 1.6 : 1); }
@@ -130,6 +140,17 @@
     disc = BABYLON.MeshBuilder.CreatePlane('sky_sun', { size: 60 }, sc); disc.material = discMat; disc.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_ALL;
     disc.infiniteDistance = true; disc.isPickable = false; disc.alphaIndex = -800;
     if (tabletop) disc.setEnabled(false);
+    // far hills: a silhouette ring in the haze, its colour from the horizon each hour (outdoor worlds)
+    {
+      const P = [], I = [], N = 160, R = 420; let s3 = 77; const rr = () => (s3 = (s3 * 16807) % 2147483647) / 2147483647;
+      const ph = [rr() * 6.3, rr() * 6.3, rr() * 6.3];
+      for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2, h = 18 + 22 * (.5 + .5 * Math.sin(a * 3 + ph[0])) + 14 * (.5 + .5 * Math.sin(a * 7 + ph[1])) + 6 * Math.sin(a * 17 + ph[2]);
+        P.push(Math.cos(a) * R, -30, Math.sin(a) * R, Math.cos(a) * R, h, Math.sin(a) * R); if (i < N) { const k = i * 2; I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } }
+      hills = new BABYLON.Mesh('sky_hills', sc); const vd = new BABYLON.VertexData(); vd.positions = P; vd.indices = I; vd.applyToMesh(hills);
+      hillMat = new BABYLON.StandardMaterial('sky_hills_mat', sc); hillMat.disableLighting = true; hillMat.backFaceCulling = false; hillMat.fogEnabled = false; hillMat.diffuseColor = C3(0, 0, 0); hillMat.specularColor = C3(0, 0, 0);
+      hills.material = hillMat; hills.isPickable = false; hills.infiniteDistance = true; hills.alphaIndex = -700;
+      if (tabletop) hills.setEnabled(false);
+    }
     if (!window.TABLEFOLK_STILL_MODE) sc.onBeforeRenderObservable.add(() => { const t = performance.now() * 1e-6; ct.uOffset = (t * 4) % 1; ct.vOffset = (t * 1.5) % 1; });
   }
 
@@ -190,6 +211,7 @@
     const fog = u ? C3(0, 0, 0) : lc(L.hor, C3(.62, .72, .86), .18 * Math.min(1, L.sunI / 2));
     sc.fogColor = fog; sc.clearColor = new BABYLON.Color4(fog.r, fog.g, fog.b, 1);
     if (dome) { dome.setEnabled(!u && world.sky && !window.TABLEFOLK_TABLETOP); paintDome(L); }
+    if (hills) { hills.setEnabled(!u && world.sky && world.hills !== false && !window.TABLEFOLK_TABLETOP); hillMat.emissiveColor = lc(fog, lc(L.top, C3(.2, .26, .34), .5), .32); }
     if (cloudMat) { cloudMat.emissiveColor = L.cl; cloudMat.alpha = .75; clouds.setEnabled(!u && world.sky && !window.TABLEFOLK_TABLETOP); }
     if (disc) {
       const v = day ? sunVector(hours) : MOON_V, low = Math.max(0, Math.min(1, v.y / .25));

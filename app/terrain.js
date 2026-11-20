@@ -244,12 +244,13 @@ var tfRough: f32 = uniforms.tfFlags.y; var tfAO: f32 = 1.0;
     // far fields: a patchwork of crops and meadows outside the board (land worlds)
     let tfOut = max(abs(tfP.x) - uniforms.tfParams.z, abs(tfP.y) - uniforms.tfParams.w);
     if (uniforms.tfExtra.x > 0.5) {
-      let q = vec2f(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + (n1 * 3.0);
+      let wq = vec2f(tfNoise(tfP * 0.021 + vec2f(4.0, 1.0)), tfNoise(tfP * 0.021 + vec2f(9.0, 6.0))) - vec2f(0.5);
+      let q = vec2f(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + wq * 22.0 + n1 * 2.0;
       let cell = floor(q / vec2f(26.0, 17.0)); let h = tfHash(cell);
       let tint = select(select(vec3f(1.3, 1.16, 0.66), vec3f(1.1, 1.14, 0.86), h > 0.33), vec3f(0.96, 0.85, 0.66), h > 0.72);
       // soft field edges (a hedge-dark seam), never a hard step
       let fe = abs(fract(q / vec2f(26.0, 17.0)) - vec2f(0.5)) * 2.0; let edge = smoothstep(0.78, 1.0, max(fe.x, fe.y));
-      col = mix(col, mix(col * tint, col * 0.8, edge * 0.6), smoothstep(12.0, 34.0, tfOut) * 0.55 * (1.0 - edge * 0.6));
+      col = mix(col, mix(col * tint, col * 0.78, edge * 0.7), smoothstep(16.0, 45.0, tfOut) * 0.32);
     }
     surfaceAlbedo = pow(max(col, vec3f(0.0)), vec3f(2.2));
     let tn = tfAccN / tfSum; let tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
@@ -294,11 +295,12 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     col *= mix(1.0, mix(0.84, 1.1, smoothstep(0.45, 0.95, tfPath)), min(1.0, tfPath * 2.2));
     float tfOut = max(abs(tfP.x) - tfParams.z, abs(tfP.y) - tfParams.w);
     if (tfExtra.x > 0.5) {
-      vec2 q = vec2(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + n1 * 3.0;
+      vec2 wq = vec2(tfNoise(tfP * 0.021 + vec2(4.0, 1.0)), tfNoise(tfP * 0.021 + vec2(9.0, 6.0))) - 0.5;
+      vec2 q = vec2(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + wq * 22.0 + n1 * 2.0;
       float h = tfHash(floor(q / vec2(26.0, 17.0)));
       vec3 tint = h > 0.72 ? vec3(0.96, 0.85, 0.66) : h > 0.33 ? vec3(1.1, 1.14, 0.86) : vec3(1.3, 1.16, 0.66);
       vec2 fe = abs(fract(q / vec2(26.0, 17.0)) - 0.5) * 2.0; float edge = smoothstep(0.78, 1.0, max(fe.x, fe.y));
-      col = mix(col, mix(col * tint, col * 0.8, edge * 0.6), smoothstep(12.0, 34.0, tfOut) * 0.55 * (1.0 - edge * 0.6));
+      col = mix(col, mix(col * tint, col * 0.78, edge * 0.7), smoothstep(16.0, 45.0, tfOut) * 0.32);
     }
     surfaceAlbedo = pow(max(col, vec3(0.0)), vec3(2.2));
     vec3 tn = tfAccN / tfSum; float tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
@@ -603,7 +605,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     try { T.rock?.dispose(); } catch {} T.rockCells = null; T.rock = T.mode === 'rock' ? buildRock() : null;
     window.tablefolkDark?.update?.();
     state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean);
-    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, indoor: true, fogNear: 8, fogFar: 32 } : { underground: false, indoor: false, fogNear: 30, fogFar: 200 });
+    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, indoor: true, hills: false, fogNear: 8, fogFar: 32 } : { underground: false, indoor: false, hills: T.mode !== 'sea', fogNear: 30, fogFar: 200 });
     // the textures (WebGPU only: the plugin's WGSL); kept while the layer set is the same
     const key = C.names.join(',') + '|' + (hi ? 2 : 1);
     // the textures wait until the world has started (the mean-colour ground shows until then), so they are

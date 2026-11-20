@@ -285,7 +285,9 @@
     const ow = room.x1 - room.x0 + 3, od = room.z1 - room.z0 + 3, across = side === 'n' || side === 's' ? ow : od, deep = side === 'n' || side === 's' ? od : ow;
     const role = roleOf(room), list = SHELL_ROLE[role] || HOUSES;
     const hsh = Math.abs(Math.sin(room.x0 * 12.9898 + room.z0 * 78.233) * 43758.5453) % 1;
-    const fits = list.map(m => ({ m, sx: across / SHELL_FOOT[m][0], sz: deep / SHELL_FOOT[m][1] })).filter(f => f.sx >= .75 && f.sx <= 1.25 && f.sz >= .75 && f.sz <= 1.25);
+    const fit = l => l.map(m => ({ m, sx: across / SHELL_FOOT[m][0], sz: deep / SHELL_FOOT[m][1] })).filter(f => f.sx >= .75 && f.sx <= 1.25 && f.sz >= .75 && f.sz <= 1.25);
+    // a home or farmhouse too big for the houses: the bigger timber buildings
+    let fits = fit(list); if (!fits.length && (list === HOUSES || role === 'farmhouse')) fits = fit(['inn', 'mill_house', 'fantasy_house', 'barracks']);
     if (!fits.length) return null;
     const pool = fits.length > 1 ? fits.filter(f => f.m !== lastShell) : fits, pick = pool[Math.floor(hsh * pool.length) % pool.length];
     lastShell = pick.m;
