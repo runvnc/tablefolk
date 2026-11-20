@@ -4551,7 +4551,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('feel')) ex.push('feel(mood) e.g. feel(angry) - show how you feel');
   // the same every turn (this is the cached prompt prefix): what it carries and
   // what is near it go at the end (commandReminder), not here
-  if(allowed.has('eat') && g) ex.push('eat(food) e.g. eat(bread) - eat food you carry; drink(ale) - drink something you carry (ale, water, a potion)');
+  if(allowed.has('eat') && g) ex.push('eat(food) e.g. eat(bread) - eat food you carry, or drink a potion you carry');
   if(allowed.has('use') && g) ex.push('use(thing) e.g. use(chest) - use something near you: open a chest, sit on a seat, lie on a bed, work at an anvil');
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');

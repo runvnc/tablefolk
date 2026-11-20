@@ -1124,7 +1124,7 @@ async function main() {
         return '\n' + name + '(' + args.map(a => /^-?\d+(\.\d+)?$/.test(a) ? a : JSON.stringify(a)).join(', ') + ')\n';
       }).replace(/<\/?tool_call>/g, '');
       // a command line ended like code, say("...");, is the command (E2B copied it from its own history: 'unknown command')
-      line = String(line || '').replace(/\)[ \t]*;[ \t]*$/gm, ')');
+      line = String(line || '').replace(/\)[ \t]*[;.][ \t]*$/gm, ')');   // (and say("..."). at chaos 50: the sword sale's first line was lost)
       if (simple) line = simpleReply(world, g, line);
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
