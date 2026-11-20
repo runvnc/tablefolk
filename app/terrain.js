@@ -45,7 +45,7 @@
   'use strict';
   const ENV = () => (window.tablefolkPacks?.base || '/assets/') + 'textures/env/';
   const GFX = () => window.TABLEFOLK_GFX || {};
-  const RES = 8, MARGIN = 8, FAR = 170;
+  const RES = 4, MARGIN = 8, FAR = 170;   // control map texels a cell (8 cost ~470 ms of main thread a build on a 45 x 35 board)
   const NATURAL = new Set(['grass_meadow', 'grass_dry', 'forest_floor', 'dirt_path', 'mud', 'sand', 'gravel', 'farmland', 'snow']);
   let manifest = null, manifestP = null;
   const T = { mesh: null, far: null, rock: null, sea: null, mat: null, rockMat: null, seaMat: null, arrays: null, arraysKey: '', ctrl: [], layers: [], mode: 'land', grid: false, cover: [], coverKey: '', sig: '' };
@@ -538,20 +538,33 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
 
   // ---- (re)build ----
   let busy = null, again = false;
+  let debounce = null, lastKey = '';
   function rebuild() {
+    // world construction asks many times in a few hundred ms: build once after the last request
+    clearTimeout(debounce);
+    return new Promise(res => { debounce = setTimeout(() => res(rebuildNow()), 120); });
+  }
+  function rebuildNow() {
     if (busy) { again = true; return busy; }
     busy = (async () => {
       try { await build(); } catch (e) { console.error('[terrain]', e); }
-      busy = null; if (again) { again = false; return rebuild(); }
+      busy = null; if (again) { again = false; return rebuildNow(); }
     })();
     return busy;
   }
+  // start-up profiling: window.__tfMarks (ms summed per part, and counts)
+  window.tfMark = window.tfMark || ((k, t0) => { const m = (window.__tfMarks ||= {}); const d = performance.now() - t0; m[k] = +((m[k] || 0) + d).toFixed(1); m[k + '#'] = (m[k + '#'] || 0) + 1; });
   async function build() {
     const sc = state.scene; if (!sc) return;
+    const tB = performance.now();
     await loadManifest();
     T.mode = mode();
     const lite = !!GFX().lite, hi = GFX().quality === 'high', maxL = lite ? 4 : 8;
-    const C = buildControl(T.mode, maxL);
+    // nothing changed (same size, mode, cell layers, walls): keep everything
+    const inKey = [WORLD.cols, WORLD.rows, T.mode, lite, hi, [...(state.paint || [])].map(([k, v]) => k + v.mat).join(), (state.blocks || []).length, T.grid].join('|');
+    if (inKey === lastKey && T.mesh && !T.mesh.isDisposed()) return;
+    lastKey = inKey;
+    const tC = performance.now(); const C = buildControl(T.mode, maxL); tfMark('terrain.control', tC);
     const I = inner();
     const sig = [WORLD.cols, WORLD.rows, T.mode, [...(state.paint || [])].filter(([, v]) => v.mat === 'sea').map(([k]) => k).join(';')].join('|');
     // meshes: rebuilt when the size, mode or sea changes; recoloured otherwise
@@ -591,10 +604,12 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, fogNear: 8, fogFar: 32 } : { underground: false, fogNear: 30, fogFar: 200 });
     // the textures (WebGPU only: the plugin's WGSL); kept while the layer set is the same
     const key = C.names.join(',') + '|' + (hi ? 2 : 1);
-    if (!/notex/.test(location.search)) {
+    // the textures wait until the world has started (the mean-colour ground shows until then), so they are
+    // decoded once, off the world's critical path
+    if (!/notex/.test(location.search) && (T.started || !window.tablefolkScenario)) {
       if (key !== T.arraysKey) {
         T.arraysKey = key;
-        const arr = await buildArrays(C.names, hi);
+        const tA = performance.now(); const arr = await buildArrays(C.names, hi); tfMark('terrain.arrays(async)', tA);
         if (T.arraysKey !== key) { arr.alb.dispose(); arr.nrm.dispose(); return; }
         if (T.arrays) { T.arrays.alb.dispose(); T.arrays.nrm.dispose(); }
         T.arrays = arr;
@@ -608,13 +623,15 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       P.u.k0 = ks.slice(0, 4); P.u.k1 = ks.slice(4); P.u.x = [T.mode === 'land' && kindFor() !== 'forest' ? 1 : 0, 0, 0, 0];
       P.tex = { tfCtrl0Sampler: C.tex[0], tfCtrl1Sampler: C.tex[1], tfAlbSampler: T.arrays.alb, tfNrmSampler: T.arrays.nrm };
     }
-    buildCover(C).catch(e => console.warn('[terrain] cover', e));
+    tfMark('terrain.build(async)', tB);
+    const tCv = performance.now(); buildCover(C).then(() => tfMark('terrain.cover(async)', tCv)).catch(e => console.warn('[terrain] cover', e));
     window.dispatchEvent(new CustomEvent('tablefolk-terrain', { detail: { mode: T.mode, layers: C.names } }));
   }
   function setGrid(on) { T.grid = !!on; }
   T.grid = !!(GFX().showGrid || window.TABLEFOLK_TABLETOP);
   // the world is finished (walls, rooms, scenario): build once more with all of it
-  addEventListener('tablefolk-scenario-started', () => setTimeout(rebuild, 700));
+  addEventListener('tablefolk-scenario-started', () => { T.started = true; lastKey = ''; setTimeout(rebuild, 400); });
+  addEventListener('tablefolk-scenario-exit', () => { T.started = false; });
   // water a walker would fall into: a sea cell, or past the board's edge where the sea is
   function waterAt(x, z) {
     const cx = Math.round(x), cz = Math.round(z), on = Math.abs(cx) <= WORLD.halfW - 1 && Math.abs(cz) <= WORLD.halfH - 1;

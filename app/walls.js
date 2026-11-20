@@ -124,7 +124,11 @@
   }
 
   function build(cell, top) {
+    const t0 = performance.now(); try { return build0(cell, top); } finally { window.tfMark?.('walls.build', t0); }
+  }
+  function build0(cell, top) {
     const M = materials(), H = wallH(), DH = doorHeight(), dark = underground(), houses = dark ? { walls: new Set(), inside: new Set() } : houseCells();
+    lastSig = looksSig(dark, houses);
     const B = { rubble: batch(), blocks: batch(), cap: batch(), plaster: batch(), timber: batch(), glass: batch() };
     const out = [];
     const isDoor = k => meta(cell.get(k))?.type === 'door';
@@ -248,7 +252,10 @@
     ensureDoorAnimator();
   }
 
-  // the world finished building (rooms, the outside known): draw the walls again
-  addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { scheduleWallRebuild(); } catch {} }, 650));
+  // which look each wall gets, as a string: a rebuild that would draw the same is skipped
+  let lastSig = '';
+  const looksSig = (dark, houses) => (dark ? 'u' : 'o') + [...houses.walls].sort().join(';').length + ':' + houses.walls.size + ':' + wallH();
+  // the world finished building (rooms, the outside known): draw the walls again if their looks changed
+  addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { const dark = underground(); if (looksSig(dark, dark ? { walls: new Set() } : houseCells()) !== lastSig) scheduleWallRebuild(); } catch {} }, 650));
   window.tablefolkWalls = { build, setNight, timber: () => materials().timber };
 })();

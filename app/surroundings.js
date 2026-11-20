@@ -50,7 +50,8 @@
     return models.get(type);
   }
 
-  async function start(scn) {
+  async function start(scn) { const t0 = performance.now(); try { await start0(scn); } finally { window.tfMark?.('surroundings(async)', t0); } }
+  async function start0(scn) {
     clear();
     const sc = state.scene; if (!sc) return;
     // terrain.js decides the mode a moment after the world starts
@@ -64,7 +65,8 @@
     // light quality: two or three models that share their bark and leaf textures
     if (lite) types.splice(0, types.length, ...(kind === 'forest' ? ['pine_tree', 'pine_tree_b', 'oak_tree'] : ['oak_tree', 'oak_tree_b', 'pine_tree_b']));
     const loaded = {};
-    for (const t of new Set(types)) { loaded[t] = await loadTree(t); if (my !== token) return; }
+    await Promise.all([...new Set(types)].map(async t => { loaded[t] = await loadTree(t); }));   // in parallel
+    if (my !== token) return;
     const hw = WORLD.halfW - .5, hh = WORLD.halfH - .5;
     let seed = 1234567 + (scn?.seed | 0) * 97;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
