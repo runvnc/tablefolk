@@ -439,6 +439,15 @@ Measured: testing.md, "A whole day".
   evening (17-21) and night per game hour, pairs, the top pair's share,
   questions; old runs: the guards' greetings counted as templated, the
   addressee guessed from names or the next speaker.
+- **Evenings** (jobs.js `evening`, `topicFor` -> `{ kind, text, question }`,
+  `openCue`/`openOf` rotating `OPEN` per pair in `ROT`, `socialLine`): one
+  narrow call (agentId `social`, 60 tokens, the card's feelings and
+  relations only), a question must end with "?" (one retry at .9), spoken
+  with `tablefolkTalk.speak(..., { answer: true })` so the other replies by a
+  normal model turn; `PAIR_LINES` per day picks the least-talked partner.
+  In 17-21: world-integration.js `busyNear` holds the floor 10 s (not 30),
+  a closed conversation releases it after 5 s, and live.js answers a
+  character's words after half the quiet gap without the idle tempo.
 
 ## Order of work
 

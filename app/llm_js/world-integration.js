@@ -405,8 +405,10 @@ function busyNear(id, r = 6) {
   const p = posById(id); if (!p) return false;
   const near = x => { const q = posById(x); return q && Math.hypot(q.x - p.x, q.z - p.z) <= r; };
   const now = performance.now();
+  // the evening's social window (17-21 on the clock): someone else's line holds the floor 10 s, not 30
+  const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null, floor = hr != null && hr >= 17 && hr < 21 ? 10000 : FLOOR_MS;
   return activeConvos().some(c => c.a !== id && c.b !== id && [c.a, c.b].some(near))
-    || [...lastLine].some(([who, l]) => who !== id && l.to !== id && now - l.at < FLOOR_MS && near(who));
+    || [...lastLine].some(([who, l]) => who !== id && l.to !== id && now - l.at < floor && near(who));
 }
 const isTalkedOut = id => (talkedOut.get(id) || 0) > performance.now();
 function convoLine(from, to) {
@@ -426,6 +428,9 @@ function convoLine(from, to) {
   if (c.n >= CONVO_LINES) {
     c.closedUntil = now + CONVO_CLOSED_MS; c.n = 0;
     talkedOut.set(from, now + TALKED_OUT_MS); talkedOut.set(to, now + TALKED_OUT_MS);
+    // a conversation that has ended holds the floor only 5 s more: the next pair may start
+    for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, now - FLOOR_MS + 5000); }
+    setTimeout(() => { for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, performance.now() - FLOOR_MS + 5000); } }, 50);
     for (const [x, y] of [[from, to], [to, from]]) { const g = charById(x), m = g && window.tablefolkMind?.mindOf(g); if (m) (m.pieceSaid ||= {})[y] = Date.now() + CONVO_CLOSED_MS; }
   }
   return true;

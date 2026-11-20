@@ -104,15 +104,25 @@ The day, by the clock:
 - **eating** when hungry: its own food, its store, the village store,
   buying from a seller, foraging (an apple tree, a food barrel), or asking
   someone;
-- **the evening** (18-21) at the tavern, or the square: the time for talk.
-  A character with someone beside it is handed one concrete thing from the
-  day's log, chosen by the game: "Tell wren about: you baked 4 bread" or
-  "Ask wren about: wren sold rosa meat for 3 gold" (made, sold, bought, who
-  ran out of what, a raid and who fought, who insulted whom, a director
-  event), each topic once per pair; news about someone is never told to
-  them as news, and a rumour is never overheard by the one it is about.
-  Only words go with it (say, whisper, emote, eat or drink, give, sell, a
-  seat);
+- **the evening** (17-21) at the tavern, or the square: the time for talk.
+  A character with someone beside it opens a talk with one line, chosen by
+  the game and written by one short model call: first one concrete thing
+  from the day's log ("Tell wren about: you baked 4 bread", or a question
+  about wren's own news: made, sold, bought, who ran out of what, a raid
+  and who fought, who insulted whom, what the player did, a director
+  event), each topic once per pair; when the day's topics are used up, an
+  open prompt grounded in its sheet and the world, a different one each
+  time for a pair: a question about the other's work, what it wants (its
+  agenda, goal or what its work lacks), its opinion of a named neighbour
+  (from what it remembers of them, or their trade and day), its plan for
+  tomorrow (from its job and the stores: "we need more wood"), a memory or
+  rumour, what it makes of the player, a question about the other's family.
+  A question must come out as a question (it ends with "?"; one retry, else
+  nothing is said). The other answers it, and the two talk a few lines;
+  partners who have talked least that evening go first, and a finished
+  talk frees the room for the next pair after 5 s. News about someone is
+  never told to them as news; a rumour is never overheard by the one it
+  is about;
 - **night**: home to its bed, up at dawn (a guard on night watch sleeps by
   day instead);
 - **threats**: fighters (guards, hunters) go to raiders; the others run

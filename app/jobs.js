@@ -55,7 +55,7 @@
   const DEFAULT_PRICES = { bread: 3, pie: 5, stew: 4, ale: 2, meat: 3, wheat: 1, flour: 2, firewood: 1, apple: 1, carrot: 1, pumpkin: 2, fish: 3, horseshoe: 6, nails: 2, knife: 5, 'iron ore': 2, stone: 1, hide: 3, bandage: 2, milk: 2, egg: 1, crystal: 4, note: 1 };
   const STATION_JOB = { anvil: 'smith', workbench: 'labourer', cauldron: 'cook', chop: 'woodcutter', mine: 'miner', read: 'scholar', train: 'guard' };
   const C = () => window.tablefolkChatter, W = () => window.tablefolk, U = () => window.tablefolkUses, M = () => window.tablefolkMind, P = () => window.tablefolkPlay, K = () => window.tablefolkClock;
-  const scn = () => window.tablefolkScenario?.active?.scn || {};
+  const scn = () => window.tablefolkScenario?.here?.() || window.tablefolkScenario?.active?.scn || {};   // the section the player is in (its agents, the world's prices)
   const posOf = g => g.logicalPos || g.root.position;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const nice = t => String(t || '').replace(/_/g, ' ');
@@ -311,7 +311,7 @@
   });
   addEventListener('tablefolk-scenario-started', e => {
     if (e.detail?.sub) return;
-    NEWS.length = 0; lastDay = 0; TOPIC_USED.clear();
+    NEWS.length = 0; lastDay = 0; TOPIC_USED.clear(); ROT.clear(); PAIR_LINES.clear(); ROT_MEM.clear();
     for (const g of state.characters) { g._job = undefined; g._jobDef = undefined; }
     // a little money by job, when the scenario gives none
     setTimeout(() => { for (const g of state.characters) { const j = jobOf(g), a = agentOf(g); if (j?.gold && a.inventory?.gold == null) { const i = inv(g); if (!i.gold) { i.gold = +j.gold; W().setBrainConfig(g.id, { inventory: i }); } } } }, 0);
@@ -669,7 +669,7 @@
       const t = gm(); s.greeted ||= {};
       const who = nearPeople(g, 4).find(c => (c !== state.playerAvatar || !!document.getElementById('chatName')?.value.trim()) && t - (s.greeted[nameOf(c)] ?? -999) >= 60);
       // by day a word in passing, at night a challenge (chatter.js pools "patrol", "challenge")
-      if (who) { const h = K()?.hour() ?? 12; if (C()?.say(g, h < 5 || h >= 21 ? 'challenge' : 'patrol', {}, { to: who })) s.greeted[nameOf(who)] = t; }
+      if (who) { const h = K()?.hour() ?? 12, night = h < 5 || h >= 22; if (night && who !== state.playerAvatar) s.greeted[nameOf(who)] = t; else if (C()?.say(g, night ? 'challenge' : 'patrol', {}, { to: who })) s.greeted[nameOf(who)] = t; }
     }
     if (r.done || r.fail) { s.sub.to = null; s.sub.i++; if (s.sub.i >= route.length) { s.sub.i = 0; return { done: true, ms: 4500, worked: true }; } return { busy: true, ms: 4500, worked: true }; }
     return r;
@@ -849,35 +849,44 @@
   function wake(g, s) { if (g.pose?.mode === 'lie') { U().standUp(g); say(g, `${g.id} gets up`, false); } }
 
   // ---------------------------------------------------------------- the evening
+  // the social window (17-21): at the tavern (or the square) people talk.
+  // One line opens a pair's talk: ONE concrete thing from the day's log
+  // (topicFor), else, the day's topics used up, an open prompt grounded in
+  // the character sheet and the world (openCue, rotating per pair). The line
+  // comes from one narrow model call (socialLine): a question must be a
+  // question (it ends with "?", one retry, else nothing is said); it goes to
+  // the other as speech to answer (tablefolkTalk.speak, answer), so a pair
+  // talks a few lines; partners who have talked least this evening first.
+  const socialHour = h => h >= 17 && h < 21;
   async function evening(g, s) {
     const tav = places().find(p => p.kind === 'tavern') || places().find(p => p.kind === 'square');
     setDoing(g, s, tav ? `spending the evening at the ${tav.id}` : 'resting after work');
     if (tav && !inPlace(tav, posOf(g).x, posOf(g).z)) { if (!s.sub.eve) s.sub.eve = spotIn(tav, g); const r = await goTo(g, s, s.sub.eve.x, s.sub.eve.z, 'the ' + tav.id); if (!r.fail) return { ms: r.ms || 3000 }; }
     s.sub.eve = null;
-    // the social window: a word with someone near, now and then, about ONE
-    // concrete thing from the day (topicFor), each topic once per pair; not
-    // while another pair talks nearby or right after its own talk (tablefolkTalk)
-    const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar);
-    if (near.length && gm() - s.lastSocial >= 60 && Math.random() < .45 && brainOk() && window.tablefolkLive?.quiet?.() !== false && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
-      const x = near[Math.floor(Math.random() * near.length)], tp = topicFor(g, x);
+    const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar && c.pose?.mode !== 'lie');
+    if (near.length && gm() - s.lastSocial >= 40 && Math.random() < .6 && brainOk() && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
+      const day = K()?.now()?.day || 0, n = x => PAIR_LINES.get(day + '|' + [g.id, x.id].sort().join('|')) || 0;
+      const free = near.filter(x => window.tablefolkTalk?.mayStart?.(x.id) !== false);
+      const x = (free.length ? free : near).slice().sort((a, b) => n(a) - n(b) || Math.random() - .5)[0];
       s.lastSocial = gm();
-      if (tp) {
-        s.social = true;
-        const cfg = W().getBrainConfig(g.id);
-        W().setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`(Evening at the ${tav?.id || 'square'}, ${x.id} beside you. ${tp} Say it to ${x.id} in one or two sentences of your own.)`]).slice(-5) });
-        try { await modelTurn(g, 'social'); } finally { s.social = false; }
+      const cue = topicFor(g, x) || openCue(g, x);
+      if (cue) {
+        const ok = await socialLine(g, x, cue, tav);
+        if (ok) { const k = day + '|' + [g.id, x.id].sort().join('|'); PAIR_LINES.set(k, n(x) + 1); }
         return { ms: 6000 };
       }
     }
     if (!g.pose && Math.random() < .4) { const seat = nearest(g, things('seat').filter(o => dist(posOf(g), o) < 5 && !state.characters.some(c => c.pose?.on === o.mesh))); if (seat) { await runLine(g, `use(${seat.type})`); return { ms: 9000 }; } }
     return { ms: rnd(5000, 9000) };
   }
+  const PAIR_LINES = new Map();   // day|a|b -> evening lines started by the pair
 
-  // ONE thing to talk about with x, from the day's log: "Tell x about: ..."
-  // (its own doings, the village's news) or "Ask x about: ..." (x's own);
-  // a topic about x is never told to x as news; each topic once per pair
+  // ONE thing to talk about with x, from the day's log: tell x about it (its
+  // own doings, the village's news) or ask x about it (x's own); a topic about
+  // x is never told to x as news; each topic once per pair.
+  // -> { text, question } | null
   const TOPIC_USED = new Set();
-  const PREF = { raid: 0, quarrel: 1, insult: 1, short: 2, event: 2, made: 3, sold: 3, bought: 4, news: 4 };
+  const PREF = { raid: 0, player: 1, quarrel: 1, insult: 1, short: 2, event: 2, made: 3, sold: 3, bought: 4, news: 4 };
   function topicFor(g, x) {
     const t = gm(), pair = [g.id, x.id].sort().join('|'), fresh = n => t - n.at < 1440 && !TOPIC_USED.has(pair + '|' + n.id);
     const you = text => String(text).replace(new RegExp('\\b' + esc(g.id) + '\\b', 'g'), 'you').replace(/^you\b/, 'You');
@@ -885,17 +894,102 @@
     const pool = NEWS.filter(fresh);
     const tell = byPref(pool.filter(n => !n.about.includes(x.id)))[0];
     const ask = byPref(pool.filter(n => n.about.includes(x.id) && !n.about.includes(g.id) && n.kind !== 'insult'))[0];
-    // its own news first, then the village's, then a question about the other's day
     const own = byPref(pool.filter(n => n.about.includes(g.id) && !n.about.includes(x.id)))[0];
     const n = own || tell || ask;
-    if (n) { TOPIC_USED.add(pair + '|' + n.id); return n === ask ? `Ask ${x.id} about: ${String(n.text).replace(/[.!]+$/, '')}.` : `Tell ${x.id} about: ${you(n.text).replace(/[.!]+$/, '')}.`; }
-    // nothing logged: its own day, once a day per pair
-    const k = K()?.now()?.day || 0, key = pair + '|day' + k + '|' + g.id, day = todayLine(s0(g));
-    if (day !== 'nothing yet' && !TOPIC_USED.has(key)) { TOPIC_USED.add(key); return `Tell ${x.id} about: today you ${day}.`; }
-    return '';
+    if (n) {
+      TOPIC_USED.add(pair + '|' + n.id);
+      const fact = String(n.text).replace(/[.!]+$/, '');
+      if (n === ask) return { kind: 'ask', question: true, text: `Today ${fact}. Ask ${x.id} about it.` };
+      if (n.kind === 'player') return { kind: 'player', question: Math.random() < .5, text: `Today ${fact}. ${Math.random() < .5 ? `Say what you think of that to ${x.id}.` : ''}` };
+      return { kind: 'tell', text: `Tell ${x.id} about this: ${you(fact)}.` };
+    }
+    return null;
   }
   const s0 = g => g._job || S(g);
 
+  // the day's topics used up: open prompts, one per turn per pair, in turn:
+  // the other's work, a want, an opinion of a neighbour, tomorrow's plan, a
+  // memory or rumour, the player, the other's family; each grounded in the
+  // sheet or the world (a kind with nothing to ground it is skipped)
+  const ROT = new Map();   // pair -> next kind index
+  const OPEN = ['work', 'want', 'opinion', 'plan', 'memory', 'player', 'family'];
+  function openCue(g, x) {
+    const pair = [g.id, x.id].sort().join('|'), start = ROT.get(pair) || 0;
+    for (let k = 0; k < OPEN.length; k++) {
+      const kind = OPEN[(start + k) % OPEN.length], c = openOf(kind, g, x);
+      if (c) { ROT.set(pair, (start + k + 1) % OPEN.length); return { kind, ...c }; }
+    }
+    return null;
+  }
+  function openOf(kind, g, x) {
+    const cfg = W().getBrainConfig(g.id), xj = jobOf(x), xs = x._job, mine = s0(g), mj = jobOf(g), m = M()?.mindOf?.(g);
+    const jobName = j => (j?.name || j?.id || '').toLowerCase();
+    if (kind === 'work') {
+      if (!xj || xj.id === 'idler') return null;
+      const did = xs ? todayLine(xs) : 'nothing yet';
+      return { question: true, text: `${x.id} is the ${jobName(xj)}${did !== 'nothing yet' ? ` (today: ${did})` : ''}. Ask ${x.id} a question about their work.` };
+    }
+    if (kind === 'family') return { question: true, text: `Ask ${x.id} a friendly question about their family or their home.` };
+    if (kind === 'want') {
+      const w = cfg.agenda || cfg.goal || (mine.lastNeed ? `more ${mine.lastNeed.item} for your work` : '') || (M()?.cardLines?.(g) || []).find(l => /^You want:/.test(l))?.replace(/^You want:\s*/, '');
+      return w ? { text: `What you want: ${String(w).replace(/[.!]+$/, '')}. Tell ${x.id} about it.` } : null;
+    }
+    if (kind === 'opinion') {
+      const ids = new Set(state.characters.filter(c => c !== g && c !== x && !c.defeated && jobOf(c)).map(c => c.id));
+      const rel = Object.entries(m?.rel || {}).filter(([id, r]) => ids.has(id) && Math.abs(r.v) >= .1).sort((a, b) => Math.abs(b[1].v) - Math.abs(a[1].v))[0];
+      if (rel) return { text: `You ${rel[1].v > 0 ? 'like' : 'dislike'} ${rel[0]} (${rel[1].why}). Tell ${x.id} what you think of ${rel[0]}.` };
+      const o = state.characters.filter(c => ids.has(c.id))[Math.floor(Math.random() * Math.max(1, ids.size))];
+      if (!o) return null;
+      const od = o._job ? todayLine(o._job) : 'nothing yet';
+      return { text: `${o.id} is the ${jobName(jobOf(o))}${od !== 'nothing yet' ? ` and today ${o.id} ${od}` : ''}. Give ${x.id} your honest opinion of ${o.id}.` };
+    }
+    if (kind === 'plan') {
+      if (!mj || mj.id === 'idler') return null;
+      const inputs = (mj.steps || []).flatMap(st => altSets(st.fetch || st.needs)[0] ? Object.keys(altSets(st.fetch || st.needs)[0]) : []);
+      const low = inputs.find(i => !inStores(i) && !count(g, i));
+      const plan = mine.lastNeed ? `get more ${mine.lastNeed.item}` : low ? `find more ${low}: the stores have none` : (mj.steps || []).map(st => st.doing).find(Boolean) || `work as the ${jobName(mj)}`;
+      return { text: `Your plan for tomorrow: ${plan}. Tell ${x.id} about it${low ? ' (we need more ' + low + ')' : ''}.` };
+    }
+    if (kind === 'memory') {
+      const e = (m?.mem || []).filter(e => e.w >= 1.4 && !new RegExp('\\b' + esc(x.id) + '\\b', 'i').test(e.text) && !(ROT_MEM.get(g.id) || new Set()).has(e.text)).slice(-6).pop();
+      if (!e) return null;
+      (ROT_MEM.get(g.id) || ROT_MEM.set(g.id, new Set()).get(g.id)).add(e.text);
+      return { text: `Something you remember: ${String(e.text).replace(/[.!]+$/, '')}. Tell ${x.id} about it.` };
+    }
+    if (kind === 'player') {
+      const pn = document.getElementById('chatName')?.value.trim() || 'the traveller', t = gm();
+      const n = NEWS.filter(n => n.kind === 'player' && t - n.at < 1440).pop();
+      if (n) return { question: true, text: `Today ${String(n.text).replace(/[.!]+$/, '')}. Ask ${x.id} what they make of ${pn}.` };
+      if (!state.playerAvatar) return null;
+      return { question: true, text: `A stranger, ${pn}, is in the village. Ask ${x.id} what they make of ${pn}.` };
+    }
+    return null;
+  }
+  const ROT_MEM = new Map();
+  // one line to x from one narrow call; a question must end with "?" (one retry)
+  async function socialLine(g, x, cue, tav) {
+    const cfg = W().getBrainConfig(g.id), xcfg = W().getBrainConfig(x.id), xj = jobOf(x);
+    const card = (M()?.cardLines?.(g) || []).filter(l => /^(You feel|You like|You dislike|What you are quietly after)/.test(l)).join('\n');
+    const who = `${x.id}${xj && xj.id !== 'idler' ? ', the ' + (xj.name || xj.id).toLowerCase() : xcfg.style ? ', ' + xcfg.style : ''}`;
+    const how = cue.question
+      ? `Write ONE short question to ${x.id}, under 20 words. Start with "${x.id}," and end with a question mark.`
+      : `Say it to ${x.id} in one or two short sentences, under 30 words, in your own voice.`;
+    const user = `${card ? card + '\n' : ''}Evening at the ${tav?.id || 'square'}. ${who} is beside you.\n${cue.text}\n${how} Only the words.`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      event(g, 'social');
+      let t = '';
+      try {
+        const r = await window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: `You are ${g.id}${cfg.style ? ', ' + cfg.style : ''}. ${String(cfg.personality || '').slice(0, 300)}` }, { role: 'user', content: user + (attempt ? `\nIt MUST be a question ending with "?".` : '') }], max_tokens: 60, temperature: attempt ? .9 : .7, agentId: 'social' });
+        t = String(r?.choices?.[0]?.message?.content || '').split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+      } catch (e) { console.warn('[jobs] social', e); return false; }
+      t = t.replace(/^say\s*\(\s*/i, '').replace(/\)\s*;?\s*$/, '').replace(/^[\w-]+:\s*/, '').replace(/^["“'*]+|["”'*]+$/g, '').trim().slice(0, 220);
+      if (t.length < 8 || /[{}<>]|\b(say|walk|give)\(/.test(t)) continue;
+      if (cue.question && !/\?["'”]?$/.test(t)) { console.info('[jobs] social: not a question:', g.id, t); continue; }
+      const r = window.tablefolkTalk?.speak?.(g, t, { to: x, answer: true });
+      return !!r;
+    }
+    return false;
+  }
   // ---------------------------------------------------------------- threats (threats.js lists the raiders)
   const fighter = (g, j) => !!(j?.fights || /guard|soldier|knight|hunter|warrior/i.test(j?.id || ''));
   async function threatened(g, s, j, asleep = false) {

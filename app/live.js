@@ -144,7 +144,9 @@
     // with idle turns gone, characters' talk ran back to back, 6.7 lines a minute in the bakery)
     const pn = (document.getElementById('chatName')?.value || '').trim().toLowerCase();
     const fromPlayer = c => (getBrainConfig(c.id).pendingChat || []).some(l => pn && String(l).toLowerCase().startsWith(pn + ' says'));
-    const pend = all.filter(c => reason(c) === 'pending' && now - lastSpeechAt >= Math.max(1500, P0().quiet * (fromPlayer(c) ? 333 : 1500) * tempo()));
+    // (in the evening's social window, 17-21 on the clock, a character's words to another wait half the quiet gap, whatever the tempo: the time for talk)
+    const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null, eve = hr != null && hr >= 17 && hr < 21;
+    const pend = all.filter(c => reason(c) === 'pending' && now - lastSpeechAt >= (eve && !fromPlayer(c) ? Math.max(1500, P0().quiet * 500) : Math.max(1500, P0().quiet * (fromPlayer(c) ? 333 : 1500) * tempo())));
     if (pend.length) return pend.sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
     // fighters don't wait for a quiet moment
     const fight = all.filter(c => nextAt.get(c) <= now && fighting(c)).sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];

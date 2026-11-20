@@ -27,6 +27,8 @@
   const PKG = [];             // [{ from, pools }] from packages (reset with the scenario)
   const GAP = 20000, URGENT_GAP = 6000;
   const URGENT = new Set(['raid', 'raid_fighter', 'intruder', 'allclear']);
+  // kinds a whole village says at once (bedtime): one of them every so often, from anyone
+  const KIND_GAP = { bed: 15000, wake: 15000, allclear: 30000, raid: 4000 }, kindAt = {};
   const W = () => window.tablefolk, P = () => window.tablefolkPlay, M = () => window.tablefolkMind;
   const posOf = g => g.logicalPos || g.root.position;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -86,6 +88,7 @@
     const now = performance.now(), c = g._chatter ||= { at: -1e9, last: '', byKind: {} };
     if (!force && now - c.at < (URGENT.has(kind) ? URGENT_GAP : GAP)) return false;
     if (to && !mindful(to) && to !== state.playerAvatar) return false;
+    if (!force && KIND_GAP[kind] && now - (kindAt[kind] || -1e9) < KIND_GAP[kind]) return false;
     if (!listener(g, to)) return false;
     const name = to ? (to === state.playerAvatar ? playerName() : to.id) : (slots.name ?? '');
     const all = { me: g.id, ...slots, name };
@@ -95,7 +98,7 @@
     const text = lines[Math.floor(Math.random() * lines.length)];
     const r = window.tablefolkTalk?.speak?.(g, text, { to: to || null, templated: kind });
     if (!r) return false;
-    c.at = now; c.last = text; c.byKind[kind] = text;
+    c.at = now; c.last = text; c.byKind[kind] = text; kindAt[kind] = now;
     return true;
   }
 
