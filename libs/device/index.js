@@ -138,12 +138,14 @@ const PROBE_KEY = 'CardProbe';
 export let lastProbe = null;   // { gb, holds, why, gbs }: the last probe run here
 export async function probeHolds(adapter, gb, sig, bwGBs = null) {
   // a yes is kept; a no is measured again after a day (the card may only have been busy)
-  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || (c.holds === false && Date.now() - c.at < 864e5))) return c.holds; } catch {}
+  try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || Date.now() - c.at < 864e5)) return c.holds ?? null; } catch {}
   // a no or a can't-tell again after 2 s: a page closed just before (a reload) may still be
   // giving its memory back, its GPU work still running
   let holds = await probeOnce(adapter, gb, bwGBs);
   if (holds !== true) { await new Promise(r => setTimeout(r, 2000)); holds = await probeOnce(adapter, gb, bwGBs); }
-  if (holds !== null) local.setJson(PROBE_KEY, { sig, gb, holds, why: lastProbe?.why || '', ms: lastProbe?.ms, at: Date.now() });
+  // a can't-tell is kept for a day too: it took seconds of the card at every start (the
+  // adapter was already used, then the probe gave up: 13 s of hearthvale's start-up)
+  local.setJson(PROBE_KEY, { sig, gb, holds, why: lastProbe?.why || '', ms: lastProbe?.ms, at: Date.now() });
   return holds;
 }
 async function probeOnce(adapter, gb, bwGBs) {
@@ -151,7 +153,9 @@ async function probeOnce(adapter, gb, bwGBs) {
   let dev = null, holds = null, lost = false, why = '', gbs = null; const start = performance.now();
   const late = () => performance.now() - start > 20000;
   try {
-    dev = await adapter.requestDevice();
+    // an adapter gives one device: the bandwidth measure (or an earlier try) used it, so a fresh one
+    const a = await navigator.gpu?.requestAdapter?.({ powerPreference: 'high-performance' }).catch(() => null) || adapter;
+    dev = await a.requestDevice();
     dev.lost.then(() => { lost = true; });
     // 1. allocate: Vulkan (Linux, Android) refuses past the card's memory
     for (let i = 0; i < n && holds === null; i++) {

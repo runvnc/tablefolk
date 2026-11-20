@@ -135,6 +135,16 @@ if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec
       }
     }
     put('stone', stone, cut.y - .018); put('black', black, cut.y - .016);
+    sconces();
+  }
+  // wall lamps (scenery.js lanternVisual) on cut walls are hidden; their light stays
+  function sconces() {
+    const list = window.tablefolkSconces; if (!list) return;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i]; if (s.root.isDisposed?.()) { list.splice(i, 1); continue; }
+      const hide = cut.on === 2 || (cut.on === 1 && inArea(s.wx, s.wz));
+      for (const m of s.meshes) if (!m.isDisposed?.()) m.setEnabled(!hide);
+    }
   }
 
   function update(x, z) {
@@ -142,20 +152,21 @@ if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec
     for (const m of state.wallVisuals || []) if (m?.material) attach(m.material);
     cut.x = Math.round(x); cut.z = Math.round(z); cut.on = 1; cut.y = (state.terrainTopY ?? 0) + STUB;
     // lids again when the player changes square, the walls are rebuilt or more is explored
-    const k = cut.x + ',' + cut.z + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0);
+    const k = cut.x + ',' + cut.z + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0) + '|' + (window.tablefolkSconces?.length || 0);
     if (k !== key) { key = k; placeLids(); }
   }
   function half() {
     const sc = state.scene; if (!sc) return;
     for (const m of state.wallVisuals || []) if (m?.material) attach(m.material);
     cut.on = 2; cut.y = (state.terrainTopY ?? 0) + (state.wallHeightScale || 1) * 1.1 * HALF;
-    const k = 'half|' + (state.blocks?.length || 0) + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0);
+    const k = 'half|' + (state.blocks?.length || 0) + '|' + (state.wallVisuals?.length || 0) + '|' + (window.tablefolkDark?.exploredCount?.() ?? 0) + '|' + (window.tablefolkSconces?.length || 0);
     if (k !== key) { key = k; placeLids(); }
   }
   function clear() {
     if (!cut.on) return;
     cut.on = 0; key = '';
     for (const m of Object.values(lids)) if (!m.isDisposed()) m.isVisible = false;
+    sconces();
   }
   // a picture from a character's eyes (senses.js): walls whole for a frame;
   // returns the mode that was on (0 none), to put it back with suspend(mode)

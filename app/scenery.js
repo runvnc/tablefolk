@@ -221,6 +221,9 @@
     }
     const one = window.mergeUnder?.(r, parts, 'lantern_post') || null;
     own(r, one ? [one] : parts); own(r, bulbs, { shadow: false });
+    // a sconce on a wall the cutaway cuts is hidden with it (cutaway.js): it hung in the air over the cut wall
+    const wdir = indoor && [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => walls.has(key(cx + dx, cz + dz)));
+    if (wdir) (window.tablefolkSconces ||= []).push({ root: r, wx: cx + wdir[0], wz: cz + wdir[1], meshes: [...(one ? [one] : parts), ...bulbs] });
   }
   function hexColor(v, fallback) { try { return v ? BABYLON.Color3.FromHexString(String(v)) : fallback; } catch { return fallback; } }
 

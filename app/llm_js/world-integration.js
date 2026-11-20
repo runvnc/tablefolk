@@ -213,11 +213,14 @@ async function loadModelOnce(manager, onBusy) {
     return false;
   }
   loadInFlight = true;
+  // the world's dressing waits meanwhile (app.js tablefolkDressGate)
+  window.TABLEFOLK_MODEL_BUSY = true;
   try {
     await manager.load();
     return true;
   } finally {
     loadInFlight = false;
+    window.TABLEFOLK_MODEL_BUSY = false;
   }
 }
 
@@ -917,8 +920,18 @@ async function main() {
     // Let the world draw its first frames first (shaders, shadows, textures:
     // a second or so of GPU work): started together with the model's setup
     // they made the picture hitch for another second after it (jank.mjs).
-    const t0 = performance.now();
-    while (performance.now() - t0 < 6000 && (window.TABLEFOLK_FRAMES || 0) < 45) await new Promise(r => setTimeout(r, 100));
+    // A world that is opening: until it is up and playable and its start-up passes are done
+    // (walls and ground rebuilt with the rooms known: about 1.2 s after it starts); the
+    // dressing that follows (ground textures, cover, trees, shells) waits for the model.
+    // Started in the middle of the world's own start the model took 7 s to set up instead of 4.
+    const t0 = performance.now(); let upAt = null;
+    const opening = () => !!window.tablefolkScenario && (/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario'));
+    while (performance.now() - t0 < 15000) {
+      if (upAt == null && window.tablefolkScenario?.active && window.TABLEFOLK_STATE?.playerAvatar) upAt = performance.now();
+      if (upAt != null ? performance.now() - upAt >= 1200 : !opening() && (window.TABLEFOLK_FRAMES || 0) >= 45) break;
+      if (!opening() && performance.now() - t0 > 6000) break;
+      await new Promise(r => setTimeout(r, 100));
+    }
     console.log(cached ? '[character] loading cached model...' : '[character] starting approved download...', liveLabel);
     if (!await loadModelOnce(manager)) return;
     console.log('[character] auto-load completed, enabling buttons...');

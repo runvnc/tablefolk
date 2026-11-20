@@ -21,7 +21,8 @@
  * iron straps) in a timber frame (house) or a stone one. "modern" and "block"
  * keep their old looks (app.js).
  *
- *   window.tablefolkWalls = { build(cell, top), setNight(k) }   (app.js rebuildWallVisuals)
+ *   window.tablefolkWalls = { build(cell, top), setNight(k), roomMeshes(room) }   (app.js rebuildWallVisuals;
+ *   roomMeshes: a house room's own wall, frame and door meshes, hidden by roofs.js under a shell)
  * Loaded after app.js (uses state, meta, wallH, doorHeight, doorAxisOf,
  * buildDoorLeaf, ensureDoorAnimator, addShadow).
  */
@@ -114,14 +115,19 @@
     return window.tablefolkTerrain?.mode?.() === 'rock' || !!s.dark || s.base === 'dungeon';
   }
   function houseCells() {
-    const out = { walls: new Set(), inside: new Set() };
+    const out = { walls: new Set(), inside: new Set(), room: new Map() };
     const R = window.tablefolkRoofs?.planned?.(); if (!R) return out;
     for (const r of R) for (const c of r.cells) {
       out.inside.add(c); const [x, z] = c.split(',').map(Number);
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) out.walls.add((x + dx) + ',' + (z + dz));
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const k = (x + dx) + ',' + (z + dz); out.walls.add(k); if (!out.room.has(k)) out.room.set(k, roomKey(r)); }
     }
     return out;
   }
+  // A house's walls are drawn per room, so roofs.js can hide them while the
+  // room's building shell stands over it (the model's walls are often inset
+  // from its footprint, and the code walls poked through them).
+  const roomKey = r => r.x0 + ',' + r.z0 + ',' + r.x1 + ',' + r.z1;
+  let roomMeshes = new Map();
 
   function build(cell, top) {
     const t0 = performance.now(); try { return build0(cell, top); } finally { window.tfMark?.('walls.build', t0); }
@@ -129,13 +135,16 @@
   function build0(cell, top) {
     const M = materials(), H = wallH(), DH = doorHeight(), dark = underground(), houses = dark ? { walls: new Set(), inside: new Set() } : houseCells();
     lastSig = looksSig(dark, houses);
-    const B = { rubble: batch(), blocks: batch(), cap: batch(), plaster: batch(), timber: batch(), glass: batch() };
-    const out = [];
+    const B0 = { rubble: batch(), blocks: batch(), cap: batch(), plaster: batch(), timber: batch(), glass: batch() };
+    const perRoom = new Map(); let B = B0;
+    const out = []; roomMeshes = new Map();
     const isDoor = k => meta(cell.get(k))?.type === 'door';
     const shade = (st, x, z) => { const r = .95 + hash(x, z, 5) * .1; return st === 'burned' ? [.3, .28, .27] : st === 'cracked' ? [.86 * r, .84 * r, .82 * r] : [r, r, r]; };
     for (const [k, w] of cell) {
       const [x, z] = k.split(',').map(Number), st = meta(w).state, col = shade(st, x, z);
       const style = houses.walls.has(k) ? 'house' : dark ? 'blocks' : 'rubble';
+      const rk = style === 'house' && houses.room?.get(k);
+      B = rk ? (perRoom.get(rk) || perRoom.set(rk, { rubble: batch(), blocks: batch(), cap: batch(), plaster: batch(), timber: batch(), glass: batch() }).get(rk)) : B0;
       const body = style === 'blocks' ? B.blocks : style === 'house' ? B.plaster : B.rubble;
       if (meta(w).type === 'door') { doorCell(B, M, cell, x, z, top, H, DH, style, col); continue; }
       let arms = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => cell.has((x + dx) + ',' + (z + dz)));
@@ -188,7 +197,10 @@
       }
     }
     for (const name of ['rubble', 'blocks', 'cap', 'plaster', 'timber', 'glass']) {
-      const m = B[name].mesh('tt_walls_' + name, () => M[name]); if (m) out.push(m);
+      const m = B0[name].mesh('tt_walls_' + name, () => M[name]); if (m) out.push(m);
+    }
+    for (const [rk, Bq] of perRoom) for (const name of ['rubble', 'cap', 'plaster', 'timber', 'glass']) {
+      const m = Bq[name].mesh('tt_walls_' + name + '_room', () => M[name]); if (m) { out.push(m); m.metadata = { ...(m.metadata || {}), room: rk }; (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); }
     }
     state.wallVisuals.push(...out);
     buildDoors(cell, top, houses);
@@ -229,9 +241,12 @@
   function buildDoors(cell, top, houses) {
     const doors = [...cell.entries()].filter(([, w]) => meta(w).type === 'door');
     if (!doors.length) return;
-    const M = materials(), DH = doorHeight(), timber = batch(), stone = batch();
+    const M = materials(), DH = doorHeight(), timber0 = batch(), stone0 = batch(), rooms = new Map();
     for (const [k, w] of doors) {
       const [x, z] = k.split(',').map(Number), alongX = doorAxisOf(cell, x, z), house = houses.walls.has(k);
+      // a house door's frame goes with its room's walls (hidden under a shell)
+      const rk0 = house && houses.room?.get(k), fr = rk0 ? (rooms.get(rk0) || rooms.set(rk0, { timber: batch(), stone: batch() }).get(rk0)) : { timber: timber0, stone: stone0 };
+      const timber = fr.timber, stone = fr.stone;
       const b = house ? timber : stone, jw = house ? .13 : .16, col = [1, 1, 1];
       const putF = (ac, y, len, hgt, thick) => { alongX ? b.add(ac, y, z, len, hgt, thick, col) : b.add(x, y, ac, thick, hgt, len, col); };
       const c = alongX ? x : z;
@@ -241,14 +256,17 @@
       // a stone doorstep on the outside of a house door
       if (house) { const side = outsideSide(houses.inside, x, z, alongX); if (side) { const d = T / 2 + .2; alongX ? stone.add(x, top + .06, z + side * d, 1.05, .12, .38, col) : stone.add(x + side * d, top + .06, z, .38, .12, 1.05, col); } }
       const g = buildDoorLeaf(state.scene, x, z, alongX, top, DH); g.door = w;
+      const rk = house && houses.room?.get(k);
       for (const m of g.pivot.getChildMeshes(false)) {
         m.metadata = { proxy: w }; m.isPickable = true; state.wallVisuals.push(m);
         if (/wood/.test(m.name)) { m.material = M.door; m.useVertexColors = false; }
+        if (rk) (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m);
       }
       state.wallVisuals.push(g.pivot);
       (state.doorLeaves = state.doorLeaves || []).push(g);
     }
-    for (const [bb, mat, name] of [[timber, () => M.timber, 'door_frames'], [stone, () => M.cap, 'door_frames_stone']]) { const m = bb.mesh(name, mat); if (m) state.wallVisuals.push(m); }
+    for (const [bb, mat, name] of [[timber0, () => M.timber, 'door_frames'], [stone0, () => M.cap, 'door_frames_stone']]) { const m = bb.mesh(name, mat); if (m) state.wallVisuals.push(m); }
+    for (const [rk, fr] of rooms) for (const [bb, mat, name] of [[fr.timber, () => M.timber, 'door_frames_room'], [fr.stone, () => M.cap, 'door_frames_stone_room']]) { const m = bb.mesh(name, mat); if (m) { state.wallVisuals.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); } }
     ensureDoorAnimator();
   }
 
@@ -257,5 +275,5 @@
   const looksSig = (dark, houses) => (dark ? 'u' : 'o') + [...houses.walls].sort().join(';').length + ':' + houses.walls.size + ':' + wallH();
   // the world finished building (rooms, the outside known): draw the walls again if their looks changed
   addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { const dark = underground(); if (looksSig(dark, dark ? { walls: new Set() } : houseCells()) !== lastSig) scheduleWallRebuild(); } catch {} }, 650));
-  window.tablefolkWalls = { build, setNight, timber: () => materials().timber };
+  window.tablefolkWalls = { build, setNight, timber: () => materials().timber, roomMeshes: r => roomMeshes.get(roomKey(r)) || [] };
 })();

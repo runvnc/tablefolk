@@ -56,6 +56,7 @@
     const sc = state.scene; if (!sc) return;
     // terrain.js decides the mode a moment after the world starts
     await new Promise(r => setTimeout(r, 900));
+    await window.tablefolkDressGate?.();
     const my = ++token, kind = kindFor(scn); if (kind === 'none' || /nosurround/.test(location.search)) return;   // ?envdbg=nosurround (memory tests)
     const lite = !!window.TABLEFOLK_GFX?.lite, T = window.tablefolkTerrain, H = (x, z) => T?.heightAt?.(x, z) ?? 0;
     const M = await loadManifest();

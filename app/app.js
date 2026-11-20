@@ -112,6 +112,26 @@ function setOrthoZoom(camera,halfWidth){
   camera.orthoLeft=-halfWidth; camera.orthoRight=halfWidth; camera.orthoTop=halfWidth/aspect; camera.orthoBottom=-halfWidth/aspect;
   camera.metadata ||= {}; camera.metadata.orthoHalfWidth=halfWidth;
 }
+// Dressing the world (ground textures, ground cover, the trees around,
+// building shells) waits while the local model loads its weights or answers:
+// both want the GPU and the main thread, and the model came up 3 s later
+// beside them (hearthvale). world-integration.js sets TABLEFOLK_MODEL_BUSY
+// while it loads; TABLEFOLK_PAUSE_RENDER is up while it answers. A wait on
+// answers gives up after `most` ms (a busy village answers nearly all the
+// time); a load is waited out (up to 40 s).
+let dressWaiting=0;
+window.__tfDressPending=()=>dressWaiting;   // start-up tests: dressing still waiting
+window.tablefolkDressGate=async(most=4000)=>{
+  const t0=performance.now();
+  dressWaiting++;
+  try{
+    while(true){
+      const loading=window.TABLEFOLK_MODEL_BUSY && performance.now()-t0<40000, thinking=window.TABLEFOLK_PAUSE_RENDER && performance.now()-t0<most;
+      if(!loading && !thinking) return;
+      await new Promise(r=>setTimeout(r,150));
+    }
+  } finally { dressWaiting--; }
+};
 // Hold rendering for a while (at most 40 s), with a note over the picture:
 // world-integration.js does it while the local model is set up.
 let renderHeldUntil=0, gpuFramesInFlight=0;

@@ -142,6 +142,7 @@
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
       await new Promise(r => requestAnimationFrame(() => r()));
+      await window.tablefolkDressGate?.();
       const base = ENV() + name + '_';
       const [col, nor, rough, ao] = await Promise.all([decode(base + 'color' + sfx + '.webp', n), decode(base + 'normal' + sfx + '.webp', n), decode(base + 'rough' + sfx + '.webp', n).catch(() => null), decode(base + 'ao' + sfx + '.webp', n).catch(() => null)]);
       const o = i * N * 4;
@@ -435,18 +436,23 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const isWall = (x, z) => wallSet.has(x + ',' + z) && !doorAt(x, z);
     const doorAt = (x, z) => (state.blocks || []).some(b => !b.isDisposed?.() && meta(b)?.type === 'door' && Math.round(b.position.x) === x && Math.round(b.position.z) === z);
     // half-cell quads: rock cells whole, and the half of a wall cell on the rock side
-    const q = new Set(), qk = (i, j) => i + ',' + j;   // i, j: half-cell index, centre at (i/2 + .25 - .5 ...)
+    // (the half of a wall cell is its own mesh, cut with the walls: left whole it stood as a row
+    // of "teeth" over cut walls)
+    const q = new Set(), qw = new Set(), qk = (i, j) => i + ',' + j;   // i, j: half-cell index, centre at (i/2 + .25 - .5 ...)
     for (let z = -bz - E; z <= bz + E; z++) for (let x = -bx - E; x <= bx + E; x++) {
       const rock = isRock(x, z), wall = isWall(x, z);
       if (!rock && !wall) continue;
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-        if (rock || isRock(x + sx, z) || isRock(x, z + sz) || (isRock(x + sx, z + sz) && isWall(x + sx, z) && isWall(x, z + sz)))
-          q.add(qk(2 * x + (sx > 0 ? 1 : 0), 2 * z + (sz > 0 ? 1 : 0)));
+        if (rock || isRock(x + sx, z) || isRock(x, z + sz) || (isRock(x + sx, z + sz) && isWall(x + sx, z) && isWall(x, z + sz))) {
+          const k = qk(2 * x + (sx > 0 ? 1 : 0), 2 * z + (sz > 0 ? 1 : 0)); q.add(k); if (!rock) qw.add(k);
+        }
       }
     }
-    const P = [], N = [], U = [], I = [], tk = 1 / 2.2;
+    const G = [{ P: [], N: [], U: [], I: [] }, { P: [], N: [], U: [], I: [] }], tk = 1 / 2.2;
+    let P, N, U, I;
     const quad = (pts, n, uvs) => { const b = P.length / 3; for (let k = 0; k < 4; k++) { P.push(...pts[k]); N.push(...n); U.push(...uvs[k]); } I.push(b, b + 1, b + 2, b, b + 2, b + 3); };
     for (const k of q) {
+      ({ P, N, U, I } = G[qw.has(k) ? 1 : 0]);
       const [i, j] = k.split(',').map(Number), x0 = i / 2 - .5, x1 = x0 + .5, z0 = j / 2 - .5, z1 = z0 + .5;
       quad([[x0, top, z0], [x1, top, z0], [x1, top, z1], [x0, top, z1]], [0, 1, 0], [[x0 * tk, z0 * tk], [x1 * tk, z0 * tk], [x1 * tk, z1 * tk], [x0 * tk, z1 * tk]]);
       const side = (has, pts, n, a0, a1) => { if (has) return; quad(pts, n, [[a0 * tk, 0], [a1 * tk, 0], [a1 * tk, top * tk], [a0 * tk, top * tk]]); };
@@ -455,11 +461,18 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       side(q.has(qk(i, j - 1)), [[x0, 0, z0], [x1, 0, z0], [x1, top, z0], [x0, top, z0]], [0, 0, -1], x0, x1);
       side(q.has(qk(i, j + 1)), [[x1, 0, z1], [x0, 0, z1], [x0, top, z1], [x1, top, z1]], [0, 0, 1], x1, x0);
     }
-    if (!P.length) return null;
-    const m = new BABYLON.Mesh('board_rock', state.scene), vd = new BABYLON.VertexData();
-    vd.positions = P; vd.normals = N; vd.uvs = U; vd.indices = I; vd.applyToMesh(m);
-    m.material = rockMaterial(); m.isPickable = false; m.receiveShadows = true;
+    if (!G[0].P.length && !G[1].P.length) return null;
+    const mk = (name, g, mat) => { const m = new BABYLON.Mesh(name, state.scene), vd = new BABYLON.VertexData(); vd.positions = g.P; vd.normals = g.N; vd.uvs = g.U; vd.indices = g.I; vd.applyToMesh(m); m.material = mat; m.isPickable = false; m.receiveShadows = true; return m; };
+    const m = mk('board_rock', G[0].P.length ? G[0] : { P: [0, -9, 0, 0, -9, 0, 0, -9, 0], N: [0, 1, 0, 0, 1, 0, 0, 1, 0], U: [0, 0, 0, 0, 0, 0], I: [0, 1, 2] }, rockMaterial());
+    if (G[1].P.length) { const w = mk('board_rock_wall', G[1], rockWallMaterial()); w.parent = m; }
     return m;
+  }
+  // the rock over walls' outer halves: cut like the walls (cutaway.js), its inside drawn dark
+  function rockWallMaterial() {
+    if (T.rockWallMat && !T.rockWallMat.isDisposed?.()) return T.rockWallMat;
+    const m = rockMaterial().clone('board_rock_wall_mat'); m.backFaceCulling = false;
+    window.tablefolkCutaway?.attach?.(m);
+    return (T.rockWallMat = m);
   }
   function envTex(name, kind, srgb) {
     const t = new BABYLON.Texture(ENV() + name + '_' + kind + '_1k.webp', state.scene, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
@@ -500,6 +513,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     for (const m of T.cover) try { m.dispose(); } catch {}
     T.cover = [];
     if (window.TABLEFOLK_TABLETOP || T.mode === 'rock' || T.mode === 'street' || /nocover/.test(location.search)) return;
+    await window.tablefolkDressGate?.();
     const lite = !!GFX().lite, models = await loadCover(); if (!models.length) return;
     const blocked = new Set();
     for (const b of state.blocks || []) if (!b.isDisposed?.()) blocked.add(Math.round(b.position.x) + ',' + Math.round(b.position.z));

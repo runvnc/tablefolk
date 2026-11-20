@@ -203,6 +203,34 @@ holds the summed ms and counts of terrain control/arrays/build/cover, walls,
 roofs and surroundings. Most of what is left is Babylon's shader
 preprocessing, as on main.
 
+Start-up with the model (2026-11-20, later; `tools/browser-test/startup-time.mjs`,
+a fresh headless test Chrome per run, three runs, medians, light quality,
+Gemma 4 E2B cached; s from navigation):
+
+| | world active before look / merged / now | brain ready before / merged / now | fully dressed (art) before / merged / now |
+|---|---|---|---|
+| hearthvale | 5.5 / 5.9 / 6.6 | 20.9 / 23.2 / 22.1 | 8.6 / 10.1 / 10.2 |
+| goblin-bakery | 3.3 / 3.1 / 3.6 | 16.4 / 16.1 / 16.1 | 5.1 / 5.0 / 4.9 |
+| deepdelve-camp | 3.8 / 4.4 / 5.4 | 19.1 / 20.3 / 20.2 | 8.6 / 8.0 / 8.4 |
+
+The "8 s before, 25-39 s after" seen in live-eval was two different
+measures: the LiteRT worker outlives a page in the same Chrome, so a second
+load there has the brain in 5-6 s (warm), while a fresh Chrome loads the
+weights again (16-23 s); live-eval's `fps=10` also slows a big world's
+start (one run: world active at 18 s). What was slow: `libs/device`'s card
+memory probe (cards sold with 6 or 12 GB) asked for a device from an adapter
+the bandwidth measure had already used, failed, retried after 2 s and kept
+no answer, so every start spent 2-13 s in `pickForDevice` before the model
+began (fixed: a fresh adapter, and a can't-tell kept for a day). The model
+now starts 1.2 s after the world is up (it waited for 45 frames, up to 6 s),
+and the dressing (ground texture layers, ground cover, the trees around,
+shells after the first roof) waits while the model loads or answers
+(`window.tablefolkDressGate`, `TABLEFOLK_MODEL_BUSY`), so "fully dressed"
+with a model comes after the brain (about 22 s in hearthvale). The model's
+own set-up (weights onto the card, warm-up: 9-13 s) is GPU-bound: the main
+thread is idle through most of it. The bandwidth figure cached in the test
+profile (30 GB/s, measured under load once) is kept 30 days.
+
 ### The edge of the world (terrain.js, surroundings.js)
 
 `tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |

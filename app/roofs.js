@@ -318,7 +318,7 @@
 
   function clear() {
     for (const g of state.characters || []) if (g._shellHidden) { g._shellHidden = null; if (!g._fogHidden) g.root?.setEnabled(true); }
-    for (const r of roofs) { r.root.dispose(false, false); }
+    for (const r of roofs) { if (r.shell) for (const m of window.tablefolkWalls?.roomMeshes?.(r.room) || []) if (!m.isDisposed?.()) m.setEnabled(true); r.root.dispose(false, false); }
     roofs = [];
   }
   function rebuild() { const t0 = performance.now(); try { rebuild0(); } finally { window.tfMark?.('roofs.rebuild', t0); } }
@@ -336,7 +336,9 @@
     const todo = rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); })
       .sort((a, b) => Math.hypot((a.x0 + a.x1) / 2 - p.x, (a.z0 + a.z1) / 2 - p.z) - Math.hypot((b.x0 + b.x1) / 2 - p.x, (b.z0 + b.z1) / 2 - p.z));
     const D = doors(), useShells = shellsWanted(); lastShell = null;
-    const step = () => { if (my !== buildToken || !todo.length) return; const room = todo.shift(); try { const plan = useShells && planShell(room, D); roofs.push(plan ? buildShell(room, plan, state.scene) : build(room, state.scene)); } catch (e) { console.warn('[roofs]', e); } requestAnimationFrame(step); };
+    const step = () => { if (my !== buildToken || !todo.length) return; const room = todo.shift(); try { const plan = useShells && planShell(room, D); roofs.push(plan ? buildShell(room, plan, state.scene) : build(room, state.scene)); } catch (e) { console.warn('[roofs]', e); } next(); };
+    // the rest wait while the model loads or answers (app.js tablefolkDressGate)
+    const next = () => { if (window.TABLEFOLK_MODEL_BUSY || window.TABLEFOLK_PAUSE_RENDER) window.tablefolkDressGate().then(() => requestAnimationFrame(step)); else requestAnimationFrame(step); };
     step();
     sig = signature(W);
   }
@@ -371,6 +373,8 @@
   }
   // characters inside a standing shell are indoors: hidden (and shown again when it lifts)
   function shellHide(r, hide) {
+    // the room's own walls, frames and door go too while the shell stands (walls.js draws them per room)
+    if (r.box) for (const m of window.tablefolkWalls?.roomMeshes?.(r.room) || []) if (!m.isDisposed?.() && m.isEnabled() === hide) m.setEnabled(!hide);
     for (const g of state.characters || []) {
       const q = posOf(g), inRoom = r.room.cells.has(cellKey(Math.round(q.x), Math.round(q.z)));
       if (hide && inRoom && !g._shellHidden) { g._shellHidden = r; if (!g._fogHidden) g.root.setEnabled(false); }
