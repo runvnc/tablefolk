@@ -217,7 +217,8 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   the last 6 lines of talk only, as plain words: `say("...")` in the history taught
   Qwen to write `say("[Pilgrim] ...`, and `[Pilgrim]` was copied into replies, so
   names appear only when more than one other person is near. 70 tokens a turn;
-  speech is cut to its first two sentences. Off in this mode: the seed example, the
+  speech is cut to its first two sentences. Off in this mode: the
+  "(You look around.)" seed (`?seed=look`; none by default since 2026-11-20), the
   planning filter, the repeat guards in `say()` and the copy guard (they left him
   silent), reports and corrections in the history, the "ponders" fallback. A quiet
   turn skips the model. `onlySpokenTo` (on by default here) skips turns with no speech in

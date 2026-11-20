@@ -490,15 +490,13 @@ function buildAgentMessages(world, g, cfg) {
   if (built.simple) return buildSimpleMessages(world, g, cfg, built);
   const { systemMessage, commandReminder } = built;
   const messages = [{ role: 'system', content: systemMessage }];
-  // Seed the conversation with a real example of responding to speech with say()
-  // (teaches the small model not to echo the speaker attribution). Only prepend
-  // if the history doesn't already start with it.
+  // No seed exchange. It was 'God says: Are you ready my son?' /
+  // say("Yes I am ready"), to show the reply format; it leaked into speech
+  // ("Aye, I'm ready, God") and made every turn look like an answer to
+  // speech. ?seed=look puts a neutral one instead ("(You look around.)" /
+  // look()), the variant measured against none on the live eval.
   const hist = cfg.messages || [];
-  const alreadySeeded = hist.some(m => m.role === 'user' && String(m.content).includes('Are you ready my son?'));
-  if (!alreadySeeded) {
-    messages.push({ role: 'user', content: 'God says: Are you ready my son?' });
-    messages.push({ role: 'assistant', content: 'say("Yes I am ready")' });
-  }
+  if (SEED === 'look') { messages.push({ role: 'user', content: '(You look around.)' }); messages.push({ role: 'assistant', content: 'look()' }); }
   // Only the recent exchange: what matters for longer (feelings, memories,
   // goal) is in the state card (mind.js), so a small model isn't asked to
   // dig it out of a long history.

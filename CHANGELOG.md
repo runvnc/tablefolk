@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **No more "God says: Are you ready my son?"**: the made-up opening exchange every character's conversation started with is gone (it leaked into speech: "Aye, I'm ready, God").
+
 - **Characters are told plainly when a command did not work**: "carry FAILED: there is no bread in sight to carry" instead of "carry worked: ..." (every command's could-not path now says so), and a command that just failed is not suggested to it again on its next turn.
 
 ## 2026-11-19
