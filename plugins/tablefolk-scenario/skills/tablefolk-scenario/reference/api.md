@@ -220,7 +220,7 @@ add kinds. `commands` lets the job's workers use package commands with
 `allowedBy: "listed"`, and its rules run one by code:
 
 ```json
-"commands": ["signal", { "run": "signal()", "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and raider_near < 10 and not world.militia_called" }],
+"commands": ["signal", { "run": "signal()", "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and not world.militia_called" }],
 "defends": "signal_beacon"
 ```
 
