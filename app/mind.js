@@ -601,7 +601,7 @@
     if (key === 'player') m.mood.trust = clamp01(m.mood.trust - .08); else opinion(g, key, -.2, 'insulted you');
     addMemory(g, why + '.', 2);
     // the day's news (jobs.js topics: who insulted whom)
-    try { window.tablefolkJobs?.addNews?.('', `${key === 'player' ? playerName() : who} insulted ${g.id}`, 'insult'); } catch {}
+    if (/insulted|pestering/.test(why)) try { window.tablefolkJobs?.addNews?.('', `${key === 'player' ? playerName() : who} insulted ${g.id}`, key === 'player' ? 'player' : 'insult'); } catch {}
     // someone watching for this troublemaker (a guard called over) steps in
     watchers(key, 'insulted ' + g.id);
     // told to leave already (calm, level 4): now it calls for help
@@ -784,6 +784,13 @@
     if (!g || g === state.playerAvatar || !state.characters.includes(g)) return;
     const cfg = getBrainConfig(g.id); if (cfg.defeated) return;
     const t = temperament(cfg), m = mindOf(g), me = isPlayerName(d.by || d.who);
+    // what the player did, for the day's news (jobs.js topics: the evening talks about it)
+    try {
+      const pn = playerName(), J = window.tablefolkJobs;
+      if (kind === 'attacked' && me && !window.tablefolkPlay?.isHostile?.(g)) J?.addNews?.('', `${pn} attacked ${g.id}`, 'player');
+      else if (kind === 'given' && me) J?.addNews?.('', `${pn} gave ${g.id} ${d.what}${isFood(String(d.what).replace(/^(an?|some|the) /, '')) ? ' to eat' : ''}`, 'player');
+      else if (kind === 'sold' && isPlayerName(d.buyer)) J?.addNews?.('', `${pn} bought ${d.item} from ${g.id} for ${d.price} gold`, 'player');
+    } catch {}
     if (kind === 'attacked') {
       const why = `${d.by} attacked you`;
       if (t === 'brave') { push(g, 'anger', .5, why); push(g, 'fear', .12, why); }
@@ -1068,5 +1075,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { insult, isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

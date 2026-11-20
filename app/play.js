@@ -95,6 +95,8 @@
     if (mm.state !== 'open') U.setOpen(m, true);
     c.gold = 0; c.items = [];
     state.player.gold = (state.player.gold || 0) + gold; give(items);
+    // jobs.js: taking from someone's store is news (and the owner, if it sees, objects)
+    if (gold || items.length) try { dispatchEvent(new CustomEvent('tablefolk-player-took', { detail: { mesh: m, gold, items: items.map(i => i.name) } })); } catch {}
     if (gold) setTimeout(() => sfx('coins', posOf(m)), 350);
     const got = describe(gold, items);
     note(`${playerName()} opens the ${name}${got ? ' and takes ' + got : ': it is empty'}`);

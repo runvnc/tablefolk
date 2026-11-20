@@ -149,6 +149,18 @@ hungry. Starving (`.8`) for a third of a day it is **weak**: it walks
 slowly and cannot work. It does not die of it unless the world is
 `"harsh": true` (then it loses health).
 
+## What the player does
+
+The village notices the player. Helping drive off a raid, buying from
+someone, giving someone food or a gift, attacking or insulting someone,
+taking things from someone's chest or barrel, and walking into someone's
+house at night are the day's news: the evening's talk turns to them, and
+those involved remember. Whoever lives in a house the player enters
+uninvited at night (21-05) wakes, objects ("Oi! What are you doing in my
+house?") and is angrier with the player (a step on its temper,
+[characters.md](characters.md)); an owner who sees the player empty its
+chest objects the same way.
+
 ## Spoken life: templated lines
 
 Most of what a busy village says needs no model. At natural moments the
@@ -172,7 +184,7 @@ asks nobody for an answer and holds no conversational floor.
 The pools are data: `jobs/common/lines.json` (kinds `sale`, `thanks`,
 `greet`, `out`, `raid`, `raid_fighter`, `allclear`, `bed`, `patrol`,
 `challenge`, `ask_food`, `share_food`, `refuse_food`, `help`, `intruder`,
-`wake`), each a list or lists by voice (`any`, `plain`, `gruff`, `cheerful`,
+`thief`, `wake`), each a list or lists by voice (`any`, `plain`, `gruff`, `cheerful`,
 `timid`: from the character's temperament and personality), with slots
 `{name}` (who it is said to), `{item}`, `{price}`, `{raiders}`, `{place}`,
 `{me}`; a line whose slot has no value is skipped. A job adds its own

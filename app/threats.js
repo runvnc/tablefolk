@@ -12,7 +12,8 @@
  *            chest) and runs for the edge
  * Fields: who (a body, or a list), name (their ids: wolf1, wolf2), count,
  * when ("night" 22:00, "day" 10:00, "any", or [hour, hour]), every (days),
- * from ("edge", or a place id: a lair), behaviour (raid | pilfer | rob, or
+ * from ("edge", or a place id: a lair), side (with "edge": north, south,
+ * east or west: that edge only, e.g. the side a forest section lies on), behaviour (raid | pilfer | rob, or
  * a package module's registered one), targets (pilfer: item names), hp,
  * retreat ("dawn": at daybreak, or 17:00 for day kinds; "half": when half
  * are down; both by default), announce (a narrator's line), scares (others
@@ -20,6 +21,8 @@
  * A package module's threats.<kind>(c, ctx) runs each raider's turn (ctx: spec,
  * group, retreat(why), despawn(), walkTo(x, z), attack(target), api); false
  * falls back to the kind's behaviour.
+ * Only the section the player is in has threats (its own list: scenario.js
+ * here()); the others stand still while the player is away.
  * They retreat to the edge and are gone (fled) at dawn or when half are
  * down. Afterwards everyone remembers it as news, and thinks better of those
  * who fought (the player included).
@@ -38,7 +41,8 @@
   const W = () => window.tablefolk, P = () => window.tablefolkPlay, K = () => window.tablefolkClock, J = () => window.tablefolkJobs;
   const posOf = g => g.logicalPos || g.root.position;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  const scn = () => window.tablefolkScenario?.active?.scn || {};
+  // the section the player is in (scenario.js here()): threats only come where the player is
+  const scn = () => window.tablefolkScenario?.here?.() || window.tablefolkScenario?.active?.scn || {};
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   function registerKind(kind, def, from = '') {
     if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(kind)) throw new Error('bad threat kind name');
@@ -56,12 +60,14 @@
   const specOf = c => c?._threat?.spec || null;
   const label = c => specOf(c)?.name || c?.charModel || 'raider';
   const scares = c => !!specOf(c)?.scares && !c?._threat?.group?.retreating;
-  function edgeCell() {
+  // a free square on the board's edge ("side": north | south | east | west: that edge only)
+  function edgeCell(only) {
     const hw = Math.floor((state.worldW || 0) / 2) || null;
     const xs = [], b = (window.tablefolk?.WORLD) || {};
     const halfW = Math.floor(b.halfW ?? 20), halfH = Math.floor(b.halfH ?? 15);
+    const SIDE = { south: 0, north: 1, west: 2, east: 3 };
     for (let i = 0; i < 80; i++) {
-      const side = Math.floor(Math.random() * 4), t = Math.random() * 2 - 1;
+      const side = only in SIDE ? SIDE[only] : Math.floor(Math.random() * 4), t = Math.random() * 2 - 1;
       const x = side < 2 ? Math.round(t * (halfW - 1)) : (side === 2 ? halfW - 1 : -halfW + 1);
       const z = side >= 2 ? Math.round(t * (halfH - 1)) : (side === 0 ? halfH - 1 : -halfH + 1);
       if (cellPassable(x, z) && !occupantAt(x, z, null)) xs.push({ x, z });
@@ -79,7 +85,7 @@
     const day = K()?.now()?.day || 1;
     const gr = { spec: { ...spec, name }, ids: [], day, retreating: false, fought: new Set(), hurt: new Set(), ate: 0, stole: 0, kind: entry.kind };
     const lair = spec.from && spec.from !== 'edge' ? J()?.places?.placeNamed?.(spec.from) : null;
-    const at = lair ? (J().places.spotIn(lair) || edgeCell()) : edgeCell();
+    const at = lair ? (J().places.spotIn(lair) || edgeCell(spec.side)) : edgeCell(spec.side);
     for (let i = 0; i < Math.max(1, Math.min(8, +spec.count || 1)); i++) {
       let n = 1, id; do id = `${name}${n++}`; while (state.characters.some(c => c.id === id));
       const x = at.x + (i % 2), z = at.z + Math.floor(i / 2);
@@ -114,12 +120,15 @@
       const spec = { ...(KINDS[entry.kind] || {}), ...entry }; if (!KINDS[entry.kind]) return;
       // a night's raid belongs to the evening it started
       const nightDay = spec.when === 'night' && h < 12 ? day - 1 : day;
-      const every = Math.max(1, +spec.every || 1), last = lastSpawn.get(i);
+      const every = Math.max(1, +spec.every || 1);
       if (!inWindow(h, spec.when)) return;
+      // per section: each section's list is its own (scenario.js here())
+      const key = (window.tablefolkScenario?.section || '') + '#' + i;
+      const last = lastSpawn.get(key);
       if (last != null && nightDay - last < every) return;
-      if (groups.some(gr => gr.entry === i && gr.ids.some(id => state.characters.some(c => c.id === id)))) return;
-      lastSpawn.set(i, nightDay);
-      spawn(entry).then(gr => { gr.entry = i; }).catch(err => console.warn('[threats] spawn', err));
+      if (groups.some(gr => gr.entry === key && gr.ids.some(id => state.characters.some(c => c.id === id)))) return;
+      lastSpawn.set(key, nightDay);
+      spawn(entry).then(gr => { gr.entry = key; }).catch(err => console.warn('[threats] spawn', err));
     });
     // retreat at daybreak (night kinds) or 17:00 (day kinds)
     for (const gr of groups) if (!gr.retreating && /dawn/.test(gr.spec.retreat || 'dawn') && (gr.spec.when === 'night' ? h >= 5 && h < 12 : h >= 17)) retreat(gr, 'the day has come');
@@ -127,7 +136,7 @@
   function retreat(gr, why) {
     if (gr.retreating) return; gr.retreating = true;
     console.info('[threats] retreat:', gr.spec.name, why);
-    gr.exit = edgeCell();
+    gr.exit = edgeCell(gr.spec.side);
     // they are gone in half a minute, wherever they got to
     setTimeout(() => { for (const id of gr.ids) { const c = state.characters.find(x => x.id === id); if (c && !c.defeated) despawn(c); } }, 30000);
     for (const c of state.characters) { const h = W().getBrainConfig(c.id).hostileTo; if (h && gr.ids.some(id => h[id])) { const n = { ...h }; for (const id of gr.ids) delete n[id]; W().setBrainConfig(c.id, { hostileTo: Object.keys(n).length ? n : null }); } }
@@ -155,6 +164,7 @@
     const what = gr.spec.behaviour === 'pilfer' ? ` (they ate ${gr.ate} from the stores)` : gr.spec.behaviour === 'rob' ? ` (they stole ${gr.stole} gold)` : '';
     const text = `${gr.startAlive} ${gr.startAlive > 1 ? plural(gr.spec.name) : gr.spec.name} came${gr.spec.when === 'night' ? ' in the night' : ''}${what}; ${names.length ? names.join(' and ') + ' drove them off' : 'they left on their own'}${down ? ` (${down} struck down)` : ''}.`;
     J()?.addNews?.('', text, 'raid');
+    if (gr.fought.has('player')) J()?.addNews?.('', `${pn} helped drive off the ${plural(gr.spec.name)}`, 'player');
     // the all-clear, out loud: one who fought, else anyone awake and outdoors near where they were
     try {
       const C = window.tablefolkChatter, awake = c => c && !c.defeated && !c._threat && !P()?.isAnimal?.(c) && c.pose?.mode !== 'lie';
@@ -223,7 +233,7 @@
   }
   function retreatOne(c, gr) {
     if (c._leaving) return; c._leaving = true;
-    const exit = edgeCell(); walkTo(c, exit.x, exit.z);
+    const exit = edgeCell(gr?.spec?.side); walkTo(c, exit.x, exit.z);
     setTimeout(() => { if (!c.defeated && state.characters.includes(c)) despawn(c); }, 9000);
     void gr;
   }

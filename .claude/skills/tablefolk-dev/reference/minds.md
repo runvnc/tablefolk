@@ -448,6 +448,13 @@ Measured: testing.md, "A whole day".
   In 17-21: world-integration.js `busyNear` holds the floor 10 s (not 30),
   a closed conversation releases it after 5 s, and live.js answers a
   character's words after half the quiet gap without the idle tempo.
+- **The player's deeds** (NEWS kind `player`): mind.js `event` (attacked,
+  given, sold to the player), `insult` (only for words), threats.js
+  allClear (fought), play.js `openChest` fires `tablefolk-player-took`
+  (jobs.js: news, the owner within 8 cells says `thief` and gets an
+  `insult` tick); jobs.js checks every second for the player in a `house`
+  place at 21-05 with someone whose `home` it is inside: `intruder` line
+  (wakes it), `insult` tick, news, once a night each.
 
 ## Order of work
 

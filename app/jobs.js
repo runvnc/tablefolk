@@ -317,6 +317,40 @@
     setTimeout(() => { for (const g of state.characters) { const j = jobOf(g), a = agentOf(g); if (j?.gold && a.inventory?.gold == null) { const i = inv(g); if (!i.gold) { i.gold = +j.gold; W().setBrainConfig(g.id, { inventory: i }); } } } }, 0);
   });
 
+  // ---------------------------------------------------------------- the player's deeds
+  // taking from someone's store: news, and the owner, if it sees (8 cells, awake), objects
+  const pname = () => document.getElementById('chatName')?.value.trim() || 'the traveller';
+  addEventListener('tablefolk-player-took', e => {
+    const d = e.detail || {}, o = getObjects().find(x => x.mesh === d.mesh); if (!o || !handlesAny()) return;
+    const owner = ownerOf(o); if (!owner || owner.defeated) return;
+    const what = [...(d.items || []), ...(d.gold ? [d.gold + ' gold'] : [])].slice(0, 3).join(', ');
+    addNews('', `${pname()} took ${what} from ${owner.id}'s ${nice(o.type)}`, 'player');
+    if (owner.pose?.mode !== 'lie' && state.playerAvatar && dist(posOf(owner), posOf(state.playerAvatar)) <= 8) {
+      C()?.say(owner, 'thief', { item: d.items?.[0] || 'things' }, { to: state.playerAvatar, force: true });
+      M()?.insult?.(owner, 'player', `${pname()} took ${what} from your ${nice(o.type)}`, pname());
+    }
+  });
+  const handlesAny = () => !!K()?.running;
+  // the player in someone's home at night, uninvited: the one who lives there objects
+  // (a line, a temper tick), once a night each; news for the village
+  setInterval(() => {
+    try {
+      const pl = state.playerAvatar; if (!pl || pl.defeated || !handlesAny() || !window.tablefolkLive?.on) return;
+      const h = K()?.hour(); if (h == null || !(h >= 21 || h < 5)) return;
+      const pp = posOf(pl), here = places().find(p => p.kind === 'house' && inPlace(p, pp.x, pp.z)); if (!here) return;
+      const night = Math.floor((gm() + 360) / 1440);
+      for (const g of state.characters) {
+        const s = g._job; if (!s || s.home !== here || g.defeated || s.intruderNight === night) continue;
+        if (!inPlace(here, posOf(g).x, posOf(g).z) || dist(posOf(g), pp) > 7) continue;
+        s.intruderNight = night;
+        if (g.pose?.mode === 'lie') { try { U().standUp(g); } catch {} }
+        C()?.say(g, 'intruder', {}, { to: pl, force: true });
+        M()?.insult?.(g, 'player', `${pname()} came into your home uninvited at night`, pname());
+        addNews('', `${pname()} came into ${g.id}'s house uninvited at night`, 'player');
+      }
+    } catch (e) { console.warn('[jobs] intruder', e); }
+  }, 1000);
+
   // ---------------------------------------------------------------- the model, narrowly
   const brainOk = () => !!(W()?.brainReady?.() && window.tablefolkLLM && window.tablefolkBrainInfo?.()?.engine !== 'none');
   // one short numbered pick: options [{ label, run }], plus "something else" (an open turn)
