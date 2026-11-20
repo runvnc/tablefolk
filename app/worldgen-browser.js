@@ -25,6 +25,13 @@
  *   window.tfWorldgen.run(prompt, emit)   emit(event, data) like the server's
  *       stream: 'progress' {stage, label, chars, preview}, then 'done'
  *       {scenario, code, link, ms, model} or 'failed' {error}
+ *   window.tfWorldgen.run(prompt, emit, { sections: 3, shape: 'levels' })
+ *       a world in sections (runSections): one plan (plain lines: the world,
+ *       then a SECTION line each), then per section only the characters (the
+ *       map is procgen's, from the section's kind), each checked by the
+ *       server (POST /api/finish); put together and checked by
+ *       app/worldgen-plan.js (links, reachability, the goal). stop() ends it
+ *       between steps.
  */
 (function () {
   const LOADER = '/libs/brain/engines/litert.js';
@@ -328,7 +335,95 @@
     return r.json();
   }
 
-  async function run(prompt, emit) {
+  // ---- a world in sections ----
+  let stopping = false;
+  const WP = () => globalThis.TablefolkWorldPlan;
+  function parseSectionPlan(text, prompt, n, shape) {
+    const line = k => (text.match(new RegExp('^\\s*\\**' + k + '\\**\\s*:\\s*(.+)$', 'im')) || [])[1]?.trim() || '';
+    const sections = [];
+    for (const l of text.split('\n')) {
+      const m = l.match(/^\s*[-*\d.)]*\s*\**SECTION\s*\d*\**\s*:\s*(.+)$/i); if (!m) continue;
+      const [title, kind, about, who] = m[1].split('|').map(x => x.trim());
+      const people = String(who || '').replace(/^\s*who\s*:\s*/i, '').split(/[;,]/).map(x => x.trim()).filter(Boolean).slice(0, 5).map(w => {
+        const [name, body, job] = w.split('/').map(x => x.trim());
+        const model = pickFrom(PEOPLE.concat(MONSTERS, ANIMALS), body || name) || 'villager';
+        return { id: id(name), model, job: pickFrom(JOBS, job) || '', role: job && !pickFrom(JOBS, job) ? job : '', ...(MINDLESS.has(model) ? { hostile: true } : {}) };
+      });
+      sections.push({ title: (title || '').replace(/\*+/g, ''), kind: (kind || '').toLowerCase(), about: about || '', who: people });
+    }
+    const plan = WP().readPlan({ title: line('TITLE').replace(/\*+/g, '') || prompt, intro: line('INTRO'), pressure: line('PRESSURE'), sections }, n, shape, prompt);
+    plan.goalText = line('GOAL'); plan.text = text;
+    return plan;
+  }
+  // the plan's GOAL line as a goal the game can check (who it names, in which section)
+  function sectionGoal(plan, world) {
+    const t = String(plan.goalText || '');
+    for (const x of WP().allSections(world).slice(1)) for (const a of x.s.agents || []) {
+      if (!new RegExp('\\b' + a.id.replace(/_/g, '[ _]') + '\\b', 'i').test(t)) continue;
+      if (a.hostile || /\b(kill|slay|defeat|destroy|stop|end)\b/i.test(t)) return { text: t.slice(0, 160), win: { agent_defeated: a.id }, lose: { player_defeated: true } };
+      return { text: t.slice(0, 160), win: { agent_near: [a.id, 'player', 2] }, lose: { player_defeated: true } };
+    }
+    return null;
+  }
+  async function encode(obj) {
+    const cs = new CompressionStream('deflate-raw'), w = cs.writable.getWriter(); w.write(new TextEncoder().encode(JSON.stringify(obj))); w.close();
+    const b = new Uint8Array(await new Response(cs.readable).arrayBuffer()); let t = ''; for (let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    return btoa(t).split('+').join('-').split('/').join('_').replace(/=+$/, '');
+  }
+  async function runSections(prompt, emit, n, shape) {
+    const t0 = Date.now(); stopping = false;
+    const stopIf = () => { if (stopping) throw new Error('stopped'); };
+    try {
+      await model(emit);
+      const shapeLine = shape === 'levels' ? 'The first section is the surface where the player starts; each next one is a level further down (dungeon, cave, crypt or mine), joined by stairs.'
+        : shape === 'region' ? 'The first section is the hub where the player starts (a village, a camp, a farm); the others lie around it (forest, farm, cave, ruins).'
+        : 'Either levels going down (dungeon, cave, crypt, mine) or a hub with places around it, whichever fits.';
+      const planText = await ask(emit, 'plan', `step 1/${n + 1}: planning the world`, 'You design small adventure worlds for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
+        `Request: "${prompt}"\n\nThe world has ${n} sections: separate maps the player walks between. ${shapeLine} The danger lives in one section and threatens another; what the player must find is beyond the first.\nWrite a plan, under 220 words, with exactly these lines:\nTITLE: a short title\nINTRO: 2 sentences for the player\nPRESSURE: what threatens the world, and where it lives\nGOAL: one thing the player tries to do, naming the person or monster it is about\n${Array.from({ length: n }, () => 'SECTION: name | kind | what is there | who: Name/body/job; Name/body/job').join('\n')}\n(${n} SECTION lines, the first where the player starts. Kinds: village, forest, farm, cave, mine, dungeon, castle, crypt. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}. Jobs: ${JOBS.join(', ')} (none for monsters).)`);
+      const plan = parseSectionPlan(planText, prompt, n, shape);
+      const list = [], repairs = [];
+      for (let i = 0; i < n; i++) {
+        stopIf();
+        const sec = plan.sections[i], g = WP().GEN[sec.kind] || WP().GEN.dungeon;
+        const kind = g.kind, planLike = { title: sec.title, kind, talk: false, mood: sec.light, places: [...(g.places || [])], chars: sec.who.map(a => ({ name: a.id, body: a.model, job: a.job || '', role: a.role || '', want: '', know: '' })), treasure: '', goal: '', pressure: plan.pressure, text: sec.about + ' ' + planText };
+        const built = buildMap(planLike, { title: sec.title, subtitle: sec.about.slice(0, 120), intro: i ? '' : plan.intro, lighting: sec.light });
+        if (g.style) built.scn.generate.style = g.style;
+        const scn = built.scn;
+        const where = `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
+        let chars = {};
+        try {
+          chars = json(await ask(emit, 'characters', `step ${i + 2}/${n + 1}: the people of ${sec.title}`, 'You write game characters as data. Answer with one JSON object, nothing else.',
+            `The world:\n${planText}\n\nWrite the characters of the section "${sec.title}" (${sec.kind}: ${sec.about}) as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "in": "...", "job": "healer", "home": "house", "workplace": "temple", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, one want, one opinion of a neighbour", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": []}}]}\nWrite exactly: ${sec.who.map(a => a.id + ' (' + a.model + ')').join(', ') || 'the 1-3 who live or lurk here'}. ${where}. Monsters that only fight need just id, model, in and "hp". Jobs: ${JOBS.join(', ')}. Commands for "allowed": ${COMMANDS.join(', ')}.`));
+        } catch (e) { emit('progress', { stage: 'characters', label: sec.title + ': the answer was not JSON; the plan\'s people are used' }); }
+        buildAgents(planLike, { agents: chars.agents || [] }, built, scn);
+        scn.goal = null;
+        let s = WP().shapeSection(plan, i, scn);
+        if (i === 0) { pressure(planLike, s); s.live = true; }
+        let r = await finish(s, prompt, t0);
+        if (r.problems?.length) {
+          repairs.push(`${sec.title}: ${r.problems.join('; ').slice(0, 200)}; built from the plan by procgen instead`);
+          s = WP().shapeSection(plan, i, WP().fallbackSection(plan, i)); r = await finish(s, prompt, t0);
+        }
+        const done = r.scenario || s;
+        if (i > 0) { delete done.goal; if (!(done.agents || []).some(a => !a.hostile && a.job)) delete done.threats; }
+        list.push(done);
+      }
+      stopIf();
+      const world = WP().assemble(plan, list);
+      const g = sectionGoal(plan, world); if (g) world.goal = g;
+      const chk = WP().checkWorld(world);
+      emit('progress', { stage: 'checks', label: 'the world: ' + chk.report.join('; '), problems: chk.problems });
+      const code = await encode(world);
+      emit('done', { scenario: world, code, link: '/app/#s=' + code, warnings: chk.problems, repairs: [...repairs, ...chk.repairs], report: chk.report, ms: Date.now() - t0, model: modelKey + ' (in this browser, ' + n + ' sections)' });
+    } catch (e) { console.error('[worldgen]', e); emit('failed', { error: e.message || String(e) }); }
+  }
+
+  async function run(prompt, emit, opts = {}) {
+    if (+opts.sections > 1) {
+      if (!WP()) await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/app/worldgen-plan.js?v=20261120b'; sc.onload = res; sc.onerror = () => rej(new Error('could not load worldgen-plan.js')); document.head.appendChild(sc); }).catch(e => emit('failed', { error: e.message }));
+      if (WP()) return runSections(prompt, emit, Math.min(5, +opts.sections), ['levels', 'region'].includes(opts.shape) ? opts.shape : 'auto');
+      return;
+    }
     const t0 = Date.now();
     try {
       await model(emit);
@@ -431,5 +526,5 @@
     } catch (e) { emit('failed', { error: String(e.message || e) }); }
   }
 
-  window.tfWorldgen = { run, runOne, parsePlan, pressure, json, log };
+  window.tfWorldgen = { run, runOne, runSections, parsePlan, parseSectionPlan, pressure, json, log, stop: () => { stopping = true; } };
 })();

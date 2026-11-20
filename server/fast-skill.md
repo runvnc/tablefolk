@@ -175,3 +175,19 @@ player_defeated true | player_has "item" | player_gold [">=", 10] |
 agent_has ["id", "item"] | agent_near ["id", "square", 2] | chest_has "item"
 | said ["id", "word"] | all/any/not [...]. A player_has goal needs a
 character allowed give or sell, or the item in a chest.
+
+# Worlds in sections (one map at a time)
+
+<!-- sections: worlds bigger than one map (app/worldgen-plan.js writes the plan and the links) -->
+A world can be several maps ("sections") joined by "links": dungeon levels
+joined by stairs, a village with the forest beside it. When asked to write
+ONE section of a planned world, write only that map as a normal scenario;
+no "links", "subworlds" or "goal" (added afterwards); only its own threats.
+When changing a world that has "subworlds", you see one section: keep its
+"links" as they are. A link: {"in": "lair", "to": "<a subworlds key>",
+"kind": "stairs_down" | "stairs_up" | "cave" | "gate" | "trapdoor" | "door",
+"name": "the stairs down"} or {"edge": "east", "to": "..."} (walking off
+that side); "to": "back" returns; "key": "iron key" locks it. A new section
+is "subworlds": {"cellar": {"title": "The Cellar", "generate": {"kind":
+"dungeon", "rooms": 4}, "agents": [...]}}; the way back is made by the game.
+<!-- /sections -->

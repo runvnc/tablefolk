@@ -114,6 +114,14 @@ with `"style": "mine"` a `mine` (a cart, crates, a pickaxe, a lamp); the rest
 are `chamber N`. Rocks, fungus and crystals line the walls. Options:
 `"rooms"` (3-9 chambers), `"size"`, `"style"`.
 
+## Links in generated maps
+
+A link of a world in sections can stand `"in"` a place of a generated map
+(`{"in": "lair", "to": "level2", "kind": "stairs_down"}`): the game picks a
+free square in it, by a wall, away from its doors, and keeps it. A link's
+`"to"` can also be `{"generate": {"kind": "cave", "seed": 4}}`: the place is
+generated the first time the player goes in ([things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links)).
+
 ## Putting things in places
 
 - `"in": "<place>"` on an agent, an object or the player puts it in a free

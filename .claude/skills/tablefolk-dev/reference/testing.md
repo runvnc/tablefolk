@@ -418,6 +418,20 @@ came in the evening window.
 
 ## The world builder (`gen-eval.mjs`, 2026-11-20)
 
+Worlds in sections (`node gen-eval.mjs --sections --base=http://localhost:8003`,
+the server path, deepseek-v4.1-flash): `delve3` ("a mining camp above an old
+dwarf delve, where a young miner went missing two levels down", 3, levels)
+built in 20 s: a hamlet (4 people with job, home and work, a rat threat, low
+stores, goal `agent_near tobin` + `player_defeated`), a mine level (2 people,
+spiders and rats, stairs down in its lair), a crypt level (tobin, skeletons,
+a ghost); structure: 3 sections, 2 links, all reachable, the goal's tobin in
+level 2, no problems, nothing repaired. `region3` ("a village by a dark
+forest, with a cave in the hills where the wolves den", 3, region) in 13 s:
+the village with an edge east to the forest and a cave mouth in its garden
+to the den, the goal `agent_defeated wolf_alpha` in the den, no problems.
+Both together cost $0.0055 on OpenRouter. The delve world played: down two
+flights of stairs and back with every section kept.
+
 Eight one-line requests through `/api/generate` (deepseek-v4.1-flash on
 OpenRouter, the default), structure only. Before (the old fast-skill and
 checks): every world a generated map with 5-11 places, `live` but no clock

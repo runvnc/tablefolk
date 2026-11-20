@@ -5,6 +5,8 @@
 //   GET /api/generate?prompt=...&mode=...&model=...&endpoint=...[&stream=1]
 //       the JSON result ({ scenario, code, link, warnings, ms }), or with
 //       stream=1 server-sent events: progress, then a final "done"
+//       sections=2..5&shape=levels|region|auto: a world in sections (generateWorldScenario:
+//       a plan, then a model call per section, put together and checked by app/worldgen-plan.js)
 //   POST /api/revise {scenario, request}
 //       the same events for a change to an existing scenario (the builder's
 //       "ask the AI for changes" box)
@@ -23,7 +25,9 @@ import { config, ROOT, endpoint, LITERT_URL } from './config.js';
 import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';
 import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, critiqueRequest, parseCritique, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
+import '../app/worldgen-plan.js';
 export { encodeScenario };
+const Plan = globalThis.TablefolkWorldPlan;
 export const checkScenario = (s, opts) => checkCore(s, packVoices(), opts);
 
 // The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
@@ -81,6 +85,69 @@ export async function generateScenario({ prompt, mode = 'auto', ep, emit = () =>
 export async function reviseScenario({ scenario, request, ep, emit = () => {} }) {
   const { kept, maxTokens, user } = reviseRequest(scenario, request);
   return runModel({ label: 'change: ' + request, mode: 'revise', ep, emit, maxTokens, user, merge: out => mergeKept(out, kept) });
+}
+// A world in sections: the model plans the world (title, pressure, goal, the
+// sections and how they link), then writes each section as its own scenario
+// with the plan as context (one call each, one repair round, checked like any
+// world); a section that fails is built by procgen from the plan instead.
+// Assembled and checked (links' ends, squares, edges, keys, reachability, what
+// the goal needs) by app/worldgen-plan.js. aborted(): the stream was closed.
+export async function generateWorldScenario({ prompt, sections, shape, ep, emit = () => {}, aborted = () => false }) {
+  const t0 = Date.now(), n = Math.max(2, Math.min(5, +sections || 2));
+  const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 600000 });
+  const ask = async (messages, maxTokens, label, extra = {}) => {
+    if (aborted()) throw new Error('stopped');
+    emit('progress', { stage: 'waiting', model: ep.model, label, ...extra });
+    let last = 0, lastT = -1;
+    const out = await collect(await client.chat.completions.create({ model: ep.model, messages, stream: true, temperature: 0.7, max_tokens: maxTokens }), text => {
+      if (text.length - last > 160) { last = text.length; emit('progress', { stage: 'writing', label, chars: text.length, preview: text.slice(-160), ...extra }); }
+    }, (thought, tail) => { if (lastT < 0 || thought - lastT > 120) { lastT = thought; emit('progress', { stage: 'thinking', label, thought, preview: tail.slice(-200), ...extra }); } });
+    return out.text;
+  };
+  const sys = { role: 'system', content: systemPrompt() };
+  // 1. the plan
+  let plan = null;
+  try { plan = Plan.readPlan(parseJSON(await ask([sys, { role: 'user', content: Plan.planPrompt(prompt, n, shape) }], 6000, 'planning the world', { section: 0, sections: n })), n, shape, prompt); }
+  catch (e) { if (/stopped/.test(e.message)) throw e; emit('progress', { stage: 'problems', problems: ['the plan was not usable (' + e.message + '): a plain one is used'] }); plan = Plan.readPlan({ title: prompt }, n, shape, prompt); }
+  // 2. each section
+  const list = [], repairs = [], warnings = [];
+  for (let i = 0; i < n; i++) {
+    const sec = plan.sections[i], label = `section ${i + 1} of ${n}: ${sec.title}`, extra = { section: i + 1, sections: n };
+    let s = null, problems = [];
+    const messages = [sys, { role: 'user', content: Plan.sectionPrompt(plan, i, prompt) }];
+    for (let round = 0; round < 2 && !s; round++) {
+      let raw = '';
+      try {
+        raw = await ask(messages, 12000, round ? label + ' (fixing)' : label, extra);
+        const cand = Plan.shapeSection(plan, i, parseJSON(raw)), notes = [];
+        problems = checkScenario(cand, { prompt, fresh: true, notes });
+        if (!problems.length) { s = cand; repairs.push(...notes.map(t => sec.title + ': ' + t)); break; }
+      } catch (e) { if (/stopped/.test(e.message)) throw e; problems = [e.message]; }
+      emit('progress', { stage: 'problems', problems, label, ...extra });
+      messages.push({ role: 'assistant', content: raw || '{}' }, { role: 'user', content: `Fix these problems and reply with the whole corrected JSON object only:\n- ${problems.join('\n- ')}` });
+    }
+    if (!s) {
+      s = Plan.shapeSection(plan, i, Plan.fallbackSection(plan, i));
+      const notes = []; const left = checkScenario(s, { prompt, fresh: true, notes });
+      repairs.push(`${sec.title}: the model's answer had problems (${problems.join('; ').slice(0, 200)}), so it was built from the plan by procgen`);
+      if (left.length) warnings.push(...left.map(p => sec.title + ': ' + p));
+    }
+    // world-level fields belong to the first section; a section with nobody to threaten has no threats
+    if (i > 0) { delete s.goal; if (!(s.agents || []).some(a => !a.hostile && a.job)) delete s.threats; }
+    list.push(s);
+  }
+  // 3. the world
+  const world = Plan.assemble(plan, list), chk = Plan.checkWorld(world);
+  repairs.push(...chk.repairs); warnings.push(...chk.problems);
+  emit('progress', { stage: 'checks', label: 'the world: ' + chk.report.join('; '), report: chk.report, problems: chk.problems });
+  const code = encodeScenario(world);
+  recent.push({ at: Date.now(), prompt, model: ep.model, ms: Date.now() - t0, ok: true, title: world.title || '' }); if (recent.length > 50) recent.shift();
+  try {
+    const slug = (world.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
+    mkdirSync(join(ROOT, 'generated'), { recursive: true });
+    writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: 'sections', shape, model: ep.model, plan, report: chk.report, repairs, ...world }, null, 2) + '\n');
+  } catch {}
+  return { scenario: world, code, warnings, repairs, report: chk.report, plan, ms: Date.now() - t0, model: ep.model, sections: n };
 }
 async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }) {
   const t0 = Date.now(), prompt = label;
@@ -149,6 +216,9 @@ export async function handleGenerate(req, url) {
   const prompt = (url.searchParams.get('prompt') || '').trim().slice(0, 2000);
   if (!prompt) return Response.json({ error: 'prompt required' }, { status: 400 });
   const mode = url.searchParams.get('mode') || 'auto';
+  // a world in sections (sections=2..5, shape=levels|region|auto)
+  const sections = Math.max(1, Math.min(5, +url.searchParams.get('sections') || 1)), shape = ['levels', 'region'].includes(url.searchParams.get('shape')) ? url.searchParams.get('shape') : 'auto';
+  const build = (o) => sections > 1 ? generateWorldScenario({ prompt, sections, shape, ...o }) : generateScenario({ prompt, mode, ...o });
   // a visitor builds at most 8 worlds an hour with the server's models
   let ep = pickEndpoint(url, req);
   if (!ep.error && overLimit(req, 'generate', 8, 3600e3)) ep = { error: 'you have built a lot of worlds this hour: try again later, or build in your browser' };
@@ -156,15 +226,17 @@ export async function handleGenerate(req, url) {
   if (ep.error && url.searchParams.get('stream') === '1') return new Response(`event: failed\ndata: ${JSON.stringify({ error: ep.error })}\n\n`, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
   if (ep.error) return Response.json({ error: ep.error }, { status: 403 });
   if (url.searchParams.get('stream') !== '1') {
-    try { const r = await generateScenario({ prompt, mode, ep }); return Response.json({ ...r, link: '/app/#s=' + r.code }); }
+    try { const r = await build({ ep }); return Response.json({ ...r, link: '/app/#s=' + r.code }); }
     catch (e) { failed(prompt, ep, e); return Response.json({ error: e.message }, { status: 502 }); }
   }
   const enc = new TextEncoder();
+  let stopped = false;   // the page closed the stream (its Stop button): a world in sections stops between calls
   const stream = new ReadableStream({
+    cancel() { stopped = true; },
     async start(ctl) {
       const send = (event, data) => { try { ctl.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)); } catch {} };
       try {
-        const r = await generateScenario({ prompt, mode, ep, emit: send });
+        const r = await build({ ep, emit: send, aborted: () => stopped });
         send('done', { ...r, link: '/app/#s=' + r.code });
       } catch (e) { failed(prompt, ep, e); send('failed', { error: e.message }); }
       ctl.close();

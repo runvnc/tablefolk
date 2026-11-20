@@ -7,6 +7,8 @@
 //        the in-browser step-by-step path (app/worldgen-browser.js) in the test Chrome
 //        (CDP 9223, the model cached for the origin), through tools/browser-test/worldgen-test.html
 //   node gen-eval.mjs --score=<file.json> ...   score saved scenarios (generated/*.json) without generating
+//   node gen-eval.mjs --sections [--only=delve3]   worlds in sections on the server path (sections=3&shape=...):
+//        each section scored like a world, plus the structure checks (app/worldgen-plan.js checkWorld)
 //
 // Per world: places, talking characters with job / home / workplace set and
 // reachable from the player's start, pressure kind, goal predicate kinds,
@@ -28,7 +30,12 @@ export const REQUESTS = {
   farm: 'a lonely farmstead on the moors',
   talk: 'a job interview between a nervous skeleton and a necromancer, just talking',
 };
-const only = flag('only') ? String(flag('only')).split(',') : Object.keys(REQUESTS);
+// worlds in sections (--sections): [request, sections, shape]
+export const SECTIONED = {
+  delve3: ['a mining camp above an old dwarf delve, where a young miner went missing two levels down', 3, 'levels'],
+  region3: ['a village by a dark forest, with a cave in the hills where the wolves den', 3, 'region'],
+};
+const only = flag('only') ? String(flag('only')).split(',') : Object.keys(flag('sections') ? SECTIONED : REQUESTS);
 const { reach, TALK_ONLY } = await import(path.join(root, 'server/worldgen-living.js'));
 const MINDLESS = /^(skeleton|skeleton_warrior|skeleton_farmer|zombie|rat|spider|wolf|bat|slime|ghost|giant|demon|dragon|wyrmling|imp|mushroom_warrior|bunny|snake|wasp|frog|minotaur|lizardman|werewolf|mummy|bear|gnoll|gargoyle|dark_knight|red_dragon)$/;
 const ANIMAL = /^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/;
@@ -48,11 +55,26 @@ export function score(s, repairs = []) {
 }
 
 async function viaServer(key) {
-  const t0 = Date.now();
-  const r = await fetch(`${base}/api/generate?prompt=${encodeURIComponent(REQUESTS[key])}&where=cloud`, { signal: AbortSignal.timeout(900000) });
+  const t0 = Date.now(), sec = SECTIONED[key];
+  const q = sec ? `prompt=${encodeURIComponent(sec[0])}&sections=${sec[1]}&shape=${sec[2]}` : `prompt=${encodeURIComponent(REQUESTS[key])}`;
+  const r = await fetch(`${base}/api/generate?${q}&where=cloud`, { signal: AbortSignal.timeout(1800000) });
   const d = await r.json();
   if (!d.scenario) throw new Error(d.error || 'no scenario');
-  return { scenario: d.scenario, repairs: d.repairs || [], ms: Date.now() - t0, model: d.model };
+  return { scenario: d.scenario, repairs: d.repairs || [], warnings: d.warnings || [], report: d.report || [], ms: Date.now() - t0, model: d.model };
+}
+// a world in sections: each section scored, and the structure checked again here
+async function sectionRows(key, r) {
+  await import(path.join(root, 'app/procgen.js')); await import(path.join(root, 'app/worldgen-plan.js'));
+  const WP = globalThis.TablefolkWorldPlan, chk = WP.checkWorld(JSON.parse(JSON.stringify(r.scenario)));
+  const secs = WP.allSections(r.scenario);
+  console.log(`\n[${key}] ${r.scenario.title}: ${secs.length} sections; server report: ${(r.report || []).join('; ')}`);
+  console.log(`  checks here: ${chk.report.join('; ')}${chk.problems.length ? ' | PROBLEMS: ' + chk.problems.join('; ') : ' | no problems'}${chk.repairs.length ? ' | would repair: ' + chk.repairs.join('; ') : ''}`);
+  if (r.warnings?.length) console.log('  server warnings: ' + r.warnings.join('; '));
+  for (const x of secs) {
+    const links = (x.s.links || []).map(l => `${l.kind || (l.edge ? 'edge ' + l.edge : 'door')}${l.in ? ' in ' + l.in : ''} -> ${typeof l.to === 'string' ? l.to : 'generated'}`);
+    console.log(`  - ${x.key || '(top)'}: ${x.title} [${x.s.generate?.kind || 'drawn'}${x.s.generate?.style ? '/' + x.s.generate.style : ''}] agents ${(x.s.agents || []).map(a => a.id + (a.hostile ? '!' : '')).join(', ')}; threats ${(x.s.threats || []).map(t => t.who || t.kind).join(', ') || 'none'}; links ${links.join(', ') || 'none'}`);
+  }
+  return secs.map(x => ({ key: key + ':' + (x.key || 'top'), ...score(x.s, []) }));
 }
 async function viaBrowser(key) {
   const { chromium } = await import('playwright-core');
@@ -78,14 +100,14 @@ async function main() {
   } else {
     const run = flag('browser') ? viaBrowser : viaServer, keys = [...only];
     const one = async key => {
-      console.log(`[${key}] ${REQUESTS[key]}`);
-      try { const r = await run(key); out.worlds[key] = r; const sc = score(r.scenario, r.repairs); rows.push({ key, ...sc, s: Math.round(r.ms / 1000) }); console.log(`[${key}] done in ${(r.ms / 1000).toFixed(0)} s: ${sc.title}`); }
+      console.log(`[${key}] ${SECTIONED[key] ? SECTIONED[key].join(" / ") : REQUESTS[key]}`);
+      try { const r = await run(key); out.worlds[key] = r; if (SECTIONED[key]) { const rs = await sectionRows(key, r); rows.push(...rs); console.log(`[${key}] done in ${(r.ms / 1000).toFixed(0)} s`); return; } const sc = score(r.scenario, r.repairs); rows.push({ key, ...sc, s: Math.round(r.ms / 1000) }); console.log(`[${key}] done in ${(r.ms / 1000).toFixed(0)} s: ${sc.title}`); }
       catch (e) { console.log(`[${key}] FAILED: ${e.message}`); rows.push({ key, title: 'FAILED: ' + e.message.slice(0, 80) }); }
     };
     const n = flag('browser') ? 1 : par;
     for (let i = 0; i < keys.length; i += n) await Promise.all(keys.slice(i, i + n).map(one));
   }
-  rows.sort((a, b) => only.indexOf(a.key) - only.indexOf(b.key));
+  rows.sort((a, b) => only.indexOf(a.key.split(':')[0]) - only.indexOf(b.key.split(':')[0]));
   console.log('\n| request | world | kind | places | people | job+home+work | reachable | pressure | goal | live+time | repairs |\n|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of rows) console.log(`| ${r.key} | ${r.title || ''}${r.talk ? ' (talk)' : ''} | ${r.kind ?? ''} | ${r.places ?? ''} | ${r.people ?? ''} | ${r.withWork ?? ''} | ${r.reachable ?? ''} | ${r.pressure ?? ''} | ${r.goal ?? ''} | ${r.live != null ? (r.live && r.time ? 'yes' : r.live ? 'live only' : 'no') : ''} | ${r.repairs ?? ''} |`);
   out.rows = rows;
