@@ -92,7 +92,7 @@
     ['skills.js?v=20261120e'],
     ['trade.js?v=20261024c'],
     ['procgen.js?v=20261120b'],
-    ['scenario.js?v=20261120m'],
+    ['scenario.js?v=20261120n'],
     ['sections.js?v=20261120b'],
     ['registry.js?v=20261120b'],
     ['tabletop.js?v=20261025a'],

@@ -1482,6 +1482,9 @@
     delete s.player; delete s.flags; delete s.clock;   // the world's, not the section's
     s.reveal = window.tablefolkDark?.save?.() || null;
     s.at = clockNow(); s.section = id; s.title = world.base?.title || '';
+    // jobs.js keeps the day's tallies on the body (g._job): the counters go with the section
+    s.jobs = {};
+    for (const g of W().getAgents()) if (g._job && ids.has(g.id)) s.jobs[g.id] = { cycles: g._job.cycles || 0, did: clone(g._job.did || {}), ...(g._job.yesterday ? { yesterday: g._job.yesterday } : {}) };
     return s;
   }
   // companions (a role's "follow" behaviour) and animals following the player, near enough to come along
@@ -1607,6 +1610,8 @@
       if (dead) { try { g.activeRigAnim?.stop(); dead.start(false, 1, dead.to, dead.to, false); g.activeRigAnim = dead; g.rigMode = 'defeated'; } catch {} } else g.root.rotation.z = Math.PI / 2;
     }
     if (saved?.reveal) window.tablefolkDark?.restore?.(saved.reveal);
+    // the day's job tallies back on the new bodies (jobs.js makes its state on first use: cardLine)
+    if (saved?.jobs) for (const g of w.getAgents()) { const j = saved.jobs[g.id]; if (!j) continue; try { window.tablefolkJobs?.cardLine?.(g); } catch {} if (g._job) Object.assign(g._job, clone(j)); }
     // time passed here while the player was away: a coarse catch-up in code (sections.js)
     if (saved && !opts.noCatchUp && saved.at != null && clockNow() != null && clockNow() - saved.at >= 30) {
       try { window.tablefolkSections?.catchUp?.({ minutes: clockNow() - saved.at, agents: here()?.agents || [], places: w.state.places || [] }); } catch (e) { console.warn('[sections] catch-up', e); }
