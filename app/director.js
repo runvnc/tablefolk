@@ -81,13 +81,15 @@
   // Events from the minds (mind.js): a chance at what the character is
   // quietly after, unease about its secret, or a rumour another character
   // carries (it is remembered as hearsay). One time in three when there is one.
+  // mindless monsters, raiders and animals hear no rumours and get no events of their own
+  const mindful = o => o && !o.defeated && !o._threat && !window.tablefolkPlay?.isAnimal?.(o) && !(window.tablefolkPlay?.isHostile?.(o) && !window.tablefolkPlay?.talksToo?.(o));
   function fromMind(c) {
-    const M = window.tablefolkMind; if (!c || !M?.mindOf || state.mind === false) return null;
+    const M = window.tablefolkMind; if (!c || !M?.mindOf || state.mind === false || !mindful(c)) return null;
     const cfg = getBrainConfig(c.id), out = [];
     if (cfg.agenda) out.push({ text: `{who} notices a chance to ${String(cfg.agenda).replace(/[.!]+$/, '')}.` });
     if (cfg.secret) out.push({ text: '{who} has the uneasy feeling that someone nearby suspects something.' });
     for (const o of state.characters) {
-      if (o === c || o.defeated) continue;
+      if (o === c || !mindful(o)) continue;
       const e = (M.mindOf(o).mem || []).filter(x => (x.kind === 'event' || x.kind === 'belief') && x.w >= 1.5 && !/^You (sold|gave)/.test(x.text)).pop();
       // (never a rumour about the one who overhears it: "odo overhears a rumour: odo bought wheat")
       if (e) { const said = String(e.text).replace(/\byour\b/gi, o.id + "'s").replace(/\byou\b/gi, o.id); if (!new RegExp('\\b' + c.id + '\\b', 'i').test(said)) out.push({ text: `{who} overhears a rumour: ${said}`, rumour: said }); }
@@ -130,7 +132,7 @@
     // told to it and to whoever is near enough to notice
     const p = posOf(c);
     for (const o of state.characters) {
-      if (o.defeated) continue;
+      if (o.defeated || !mindful(o)) continue;
       const q = posOf(o), d = Math.hypot(q.x - p.x, q.z - p.z);
       if (o !== c && d > 4) continue;
       // a rumour is not told to the one it is about
@@ -167,7 +169,7 @@
     const ev = scnEvents.find(e => Number.isFinite(+e.round) && r >= +e.round && !used.has(e.text));
     if (!ev) return false;
     const who = ev.to ? state.characters.find(o => o.id === ev.to && !o.defeated) : null;
-    const target = who || state.characters.find(o => !o.defeated);
+    const target = who || state.characters.find(mindful);
     if (target) { happen(target, ev); lastAt = performance.now(); }
     return true;
   }
@@ -180,12 +182,12 @@
     if (performance.now() - lastAt < gap * 1000) { turns--; return; }
     lastAt = performance.now(); gap = null;
     // to someone the player can see, when there is someone
-    const seen = state.characters.filter(o => !o.defeated && (window.tablefolkDark?.visible?.(posOf(o).x, posOf(o).z) ?? true));
-    const target = seen.length ? seen[Math.floor(Math.random() * seen.length)] : c;
+    const seen = state.characters.filter(o => mindful(o) && (window.tablefolkDark?.visible?.(posOf(o).x, posOf(o).z) ?? true));
+    const target = seen.length ? seen[Math.floor(Math.random() * seen.length)] : mindful(c) ? c : null;
     if (target) happen(target, pick(target));
   }
   function now(text) {
-    const list = state.characters.filter(o => !o.defeated); if (!list.length) return null;
+    const list = state.characters.filter(mindful); if (!list.length) return null;
     const c = list[Math.floor(Math.random() * list.length)];
     return happen(c, text ? { text } : pick(c));
   }

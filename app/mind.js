@@ -384,6 +384,8 @@
     }
     return true;
   }
+  // animals, raiders and mindless monsters take in no gossip
+  const mindfulC = c => !c._threat && !window.tablefolkPlay?.isAnimal?.(c) && !(window.tablefolkPlay?.isHostile?.(c) && !window.tablefolkPlay?.talksToo?.(c));
   function onSpoke(g, text) {
     if (state.gossip === false || !state.characters.includes(g)) return;
     const said = new Set(words(text)); if (said.size < 2) return;
@@ -391,7 +393,7 @@
     if (!mine.length) return;
     const p = g.root.position, R = state.earshot || 6;
     for (const c of state.characters) {
-      if (c === g || c.defeated || getBrainConfig(c.id).defeated || UNDEAD.test(c.charModel || '')) continue;
+      if (c === g || c.defeated || getBrainConfig(c.id).defeated || UNDEAD.test(c.charModel || '') || !mindfulC(c)) continue;
       if (Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) > R) continue;
       for (const e of mine) if (hearGossip(c, g, e.text)) mindOf(g).shared = { ...(mindOf(g).shared || {}), [c.id + '|' + e.text]: 1 };
     }
@@ -399,7 +401,7 @@
   function gossipLine(g) {
     if (state.gossip === false) return '';
     const m = mindOf(g), p = g.root?.position; if (!p) return '';
-    const near = state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && !UNDEAD.test(c.charModel || '') && Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) <= 4);
+    const near = state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && !UNDEAD.test(c.charModel || '') && mindfulC(c) && Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) <= 4);
     if (!near.length) return '';
     for (const c of near) {
       const news = m.mem.filter(e => juicy(g, e) && !(m.shared || {})[c.id + '|' + e.text] && !e.text.toLowerCase().includes(c.id.toLowerCase())).sort((a, b) => b.w - a.w || b.turn - a.turn)[0];

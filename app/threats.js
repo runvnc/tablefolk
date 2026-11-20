@@ -105,7 +105,7 @@
     if (spec.sound) try { window.tablefolkSfx?.play(spec.sound); } catch {}
     try { log('[threat] ' + text); } catch {}
     J()?.addNews?.('', text, 'raid');
-    for (const c of state.characters) if (!c._threat && !c.defeated && !P()?.isAnimal?.(c)) try { window.tablefolkMind?.addMemory?.(c, text, 1.5, 'event'); } catch {}
+    for (const c of state.characters) if (!c._threat && !c.defeated && !P()?.isAnimal?.(c) && !(P()?.isHostile?.(c) && !P()?.talksToo?.(c))) try { window.tablefolkMind?.addMemory?.(c, text, 1.5, 'event'); } catch {}
     console.info('[threats] spawned', gr.ids.join(', '), 'at', at);
     return gr;
   }
@@ -172,7 +172,7 @@
       for (const c of [...by, ...state.characters.filter(awake)]) if (C?.say(c, 'allclear', {})) break;
     } catch {}
     for (const c of state.characters) {
-      if (c._threat || c.defeated || P()?.isAnimal?.(c)) continue;
+      if (c._threat || c.defeated || P()?.isAnimal?.(c) || (P()?.isHostile?.(c) && !P()?.talksToo?.(c))) continue;
       try { window.tablefolkMind?.addMemory?.(c, text, 2, 'event'); } catch {}
       for (const k of gr.fought) { if (k === c.id) continue; if (k === 'player') { const m = window.tablefolkMind?.mindOf?.(c); if (m) m.mood.trust = Math.min(1, m.mood.trust + .12); } else window.tablefolkMind?.opinion?.(c, k, .25, `fought off the ${plural(gr.spec.name)}`); }
     }
