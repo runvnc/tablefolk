@@ -1,0 +1,758 @@
+{
+ "about": "Environment models generated with Meshy 7.1 from the concept scenes (LICENSE.txt). Units: metres; origin at the centre of the footprint on the ground; front toward +Z. Wire with fit \"footprint\" (or set w/h/d to these sizes).",
+ "items": [
+  {
+   "type": "house",
+   "files": {
+    "full": "house.glb",
+    "1k": "house.1k.glb"
+   },
+   "footprint_m": [
+    4.69,
+    4.99
+   ],
+   "footprint_cells": [
+    5,
+    5
+   ],
+   "height_m": 4.53,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2710,
+    "1k": 1425
+   },
+   "replaces": {
+    "house": {
+     "file": "models/props/gen/house.1k.glb",
+     "w": 2.3,
+     "h": 2.2,
+     "d": 2.3,
+     "static": true,
+     "fit": "footprint",
+     "visualRy": 3.14159,
+     "clay": true,
+     "flammable": true,
+     "tags": [
+      "building"
+     ],
+     "aliases": [
+      "cottage",
+      "hut",
+      "cabin"
+     ]
+    }
+   },
+   "notes": "walk-in size (procgen WALK_IN house 5x5); pack.json w/d 2.3 is the old dollhouse scale. Thatch, cream plaster, 1.5 storeys."
+  },
+  {
+   "type": "fantasy_house",
+   "files": {
+    "full": "fantasy_house.glb",
+    "1k": "fantasy_house.1k.glb"
+   },
+   "footprint_m": [
+    5.44,
+    5.01
+   ],
+   "footprint_cells": [
+    6,
+    5
+   ],
+   "height_m": 5.57,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2842,
+    "1k": 1421
+   },
+   "replaces": {
+    "fantasy_house": {
+     "file": "models/props/village/fantasy_house.glb",
+     "w": 3.0,
+     "h": 3.4,
+     "d": 3.0,
+     "static": true,
+     "fit": "footprint",
+     "aliases": [
+      "timber_house",
+      "townhouse"
+     ],
+     "flammable": true,
+     "tags": [
+      "fantasy",
+      "village"
+     ]
+    }
+   },
+   "notes": "walk-in size (WALK_IN fantasy_house 6x5). Two-storey timber frame, clay tile. Made in the style test (its cost is in the test's ledger, not this one)."
+  },
+  {
+   "type": "stone_house",
+   "files": {
+    "full": "stone_house.glb",
+    "1k": "stone_house.1k.glb"
+   },
+   "footprint_m": [
+    3.82,
+    5.52
+   ],
+   "footprint_cells": [
+    4,
+    6
+   ],
+   "height_m": 4.7,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2255,
+    "1k": 1157
+   },
+   "replaces": {
+    "stone_house": {
+     "file": "models/props/village/stone_house.glb",
+     "w": 2.74,
+     "h": 1.52,
+     "d": 3.0,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village"
+     ],
+     "aliases": [
+      "stone_cottage"
+     ],
+     "material": "stone",
+     "flammable": false
+    }
+   },
+   "notes": "pack.json 2.74x3.0 at dollhouse scale; same aspect at full scale. Stone, slate."
+  },
+  {
+   "type": "tall_house",
+   "files": {
+    "full": "tall_house.glb",
+    "1k": "tall_house.1k.glb"
+   },
+   "footprint_m": [
+    3.68,
+    6.01
+   ],
+   "footprint_cells": [
+    4,
+    6
+   ],
+   "height_m": 6.35,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2522,
+    "1k": 1332
+   },
+   "replaces": {
+    "tall_house": {
+     "file": "models/props/village/tall_house.glb",
+     "w": 1.69,
+     "h": 2.47,
+     "d": 2.6,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village"
+     ],
+     "aliases": [
+      "narrow_house"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json 1.69x2.6; same aspect, narrow gable front."
+  },
+  {
+   "type": "inn",
+   "files": {
+    "full": "inn.glb",
+    "1k": "inn.1k.glb"
+   },
+   "footprint_m": [
+    6.71,
+    8.0
+   ],
+   "footprint_cells": [
+    7,
+    8
+   ],
+   "height_m": 6.44,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2933,
+    "1k": 1487
+   },
+   "replaces": {
+    "inn": {
+     "file": "models/props/village/inn.glb",
+     "w": 4.4,
+     "h": 3.81,
+     "d": 4.39,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village"
+     ],
+     "aliases": [
+      "tavern_house",
+      "pub"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json 4.4x4.39."
+  },
+  {
+   "type": "blacksmith",
+   "files": {
+    "full": "blacksmith.glb",
+    "1k": "blacksmith.1k.glb"
+   },
+   "footprint_m": [
+    6.94,
+    6.01
+   ],
+   "footprint_cells": [
+    7,
+    6
+   ],
+   "height_m": 6.96,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "open forge front",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2185,
+    "1k": 1104
+   },
+   "replaces": {
+    "blacksmith": {
+     "file": "models/props/village/blacksmith.glb",
+     "w": 3.6,
+     "h": 2.78,
+     "d": 3.04,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village"
+     ],
+     "aliases": [
+      "forge",
+      "smithy_house"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json 3.6x3.04."
+  },
+  {
+   "type": "barn",
+   "files": {
+    "full": "barn.glb",
+    "1k": "barn.1k.glb"
+   },
+   "footprint_m": [
+    6.51,
+    9.0
+   ],
+   "footprint_cells": [
+    7,
+    9
+   ],
+   "height_m": 7.02,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2140,
+    "1k": 1112
+   },
+   "replaces": {
+    "barn": {
+     "file": "models/props/farm/barn.glb",
+     "w": 3.95,
+     "h": 3.07,
+     "d": 4.2,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "farm"
+     ],
+     "aliases": [
+      "red_barn"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json 3.95x4.2."
+  },
+  {
+   "type": "stable",
+   "files": {
+    "full": "stable.glb",
+    "1k": "stable.1k.glb"
+   },
+   "footprint_m": [
+    7.05,
+    4.62
+   ],
+   "footprint_cells": [
+    7,
+    5
+   ],
+   "height_m": 3.92,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "row of stall doors",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2271,
+    "1k": 1195
+   },
+   "replaces": {
+    "stable": {
+     "file": "models/props/village/stable.glb",
+     "w": 3.4,
+     "h": 2.6,
+     "d": 2.6,
+     "static": true,
+     "fit": "footprint",
+     "aliases": [
+      "stables"
+     ],
+     "flammable": true,
+     "tags": [
+      "fantasy",
+      "village"
+     ]
+    }
+   },
+   "notes": "walk-in size (WALK_IN stable 7x5). The old stable.glb's door faced -x; this one faces +z like the walk-in door."
+  },
+  {
+   "type": "barracks",
+   "files": {
+    "full": "barracks.glb",
+    "1k": "barracks.1k.glb"
+   },
+   "footprint_m": [
+    7.52,
+    4.94
+   ],
+   "footprint_cells": [
+    8,
+    5
+   ],
+   "height_m": 7.55,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2119,
+    "1k": 1168
+   },
+   "replaces": {
+    "barracks": {
+     "file": "models/props/village/barracks.glb",
+     "w": 3.1,
+     "h": 3.34,
+     "d": 3.4,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village",
+      "castle"
+     ],
+     "aliases": [
+      "guardhouse",
+      "keep"
+     ],
+     "material": "stone",
+     "flammable": false
+    }
+   },
+   "notes": "pack.json 3.1x3.4 (deeper than wide); this model came out wider than deep (7.5 x 4.9): the front is a long side."
+  },
+  {
+   "type": "mill_house",
+   "files": {
+    "full": "mill_house.glb",
+    "1k": "mill_house.1k.glb"
+   },
+   "footprint_m": [
+    4.7,
+    5.0
+   ],
+   "footprint_cells": [
+    5,
+    5
+   ],
+   "height_m": 7.68,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 30000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2550,
+    "1k": 1420
+   },
+   "replaces": {
+    "mill_house": {
+     "file": "models/props/village/mill_house.glb",
+     "w": 3.0,
+     "h": 4.24,
+     "d": 2.41,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "building",
+      "fantasy",
+      "village"
+     ],
+     "aliases": [
+      "mill_cottage"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json 3.0x2.41; sails on the front gable (static, not animated)."
+  },
+  {
+   "type": "well",
+   "files": {
+    "full": "well.glb",
+    "1k": "well.1k.glb"
+   },
+   "footprint_m": [
+    1.7,
+    1.7
+   ],
+   "footprint_cells": [
+    2,
+    2
+   ],
+   "height_m": 1.7,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 12000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1726,
+    "1k": 682
+   },
+   "replaces": {
+    "well": {
+     "file": "models/props/village/well.glb",
+     "w": 1.4,
+     "h": 1.9,
+     "d": 1.4,
+     "static": true,
+     "fit": "footprint",
+     "material": "stone",
+     "flammable": false,
+     "aliases": [
+      "water_well"
+     ],
+     "tags": [
+      "fantasy",
+      "village"
+     ]
+    }
+   },
+   "notes": "pack.json 1.4x1.4."
+  },
+  {
+   "type": "market_stand",
+   "files": {
+    "full": "market_stand.glb",
+    "1k": "market_stand.1k.glb"
+   },
+   "footprint_m": [
+    1.9,
+    1.59
+   ],
+   "footprint_cells": [
+    2,
+    2
+   ],
+   "height_m": 2.22,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "counter side",
+   "triangles": 12000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2092,
+    "1k": 812
+   },
+   "replaces": {
+    "market_stand": {
+     "file": "models/props/village/market_stand.glb",
+     "w": 1.8,
+     "h": 1.9,
+     "d": 1.1,
+     "static": true,
+     "fit": "footprint",
+     "aliases": [
+      "market_stall",
+      "booth"
+     ],
+     "flammable": true,
+     "tags": [
+      "fantasy",
+      "village"
+     ]
+    }
+   },
+   "notes": "pack.json 1.8x1.1; the awning overhangs to 1.6 deep."
+  },
+  {
+   "type": "cart",
+   "files": {
+    "full": "cart.glb",
+    "1k": "cart.1k.glb"
+   },
+   "footprint_m": [
+    1.85,
+    1.31
+   ],
+   "footprint_cells": [
+    2,
+    1
+   ],
+   "height_m": 0.95,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "handles",
+   "triangles": 12000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1662,
+    "1k": 680
+   },
+   "replaces": {
+    "cart": {
+     "file": "models/props/village/cart.glb",
+     "w": 1.9,
+     "h": 1.0,
+     "d": 1.0,
+     "static": true,
+     "fit": "footprint",
+     "aliases": [
+      "handcart",
+      "wagon"
+     ],
+     "flammable": true,
+     "tags": [
+      "fantasy",
+      "village"
+     ]
+    }
+   },
+   "notes": "pack.json 1.9x1.0; four-wheeled."
+  },
+  {
+   "type": "fence_section",
+   "files": {
+    "full": "fence_section.glb",
+    "1k": "fence_section.1k.glb"
+   },
+   "footprint_m": [
+    2.0,
+    0.26
+   ],
+   "footprint_cells": [
+    2,
+    1
+   ],
+   "height_m": 1.04,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "either long side",
+   "triangles": 6000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1640,
+    "1k": 553
+   },
+   "replaces": {
+    "fence_section": {
+     "file": "models/props/village/fence_section.glb",
+     "w": 1.0,
+     "h": 0.41,
+     "d": 0.03,
+     "fit": "footprint",
+     "static": true,
+     "tags": [
+      "village",
+      "farm"
+     ],
+     "aliases": [
+      "wooden_fence"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "one 2 m straight length, a post at each end, rails run along x; pack.json fence_section is 1.0 long and 0.41 high (toy scale): scale or space them 2 m apart."
+  },
+  {
+   "type": "bar_counter",
+   "files": {
+    "full": "bar_counter.glb",
+    "1k": "bar_counter.1k.glb"
+   },
+   "footprint_m": [
+    3.0,
+    0.86
+   ],
+   "footprint_cells": [
+    3,
+    1
+   ],
+   "height_m": 1.19,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "plain panelled customer side",
+   "triangles": 15000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1991,
+    "1k": 867
+   },
+   "replaces": "new type bar_counter (3x1); shelves and cupboards on the keeper's side (-z). Made in the style test (its cost is in the test's ledger).",
+   "notes": "New type."
+  }
+ ]
+}

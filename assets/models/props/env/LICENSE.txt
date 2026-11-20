@@ -1,0 +1,13 @@
+Environment models (buildings and props) generated for Tablefolk with Meshy 7.1
+image-to-3D and multi-image-to-3D (through fal.ai), 2026-11, from the project's
+own concept art: crops of the approved style scenes, isolated with FLUX Kontext
+(fal-ai/flux-pro/kontext), back views of the buildings with nano-banana-pro edit.
+Paid generations owned by the project, like the Meshy people and monsters in
+assets/models/characters/meshy/; released with the project under the repo's
+asset licence (README.md, "Licence").
+
+Processed in Blender (ground discs and stray bits removed, origin at the centre
+of the footprint on the ground, front/door toward +Z, scaled to metres,
+decimated) and compressed with tools/compress-glb.sh: <name>.glb has 2048 px
+textures (--max 2048), <name>.1k.glb 1024 px. manifest.json lists every model,
+its footprint, height, front side and the pack.json type it replaces.

@@ -223,6 +223,51 @@ full 1536 mode runs out of memory on 24 GB (low-VRAM mode, 1024). Then
 UV, bake; mostly CPU) ~100 s, so a 5090 would gain little. Its animals came
 out speckled and walked worse than Hunyuan3D's: not used. fal is the way.
 
+### Environment models from the concept scenes (2026-11-20)
+
+`assets/models/props/env/` (manifest.json lists each model's footprint,
+height, front, triangles and the pack.json type it replaces; LICENSE.txt):
+buildings and props in the style of the approved concept scenes (weathered,
+muted, painterly semi-realistic, matte). The pipeline, scripts in
+`work/env/scripts/` (git-ignored; the ledger is `work/env/ledger.jsonl`):
+
+1. **Scene crop -> FLUX Kontext isolate** (`fal-ai/flux-pro/kontext`, $0.04):
+   edit a crop of a concept scene: "show only this one object, complete,
+   isolated on plain light grey, three-quarter view from slightly above, flat
+   overcast lighting, keep the exact style, materials and weathering; no cast
+   shadow, no ground, no grass at the base". For something the scene lacks,
+   pass a crop as the style reference and describe the other object; give the
+   footprint's proportions. Text-to-image inputs came out generic or
+   cartoonish. Look at every input; Kontext also removes a fault well when
+   asked to edit its own output ("remove the paving under the building").
+2. **Back view** (buildings only): nano-banana-pro edit (`fal-ai/nano-banana-pro/edit`,
+   $0.15) of the front image, "seen from the diagonally opposite corner". It
+   sometimes returns the front again, mirrored: say what must NOT be visible
+   (the porch, the sign).
+3. **Meshy 7.1** (`meshy/v7.1/multi-image-to-3d` with front + back for
+   buildings, `meshy/v7.1/image-to-3d` for props; $0.80, 5-15 min; PBR, 2048 px
+   base colour, metal-roughness and normal maps, ~80k triangles). The front
+   image's view comes out facing glTF +Z (the game's front at ry 0) for most
+   models; check the four-view sheet and turn it (`yaw`). Hunyuan3D drifted
+   cartoonish/blue; trees fail in image-to-3D.
+4. **Process** (`proc.py`, headless Blender): join, drop tiny loose parts and
+   flat ones at the base (ground discs), turn, scale to the footprint in metres
+   (door about 2 m), origin at the centre of the footprint on the ground,
+   decimate (buildings 30k triangles, props 6-15k), normals, and warm
+   near-white plaster toward the scenes' cream (`cream`).
+5. **Tiers**: `tools/compress-glb.sh --max 2048 in out/<name>.glb` and the
+   default (1024) for `<name>.1k.glb`; AVIF + meshopt.
+6. **Check** from the final file: `~/.cache/tablefolk-gltf/env-decomp.mjs`
+   (like `tools/decompress-glb.mjs`, and re-encodes AVIF as PNG so Blender can
+   texture it), then `render2.py`: four views and a shot with the swordswoman.
+
+Faults to watch for: soft cast shadows and ground or grass discs under the
+object (ask for none, reject inputs that keep them), hollow things filled in
+(a well's shaft), plaster whiter than the scenes, spiky roof-ridge noise,
+interiors left empty (the forge front came out as an empty shed), pictures
+read as the wrong count of parts (windmill sails). About $1.0 a building and
+$0.85 a prop including inputs.
+
 ## Hosting
 
 **Only tablefolk.world uses the mirror** (and the game on localhost):
