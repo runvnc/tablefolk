@@ -285,3 +285,39 @@ code for hearthvale except the last two fixes, which touch quarrels and
 
 The evening talk is still thin ("Hush." "Hmph." "Keep working."): it has a
 cue with the day's news since (jobs.js evening), not measured yet.
+
+Final code (after the quarrel, `say(...);`, ask, evening cue, quiet-gap and
+seat fixes; hearthvale `final`): 53 model calls (2.2 a game hour), 0% idle
+open turns, 96% of ticks in code; cycles farmer 6, baker 2, innkeeper 4,
+smith 3, woodcutter 3, guard 1, hunter 4, picker 7; 11 sales; everyone ate
+once, nobody above hunger .66; all but hector (night watch) slept at night
+(108-396 game minutes); 1.0 spoken lines a game hour (0.36 a real minute
+per person); raid: 4 spawned, 1 struck down, 3 fled, 74% of the others
+indoors meanwhile, nobody hurt.
+
+Old evals on the final code (E2B, same day):
+
+| | bakery before (prev. job) | bakery after | market before | market after |
+|---|---|---|---|---|
+| model turns (6 min) | 60 | 26 | 59 | 9 |
+| muted (idle) model turns | 39 | 0 | 46 | 2 |
+| spoken lines a minute | 2.0 | 4.3 | 1.3 | 1.2 |
+| tasks done / failed | 15 / 4 | 40 / 0 | 10 / 9 | 92 / 1 |
+| trades between characters | 1 | 0 | 0 | 0 |
+| malformed replies | 2% | 0% | 2% | 0% |
+
+The bakery talks more than after the last job: with no idle model turns
+filling the time, its three characters stand together and talk back to
+back (6.7 lines a minute before the quiet-gap change, 4.3 after); worse
+than the 2.0 target. Provocation: grub refuses at insult 3, hostile and
+first blow at 4, stops at a third of the player's health ("That's enough.
+Get out of here"); hector refuses at 3, orders out at 2, attacks at 4,
+stood down at 5 hp but was pushed into a second fight and beat the player
+to 0 (fixed: no new fight or blow at someone at a third of their health;
+re-run: the player ends at 3/20); greta (calm) refuses at 4 (was 5) and
+calls for help. `run-evals.sh`: 30/36 on the first pass (smithy ran out of
+GPU memory beside the Blender jobs; dagger 0/2 twice: a package anvil
+suggested as `use()`, fixed, 2/2); shop-chaos potion 0/2 then 2/2;
+feelings 'hit' 0/2, 1/2, 1/2, and 1/4 on the code from before this work
+(ccae1fd), so noise there, not a regression. With the fixes: 36 - 1 to 3
+(feelings 'hit').

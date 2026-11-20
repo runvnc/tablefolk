@@ -76,7 +76,7 @@
     ['live.js?v=20261120d'],
     ['director.js?v=20261120a'],
     ['clock.js?v=20261120b'],
-    ['jobs.js?v=20261120i'],
+    ['jobs.js?v=20261120j'],
     ['threats.js?v=20261120d'],
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261115a'],

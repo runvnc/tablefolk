@@ -567,7 +567,8 @@
   // the job has no valid next step: one pick, then it keeps to that for an hour
   async function decide(g, s, j, need, i) {
     const t = gm();
-    if (s.fallback && t < s.fallback.until) return s.fallback.run();
+    // keeping busy while stuck: now and then, not every tick ("thistle stirs the cauldron" eight times running)
+    if (s.fallback && t < s.fallback.until) { if (Math.random() < .5) return idleAt(g, s, s.work).then(r => ({ ms: Math.max(r.ms || 0, 9000) })); return s.fallback.run().then(r => ({ ms: Math.max(r?.ms || 0, 12000) })); }
     // nothing to do (all spent, nothing to sell) is a quieter matter than missing materials: a pick every three hours at most
     if (t - s.lastPick < (need ? 60 : 180)) { setDoing(g, s, need ? `out of ${need.item}` : 'waiting for work'); return idleAt(g, s, s.work); }
     s.lastPick = t;
