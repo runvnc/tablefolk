@@ -3187,7 +3187,7 @@ function beginTurnForAgent(agentId,cmd,source='agent'){
     state.turn.index++; state.turn.phase='resolving'; state.turn.command=cmd;
     updateTurnUI();
     const who=actor ? actor.id+' ' : '';
-    const actionDesc=`${who}${cmd.kind}${cmd.spell?' '+cmd.spell:''}${cmd.dir?' '+cmd.dir:''}${cmd.text?' "'+cmd.text+'"':''}`;
+    const actionDesc=`${who}${cmd.kind==='skill'&&cmd.name?cmd.name:cmd.kind}${cmd.spell?' '+cmd.spell:''}${cmd.dir?' '+cmd.dir:''}${cmd.text?' "'+cmd.text+'"':''}`;
     log(`turn ${state.turn.index}: ${source} → ${actionDesc}`);
     state.globalHistory=(state.globalHistory||[]).concat([`T${state.turn.index} ${actor?actor.id:'?'}: ${actionDesc}`]).slice(-20);
     executeGameCommandImmediate(cmd,actor);

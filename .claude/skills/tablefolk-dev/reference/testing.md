@@ -150,6 +150,42 @@ help or attacked; his anger read .6 after insult 2 only because he wrote
 disgusting presence away from my kitchen!"). hector (a guard, `evals/roles.json`):
 anger 0 throughout, trust .50 to .53, polite answers, no attack.
 
+After the changes (same day, same settings; bakery "after" is the final code,
+market-village ran before the last tweak that stopped "comes up to you"
+counting as a reason to talk):
+
+| | bakery before | bakery after | market before | market after |
+|---|---|---|---|---|
+| model turns | 42 | 60 | 45 | 52 |
+| turns with speech written / actually spoken | 86% / - | 44% / 23% | 93% / - | 42% / 25% |
+| speech-only turns | 2% | 2% | 64% | 37% |
+| spoken lines a minute | 4.7 | 2.0 | 4.0 | 2.5 |
+| replies to overheard talk | 22 | 0 | 0 | 1 |
+| turns muted (no reason to talk) | - | 39 | - | 35 |
+| trades or gifts between characters | 0 | 1 (thistle gives grub a bun) | 0 | 0 |
+| tasks done / failed | 12 / 4 | 15 / 4 | 4 / 4 | 10 / 13 |
+| failures reported as "worked" | 1 | 0 | 0 | 0 |
+| malformed replies | 2% | 2% | 0 | 3% |
+| "God"/"ready" leaks | 0 | 0 | 0 | 0 |
+
+The first after-run (before the last tweak) had 65% speech turns, mostly 6-line
+conversations between characters started by approach notices and director
+events. Seed variants on the bakery (60 turns each): none 1 malformed reply,
+the neutral "(You look around.)" seed 0 (kept). Provocation after: grub
+(brave) refuses service by code at insult 3, says "leave" at 3, turns
+hostile at 4, first blow lands at 5; hector (guard) refuses at 3, attacks
+and lands a blow at 4 (the player is beaten down by insult 8); greta (calm
+innkeeper) refuses at 5, orders the player out at 6, calls for help at 7
+(hector got the call but `evals/roles.json` does not allow `walk`, so he
+could not come over). Run memories: live-eval clears `tablefolk-mind:*`
+first (a run started with trust .16 from an earlier run's insults).
+
+Regressions after these changes (`run-evals.sh`, E2B, RUNS=2): 33/36 at
+first (shop-chaos haggle to 45 1/2, smithy commission a dagger 0/2: with
+the honest result "skill FAILED: bram doesn't know iron_bar" bram tried
+`use(iron_bar)` instead of `forge(dagger)`; history entries now name the
+skill, "forge FAILED: ...", and the dagger went back to 2/2).
+
 Tactics files use the Scenario pane's format plus `act:` lines and
 per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
 
