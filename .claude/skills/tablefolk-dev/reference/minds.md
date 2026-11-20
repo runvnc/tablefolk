@@ -404,6 +404,9 @@ Measured: testing.md, "A whole day".
   alternatives (`needs`/`fetch` as a list of sets). The old "keep busy at
   the station" option (the stir loop) is gone.
 - **Steps** `tidy`, `lookout`, `pace`; job `"order": "random"` (idler).
+- **Hiding at bedtime**: `threatened(g, s, j, asleep)` puts a non-fighter
+  hiding at home to bed in its sleep hours (a raid at 22:00 kept two of a
+  generated village's people standing all night).
 - **Patrol**: a fighter's patrol counts a cycle per place reached
   (`s.patrols`), emotes a look round and greets someone within 4 cells by
   name (each once a game hour; app.js `say`, voiced, not addressed).

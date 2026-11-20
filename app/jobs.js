@@ -845,7 +845,7 @@
 
   // ---------------------------------------------------------------- threats (threats.js lists the raiders)
   const fighter = (g, j) => !!(j?.fights || /guard|soldier|knight|hunter|warrior/i.test(j?.id || ''));
-  async function threatened(g, s, j) {
+  async function threatened(g, s, j, asleep = false) {
     const T = window.tablefolkThreats, raiders = T?.active?.() || []; if (!raiders.length) return null;
     const cfg = W().getBrainConfig(g.id);
     if (fighter(g, j)) {
@@ -862,7 +862,9 @@
     if (!raiders.some(r => T.scares?.(r))) return null;
     // the rest go home and stay in until the all-clear
     const home = s.home || placeAt(s.start.x, s.start.z) || places().find(p => !['square', 'pond', 'garden'].includes(p.kind) && p.x0 != null);
-    if (home && inPlace(home, posOf(g).x, posOf(g).z)) { setDoing(g, s, 'hiding indoors'); return { ms: 4000 }; }
+    // home: indoors till the all-clear, and in bed at bedtime (a raid at 22:00 kept two villagers standing all night)
+    if (home && inPlace(home, posOf(g).x, posOf(g).z)) { if (asleep) return bedtime(g, s); setDoing(g, s, 'hiding indoors'); return { ms: 4000 }; }
+    if (asleep && g.pose?.mode === 'lie') { setDoing(g, s, 'asleep'); return { ms: 6000 }; }
     setDoing(g, s, 'running home to hide');
     if (g.pose) U().standUp(g, true);
     const spot = home ? spotIn(home, g) : null;
@@ -879,7 +881,7 @@
     // in danger and no fighter: the game's reflexes (or the model) as before
     const foes = M()?.foes?.(g, 4) || [];
     if (foes.length && !fighter(g, j)) { await modelTurn(g, 'danger'); return { ms: 1800 }; }
-    const th = await threatened(g, s, j); if (th) return th;
+    const th = await threatened(g, s, j, inHours(h, j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]))); if (th) return th;
     // a word to say (mind.js speechCause): an answer to a want, a temper, a warning; at most one an hour
     const cause = M()?.speechCause?.(g);
     if (cause && cause !== 'news' && cause !== 'ask' && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g).length) { s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
