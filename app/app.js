@@ -1853,7 +1853,11 @@ function loadModelInstance(scene,dir,name,prepare){
     modelContainers.set(url,p);
   }
   return modelContainers.get(url).then(c=>{
-    const inst=c.instantiateModelsToScene(n=>n,false,{doNotInstantiate:true});
+    // Static models are hardware instances of the container's meshes (one draw per mesh for every copy:
+    // the market village's props were ~170 of its 350 draw calls as clones, 2026-11-20); skinned,
+    // morphing or animated ones are clones (their own bones and clips).
+    const animated=!!(c.skeletons?.length || c.animationGroups?.length);
+    const inst=c.instantiateModelsToScene(n=>n,false,{doNotInstantiate:animated ? true : (node=>!!(node.skeleton || node.morphTargetManager))});
     const meshes=[];
     for(const r of inst.rootNodes){ if(r instanceof BABYLON.AbstractMesh) meshes.push(r); meshes.push(...r.getChildMeshes(false)); }
     return { meshes, rootNodes:inst.rootNodes, animationGroups:inst.animationGroups||[], skeletons:inst.skeletons||[] };
@@ -3020,7 +3024,9 @@ async function importPropAsset(scene,file,opts={}){
     root.scaling.setAll(opts.scale||1);
     root.rotation.y=opts.visualRy||0;
     for(const r of result.rootNodes) r.parent=root;
-    for(const mesh of result.meshes){ mesh.metadata={proxy}; mesh.receiveShadows=true; addShadow(mesh); }
+    // small things cast no sun shadow (each caster is drawn again in the shadow pass); characters keep their contact discs
+    const castsShadow=(opts.h??1)>=.7;
+    for(const mesh of result.meshes){ mesh.metadata={proxy}; mesh.receiveShadows=true; if(castsShadow) addShadow(mesh); }
     // "fit": scale the model to the item's size (footprint w/d, or height h)
     // and stand it on the proxy's floor, centred. For models of unknown scale.
     if(opts.fit){
