@@ -554,7 +554,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       const tiles = [0, 1, 2, 3, 4, 5, 6, 7].map(i => 1 / tile(C.names[i] || C.names[0]));
       P.u.ctrl = C.ctrl; P.u.t0 = tiles.slice(0, 4); P.u.t1 = tiles.slice(4, 8);
       P.u.p = [0, .32, WORLD.halfW - .5, WORLD.halfH - .5];
-      P.u.f = [lite ? 0 : 1, .9, lite ? .8 : 1, .1];
+      P.u.f = [lite ? 0 : 1, .9, lite ? .8 : 1, .16];
       P.tex = { tfCtrl0Sampler: C.tex[0], tfCtrl1Sampler: C.tex[1], tfAlbSampler: T.arrays.alb, tfNrmSampler: T.arrays.nrm };
     }
     buildCover(C).catch(e => console.warn('[terrain] cover', e));
@@ -564,5 +564,10 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
   T.grid = !!(GFX().showGrid || window.TABLEFOLK_TABLETOP);
   // the world is finished (walls, rooms, scenario): build once more with all of it
   addEventListener('tablefolk-scenario-started', () => setTimeout(rebuild, 700));
-  window.tablefolkTerrain = { rebuild, mode: () => T.mode, heightAt, setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
+  // water a walker would fall into: a sea cell, or past the board's edge where the sea is
+  function waterAt(x, z) {
+    const cx = Math.round(x), cz = Math.round(z), on = Math.abs(cx) <= WORLD.halfW - 1 && Math.abs(cz) <= WORLD.halfH - 1;
+    return on ? seaCell(cx, cz) : (T.mode === 'sea' || rimSea(cx, cz));
+  }
+  window.tablefolkTerrain = { rebuild, mode: () => T.mode, heightAt, waterAt, setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
 })();

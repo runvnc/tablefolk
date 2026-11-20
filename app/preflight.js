@@ -58,8 +58,9 @@
     ['spells.js?v=20261115c'],
     ['reactions.js?v=20261115b'],
     ['terrain.js?v=20261120a'],
+    ['surroundings.js?v=20261120a'],
     ['darkness.js?v=20261114c'],
-    ['surroundings.js?v=20261114c'],
+
     ['roofs.js?v=20261031a'],
     ['cutaway.js?v=20261030b'],
     ['head-window.js?v=20261101f'],
