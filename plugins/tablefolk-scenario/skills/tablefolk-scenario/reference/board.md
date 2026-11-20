@@ -1,8 +1,12 @@
 # The board
 
-The world is a board of 1 x 1 tiles standing in the sea. This chapter covers
-its size and coordinates, the base maps, how the map layers combine, walls,
-floors, light, darkness and roofs.
+The world is a board of 1 x 1 squares: the logic's grid (walking, paths,
+sight). On screen it is one continuous ground whose materials blend into
+each other, and the land carries on past the board's edge (hills and trees
+outdoors, rock around a dungeon, a street around a lone building, the sea
+around an island). This chapter covers its size and coordinates, the base
+maps, how the map layers combine, floors, walls, what lies beyond the edge,
+light, darkness and roofs.
 
 ## Size and coordinates
 
@@ -14,8 +18,9 @@ from -(cols-1)/2 to (cols-1)/2 in x, and likewise in z, around the centre
 south by default. In a centred grid of R rows x C columns, row r and column c
 is x = (C-1)/2 - c, z = r - (R-1)/2 (top row north, left column west).
 
-`sea` cells are holes in the board: that's how you draw coasts and islands.
-Walking onto sea is a fall. A house model takes about 2 x 2 cells; wide items
+`sea` cells are water: that's how you draw coasts and islands (a sandy
+shore blends into them). Walking onto sea is a fall; walking off the board
+where there is no water just stops at the edge. A house model takes about 2 x 2 cells; wide items
 (`table bench workbench desk sofa`, and pack items 1.3 or more wide) take two;
 everything else one.
 
@@ -94,24 +99,40 @@ the-maze puzzle.
 `floor` paints the whole board; `paint` (or a map line `paint`, or grid
 glyphs) paints cells. Materials: `stone flagstone dirt wood sand grass water
 lava` and modern `oak tile concrete carpet`. Water and lava block walking and
-placement; lava glows and lights its surroundings. `sea` removes the tile.
-Every floor is real geometry with relief (`app/terrain-hd.js`); water flows
-one way.
+placement; lava glows and lights its surroundings. `sea` makes the cell
+water.
+
+Every floor is a real-world texture on one continuous ground: grass a meadow
+(forest floor in a generated forest), `stone` cobbles (flagstones
+underground), `dirt` a worn path, `sand`, `wood`/`oak` planks, `tile`
+flagstones, `concrete` rough stone. Natural ground (grass, dirt, sand, mud
+under water) blends softly into its neighbours; built floors (cobbles,
+flagstones, planks) keep a crisper edge; the edges wander and never follow
+the squares. Unpainted squares inside a house are planks. `carpet` is a
+woven rug standing on the floor. Outdoors on medium and high quality, grass
+gets tufts, wild flowers and pebbles (thicker along paths and wall feet).
+
+The squares' lines are off by default; the Graphics pane's **show grid**
+draws them faintly (the printed tabletop map always has them).
 
 ## Walls
 
-- `"walls": "tabletop"` (default): stone-block sections about 1.1 tall that
-  join their neighbours.
-- `"stone"`: natural dry-stone walls of flat slab stones with capstones
-  (the default in generated maps).
+- `"walls": "stone"` and `"tabletop"` (the default; the same now): thick
+  stone walls. Outdoors they are rubble walls with a cut-stone cap; in
+  dungeons, caves and dark worlds large dressed blocks; the walls of a
+  house (a room that gets a roof) are timber-framed plaster on a low stone
+  plinth, with small windows on long outside walls that glow at dusk and
+  night (only a picture: they don't let anyone see through). A cracked wall
+  has a broken top.
 - `"modern"`: smooth painted panels with a baseboard.
 - `"block"`: the old cubes.
 
 `"wallHeight"` multiplies the height (0.25-4). Doors are person-height, so
 **use `wallHeight: 2` whenever there are doors** (generated maps and the
 world generator always do; at 1 the door looks sunken and the first-person
-head clips the lintel). A `door` fills a wall cell (`+` in a grid): a wooden
-leaf with the wall carried over the top, swinging open as anyone approaches.
+head clips the lintel). A `door` fills a wall cell (`+` in a grid): a plank
+door in a timber or stone frame with the wall carried over the top, swinging
+open as anyone approaches.
 
 With the follow camera, walls between the camera and the player drop to a low
 stub (`app/cutaway.js`), so tall walls never hide the hero. With the free
@@ -119,20 +140,37 @@ camera every wall stands at half height; first person shows them whole.
 
 ## Beyond the edge
 
-Outdoor worlds needn't stop at a hard edge: `"surroundings": "forest"` sets
-the board in woods that run on into the haze (a few rows of trees, thickest
-near the edge, on ground out to the horizon), `"fields"` in open country with
-scattered trees, `"none"` leaves the board alone. A generated forest gets
-`forest` and a generated village, town, hamlet or farm `fields` by default;
-other boards (islands at sea, dungeons, caves, dark worlds) none. It is only
+No board floats any more. What lies past the edge (`"outside"`):
+
+- `"land"`: the ground carries on into gentle hills and haze; outdoor worlds.
+- `"rock"`: solid rock at wall-top height fills everything outside the rooms
+  and corridors and runs on into darkness; dungeons, caves, dark worlds.
+- `"street"`: a cobbled street into the dusk; a world that is all one
+  building (a tavern, a shop).
+- `"sea"`: open water to the horizon; islands.
+- `"none"`: nothing past a narrow margin.
+
+Left out, it is chosen from the world: dark worlds, the `dungeon` base and
+generated dungeons and caves get rock; a board whose rim is mostly sea gets
+sea; a board that is mostly one walled building gets street; everything else
+land. Sea squares on the rim of a land board carry on outward as sea (a
+coast).
+
+`"surroundings"` puts trees on the land beyond the edge: `"forest"` (woods
+that thicken into the distance), `"fields"` (open country, scattered trees
+and clumps, a tree line far off) or `"none"`. Every land board gets one by
+default: forest for a generated forest, fields otherwise. It is only
 scenery: nobody can walk there, and characters don't see it.
 
 ## Light
 
-`lighting`: `bright` (default), `night`, `dim` (night at half ambient). The
-scene keeps its key, rim and fill lights, scaled with the board. `campfire`
-and `lantern` bring their own warm light, candles and standing torches too;
-`light` is an invisible point light:
+`lighting` sets the time of day: `bright` (default) is mid-morning,
+`dim` dusk, `night` a moonlit night (readable, not black). One sun (or the
+moon) casts soft shadows, the sky follows the hour (stars at night), and
+fog fades the land into the horizon. In a living world the clock moves
+the sun through the day. Dark worlds have no sun: torches, lamps and fires
+light them. `campfire` and `lantern` bring their own warm light, candles
+and standing torches too; `light` is an invisible point light:
 
 ```jsonc
 { "type": "light", "x": 2, "z": -1, "color": "#ffb060", "intensity": 3, "range": 6, "y": 2 }
@@ -162,12 +200,13 @@ What characters themselves see follows the same rule from where they stand:
 
 ## Roofs
 
-Walled rooms in a world that has an outside get thatched gable roofs
-(`app/roofs.js`): rooms are found from the walls (a door, or a one-square gap
-between two walls, closes a room), so generated villages, drawn grids and
-hand-edited maps all get them. Not in dark worlds, dungeons, or a world that
-is all one building (the roof would be the whole sky). `"roofs": false`
-turns them off, `true` forces them on.
+Walled rooms in a world that has an outside get gable roofs (`app/roofs.js`):
+thatch on small houses, clay tiles or slate on bigger ones, with plaster
+gables and timber trim. Rooms are found from the walls (a door, or a
+one-square gap between two walls, closes a room), so generated villages,
+drawn grids and hand-edited maps all get them. Not in dark worlds, dungeons,
+or a world that is all one building (the roof would be the whole sky).
+`"roofs": false` turns them off, `true` forces them on.
 
 The roof of the room the player is in (or whose doorway they stand in) fades
 away; with the follow camera, a roof between the camera and the player turns

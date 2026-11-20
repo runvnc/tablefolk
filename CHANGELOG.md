@@ -6,6 +6,12 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **A new look for the world**: matte, weathered, semi-realistic. One sun (or the moon) with soft shadows at every quality, a sky that follows the time of day (`lighting` bright is morning, dim dusk, night moonlit; the world clock moves the sun), fog that fades the land into the horizon; no more glossy plastic finish.
+- **The ground is one continuous terrain**: real textures (meadow, worn paths, cobbles, flagstones, sand, planks) blending into each other instead of a grid of tiles; the squares' lines only with the Graphics pane's **show grid**. Grass tufts, flowers and pebbles on medium/high quality.
+- **No floating boards**: the land runs on past the edge into hills and trees (`"surroundings"` for every outdoor world), dungeons sit in solid rock, a lone building in a cobbled street, islands in open sea (`"outside"` to choose). Walking off the board stops at the edge.
+- **Real walls and roofs**: thick stone walls (rubble outdoors, dressed blocks underground), timber-framed plaster houses with windows that glow at night, plank doors, thatch, clay-tile and slate roofs.
+- **New trees, buildings and furniture**: real-size trees and plants, the village buildings, wells, carts, market stands, tables, benches, beds, bookcases, chests, anvils, cauldrons and torches from the concept scenes; a `bar_counter`. The old models stay as `<type>_classic`.
+
 - **A world clock**: living worlds have a time of day (`"time"`, `"dayMinutes"`, `"clock": false`), shown at the top of the screen and saved with the world; the light dims at dusk and comes back at dawn (dark worlds keep theirs).
 
 - **Things run out and grow back**: trees, rocks, crystals, food barrels, fields (`tall_grass`: wheat, `pumpkin`), snares (`bear_trap`) and fishing spots hold stock; barrels and crates are stores for `put`/`take`; a pack or package item can say the same (`"stock"`, `"gather"`, `"station"`), and package items' `use` works for characters too.

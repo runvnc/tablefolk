@@ -268,6 +268,53 @@ interiors left empty (the forge front came out as an empty shed), pictures
 read as the wrong count of parts (windmill sails). About $1.0 a building and
 $0.85 a prop including inputs.
 
+**Wiring (2026-11-20)**: pack.json points house, fantasy_house, stone_house,
+tall_house, inn, blacksmith, barn, stable, barracks, mill_house, well,
+market_stand, cart, hay, anvil, bed, bench, bookcase, cauldron, chest, table
+and torch at these files, at real scale (w/d/h from the manifest, `fit`
+footprint, or height for the torch), and adds `bar_counter`. The old entry of
+each stays reachable as `<type>_classic` (tag `classic`, no aliases).
+`"tier": "1k"` makes light quality load `<name>.1k.glb` (packs.js keeps it,
+app.js `makeCatalogItem` swaps the file); medium/high load the 2048 files.
+Not wired: `fence_section` (one 2 m length with two posts: fences placed a
+cell apart would double up; the old fence stays), `signpost` (code-built in
+app.js, glyph I), and barrel/crate (code-built; the earlier gen/barrel.glb and
+crate.glb are still unused). The chest model has no lid animation (packages
+that play a chest's clip get none). procgen.js reserves room for the real
+sizes (closed buildings: inn and barracks 9 x 9 squares, smithy and
+stone/tall/timber houses 7 x 7) and puts walk-in door pads 3 squares out.
+
+### Procedural trees, plants and the environment texture set (2026-11-20)
+
+- `assets/models/props/env-nature/` (manifest.json: type, files `<type>.gltf`
+  and `<type>.med.gltf`, real height and canopy radius, the pack.json type it
+  replaces; variants oak_tree_b/_c, pine_tree_b/_c): trees and plants made in
+  Blender from Sapling Tree Gen skeletons with leaf-cluster cards. Foliage is
+  alpha-tested (MASK), double-sided, with normals bent toward the crowns and
+  occlusion baked into COLOR_0 (keep the file normals). `cover/`: grass
+  tufts (4), flowers (3), pebbles (5) as crossed cards with up normals, one
+  node per kind (terrain.js scatters them). Scripts in `tools/blender/`
+  (headers say how to run them): `env-fetch.py` (CC0 bark and leaf
+  sources), `make-leaf-atlases.py`, `make-trees.py`, `pack-trees.py`,
+  `render-trees.py` (contact sheets), `render-patch.py` (a 20 m test patch),
+  `make-cover-atlas.py`, `make-cover.py`.
+- Wiring: pack.json oak_tree, tree, tall_tree, autumn_tree, dead_tree,
+  pine_tree, tall_pine, flower_bush, red_bush, fern use the full file at
+  medium/high and `.med` at light (`"tier": "med"`), oak and pine with
+  `"variants"` chosen per square (the same square keeps the same tree). On
+  the board the trees stand at 55-70% of their real 8-15 m (`h`), so a small
+  board isn't one canopy; beyond the edge (surroundings.js) they are full
+  size. The old models are `<type>_classic`.
+- `assets/textures/env/` (manifest.json: `tileMeters`, the real size one
+  repeat covers, and the mean colour; LICENSE.txt): 22 CC0 PBR materials
+  (Poly Haven, ambientCG) as WebP colour/normal/rough/ao at 2048 and `_1k`,
+  colour-corrected to sit together under one warm sun, rebuilt by
+  `tools/blender/make-textures.py`. Normal maps are OpenGL (+Y): on code-built
+  Babylon materials `invertNormalMapX = true, invertNormalMapY = false`
+  (walls.js, roofs.js, terrain.js's rock); the terrain shader builds its own
+  frame (T = +x, B = cross(N, T)). Used by terrain.js (ground layers), walls.js,
+  roofs.js. The 1k files everywhere below high quality.
+
 ## Hosting
 
 **Only tablefolk.world uses the mirror** (and the game on localhost):
