@@ -26,8 +26,9 @@
  *   state:   per-character resources, e.g. { "mana": 10, "maxMana": 10 }
  *   regen:   per own turn, e.g. { "mana": 1 } (capped by maxMana)
  *   prompt:  a line for the character's prompt, with {{params}} and {{state}}
- *   module:  optional "skill.js" exporting default (api) => ({ effects, commands });
- *            loaded only from this site, or anywhere with ?trustSkills=1
+ *   module:  optional "skill.js" exporting default (api) => ({ effects, commands, cards, behaviours });
+ *            code from another site asks the player first, as a package's does
+ *            (packages.js askTrust); declined, the skill works as data only
  *
  * Effects: { vfx: spark|fireball|glow|ring }, { damage: N }, { heal: N },
  * { burn: N } (fire on things around the target), { light: { intensity,
@@ -50,12 +51,15 @@
     if (!m || !m.id) throw new Error(`skill ${ref}: manifest has no "id"`);
     m._url = url; m._ref = String(ref);
     if (m.module) {
-      const mod = new URL(m.module, url || location.href);
-      if (window.tablefolkPackages.trusted(mod.href)) {
-        try { const x = await import(mod.href); m.api = (x.default || x.register)?.(api()) || {}; }
-        catch (e) { console.warn('skill module failed', m.id, e); }
+      // the same rule as a package's modules (packages.js askTrust): this
+      // site, ?trustSkills=1, or the player said yes (asked once, remembered,
+      // revocable in the Library pane); else the skill works as data only
+      const mod = new URL(m.module, url || location.href), P = window.tablefolkPackages;
+      if (P.trusted(mod.href) || await P.askTrust(m, mod.href, 'skill')) {
+        try { const x = await import(mod.href); m.api = (x.default || x.register)?.({ ...api(), ...(P.api?.() || {}) }) || {}; }
+        catch (e) { console.warn('skill module failed', m.id, e); m._warning = `skill ${m.id}: its code (${m.module}) failed: ${e.message}`; }
         for (const [name, b] of Object.entries(m.api?.behaviours || {})) window.tablefolkRoles?.addBehaviour(name, b);
-      } else console.warn(`skill ${m.id}: code module from ${mod.origin} not loaded (open with ?trustSkills=1 to allow)`);
+      } else { m._warning = `skill ${m.id}: its code (${m.module}) was not run (data only: not allowed in this browser)`; console.warn(m._warning); }
     }
     reg.set(m.id, m);
     return m;
@@ -64,7 +68,7 @@
   async function load(scn) {
     const refs = new Set([...(scn.skills || []), ...(scn.agents || []).flatMap(a => a.skills || []), ...(scn.player?.skills || [])].map(String));
     const warnings = [];
-    await Promise.all([...refs].map(r => loadOne(r).catch(e => warnings.push(e.message))));
+    await Promise.all([...refs].map(r => loadOne(r).then(m => { if (m?._warning) warnings.push(m._warning); }).catch(e => warnings.push(e.message))));
     return warnings;
   }
   // A ref ("magic", a URL...) -> the loaded manifest's id.
@@ -106,7 +110,31 @@
       const d = data[m.id] || {}, known = c.param ? d.params?.[c.param] : null;
       out.push(`${c.usage || name + '()'}${c.example ? ' e.g. ' + c.example : ''}${c.help ? ' - ' + c.help : ''}${known ? ' (yours: ' + [].concat(known).join(', ') + ')' : ''}`);
     }
+    // a package module's own commands this character may use
+    for (const [name, c] of Object.entries(PKG)) if (pkgAllowed(g, name)) out.push(pkgLine(name, c));
     return out;
+  }
+  // ---- commands from package modules (packages.js adopt): { name: { run(g, args, ctx), help, example, usage, allowedBy } }
+  // "default": every character with a mind (and the player) in a scenario that
+  // loads the package; "listed": only those whose commands name it (the
+  // scenario's or agent's "allowed", its role's or job's "commands").
+  const PKG = {};
+  function addCommand(name, c, from = '') {
+    name = String(name).toLowerCase();
+    if (!/^[a-z][a-z0-9_]{0,31}$/.test(name)) throw new Error(`command "${name}": use letters, digits and _`);
+    if (typeof c?.run !== 'function') throw new Error(`command ${name}: needs run(g, args, ctx)`);
+    PKG[name] = { ...c, allowedBy: c.allowedBy === 'listed' ? 'listed' : 'default', _from: from };
+    if (!COMMANDS.includes(name)) COMMANDS.push(name);
+  }
+  function removeCommand(name) { delete PKG[name]; const i = COMMANDS.indexOf(name); if (i >= 0) COMMANDS.splice(i, 1); }
+  const pkgLine = (name, c) => { const h = String(c.help || ''); const usage = c.usage || name + '()'; const line = h.startsWith(name + '(') ? h : `${usage}${h ? ' - ' + h : ''}`; return line + (c.example && !line.startsWith(c.example) ? ` e.g. ${c.example}` : ''); };
+  function pkgAllowed(g, name) {
+    const c = PKG[name]; if (!c || !g) return false;
+    if (isPlayer(g)) return true;
+    const listed = () => commandsFor(g).has(name) || [].concat(window.tablefolkJobs?.jobOf?.(g)?.commands || []).includes(name);
+    if (c.allowedBy === 'listed') return listed();
+    // "default": characters with a mind (not mindless monsters or animals)
+    return listed() || !(window.tablefolkPlay?.isHostile?.(g) || window.tablefolkPlay?.isAnimal?.(g) || g._threat);
   }
   // State-card lines a skill names ("card": ["wares", "offer"]): providers
   // from the game (trade.js adds wares and offer) or the skill's own module.
@@ -130,10 +158,11 @@
   const has = (g, id) => skillsOf(g).some(m => m.id === id);
   function commandFor(g, name) {
     for (const m of skillsOf(g)) if (m.commands?.[name]) return { m, c: m.commands[name] };
+    if (pkgAllowed(g, name)) return { pkg: true, c: PKG[name] };
     return null;
   }
-  // Is `name` a skill command of anyone (for the parser)?
-  const isCommand = name => [...reg.values()].some(m => m.commands?.[name]);
+  // Is `name` a skill command of anyone, or a package's (for the parser)?
+  const isCommand = name => !!PKG[name] || [...reg.values()].some(m => m.commands?.[name]);
 
   // ------------------------------------------------------------ running
   const others = g => state.characters.concat(state.playerAvatar ? [state.playerAvatar] : []).filter(o => o && o !== g);
@@ -213,7 +242,8 @@
   // Run a skill command: cast(fireball, gob1).
   async function run(g, name, args) {
     const found = commandFor(g, name);
-    if (!found) return fail(g, `${nameOf(g)} doesn't know how to ${name}`);
+    if (!found) return fail(g, PKG[name] ? `${name} failed: ${nameOf(g)} may not use ${name}()` : `${nameOf(g)} doesn't know how to ${name}`);
+    if (found.pkg) return runPkg(g, name, found.c, args);
     const { m, c } = found, d = store(g)[m.id] || (store(g)[m.id] = { params: { ...(m.params || {}) }, state: { ...(m.state || {}) }, cooldown: {} });
     let entry = c, key = name, rest = args.slice();
     if (c.variants) {
@@ -256,6 +286,21 @@
     return true;
   }
 
+  // A package command: run(g, args, ctx) returns a string (it worked: the
+  // result line), true (worked, ctx.say/narrate said it), or false / throws /
+  // ctx.fail(text) (FAILED, the text is the reason: the actor reads it).
+  async function runPkg(g, name, c, args) {
+    let failed = null, said = false;
+    const ctx = { name, args, findTarget, api: window.tablefolkPackages?.api?.(),
+      narrate: t => { said = true; narrate(g, t); }, fail: t => { failed = String(t || `${name} failed`); return false; } };
+    let r;
+    try { r = await c.run(g, args, ctx); } catch (e) { console.warn('[package command]', name, e); failed = `${name} failed: ${e.message || e}`; }
+    if (failed != null || r === false) return fail(g, /\bfailed\b/i.test(failed || '') ? failed : `${name} failed: ${failed || 'nothing happened'}`);
+    if (typeof r === 'string') narrate(g, r);
+    else if (!said) narrate(g, `${nameOf(g)} uses ${name}()`);
+    return true;
+  }
+
   // Each character's own turn: resources come back, cooldowns tick.
   window.addEventListener('tablefolk-agent-turn', e => {
     const g = state.characters.find(c => c.id === e.detail?.agentId); if (!g) return;
@@ -276,5 +321,5 @@
   }
 
   function api() { return { state, narrate, findTarget, combat: window.tablefolkCombat, say, log, getBrainConfig, setBrainConfig, effects: EFFECTS }; }
-  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, urgentLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor };
+  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, urgentLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor, addCommand, removeCommand, packageCommands: PKG, mayUse: pkgAllowed };
 })();

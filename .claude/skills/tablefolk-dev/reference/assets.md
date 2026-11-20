@@ -49,6 +49,13 @@ builder's body lists (`app/builder.js`, `app/map-editor.js`), render its tile,
 and list it in the scenario skill's `format.md`. Check facing by rendering an
 idle model turned toward the camera.
 
+A body that is not part of the game needs none of that: a pack's or
+package's `"bodies"` (`app/bodies.js`, the scenario skill's `api.md`) gives
+a GLB, its height and a clip map, and becomes a `FIGURES` entry with a `url`
+while its scenario plays (`createFigure` loads it from there and
+`bodies.js mapClips` names its clips). `packages/nightwatch` has one (the
+dire wolf: the wolf GLB with its own height, clips and a howl emote).
+
 ## Pipelines
 
 - **`wizard.glb` has a corrected face**: as supplied it had empty eye sockets and a nearly flat nose. `tools/fix-wizard-face.mjs` (gltf-transform, run on the original from commit b8eb3b1; usage in its header) moves the nose's wedge corners forward and adds eyes to the `Face` mesh with the one material (whites and pupils take their colour from a light and a black spot on the atlas), then re-quantizes and meshopt-compresses as the other files are. Blender can read the result only after decoding (no meshopt or AVIF), so the script stays in gltf-transform: a Blender round trip would risk the rig and clips.

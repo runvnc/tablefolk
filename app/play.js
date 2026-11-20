@@ -33,7 +33,7 @@
   // animals: never hostile unless told ("hostile": true), and no brain unless "talks": true
   // (live.js grazes and wanders them; world-integration.js skips their turns)
   const ANIMALS = new Set(['cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag', 'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep']);
-  const isAnimal = c => ANIMALS.has(c?.charModel) && getBrainConfig(c.id).talks !== true;
+  const isAnimal = c => (ANIMALS.has(c?.charModel) || !!window.tablefolkBodies?.isAnimal(c?.charModel)) && getBrainConfig(c.id).talks !== true;
   const PICKUPS = { potion: 'healing potion', scroll: 'scroll', axe: 'axe', pickaxe: 'pickaxe', bag: 'bag', bucket: 'bucket', key: 'key', chalice: 'gold chalice', rope: 'rope', torch: 'torch', sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', spear: 'spear', war_hammer: 'war hammer', hunting_bow: 'hunting bow', shield: 'shield', round_shield: 'round shield', leather_armor: 'leather armor', plate_armor: 'plate armor', crown: 'golden crown', necklace: 'necklace', gold_bars: 'gold bars', crystals: 'crystals', book: 'book', open_book: 'spellbook', skull: 'skull', bone: 'bone', shovel: 'shovel', scythe: 'scythe', backpack: 'backpack', frying_pan: 'frying pan', log: 'firewood', sacks: 'sack of grain', bear_trap: 'bear trap' };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const toast = (t, type = 'info') => window.tablefolkToast?.(t, { type });
@@ -415,7 +415,7 @@
   }
   // the note goes away once the character has decided what to do
   addEventListener('tablefolk-agent-turn', () => banner('npcThinking', ''));
-  function isHostile(c) { const cfg = getBrainConfig(c.id); return cfg.hostile ?? MINDLESS.has(c.charModel); }
+  function isHostile(c) { const cfg = getBrainConfig(c.id); return cfg.hostile ?? (MINDLESS.has(c.charModel) || !!window.tablefolkBodies?.isMindless(c.charModel)); }
   // mind.js tempers: a character pushed too far fights that one only
   // ("hostileTo": { "player" | id: since }): the nearest of them it can see within 8 cells
   function hostileTarget(c) {

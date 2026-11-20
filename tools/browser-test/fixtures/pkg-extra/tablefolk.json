@@ -1,0 +1,26 @@
+{
+  "id": "pkg_extra", "name": "Fixture: the documented options", "version": "1.0.0",
+  "description": "package-test.mjs: loop, use (anim, who, give, gold, once, state, sound), requires, workflows, module cards and effects.",
+  "requires": ["../pkg-dep/"],
+  "items": {
+    "music_box": {
+      "file": "../../../../assets/models/characters/quaternius/rat.glb", "w": 0.6, "h": 0.4, "d": 0.6, "static": true,
+      "loop": "Rat_Idle",
+      "use": { "text": "{{player}} winds the music box", "anim": "Rat_Jump", "who": "pickup", "give": "silver coin", "gold": 2,
+               "once": true, "state": "played", "sound": "chime" }
+    }
+  },
+  "sounds": { "chime": "../../../../assets/sounds/kenney-rpg/chop.ogg" },
+  "skills": {
+    "fx_skill": {
+      "name": "Fixture skill", "card": ["fx_card"],
+      "commands": { "fx": { "usage": "fx()", "help": "the fixture's effect", "target": "self", "effects": [{ "fx_effect": 2 }], "text": "{{me}} does the fixture thing" } }
+    }
+  },
+  "workflows": {
+    "fx_flow": { "description": "a package's workflow", "steps": [
+      { "set": { "world.fx_flow_ran": true } },
+      { "do": { "reply": "The fixture workflow ran.", "anim": "wave", "sound": "chime" }, "end": true } ] }
+  },
+  "modules": ["fx.js"]
+}

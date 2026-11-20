@@ -24,7 +24,7 @@ for (const [kind, [dir, file]] of Object.entries(KINDS)) {
     const m = JSON.parse(fs.readFileSync(f, 'utf8'));
     const code = !!(m.module || m.modules?.length);
     builtin.push({ kind, ref: d, name: m.name || m.id, description: m.description || '', version: m.version || '', code,
-      ...(kind === 'package' ? { has: ['items', 'skills', 'roles', 'workflows', 'modules'].filter(k => m[k] && Object.keys(m[k]).length) } : {}) });
+      ...(kind === 'package' ? { has: ['items', 'bodies', 'sounds', 'skills', 'roles', 'jobs', 'threats', 'uses', 'workflows', 'modules'].filter(k => m[k] && Object.keys(m[k]).length) } : {}) });
   }
 }
 const community = old.community || [];

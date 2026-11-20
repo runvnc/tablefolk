@@ -608,7 +608,7 @@
       }
       // agents_alive: 4 (or "all"): that many characters with a mind still standing (monsters, raiders and animals not counted)
       case 'agents_alive': {
-        const folk = (active?.scn?.agents || []).filter(a => !a.hostile && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/.test(a.model || ''));
+        const folk = (active?.scn?.agents || []).filter(a => !a.hostile && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/.test(a.model || '') && !window.tablefolkBodies?.isAnimal(a.model) && !(a.hostile == null && window.tablefolkBodies?.isMindless(a.model)));
         const up = folk.filter(a => !ctx.w.getBrainConfig(a.id)?.defeated).length;
         return v === 'all' ? up >= folk.length : up >= +v;
       }
@@ -963,6 +963,8 @@
       packs: Array.isArray(s.packs) ? s.packs.filter(u => typeof u === 'string' && u).slice(0, 8) : [],
       // packages.js: tablefolk.json packages (items, skills, roles, workflows, code)
       packages: Array.isArray(s.packages) ? s.packages.filter(u => typeof u === 'string' && u).slice(0, 16) : [],
+      // bodies.js: the ids of the bodies its packs and packages bring (a hint for checks that cannot fetch them: the world builder, scenario_link.py)
+      bodies: Array.isArray(s.bodies) ? s.bodies.map(String).filter(id => /^[a-z][a-z0-9_]{0,31}$/.test(id)).slice(0, 32) : [],
       // mind.js: world facts characters may know, needs (hunger) on or off, the whole mind on or off
       // books.js: knowledge bases characters read from (passages, vectors, cover and spine)
       books: s.books && typeof s.books === 'object' && !Array.isArray(s.books) ? s.books : {},
@@ -1081,7 +1083,7 @@
     // Packages (packages.js): their items, skills, roles and workflows.
     // (what the last scenario's packages brought goes first: they must not leak into this one)
     if (!opts.sub) window.tablefolkPackages?.reset?.();
-    const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages) : [];
+    const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages, { testing: !!opts.testing }) : [];
     // jobs.js: the built-in jobs and any the agents name by reference
     if (!opts.sub && window.tablefolkJobs) packageWarnings.push(...await window.tablefolkJobs.load(base).catch(e => [e.message]));
     const parentAgents = opts.restore ? base.agents : null;
@@ -1173,12 +1175,12 @@
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, onlySpokenTo: typeof a.onlySpokenTo === 'boolean' ? a.onlySpokenTo : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
-        ttsVoiceId: a.ttsVoiceId || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || scn.speech === false || opts.testing) ? { ttsEnabled: false } : {}),
+        ttsVoiceId: a.ttsVoiceId || window.tablefolkBodies?.get(a.model)?.voice || w.defaultVoiceFor?.(a.id, a.model) || 'builtin:alba', ...((a.ttsEnabled === false || scn.speech === false || opts.testing) ? { ttsEnabled: false } : {}),
         fireballTemptation: a.fireballTemptation ?? 10, chaos: a.chaos ?? 1,
         // menus.js: choices shown when the player talks to it (E), a menu or a "menus" id
         menu: a.menu && (typeof a.menu === 'string' || typeof a.menu === 'object') ? a.menu : null,
         // combat.js: hit points, and nothing wielded or defeated from a previous run
-        maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || 10), wielding: null, defeated: false,
+        maxHp: Math.max(1, +a.hp || MONSTER_HP[a.model] || window.tablefolkBodies?.get(a.model)?.hp || 10), hp: Math.max(1, +a.hp || MONSTER_HP[a.model] || window.tablefolkBodies?.get(a.model)?.hp || 10), wielding: null, defeated: false,
         // play.js: hostile characters fight with a built-in routine, no LLM
         // (unset: mindless monster models are hostile, everyone else talks)
         talks: a.talks === true,   // an animal with a brain (play.js ANIMALS)

@@ -80,10 +80,16 @@ export function checkScenario(s, packVoices = [], opts = {}) {
   s.v = 1;
   if (!Array.isArray(s.agents) || !s.agents.length) problems.push('"agents" must list at least one character');
   const ids = (s.agents || []).map(a => a?.id);
+  // bodies and commands a scenario's packs and packages bring cannot be fetched
+  // here: a body is kept when the scenario lists it in "bodies" (its hint), a
+  // command in "allowed" when the scenario loads any package (packages.md)
+  const pkgBodies = new Set(Array.isArray(s.bodies) ? s.bodies.map(String) : []);
+  const knownBody = m => MODELS.has(m) || pkgBodies.has(m);
+  const knownCommand = c => COMMANDS.has(c) || (Array.isArray(s.packages) && s.packages.length > 0 && /^[a-z][a-z0-9_]{0,31}$/.test(c));
   for (const a of s.agents || []) {
     if (!a || typeof a !== 'object') { problems.push('every agent must be an object'); continue; }
     if (!/^[A-Za-z0-9_-]{1,24}$/.test(String(a.id || ''))) problems.push(`agent id ${JSON.stringify(a.id)}: use 1-24 letters, digits, _ or -`);
-    if (a.model && !MODELS.has(a.model)) a.model = 'critter';
+    if (a.model && !knownBody(a.model)) a.model = 'critter';
     // monsters that only fight need no brief
     if (!a.personality && (a.hostile || (a.hostile == null && MINDLESS.has(a.model)))) a.personality = `A hostile ${String(a.model).replace(/_/g, ' ')}.`;
     if (!a.personality && ANIMALS.has(a.model)) a.personality = `A ${String(a.model).replace(/_/g, ' ')}.`;   // animals never talk
@@ -91,11 +97,11 @@ export function checkScenario(s, packVoices = [], opts = {}) {
     // a voice of the world's own ("voices", made in the builder) keeps its exact id
     if (a.ttsVoiceId && Array.isArray(s.voices) && s.voices.some(v => 'pack:' + v?.id === String(a.ttsVoiceId))) {}
     else if (a.ttsVoiceId) { const raw = String(a.ttsVoiceId).toLowerCase(), v = raw.replace(/^builtin:/, ''); if (packVoices.some(p => p.id === raw)) a.ttsVoiceId = raw; else if (VOICES.has(v) || ZONOS_VOICES.has(v)) a.ttsVoiceId = 'builtin:' + v; else delete a.ttsVoiceId; }
-    for (const c of a.allowed || []) if (!COMMANDS.has(c)) problems.push(`agent ${a.id} "allowed": unknown command ${c}`);
+    for (const c of a.allowed || []) if (!knownCommand(c)) problems.push(`agent ${a.id} "allowed": unknown command ${c}`);
   }
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
-  if (s.player?.model && !MODELS.has(s.player.model)) delete s.player.model;
-  for (const c of s.allowed || []) if (!COMMANDS.has(c)) problems.push(`"allowed": unknown command ${c}`);
+  if (s.player?.model && !knownBody(s.player.model)) delete s.player.model;
+  for (const c of s.allowed || []) if (!knownCommand(c)) problems.push(`"allowed": unknown command ${c}`);
   if (!Array.isArray(s.allowed)) s.allowed = ['say', 'walk', 'face', 'emote'];
   // Person-height doors and first person need the tall walls (twice the
   // tabletop height); lower ones put the player's head through the lintel.
@@ -118,7 +124,8 @@ export function checkScenario(s, packVoices = [], opts = {}) {
   }
   if (s.map && !Array.isArray(s.map)) problems.push('"map" must be a list of lines');
   // menus, workflows, triggers, conditions (@tablefolk/script): errors go back to the model to fix
-  try { for (const x of validateScript(s)) if (x.level === 'error') problems.push(`${x.where}: ${x.message}`); } catch (e) { problems.push('scripted parts: ' + e.message); }
+  // (a workflow a package brings is not known here: with packages loaded, a missing one is not an error)
+  try { for (const x of validateScript(s)) if (x.level === 'error' && !(s.packages?.length && /workflow "[^"]+" does not exist/.test(x.message))) problems.push(`${x.where}: ${x.message}`); } catch (e) { problems.push('scripted parts: ' + e.message); }
   // goal ids
   const walk = n => {
     if (Array.isArray(n)) return n.forEach(walk);
@@ -398,7 +405,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261120a"></script><script src="/app/map-editor.js?v=20261115e"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120a"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261120a"></script><script src="/app/map-editor.js?v=20261120a"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120b"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);

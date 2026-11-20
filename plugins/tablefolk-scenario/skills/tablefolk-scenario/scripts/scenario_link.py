@@ -24,6 +24,21 @@ GEN_KINDS = {'dungeon': ROOMS, 'castle': ROOMS, 'keep': ROOMS, 'fortress': ROOMS
 # jobs/<id>/job.json (built in); a package or a URL may bring others
 JOBS = {'farmer', 'baker', 'innkeeper', 'cook', 'smith', 'woodcutter', 'miner', 'hunter', 'fisher', 'herder', 'merchant', 'guard', 'healer', 'ratcatcher', 'scholar', 'child', 'labourer', 'idler'}
 THREAT_KINDS = {'raid', 'rats', 'bandits'}
+# app.js FIGURES + AVATAR_MODELS (the bodies an agent's or the player's "model" may name);
+# a pack or package can bring more: list their ids in the scenario's "bodies"
+MODELS = {'critter', 'woman', 'rogue', 'knight', 'mage', 'ranger', 'barbarian', 'woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer',
+          'adventurer_woman', 'hooded', 'king', 'farmer', 'villager', 'witch', 'wizard', 'swordswoman', 'sorceress', 'swordsman', 'wanderer',
+          'villager_woman', 'dwarf', 'elf', 'priest', 'guard', 'merchant', 'skeleton', 'skeleton_warrior', 'skeleton_farmer', 'zombie', 'goblin',
+          'kobold', 'orc', 'troll', 'demon', 'giant', 'rat', 'spider', 'wolf', 'bat', 'dragon', 'ghost', 'slime', 'wyrmling', 'imp',
+          'mushroom_warrior', 'bunny', 'snake', 'wasp', 'frog', 'minotaur', 'lizardman', 'werewolf', 'mummy', 'ogre', 'gnoll', 'lich', 'vampire',
+          'bear', 'bandit', 'cultist', 'gargoyle', 'dark_knight', 'red_dragon', 'cow', 'bull', 'horse', 'white_horse', 'donkey', 'deer', 'stag',
+          'fox', 'dog', 'husky', 'alpaca', 'pig', 'sheep', 'king_classic', 'woodsman_classic', 'huntress_classic', 'peasant_woman_classic',
+          'adventurer_classic', 'adventurer_woman_classic', 'villager_classic', 'witch_classic', 'skeleton_classic', 'skeleton_warrior_classic',
+          'zombie_classic', 'goblin_classic', 'kobold_classic', 'orc_classic', 'demon_classic', 'giant_classic', 'imp_classic'}
+REF = re.compile(r'^(https?://|npm:|gh:)|^[a-z0-9_-]+$', re.I)
+TRIGGER_ON = {'flag', 'given', 'start'}
+ACTION_KEYS = {'take', 'set', 'say', 'reply', 'act', 'give', 'start', 'workflow', 'stop', 'anim', 'sound'}
+STEP_KEYS = {'prompt', 'choose', 'if', 'command', 'await', 'set', 'take', 'menu', 'do'}
 COMMANDS = {'say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
             'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing',
             'spell.firebreath', 'spell.lightning', 'spawn', 'remember', 'feel', 'eat', 'drink', 'use', 'put', 'take', 'close', 'paint'}
@@ -54,10 +69,26 @@ def check(obj):
     for i in ids:
         if not i or not re.fullmatch(r'[A-Za-z0-9_-]{1,24}', str(i)): problems.append(f'agent id {i!r}: use 1-24 letters, digits, _ or -')
     if len(set(ids)) != len(ids): problems.append('agent ids must be unique')
+    has_packages = bool(obj.get('packages'))
     for where, cmds in [('"allowed"', obj.get('allowed', []))] + [(f'agent {a.get("id")!r} "allowed"', a['allowed']) for a in obj.get('agents', []) if 'allowed' in a]:
         if not isinstance(cmds, list): problems.append(f'{where} must be a list of commands'); continue
         for c in cmds:
-            if c not in COMMANDS: problems.append(f'{where}: unknown command {c!r} (known: {" ".join(sorted(COMMANDS))})')
+            # a package may bring commands (a module's "commands"): unknown names pass when it loads one
+            if c not in COMMANDS and not (has_packages and re.fullmatch(r'[a-z][a-z0-9_]{0,31}', str(c))):
+                problems.append(f'{where}: unknown command {c!r} (known: {" ".join(sorted(COMMANDS))}; a package can bring more)')
+    # bodies: built in, or listed in "bodies" (the ids its packs and packages bring)
+    bodies = obj.get('bodies', [])
+    if not isinstance(bodies, list) or not all(isinstance(b, str) and re.fullmatch(r'[a-z][a-z0-9_]{0,31}', b) for b in bodies):
+        problems.append('"bodies" must be a list of body ids (lowercase letters, digits, _) that its packs and packages bring'); bodies = []
+    for who, m in [(f'agent {a.get("id")!r}', a.get('model')) for a in obj.get('agents', [])] + [('player', (obj.get('player') or {}).get('model'))]:
+        if m and m not in MODELS and m not in bodies:
+            problems.append(f'{who} "model": {m!r} is not a built-in body (a package\'s body must be listed in "bodies"; else the game uses a critter)')
+    for key in ('packages', 'packs'):
+        v = obj.get(key, [])
+        if not isinstance(v, list) or not all(isinstance(r, str) and r for r in v): problems.append(f'"{key}" must be a list of references (strings)')
+    for r in obj.get('packages', []) if isinstance(obj.get('packages'), list) else []:
+        if isinstance(r, str) and not REF.match(r): problems.append(f'package {r!r}: a built-in name, a URL, npm:<name>@<version> or gh:<user>/<repo>@<tag>')
+    problems += check_script(obj)
     # Goal predicates whose first argument is a character id.
     def walk_goal(node):
         if isinstance(node, dict):
@@ -74,8 +105,8 @@ def check(obj):
     skills_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..', 'skills')
     for ref in set(obj.get('skills', []) + [r for a in obj.get('agents', []) for r in a.get('skills', [])] + (obj.get('player') or {}).get('skills', [])):
         r = str(ref)
-        if not (r.startswith(('http://', 'https://', 'npm:', 'gh:')) or os.path.exists(os.path.join(skills_dir, r, 'skill.json')) or r in ('magic', 'healing', 'thievery', 'bard')):
-            problems.append(f'skill {r!r}: not a built-in skill (magic healing thievery bard) or a URL / npm: / gh: reference')
+        if not (r.startswith(('http://', 'https://', 'npm:', 'gh:')) or os.path.exists(os.path.join(skills_dir, r, 'skill.json')) or r in ('magic', 'healing', 'thievery', 'bard', 'trade', 'painting') or obj.get('packages')):
+            problems.append(f'skill {r!r}: not a built-in skill (magic healing thievery bard trade painting), a URL / npm: / gh: reference, or from a package')
     for u in obj.get('packs', []):
         if not isinstance(u, str) or not u.endswith('.json'):
             problems.append(f'"packs": {u!r} should be the URL of a pack.json')
@@ -89,7 +120,6 @@ def check(obj):
                 where = thing.get(key)
                 if where is not None and re.sub(r'\s+\d+$', '', str(where).lower()) not in known and not (key != 'in' and re.sub(r'\s+\d+$', '', str(where).lower()) in ('house',)):
                     problems.append(f'"{key}": {where!r} is not a {kind} place ({" ".join(sorted(known))})')
-    has_packages = bool(obj.get('packages'))
     for a in obj.get('agents', []):
         j = a.get('job')
         if isinstance(j, str) and j.lower() not in JOBS and not j.startswith(('http://', 'https://', 'npm:', 'gh:')) and not has_packages:
@@ -119,6 +149,55 @@ def check(obj):
     elif grid and isinstance(size, list) and len(size) == 2 and (gw > size[0] or gh > size[1]):
         problems.append(f'"grid" is {gw} x {gh} but "size" is {size[0]} x {size[1]}; cells outside the board are dropped')
     if not isinstance(obj.get('map', []), list): problems.append('"map" must be a list of lines')
+    return problems
+
+
+def check_script(obj):
+    """Structural checks of menus, workflows and triggers (the game's @tablefolk/script validate does the rest at load)."""
+    problems = []
+    def actions(a, where):
+        if a is None: return
+        if not isinstance(a, dict): problems.append(f'{where}: "do" must be an object of actions'); return
+        for k in a:
+            if k not in ACTION_KEYS: problems.append(f'{where}: unknown action {k!r} (known: {" ".join(sorted(ACTION_KEYS))})')
+        if 'act' in a and not isinstance(a['act'], (str, list)): problems.append(f'{where}: "act" is a command line or a list of them')
+        if 'set' in a and not isinstance(a['set'], dict): problems.append(f'{where}: "set" is an object of flags')
+    def menu(m, where):
+        if isinstance(m, list):
+            for i, x in enumerate(m): menu(x.get('menu', x) if isinstance(x, dict) else x, f'{where}[{i}]')
+            return
+        if isinstance(m, str): return
+        if not isinstance(m, dict) or not isinstance(m.get('items'), list): problems.append(f'{where}: a menu needs "items" (a list of choices)'); return
+        for i, it in enumerate(m['items']):
+            if not isinstance(it, dict) or not (it.get('label') or it.get('say')): problems.append(f'{where}.items[{i}]: a choice needs a "label"'); continue
+            actions({k: v for k, v in it.items() if k in ACTION_KEYS}, f'{where}.items[{i}]')
+    menus = obj.get('menus', {})
+    if not isinstance(menus, dict): problems.append('"menus" must be an object: { id: menu }')
+    else:
+        for mid, m in menus.items(): menu(m, f'menus.{mid}')
+    for a in obj.get('agents', []):
+        if a.get('menu') is not None: menu(a['menu'], f'agent {a.get("id")!r} "menu"')
+    flows = obj.get('workflows', {})
+    if not isinstance(flows, dict): problems.append('"workflows" must be an object: { name: { steps: [...] } }')
+    else:
+        for name, wf in flows.items():
+            if not isinstance(wf, dict) or not isinstance(wf.get('steps'), list) or not wf['steps']: problems.append(f'workflows.{name}: needs "steps" (a list)'); continue
+            ids = {s.get('id') for s in wf['steps'] if isinstance(s, dict) and s.get('id')}
+            for i, st in enumerate(wf['steps']):
+                where = f'workflows.{name}.steps[{st.get("id", i) if isinstance(st, dict) else i}]'
+                if not isinstance(st, dict): problems.append(f'{where}: a step is an object'); continue
+                if not (set(st) & STEP_KEYS) and not st.get('goto') and not st.get('end'): problems.append(f'{where}: no step kind ({" ".join(sorted(STEP_KEYS))})')
+                for k in ('goto', 'then', 'else', 'exit', 'other', 'closed'):
+                    t = st.get(k)
+                    if isinstance(t, str) and t not in ids and t != '#end': problems.append(f'{where}: "{k}" names no step id {t!r}')
+                if 'do' in st: actions(st['do'], where)
+                if 'menu' in st: menu(st['menu'], where + '.menu')
+    trigs = obj.get('triggers', [])
+    if not isinstance(trigs, list): problems.append('"triggers" must be a list')
+    else:
+        for i, t in enumerate(trigs):
+            if not isinstance(t, dict) or t.get('on') not in TRIGGER_ON: problems.append(f'triggers[{i}]: "on" must be one of {" ".join(sorted(TRIGGER_ON))}'); continue
+            actions(t.get('do'), f'triggers[{i}]')
     return problems
 
 

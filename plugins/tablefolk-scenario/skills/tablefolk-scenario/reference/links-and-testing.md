@@ -88,6 +88,10 @@ Each `.json` (and most have an `.html` page that opens it):
 | `skills-demo` | the magic, thievery, bard and healing skills |
 | `haggle-workflow` | a workflow |
 | `door-test` | doors in a small stone house |
+| `nightwatch` | a small game made only as a package and a scenario (`packages/nightwatch`): a beacon to keep burning, a keeper's job, dire wolves that circle it, `signal()` ([api.md](api.md)) |
+| `willow-lane` | a world with no language model: menus, flags, a riddle workflow ([story.md](story.md)) |
+| `the-studio` | the painting skill: a painter certain of his own genius |
+| `crystal-caves`, `greenwood`, `millbrook-farm` | a generated cave with a wyrmling, woods with a camp and ruins, a farmstead |
 
 More test scenarios live in `tools/browser-test/test-pack/` and
 `tools/browser-test/evals/`.

@@ -60,6 +60,7 @@ node close.mjs                                         # always close it: it hol
 | `gen-eval.mjs [--browser] [--only=village,talk] [--label=]` | the world builder on 8 one-line requests (village, outpost, dungeon, forest, mine, market, farm, a talk scene) through `/api/generate` (the server's cloud model) or the in-browser step-by-step path; per world: places, people with job/home/workplace set and reachable, pressure, goal predicates, live/time, repairs; saves `results/gen-<label>-<key>.json` to play with live-eval |
 | `live-pending-test.mjs` | a monster told something must not starve the others' live turns |
 | `editor-test.mjs` | the world builder's map editor: every tool against the scenario it writes (18 checks) |
+| `package-test.mjs` | packages with no model (`?art=1`, `brain: none`): the Night Watch from this site and from a second origin (its own CORS server on 8014: the trust question answered in the page, data only, allowed, remembered, revoked), the documented options on `fixtures/pkg-extra` and `pkg-dep`, a skill's code from another site, `npm:`/`gh:` mapping, the Library's npm filter (50 checks, about 40 s) |
 | `render-tiles.mjs [base] [only=a,b] [ppu]` | render the 2D tiles into `assets/tiles/` (about 4 minutes) |
 | `jank.mjs [url] [seconds]` | frame gaps, GPU frame time and input delay during start-up |
 | `gpu-profile/profile.mjs <url> <out.json>` | graphics profile: GPU time per frame (timestamp queries), CPU phases, per-callback cost, JS profile, ablations (usage in its header; findings in rendering.md, Light quality) |
@@ -216,6 +217,35 @@ per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
 - From Claude Code: run `launch-chrome.sh` with `run_in_background`, and
   stream long runs through a Monitor.
 
+## Packages (`package-test.mjs`, `tools/check-api-doc.mjs`)
+
+`node package-test.mjs` (the test Chrome on any app origin, `BASE=` for
+another port) needs no model: it plays `scenarios/nightwatch.json` with
+`"brain": "none"` and drives what a model would (commands through
+`tablefolk.runAs`, the keeper's job through `tablefolkJobs.tick`, since
+`?art=1` has no brain and live.js waits for one), then the fixtures, then
+the same package from `http://localhost:8014` (a static server the test
+starts and stops) to exercise URL resolution and the code question. 50/50
+on 2026-11-20. After a change to the module API, an event or a supported
+`window.tablefolk` member, run `node tools/check-api-doc.mjs` (the
+scenario skill's `api.md` against the code, grep-level).
+
+One game day with Gemma E2B (`live-eval.mjs scenarios/nightwatch.json --day
+--day-minutes=8`, 2026-11-20): odo (beacon_keeper) ran 18 job cycles,
+gathered 8 firewood and fed the beacon 6 times (it burnt out twice in the
+night and he relit it); 8 model calls in the day (pick 6, danger 1, remark
+1), every live tick in code; nobody used `signal()` (it is offered only by
+the model's own turns, and the day had almost none); the wolfpack came (3),
+circled, none was struck down, all fled at dawn, 84% of the others indoors;
+the idle player standing outside was struck down by direwolf1 while the
+fire was out (the scenario's lose condition).
+
+Traps found writing it: a scenario with `"brain": "none"` switches the
+page's brain, which clears the conversation history once, a moment after
+the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
+dialog stays in the page for a moment after a click (count each element
+once).
+
 ## The libraries (libs/)
 
 `node tools/libs.mjs check` (imports and no game globals), then
@@ -357,4 +387,50 @@ The smith works all day now (ore from the rocks, firewood bought from jory
 or chopped). Evening talk has topics ("Odo paid me one gold for the wheat
 today.", "Rosa sold you ale for two gold, tam."), but only two social turns
 came in the evening window.
+
+## The world builder (`gen-eval.mjs`, 2026-11-20)
+
+Eight one-line requests through `/api/generate` (deepseek-v4.1-flash on
+OpenRouter, the default), structure only. Before (the old fast-skill and
+checks): every world a generated map with 5-11 places, `live` but no clock
+time, **no character with a job, home or workplace**, a pressure only where
+the request had monsters (4 of 8 none), goals `player_has`/`said`, the talk
+request a one-room grid.
+
+| request | before: pressure / goal | after: places, people with job+home+work (reachable), pressure, goal, repairs |
+|---|---|---|
+| village | none / player_has | 10, 5/5 (5), wolves + low stores, stock_at_least + survived_days + agents_alive, 7 |
+| outpost | none / player_has | 12, 5/5 (5), goblins + low stores, survived_days + agents_alive, 7 |
+| dungeon | monsters / player_has | 9, 4/4 (4), skeletons + monsters, player_has + player_defeated, 4 |
+| forest | monsters / player_has, said | 8, 3/3 (3), wolves, survived_days + agents_alive, 7 |
+| mine | monsters / player_has | 5, 5/5 (5), spiders + low stores, agent_near + agents_alive, 0 |
+| market | none / said | 11, 6/6 (6), bandits + low stores, threat_defeated + agents_alive, 6 |
+| farm | none / player_has | 5, 4/4 (4), wolves + rats + low stores, survived_days + stock_at_least, 4 |
+| talk (interview) | grid, 1 room | `"talk": true`, a 4-room dungeon, no jobs or threats added |
+
+Repairs are mostly stations (a cauldron in a tavern, a target for a guard),
+beds, a store by the work, and `allowed` for fighters and sellers; the model
+writes jobs, homes, workplaces, threats and the goal itself. In-browser step
+by step (E2B, 25-60 s a world): village 9 places, 4/4 with work, monsters +
+low stores, survived_days (10 repairs); forest 7 places, 3/3, wolves (6);
+talk kept talk-only. Cost of all the cloud runs: $0.04.
+
+One game day (`--day --day-minutes=6`, E2B) on three of the generated worlds
+as they came out (no hand tuning):
+
+| | Harvestmere (village, 5) | Watchpost Kestrel (outpost, 5) | Thornwood Camp (forest, 3) |
+|---|---|---|---|
+| job cycles | farmer 6, baker 4, innkeeper 4, guard 7 places, smith 2 | guard 9, hunter 2, cook 1, smith 3, labourer 0 | hunter 2, cook 3, woodcutter 7 |
+| made / gathered / sold between them | 11 / 22 / 3 | 4 / 8 / 1 | 2 / 19 / 3 |
+| meals (of people) | 3 of 5 | 3 of 5 | 2 of 3 |
+| slept at night | 2 of 4 (+ the guard's watch) | 3 of 4 | 3 of 3 (kestrel 36 min) |
+| raid | 2 wolves, 1 down, 1 fled, all others indoors | 3 goblins, 2 down, 1 fled, 89% indoors, guard and hunter hurt | 2 wolves fled, all indoors; the hunter never reached them (12.6 cells) |
+| model calls a game hour | 0.7 | 1.2 | 0.6 |
+| spoken lines a real minute | 2.3 | 2.3 | 0.2 |
+
+Found and fixed from these: villagers who reached home after the raid
+began hid indoors standing all night (now they go to bed when it is
+bedtime). Left: a single snare starves a hunter (one meat every 4 game
+hours), a labourer with nothing to haul does nothing, a cook without meat
+cooks once.
 

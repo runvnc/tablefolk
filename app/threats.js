@@ -16,7 +16,10 @@
  * a package module's registered one), targets (pilfer: item names), hp,
  * retreat ("dawn": at daybreak, or 17:00 for day kinds; "half": when half
  * are down; both by default), announce (a narrator's line), scares (others
- * hide: true for raid and rob).
+ * hide: true for raid and rob), sound (played as they come: sfx.js, a package's too).
+ * A package module's threats.<kind>(c, ctx) runs each raider's turn (ctx: spec,
+ * group, retreat(why), despawn(), walkTo(x, z), attack(target), api); false
+ * falls back to the kind's behaviour.
  * They retreat to the edge and are gone (fled) at dawn or when half are
  * down. Afterwards everyone remembers it as news, and thinks better of those
  * who fought (the player included).
@@ -92,6 +95,8 @@
     groups.push(gr);
     const text = String(spec.announce || `{name}s are coming!`).replace(/\{name\}s\b/g, plural(name)).replace(/\{name\}/g, name).replace(/^\w/, c => c.toUpperCase());
     try { window.tablefolkDirector?.narrate?.(text); } catch {}
+    // "sound": played as they come (sfx.js: a built-in name or a package's "sounds")
+    if (spec.sound) try { window.tablefolkSfx?.play(spec.sound); } catch {}
     try { log('[threat] ' + text); } catch {}
     J()?.addNews?.('', text, 'raid');
     for (const c of state.characters) if (!c._threat && !c.defeated && !P()?.isAnimal?.(c)) try { window.tablefolkMind?.addMemory?.(c, text, 1.5, 'event'); } catch {}
@@ -178,7 +183,12 @@
       walkTo(c, gr.exit.x, gr.exit.z); await sleep(400); return true;
     }
     const custom = BEHAVIOURS[gr.kind] || BEHAVIOURS[spec.behaviour];
-    if (custom) { try { return !!(await custom(c, { spec, group: gr, retreat: why => retreat(gr, why), despawn: () => despawn(c), walkTo: (x, z) => walkTo(c, x, z) })); } catch (e) { console.warn('[threats] behaviour', e); return false; } }
+    if (custom) {
+      gr.customRuns = (gr.customRuns || 0) + 1;
+      try { return !!(await custom(c, { spec, group: gr, retreat: why => retreat(gr, why), despawn: () => despawn(c), walkTo: (x, z) => walkTo(c, x, z),
+        attack: target => window.tablefolkCombat?.attack(c, typeof target === 'string' ? target : target?.id === 'player' || target === state.playerAvatar ? 'player' : target?.id || ''),
+        api: window.tablefolkPackages?.api?.() })); } catch (e) { console.warn('[threats] behaviour', e); return false; }
+    }
     const cfg = W().getBrainConfig(c.id), hurt = (cfg.hp ?? 1) < (cfg.maxHp ?? 1);
     if (spec.behaviour === 'pilfer') {
       if (hurt) { retreatOne(c, gr); return true; }

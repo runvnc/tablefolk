@@ -1,0 +1,52 @@
+{
+  "v": 1,
+  "title": "The Night Watch",
+  "subtitle": "A hill fort, a beacon, and what waits in the dark below.",
+  "intro": "You have come up to Harrowcrest to stand the night watch. The beacon on the hill must burn till dawn: the dire wolves of the valley circle while it burns and close in when it dies. Keep it fed from the woodpile, keep Odo the keeper alive, and if it goes wrong, signal() for the militia. Hold two nights.",
+  "seed": 7,
+  "live": true,
+  "time": "17:30",
+  "dayMinutes": 12,
+  "lighting": "bright",
+  "monsters": "everyone",
+  "packages": ["nightwatch"],
+  "bodies": ["dire_wolf"],
+  "generate": { "kind": "village", "buildings": 3, "style": "hamlet", "places": ["square", "guardhouse", "tavern"] },
+  "allowed": ["say", "walk", "face", "emote", "give", "attack", "wield", "look", "carry", "drop"],
+  "player": { "name": "Traveller", "gold": 5, "items": ["bread", "firewood"], "model": "adventurer", "hp": 20 },
+  "agents": [
+    { "id": "brenna", "model": "swordswoman", "in": "guardhouse", "home": "guardhouse", "workplace": "guardhouse",
+      "job": "guard", "skills": ["watchkeeping"], "wield": "iron sword", "hp": 16,
+      "allowed": ["say", "walk", "attack", "wield", "give", "emote", "signal"],
+      "style": "captain of the watch",
+      "personality": "Brenna, captain of the Harrowcrest watch. Blunt, tired, fair. You trust the beacon more than any wall, and you have no patience for anyone who lets it go out." },
+    { "id": "odo", "model": "farmer", "in": "square", "home": "tavern", "workplace": "square",
+      "job": "beacon_keeper", "skills": ["watchkeeping"], "hp": 10,
+      "style": "old beacon keeper",
+      "personality": "Odo, the beacon keeper. Old, slow and stubborn; he has fed this fire for thirty winters and talks to it like a friend. He is afraid of the wolves and ashamed of it." },
+    { "id": "wren", "model": "villager_woman", "in": "tavern", "home": "tavern", "job": "cook",
+      "style": "cook of the fort",
+      "inventory": { "items": ["bread", "bread", "stew"] },
+      "personality": "Wren, who cooks for the fort. Quick, cheerful, practical; she counts the logs in the woodpile every evening and worries out loud when they run low." }
+  ],
+  "objects": [
+    { "type": "signal_beacon", "in": "square" },
+    { "type": "woodpile", "in": "square" },
+    { "type": "woodpile", "in": "guardhouse", "stock": 3 },
+    { "type": "chest", "in": "tavern", "items": [{ "name": "bread", "qty": 3 }, { "name": "firewood", "qty": 2 }] },
+    { "type": "bed", "in": "tavern" },
+    { "type": "bed", "in": "tavern" },
+    { "type": "bed", "in": "guardhouse" },
+    { "type": "cauldron", "in": "tavern" },
+    { "type": "target", "in": "guardhouse" }
+  ],
+  "threats": [{ "kind": "wolfpack", "count": 3 }],
+  "triggers": [{ "on": "start", "as": "brenna", "once": true, "do": { "start": "briefing" } }],
+  "goal": {
+    "text": "Keep the beacon burning and Odo alive for two nights.",
+    "win": { "all": [{ "survived_days": 2 }, { "not": { "agent_defeated": "odo" } }] },
+    "lose": { "any": [{ "agent_defeated": "odo" }, { "player_defeated": true }] },
+    "winText": "The second dawn comes up grey over the valley. The beacon is still smoking, Odo is still grumbling, and the relief is on the road.",
+    "loseText": "Odo lies still by the cold beacon. Below the walls, the wolves sing."
+  }
+}

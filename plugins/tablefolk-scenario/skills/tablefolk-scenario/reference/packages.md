@@ -2,14 +2,16 @@
 
 Tablefolk is a platform: worlds are built from things anyone can publish.
 There are four kinds, all named the same way and loaded straight into the
-browser from wherever they are hosted:
+browser from wherever they are hosted. A whole small game can be one
+package plus a scenario: `packages/nightwatch/` is one, and
+[api.md](api.md) is the reference for everything it uses.
 
 | Kind | File | What it brings |
 |---|---|---|
-| **asset pack** | `pack.json` | object types: models, sizes, tags ([things.md](things.md#asset-packs-packs)) |
+| **asset pack** | `pack.json` | object types: models, sizes, tags ([things.md](things.md#asset-packs-packs)); bodies and sounds |
 | **skill** | `skill.json` | what a character can do: commands, resources, prompt lines ([skills-and-roles.md](skills-and-roles.md)) |
 | **role** | `role.json` | a character's job: duty, commands, skills, behaviours ([skills-and-roles.md](skills-and-roles.md#roles)) |
-| **package** | `tablefolk.json` | any mix of the above, plus jobs, threats, uses, workflows and code, in one download |
+| **package** | `tablefolk.json` | any mix of the above, plus bodies, sounds, jobs, threats, uses, workflows and code, in one download |
 
 ## Naming one
 
@@ -24,6 +26,7 @@ A scenario lists what it uses:
 
 ```json
 "packages": ["smithy", "npm:tablefolk-smithy@1"],
+"bodies": ["dire_wolf"],
 "skills": ["magic"],
 "packs": ["https://example.com/my-pack/pack.json"],
 "agents": [{ "id": "bram", "role": "blacksmith" }]
@@ -38,7 +41,7 @@ Every section is optional; paths are relative to the file.
   "id": "smithy", "name": "Smithy", "version": "1.0.0",
   "description": "A blacksmith role, a smithing skill, an anvil to strike.",
   "author": "you", "license": "CC0-1.0",
-  "requires": ["npm:tablefolk-ores@1"],
+  "requires": ["npm:tablefolk-ores@1", "../ores/"],
   "items": {
     "smith_anvil": { "file": "models/anvil.glb", "w": 0.9, "h": 0.55, "d": 0.48,
       "loop": "Glow",
@@ -51,19 +54,24 @@ Every section is optional; paths are relative to the file.
   "jobs": { "picker": { "match": "...", "hours": [7, 17], "steps": [ ... ] } },
   "threats": { "crows": { "who": "bat", "name": "crow", "behaviour": "pilfer", ... } },
   "uses": { "loom": { "types": ["loom"], "anim": "saw", "time": 4, "verb": "weaves at the {t}", "gives": "cloth", "what": "weave" } },
+  "bodies": { "dire_wolf": { "model": "models/dire_wolf.glb", "h": 0.95, "clips": { "idle": "Idle", "walk": "Walk" }, "emotes": ["howl"] } },
+  "sounds": { "howl": "sounds/howl.ogg" },
   "modules": ["smithy.js"]
 }
 ```
 
-- `requires`: other packages, loaded first.
+- `requires`: other packages, loaded first (a relative path, `"../ores/"`,
+  is a package beside this one).
 - `items`: asset-pack items (same fields as `pack.json`), plus:
   - `loop`: an animation clip of the model to play from the start (`true`:
     the first). Clips travel inside the glTF/GLB file.
   - `use`: what E does when the player is next to it. Data form: `text`
-    (`{{player}}`), `sound` (doorOpen, doorClose, chestOpen, coins, pickup,
-    hit, miss, step), `anim` (a clip to play; `loopAnim: true` keeps it
-    going), `give` (items), `gold`, `once`, `state`. Or a name: a module's
-    `uses.<name>`.
+    (`{{player}}`), `sound` (a package's `sounds`, or doorOpen, doorClose,
+    chestOpen, coins, pickup, hit, miss, step), `anim` (a clip of the thing
+    to play; `loopAnim: true` keeps it going), `who` (a clip for whoever
+    uses it: `pickup`, or a body's own), `give` (items), `gold`, `once`,
+    `state`. Or a name: a module's `uses.<name>`. Clip names may leave out
+    the armature prefix (`Rat_Idle` for `RatArmature|Rat_Idle`).
   - `stock`: `{"item": "apple", "count": 6, "regrow": 2, "spent": "..."}`:
     what it holds and gives until spent and how fast one comes back (game
     hours a unit, 0 never). Characters gather from it with `use()` and jobs
@@ -97,55 +105,84 @@ Every section is optional; paths are relative to the file.
   (`["skills/smithing/skill.json"]`) or references.
 - `workflows`: routines ([workflows.md](workflows.md)), usable by every scenario that
   loads the package (a scenario's own win on a name clash).
+- `bodies`: characters' bodies, data only: a rigged GLB, its height, its
+  clips mapped to the game's names, custom emotes, kind, attack, hp
+  ([api.md](api.md#bodies)). A scenario's agents, player and threats use
+  them as `"model"`; list their ids in the scenario's `"bodies"` so the
+  world builder and `scenario_link.py`, which cannot fetch packages, keep
+  them.
+- `sounds`: `{"howl": "sounds/howl.ogg"}` (a list is picked from at
+  random): `use.sound`, job steps, threats and code play them by name.
 - `modules`: code (below).
 
 The example `packages/smithy/` has one of each; `packages/orchard/` is a
 data-only package for living worlds: an `apple_tree` with stock that grows
-back, a `picker` job and a `crows` threat (used by `scenarios/hearthvale.json`).
+back, a `picker` job and a `crows` threat (used by `scenarios/hearthvale.json`);
+`packages/nightwatch/` is a small game (`scenarios/nightwatch.json`; its
+`README.md` walks through it).
 
 A scenario's packages last only while it plays: when another scenario
-starts, what they brought (items, jobs, uses, threat kinds, workflows, code
-additions) is forgotten and that scenario's own packages load fresh.
+starts, what they brought (items, bodies, sounds, jobs, uses, threat kinds,
+workflows, commands, code additions) is forgotten, a module's `dispose()`
+runs, and that scenario's own packages load fresh.
 
 ## Code
 
 A module is an ES module whose default export receives the game's API and
-returns what it adds:
+returns what it adds. [api.md](api.md) is the full reference (every key,
+the `api` object, the events); in short:
 
 ```js
-export default function (api) {   // api: state, meta, narrate, findTarget, combat, say, log,
-                                  // getBrainConfig, setBrainConfig, effects, playClip, toast, addMemory
+export default function (api) {   // api.md: things, people, give/take, runAs, spawn, flag, clock,
+                                  // playClip, sound, badge, narrator, on, every, light, combat...
   return {
+    commands:   { signal: { run(g, args, ctx) { return 'it worked'; }, help: 'signal() - call the militia', allowedBy: 'listed' } },
     behaviours: { hammer: { on: 'tablefolk-player-turn', run(g) { /* ... */ } } },
     cards:      { forge_heat(g, data) { return 'The forge is hot.'; } },
     effects:    { temper(g, value, target, how) { /* ... */ } },
     uses:       { pump_bellows(thing, who, api) { /* ... */ return true; } },
     threats:    { crows(c, ctx) { /* a raider's turn: ctx.spec, ctx.retreat(why), ctx.walkTo(x, z), ctx.despawn() */ return true; } },
+    steps:      { refuel(g, step, ctx) { return { done: true, ms: 3000 }; } },
+    dispose() { /* the scenario ended */ },
   };
 }
 ```
+
+- `commands`: commands of its own, for characters and the player
+  (`/signal`): `"allowedBy": "default"` gives them to every character with
+  a mind, `"listed"` only to those whose `allowed`, role or job names them.
+  The result reads "worked" or "FAILED" in the actor's next prompt like any
+  built-in command.
 
 - `behaviours`: routines run by code on a game event; roles and skills list
   them by name (`"behaviours": ["hammer"]`).
 - `cards`: state-card lines; skills name them (`"card": ["forge_heat"]`).
 - `effects`: usable in any skill's `effects` list.
 - `uses`: what E does on an item whose `use` is that name (for a character
-  using it, `who` is that character; return a string to say what it did).
+  using it, `who` is that character; return a string to say what it did,
+  `{ fail: "why" }` when it could not).
 - `threats`: a threat kind's own behaviour, run on each of its raiders'
   turns (return false to fall back to the kind's `behaviour`).
 
+- `steps`: job step kinds; `dispose()`: clean up what is not part of the
+  map (lights, particles) when the scenario ends.
+
 A skill can still bring its own `module` ([skills-and-roles.md](skills-and-roles.md)), and both follow
-the same rule.
+the same rule (below): the same question, the same remembered answer.
 
 **Trust.** Data is safe to load from anywhere, so scenario links can carry
 packages. Code is not: a module runs only when it comes from this site, when
 the page is opened with `?trustSkills=1`, or when the player said yes to
 that package. The first time a package with code loads, the player is asked
 ("Run code from a package?" with *allow code* or *data only*), and the
-answer is remembered for that package's folder in this browser. The Library
-pane lists what is allowed, with a button to revoke each. Tests never ask
-and never run outside code. With *data only*, everything except the code
-still loads.
+answer is remembered for that package's folder in this browser (a skill's
+the same way, "Run code from a skill?"). The Library pane lists what is
+allowed, with a button to revoke each. The Scenario pane's tactic tests
+never ask and never run outside code. With *data only*, everything except
+the code still loads, and the game says so plainly (a note naming what
+will not work: using the beacon, its commands); using a thing whose `use`
+needs that code says so too. *data only* is not remembered: the question
+comes again next time.
 
 ## Finding packages
 
@@ -163,10 +200,12 @@ The Library pane (dev mode) lists them, from three places:
 
    `node tools/registry.mjs --check` fetches every community entry and
    checks its manifest (run it when reviewing a PR).
-2. **npm**: packages with the keyword `tablefolk`, plus `tablefolk-package`,
-   `tablefolk-skill`, `tablefolk-role` or `tablefolk-pack` for the kind
-   (package when none). Searched live from the browser; listed as
-   `npm:<name>@<version>`.
+2. **npm**: packages with the keyword `tablefolk` and one of
+   `tablefolk-package`, `tablefolk-skill`, `tablefolk-role` or
+   `tablefolk-pack` for the kind (without one they are not listed, nor are
+   the game's own `@tablefolk/*` libraries). Searched live from the
+   browser; listed as `npm:<name>@<version>` (an asset pack as its
+   jsDelivr `pack.json` URL, which `"packs"` takes).
 3. **GitHub**: repos with the topic `tablefolk` (and a kind topic as above)
    with the manifest at the repo root; listed as `gh:<owner>/<repo>@<branch>`.
    Only when "GitHub too" is ticked, since GitHub allows 10 searches a

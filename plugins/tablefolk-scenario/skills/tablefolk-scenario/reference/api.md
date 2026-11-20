@@ -1,0 +1,272 @@
+# The API: making a game as a package
+
+Everything a package author can use without editing the game, in one
+place: the module contract, the `api` a module is handed, the supported
+part of `window.tablefolk`, the events, and the data schemas with a
+minimal example each. [packages.md](packages.md) says how packages are
+named, found, trusted and published; `packages/nightwatch/` (its
+`README.md` walks through it) is a whole small game built only from what
+this chapter lists.
+
+Names written here exist in the code: `node tools/check-api-doc.mjs` fails
+when one of them no longer does.
+
+## The module contract
+
+A package's `"modules"` (and a skill's `"module"`) are ES modules whose
+default export receives the `api` and returns what it adds. Every key is
+optional.
+
+```js
+export default function (api) {
+  return {
+    commands:   { signal: { run(g, args, ctx) {}, help: 'signal() - light the beacon', usage: 'signal()', example: 'signal()', allowedBy: 'listed' } },
+    uses:       { tend_beacon(thing, who, api) { return 'feeds the fire'; } },
+    threats:    { wolfpack(c, ctx) { return true; } },
+    cards:      { beacon(g, data) { return 'The beacon burns.'; } },
+    effects:    { kindle(g, value, target, how, ctx) { return 'it flares up'; } },
+    behaviours: { hammer: { on: 'tablefolk-player-turn', run(g) {} } },
+    steps:      { refuel(g, step, ctx) { return { done: true, ms: 3000 }; } },
+    dispose() {},
+  };
+}
+```
+
+| key | signature | what it does |
+|---|---|---|
+| `commands` | `run(g, args, ctx)` | a command characters (and the player, `/signal`) can use. `g` the actor, `args` the words between the brackets split on commas. Return a string (it worked: the result line everyone reads), `true` (worked; you called `ctx.narrate`), or `ctx.fail("why")` / `false` / throw (the actor's next prompt reads `signal FAILED: why`). `ctx`: `{ name, args, narrate(text), fail(text), findTarget(word), api }`. `help` is the prompt's line (start it with the usage, `signal() - ...`), `example` follows it. `allowedBy`: `"default"` every character with a mind in a scenario that loads the package, `"listed"` only those whose `allowed`, role `commands` or job `commands` name it. The player may always use them. |
+| `uses` | `(thing, who, api)` | what using an item whose `"use"` is this name does: E by the player (`who` the player's avatar) or `use(thing)` by a character (`who` that character). Return a string (what happened), `true`, `false` (nothing happens), or `{ fail: "why" }`. |
+| `threats` | `(c, ctx)` | one turn of a raider of the threat kind with this name. `ctx`: `{ spec, group, retreat(why), despawn(), walkTo(x, z), attack(target), api }`; `group.ids` are its pack. Return `false` to let the kind's `behaviour` (`raid`, `pilfer`, `rob`) take the turn. |
+| `cards` | `(g, data)` | a state-card line for characters whose skills name it (`"card": ["beacon"]`); a line starting with `!` is urgent and goes at the very end of the prompt. Return a string, a list, or `''`. |
+| `effects` | `(g, value, target, how, ctx)` | an effect any skill entry can list (`{"kindle": 3}`); return a string to add to the result line. `target`: `{ who, thing, kind, pos }`. |
+| `behaviours` | `{ on: '<event>', run(g) }` | a routine run on a game event for characters whose role or skill lists it. |
+| `steps` | `(g, step, ctx)` | a job step kind (`{"refuel": true}` in a job's `steps`). Return `{ busy, ms }` (still at it), `{ done, ms, worked }`, `{ skip }`, `{ fail: "why" }` or `{ need: { item, n } }` (out of something: the job's fallbacks). `ctx`: `{ state, job, setDoing(text), goTo(x, z, label), goDo(thing, line), runLine(line), things(kind), nearest(list), count(item) }`. |
+| `dispose` | `()` | the scenario that loaded the package has ended: remove what you made that is not part of the map (lights, particles). Listeners and timers made with `api.on` / `api.every` are removed for you. |
+
+A module is called once per scenario that loads its package (the file is
+imported once; the default export runs again with a fresh `api`), so keep
+state inside the function, not at the top of the file.
+
+## The `api` object
+
+| member | what |
+|---|---|
+| `api.state`, `api.meta(mesh)` | the world (`state.characters`, `state.playerAvatar`, `state.player`...) and a thing's data (`meta(mesh).state`, `.opts`, `.type`). Read freely; change through the functions below where one exists. |
+| `api.things(type?)` | the things on the map: `[{ type, x, z, mesh, state }]`, all or one type |
+| `api.people()`, `api.player()` | the characters standing (not defeated); the player's avatar |
+| `api.inventory(who)` | `{ gold, items: [{ name, qty }] }` of a character, the player's avatar or `'player'` |
+| `api.give(who, item, n)`, `api.take(who, item, n)` | add or remove items (false when there were not enough) |
+| `api.getBrainConfig(id)`, `api.setBrainConfig(id, patch)` | a character's settings: personality, hp, allowed, inventory, mind... |
+| `api.runAs(id, line)` | a command line as that character, as if it chose it (`'walk(beacon)'`); awaits the result |
+| `api.spawn(id, model, x, z, cfg)` | a new character (a unique id is made from `id`); `cfg`: `style, personality, hp, items, gold, allowed, role, hostile, facing` |
+| `api.findTarget(g, word)` | a person or thing by name, as commands find them |
+| `api.say(g, text, voiced)`, `api.narrate(g, text)`, `api.narrator(text)`, `api.log(text)` | a line from a character, a result line in its turn, the narrator's line, the log |
+| `api.toast(text, type)`, `api.badge(g, text)` | a message to the player; a word over a character or thing |
+| `api.playClip(target, name, { loop })` | a clip of a thing's model or a character's body (a body's own clip name, the file's clip name, or a game mode: `pickup`, `wave`, `hammer`...) |
+| `api.sound(name, at)` | a sound by name (a package's `sounds` first, then the built-in ones) at a position or character |
+| `api.flag(name)`, `api.flag(name, value)` | read or set a world flag (story.md conditions, goals, menus see it as `world.<name>`) |
+| `api.clock()` | `{ min, day, hour }` or null |
+| `api.addMemory(g, text, weight)` | something a character remembers |
+| `api.combat` | `attack(g, target)`, `hurt(g, n, by, how)`, `heal(g, n)`, `wield(g, item)`, `hpOf(g)` |
+| `api.effects` | the skill effects by name (`damage`, `heal`, `vfx`...) to call from code |
+| `api.on(event, fn)`, `api.every(ms, fn)` | listen to a game event; run something every so often (both stop when the scenario ends) |
+| `api.light(x, z, { y, color, intensity, range })` | a point light inside the scene's light budget; `dispose()` it |
+| `api.freeCell(x, z, r)` | the nearest free, walkable cell, or null |
+| `api.scene`, `api.BABYLON`, `api.vec(x, y, z)` | the Babylon.js scene and library for effects of your own |
+
+## `window.tablefolk` and the other globals
+
+The game's own scripts publish more than this; what is listed here is the
+supported part (other members are internal and may change).
+
+| function | what |
+|---|---|
+| `window.tablefolk.getAgents()`, `.getPlayerAvatar()`, `.getPlayer()` | the characters; the player's avatar and gold and items |
+| `window.tablefolk.getBrainConfig(id)`, `.setBrainConfig(id, patch)` | a character's settings |
+| `window.tablefolk.getObjects()`, `.findItem(items, name)` | the things on the map; an item in a list by name |
+| `window.tablefolk.spawnAgent(id, x, z, facing, model)`, `.makeObject(type, x, z, opts)`, `.disposeWorldObject(mesh)` | add a character or a thing; remove a thing |
+| `window.tablefolk.runAs(id, line)`, `.parseLLMCommandLine(line)` | run a command as a character; parse one |
+| `window.tablefolk.getAllowedCommands(id)`, `.getAgentPerception(id, radius)`, `.buildAgentPrompt(g, cfg)` | what it may do, what it sees, its whole prompt |
+| `window.tablefolk.isFailedEntry(entry)`, `.markFailed(g)` | whether a history line was a failure; mark the actor's last one |
+| `window.tablefolk.isTurnReady()`, `.saveWorldState()`, `.worldStateData()`, `.restoreWorldState(data)` | turns; saving and loading |
+| `window.tablefolk.setLighting(mode)`, `.setCameraView(view)`, `.log(text)` | `bright`/`dim`/`night`; `overview`/`follow`/`first`; the log |
+| `tablefolkScenario.playScenario(json)`, `tablefolkScenario.active` | start a scenario; the running one (`scn`, `ended`, `result`) |
+| `tablefolkStory.get(name)`, `.set(name, value)`, `.check(expr, { me })` | flags and conditions |
+| `tablefolkWorkflows.start(id, name, input)`, `.drive(id)`, `.active(id)` | workflows |
+| `tablefolkMenu.open(menu, { agentId })`, `.offer(words)` | menus; answer the open one with words |
+| `tablefolkClock.now()`, `.set(min, day)`, `.isNight()` | the time of day |
+| `tablefolkThreats.now(kind)`, `.active()`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats |
+| `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
+| `tablefolkUses.register(kind, def)`, `.stockOf(thing)` | kinds of use; what a thing has left |
+| `tablefolkBodies.add(id, def, baseUrl)`, `.get(id)`, `.playClip(g, name, { loop })`, `.emote(g, name, loop)` | bodies and character clips |
+| `tablefolkSfx.play(name, pos)`, `.register(name, url)`, `.requested` | sounds; the last ones asked for |
+| `tablefolkSkills.addCommand(name, def)`, `.commandLines(g)`, `.cardLines(g)`, `.run(g, name, args)` | commands and skills |
+| `tablefolkPackages.load(ref)`, `.refUrl(ref, kind)`, `.api()`, `.useThing(mesh, who)`, `.allowedList()`, `.untrust(scope)` | packages and code trust |
+| `tablefolkCombat.attack(g, target)`, `.hurt(g, n, by, how)`, `.heal(g, n)` | combat |
+
+## Events
+
+All on `window`, as `CustomEvent`s; read `e.detail`.
+
+| event | detail | when |
+|---|---|---|
+| `tablefolk-scene-ready` | `{ meshes, materials }` | the 3D scene is up (once) |
+| `tablefolk-scenario-started` | `{ title, live, sub }` | a scenario has been built (`sub`: a subworld walked into) |
+| `tablefolk-clock` | `{ min, day, hour }` | every game quarter hour of a living world |
+| `tablefolk-player-turn` | `{ kind }` | the player acted (moved, used, attacked...) |
+| `tablefolk-player-chat` | `{ agentId, text }` | the player said something to a character |
+| `tablefolk-agent-turn` | `{ agentId, line }` | a character's turn ended |
+| `tablefolk-say` | `{ agentId, text, voiced }` | a character spoke (or an action line, `voiced: false`) |
+| `tablefolk-attacked` | `{ agentId }` | a character was attacked |
+| `tablefolk-defeated` | `{ id, by }` | someone was struck down (`id` may be `player`) |
+| `tablefolk-approached` | `{ agentId, by }` | someone came up to a character |
+| `tablefolk-flag` | `{ name, value, was }` | a world flag changed |
+| `tablefolk-menu` | `{ menu, item, agentId, how, text }` | a menu choice was taken |
+| `tablefolk-workflow` | `{ agentId, name, ended, vars }` | a workflow ended |
+| `tablefolk-model-call` | `{ agentId, kind }` | the language model was asked something (`reply`, `pick`, `cause`, `remark`...) |
+| `tablefolk-thinking` | `{ agentId, thinking }` | the model started or stopped thinking |
+| `tablefolk-load` | `{ key, label, state, ... }` | a download's progress (speech input) |
+
+## The data schemas
+
+Everything below is data: it loads from any site without asking. Paths are
+relative to the manifest (`pack.json` or `tablefolk.json`).
+
+### Items (object types)
+
+```json
+"items": { "woodpile": { "file": "models/woodpile.glb", "w": 1.3, "h": 0.45, "d": 0.8, "fit": "footprint", "static": true,
+  "stock": { "item": "firewood", "count": 6, "regrow": 0 },
+  "gather": { "gives": "firewood", "time": 3, "anim": "pickup", "verb": "takes {a} from the {t}" } } }
+```
+
+`file` (glTF/GLB), size `w h d` in cells, `fit` (`height`, `footprint`),
+`scale`, `visualYOffset`, `visualRy`, `mass`, `static`, `flammable`,
+`material`, `aliases`, `tags`; `loop` (a clip played from the start, `true`
+for the first); `use` (below); `stock`, `gather`, `station` (things.md,
+"Stock and stores"). Clip names may be written without the armature prefix
+(`Rat_Idle` for `RatArmature|Rat_Idle`).
+
+### Use
+
+```json
+"use": { "text": "{{player}} winds the music box", "anim": "Rat_Jump", "loopAnim": false, "who": "pickup",
+         "give": "silver coin", "gold": 2, "once": true, "state": "played", "sound": "chime", "what": "wind it" }
+```
+
+Or a module's name: `"use": "tend_beacon"`. `anim` plays on the thing,
+`who` on whoever used it, `state` becomes the thing's state (goals:
+`prop_state`), `once` refuses a second use, `what` offers it in the
+characters' prompt.
+
+### Bodies
+
+```json
+"bodies": { "dire_wolf": { "model": "models/dire_wolf.glb", "h": 0.95, "kind": "monster", "mindless": true,
+  "clips": { "idle": "Idle", "walk": "Walk", "run": "Gallop", "attack": "Attack", "hit": "Idle_HitReact_Left", "death": "Death", "howl": "Idle_2" },
+  "emotes": ["howl"], "natural": { "dmg": 3, "name": "great fangs" }, "hp": 8, "gender": "m" } }
+```
+
+`model` (a rigged glTF/GLB with its clips), `h` (standing height in cells:
+a person is 1.3), `clips` (the game's names `idle walk run attack hit death
+sit sleep work talk cast pickup` and any of your own, mapped to the file's
+clip names; a missing one falls back as for the built-in bodies), `emotes`
+(custom clips `emote(name)` plays; `emote(name, loop)` keeps it going),
+`kind` (`person`, `monster`, `animal`), `mindless` (fights with no model;
+default for monsters), `natural` (its attack), `hp`, `gender` and `voice`
+(a voice id for speaking bodies), `footprint` ([w, d] cells it blocks, for
+big bodies), `lift` (hover height), `ry` (a model made facing another way),
+`tile` (accepted; the world builder's map editor still draws a lettered
+token). A model with a `mouth_open` morph target talks with it. A scenario
+using one lists its id in `"bodies": ["dire_wolf"]`: the world builder and
+`scenario_link.py` cannot fetch packages, and keep a listed body.
+
+### Sounds
+
+```json
+"sounds": { "howl": "sounds/howl.ogg", "clang": ["sounds/clang1.ogg", "sounds/clang2.ogg"] }
+```
+
+A list is picked from at random. Fetched on first use and cached; a
+package's sounds are forgotten when its scenario ends. `use.sound`, a job
+step's `sound`, a threat's `sound`, a `do` action's `sound` and
+`api.sound()` find them first.
+
+### Jobs
+
+```json
+"jobs": { "beacon_keeper": { "match": "\\b(beacon|keeper)\\b", "hours": [16, 8], "sleep": [9, 15], "watch": "night",
+  "workplace": ["signal_beacon"], "commands": ["signal"],
+  "steps": [
+    { "gather": "woodpile", "when": "world.beacon_fuel < 5 and not me has firewood" },
+    { "use": "signal_beacon", "needs": { "firewood": 1 }, "optional": true, "anim": "pickup", "doing": "feeding the beacon" },
+    { "pace": "square" } ],
+  "fallback": [{ "gather": true }, { "idle": "pace" }] } }
+```
+
+Steps and fields: [skills-and-roles.md](skills-and-roles.md#jobs). Any step
+takes `when` (a story.md condition, `me` the worker), `anim` and `sound`
+(once it is done); `use` goes to a thing and uses it; a module's `steps`
+add kinds. `commands` lets the job's workers use package commands with
+`allowedBy: "listed"`.
+
+### Threats
+
+```json
+"threats": { "wolfpack": { "who": "dire_wolf", "name": "direwolf", "count": 3, "when": "night", "every": 1, "from": "edge",
+  "behaviour": "raid", "retreat": "dawn half", "scares": true, "hp": 8, "sound": "howl",
+  "announce": "Howling below the walls: {name}s are circling the fort!" } }
+```
+
+Fields: [living.md](living.md#threats-threats). A module function of the
+same name runs each raider's turn.
+
+### Stock and uses
+
+`stock` and `gather` on items (above). A package's `uses` adds kinds
+characters can use: `{ "loom": { "types": ["loom"], "anim": "saw", "time":
+4, "verb": "weaves at the {t}", "gives": "cloth", "what": "weave" } }`.
+
+### Skills
+
+```json
+"skills": { "watchkeeping": { "prompt": "You keep the watch.", "card": ["beacon"],
+  "commands": { "kindle": { "usage": "kindle()", "help": "feed the beacon a log", "target": "none", "needs": "firewood",
+                            "effects": [{ "take": "firewood" }, { "kindle": 3 }] } } } }
+```
+
+Fields: [skills-and-roles.md](skills-and-roles.md#writing-a-skill).
+
+### Roles
+
+```json
+"roles": { "keeper": { "duty": "You keep the beacon burning.", "commands": ["say", "signal"], "skills": ["watchkeeping"], "temperament": "gruff" } }
+```
+
+### Workflows, menus and triggers
+
+```json
+"workflows": { "briefing": { "steps": [
+  { "id": "ask", "menu": { "items": [{ "id": "duty", "label": "What is my duty?" }, { "id": "ready", "label": "Ready." }] },
+    "options": { "duty": "duty", "ready": "done" } },
+  { "id": "duty", "command": "say(\"Keep the fire burning.\")", "goto": "ask" },
+  { "id": "done", "do": { "set": { "world.briefed": true }, "anim": "wave" }, "end": true } ] } }
+```
+
+A package's workflows work in every scenario that loads it (a scenario's
+own win on a name). A step's `menu` may be written inline. `do` actions
+(menus, workflows, triggers) take `anim` (a clip of the character's body)
+and `sound`. Start one from the scenario: `"triggers": [{ "on": "start",
+"as": "brenna", "do": { "start": "briefing" } }]`. Fields:
+[workflows.md](workflows.md), [story.md](story.md).
+
+## What a package cannot do yet
+
+- Change rendering: walls, floors, lighting, the camera (the `api.scene`
+  is there, but nothing is managed for you beyond `api.light`).
+- Add panes or buttons to the game's interface (a toast and the menus are
+  the ways to talk to the player).
+- Replace the prompt's built-in parts or the reply parser; only add lines
+  (cards, a skill's prompt, command help).
+- Add goal predicates (use flags: `{"if": "world.beacon_lit"}`).
+- New map generators or base maps.

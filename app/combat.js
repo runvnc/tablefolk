@@ -204,7 +204,7 @@
     }
     const d = gap(g, v);
     if (d > REACH) { narrate(g, `attack failed: ${nameOf(v)} is ${d.toFixed(1)} cells away; walk next to them first`); if (isPlayer(g)) window.tablefolkToast?.(`${nameOf(v)} is too far away`, { type: 'error' }); return; }
-    const nat = !isPlayer(g) && NATURAL[g.charModel];
+    const nat = !isPlayer(g) && (NATURAL[g.charModel] || window.tablefolkBodies?.get(g.charModel)?.natural);   // a pack's body: its "natural"
     const wName = wielded(g), w = (wName && weaponFor(wName)) || (wName ? { dmg: 2, kind: 'club', name: wName } : nat ? { ...nat, kind: 'natural' } : { dmg: isPlayer(g) ? 2 : 1, kind: 'fists', name: 'fists' });
     // face the target and swing
     try { setCharacterFacing(g, new BABYLON.Vector3(v.root.position.x - g.root.position.x, 0, v.root.position.z - g.root.position.z).normalize()); } catch {}

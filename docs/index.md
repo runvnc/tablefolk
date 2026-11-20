@@ -21,4 +21,7 @@ features:
   - title: A platform
     details: Asset packs, skills, roles and packages from any URL, npm or GitHub.
     link: /guide/reference/packages
+  - title: A base for games
+    details: Bodies, objects with code, commands, jobs, threats and sounds in one package, no engine changes. The Night Watch is one.
+    link: /guide/reference/api
 ---

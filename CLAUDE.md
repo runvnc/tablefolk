@@ -58,7 +58,7 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 ## Libraries (2026-11-13)
 
 - `libs/` holds the standalone `@tablefolk/*` packages the game is built
-  on (device, brain, decider, voice, hear, menus, models): `libs/README.md`.
+  on (device, brain, decider, voice, hear, menus, models, paint, script): `libs/README.md`.
   No game globals and no `?v=` there; run `node tools/libs.mjs check` after
   editing them. Publishing (`node tools/libs.mjs publish`) needs `npm login`
   and the `tablefolk` npm org; ask before publishing.

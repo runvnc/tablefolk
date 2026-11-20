@@ -287,6 +287,7 @@
   function packUse(g, o) {
     const P = window.tablefolkPackages; if (!P?.useThing) return fail(g, `${g.id} cannot think of a use for the ${nice(o.type)}`, false);
     Promise.resolve(P.useThing(meshOf(o), g)).then(r => {
+      if (r && typeof r === 'object' && r.fail) return fail(g, `use failed: ${r.fail}`, false);
       if (!r) return fail(g, `nothing happens when ${g.id} uses the ${nice(o.type)}`, false);
       emitBadge(g, nice(o.type));
       say(g, typeof r === 'string' ? r : `${g.id} uses the ${nice(o.type)}`, false);

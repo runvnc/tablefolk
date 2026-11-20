@@ -28,6 +28,14 @@
     },
     {
       "kind": "skill",
+      "ref": "painting",
+      "name": "Painting",
+      "description": "Paints a real picture of anything with a small image model in the player's browser (tiny-sd at 512 px, or Chitra Tiny at 256 px on smaller graphics cards), and hangs it up for everyone to see. Characters with this skill are artists.",
+      "version": "1.0.0",
+      "code": true
+    },
+    {
+      "kind": "skill",
       "ref": "thievery",
       "name": "Thievery",
       "description": "Pick pockets: lift an item or a few coins from someone next to you.",
@@ -89,6 +97,37 @@
       "description": "Lives here: chats and shares what it knows about the place.",
       "version": "1.0.0",
       "code": false
+    },
+    {
+      "kind": "package",
+      "ref": "nightwatch",
+      "name": "Night Watch",
+      "description": "A small game as a package: a signal beacon to keep burning through the night, a keeper's job, a woodpile that runs down, dire wolves that circle while the fire burns and close in when it dies, a signal() command that calls the militia, and the captain's briefing.",
+      "version": "1.0.0",
+      "code": true,
+      "has": [
+        "items",
+        "bodies",
+        "sounds",
+        "skills",
+        "jobs",
+        "threats",
+        "workflows",
+        "modules"
+      ]
+    },
+    {
+      "kind": "package",
+      "ref": "orchard",
+      "name": "Orchard",
+      "description": "An example package for living worlds: an apple tree that runs out and grows back, an apple picker's job, and crows that raid the apple stores. Data only, no code.",
+      "version": "1.0.0",
+      "code": false,
+      "has": [
+        "items",
+        "jobs",
+        "threats"
+      ]
     },
     {
       "kind": "package",

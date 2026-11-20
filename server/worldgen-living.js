@@ -139,10 +139,12 @@ export function livingWorld(s, { prompt = '', fresh = false, notes = [] } = {}) 
     for (const k of (j?.workplace || [])) {
       const types = KIND_TYPES[k]; if (!types) continue;
       const outdoor = OUTDOOR_KIND.has(k);
-      if (outdoor ? has(types) : (wp ? has(types, wp) || addedIn(types, wp) : has(types))) continue;
+      // outdoor work needs a few (one snare gave a hunter a meat every four game hours)
+      const many = b.things.filter(t => types.includes(t.type)).length;
+      if (outdoor ? many >= 3 : (wp ? has(types, wp) || addedIn(types, wp) : has(types))) continue;
       const where = outdoor ? (places.find(p => ['field', 'meadow', 'garden', 'yard', 'clearing', 'square', 'camp', 'orchard'].includes(p.kind)) || wp) : wp || places.find(p => !OUTDOOR_PLACES.includes(p.kind));
       if (!where) continue;
-      const n = outdoor ? 3 : 1;
+      const n = outdoor ? 3 - many : 1;
       for (let i = 0; i < n; i++) add({ type: ADD_TYPE[k], in: where.id, ...(k === 'field' ? { crop: 'wheat' } : {}) }, i ? null : `${a.id}: a ${ADD_TYPE[k].replace(/_/g, ' ')} to work at (${where.id})`);
     }
     // a store beside the work for one who makes, gathers or sells

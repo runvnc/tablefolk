@@ -95,7 +95,8 @@ lines (`map`, quick natural scenes), explicit `objects` / `paint`, and
 | [workflows.md](reference/workflows.md) | step-by-step routines that keep small models on track, or run with no model at all |
 | [story.md](reference/story.md) | world flags, facts characters know once a flag is set, conditions on flags, inventory and gold |
 | [skills-and-roles.md](reference/skills-and-roles.md) | skills (magic, trade...) and roles (shopkeeper, guard...): using and writing them |
-| [packages.md](reference/packages.md) | `tablefolk.json` packages (items, skills, roles, workflows, code), finding and publishing them |
+| [packages.md](reference/packages.md) | `tablefolk.json` packages (items, bodies, sounds, skills, roles, jobs, threats, workflows, code), finding and publishing them |
+| [api.md](reference/api.md) | making a game as a package: the module contract, the `api` for code, the supported `window.tablefolk`, every event, the data schemas with examples |
 | [links-and-testing.md](reference/links-and-testing.md) | links, the Scenario pane, the example scenarios, testing tactics |
 | [playing.md](reference/playing.md) | the app for players: controls, cameras, panes, dev mode, brains, voices, URL flags, the tabletop view |
 | [world-builder.md](reference/world-builder.md) | `/world/<prompt>`: where the model runs, the map editor, AI changes, tiles |
