@@ -85,6 +85,40 @@ five tactics for a quick look.
 Gemma) on the voice library's samples or LibriSpeech clips: word error rate
 and seconds per clip; see the maintainer skill's testing chapter.
 
+## Living worlds (`live-eval.mjs`)
+
+```bash
+node live-eval.mjs scenarios/goblin-bakery.json --minutes=6 --label=before      # the world lives, the player idle
+node live-eval.mjs scenarios/goblin-bakery.json --provoke=grub --label=before  # 8 insults to grub, one per turn of his
+node live-eval.mjs tools/browser-test/evals/roles.json --provoke=hector         # a guard (generic insults)
+```
+
+Opens `<base>/app/?play=1&gfx=light&fps=10&intro=0&scenario=/<path>` (base
+`http://localhost:8000`, where the model is cached), never approves a
+download, turns voices off, starts living at `--pace` (default `lively`:
+about 40 turns in 6 minutes on E2B) and keeps it on. Stops after
+`--minutes` (6) or `--turns` (60) model turns, with a progress line each
+minute. Prints and saves (`results/live-<name>-<label>-<ts>.json`, with
+every prompt, reply and history entry): model turns, commands by type, share
+of turns with speech and with speech only, spoken lines a minute, speaking
+turns that reply to overheard talk (nothing said to the speaker, and the
+line shares words with or names someone it only overheard) or that speak to
+nobody, trades and gifts between characters, tasks done (use, take, put, eat,
+carry that worked), failed commands (by the eval's own wording test, the same
+before and after) and how many the game labelled FAILED, repeated openings,
+malformed replies (a line that is not a known command), "God"/"ready"
+leaks, seconds a turn. `--provoke=<id>` stands the player next to that
+character and sends K (`--k`, 8) insults (`--insults=bakery|generic`), one
+per turn of its own, recording the reply, mood, trust, anger level
+(`angryAt`), `hostileTo`, and the first insult at which it refuses, orders
+the player off, calls for help, attacks, or (by code) refuses service or
+turns hostile. `--model=`, `--llm=`/`--llm-model=` as for agenttest;
+`--query=seed=look` adds page parameters.
+
+`live-pending-test.mjs [seconds]`: a mindless wolf told something must not
+starve everyone else's turns in a living world (survival-one, busy pace);
+PASS when the woodcutter took turns and the wolf is not left pending.
+
 ## Poking at the page
 
 `node eval.mjs` prints a status summary; `node eval.mjs "<js expression>"`

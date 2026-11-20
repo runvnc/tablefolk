@@ -56,6 +56,8 @@ node close.mjs                                         # always close it: it hol
 | `agenttest.mjs <scn.json> <tactics.txt> [runs] [--prompts] [--render] [--base=URL]` | play a scenario file with tactics, print every turn, save `results/agent-*.json` |
 | `run-evals.sh` | all evals in `evals/` (run it with `bash -c` from fish) |
 | `live-watch.mjs <scenario> [seconds]` | play a scenario live and keep the transcript |
+| `live-eval.mjs <scenario> [--minutes=6] [--provoke=<id>]` | a living world scored: speech share, replies to overheard talk, trades, tasks, failures, malformed replies; or K insults to one character and when it refuses, calls for help or attacks (README) |
+| `live-pending-test.mjs` | a monster told something must not starve the others' live turns |
 | `editor-test.mjs` | the world builder's map editor: every tool against the scenario it writes (18 checks) |
 | `render-tiles.mjs [base] [only=a,b] [ppu]` | render the 2D tiles into `assets/tiles/` (about 4 minutes) |
 | `jank.mjs [url] [seconds]` | frame gaps, GPU frame time and input delay during start-up |
@@ -125,6 +127,28 @@ Before that (2026-10-24, E2B): shop-role 2/2, roles
 4/4, smithy and companion pass, feelings 'hit' 3/3. Run them after any
 prompt change: the feelings eval fell to 0/2 once just from moving the
 "Stay yourself" line below the feelings.
+
+Living worlds (`live-eval.mjs`, Gemma 4 E2B in the headless test Chrome,
+pace lively, player idle, 6 minutes; 2026-11-20 baseline before the
+addressed-speech, tempers and results changes):
+
+| | bakery | market-village |
+|---|---|---|
+| model turns | 42 | 45 |
+| turns with speech / speech only | 86% / 2% | 93% / 64% |
+| spoken lines a minute | 4.7 | 4.0 |
+| replies to overheard talk / to nobody | 22 / 8 | 0 / 36 |
+| trades or gifts between characters | 0 | 0 |
+| tasks done / failed commands (labelled FAILED) | 12 / 4 (0) | 4 / 4 (0) |
+| malformed replies | 1 (2%) | 0 |
+| seconds a turn (median) | 2.2 | 1.5 |
+
+Provocation (8 insults, no threats): grub (bakery) never refused, called for
+help or attacked; his anger read .6 after insult 2 only because he wrote
+`feel(angry)`, then faded to .36 while the insults went on, and trust rose
+.50 to .53; the first "order off" in words came at insult 4 ("Keep your
+disgusting presence away from my kitchen!"). hector (a guard, `evals/roles.json`):
+anger 0 throughout, trust .50 to .53, polite answers, no attack.
 
 Tactics files use the Scenario pane's format plus `act:` lines and
 per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
