@@ -1,0 +1,323 @@
+{
+ "about": "Procedural trees and plants (tools/blender/make-trees.py; Sapling Tree Gen skeletons, leaf-cluster cards). Full = <type>.gltf (6-10k triangles), light = <type>.med.gltf (fewer, larger, folded cards; the MED naming of app/graphics-settings.js). Textures are shared AVIF files in this folder (1024 px max). Units: metres, +Y up, origin at the trunk base. Foliage: alphaMode MASK, double-sided, COLOR_0 = baked occlusion, normals bent toward clump/crown centres (keep the file normals; do not recompute).",
+ "items": [
+  {
+   "type": "oak_tree",
+   "replaces": "oak_tree",
+   "sapling_preset": "cambridge_oak",
+   "files": {
+    "full": "oak_tree.gltf",
+    "light": "oak_tree.med.gltf"
+   },
+   "height_m": 9.22,
+   "canopy_radius_m": 6.69,
+   "triangles": {
+    "full": 8582,
+    "light": 2448
+   },
+   "variants": [
+    "oak_tree_b",
+    "oak_tree_c"
+   ],
+   "textures": [
+    "jolcham_oak_bark_01_diff.avif",
+    "jolcham_oak_bark_01_nor_gl.avif",
+    "jolcham_oak_bark_01_rough.avif",
+    "leaves_broadleaf.avif"
+   ]
+  },
+  {
+   "type": "oak_tree_b",
+   "replaces": "oak_tree (variant)",
+   "sapling_preset": "cambridge_oak",
+   "files": {
+    "full": "oak_tree_b.gltf",
+    "light": "oak_tree_b.med.gltf"
+   },
+   "height_m": 8.71,
+   "canopy_radius_m": 6.17,
+   "triangles": {
+    "full": 8031,
+    "light": 2461
+   },
+   "textures": [
+    "jolcham_oak_bark_01_diff.avif",
+    "jolcham_oak_bark_01_nor_gl.avif",
+    "jolcham_oak_bark_01_rough.avif",
+    "leaves_broadleaf.avif"
+   ]
+  },
+  {
+   "type": "oak_tree_c",
+   "replaces": "oak_tree (variant)",
+   "sapling_preset": "coast_live_oak",
+   "files": {
+    "full": "oak_tree_c.gltf",
+    "light": "oak_tree_c.med.gltf"
+   },
+   "height_m": 8.41,
+   "canopy_radius_m": 7.28,
+   "triangles": {
+    "full": 8268,
+    "light": 2342
+   },
+   "textures": [
+    "jolcham_oak_bark_01_diff.avif",
+    "jolcham_oak_bark_01_nor_gl.avif",
+    "jolcham_oak_bark_01_rough.avif",
+    "leaves_broadleaf.avif"
+   ]
+  },
+  {
+   "type": "tree",
+   "replaces": "tree",
+   "sapling_preset": "acer",
+   "files": {
+    "full": "tree.gltf",
+    "light": "tree.med.gltf"
+   },
+   "height_m": 7.68,
+   "canopy_radius_m": 5.37,
+   "triangles": {
+    "full": 6447,
+    "light": 2045
+   },
+   "textures": [
+    "bark_brown_02_diff.avif",
+    "bark_brown_02_nor_gl.avif",
+    "bark_brown_02_rough.avif",
+    "leaves_broadleaf.avif"
+   ]
+  },
+  {
+   "type": "tall_tree",
+   "replaces": "tall_tree",
+   "sapling_preset": "black_tupelo",
+   "files": {
+    "full": "tall_tree.gltf",
+    "light": "tall_tree.med.gltf"
+   },
+   "height_m": 12.19,
+   "canopy_radius_m": 4.47,
+   "triangles": {
+    "full": 7478,
+    "light": 2144
+   },
+   "textures": [
+    "leaves_broadleaf.avif",
+    "tree_bark_03_diff.avif",
+    "tree_bark_03_nor_gl.avif",
+    "tree_bark_03_rough.avif"
+   ]
+  },
+  {
+   "type": "autumn_tree",
+   "replaces": "autumn_tree",
+   "sapling_preset": "acer",
+   "files": {
+    "full": "autumn_tree.gltf",
+    "light": "autumn_tree.med.gltf"
+   },
+   "height_m": 8.02,
+   "canopy_radius_m": 5.78,
+   "triangles": {
+    "full": 6950,
+    "light": 1944
+   },
+   "textures": [
+    "bark_brown_02_diff.avif",
+    "bark_brown_02_nor_gl.avif",
+    "bark_brown_02_rough.avif",
+    "leaves_autumn.avif"
+   ]
+  },
+  {
+   "type": "dead_tree",
+   "replaces": "dead_tree",
+   "sapling_preset": "black_oak",
+   "files": {
+    "full": "dead_tree.gltf",
+    "light": "dead_tree.med.gltf"
+   },
+   "height_m": 5.69,
+   "canopy_radius_m": 3.99,
+   "triangles": {
+    "full": 6994,
+    "light": 2518
+   },
+   "textures": [
+    "bark_willow_02_diff.avif",
+    "bark_willow_02_nor_gl.avif",
+    "bark_willow_02_rough.avif"
+   ]
+  },
+  {
+   "type": "pine_tree",
+   "replaces": "pine_tree",
+   "sapling_preset": "european_larch",
+   "files": {
+    "full": "pine_tree.gltf",
+    "light": "pine_tree.med.gltf"
+   },
+   "height_m": 9.01,
+   "canopy_radius_m": 2.91,
+   "triangles": {
+    "full": 6574,
+    "light": 1900
+   },
+   "variants": [
+    "pine_tree_b",
+    "pine_tree_c"
+   ],
+   "textures": [
+    "leaves_conifer.avif",
+    "pine_bark_diff.avif",
+    "pine_bark_nor_gl.avif",
+    "pine_bark_rough.avif"
+   ]
+  },
+  {
+   "type": "pine_tree_b",
+   "replaces": "pine_tree (variant)",
+   "sapling_preset": "european_larch",
+   "files": {
+    "full": "pine_tree_b.gltf",
+    "light": "pine_tree_b.med.gltf"
+   },
+   "height_m": 8.11,
+   "canopy_radius_m": 2.79,
+   "triangles": {
+    "full": 5534,
+    "light": 1642
+   },
+   "textures": [
+    "leaves_conifer.avif",
+    "pine_bark_diff.avif",
+    "pine_bark_nor_gl.avif",
+    "pine_bark_rough.avif"
+   ]
+  },
+  {
+   "type": "pine_tree_c",
+   "replaces": "pine_tree (variant)",
+   "sapling_preset": "balsam_fir",
+   "files": {
+    "full": "pine_tree_c.gltf",
+    "light": "pine_tree_c.med.gltf"
+   },
+   "height_m": 8.37,
+   "canopy_radius_m": 4.75,
+   "triangles": {
+    "full": 7200,
+    "light": 1951
+   },
+   "textures": [
+    "leaves_conifer.avif",
+    "pine_bark_diff.avif",
+    "pine_bark_nor_gl.avif",
+    "pine_bark_rough.avif"
+   ]
+  },
+  {
+   "type": "tall_pine",
+   "replaces": "tall_pine",
+   "sapling_preset": "douglas_fir",
+   "files": {
+    "full": "tall_pine.gltf",
+    "light": "tall_pine.med.gltf"
+   },
+   "height_m": 15.28,
+   "canopy_radius_m": 3.23,
+   "triangles": {
+    "full": 7430,
+    "light": 1980
+   },
+   "textures": [
+    "leaves_conifer.avif",
+    "pine_bark_diff.avif",
+    "pine_bark_nor_gl.avif",
+    "pine_bark_rough.avif"
+   ]
+  },
+  {
+   "type": "flower_bush",
+   "replaces": "flower_bush",
+   "sapling_preset": "coyote_brush",
+   "files": {
+    "full": "flower_bush.gltf",
+    "light": "flower_bush.med.gltf"
+   },
+   "height_m": 1.38,
+   "canopy_radius_m": 1.04,
+   "triangles": {
+    "full": 2637,
+    "light": 718
+   },
+   "textures": [
+    "bark_brown_02_diff.avif",
+    "bark_brown_02_nor_gl.avif",
+    "bark_brown_02_rough.avif",
+    "leaves_broadleaf.avif"
+   ]
+  },
+  {
+   "type": "red_bush",
+   "replaces": "red_bush",
+   "sapling_preset": "coyote_brush",
+   "files": {
+    "full": "red_bush.gltf",
+    "light": "red_bush.med.gltf"
+   },
+   "height_m": 1.26,
+   "canopy_radius_m": 0.95,
+   "triangles": {
+    "full": 2437,
+    "light": 593
+   },
+   "textures": [
+    "bark_brown_02_diff.avif",
+    "bark_brown_02_nor_gl.avif",
+    "bark_brown_02_rough.avif",
+    "leaves_autumn.avif"
+   ]
+  },
+  {
+   "type": "fern",
+   "replaces": "fern",
+   "sapling_preset": "(hand-built fronds)",
+   "files": {
+    "full": "fern.gltf",
+    "light": "fern.med.gltf"
+   },
+   "height_m": 0.75,
+   "canopy_radius_m": 0.81,
+   "triangles": {
+    "full": 264,
+    "light": 72
+   },
+   "textures": [
+    "leaves_conifer.avif"
+   ]
+  }
+ ],
+ "textures": {
+  "bark_brown_02_diff.avif": 236228,
+  "bark_brown_02_nor_gl.avif": 401662,
+  "bark_brown_02_rough.avif": 81429,
+  "bark_willow_02_diff.avif": 212925,
+  "bark_willow_02_nor_gl.avif": 464846,
+  "bark_willow_02_rough.avif": 31171,
+  "jolcham_oak_bark_01_diff.avif": 423046,
+  "jolcham_oak_bark_01_nor_gl.avif": 892477,
+  "jolcham_oak_bark_01_rough.avif": 39102,
+  "leaves_autumn.avif": 216990,
+  "leaves_broadleaf.avif": 171363,
+  "leaves_conifer.avif": 414001,
+  "pine_bark_diff.avif": 170371,
+  "pine_bark_nor_gl.avif": 371515,
+  "pine_bark_rough.avif": 37466,
+  "tree_bark_03_diff.avif": 238723,
+  "tree_bark_03_nor_gl.avif": 389522,
+  "tree_bark_03_rough.avif": 21890
+ }
+}

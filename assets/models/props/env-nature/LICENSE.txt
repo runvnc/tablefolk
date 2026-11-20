@@ -1,0 +1,30 @@
+Trees and plants in this folder (and cover/) were generated procedurally for
+Tablefolk by tools/blender/make-trees.py and make-cover.py (branch skeletons
+grown with the Sapling Tree Gen add-on for Blender; its GPL licence covers the
+add-on, not the meshes it produces). The meshes are released under CC0 1.0
+(public domain), like the rest of the generated assets.
+
+Textures are made from these CC0 1.0 (public domain) assets by Poly Haven
+(https://polyhaven.com, licence: https://polyhaven.com/license):
+
+  bark
+    jolcham_oak_bark_01_*.avif   Jolcham Oak Bark 01   https://polyhaven.com/a/jolcham_oak_bark_01
+    pine_bark_*.avif             Pine Bark             https://polyhaven.com/a/pine_bark
+    tree_bark_03_*.avif          Tree Bark 03          https://polyhaven.com/a/tree_bark_03
+    bark_brown_02_*.avif         Bark Brown 02         https://polyhaven.com/a/bark_brown_02
+    bark_willow_02_*.avif        Bark Willow 02        https://polyhaven.com/a/bark_willow_02
+
+  leaf-cluster atlases (leaves_broadleaf, leaves_autumn, leaves_conifer;
+  tools/blender/make-leaf-atlases.py cuts single leaves out of these models'
+  textures, recolours them and arranges them into sprays)
+    Island Tree 01      https://polyhaven.com/a/island_tree_01      (elliptic leaves: oak, autumn)
+    Shrub 01            https://polyhaven.com/a/shrub_01            (serrated leaf: tall_tree)
+    Shrub 03            https://polyhaven.com/a/shrub_03            (heart leaves: tree, autumn)
+    Shrub 04            https://polyhaven.com/a/shrub_04            (small leaves: bushes)
+    Fir Tree 01         https://polyhaven.com/a/fir_tree_01         (needle sprays)
+    Pine Tree 01        https://polyhaven.com/a/pine_tree_01        (long-needle spray)
+    Fern 02             https://polyhaven.com/a/fern_02             (fern fronds)
+    Celandine 01        https://polyhaven.com/a/celandine_01        (flower heads: blossoms, wildflowers)
+
+  cover/cover_atlas.avif: grass blades drawn by the script (no source image);
+  flower heads from Celandine 01 above.
