@@ -200,7 +200,7 @@ The pools are data: `jobs/common/lines.json` (kinds `sale`, `thanks`,
 `thief`, `wake`), each a list or lists by voice (`any`, `plain`, `gruff`, `cheerful`,
 `timid`: from the character's temperament and personality), with slots
 `{name}` (who it is said to), `{item}`, `{price}`, `{raiders}`, `{place}`,
-`{me}`; a line whose slot has no value is skipped. A job adds its own
+`{me}`, `{greeting}` (Morning, Good day, Evening, Good night by the clock); a line whose slot has no value is skipped. A job adds its own
 (`"lines": {"greet": ["Fresh bread soon, {name}."]}`, used first) and a
 package its `"lines"` ([packages.md](packages.md#tablefolkjson)).
 

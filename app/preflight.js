@@ -83,7 +83,7 @@
     ['clock.js?v=20261120c'],
     ['jobs.js?v=20261120ad'],
     ['threats.js?v=20261120j'],
-    ['chatter.js?v=20261120c'],
+    ['chatter.js?v=20261120d'],
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261115a'],
     ['online-brain.js?v=20261112b'],

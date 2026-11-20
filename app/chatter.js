@@ -8,7 +8,7 @@
  * first), a package's "lines" section. Each kind is a list, or lists by
  * voice (any, plain, gruff, cheerful, timid; the voice comes from the
  * character's temperament and personality). Slots {name} {item} {price}
- * {raiders} {place} {me}; a line with a slot left empty is skipped.
+ * {raiders} {place} {me} {greeting} (by the clock); a line with a slot left empty is skipped.
  *
  * Rules: never the same line twice in a row (nor one of its last eight
  * lines, which app.js would drop); at most one line per character per 20
@@ -91,7 +91,8 @@
     if (!force && KIND_GAP[kind] && now - (kindAt[kind] || -1e9) < KIND_GAP[kind]) return false;
     if (!listener(g, to)) return false;
     const name = to ? (to === state.playerAvatar ? playerName() : to.id) : (slots.name ?? '');
-    const all = { me: g.id, ...slots, name };
+    const h = window.tablefolkClock?.hour?.() ?? 12, greeting = h >= 5 && h < 12 ? 'Morning' : h < 18 && h >= 12 ? 'Good day' : h >= 18 && h < 22 ? 'Evening' : 'Good night';
+    const all = { me: g.id, greeting, ...slots, name };
     const recent = new Set(g._said || []);
     const lines = candidates(g, kind).map(t => fill(t, all)).filter(t => t && t !== c.last && t !== c.byKind[kind] && !recent.has(keyOf(t)));
     if (!lines.length) return false;

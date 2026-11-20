@@ -98,7 +98,7 @@
  "lines": {
   "greet": [
    "Bread's in the oven, {name}. Come back in a bit.",
-   "Morning, {name}! Smell that?"
+   "{greeting}, {name}! Smell that?"
   ],
   "sale": [
    "Still warm, {name}. {price} gold.",

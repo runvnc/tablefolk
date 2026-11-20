@@ -1,5 +1,5 @@
 {
-  "about": "Short lines characters say by code at natural moments (app/chatter.js). Each kind is a list, or lists by voice: any, plain, gruff, cheerful, timid. Slots: {name} (who it is said to), {item}, {price}, {raiders}, {place}, {me}. A line whose slot has no value is skipped. A job's \"lines\" and a package's \"lines\" add to these (a job's come first).",
+  "about": "Short lines characters say by code at natural moments (app/chatter.js). Each kind is a list, or lists by voice: any, plain, gruff, cheerful, timid. Slots: {name} (who it is said to), {item}, {price}, {raiders}, {place}, {me}, {greeting} (Morning, Good day, Evening or Good night by the clock). A line whose slot has no value is skipped. A job's \"lines\" and a package's \"lines\" add to these (a job's come first).",
   "sale": {
     "any": [
       "{price} gold for the {item}, {name}.",
@@ -48,7 +48,7 @@
   },
   "greet": {
     "any": [
-      "Morning, {name}. Busy day.",
+      "{greeting}, {name}. Busy day.",
       "Hello there, {name}.",
       "Good to see you, {name}.",
       "Mind your step, {name}, I'm working here."
@@ -152,7 +152,7 @@
   },
   "patrol": {
     "any": [
-      "Morning, {name}.",
+      "{greeting}, {name}.",
       "All quiet, {name}?",
       "Keep your eyes open, {name}.",
       "Good day, {name}. Anything amiss?"
