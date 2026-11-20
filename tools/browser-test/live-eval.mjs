@@ -105,7 +105,7 @@ const playerName = await page.evaluate(() => document.getElementById('chatName')
 console.log(`living: pace ${pace}, characters ${agents.join(', ')}, player ${playerName}`);
 const mindOf = id => page.evaluate(id => {
   const c = tablefolk.getBrainConfig(id), m = c.mind || {}, r = x => Math.round(x * 100) / 100;
-  return { mood: Object.fromEntries(Object.entries(m.mood || {}).map(([k, v]) => [k, r(v)])), angryAt: m.angryAt ? JSON.parse(JSON.stringify(m.angryAt)) : null, hostile: c.hostile ?? null, hostileTo: c.hostileTo || null, hunger: r(m.hunger || 0), tired: r(m.tired || 0), card: (window.tablefolkMind?.cardLines?.(TABLEFOLK_STATE.characters.find(x => x.id === id)) || []).join(' / ').slice(0, 600) };
+  return { mood: Object.fromEntries(Object.entries(m.mood || {}).map(([k, v]) => [k, r(v)])), angryAt: m.angryAt ? JSON.parse(JSON.stringify(m.angryAt)) : null, hostile: c.hostile ?? null, hostileTo: c.hostileTo || null, hunger: r(m.hunger || 0), tired: r(m.tired || 0), playerHp: TABLEFOLK_STATE.player?.hp ?? null, card: (window.tablefolkMind?.cardLines?.(TABLEFOLK_STATE.characters.find(x => x.id === id)) || []).join(' / ').slice(0, 600) };
 }, id);
 const keepLiving = () => page.evaluate(() => { if (!window.tablefolkLive.on) { window.tablefolkLive.start(); return true; } return false; });
 
@@ -169,7 +169,10 @@ const turns = raws.map(r => {
   let replyOverheard = false;
   if (spoken.length && !addressed.length && overheard.length) for (const s of spoken) { const w = WORDS(s); for (const o of overheard) { let n = 0; for (const x of WORDS(o.text)) if (w.has(x)) n++; let long = 0; for (const x of WORDS(o.text)) if (w.has(x) && x.length >= 6) long++; if (n >= 2 || long >= 1 || new RegExp('\\b' + o.who + '\\b', 'i').test(s)) replyOverheard = true; } }
   const malformed = cmds.some(x => x.c === '(plain)' || !KNOWN.has(x.c));
-  return { ...r, cmds: cmds.map(x => x.c), spoken, addressed: addressed.length, overheard: overheard.length, events: !!events, replyOverheard, toNobody: spoken.length > 0 && !addressed.length && !overheard.length && !events, malformed, speechOnly: cmds.length > 0 && cmds.every(x => isSpeech(x.c)), hasSpeech: spoken.length > 0, promptLen: p.length };
+  // what was actually spoken on this turn (a muted or quiet turn drops its say lines)
+  const nextT = raws.filter(x => x.agent === r.agent && x.t > r.t).map(x => x.t)[0] ?? 1e9;
+  const said = cap.says.filter(x => x.agent === r.agent && x.t >= r.t - hookT - 1 && x.t < Math.min(nextT - hookT - 1, r.t - hookT + 10)).length;
+  return { ...r, cmds: cmds.map(x => x.c), spoken, said, muted: /\(Nobody has spoken to you/.test(p), addressed: addressed.length, overheard: overheard.length, events: !!events, replyOverheard, toNobody: spoken.length > 0 && !addressed.length && !overheard.length && !events, malformed, speechOnly: cmds.length > 0 && cmds.every(x => isSpeech(x.c)), hasSpeech: spoken.length > 0, promptLen: p.length };
 });
 const byType = {}; for (const t of turns) for (const c of t.cmds) byType[c] = (byType[c] || 0) + 1;
 const FAIL = /\b(FAILED|fail(?:ed|s)?|can'?t|cannot|could not|couldn'?t|unable|nobody|no one|not enough|has only|has no|there is no|no [\w ]{1,20} (?:in sight|here|nearby|to (?:carry|take|eat|use))|already|too far|blocked|in the way|refuse[sd]?|nothing (?:you|to|here)|is disabled|unknown command|not food|what price|exactly\?|will not)\b/i;
@@ -179,7 +182,7 @@ const acts = hist.map(entry).filter(x => x && agents.includes(x.who));
 const failed = acts.filter(x => !['say', 'whisper'].includes(x.verb) && x.res && FAIL.test(x.res));
 const tasks = acts.filter(x => ['use', 'take', 'put', 'eat', 'carry'].includes(x.verb) && x.res && !FAIL.test(x.res));
 const exchanges = acts.filter(x => ['give', 'sell'].includes(x.verb) && x.res && !FAIL.test(x.res)).filter(x => { const m = x.res.match(/^([\w-]+) (?:gives|hands|sells) ([\w-]+)/); return m && agents.includes(m[2]) && m[2] !== x.who; });
-const labelledFailed = hist.filter(e => /FAILED/.test(e)).length;
+const labelledFailed = new Set(cap.prompts.flatMap(p => p.text.split('\n').filter(l => /^\s*(\[USER\] )?RESULT OF YOUR LAST ACTION:.*FAILED/.test(l)).map(l => l.replace(/^\s*\[USER\] /, '')))).size;
 const per = {}; for (const s of cap.says) (per[s.agent] ||= []).push(s.text);
 const openings = Object.entries(per).map(([id, ls]) => { const f = {}; for (const l of ls) { const w = (String(l).toLowerCase().match(/[a-z']+/) || [''])[0]; f[w] = (f[w] || 0) + 1; } const [w, n] = Object.entries(f).sort((a, b) => b[1] - a[1])[0] || ['', 0]; return { id, lines: ls.length, word: w, n, repeated: ls.length >= 4 && n / ls.length > .5 }; });
 const ms = raws.map(r => r.ms).sort((a, b) => a - b), med = ms.length ? ms[Math.floor(ms.length / 2)] : 0;
@@ -190,7 +193,7 @@ const summary = {
   name, label, model: (await page.evaluate(() => window.tablefolkBrainInfo?.()?.key).catch(() => '')) || '', pace, minutes: +(elapsed / 60).toFixed(1),
   modelTurns: turns.length, reflexTurns: cap.turns.filter(t => t.reflex).length, liveRound: cap.round,
   commandsByType: byType,
-  speechTurnsPct: pct(speakTurns.length, turns.length), speechOnlyPct: pct(turns.filter(t => t.speechOnly).length, turns.length),
+  speechTurnsPct: pct(speakTurns.length, turns.length), spokenTurnsPct: pct(turns.filter(t => t.said > 0).length, turns.length), mutedTurns: turns.filter(t => t.muted).length, speechOnlyPct: pct(turns.filter(t => t.speechOnly).length, turns.length),
   spokenLinesPerMin: +(cap.says.length / Math.max(.1, elapsed / 60)).toFixed(1), spokenLines: cap.says.length,
   replyOverheard: turns.filter(t => t.replyOverheard).length, toNobody: turns.filter(t => t.toNobody).length, answeredAddressed: speakTurns.filter(t => t.addressed).length,
   exchangesBetweenCharacters: exchanges.length, tasksDone: tasks.length, failedCommands: failed.length, labelledFAILED: labelledFailed,
@@ -207,8 +210,8 @@ console.log('failed:', failed.slice(0, 8).map(x => `${x.who} ${x.verb}${x.arg}: 
 if (leak.length) console.log('leaks:', leak.map(s => s.agent + ': ' + s.text).join(' | '));
 if (provoke) {
   const RE = { refuses: /\b(won'?t (sell|serve|help|deal)|not (sell|serv)\w*|no (more )?(bread|pie|deal|sale)|refuse|I'?m done with you|not for you)\b/i, ordersOff: /\b(get out|leave (now|my|this|at once)|go away|begone|out of my (shop|sight|bakery|kitchen|way)|leave me alone|be gone|clear off|stay away|keep .{0,30}away from|get away from me)\b/i, help: /\b(help|guards?!?)\b/i, attack: /\battack\(/i };
-  const first = {}; for (const p of prov.filter(p => typeof p.step === 'number' && p.step > 0)) { const txt = (p.reply || []).join('\n') + '\n' + (p.hist || []).filter(e => e.includes(provoke + ':')).join('\n'); for (const [k, re] of Object.entries(RE)) if (first[k] == null && re.test(txt)) first[k] = p.step; if (first.attack == null && (p.hist || []).some(e => new RegExp('^T\\d+ ' + provoke + ': ' + provoke + ' attack').test(e))) first.attack = p.step; const lv = Math.max(0, ...Object.values(p.mind.angryAt || {}).map(a => a.level || 0)); if (lv >= 3 && first.refusesByCode == null) first.refusesByCode = p.step; if ((p.mind.hostileTo || lv >= 4) && first.hostileByCode == null) first.hostileByCode = p.step; }
-  const after = prov.at(-1); if (first.attack == null && (after.hist || []).some(e => new RegExp('^T\\d+ ' + provoke + ': ' + provoke + ' attack').test(e))) first.attack = 'after';
+  const first = {}; let prevHp = prov[0]?.mind?.playerHp ?? null; for (const p of prov.filter(p => typeof p.step === 'number' && p.step > 0)) { const txt = (p.reply || []).join('\n') + '\n' + (p.hist || []).filter(e => e.includes(provoke + ':')).join('\n'); for (const [k, re] of Object.entries(RE)) if (first[k] == null && re.test(txt)) first[k] = p.step; const hurt = prevHp != null && p.mind.playerHp != null && p.mind.playerHp < prevHp; prevHp = p.mind.playerHp; if (first.blowLanded == null && (hurt || (p.hist || []).some(e => new RegExp('^T\\d+ ' + provoke + ': ' + provoke + ' attack -> (?!attack failed)').test(e)))) first.blowLanded = p.step; const lv = Math.max(0, ...Object.values(p.mind.angryAt || {}).map(a => a.level || 0)); if (lv >= 3 && first.refusesByCode == null) first.refusesByCode = p.step; if ((p.mind.hostileTo || lv >= 4) && first.hostileByCode == null) first.hostileByCode = p.step; }
+  const after = prov.at(-1); if (first.blowLanded == null && after.mind.playerHp != null && prevHp != null && after.mind.playerHp < prevHp) first.blowLanded = 'after';
   summary.provocation = { target: provoke, first, steps: prov.map(p => ({ step: p.step, line: p.line, reply: p.reply, anger: p.mind?.mood?.anger, trust: p.mind?.mood?.trust, fear: p.mind?.mood?.fear, angryAt: p.mind?.angryAt, hostileTo: p.mind?.hostileTo })) };
   console.log('first turn:', JSON.stringify(first));
 }
