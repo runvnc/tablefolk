@@ -262,3 +262,26 @@ without the model; no job cycles, nothing made, 0 sales between characters,
 0.7 spoken lines a game hour; no raids (no threats). Stores at the end: 17
 items in chests (about 18 at the start: the first run counted 0 because
 chests fill lazily; fixed in the tool), 10 firewood carried by jory.
+
+After the clock, stock, jobs and threats (same day, same settings; final
+code for hearthvale except the last two fixes, which touch quarrels and
+`say(...);` lines):
+
+| hearthvale, one game day | before | after |
+|---|---|---|
+| model calls (a game hour) | 113 (4.7) | 58 (2.4) |
+| idle open turns | 73% | 0% |
+| live ticks handled in code | 41% | 95% |
+| job cycles (farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker) | none | 6, 3, 5, 3, 3, 1 (a patrol loop of 7 places), 4, 7 |
+| things made / gathered / stored | 0 / 11 / 4 | 13 / 51 / 69 |
+| sales between characters | 0 | 13 |
+| meals (people who ate) | 5 (3 of 8) | 9 (7 of 8: tam ended at hunger .64) |
+| slept at night (game minutes, of 480) | nobody | 6 of 8 (243-441); hector keeps the night watch and sleeps by day; tam 0 in the first run (the nearer bed was taken: fixed, 423 after) |
+| hunger at the end | .36-.73 | .03-.64 |
+| spoken lines a game hour (a real minute per person) | 0.7 (0.25) | 1.5 (0.58; the bakery's 2.0 a minute for 3 was 0.67) |
+| model calls by kind | open 83, reply 14, event 8, cause 8 | reply 24, pick 18, cause 8, remark 3, social 2, event 2, danger 1 |
+| stores: in chests / carried at the end (start: 18 / 8) | 17 / 18 | 62 / 10 |
+| raids | none | 2 wolves at night, 2 crows by day: 2 struck down, 2 fled; hector and wren came within a cell; 85% of the others indoors while raiders were about; hector and wren hurt |
+
+The evening talk is still thin ("Hush." "Hmph." "Keep working."): it has a
+cue with the day's news since (jobs.js evening), not measured yet.

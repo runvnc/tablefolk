@@ -594,7 +594,7 @@
     if (g.turnMove) return { ms: 800 };
     const spot = p && !inPlace(p, posOf(g).x, posOf(g).z) ? spotIn(p, g) : null;
     if (spot) { walkTo(g, spot.x, spot.z); return { ms: walkMs(g) }; }
-    if (Math.random() < .3) { const seat = nearest(g, things('seat').filter(o => dist(posOf(g), o) < 5)); if (seat && !g.pose) { await runLine(g, `use(${seat.type})`); return { ms: 9000 }; } }
+    if (Math.random() < .3) { const seat = nearest(g, things('seat').filter(o => dist(posOf(g), o) < 5 && !state.characters.some(c => c !== g && c.pose?.on === o.mesh))); if (seat && !g.pose) { await runLine(g, `use(${seat.type})`); return { ms: 9000 }; } }
     return { ms: rnd(4000, 7000) };
   }
 
