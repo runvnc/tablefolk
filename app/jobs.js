@@ -21,6 +21,11 @@
  *     {"tend": kind|type}                              a bare field sown (grows back twice as fast); animals patted
  *     {"heal": true}                                   bandage the wounded nearby
  *     {"rest": true} {"wander": true} {"read": true}
+ *     {"use": kind|type, "needs": {"firewood": 1}}       go and use(thing) (a package item's "use", data or code)
+ *     {"<a module's step>": ...}                       a package module's own step kind (packages.js "steps")
+ *   any step: "when" (story.js condition, "me" = the worker), "anim" (a clip
+ *   of its body once the step is done) and "sound" (sfx.js name, a package's too);
+ *   the job: "commands" (package commands it may use, skills.js mayUse)
  * The day, per character, on the clock (clock.js): threats first (fighters
  * go to them, the rest hide at home), eating when hungry (its own food, its
  * stores, the village store, buying from a seller, asking, foraging),
@@ -356,7 +361,22 @@
   }
 
   // ---------------------------------------------------------------- the steps
-  const stepName = st => Object.keys(st).find(k => ['haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace'].includes(k));
+  // step kinds a package module adds (packages.js adopt "steps"): name -> fn(g, step, ctx)
+  const STEPS = {};
+  const registerStep = (name, fn) => { STEPS[name] = fn; };
+  const removeStep = name => { delete STEPS[name]; };
+  const stepName = st => Object.keys(st).find(k => ['haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace', 'use'].includes(k) || STEPS[k]);
+  // any step: "when" (a story.js condition, "me" the worker: "world.beacon_fuel < 4"),
+  // and once it is done, "anim" (a clip of the worker's body, bodies.js) and "sound" (sfx.js, a package's too)
+  async function doStep(g, s, j, st) {
+    if (st.when != null && !window.tablefolkStory?.check(st.when, { me: g.id })) return { skip: true };
+    const r = await doStep0(g, s, j, st);
+    if (r?.done) {
+      if (st.anim) window.tablefolkBodies?.playClip(g, st.anim) || playRig(g, st.anim, false);
+      if (st.sound) window.tablefolkSfx?.play(st.sound, posOf(g));
+    }
+    return r;
+  }
   // a recipe's inputs: one set ({"wheat": 2}) or alternatives ([{"wheat": 2}, {"flour sack": 1}])
   const altSets = v => (Array.isArray(v) ? v : [v || {}]).filter(x => x && typeof x === 'object');
   const missingIn = (g, set) => Object.entries(set).find(([n, q]) => count(g, n) < q) || null;
@@ -380,8 +400,27 @@
     return nearest(g, list, o => inPlace(s.work, o.x, o.z) || (s.workThing && o.type === s.workThing));
   }
   // the next unit of a step: { busy, ms } | { done, ms } | { skip } | { fail } | { need }
-  async function doStep(g, s, j, st) {
+  async function doStep0(g, s, j, st) {
     const kind = stepName(st), arg = st[kind];
+    // a module's own step kind: { busy, ms } | { done, ms, worked } | { skip } | { fail } | { need }
+    if (STEPS[kind]) {
+      try { return (await STEPS[kind](g, st, { state: s, job: j, setDoing: t => setDoing(g, s, t), goTo: (x, z, label) => goTo(g, s, x, z, label || 'there'), goDo: (o, line) => goDo(g, s, o, line), runLine: line => runLine(g, line), things, nearest: list => nearest(g, list), count: item => count(g, item) })) || { skip: true }; }
+      catch (e) { console.warn('[jobs] step', kind, e); return { fail: e.message }; }
+    }
+    // use: go to a thing (a type or a kind) and use() it, as the character would (a package
+    // item's "use" runs its data or code); "needs": what it must carry first (fetched by the fallbacks)
+    if (kind === 'use') {
+      const sets = st.needs ? altSets(st.needs) : null;
+      if (sets && !sets.some(x => !missingIn(g, x))) {
+        if (st.optional) return { skip: true };
+        const [n, q] = missingIn(g, sets[0]);
+        return { need: { item: n, n: q - count(g, n), for: nice(arg) } };
+      }
+      const o = stationFor(g, arg); if (!o) return { skip: true, why: `no ${nice(arg)} here` };
+      setDoing(g, s, st.doing || `at the ${nice(o.type)}`);
+      const r = await goDo(g, s, o, `use(${o.type})`);
+      return r.done ? { ...r, worked: true, ms: Math.max(r.ms || 0, (+st.time || 3) * 1000) } : r;
+    }
     if (kind === 'gather') {
       const o = stationFor(g, arg); if (!o) return { skip: true, why: `nothing left to gather (${nice(arg)})` };
       const st0 = U().stockOf(o), item = st0?.item || st.gives || nice(arg);
@@ -940,5 +979,5 @@
   // (worded with no "ask X": E2B wrote ask(grub) as a command)
   function askLine(g) { const s = g._job; return s?.ask && s.ask.until > gm() ? `You need ${s.ask.item} and have none: say so to ${s.ask.who || 'someone nearby'}, in your own words.` : ''; }
   function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, did: g._job.did, doing: g._job.doing }; return out; }
-  window.tablefolkJobs = { load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
+  window.tablefolkJobs = { registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
 })();

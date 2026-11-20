@@ -85,6 +85,9 @@ const host = {
     return heard.map(l => String(l).replace(/^(.+?)\s+says:\s*/, '')).join(' ');
   },
   menu: (actor, ref) => window.tablefolkMenu?.open(ref, { agentId: actor, flow: true }) ?? Promise.resolve(null),
+  // "anim" and "sound" in a "do" (menus, workflows, triggers): a clip of the character's body (bodies.js), a named sound (sfx.js)
+  anim(actor, name) { const g = agent(actor); if (g) window.tablefolkBodies?.playClip(g, name) || window.tablefolkPackages?.playClip(g, name); },
+  sound(actor, name) { const g = agent(actor); window.tablefolkSfx?.play(name, g ? (g.logicalPos || g.root.position) : undefined); },
   ended(actor, run) {
     try { window.dispatchEvent(new CustomEvent('tablefolk-workflow', { detail: { agentId: actor, name: run.name, ended: true, vars: run.vars } })); } catch {}
     try { window.updatePerceptionUI?.(); } catch {}
@@ -103,7 +106,9 @@ const runner = createRunner({ flows, state, host, store });
 const triggers = createTriggers({ list: () => S().triggers || [], state, host, runner });
 
 window.tablefolkStory = {
-  get: state.get, set: state.set, all: state.all, state, host, runner, triggers, truthy, validate,
+  get: state.get, set: state.set, all: state.all, state, host, runner, triggers, truthy,
+  // a scenario's scripted parts checked with the loaded packages' workflows too
+  validate: scn => validate({ ...scn, workflows: { ...(window.tablefolkPackages?.workflows || {}), ...(scn?.workflows || {}) } }),
   check: (expr, { me = null, vars = {} } = {}) => libCheck(expr, host.scope(me, vars)),
   render: (text, { me = null, vars = {} } = {}) => libRender(text, host.scope(me, vars)),
   take: (me, item) => transfer('player', meId(me), item),

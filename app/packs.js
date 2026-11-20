@@ -11,6 +11,8 @@
  *   window.tablefolkPacks.load(url)      load another pack; resolves to its new item types
  *   window.tablefolkPacks.add(pack, url)  add a pack's items given inline (a package's "items")
  *   window.tablefolkPacks.items          { type: { url, pack, w, h, d, ... } }
+ * A pack.json may also carry "bodies" (bodies.js) and "sounds" (sfx.js
+ * registerAll): characters' bodies and named sounds, files relative to it.
  */
 (function () {
   const param = new URLSearchParams(location.search).get('assets');
@@ -51,6 +53,9 @@
       if (items[type]) { if (items[type].pack !== id) console.warn(`[packs] ${id}: "${type}" already defined by ${items[type].pack}; skipped`); continue; }
       try { items[type] = cleanItem(type, it, packUrl, id); added.push(type); } catch (e) { console.warn(`[packs] ${id}: ${e.message}`); }
     }
+    // bodies (bodies.js) and sounds (sfx.js) a pack.json brings (a package's go through packages.js)
+    if (pack.bodies && !pack._pkg) window.tablefolkBodies?.addAll(pack.bodies, packUrl, id);
+    if (pack.sounds && !pack._pkg) window.tablefolkSfx?.registerAll?.(pack.sounds, packUrl, id);
     console.log(`[packs] ${id}: ${added.length} item types from ${packUrl}`);
     for (const fn of listeners) try { fn(added, id); } catch (e) { console.error(e); }
     return added;

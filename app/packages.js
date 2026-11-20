@@ -42,7 +42,7 @@
  *
  *   window.tablefolkPackages.load(ref)        -> { id, manifest, warnings }
  *   window.tablefolkPackages.loadAll(refs)    -> warnings
- *   window.tablefolkPackages.refUrl(ref, kind) kind: 'package' | 'skill' | 'role'
+ *   window.tablefolkPackages.refUrl(ref, kind) kind: 'package' | 'skill' | 'role' | 'job' | 'pack'
  *   window.tablefolkPackages.useThing(mesh, who)   what E does on an item with "use"
  */
 (function () {
@@ -52,6 +52,7 @@
     job: { dir: 'jobs', file: 'job.json' },
     skill: { dir: 'skills', file: 'skill.json' },
     role: { dir: 'roles', file: 'role.json' },
+    pack: { dir: 'assets', file: 'pack.json' },   // an asset pack named like a package (npm:, gh:); the Library pane's refs
   };
   const isRef = r => /^(https?:\/\/|npm:|gh:)/.test(r) || /^[a-z0-9_-]+$/i.test(r);
 
@@ -77,22 +78,87 @@
     if (u.origin === location.origin || new URLSearchParams(location.search).has('trustSkills')) return true;
     return allowedList().some(s => u.href.startsWith(s));
   }
-  // Ask once per package whose code isn't trusted yet.
-  async function askTrust(m, url) {
+  // Ask once per package (or skill) whose code isn't trusted yet. Packages
+  // and skills follow the same rule, dialog and remembered answer. A "data
+  // only" answer is said plainly (a toast), since parts will not work.
+  const asking = new Map();   // scope -> promise (one question per folder, however many modules)
+  async function askTrust(m, url, what = 'package') {
     if (trusted(url)) return true;
-    if (window.tablefolkScenario?.active?.testing || !window.confirmDialog) return false;
-    const ok = await window.confirmDialog(
-      `The package "${m.name || m.id}" wants to run its own code (from ${new URL(url).host}). Code can do anything this page can. Allow it?`,
-      { title: 'Run code from a package?', confirmText: 'allow code', cancelText: 'data only' }).catch(() => false);
-    if (ok) { try { localStorage.setItem(TRUST_KEY, JSON.stringify([...new Set([...allowedList(), scopeOf(url)])])); } catch {} }
-    return !!ok;
+    const scope = scopeOf(url);
+    if (asking.has(scope)) return asking.get(scope);
+    const p = (async () => {
+      if (noAsk || !window.confirmDialog) return false;
+      const ok = await window.confirmDialog(
+        `The ${what} "${m.name || m.id}" wants to run its own code (from ${new URL(url).host}). Code can do anything this page can. Allow it?`,
+        { title: `Run code from a ${what}?`, confirmText: 'allow code', cancelText: 'data only' }).catch(() => false);
+      if (ok) { try { localStorage.setItem(TRUST_KEY, JSON.stringify([...new Set([...allowedList(), scope])])); } catch {} }
+      else window.tablefolkToast?.(`${m.name || m.id}: its code was not run (data only). Its things, people and rules are here, but what needs code (${codeParts(m)}) will not work.`, { type: 'warn', ms: 9000 });
+      return !!ok;
+    })();
+    asking.set(scope, p); p.finally(() => setTimeout(() => asking.delete(scope), 0));
+    return p;
   }
+  const codeParts = m => { const named = Object.entries(m.items || {}).filter(([, it]) => typeof it?.use === 'string').map(([t]) => t.replace(/_/g, ' ')); return named.length ? 'using the ' + named.join(', ') + ', its commands' : 'its commands and behaviours'; };
   function untrust(scope) { try { localStorage.setItem(TRUST_KEY, JSON.stringify(allowedList().filter(s => s !== scope))); } catch {} }
 
   // ---- what modules add ----
-  const uses = {}, workflows = {}, added = { behaviours: [], cards: [], effects: [], items: new Set() };
+  const uses = {}, workflows = {}, added = { behaviours: [], cards: [], effects: [], commands: [], steps: [], items: new Set(), bodies: new Set(), sounds: new Set() };
+  // The api handed to a module (and a skill's module): the supported surface,
+  // documented in the scenario skill's reference/api.md. Keep it stable.
   function api() {
-    return { ...(window.tablefolkSkills?.api?.() || {}), state, meta, playClip, toast: (t, type) => window.tablefolkToast?.(t, { type }), addMemory: window.tablefolkMind?.addMemory };
+    const T = () => window.tablefolk;
+    return { ...(window.tablefolkSkills?.api?.() || {}), state, meta, playClip,
+      toast: (t, type) => window.tablefolkToast?.(t, { type }), addMemory: window.tablefolkMind?.addMemory,
+      // a word or icon over a character or thing for a moment ("clang", "+1 firewood")
+      badge: (g, text) => { try { emitBadge(g, String(text)); } catch {} },
+      sound: (name, pos) => window.tablefolkSfx?.play(name, pos?.root?.position || pos?.position || pos),
+      // a command line as that character, as if it chose it (results, clips, memories): await api.runAs('bram', 'walk(anvil)')
+      runAs: (id, line) => T()?.runAs?.(typeof id === 'string' ? id : id?.id, line, 'package'),
+      spawn: (id, model, x, z, cfg = {}) => spawnCharacterAt(id, model, x, z, cfg),
+      things: type => T().getObjects().filter(o => !type || o.type === type),
+      people: () => T().getAgents().filter(c => !c.defeated),
+      player: () => T().getPlayerAvatar?.() || null,
+      inventory: who => who === state.playerAvatar || who === 'player' ? state.player : charInventory(typeof who === 'string' ? T().getAgents().find(c => c.id === who) : who),
+      give: (who, item, n = 1) => giveItem(who, item, n), take: (who, item, n = 1) => takeItem(who, item, n),
+      flag: (name, value) => value === undefined ? window.tablefolkStory?.get(name) : window.tablefolkStory?.set(name, value),
+      clock: () => window.tablefolkClock?.now?.() || null,
+      narrator: text => { try { window.tablefolkDirector?.narrate?.(text); } catch {} try { log(text); } catch {} },
+      on: (event, fn) => { addEventListener(event, fn); listeners.push([event, fn]); return () => removeEventListener(event, fn); },
+      every: (ms, fn) => { const t = setInterval(() => { try { fn(); } catch (e) { console.warn('[package] every', e); } }, Math.max(100, +ms || 1000)); timers.push(t); return t; },
+      // a point light in the scene's light budget (scenery.js trackLight): dispose() it when done
+      light: (x, z, { y = 1, color = [1, .7, .4], intensity = 2, range = 8 } = {}) => { const L = new BABYLON.PointLight('pkg_light', new BABYLON.Vector3(x, y, z), state.scene); L.diffuse = new BABYLON.Color3(...color); L.intensity = intensity; L.range = range; window.tablefolkScenery?.trackLight?.(L); return L; },
+      // the nearest free, walkable cell to (x, z) within r cells, or null
+      freeCell: (x, z, r = 4) => { for (let d = 0; d <= r; d++) for (let dx = -d; dx <= d; dx++) for (let dz = -d; dz <= d; dz++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== d) continue; const cx = Math.round(x) + dx, cz = Math.round(z) + dz; if (cellPassable(cx, cz) && !occupantAt(cx, cz, null)) return { x: cx, z: cz }; } return null; },
+      vec: (x, y, z) => new BABYLON.Vector3(x, y, z), scene: state.scene, BABYLON: window.BABYLON };
+  }
+  // what a module's listeners and timers are, so reset() stops them
+  const listeners = [], timers = [];
+  const invOf = who => who === state.playerAvatar || who === 'player' ? state.player : charInventory(who);
+  function giveItem(who, item, n) {
+    const inv = invOf(who); if (!inv) return false;
+    for (let i = 0; i < n; i++) addItem(inv.items ||= [], String(item));
+    if (who !== state.playerAvatar && who !== 'player') setBrainConfig(who.id, { inventory: inv });
+    inventoryChanged(); return true;
+  }
+  function takeItem(who, item, n) {
+    const inv = invOf(who), it = inv && findItem(inv.items || [], String(item));
+    if (!it || (it.qty ?? 1) < n) return false;
+    it.qty = (it.qty ?? 1) - n; inv.items = inv.items.filter(i => (i.qty ?? 1) > 0);
+    if (who !== state.playerAvatar && who !== 'player') setBrainConfig(who.id, { inventory: inv });
+    inventoryChanged(); return true;
+  }
+  // a character a module adds (reinforcements, a visitor): a body, a place,
+  // its brain config (personality, style, hp, allowed, hostile...)
+  async function spawnCharacterAt(id, model, x, z, cfg = {}) {
+    const T = window.tablefolk; let n = 1, unique = id;
+    while (state.characters.some(c => c.id === unique)) unique = id + (++n);
+    const g = await T.spawnAgent(unique, Math.round(x), Math.round(z), cfg.facing || 's', model);
+    if (!g) return null;
+    const hp = Math.max(1, +cfg.hp || window.tablefolkBodies?.get(model)?.hp || 10);
+    T.setBrainConfig(unique, { enabled: true, style: cfg.style || model, personality: cfg.personality || `A ${String(model).replace(/_/g, ' ')}.`, mind: null, messages: [], pendingChat: [], maxHp: hp, hp, defeated: false,
+      inventory: { gold: +cfg.gold || 0, items: (cfg.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : i) }, ttsEnabled: false, allowed: cfg.allowed || null, role: cfg.role || '',
+      ...(cfg.hostile != null ? { hostile: !!cfg.hostile } : {}) });
+    return g;
   }
   function adopt(x, from) {
     for (const [name, b] of Object.entries(x?.behaviours || {})) { window.tablefolkRoles?.addBehaviour(name, b); added.behaviours.push(name); }
@@ -101,11 +167,16 @@
     Object.assign(uses, x?.uses || {});
     // a threat kind's behaviour in code (threats.js): { crows(c, ctx) { ... return true } }
     for (const [kind, fn] of Object.entries(x?.threats || {})) if (typeof fn === 'function') window.tablefolkThreats?.registerBehaviour(kind, fn);
-    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
+    // commands (skills.js addCommand): { signal: { run(g, args, ctx), help, example, allowedBy } }
+    for (const [name, c] of Object.entries(x?.commands || {})) { try { window.tablefolkSkills?.addCommand(name, c, from); added.commands.push(String(name).toLowerCase()); } catch (e) { console.warn('[packages]', e.message); } }
+    // job step kinds in code (jobs.js): { refuel(g, step, ctx) { return { done: true, ms: 3000 } } }
+    for (const [name, fn] of Object.entries(x?.steps || {})) if (typeof fn === 'function') { window.tablefolkJobs?.registerStep?.(name, fn); added.steps.push(name); }
+    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
   }
 
   // ---- loading ----
   const loaded = new Map();   // url -> promise of { id, manifest, warnings }
+  const dataOnly = new Set();   // ids of packages whose code was not run
   function load(ref, depth = 0) {
     const url = refUrl(ref, 'package');
     if (loaded.has(url)) return loaded.get(url);
@@ -120,6 +191,9 @@
         try { warnings.push(...(await load(q, depth + 1)).warnings); } catch (e) { warnings.push(e.message); }
       }
       if (m.items && window.tablefolkPacks) for (const t of window.tablefolkPacks.add({ id: m.id, items: m.items }, url) || []) added.items.add(t);
+      // bodies (bodies.js) and sounds (sfx.js): data, relative to the file
+      for (const id of window.tablefolkBodies?.addAll(m.bodies, url, m.id) || []) added.bodies.add(id);
+      for (const n of window.tablefolkSfx?.registerAll?.(m.sounds, url, m.id) || []) added.sounds.add(n);
       // uses.js kinds characters and jobs can use
       for (const [kind, def] of Object.entries(m.uses && typeof m.uses === 'object' && !Array.isArray(m.uses) ? m.uses : {})) { try { window.tablefolkUses?.register(kind, def); } catch (e) { warnings.push(`package ${m.id}: use ${kind}: ${e.message}`); } }
       // jobs (jobs.js): inline job.json manifests, or files / references
@@ -148,7 +222,7 @@
         const ok = await askTrust(m, rel(m.modules[0]));
         for (const path of m.modules) {
           const src = rel(path);
-          if (!ok || !trusted(src)) { warnings.push(`package ${m.id}: its code (${path}) was not run: not allowed`); continue; }
+          if (!ok || !trusted(src)) { warnings.push(`package ${m.id}: its code (${path}) was not run (data only: not allowed in this browser)`); dataOnly.add(m.id); continue; }
           try { const x = await import(src); adopt((x.default || x.register)?.(api()) || {}, src); }
           catch (e) { warnings.push(`package ${m.id}: ${path} failed: ${e.message}`); }
         }
@@ -160,8 +234,10 @@
     p.catch(() => loaded.delete(url));
     return p;
   }
-  async function loadAll(refs) {
+  let noAsk = false;   // a scenario played as a test (Test tactics) never asks
+  async function loadAll(refs, opts = {}) {
     const warnings = [];
+    noAsk = !!opts.testing;
     for (const r of await Promise.allSettled((refs || []).map(x => load(x)))) {
       if (r.status === 'rejected') warnings.push(r.reason?.message || String(r.reason));
       else warnings.push(...r.value.warnings);
@@ -170,8 +246,11 @@
   }
 
   // ---- using things ----
-  // Play one of a model's clips (packages' "use" and "loop"; from importPropAsset).
+  // Play one of a model's clips (packages' "use" and "loop"; from importPropAsset),
+  // or of a character's body (bodies.js): playClip(target, name, loop | { loop })
   function playClip(thing, name, loop = false) {
+    if (loop && typeof loop === 'object') loop = !!loop.loop;
+    if (thing && (thing.rigAnims || thing.root && state.characters.concat(state.playerAvatar || []).includes(thing))) return window.tablefolkBodies?.playClip(thing, name, { loop }) || (() => { try { playRig(thing, String(name), !!loop); return thing.rigMode === String(name); } catch { return false; } })();
     const anims = meta(thing)?.anims || [];
     const ag = name === true || name == null ? anims[0] : anims.find(a => a.name.toLowerCase() === String(name).toLowerCase());
     if (!ag) return false;
@@ -184,14 +263,21 @@
     if (!def) return false;
     if (typeof def === 'string') {
       const fn = uses[def];
-      if (!fn) { window.tablefolkToast?.(`Nothing happens (the ${type.replace(/_/g, ' ')} needs code that isn't loaded)`); return false; }
-      try { return !!(await fn(thing, who, api())); } catch (e) { console.warn('use', def, e); return false; }
+      if (!fn) { const t = `nothing happens: the ${type.replace(/_/g, ' ')} needs its package's code, which is not running`; if (who === state.playerAvatar || !who) window.tablefolkToast?.(t.replace(/^n/, 'N')); return who && who !== state.playerAvatar ? { fail: t } : false; }
+      // a module's use returns a string (what happened), true, false, or { fail: "why" }
+      let r; try { r = await fn(thing, who, api()); } catch (e) { console.warn('use', def, e); return false; }
+      if (who && who !== state.playerAvatar && state.characters.includes(who)) return r;
+      if (r && typeof r === 'object' && r.fail) { window.tablefolkToast?.(String(r.fail)); return false; }
+      if (typeof r === 'string') { state.globalHistory = (state.globalHistory || []).concat([`T${state.turn?.index ?? 0} player: ${r}`]).slice(-20); log(r); }
+      return !!r;
     }
     mm.opts ||= {};
     if (def.once && mm.opts.used) { window.tablefolkToast?.(`The ${type.replace(/_/g, ' ')} has already been used`); return false; }
     mm.opts.used = true;
     if (def.state) mm.state = String(def.state);
     if (def.anim) playClip(thing, def.anim, !!def.loopAnim);
+    // "who": a clip of the user's body (a character or the player): "pickup", or a body's own clip
+    if (def.who && who) playClip(who, def.who);
     if (def.sound) window.tablefolkSfx?.play(def.sound, thing.getAbsolutePosition?.() || thing.position);
     // the player, or a character (uses.js: use(thing) and jobs): what it gives goes to whoever used it
     const npc = who && who !== state.playerAvatar && state.characters.includes(who);
@@ -211,7 +297,7 @@
   // Forget what the last scenario's packages brought (scenario.js, before
   // this one's load): they load again, fresh, if this scenario names them.
   function reset() {
-    loaded.clear();
+    loaded.clear(); dataOnly.clear();
     for (const k of Object.keys(uses)) delete uses[k];
     for (const k of Object.keys(workflows)) delete workflows[k];
     const items = window.tablefolkPacks?.items || {};
@@ -219,10 +305,16 @@
     for (const n of added.behaviours) window.tablefolkRoles?.removeBehaviour?.(n);
     for (const n of added.cards) delete window.tablefolkSkills?.cards?.[n];
     for (const n of added.effects) delete window.tablefolkSkills?.effects?.[n];
-    added.items.clear(); added.behaviours.length = 0; added.cards.length = 0; added.effects.length = 0;
+    for (const n of added.commands) window.tablefolkSkills?.removeCommand?.(n);
+    for (const n of added.steps) window.tablefolkJobs?.removeStep?.(n);
+    for (const id of added.bodies) window.tablefolkBodies?.remove(id);
+    for (const n of added.sounds) window.tablefolkSfx?.unregister?.(n);
+    for (const [e, fn] of listeners.splice(0)) removeEventListener(e, fn);
+    for (const t of timers.splice(0)) clearInterval(t);
+    added.items.clear(); added.bodies.clear(); added.sounds.clear(); added.behaviours.length = 0; added.cards.length = 0; added.effects.length = 0; added.commands.length = 0; added.steps.length = 0;
     window.tablefolkUses?.resetRegistered?.();
     window.tablefolkJobs?.resetPackaged?.();
     window.tablefolkThreats?.resetPackaged?.();
   }
-  window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, useThing, playClip, uses, workflows, ROOT };
+  window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, askTrust, api, useThing, playClip, uses, workflows, ROOT, dataOnly, loaded };
 })();

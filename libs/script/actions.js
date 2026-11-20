@@ -10,11 +10,13 @@
 //   start     starts a workflow on the character: "riddle" or { "name": "riddle", "input": "..." }
 //             ("workflow": the same, the name menus used first)
 //   stop      stops the character's workflow (true)
+//   anim      a clip the character's body plays ("howl", "pickup"): host.anim(actorId, name)
+//   sound     a named sound: host.sound(actorId, name)
 // Texts take {{player}}, {{me}}, {{world.flag}}, {{player.gold}}, run variables.
 //
 //   await perform(actions, { host, state, me, vars, runner, triggers }) -> { ok, missing?, started? }
 // host: { run(actorId, line) -> Promise<{ tookTurn }>, transfer(from, to, item) -> bool,
-//         playerSays?(actorId, text), scope(me, vars) -> expr scope }
+//         playerSays?(actorId, text), scope(me, vars) -> expr scope, anim?(actorId, name), sound?(actorId, name) }
 import { render, applyValue, findItem } from './expr.js';
 
 // "+1" adds to what was there; "3+1" (a rendered "{{tries}}+1") is worked out
@@ -44,6 +46,9 @@ export async function perform(a, ctx) {
   for (const l of [].concat(a.act ?? [])) lines.push(t(l));
   if (a.give != null) lines.push(`give(${t(a.give)})`);
   for (const line of lines) if (me) await host.run(me, line);
+  // a clip of the character's body and a sound (the host plays them, if it can)
+  if (a.anim != null && me) await host.anim?.(me, t(a.anim));
+  if (a.sound != null) await host.sound?.(me, t(a.sound));
   if (a.stop && runner && me) runner.stop(me, 'stopped');
   let started = null;
   const startRef = a.start ?? a.workflow;   // "workflow": the menu field's older name

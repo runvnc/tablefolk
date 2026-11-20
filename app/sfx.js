@@ -16,6 +16,11 @@
  * synthesized, as are all of them until the samples have loaded.
  *   window.tablefolkSfx.voiceBuffer(bank)  a random recorded cry or call from
  *       a voice bank (null until loaded; reactions.js plays them)
+ *   window.tablefolkSfx.register(name, url | [urls]) / registerAll(map, baseUrl, from)
+ *       a pack's or package's "sounds" (packages.js, packs.js): play(name)
+ *       finds them first; unregister(name) (a package's reset)
+ *   window.tablefolkSfx.requested         the last 50 play() calls ({ name, at }),
+ *       played or not (tests: "was the howl asked for")
  */
 (function () {
   let ctx = null, master = null, noiseBuf = null;
@@ -188,9 +193,42 @@
     step(out, t) { noise(t, .07, { type: 'lowpass', freq: 420, gain: .18 }).connect(out); },
   };
 
+  // Sounds a pack or package names ("sounds": { "howl": "sounds/howl.ogg" }):
+  // fetched and decoded on first play, cached; they win over the built-in
+  // names. A list of files is a bank: one picked at random each time.
+  const REG = {};   // name -> { urls, from, bufs: Promise<AudioBuffer[]> | null }
+  function register(name, url, from = '') {
+    name = String(name);
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(name)) throw new Error(`sound "${name}": use letters, digits, _ and -`);
+    REG[name] = { urls: [].concat(url).map(String), from, bufs: null };
+    return name;
+  }
+  function registerAll(map, baseUrl = location.href, from = '') {
+    const out = [];
+    for (const [name, src] of Object.entries(map && typeof map === 'object' ? map : {})) {
+      try { out.push(register(name, [].concat(src).map(u => new URL(u, baseUrl).href), from)); } catch (e) { console.warn('[sfx]', e.message); }
+    }
+    return out;
+  }
+  const unregister = name => { delete REG[name]; };
+  function registered(name, out, t) {
+    const r = REG[name]; if (!r) return false;
+    r.bufs ||= Promise.all(r.urls.map(u => fetch(u).then(x => x.ok ? x.arrayBuffer() : Promise.reject(x.status)).then(b => ctx.decodeAudioData(b)).catch(e => { console.warn('[sfx] sound', name, u, e); return null; }))).then(l => l.filter(Boolean));
+    r.bufs.then(list => {
+      if (!list.length) return;
+      const src = ctx.createBufferSource(); src.buffer = list[Math.floor(Math.random() * list.length)];
+      src.connect(out); src.start(Math.max(t, ctx.currentTime));
+      setTimeout(() => { try { out.disconnect(); } catch {} }, src.buffer.duration * 1000 + 500);
+    });
+    return true;
+  }
+  // every sound asked for, played or not (muted, no audio yet): tests and the dev console
+  const requested = [];
   function play(name, pos) {
-    if (!enabled || !SOUNDS[name]) return;
+    requested.push({ name: String(name), at: Date.now() }); if (requested.length > 50) requested.shift();
+    if (!enabled || (!SOUNDS[name] && !REG[name])) return;
     if (!audio() || ctx.state !== 'running') return;
+    if (REG[name]) { const v = volumeAt(pos); if (v < .02) return; const out = ctx.createGain(); out.gain.value = v; out.connect(master); registered(name, out, ctx.currentTime); return; }
     const v = volumeAt(pos); if (v < .02) return;
     const out = ctx.createGain(); out.gain.value = v; out.connect(master);
     try { (SAMPLES[name] && sample(name, out, ctx.currentTime)) || SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
@@ -198,7 +236,8 @@
   }
 
   window.tablefolkSfx = {
-    play, voiceBuffer,
+    play, voiceBuffer, register, registerAll, unregister, requested, has: name => !!(SOUNDS[name] || REG[name]),
+    get names() { return [...Object.keys(REG), ...Object.keys(SOUNDS)]; },
     // spells.js builds its own 3D (HRTF) sounds on the same context:
     // { ctx, master, noise } once audio is running, else null.
     context() { return enabled && audio() && ctx.state === 'running' ? { ctx, master, noise: noiseBuf } : null; },

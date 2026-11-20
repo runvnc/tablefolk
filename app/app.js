@@ -3487,7 +3487,7 @@ function parseLLMCommandLine(line){
   if(name==='sell') return parseSellArgs(m[2]);
   if(name==='note') return {kind:'note',html:arg||''};
   if(name==='touch') return {kind:'touch',target:arg||''};
-  if(name==='emote') return {kind:'emote',emote:(arg.split(',')[0]||'dance').trim().toLowerCase()||'dance'};
+  if(name==='emote') return {kind:'emote',emote:(arg.split(',')[0]||'dance').trim().toLowerCase()||'dance',loop:/^\s*(loop|true|on)\s*$/i.test(arg.split(',')[1]||'')};
   // carry(note), dig(north), push(barrel): the thing (or way) named, if any
   if(['carry','dig','push','pull','repair'].includes(name)) return {kind:name,target:String(arg||'').trim().replace(/^["']|["']$/g,'')};
   if(['look','drop','throw','panic','inventory'].includes(name)) return {kind:name};
@@ -3500,7 +3500,7 @@ function parseLLMCommandLine(line){
 // what a seated or lying character does without getting up (uses.js)
 const SEATED_OK=new Set(['say','whisper','look','inventory','goal','remember','feel','eat','emote','give_quest','note','workflow']);
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); if(g.pose && !SEATED_OK.has(cmd.kind)) window.tablefolkUses?.standUp(g); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark',cmd.target||''); case 'spawn': return window.tablefolkSpells?.spawn(g,cmd.thing||'',cmd.count); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price,cmd.to||''); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : quietFail(g,`no routine called ${cmd.name}`); case 'unknown': return quietFail(g,cmd.text||'unknown command'); default: return quietFail(g,'unknown command object'); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance',!!cmd.loop); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark',cmd.target||''); case 'spawn': return window.tablefolkSpells?.spawn(g,cmd.thing||'',cmd.count); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price,cmd.to||''); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : quietFail(g,`no routine called ${cmd.name}`); case 'unknown': return quietFail(g,cmd.text||'unknown command'); default: return quietFail(g,'unknown command object'); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -3878,9 +3878,11 @@ function build(g,thing='wall',at=null){
   say(g,'built '+thing+' at ('+x+','+z+')'); updatePerceptionUI(); saveWorldState();
 }
 function panic(g){ g.anim='panic'; playRig(g,'panic',true); say(g,`${g.id} panics and runs in circles`); if(!isTurnMode()){ for(let i=0;i<5;i++) setTimeout(()=>{ const v=new BABYLON.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(); g.collider.physicsBody?.applyImpulse(v.scale(1.15),g.collider.position); },i*160); } else emitBadge(g,'panic'); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); zeroMeshMotion(g.collider); },1050); }
-function emote(g,name){
+function emote(g,name,loop=false){
   const valid=['dance','laugh','sit','wave','clap','cheer','sleep','bow'];
   name=String(name||'dance').toLowerCase().replace(/^["']|["']$/g,'').trim();
+  // a body's own emotes (a pack's or package's "emotes": howl, bow...): its clip, once or looping (bodies.js)
+  if(window.tablefolkBodies?.emote(g,name,loop)) return;
   // sit / sleep beside a seat or bed: on it (uses.js)
   if(window.tablefolkUses?.emoteUse(g,/sleep|nap|bed|lie|tired|yawn|doze|exhaust/.test(name)?'sleep':/sit|seat|bench|chair|rest/.test(name)?'sit':name)) return;
   // Models invent emotes (frown, smile, nod, gossip): the nearest real one,
@@ -4541,7 +4543,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('face')) ex.push('face(direction) e.g. face(n) - rotate without moving (n/s/e/w)');
   if(allowed.has('repair')) ex.push('repair()');
   if(allowed.has('panic')) ex.push('panic()');
-  if(allowed.has('emote')) ex.push('emote(name) e.g. emote(dance) - dance, laugh, sit, wave, clap, cheer, sleep, bow');
+  if(allowed.has('emote')) ex.push('emote(name) e.g. emote(dance) - '+(window.tablefolkBodies?.emotesOf(g)||['dance','laugh','sit','wave','clap','cheer','sleep','bow']).join(', '));
   if(allowed.has('spell.push')) ex.push('spell(push)');
   if(allowed.has('spell.spark')) ex.push('spell(spark)');
   if(allowed.has('spell.fireball')) ex.push('spell(fireball)');
@@ -5070,7 +5072,9 @@ function standOnFeet(g,inner){
 async function createFigure(id,pos,model,label){
   const F=FIGURES[model], sc=state.scene;
   // dir: another folder under characters/ (meshy: made with Meshy via fal.ai, tools/fal-monster.py)
-  const res=await BABYLON.SceneLoader.ImportMeshAsync('',F.dir?ASSET_BASE+'models/characters/'+F.dir+'/':FIG_ASSET,(F.file||model)+'.glb?v='+(F.v||'20261022a'),sc);
+  // url: a body from a pack or package (bodies.js), any glTF/GLB
+  const res=F.url ? await BABYLON.SceneLoader.ImportMeshAsync('',F.url.slice(0,F.url.lastIndexOf('/')+1),F.url.slice(F.url.lastIndexOf('/')+1)+(F.url.includes('?')?'':'?v='+(F.v||'1')),sc)
+    : await BABYLON.SceneLoader.ImportMeshAsync('',F.dir?ASSET_BASE+'models/characters/'+F.dir+'/':FIG_ASSET,(F.file||model)+'.glb?v='+(F.v||'20261022a'),sc);
   const root=new BABYLON.TransformNode(id,sc); root.position.copyFrom(pos);
   const importedRoot=res.meshes.find(m=>m.name==='__root__') || res.meshes[0];
   // like KayKit people: glTF front is +Z; zero yaw must face north (-Z)
@@ -5092,6 +5096,7 @@ async function createFigure(id,pos,model,label){
   // model's own Attack suits the weapon it was made with)
   const rigAnims={...clips};
   for(const [want,from] of Object.entries(FIG_CLIPS)){ if(clips[want] && !/^Melee_/.test(want)) continue; const hit=from.map(n=>clips[n]).find(Boolean); if(hit) rigAnims[want]=hit; }
+  if(F.clips) window.tablefolkBodies?.mapClips(F,clips,rigAnims);   // a pack's or package's body: its own clip map
   // size to its height in cells
   root.computeWorldMatrix(true);
   const bb=root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0);
@@ -5099,7 +5104,7 @@ async function createFigure(id,pos,model,label){
   // big ones block all the squares under them (bigBodyAt): half length and
   // width and the centre's offset, in the body's own frame (it faces -z here)
   const ex=(bb.max.x-bb.min.x)*k/2, ez=(bb.max.z-bb.min.z)*k/2;
-  const footHalf=Math.max(ex,ez)>.8 ? [ex*.85,ez*.85,((bb.max.x+bb.min.x)/2-root.position.x)*k,((bb.max.z+bb.min.z)/2-root.position.z)*k] : null;
+  const footHalf=F.footprint ? [F.footprint[0]/2,F.footprint[1]/2,0,0] : Math.max(ex,ez)>.8 ? [ex*.85,ez*.85,((bb.max.x+bb.min.x)/2-root.position.x)*k,((bb.max.z+bb.min.z)/2-root.position.z)*k] : null;
   importedRoot.position.y=(-(bb.min.y-root.position.y)+(F.lift||0)/k);
   const wide=Math.max(.4,Math.min(1.1,F.h*.55));
   const collider=BABYLON.MeshBuilder.CreateBox(id+'_collider',{width:wide,height:Math.max(.4,Math.min(1.4,F.h)),depth:wide},sc);
@@ -5650,7 +5655,7 @@ function installWorldAPI(){
   const prior=window.tablefolk||{};
   window.tablefolk={...prior,ready:true,state,log,parseCommand,parseLLMCommandLine,startHandover,faceToward,
     getAgents:()=>state.characters.slice(), getSelectedAgent:()=>state.selected,
-    getBrainConfig, setBrainConfig, refreshAgentSelect, isPersonModel:m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m] && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep|wolf|wyrmling|imp|mushroom_warrior|bunny|snake|wasp|frog|skeleton.*|troll|orc.*|demon|giant|rat|spider|bat|dragon|ghost|slime|minotaur|lizardman|werewolf|mummy|ogre|gnoll|lich|bear|red_dragon|gargoyle|dark_knight|zombie_classic|kobold_classic|demon_classic|giant_classic|imp_classic)$/.test(m))), isFemaleModel:m=>FEMALE_MODELS.has(m),
+    getBrainConfig, setBrainConfig, refreshAgentSelect, isPersonModel:m=>!!(m && (AVATAR_MODELS[m] || FIGURES[m] && !(FIGURES[m].kind && FIGURES[m].kind!=='person') && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep|wolf|wyrmling|imp|mushroom_warrior|bunny|snake|wasp|frog|skeleton.*|troll|orc.*|demon|giant|rat|spider|bat|dragon|ghost|slime|minotaur|lizardman|werewolf|mummy|ogre|gnoll|lich|bear|red_dragon|gargoyle|dark_knight|zombie_classic|kobold_classic|demon_classic|giant_classic|imp_classic)$/.test(m))), isFemaleModel:m=>FEMALE_MODELS.has(m),
     getAllowedCommands:(agentId=null)=>Array.from(commandsFor(state.characters.find(x=>x.id===agentId))), allowedFor, commandsFor, canRun,
     getAgentPerception:(agentId=null,radius=7)=>buildVisiblePerception(agentId,radius), buildVisiblePerception,
     parseInventoryItems, formatInventoryItems, getPlayer:()=>state.player,
