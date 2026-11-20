@@ -23,7 +23,7 @@
     {
       "type": "SCALAR",
       "componentType": 5123,
-      "count": 6456,
+      "count": 7152,
       "normalized": false,
       "byteOffset": 2910,
       "bufferView": 0
@@ -65,15 +65,15 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 2421,
+      "count": 2682,
       "max": [
-        30839,
-        25379,
+        32479,
+        25059,
         32767
       ],
       "min": [
-        -30839,
-        -25379,
+        -32479,
+        -25059,
         -32767
       ],
       "normalized": true,
@@ -83,7 +83,7 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 2421,
+      "count": 2682,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 6
@@ -91,7 +91,7 @@
     {
       "type": "VEC2",
       "componentType": 5123,
-      "count": 2421,
+      "count": 2682,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 7
@@ -99,7 +99,7 @@
     {
       "type": "VEC3",
       "componentType": 5121,
-      "count": 2421,
+      "count": 2682,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 8
@@ -109,29 +109,29 @@
     {
       "buffer": 1,
       "byteOffset": 0,
-      "byteLength": 15822,
+      "byteLength": 17214,
       "target": 34963,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
           "byteOffset": 0,
-          "byteLength": 2724,
+          "byteLength": 2956,
           "mode": "TRIANGLES",
           "byteStride": 2,
-          "count": 7911
+          "count": 8607
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 15824,
+      "byteOffset": 17216,
       "byteLength": 2488,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 2724,
+          "byteOffset": 2956,
           "byteLength": 1866,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -141,14 +141,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 18312,
+      "byteOffset": 19704,
       "byteLength": 2488,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 4592,
+          "byteOffset": 4824,
           "byteLength": 1623,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -158,14 +158,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 20800,
+      "byteOffset": 22192,
       "byteLength": 2488,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 6216,
+          "byteOffset": 6448,
           "byteLength": 1945,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -175,14 +175,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 23288,
+      "byteOffset": 24680,
       "byteLength": 1244,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 8164,
+          "byteOffset": 8396,
           "byteLength": 704,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
@@ -192,69 +192,69 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 24532,
-      "byteLength": 19368,
+      "byteOffset": 25924,
+      "byteLength": 21456,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 8868,
-          "byteLength": 14871,
+          "byteOffset": 9100,
+          "byteLength": 16475,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 2421
+          "count": 2682
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 43900,
-      "byteLength": 19368,
+      "byteOffset": 47380,
+      "byteLength": 21456,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 23740,
-          "byteLength": 14881,
+          "byteOffset": 25576,
+          "byteLength": 16484,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 2421
+          "count": 2682
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 63268,
-      "byteLength": 9684,
+      "byteOffset": 68836,
+      "byteLength": 10728,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 38624,
-          "byteLength": 8356,
+          "byteOffset": 42060,
+          "byteLength": 9251,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
-          "count": 2421
+          "count": 2682
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 72952,
-      "byteLength": 9684,
+      "byteOffset": 79564,
+      "byteLength": 10728,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 46980,
-          "byteLength": 7394,
+          "byteOffset": 51312,
+          "byteLength": 8211,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
-          "count": 2421
+          "count": 2682
         }
       }
     }
@@ -326,10 +326,10 @@
   "buffers": [
     {
       "uri": "flower_bush.bin",
-      "byteLength": 54376
+      "byteLength": 59524
     },
     {
-      "byteLength": 82636,
+      "byteLength": 90292,
       "extensions": {
         "EXT_meshopt_compression": {
           "fallback": true
@@ -424,14 +424,14 @@
     {
       "name": "flower_bush_leaves",
       "translation": [
-        -0.07220858335494995,
-        0.6529697366058826,
-        0.008669257164001465
+        -0.05566456913948059,
+        0.6321800518780947,
+        0.007949769496917725
       ],
       "scale": [
-        0.9332377910614014,
-        0.9332377910614014,
-        0.9332377910614014
+        0.8901651501655579,
+        0.8901651501655579,
+        0.8901651501655579
       ],
       "mesh": 1
     }

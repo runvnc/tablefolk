@@ -279,7 +279,7 @@ def build_cards(spec, samples, branch_kd, crown, light, scale):
         sub = random.Random(5).sample(pts, min(3000, len(pts)))
         LC, _, _, lkd = kmeans(sub, lobes)
         lr = random.Random(spec.get('seed', 0))
-        shrink = [lr.uniform(0.62, 0.82) for _ in LC]
+        shrink = [lr.uniform(0.68, 0.86) for _ in LC]
         pts = [LC[i] + (p - LC[i]) * shrink[i] for p in pts for i in (lkd.find(p)[1],)]
     dmin = size * 0.22
     sel = poisson(list(pts), dmin, 10 ** 9)

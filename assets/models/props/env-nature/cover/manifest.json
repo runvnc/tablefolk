@@ -1,0 +1,39 @@
+{
+ "about": "Ground cover for the medium/high tiers (tools/blender/make-cover-atlas.py, make-cover.py). Each file holds one node per kind, all at the origin (instance sources). Units metres, +Y up.",
+ "meadow_mean_hex": "#51652c",
+ "files": {
+  "grass_tufts.gltf": {
+   "nodes": [
+    "tuft_fine",
+    "tuft_wispy",
+    "tuft_clump",
+    "tuft_broad"
+   ],
+   "size_m": "0.5-0.62 wide, 0.36-0.47 high",
+   "note": "three crossed cards each, normals straight up (lit like the ground), roots darkened by COLOR_0; colour matched to grass_meadow's mean"
+  },
+  "flowers.gltf": {
+   "nodes": [
+    "flower_daisy",
+    "flower_yellow",
+    "flower_blue"
+   ],
+   "size_m": "0.4 wide, 0.3 high",
+   "note": "white daisy-like, yellow (celandine), violet-blue; three crossed cards, up normals"
+  },
+  "pebbles.gltf": {
+   "nodes": [
+    "pebble_a",
+    "pebble_b",
+    "pebble_c",
+    "pebble_d",
+    "pebble_e"
+   ],
+   "size_m": "0.05-0.14",
+   "note": "vertex-coloured stones, 320 triangles each, no texture"
+  }
+ },
+ "textures": {
+  "cover_atlas.avif": 277686
+ }
+}

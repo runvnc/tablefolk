@@ -71,7 +71,7 @@ def pebble(name, seed, size, mat):
     col = bm.verts.layers.float_color.new('Col')
     sx, sy, sz = rnd.uniform(0.8, 1.2), rnd.uniform(0.6, 1.0), rnd.uniform(0.35, 0.6)
     off = Vector((rnd.uniform(0, 50), rnd.uniform(0, 50), rnd.uniform(0, 50)))
-    base = Vector((rnd.uniform(0.42, 0.55), rnd.uniform(0.4, 0.5), rnd.uniform(0.34, 0.44)))
+    base = Vector((rnd.uniform(0.19, 0.26), rnd.uniform(0.18, 0.23), rnd.uniform(0.15, 0.2)))   # linear
     for v in bm.verts:
         n = noise.noise(v.co * 1.3 + off) * 0.22 + noise.noise(v.co * 3.1 + off) * 0.06
         c = v.co * (1 + n); c.x *= sx; c.y *= sy; c.z *= sz
@@ -91,6 +91,7 @@ def stone_material():
     m = bpy.data.materials.new('pebble'); m.use_nodes = True; nt = m.node_tree
     b = nt.nodes['Principled BSDF']; va = nt.nodes.new('ShaderNodeVertexColor'); va.layer_name = 'Col'
     nt.links.new(va.outputs['Color'], b.inputs['Base Color']); b.inputs['Roughness'].default_value = 0.88
+    m.use_backface_culling = True
     return m
 
 

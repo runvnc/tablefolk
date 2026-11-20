@@ -20,7 +20,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 rnd = random.Random(3)
 
-render_trees = {}
+render_trees = {'__file__': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'render-trees.py')}
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'render-trees.py')).read().split("os.makedirs(OUTD, exist_ok=True)")[0]
      .replace("bpy.ops.wm.read_factory_settings(use_empty=True)", ""), render_trees)
 imp, group, figure, light_and_sky, settings, camera, shoot, matte_all = (render_trees[k] for k in
@@ -33,7 +33,7 @@ def tile_m(name, d=2.0):
         items = man.get('materials', man) if isinstance(man, dict) else man
         for it in (items.values() if isinstance(items, dict) else items):
             if it.get('name') == name:
-                for k in ('tile_m', 'tile_size_m', 'tileSize', 'tile_size', 'size_m'):
+                for k in ('tileMeters', 'tile_m', 'tile_size_m', 'tileSize'):
                     if k in it: return float(it[k])
     except Exception as e: print('manifest', e)
     return d
@@ -97,6 +97,10 @@ cover = {}
 for f in ('grass_tufts', 'flowers', 'pebbles'):
     for o in imp(os.path.join(WORK, 'cover', f + '.gltf')):
         if o.type == 'MESH': cover[o.name.split('.')[0]] = o.data; bpy.data.objects.remove(o)
+for k, me in cover.items():   # Blender's importer leaves COLOR_0 unused on untextured materials: wire it up
+    if k.startswith('pebble'):
+        nt = me.materials[0].node_tree; b = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
+        va = nt.nodes.new('ShaderNodeVertexColor'); va.layer_name = me.color_attributes[0].name; nt.links.new(va.outputs['Color'], b.inputs['Base Color'])
 
 
 def put(mesh, x, y, s, r):
@@ -119,7 +123,7 @@ for c in range(16):   # flowers in loose drifts
     cx, cy = rnd.uniform(-9, 9), rnd.uniform(-9, 13); kind = rnd.choice(flowers)
     for k in range(rnd.randint(3, 8)):
         x, y = cx + rnd.gauss(0, 0.8), cy + rnd.gauss(0, 0.8)
-        if not on_path(x, y): put(kind, x, y, rnd.uniform(0.8, 1.2), rnd.uniform(0, 6.3)); n_f += 1
+        if not on_path(x, y): put(kind, x, y, rnd.uniform(1.0, 1.5), rnd.uniform(0, 6.3)); n_f += 1
 for i in range(70):
     y = rnd.uniform(-10, 14); x = path_x(y) + rnd.choice((-1, 1)) * rnd.uniform(0.6, 1.8)
     put(rnd.choice(pebbles), x, y, rnd.uniform(0.6, 1.4), rnd.uniform(0, 6.3)); n_p += 1

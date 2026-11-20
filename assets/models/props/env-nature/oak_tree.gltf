@@ -23,7 +23,7 @@
     {
       "type": "SCALAR",
       "componentType": 5123,
-      "count": 16800,
+      "count": 16536,
       "normalized": false,
       "byteOffset": 17892,
       "bufferView": 0
@@ -65,16 +65,16 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 6300,
+      "count": 6201,
       "max": [
         32767,
-        20374,
-        25211
+        20126,
+        24811
       ],
       "min": [
         -32767,
-        -20374,
-        -25211
+        -20126,
+        -24811
       ],
       "normalized": true,
       "byteOffset": 0,
@@ -83,7 +83,7 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 6300,
+      "count": 6201,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 6
@@ -91,7 +91,7 @@
     {
       "type": "VEC2",
       "componentType": 5123,
-      "count": 6300,
+      "count": 6201,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 7
@@ -99,7 +99,7 @@
     {
       "type": "VEC3",
       "componentType": 5121,
-      "count": 6300,
+      "count": 6201,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 8
@@ -109,29 +109,29 @@
     {
       "buffer": 1,
       "byteOffset": 0,
-      "byteLength": 51492,
+      "byteLength": 50964,
       "target": 34963,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
           "byteOffset": 0,
-          "byteLength": 8980,
+          "byteLength": 8892,
           "mode": "TRIANGLES",
           "byteStride": 2,
-          "count": 25746
+          "count": 25482
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 51492,
+      "byteOffset": 50964,
       "byteLength": 15584,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 8980,
+          "byteOffset": 8892,
           "byteLength": 11622,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -141,14 +141,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 67076,
+      "byteOffset": 66548,
       "byteLength": 15584,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 20604,
+          "byteOffset": 20516,
           "byteLength": 9939,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -158,14 +158,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 82660,
+      "byteOffset": 82132,
       "byteLength": 15584,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 30544,
+          "byteOffset": 30456,
           "byteLength": 11979,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
@@ -175,14 +175,14 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 98244,
+      "byteOffset": 97716,
       "byteLength": 7792,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 42524,
+          "byteOffset": 42436,
           "byteLength": 3712,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
@@ -192,69 +192,69 @@
     },
     {
       "buffer": 1,
-      "byteOffset": 106036,
-      "byteLength": 50400,
+      "byteOffset": 105508,
+      "byteLength": 49608,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 46236,
-          "byteLength": 37294,
+          "byteOffset": 46148,
+          "byteLength": 36539,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 6300
+          "count": 6201
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 156436,
-      "byteLength": 50400,
+      "byteOffset": 155116,
+      "byteLength": 49608,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 83532,
-          "byteLength": 38566,
+          "byteOffset": 82688,
+          "byteLength": 37977,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 6300
+          "count": 6201
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 206836,
-      "byteLength": 25200,
+      "byteOffset": 204724,
+      "byteLength": 24804,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 122100,
-          "byteLength": 22934,
+          "byteOffset": 120668,
+          "byteLength": 22587,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
-          "count": 6300
+          "count": 6201
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 232036,
-      "byteLength": 25200,
+      "byteOffset": 229528,
+      "byteLength": 24804,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 145036,
-          "byteLength": 19188,
+          "byteOffset": 143256,
+          "byteLength": 18886,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
-          "count": 6300
+          "count": 6201
         }
       }
     }
@@ -326,10 +326,10 @@
   "buffers": [
     {
       "uri": "oak_tree.bin",
-      "byteLength": 164224
+      "byteLength": 162144
     },
     {
-      "byteLength": 257236,
+      "byteLength": 254332,
       "extensions": {
         "EXT_meshopt_compression": {
           "fallback": true
@@ -424,14 +424,14 @@
     {
       "name": "oak_tree_leaves",
       "translation": [
-        -0.32240962982177734,
-        5.451131820678711,
-        0.018004655838012695
+        -0.41199707984924316,
+        5.373909950256348,
+        0.08704566955566406
       ],
       "scale": [
-        6.053903579711914,
-        6.053903579711914,
-        6.053903579711914
+        6.1807591915130615,
+        6.1807591915130615,
+        6.1807591915130615
       ],
       "mesh": 1
     }

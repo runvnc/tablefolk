@@ -9,11 +9,11 @@
     "full": "oak_tree.gltf",
     "light": "oak_tree.med.gltf"
    },
-   "height_m": 9.22,
-   "canopy_radius_m": 6.69,
+   "height_m": 9.17,
+   "canopy_radius_m": 6.87,
    "triangles": {
-    "full": 8582,
-    "light": 2448
+    "full": 8494,
+    "light": 2452
    },
    "variants": [
     "oak_tree_b",
@@ -34,11 +34,11 @@
     "full": "oak_tree_b.gltf",
     "light": "oak_tree_b.med.gltf"
    },
-   "height_m": 8.71,
-   "canopy_radius_m": 6.17,
+   "height_m": 8.84,
+   "canopy_radius_m": 6.14,
    "triangles": {
-    "full": 8031,
-    "light": 2461
+    "full": 8591,
+    "light": 2477
    },
    "textures": [
     "jolcham_oak_bark_01_diff.avif",
@@ -55,11 +55,11 @@
     "full": "oak_tree_c.gltf",
     "light": "oak_tree_c.med.gltf"
    },
-   "height_m": 8.41,
-   "canopy_radius_m": 7.28,
+   "height_m": 8.39,
+   "canopy_radius_m": 7.29,
    "triangles": {
-    "full": 8268,
-    "light": 2342
+    "full": 8172,
+    "light": 2478
    },
    "textures": [
     "jolcham_oak_bark_01_diff.avif",
@@ -76,11 +76,11 @@
     "full": "tree.gltf",
     "light": "tree.med.gltf"
    },
-   "height_m": 7.68,
-   "canopy_radius_m": 5.37,
+   "height_m": 7.78,
+   "canopy_radius_m": 5.4,
    "triangles": {
-    "full": 6447,
-    "light": 2045
+    "full": 6663,
+    "light": 2009
    },
    "textures": [
     "bark_brown_02_diff.avif",
@@ -97,11 +97,11 @@
     "full": "tall_tree.gltf",
     "light": "tall_tree.med.gltf"
    },
-   "height_m": 12.19,
-   "canopy_radius_m": 4.47,
+   "height_m": 12.14,
+   "canopy_radius_m": 4.39,
    "triangles": {
-    "full": 7478,
-    "light": 2144
+    "full": 7374,
+    "light": 2100
    },
    "textures": [
     "leaves_broadleaf.avif",
@@ -118,11 +118,11 @@
     "full": "autumn_tree.gltf",
     "light": "autumn_tree.med.gltf"
    },
-   "height_m": 8.02,
-   "canopy_radius_m": 5.78,
+   "height_m": 7.98,
+   "canopy_radius_m": 5.85,
    "triangles": {
-    "full": 6950,
-    "light": 1944
+    "full": 6902,
+    "light": 2048
    },
    "textures": [
     "bark_brown_02_diff.avif",
@@ -247,11 +247,11 @@
     "full": "flower_bush.gltf",
     "light": "flower_bush.med.gltf"
    },
-   "height_m": 1.38,
-   "canopy_radius_m": 1.04,
+   "height_m": 1.31,
+   "canopy_radius_m": 1.06,
    "triangles": {
-    "full": 2637,
-    "light": 718
+    "full": 2869,
+    "light": 714
    },
    "textures": [
     "bark_brown_02_diff.avif",
@@ -269,10 +269,10 @@
     "light": "red_bush.med.gltf"
    },
    "height_m": 1.26,
-   "canopy_radius_m": 0.95,
+   "canopy_radius_m": 0.99,
    "triangles": {
-    "full": 2437,
-    "light": 593
+    "full": 2701,
+    "light": 665
    },
    "textures": [
     "bark_brown_02_diff.avif",
