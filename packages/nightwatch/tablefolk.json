@@ -1,0 +1,95 @@
+{
+  "id": "nightwatch",
+  "name": "Night Watch",
+  "version": "1.0.0",
+  "description": "A small game as a package: a signal beacon to keep burning through the night, a keeper's job, a woodpile that runs down, dire wolves that circle while the fire burns and close in when it dies, a signal() command that calls the militia, and the captain's briefing.",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "game", "threats", "jobs"],
+
+  "items": {
+    "signal_beacon": {
+      "file": "models/beacon.glb", "w": 1.1, "h": 0.3, "d": 0.98, "fit": "footprint", "static": true,
+      "material": "stone", "tags": ["camp", "fort"], "aliases": ["beacon", "signal_fire"],
+      "use": "tend_beacon"
+    },
+    "woodpile": {
+      "file": "models/woodpile.glb", "w": 1.3, "h": 0.45, "d": 0.8, "fit": "footprint", "static": true, "flammable": true,
+      "tags": ["camp", "fort"], "aliases": ["log_pile"],
+      "stock": { "item": "firewood", "count": 6, "regrow": 0 },
+      "gather": { "gives": "firewood", "time": 3, "anim": "pickup", "verb": "takes {a} from the {t}" }
+    }
+  },
+
+  "bodies": {
+    "dire_wolf": {
+      "model": "models/dire_wolf.glb", "h": 0.95, "kind": "monster", "mindless": true, "gender": "m",
+      "clips": { "idle": "Idle", "walk": "Walk", "run": "Gallop", "attack": "Attack", "hit": "Idle_HitReact_Left",
+                 "death": "Death", "eat": "Eating", "howl": "Idle_2" },
+      "emotes": ["howl"],
+      "natural": { "dmg": 3, "name": "great fangs" }, "hp": 8
+    }
+  },
+
+  "sounds": { "howl": "sounds/howl.ogg" },
+
+  "skills": {
+    "watchkeeping": {
+      "name": "Watchkeeping",
+      "description": "Keeps the fort's beacon: its state on the card, and kindle() to feed it.",
+      "prompt": "You keep the watch at the hill fort. The beacon must burn all night: wolves fear it.",
+      "card": ["beacon"],
+      "commands": {
+        "kindle": { "usage": "kindle()", "help": "feed the beacon a log of firewood (stand next to it)",
+                    "target": "none", "needs": "firewood",
+                    "effects": [{ "take": "firewood" }, { "kindle": 3 }],
+                    "text": "{{me}} feeds the beacon a log" }
+      }
+    }
+  },
+
+  "jobs": {
+    "beacon_keeper": {
+      "name": "Beacon keeper",
+      "match": "\\b(beacon|keeper|watchman)\\b",
+      "hours": [16, 8], "sleep": [9, 15], "watch": "night", "fights": false, "gold": 3,
+      "workplace": ["signal_beacon"],
+      "commands": ["signal"],
+      "steps": [
+        { "gather": "woodpile", "when": "world.beacon_fuel < 5 and not me has firewood", "doing": "fetching firewood" },
+        { "use": "signal_beacon", "needs": { "firewood": 1 }, "optional": true, "when": "world.beacon_fuel < 5",
+          "doing": "feeding the beacon", "anim": "pickup" },
+        { "pace": "square", "doing": "keeping the night watch" }
+      ],
+      "fallback": [{ "gather": true }, { "idle": "pace" }]
+    }
+  },
+
+  "threats": {
+    "wolfpack": {
+      "who": "dire_wolf", "name": "direwolf", "count": 3, "when": "night", "every": 1, "from": "edge",
+      "behaviour": "raid", "retreat": "dawn half", "scares": true, "hp": 8, "sound": "howl",
+      "announce": "Howling below the walls: {name}s are circling the fort!"
+    }
+  },
+
+  "workflows": {
+    "briefing": {
+      "description": "the captain's briefing to a newcomer",
+      "steps": [
+        { "id": "hello", "command": "say(\"You're the new watch, {{player}}? Good. Listen.\")" },
+        { "id": "ask", "menu": { "title": "The captain's briefing", "text": "Brenna waits for your question.",
+            "items": [
+              { "id": "duty", "label": "What is my duty?" },
+              { "id": "wolves", "label": "What about the wolves?" },
+              { "id": "ready", "label": "Understood. I'm ready." } ] },
+          "save": "q", "options": { "duty": "duty", "wolves": "wolves", "ready": "done" }, "other": "done", "closed": "done" },
+        { "id": "duty", "command": "say(\"Keep the beacon burning till dawn. Firewood is in the woodpile; Odo tends the fire, help him.\")", "goto": "ask", "max": 3, "exit": "done" },
+        { "id": "wolves", "command": "say(\"They circle while the fire burns and come in when it dies. If it all goes wrong, stand by the fire and signal() for the militia.\")", "goto": "ask", "max": 3, "exit": "done" },
+        { "id": "done", "do": { "set": { "world.briefed": true }, "reply": "Two nights, {{player}}. Then the relief comes up the hill.", "anim": "wave" }, "end": true }
+      ]
+    }
+  },
+
+  "modules": ["nightwatch.js"]
+}
