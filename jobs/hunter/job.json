@@ -28,5 +28,13 @@
   {
    "sell": "meat"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Quiet, {name}. You'll scare the game."
+  ],
+  "sale": [
+   "Fresh {item}, {name}. {price} gold."
+  ]
+ }
 }

@@ -71,5 +71,10 @@
   {
    "idle": "tidy"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Hungry, {name}? Stew's coming."
+  ]
+ }
 }

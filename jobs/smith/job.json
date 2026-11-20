@@ -67,5 +67,14 @@
   {
    "idle": "tidy"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Mind the sparks, {name}.",
+   "Stand back from the forge, {name}."
+  ],
+  "out": [
+   "No {item}, no work. Blast."
+  ]
+ }
 }

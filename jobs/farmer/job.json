@@ -34,5 +34,10 @@
    ],
    "keep": 0
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Morning, {name}. Crops won't pick themselves."
+  ]
+ }
 }

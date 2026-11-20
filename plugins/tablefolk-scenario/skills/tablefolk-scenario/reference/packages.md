@@ -56,6 +56,7 @@ Every section is optional; paths are relative to the file.
   "uses": { "loom": { "types": ["loom"], "anim": "saw", "time": 4, "verb": "weaves at the {t}", "gives": "cloth", "what": "weave" } },
   "bodies": { "dire_wolf": { "model": "models/dire_wolf.glb", "h": 0.95, "clips": { "idle": "Idle", "walk": "Walk" }, "emotes": ["howl"] } },
   "sounds": { "howl": "sounds/howl.ogg" },
+  "lines": { "sale": ["Mind, it's hot from the forge, {name}."], "raid": { "gruff": ["{raiders}! Grab a hammer!"] } },
   "modules": ["smithy.js"]
 }
 ```
@@ -113,6 +114,11 @@ Every section is optional; paths are relative to the file.
   them.
 - `sounds`: `{"howl": "sounds/howl.ogg"}` (a list is picked from at
   random): `use.sound`, job steps, threats and code play them by name.
+- `lines`: short lines characters say by code (a sale, thanks, a greeting,
+  running out, raid shouts, the all-clear, goodnight, a guard's challenge,
+  asking for and sharing food, an intruder told off), added to the shared
+  pools ([living.md](living.md#spoken-life-templated-lines)); a job's own
+  `lines` come first.
 - `modules`: code (below).
 
 The example `packages/smithy/` has one of each; `packages/orchard/` is a

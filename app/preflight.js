@@ -52,7 +52,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261120a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261120k'],
+    ['app.js?v=20261120l'],
     ['bodies.js?v=20261120c'],
     ['scenery.js?v=20261120a'],
     ['combat.js?v=20261120b'],
@@ -70,7 +70,7 @@
     ['locks.js?v=20261024a'],
     ['fp-hands.js?v=20261114b'],
     ['senses.js?v=20261120c'],
-    ['packages.js?v=20261120f'],
+    ['packages.js?v=20261120g'],
     ['embed.js?v=20261115c'],
     ['books.js?v=20261115f'],
     ['mind.js?v=20261120d'],
@@ -81,8 +81,9 @@
     ['live.js?v=20261120d'],
     ['director.js?v=20261120b'],
     ['clock.js?v=20261120c'],
-    ['jobs.js?v=20261120p'],
-    ['threats.js?v=20261120f'],
+    ['jobs.js?v=20261120q'],
+    ['threats.js?v=20261120g'],
+    ['chatter.js?v=20261120b'],
     ['speech-input.js?v=20261113a'],
     ['worldgen-own.js?v=20261115a'],
     ['online-brain.js?v=20261112b'],
@@ -96,7 +97,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261120j', 'module'],
+    ['llm_js/world-integration.js?v=20261120k', 'module'],
   ];
 
   function browserSummary() {

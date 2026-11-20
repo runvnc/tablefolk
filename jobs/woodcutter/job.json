@@ -27,5 +27,10 @@
   {
    "sell": "firewood"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Careful, {name}, trees fall where they like."
+  ]
+ }
 }

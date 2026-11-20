@@ -442,10 +442,45 @@ function yesNoQuestion(line) {
 // the player talking to one of them: their talks start afresh
 function convoReset(id) { for (const k of [...convos.keys()]) if (k.split('|').includes(id)) convos.delete(k); talkedOut.delete(id); const g = charById(id), m = g && window.tablefolkMind?.mindOf(g); if (m) m.pieceSaid = {}; }
 // jobs.js (evening talk, remarks) and live.js ask before starting a conversation
-window.tablefolkTalk = { activeConvos, busyNear, talkedOut: isTalkedOut, mayStart: id => !isTalkedOut(id) && !busyNear(id), spoke: (id, to) => lastLine.set(id, { at: performance.now(), to: to || null }), reset: () => { convos.clear(); talkedOut.clear(); lastLine.clear(); } };
+// A line spoken by code as the character's own (chatter.js templated lines,
+// jobs.js evening lines): shown and voiced like any line, kept in its own
+// history as say("..."), told to those in earshot. { to }: who it is said
+// to (else app.js addresseeOf); { answer }: the one it is said to gets it as
+// speech to answer (pendingChat, a model reply), else only as heard;
+// { templated }: a short line from a pool, which holds no floor.
+function speakAs(gOrId, text, { to = null, answer = false, templated = false } = {}) {
+  const world = window.tablefolk, st = window.TABLEFOLK_STATE, g = typeof gOrId === 'string' ? charById(gOrId) : gOrId;
+  if (!world || !g || g.defeated || !text) return false;
+  g._spoke = null;
+  const toG = to ? (to === 'player' ? st.playerAvatar : typeof to === 'string' ? charById(to) : to) : null;
+  if (toG) g._sayTo = toG;
+  try { window.say(g, text, true, { templated }); } finally { g._sayTo = null; }
+  const sp = g._spoke; if (!sp) return false;   // dropped (a repeat)
+  const cfg = world.getBrainConfig(g.id);
+  cfg.messages = (cfg.messages || []).concat([{ role: 'assistant', content: `say(${JSON.stringify(String(text))})` }]).slice(-40);
+  world.setBrainConfig(g.id, cfg);
+  const addressed = answer && !!sp.to && sp.to !== 'player' && convoLine(g.id, sp.to);
+  if (!templated && sp.to !== 'player') lastLine.set(g.id, { at: performance.now(), to: sp.to || null });
+  const pn = world.playerName?.() || document.getElementById('chatName')?.value.trim() || 'the player', nameOf = id => id === 'player' ? pn : id;
+  for (const other of world.getAgents()) {
+    if (other === g || other.defeated || !within(other.root.position, g.root.position, earshot(world))) continue;
+    if (window.tablefolkPlay?.isAnimal?.(other) || (window.tablefolkPlay?.isHostile?.(other) && !window.tablefolkPlay?.talksToo?.(other))) continue;
+    const ocfg = world.getBrainConfig(other.id);
+    if (addressed && sp.to === other.id) {
+      ocfg.pendingChat = (ocfg.pendingChat || []).concat([`${g.id} says: ${text}`]).slice(-5);
+      try { window.tablefolkMind?.event(other, 'heard', { who: g.id, text }); } catch {}
+    } else {
+      const heard = sp.to === other.id ? `${g.id} says to you: ${text}` : sp.to ? `You overhear ${g.id} telling ${nameOf(sp.to)}: ${text}` : `${g.id} says: ${text}`;
+      ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: heard }]).slice(-40);
+    }
+    world.setBrainConfig(other.id, ocfg);
+  }
+  return { to: sp.to, addressed };
+}
+window.tablefolkTalk = { activeConvos, busyNear, talkedOut: isTalkedOut, mayStart: id => !isTalkedOut(id) && !busyNear(id), spoke: (id, to) => lastLine.set(id, { at: performance.now(), to: to || null }), speak: speakAs, reset: () => { convos.clear(); talkedOut.clear(); lastLine.clear(); } };
 addEventListener('tablefolk-scenario-started', e => { if (!e.detail?.sub) window.tablefolkTalk.reset(); });
 // every spoken line holds the floor (remarks and greetings from jobs.js too); the player's do not
-addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (!d.voiced) return; const g = charById(d.agentId); if (!g || d.agentId === 'player' || g === window.TABLEFOLK_STATE?.playerAvatar) return; if (g._spoke?.whisper || g._spoke?.to === 'player') return; lastLine.set(g.id, { at: performance.now(), to: g._spoke?.to || null }); });
+addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (!d.voiced || d.templated) return; const g = charById(d.agentId); if (!g || d.agentId === 'player' || g === window.TABLEFOLK_STATE?.playerAvatar) return; if (g._spoke?.whisper || g._spoke?.to === 'player') return; lastLine.set(g.id, { at: performance.now(), to: g._spoke?.to || null }); });
 // a command as the "You could, right here" menu writes it: carry(note), give(bread, pip)
 const cmdSig = c => (c.kind + '(' + String(c.target ?? c.item ?? c.arg ?? c.destinationText ?? c.emote ?? '') + ')').toLowerCase().replace(/["'\s]/g, '');
 const HISTORY_KEEP = 12;

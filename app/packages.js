@@ -20,6 +20,7 @@
  *     "jobs":      { "picker": { ...job.json... } } or ["jobs/picker/job.json"],   // jobs.js
  *     "threats":   { "crows": { who, count, when, every, from, behaviour, ... } },  // threats.js
  *     "uses":      { "loom": { types: ["loom"], anim, time, verb, gives } },       // uses.js register
+ *     "lines":     { "sale": ["..."], "raid": { "gruff": ["..."] } },          // chatter.js templated lines
  *     "modules":   ["blacksmith.js"] }                   // code: see below
  * Items may also carry "stock": {item, count, regrow, spent} and "gather":
  * {gives, time, anim, verb} (uses.js), and "station": a kind of use.
@@ -208,6 +209,8 @@
           catch (e) { warnings.push(`package ${m.id}: ${e.message}`); }
         }
       }
+      // templated lines (chatter.js): { "sale": [...], "raid": { "gruff": [...] } }
+      if (m.lines && typeof m.lines === 'object') window.tablefolkChatter?.add(m.lines, m.id);
       // threat kinds (threats.js), in data
       for (const [kind, def] of Object.entries(m.threats && typeof m.threats === 'object' ? m.threats : {})) { try { window.tablefolkThreats?.registerKind(kind, def, m.id); } catch (e) { warnings.push(`package ${m.id}: threat ${kind}: ${e.message}`); } }
       // skills and roles: inline manifests, or files relative to the package
@@ -321,6 +324,7 @@
     window.tablefolkUses?.resetRegistered?.();
     window.tablefolkJobs?.resetPackaged?.();
     window.tablefolkThreats?.resetPackaged?.();
+    window.tablefolkChatter?.reset?.();
   }
   window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, askTrust, api, useThing, playClip, uses, workflows, ROOT, dataOnly, loaded };
 })();

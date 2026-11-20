@@ -27,5 +27,10 @@
    "optional": true,
    "doing": "practising"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Move along, {name}. Nothing to see."
+  ]
+ }
 }

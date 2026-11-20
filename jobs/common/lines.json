@@ -1,0 +1,79 @@
+{
+  "about": "Short lines characters say by code at natural moments (app/chatter.js). Each kind is a list, or lists by voice: any, plain, gruff, cheerful, timid. Slots: {name} (who it is said to), {item}, {price}, {raiders}, {place}, {me}. A line whose slot has no value is skipped. A job's \"lines\" and a package's \"lines\" add to these (a job's come first).",
+  "sale": {
+    "any": ["{price} gold for the {item}, {name}.", "Here you are, {name}. {price} gold.", "One {item} for you, {name}.", "That's {price} gold. Thank you, {name}."],
+    "gruff": ["{price} gold. Don't drop it.", "There. {price} gold, and mind you pay on time.", "Your {item}, {name}. Next."],
+    "cheerful": ["There you go, {name}! Enjoy the {item}.", "Fresh {item} for you, {name}! {price} gold.", "Lovely doing business, {name}!"],
+    "timid": ["Um, that's {price} gold, please.", "H-here's your {item}, {name}.", "I hope the {item} is all right, {name}."]
+  },
+  "thanks": {
+    "any": ["Thank you kindly.", "Thanks, {name}.", "Just what I needed, {name}.", "Much obliged, {name}."],
+    "gruff": ["Hm. It'll do.", "About time. Thanks.", "Fair enough, {name}."],
+    "cheerful": ["Lovely, thank you {name}!", "Oh, that smells good. Thanks!", "You're a treasure, {name}."],
+    "timid": ["Oh, th-thank you.", "Thank you, {name}. Really.", "That's very kind."]
+  },
+  "greet": {
+    "any": ["Morning, {name}. Busy day.", "Hello there, {name}.", "Good to see you, {name}.", "Mind your step, {name}, I'm working here."],
+    "gruff": ["What is it, {name}? I'm working.", "Hm. {name}.", "Don't stand in my light, {name}."],
+    "cheerful": ["Oh, hello {name}! Lovely day for it.", "There you are, {name}! Come to watch?", "Good day to you, {name}!"],
+    "timid": ["Oh! H-hello, {name}.", "Hello... can I help you, {name}?", "Oh, you startled me, {name}."]
+  },
+  "out": {
+    "any": ["We're out of {item}!", "No more {item}. Not a scrap left.", "Out of {item} again...", "Who's got {item}? I've none left."],
+    "gruff": ["Blast it, no {item}.", "Out of {item}. Typical.", "Not a crumb of {item} anywhere."],
+    "cheerful": ["Oh dear, the {item}'s all gone!", "Well, that's the last of the {item}!"],
+    "timid": ["Oh no, there's no {item} left...", "I c-can't find any {item}."]
+  },
+  "raid": {
+    "any": ["{raiders}! Get inside!", "{raiders} at the edge of the village!", "Get indoors, {raiders} are coming!", "Bar the doors! {raiders}!"],
+    "gruff": ["{raiders}! Inside, all of you!", "Here they come. {raiders}!"],
+    "timid": ["{raiders}! Oh no, oh no...", "Help! {raiders}!"]
+  },
+  "raid_fighter": {
+    "any": ["To me! {raiders}!", "{raiders}! Everyone inside, I'll hold them!", "Stand back, I've got them!", "{raiders}! Stay behind me!"]
+  },
+  "allclear": {
+    "any": ["They're gone. You can come out now.", "All clear!", "That's the last of them.", "Safe now. They've run off."],
+    "gruff": ["That's seen them off.", "Done. They won't be back tonight."],
+    "cheerful": ["We did it! They're gone!", "All clear, everyone!"]
+  },
+  "bed": {
+    "any": ["Goodnight, {name}.", "Off to bed with me.", "Sleep well, {name}.", "That's me done for the day."],
+    "gruff": ["Bed. Finally.", "Night, {name}. Don't wake me."],
+    "cheerful": ["Night night, {name}!", "Sweet dreams, {name}!"],
+    "timid": ["Goodnight... lock your door, {name}.", "I'm off to bed, {name}."]
+  },
+  "patrol": {
+    "any": ["Morning, {name}.", "All quiet, {name}?", "Keep your eyes open, {name}.", "Good day, {name}. Anything amiss?"],
+    "gruff": ["Move along, {name}.", "Keep out of trouble, {name}."]
+  },
+  "challenge": {
+    "any": ["Who goes there? Oh, it's you, {name}.", "Halt! ...Ah, {name}. Stay close to the light.", "Late to be about, {name}.", "Shouldn't you be abed, {name}?", "Easy, {name}. Keep to the lit paths tonight."],
+    "gruff": ["Halt! Name yourself. ...{name}. Go home.", "You. {name}. What are you doing out at this hour?"]
+  },
+  "ask_food": {
+    "any": ["Could you spare a bite, {name}? I'm starving.", "{name}, have you any food to spare?", "I've not eaten all day, {name}. Anything?"],
+    "gruff": ["{name}. Food. Have you any?"],
+    "timid": ["S-sorry, {name}... could I have a little food?"]
+  },
+  "share_food": {
+    "any": ["Here, have this {item}, {name}.", "Take this {item}. You look famished.", "Go on, {name}, eat this {item}."],
+    "gruff": ["Here. Eat, {name}.", "Take the {item}. Don't make a habit of it."]
+  },
+  "refuse_food": {
+    "any": ["Sorry, {name}, I've barely enough myself.", "Not today, {name}."]
+  },
+  "help": {
+    "any": ["Here's some {item} for you, {name}.", "Brought you {item}, {name}.", "{name}, you were short of {item}. Here."],
+    "cheerful": ["{item} for you, {name}! Thought you'd need it."]
+  },
+  "intruder": {
+    "any": ["Oi! What are you doing in my house?", "Get out of my home, {name}!", "Who's there? {name}! Out, now!", "This is my house, {name}. Leave."],
+    "timid": ["W-who's there? Please, {name}, go away!"]
+  },
+  "wake": {
+    "any": ["Morning already...", "Up and at it.", "Another day."],
+    "gruff": ["Up. Again."],
+    "cheerful": ["Good morning, world!"]
+  }
+}

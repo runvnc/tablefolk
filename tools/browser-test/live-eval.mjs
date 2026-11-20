@@ -43,6 +43,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
+import { talkReport } from './talk-report.mjs';
 
 const args = process.argv.slice(2), flag = n => { const a = args.find(x => x === '--' + n || x.startsWith('--' + n + '=')); return a == null ? null : a.includes('=') ? a.slice(a.indexOf('=') + 1) : true; };
 const scnPath = args.find(a => !a.startsWith('--'));
@@ -108,7 +109,7 @@ await page.evaluate(() => {
   const po = document.getElementById('promptOut');
   if (po) new MutationObserver(() => { const tx = po.dataset.baseText; if (tx && tx !== C.prompts.at(-1)?.text) C.prompts.push({ t: now(), agent: (tx.match(/^\[AGENT: (\S+)\]/) || [])[1], text: tx }); }).observe(po, { attributes: true, attributeFilter: ['data-base-text'] });
   addEventListener('tablefolk-agent-turn', e => C.turns.push({ t: now(), agent: e.detail?.agentId, line: String(e.detail?.line || ''), reflex: !!e.detail?.reflex }));
-  addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (d.voiced && TABLEFOLK_STATE.characters.some(c => c.id === d.agentId)) C.says.push({ t: now(), agent: d.agentId, text: d.text }); if (!d.voiced) (C.acts ||= []).push({ t: now(), agent: d.agentId, text: String(d.text || '') }); });
+  addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (d.voiced && TABLEFOLK_STATE.characters.some(c => c.id === d.agentId)) C.says.push({ t: now(), agent: d.agentId, text: d.text, tpl: !!d.templated, kind: typeof d.templated === 'string' ? d.templated : null, to: d.to || null }); if (!d.voiced) (C.acts ||= []).push({ t: now(), agent: d.agentId, text: String(d.text || '') }); });
   // jobs.js and world-integration.js name each model call's kind (absent before the jobs change)
   addEventListener('tablefolk-model-call', e => (C.calls ||= []).push({ t: now(), agent: e.detail?.agentId, kind: e.detail?.kind }));
   addEventListener('tablefolk-attacked', e => (C.hits ||= []).push({ t: now(), agent: e.detail?.agentId }));
@@ -285,7 +286,7 @@ if (dayMode) {
   // sleep at night, hunger, hurt
   for (let i = 1; i < S.length; i++) { const dt = S[i].gm - S[i - 1].gm, h = ((S[i].gm % 1440) + 1440) % 1440 / 60; for (const c of S[i].chars) { const r = per[c.id]; if (!r) continue; if (c.lie && (h >= 21 || h < 5)) r.nightSleepMin += dt; if (c.hp != null && c.maxHp && c.hp < c.maxHp) r.hurt = true; } }
   for (const c of last.chars) if (per[c.id]) { per[c.id].hungerEnd = c.hunger; per[c.id].job = c.job; }
-  if (D.stats) for (const [id, st] of Object.entries(D.stats)) if (per[id]) per[id].cycles = st.cycles || 0;
+  if (D.stats) for (const [id, st] of Object.entries(D.stats)) if (per[id]) { per[id].cycles = st.cycles || 0; if (st.hungerWhy) per[id].hungerWhy = st.hungerWhy; }
   // model calls by kind: page events when there are any (after the jobs change), else read from the prompts
   const calls = [];
   const runCalls = D.calls.filter(c => c.kind && !['pick', 'remark'].includes(c.kind));
@@ -330,6 +331,11 @@ if (dayMode) {
   for (const [k, v] of Object.entries(day.totals)) console.log(k.padEnd(34), typeof v === 'object' ? JSON.stringify(v) : v);
   summary.day = day;
 }
+// talk: templated vs model lines, by part of the day, pairs, questions (talk-report.mjs)
+summary.talk = talkReport({ says: cap.says, day: dayCap, summary });
+console.log('\n==== talk');
+for (const [k, v] of Object.entries(summary.talk)) console.log(k.padEnd(22), typeof v === 'object' ? JSON.stringify(v) : v);
+if (summary.day) for (const [id, r] of Object.entries(summary.day.per)) if ((r.hungerEnd ?? 0) >= .55) console.log(`HUNGRY at the end: ${id} (${r.job}) ${r.hungerEnd}${r.hungerWhy ? ': ' + r.hungerWhy : ''}`);
 fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
 // the transcript as a player reads it: who said and did what, with the game clock when there is one

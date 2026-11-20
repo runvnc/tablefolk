@@ -139,6 +139,36 @@ hungry. Starving (`.8`) for a third of a day it is **weak**: it walks
 slowly and cannot work. It does not die of it unless the world is
 `"harsh": true` (then it loses health).
 
+## Spoken life: templated lines
+
+Most of what a busy village says needs no model. At natural moments the
+game has a character say one short line from a pool, voiced and shown like
+any other: a sale ("Two gold for the ale, tam.") and the buyer's thanks; a
+greeting when the player walks up to someone at work (within 2 cells, once
+a game day each); a call when its work runs out of something ("We're out of
+flour!"); raid shouts ("Wolves! Get inside!", a fighter's "To me!"); the
+all-clear; goodnight on the way to bed; a guard's word in passing by day
+and its challenge at night ("Halt! ...Ah, Traveller. Stay close to the
+light."); asking for food when starving and sharing it; an intruder told
+off.
+
+Rules: never the same line twice in a row; at most one line per character
+per 20 real seconds (raid shouts, the all-clear and intruders: 6); only when
+someone with a mind, or the player, is within earshot; nothing while asleep.
+The line goes into the speaker's own history as its words (so the model's
+later lines stay consistent) and into the history of those who hear it, but
+asks nobody for an answer and holds no conversational floor.
+
+The pools are data: `jobs/common/lines.json` (kinds `sale`, `thanks`,
+`greet`, `out`, `raid`, `raid_fighter`, `allclear`, `bed`, `patrol`,
+`challenge`, `ask_food`, `share_food`, `refuse_food`, `help`, `intruder`,
+`wake`), each a list or lists by voice (`any`, `plain`, `gruff`, `cheerful`,
+`timid`: from the character's temperament and personality), with slots
+`{name}` (who it is said to), `{item}`, `{price}`, `{raiders}`, `{place}`,
+`{me}`; a line whose slot has no value is skipped. A job adds its own
+(`"lines": {"greet": ["Fresh bread soon, {name}."]}`, used first) and a
+package its `"lines"` ([packages.md](packages.md#tablefolkjson)).
+
 ## Threats (`threats`)
 
 ```json

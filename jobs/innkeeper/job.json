@@ -84,5 +84,15 @@
   {
    "idle": "tidy"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Welcome in, {name}! Ale's cold.",
+   "Come in, {name}, warm yourself."
+  ],
+  "sale": [
+   "Your {item}, {name}. {price} gold.",
+   "There's your {item}. Enjoy, {name}."
+  ]
+ }
 }

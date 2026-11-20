@@ -54,7 +54,7 @@
   const BUILTIN = ['farmer', 'baker', 'innkeeper', 'cook', 'smith', 'woodcutter', 'miner', 'hunter', 'fisher', 'herder', 'merchant', 'guard', 'healer', 'ratcatcher', 'scholar', 'child', 'labourer', 'idler'];
   const DEFAULT_PRICES = { bread: 3, pie: 5, stew: 4, ale: 2, meat: 3, wheat: 1, flour: 2, firewood: 1, apple: 1, carrot: 1, pumpkin: 2, fish: 3, horseshoe: 6, nails: 2, knife: 5, 'iron ore': 2, stone: 1, hide: 3, bandage: 2, milk: 2, egg: 1, crystal: 4, note: 1 };
   const STATION_JOB = { anvil: 'smith', workbench: 'labourer', cauldron: 'cook', chop: 'woodcutter', mine: 'miner', read: 'scholar', train: 'guard' };
-  const W = () => window.tablefolk, U = () => window.tablefolkUses, M = () => window.tablefolkMind, P = () => window.tablefolkPlay, K = () => window.tablefolkClock;
+  const C = () => window.tablefolkChatter, W = () => window.tablefolk, U = () => window.tablefolkUses, M = () => window.tablefolkMind, P = () => window.tablefolkPlay, K = () => window.tablefolkClock;
   const scn = () => window.tablefolkScenario?.active?.scn || {};
   const posOf = g => g.logicalPos || g.root.position;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -618,7 +618,13 @@
     g._wants = { item, until: performance.now() + 20000 };
     const res = await runLine(seller, `sell(${item}, ${price(item, seller)}, ${g.id})`);
     g._wants = null;
+    if (res.ok) saleLines(seller, g, item, price(item, seller));
     return res.ok ? { done: true, ms: 2500 } : { fail: res.text };
+  }
+  // a sale done by code: a word from the seller, thanks from the buyer (chatter.js pools)
+  function saleLines(seller, buyer, item, cost) {
+    C()?.say(seller, 'sale', { item, price: cost }, { to: buyer });
+    setTimeout(() => { try { C()?.say(buyer, 'thanks', { item }, { to: seller }); } catch {} }, 1800);
   }
   async function sellStep(g, s, j, items, serve) {
     const have = items.filter(n => count(g, n) > 0);
@@ -635,6 +641,7 @@
       b._wants = { item, until: performance.now() + 20000 };
       const res = await runLine(g, `sell(${item}, ${price(item, g)}, ${b.id})`);
       b._wants = null;
+      if (res.ok) saleLines(g, b, item, price(item, g));
       if (res.ok && item === 'ale') bs.hadAle = true;
       if (res.ok && bs.wantItem === item) bs.wantItem = null;
       return res.ok ? { done: true, ms: 3000, worked: true } : { done: true, ms: 2000 };
@@ -661,7 +668,8 @@
       await runLine(g, `emote(${oneOf([`looks around the ${p.id}`, `checks the ${p.id}`, `stops at the ${p.id} and looks about`])})`);
       const t = gm(); s.greeted ||= {};
       const who = nearPeople(g, 4).find(c => (c !== state.playerAvatar || !!document.getElementById('chatName')?.value.trim()) && t - (s.greeted[nameOf(c)] ?? -999) >= 60);
-      if (who) { s.greeted[nameOf(who)] = t; const h = K()?.hour() ?? 12; say(g, `${h < 5 || h >= 21 ? 'Quiet night' : h < 12 ? 'Morning' : h < 18 ? 'Good day' : 'Evening'}, ${nameOf(who)}.`, true); }
+      // by day a word in passing, at night a challenge (chatter.js pools "patrol", "challenge")
+      if (who) { const h = K()?.hour() ?? 12; if (C()?.say(g, h < 5 || h >= 21 ? 'challenge' : 'patrol', {}, { to: who })) s.greeted[nameOf(who)] = t; }
     }
     if (r.done || r.fail) { s.sub.to = null; s.sub.i++; if (s.sub.i >= route.length) { s.sub.i = 0; return { done: true, ms: 4500, worked: true }; } return { busy: true, ms: 4500, worked: true }; }
     return r;
@@ -682,6 +690,9 @@
         const fr = await fallback(g, s, j, r.need);
         if (fr) return fr;
         addNews(g.id, `${g.id} ran out of ${r.need.item}`, 'short');
+        // a call when it runs out (once a game day an item)
+        const day = K()?.now()?.day || 0; s.outSaid ||= {};
+        if (s.outSaid[r.need.item] !== day && C()?.say(g, 'out', { item: r.need.item })) s.outSaid[r.need.item] = day;
         s.lastNeed = r.need; s.blocked[i] = t + 60; advance(s, steps, j); continue;
       }
       if (r.done) { s.fails[i] = 0; advance(s, steps, j); }
@@ -826,6 +837,9 @@
   async function bedtime(g, s) {
     if (g.pose?.mode === 'lie') { setDoing(g, s, 'asleep'); return { ms: rnd(5000, 8000) }; }
     const bed = bedFor(g, s);
+    // a goodnight to whoever is near, once a night
+    const night = Math.floor((gm() + 360) / 1440);
+    if (s.bedSaid !== night) { const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar || !!nameOf(c)); if (C()?.say(g, 'bed', {}, { to: near[0] || null })) s.bedSaid = night; else if (!near.length) s.bedSaid = night; }
     setDoing(g, s, bed ? 'going home to bed' : 'settling down for the night');
     if (!bed) { const h = s.home && spotIn(s.home, g); if (h && !inPlace(s.home, posOf(g).x, posOf(g).z)) { const r = await goTo(g, s, h.x, h.z, 'home'); return { ms: r.ms || 3000 }; } return { ms: 8000 }; }
     const r = await goDo(g, s, bed, `use(${bed.type})`);
@@ -887,6 +901,12 @@
   async function threatened(g, s, j, asleep = false) {
     const T = window.tablefolkThreats, raiders = T?.active?.() || []; if (!raiders.length) return null;
     const cfg = W().getBrainConfig(g.id);
+    // the first sight of them (within 10 cells): a shout, once a raid each, two shouts a raid at most
+    const seen = raiders.filter(r => dist(posOf(r), posOf(g)) <= 10), gr = seen[0]?._threat?.group;
+    if (gr && !asleep && !(gr.shouted ||= new Set()).has(g.id) && gr.shouted.size < 2) {
+      const one = String(T.label?.(seen[0]) || seen[0]._threat.spec?.name || 'raider'), what = /s$/.test(one) ? one : one.replace(/f$/, 've') + 's';
+      if (C()?.say(g, fighter(g, j) ? 'raid_fighter' : 'raid', { raiders: what.replace(/^\w/, c => c.toUpperCase()) })) gr.shouted.add(g.id);
+    }
     if (fighter(g, j)) {
       const near = raiders.slice().sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
       if (g.pose) U().standUp(g);

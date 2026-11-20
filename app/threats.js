@@ -155,6 +155,12 @@
     const what = gr.spec.behaviour === 'pilfer' ? ` (they ate ${gr.ate} from the stores)` : gr.spec.behaviour === 'rob' ? ` (they stole ${gr.stole} gold)` : '';
     const text = `${gr.startAlive} ${gr.startAlive > 1 ? plural(gr.spec.name) : gr.spec.name} came${gr.spec.when === 'night' ? ' in the night' : ''}${what}; ${names.length ? names.join(' and ') + ' drove them off' : 'they left on their own'}${down ? ` (${down} struck down)` : ''}.`;
     J()?.addNews?.('', text, 'raid');
+    // the all-clear, out loud: one who fought, else anyone awake and outdoors near where they were
+    try {
+      const C = window.tablefolkChatter, awake = c => c && !c.defeated && !c._threat && !P()?.isAnimal?.(c) && c.pose?.mode !== 'lie';
+      const by = [...gr.fought].filter(k => k !== 'player').map(k => state.characters.find(c => c.id === k)).filter(awake);
+      for (const c of [...by, ...state.characters.filter(awake)]) if (C?.say(c, 'allclear', {})) break;
+    } catch {}
     for (const c of state.characters) {
       if (c._threat || c.defeated || P()?.isAnimal?.(c)) continue;
       try { window.tablefolkMind?.addMemory?.(c, text, 2, 'event'); } catch {}

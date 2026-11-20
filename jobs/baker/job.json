@@ -94,5 +94,18 @@
   {
    "idle": "tidy"
   }
- ]
+ ],
+ "lines": {
+  "greet": [
+   "Bread's in the oven, {name}. Come back in a bit.",
+   "Morning, {name}! Smell that?"
+  ],
+  "sale": [
+   "Still warm, {name}. {price} gold.",
+   "Fresh {item}, {name}. {price} gold."
+  ],
+  "out": [
+   "Out of {item}! No bread without it."
+  ]
+ }
 }

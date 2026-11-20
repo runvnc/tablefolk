@@ -98,6 +98,8 @@ supported part (other members are internal and may change).
 | `tablefolkThreats.now(kind)`, `.active()`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats |
 | `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
 | `tablefolkUses.register(kind, def)`, `.stockOf(thing)` | kinds of use; what a thing has left |
+| `tablefolkChatter.say(g, kind, slots, { to })`, `.add(pools)` | a templated line from a pool (living.md, "Spoken life"); add pools |
+| `tablefolkTalk.speak(g, text, { to, answer })` | a line as the character's own, told to those in earshot; `answer`: the one it is said to answers it |
 | `tablefolkBodies.add(id, def, baseUrl)`, `.get(id)`, `.playClip(g, name, { loop })`, `.emote(g, name, loop)` | bodies and character clips |
 | `tablefolkSfx.play(name, pos)`, `.register(name, url)`, `.requested` | sounds; the last ones asked for |
 | `tablefolkSkills.addCommand(name, def)`, `.commandLines(g)`, `.cardLines(g)`, `.run(g, name, args)` | commands and skills |
@@ -116,7 +118,7 @@ All on `window`, as `CustomEvent`s; read `e.detail`.
 | `tablefolk-player-turn` | `{ kind }` | the player acted (moved, used, attacked...) |
 | `tablefolk-player-chat` | `{ agentId, text }` | the player said something to a character |
 | `tablefolk-agent-turn` | `{ agentId, line }` | a character's turn ended |
-| `tablefolk-say` | `{ agentId, text, voiced }` | a character spoke (or an action line, `voiced: false`) |
+| `tablefolk-say` | `{ agentId, text, voiced, templated, to }` | a character spoke (or an action line, `voiced: false`); `templated`: the pool kind of a line said by code (`sale`, `raid`...), else false; `to`: who it was said to |
 | `tablefolk-attacked` | `{ agentId }` | a character was attacked |
 | `tablefolk-defeated` | `{ id, by }` | someone was struck down (`id` may be `player`) |
 | `tablefolk-approached` | `{ agentId, by }` | someone came up to a character |
@@ -220,6 +222,15 @@ add kinds. `commands` lets the job's workers use package commands with
 
 Fields: [living.md](living.md#threats-threats). A module function of the
 same name runs each raider's turn.
+
+### Lines
+
+```json
+"lines": { "sale": ["Mind, it's hot from the forge, {name}."], "raid": { "gruff": ["{raiders}! Grab a hammer!"] } }
+```
+
+Kinds and slots: [living.md](living.md#spoken-life-templated-lines). A
+job's `"lines"` has the same form.
 
 ### Stock and uses
 

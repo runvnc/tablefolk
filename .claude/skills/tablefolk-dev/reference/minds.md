@@ -416,6 +416,30 @@ Measured: testing.md, "A whole day".
   same action line within the last five becomes one with "(xN)".
   live-eval's transcript does the same for consecutive lines.
 
+## Built (2026-11-20, evening): spoken life, evenings, work that never stops
+
+- **Templated lines** (`app/chatter.js`, `jobs/common/lines.json`): `say(g,
+  kind, slots, { to })` picks a line by voice (`voiceOf`: gruff, cheerful,
+  timid, plain), skips any in `g._said` (app.js would drop a repeat) and the
+  last of its kind; 20 s a character (6 s for raid, allclear, intruder);
+  needs a mindful listener in earshot. Spoken through world-integration.js
+  `speakAs` (`tablefolkTalk.speak`): app.js `say(..., { templated })`, the
+  addressee forced through `g._sayTo` (addresseeOf), the speaker's history
+  gets `say("...")` as an assistant message, hearers a user message;
+  `answer: true` puts it in the addressee's pendingChat through convoLine
+  (evening lines). `tablefolk-say` carries `templated` (the kind) and `to`;
+  templated lines set no `lastLine` (no floor). Hooks: jobs.js `saleLines`
+  (sellStep, buyFrom), `out` on a need with no fallback (once a day an
+  item), patrol (`patrol` / `challenge`), bedtime (`bed`, once a night),
+  threatened (`raid` / `raid_fighter`, two shouters a raid); threats.js
+  allClear; chatter.js `greetTick` (1 s: the player within 2.2 cells of a
+  worker in its hours, once a game day).
+- **Measuring talk**: `tools/browser-test/talk-report.mjs` (live-eval calls
+  it; also runs over saved results): templated vs model lines by day,
+  evening (17-21) and night per game hour, pairs, the top pair's share,
+  questions; old runs: the guards' greetings counted as templated, the
+  addressee guessed from names or the next speaker.
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

@@ -3187,6 +3187,8 @@ function bodyYaw(g,dt){
 // spoke to the speaker last (20 s) and is still in earshot, else the nearest
 // person it faces within 3 cells, else nobody (null).
 function addresseeOf(g,text){
+  // a line spoken by code to someone named (world-integration.js speakAs)
+  if(g._sayTo && !g._sayTo.defeated) return g._sayTo;
   const p=g.root.position, dist=c=>Math.hypot(c.root.position.x-p.x,c.root.position.z-p.z);
   const near=c=>c && c!==g && !c.defeated && c.root && !getBrainConfig(c.id)?.defeated && dist(c)<=(state.earshot||6);
   const people=state.characters.filter(near), av=near(state.playerAvatar)?state.playerAvatar:null, t=String(text||'').toLowerCase();
@@ -3312,7 +3314,7 @@ const entryKey=e=>String(e||'').split(' -> ')[0].replace(/^(T\d+ [^:]+):.*$/s,'$
 function markFailed(g){ const h=state.globalHistory, last=h?.[h.length-1]; if(g && g!==state.playerAvatar && last && last.startsWith('T') && last.includes(g.id+':')){ failedEntries.add(entryKey(last)); if(failedEntries.size>200) failedEntries.delete(failedEntries.values().next().value); } }
 function isFailedEntry(e){ return failedEntries.has(entryKey(e)); }
 function fail(g,text){ markFailed(g); return say(g,text,false); }
-function say(g,text,voiced=false,{whisper=false}={}){
+function say(g,text,voiced=false,{whisper=false,templated=false}={}){
   // The dead say nothing (a turn that was thinking when it died ends here).
   if(g?.defeated){ clearStreamingBubble(g); return; }
   // A character repeating one of its recent spoken lines: say nothing at all.
@@ -3339,7 +3341,7 @@ function say(g,text,voiced=false,{whisper=false}={}){
   const level=whisper ? .35 : toD<=1.6 ? .55 : toD<=3 ? .75 : 1;
   if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId,level); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
   log(g.id+': '+text);
-  try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced}})); }catch{}
+  try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced,templated,to:voiced&&g!==state.playerAvatar?g._spoke?.to||null:null}})); }catch{}
   const speechRequested=localStorage.getItem('tablefolkTtsEnabled')!=='0' && getBrainConfig(g.id).ttsEnabled!==false;
   showSpeechBubble(g,text,{whisper,waitVoice:voiced && speechRequested && !!window.tablefolkTTS?.ready});
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
