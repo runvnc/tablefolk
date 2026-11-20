@@ -3231,17 +3231,22 @@ function bodyYaw(g,dt){
   let d=want-g.root.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d));
   return g.root.rotation.y+d*Math.min(1,dt*9);
 }
-// Whom a spoken line is for: someone in earshot it names, else whoever spoke
-// to the speaker last (30 s), else the player when near, else the nearest.
+// Whom a spoken line is for (world-integration.js tells it to them as
+// speech addressed to them, and to everyone else in earshot as overheard):
+// someone in earshot it names (by the start of the line first), else whoever
+// spoke to the speaker last (20 s) and is still in earshot, else the nearest
+// person it faces within 3 cells, else nobody (null).
 function addresseeOf(g,text){
   const p=g.root.position, dist=c=>Math.hypot(c.root.position.x-p.x,c.root.position.z-p.z);
-  const near=c=>c && c!==g && !c.defeated && c.root && dist(c)<=(state.earshot||6);
+  const near=c=>c && c!==g && !c.defeated && c.root && !getBrainConfig(c.id)?.defeated && dist(c)<=(state.earshot||6);
   const people=state.characters.filter(near), av=near(state.playerAvatar)?state.playerAvatar:null, t=String(text||'').toLowerCase();
-  const named=n=>n && new RegExp('(^|[^a-z0-9])'+n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z0-9])').test(t);
-  const hit=people.find(c=>named(c.id) || named(c.label)); if(hit) return hit;
-  if(av && named(playerName())) return av;
-  const h=g._heard; if(h && performance.now()-h.at<30000 && (h.who===av || people.includes(h.who))) return h.who;
-  return av || people.sort((a,b)=>dist(a)-dist(b))[0] || null;
+  const at=n=>{ if(!n) return -1; const m=new RegExp('(^|[^a-z0-9])'+String(n).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z0-9])').exec(t); return m?m.index:-1; };
+  const cands=[...people.map(c=>({c,i:Math.min(...[at(c.id),at(c.label)].map(i=>i<0?1e9:i))})), ...(av?[{c:av,i:(i=>i<0?1e9:i)(at(playerName()))}]:[])].filter(x=>x.i<1e9).sort((a,b)=>a.i-b.i);
+  if(cands.length) return cands[0].c;
+  const h=g._heard; if(h && performance.now()-h.at<20000 && (h.who===av || people.includes(h.who))) return h.who;
+  const fx=g.dir?.x||0, fz=g.dir?.z||0, fl=Math.hypot(fx,fz)||1;
+  const faced=[...people,...(av?[av]:[])].filter(c=>{ const d=dist(c); if(d>3) return false; const dx=c.root.position.x-p.x, dz=c.root.position.z-p.z; return d<1.2 || (dx*fx+dz*fz)/(d*fl)>=.5; }).sort((a,b)=>dist(a)-dist(b));
+  return faced[0]||null;
 }
 function startTurnMove(g,d,distance=null){
   setCharacterFacing(g,d);
@@ -3379,6 +3384,7 @@ function say(g,text,voiced=false,{whisper=false}={}){
   // Dispatch speech before logging, DOM bubbles, animation, or history work. Only explicit say commands are voiced; action confirmations stay text-only.
   // How loud: softly to someone beside the speaker, up to full voice across a room.
   const to=voiced && g!==state.playerAvatar ? addresseeOf(g,text) : null;
+  if(voiced && g!==state.playerAvatar) g._spoke={to:to?(to===state.playerAvatar?'player':to.id):null,text:String(text||''),at:performance.now(),whisper};
   const toD=to ? Math.hypot(to.root.position.x-g.root.position.x,to.root.position.z-g.root.position.z) : 4;
   const level=whisper ? .35 : toD<=1.6 ? .55 : toD<=3 ? .75 : 1;
   if(voiced){ try{ window.tablefolkTTS?.speak(g,text,getBrainConfig(g.id).ttsVoiceId,level); }catch(e){ console.warn('Pocket-TTS say failed',e); } }
@@ -3389,7 +3395,8 @@ function say(g,text,voiced=false,{whisper=false}={}){
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
   if(voiced && g!==state.playerAvatar){
     if(to){ faceToward(g,to); if(to!==state.playerAvatar && !to.turnMove && !to.speaking) faceToward(to,g); }
-    const p=g.root.position; for(const c of state.characters) if(c!==g && Math.hypot(c.root.position.x-p.x,c.root.position.z-p.z)<=(state.earshot||6)) c._heard={who:g,at:performance.now()};
+    // who spoke to whom last: the one it was said to answers the speaker next (addresseeOf)
+    if(to && to!==state.playerAvatar && !whisper) to._heard={who:g,at:performance.now()};
   }
   setTimeout(()=>{ if(g.anim==='talk' && (!speechRequested || window.tablefolkTTS?.current?.agent!==g)){ g.anim='idle'; playRig(g,'idle',true); g.speaking=false; if(g._headNodes)for(const h of g._headNodes)h.scaling.y=1; } },speechRequested?2000:900);
   if(state.globalHistory?.length){ const last=state.globalHistory[state.globalHistory.length-1]; if(last && last.startsWith('T') && last.includes(g.id+':')) state.globalHistory[state.globalHistory.length-1]=last+' -> '+text; }
@@ -4601,11 +4608,13 @@ function buildAgentPrompt(g, cfg) {
     // Small models narrate hand-overs ("here it is") instead of doing them.
     // (commandsFor: roles and skills grant give/sell too)
     ...((commandsFor(g).has('give') || commandsFor(g).has('sell')) ? ['Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use ' + [commandsFor(g).has('give') ? 'give(item)' : '', commandsFor(g).has('sell') ? 'sell(item, price)' : ''].filter(Boolean).join(' or ') + ' in the same reply.'] : []),
-    'Messages in the form "NAME says ..." report speech addressed to you.',
-    'Understand and answer the meaning of that speech; do not copy or quote it back.',
+    // Said TO it vs overheard (world-integration.js): only speech said to it
+    // wants an answer. "Always answer" made every overheard line a cue to talk.
     // One command per line: an action alone left customers unanswered (a smith
     // forged a dagger without a word to the person who asked for it).
-    'Reply with commands only, one per line. When someone speaks to you, always answer with say(...); if you also act, put the action on the next line.',
+    'Reply with commands only, one per line.',
+    'When someone speaks to you (NEW SPEECH ADDRESSED TO YOU), answer them with say(...) in your own words; if you also act, put the action on the next line.',
+    'Talk you only overhear needs no answer. When nobody has spoken to you, get on with what you are doing: act rather than talk.',
     // Thinking on (Character setup, or "thinking": true in a scenario): small
     // reasoning models (LFM3 1.7B) otherwise spend hundreds of tokens per turn
     ...(getBrainConfig(g.id).thinking === true ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),

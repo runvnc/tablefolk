@@ -40,7 +40,18 @@ Pacing runs on real time:
   or soldier: `dummy` / `target`), others now and then sit on a bench
   nearby. Put the station near the character
   ([characters.md](characters.md#using-things));
-- someone spoken to, or told of an event, goes after a short pause;
+- someone spoken to, or told of an event, goes after a short pause; a line
+  one character says to another counts as spoken to (see
+  [characters.md](characters.md#hearing-seeing-and-talking): the others
+  only overhear it, and after three exchanges the two have said their
+  piece for 90 s);
+- a character with nothing said to it talks only for a reason (news, a want
+  that needs someone, a goal naming someone near, a temper); otherwise it
+  does things;
+- a fighter with prey in sight goes every 1.5-2.5 s, whatever the pace;
+- hunger and tiredness grow with real time while the world lives (hungry
+  after about 8 minutes, tired after about 12), and a hungry or tired
+  character counts as having something to do;
 - for 30 s after the player acts or talks things move faster; after 3 minutes
   without, slower.
 

@@ -86,10 +86,22 @@ a ring in, and the player finds it there. The player does the same with E.
 ## Hearing, seeing and talking
 
 - **Earshot** (default 6 cells): a character only hears and sees what other
-  characters do closer than that. When the player talks to one character,
-  the others in earshot overhear it (as context, "(to bram)", without having
-  to answer). Together with `whisper`, this makes secrets, hand-overs out of a
-  guard's sight, and "lure him away" plans work.
+  characters do closer than that. Together with `whisper`, this makes
+  secrets, hand-overs out of a guard's sight, and "lure him away" plans work.
+- **Said to you, or overheard**: every spoken line has an addressee: someone
+  in earshot it names (the start of the line first), else whoever spoke to
+  the speaker in the last 20 s, else the nearest person it faces within 3
+  cells, else nobody. The addressee gets it as speech said to it and answers
+  soon; everyone else in earshot overhears it ("You overhear grub telling
+  pip: ...", "grub says to nobody in particular: ..."), which needs no
+  answer. The player's words always count as said to the one they talk to.
+- **Conversations end**: after three exchanges between two characters
+  without the player, their lines count as overheard for 90 s and each is
+  told it has said its piece.
+- **Talking needs a reason**: a character nobody has spoken to (and to whom
+  nothing happened) may only speak when it has news to tell someone near, a
+  want that needs a person (food it has to ask or pay for), a goal naming
+  someone in earshot, or a temper (below); otherwise it acts.
 - The player picks who they talk to (the selected character, the "to:"
   picker, or an `@name` prefix); that one answers.
 - **What a character sees** (its prompt): from where it stands, all round

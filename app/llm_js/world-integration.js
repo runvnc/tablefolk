@@ -935,12 +935,18 @@ async function main() {
       // say/whisper in its command list) unless someone speaks to it.
       const spokenTo = !!cfg.pendingChat?.length;
       if (spokenTo) cfg.quietTurns = 0;
+      // Nobody spoke to it and nothing happened to it: it may talk only with a
+      // cause (mind.js speechCause: news to tell someone here, a want that
+      // needs a person, a goal naming someone in earshot, anger at someone
+      // here, a guard's warning); otherwise speech is off this turn, as on a
+      // quiet turn, and it is pointed at what it could do instead.
+      const muted = !spokenTo && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g);
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
-      const quiet = !spokenTo && cfg.quietTurns > 0;
+      const budgetQuiet = !spokenTo && cfg.quietTurns > 0, quiet = budgetQuiet || (muted && !chatTestMode);
       const simple = !chatTestMode && !!world.isSimpleBrain?.(g, cfg);
       // In simple mode whatever it writes is spoken, so a quiet turn costs no model time.
-      if (simple && quiet) { cfg.quietTurns--; world.setBrainConfig(g.id, cfg); return false; }
+      if (simple && quiet) { if (budgetQuiet) cfg.quietTurns--; world.setBrainConfig(g.id, cfg); return false; }
       let messages;
      let chatSuffix = '';
       if (chatTestMode) {
@@ -975,7 +981,7 @@ async function main() {
       }
       if (quiet) {
         const last = messages[messages.length - 1];
-        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' }]);
+        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + (budgetQuiet ? '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' : '\n\n(Nobody has spoken to you: no need to talk. Do something: one of "You could, right here", a step toward your goal, or wait.)') }]);
       }
       // Show in prompt panel
       let displayText = `[AGENT: ${g.id}]
@@ -1145,7 +1151,8 @@ async function main() {
         if (quiet || ++lines > 2) { planCmds.splice(i--, 1); droppedSpeech = true; }
       }
       const spoke = planCmds.some(c => c.kind === 'say' || c.kind === 'whisper');
-      if (quiet) cfg.quietTurns--;
+      if (budgetQuiet) cfg.quietTurns--;
+      else if (quiet) {}
       else if (spokenTo) cfg.talkRun = spoke ? 1 : 0;
       else if (!spoke) cfg.talkRun = 0;
       else if ((cfg.talkRun = (cfg.talkRun || 0) + 1) >= 2) { cfg.talkRun = 0; cfg.quietTurns = 3; }
@@ -1220,16 +1227,30 @@ async function main() {
       // in as well, so each turn showed up twice.
       // Every entry this turn added (say + give is two), not just the last;
       // whispers are for the player only.
+      // A: what it said goes to the one it said it to as speech addressed to
+      // them (their pendingChat: they answer soon); everyone else in earshot
+      // overhears it ("You overhear grub telling pip: ..."), which needs no
+      // answer. Its actions are told as before ("grub walks").
       const turnEntries = (world.state?.globalHistory || []).slice(-Math.max(1, planCmds.length)).filter(e => new RegExp('^T\\d+\\s+' + g.id + ':').test(e))
-        .filter(e => !new RegExp('^T\\d+\\s+[^:]+:\\s*' + g.id + ' whisper\\b').test(e));
+        .filter(e => !new RegExp('^T\\d+\\s+[^:]+:\\s*' + g.id + ' (whisper|say)\\b').test(e));
       const onlyWhispers = planCmds.length && planCmds.every(c => c.kind === 'whisper');
-      const resultMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : (onlyWhispers ? '' : summary);
+      const actionMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : (onlyWhispers || spokenLines.length ? '' : summary);
+      const pn = world.playerName?.() || document.getElementById('chatName')?.value.trim() || 'the player', nameOf = id => id === 'player' ? pn : id;
+      const toChar = spokenLines.map(sp => ({ ...sp, addressed: !!sp.to && sp.to !== 'player' && !sp.whisper && convoLine(g.id, sp.to) }));
       const r = earshot(world);
       for (const other of world.getAgents()) {
-        if (other.id === g.id || !resultMsg || !within(other.root.position, g.root.position, r)) continue;
-        const ocfg = world.getBrainConfig(other.id);
-        ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: resultMsg }]);
-        if (ocfg.messages.length > 40) ocfg.messages = ocfg.messages.slice(-32);
+        if (other.id === g.id || !within(other.root.position, g.root.position, r)) continue;
+        const ocfg = world.getBrainConfig(other.id), heard = [];
+        for (const sp of toChar) {
+          if (sp.whisper) continue;
+          if (sp.to === other.id && sp.addressed) {
+            ocfg.pendingChat = (ocfg.pendingChat || []).concat([`${g.id} says: ${sp.text}`]).slice(-5);
+            try { window.tablefolkMind?.event(other, 'heard', { who: g.id, text: sp.text }); } catch {}
+          } else heard.push(sp.to === other.id ? `${g.id} says to you: ${sp.text} (you two have said your piece; no need to answer)` : sp.to ? `You overhear ${g.id} telling ${nameOf(sp.to)}: ${sp.text}` : `${g.id} says to nobody in particular: ${sp.text}`);
+        }
+        const msg = [...heard, actionMsg].filter(Boolean).join('\n');
+        if (msg) ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: msg }]);
+        if (ocfg.messages?.length > 40) ocfg.messages = ocfg.messages.slice(-32);
         world.setBrainConfig(other.id, ocfg);
       }
       return true;
@@ -1320,6 +1341,7 @@ async function main() {
     // Listeners (scenario safety check) may add a note to this agent's prompt first.
     try { window.dispatchEvent(new CustomEvent('tablefolk-player-chat', { detail: { agentId: g.id, text } })); } catch {}
     const cfg = world.getBrainConfig(g.id);
+    g._heard = { who: world.getPlayerAvatar?.() || null, at: performance.now() }; convoReset(g.id);
     // Store chat separately so it can be appended at the end of the next prompt (after perception)
     cfg.pendingChat = (cfg.pendingChat || []).concat([`${name} says: ${text}`]);
     if (cfg.pendingChat.length > 5) cfg.pendingChat = cfg.pendingChat.slice(-5);
@@ -1366,6 +1388,7 @@ async function main() {
       try { window.dispatchEvent(new CustomEvent('tablefolk-player-chat', { detail: { agentId: g.id, text } })); } catch {}
       const who = name || el('chatName')?.value || 'God';
       const cfg = world.getBrainConfig(g.id);
+      g._heard = { who: world.getPlayerAvatar?.() || null, at: performance.now() }; convoReset(g.id);
       cfg.pendingChat = (cfg.pendingChat || []).concat([`${who} says: ${text}`]).slice(-5);
       world.setBrainConfig(g.id, cfg);
       overhear(world, g, who, text);
