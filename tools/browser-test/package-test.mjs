@@ -34,6 +34,7 @@ const t0 = Date.now(), say = s => console.log(`[${((Date.now() - t0) / 1000).toF
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 page.setDefaultTimeout(90000);
+await page.bringToFront().catch(() => {});   // a background tab's frames are throttled: walks (the militia's) never finish
 try {
   say('opening the app');
   await page.goto(`${BASE}/app/?art=1&t=${Date.now()}`);
@@ -152,9 +153,11 @@ try {
     const o = __t.beacon(), m = tablefolk.getAgents().find(a => /^militia/.test(a.id) && !a.defeated), j = tablefolkJobs.jobOf(m);
     const far = tablefolkPackages.api().freeCell(o.x + 9, o.z + 2, 3); __t.put(m, far.x, far.z);
     for (const id of __gr2.ids) { const w = __t.agent(id); if (w) __t.put(w, o.x - 14, o.z - 14); }
-    for (let i = 0; i < 12; i++) { const r = await tablefolkJobs.tick(m); await __t.sleep(Math.min(1500, Math.max(300, r?.ms || 600))); }
+    const trace = [];
+    for (let i = 0; i < 12; i++) { const r = await tablefolkJobs.tick(m); const q = m.logicalPos || m.root.position; trace.push(`${q.x.toFixed(0)},${q.z.toFixed(0)}:${r?.ms}${m.turnMove ? 'm' : ''}`); await __t.sleep(Math.min(1500, Math.max(300, r?.ms || 600))); }
+    window.__dtrace = trace.join(' ') + ' from ' + far.x + ',' + far.z + ' beacon ' + o.x + ',' + o.z + ' raiders ' + tablefolkThreats.active().map(r => r.id).join(',');
     const p = m.logicalPos || m.root.position, d = Math.hypot(p.x - o.x, p.z - o.z);
-    return [j?.id === 'militia' && j.defends === 'signal_beacon' && d <= 4.5 && /guarding|defending/.test(m._job?.doing || ''), `job ${j?.id} defends ${j?.defends}, ${d.toFixed(1)} cells from the beacon, "${m._job?.doing}"`];
+    return [j?.id === 'militia' && j.defends === 'signal_beacon' && d <= 4.5 && /guarding|defending/.test(m._job?.doing || ''), `job ${j?.id} defends ${j?.defends}, ${d.toFixed(1)} cells from the beacon, "${m._job?.doing}" ${window.__dtrace}`];
   });
   await check('goal predicate from the module: beacon_burning', () => [typeof tablefolkPackages.goals.beacon_burning === 'function' && tablefolkPackages.goals.beacon_burning(true) === (__t.mm(__t.beacon()).state === 'lit'), Object.keys(tablefolkPackages.goals).join(',')]);
   await check('package lines: the Night Watch\'s pools are added (chatter.js)', () => [tablefolkChatter.pools.packages.some(p => p.from === 'nightwatch' && p.pools.raid_fighter), tablefolkChatter.pools.packages.map(p => p.from).join(',')]);
