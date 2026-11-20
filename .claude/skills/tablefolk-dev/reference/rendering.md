@@ -42,21 +42,28 @@ neutral vignette, FXAA, mild sharpen; SSAO (strength 1.6) only at high.
   through their cut-outs. `?sunshadow=0|1` overrides; the Graphics pane's
   "sun and moon shadows" (old key `keyShadowEnabled`) switches it. The
   contact-shadow discs under figures stay at every quality.
-- `setTimeOfDay(hours)` interpolates keyframes (00, 04:36, 05:42, 07, 10, 14,
-  16:30, 18, 19, 20:18): sun colour and intensity, moon intensity, sky top
-  and horizon colours, hemi sky/ground colours and intensity, environment
-  intensity, exposure, cloud colour, star alpha. The sun rises in the east
-  (-x), is highest in the north (-z: it lights the scene from behind what the
-  default camera looks at, so shadows fall toward the viewer) and sets in the
-  west; between 20:18 and 04:36 the moon (fixed, high in the north-west, cool
-  blue, .4-.6) takes the same light. `setLighting(mode)`: bright 10:00, dim
+- `setTimeOfDay(hours)` interpolates keyframes (00, 04:36, 05:42, 07, 10, 15,
+  16:36, 17:30 golden, 18:36, 19:24 dusk, 20:24): sun colour and intensity
+  (3.8 at midday), moon intensity (.6-.75), sky top and horizon colours,
+  hemi sky/ground colours and intensity (.74 by day), environment intensity,
+  exposure (1.3 by day: sunlit plaster near-white cream, a shadowed cobble
+  mid-grey), cloud colour, star alpha. The sun rises in the east (-x), is
+  highest in the SOUTH (+z, the default follow camera's side, which looks
+  north: faces toward the camera are lit and shadows fall away to the side
+  and back; pass 1 had it in the north and the scene came out backlit and
+  murky) and sets in the west: morning from the south-east, evening from the
+  south-west. Between 20:24 and 04:36 the moon (fixed, high in the
+  south-west, cool blue) takes the same light. The haze is the horizon colour
+  leaned a little blue (aerial perspective); dusk is blue-violet. `setLighting(mode)`: bright 10:00, dim
   19:00, night 23:00. Published as `tablefolk.setTimeOfDay` (installWorldAPI)
   and `tablefolkLook.setTimeOfDay`; clock.js's quarter-hour hook calls it.
 - `setWorld({ underground, fogNear, fogFar, sky })` (terrain.js sets it by
   the world's outside): underground worlds get no sun (intensity 0, still
-  there), a faint cool fill, black fog and clear colour, no sky.
+  there), a cool fill (.32, blue-grey) so unlit explored stone is dim but
+  legible, exposure 1.25, black fog and clear colour, no sky.
 - Fog is linear, from `radius + fogNear` to `radius + fogNear + fogFar` (the
-  camera's distance to its target), recomputed each frame, so the board is
+  camera's distance to its target; land 30/200, street 8/32, underground
+  6/26), recomputed each frame, so the board is
   clear at any zoom; its colour is the horizon's (the clear colour too).
 - Sky: a 1000 m back-faced sphere (`sky_dome`, infinite distance, no fog)
   wearing a 512 x 256 DynamicTexture repainted when the hour's colours change
@@ -121,12 +128,25 @@ neutral vignette, FXAA, mild sharpen; SSAO (strength 1.6) only at high.
   (no plank geometry, `floorLiftAt` 0); the rug (`buildRug`) still stands
   3 cm up. Water and lava stay overlays (`rebuildPaint`): water is dark
   (.05,.09,.10), roughness .12, alpha .8, over mud, so its shore blends.
+- Variation (pass 2): natural layers (`tfKind` 1) get patches of drier,
+  yellower and of lusher grass at 6-15 m (`tfPat` noise); dirt_path (`tfKind`
+  2) a lighter worn centre and darker edges by its control weight; on land
+  boards the far ground outside the board gets a rotated field patchwork
+  (26 x 17 m cells, three crop tints, soft darker seams, from 12 m out).
+  JS has the same noise (`patchAt`) so the tufts' instance colours follow
+  the patches.
+- Local lights: the terrain and the dungeon rock (`board_terrain`,
+  `board_rock`) take the local lights nearest the camera target (scenery.js
+  budget); before pass 2 floors got only the glow decals, so torch pools on
+  the ground were faint.
 - Ground cover (medium/high): `env-nature/cover` grass_tufts (4 meshes),
   flowers (3), pebbles (5) as thin instances, deterministic per board seed,
-  on grass and forest-floor cells (1.2 tufts a cell + 1.4 per neighbouring
-  path/wall/floor, kept .45 cell off a path's side, half by objects, none in
-  rooms, on paths, floors or doorways), pebbles on natural ground; capped at
-  3500 (light: pebbles only, 500). They don't cast shadows.
+  on grass and forest-floor cells (open grass one tuft on about a third of the
+  cells, edges .6 + 1.5 per neighbouring path/wall/floor, kept .45 cell off a
+  path's side, none in rooms, on paths, floors or doorways), pebbles only by
+  paths and objects; instance colours (tufts lightened, tinted by the grass
+  patches); capped at 3500 (light: pebbles only, 500). Seen from above, open
+  tufts read as dark specks: hence the thin spread. They don't cast shadows.
 - `rebuildBoardSupport()` builds the physics ground and the pick plane as
   before.
 - Terrain modes and the outside: see "The edge of the world" below.
@@ -191,7 +211,9 @@ the ground is outside them (a world that is all one building); else land.
   outer half of every wall cell facing it (half-cell quads; corners by the
   diagonal rule), 10 cells past the board, with vertical faces where it
   meets floor; stone_wall_rubble darkened, world UVs. Underground light
-  (sky.js), black fog at 3-25 m. The fog of war's boxes still cover it.
+  (sky.js), black fog. `tablefolkTerrain.isRock(x, z)`: darkness.js puts no
+  fog box on rock squares (the rock fades into the black fog instead) and the
+  boxes over unexplored rooms are a dark tone close to the rock's.
 - street: cobblestone past the walls, fog at 3-29 m, the sky stays.
 - sea: sand under shallow water at the edge, the sea floor falling to
   -2.6 m, open water to the horizon.
@@ -258,7 +280,10 @@ the ground is outside them (a world that is all one building); else land.
   player are cut per pixel in the walls' own materials (a material plugin
   discards fragments above a stub height in the cut squares); geometry is
   never changed. Every mesh in `state.wallVisuals` is cut, so walls.js's
-  meshes need nothing more. Cut squares get a stone lid. The free camera uses
+  meshes need nothing more. walls.js materials are not back-face culled, and
+  the plugin draws a back face seen through a cut as a flat dark section
+  (`tfCutArea.w` 1; the fog boxes' instance 0), so a cut wall reads solid
+  rather than hollow with timber "teeth". Cut squares get a stone lid. The free camera uses
   a second mode (`half()`, uniform `tfCut.z` = 2): every wall fragment above
   half the wall height is discarded, with no lids; the fog boxes' plugin
   (`attach(mat, true)`) ignores that mode. `suspend(true)` returns the mode,
@@ -416,6 +441,14 @@ The extra draw calls are the shadow pass (every caster again), the
 real-model trees (several meshes each), the ground cover kinds and the
 surroundings' tree meshes. Without the shadow map the market village at
 medium drew 200 calls instead of 442 (before the every-second-frame refresh).
+
+Pass 2 (light-tier memory, the Oracle, fresh Chrome, +-50 MiB noise): all
+on 517 MiB; without the surroundings' trees 419; without ground cover,
+without the terrain's texture arrays or without the sun's shadow map, no
+change beyond the noise. So at light quality the surroundings use three
+tree models that share bark and leaf textures and drop their normal and
+roughness maps, the terrain arrays are 512 px, walls and roofs have colour
+and normal maps only, and wall materials are made on first use.
 
 Before 2026-11-20:
 

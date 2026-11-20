@@ -149,3 +149,14 @@ setting), `add_objects`, `paint_area` (a whole patch of floor tiles
 `{from, to, mat}`), `add_paint` (one tile, replacing that square's),
 `remove_paint`, `update_agents` (`{id, ...only the fields to change}`) and
 `remove_agents`.
+
+### Buildings in a generated village (2026-11-20)
+
+A building nobody lives or works in (no character's `home`, `workplace` or
+`in`, no object placed `in` it) becomes one of the real building models,
+chosen by its role (a house: house, timber house, tall house or stone house;
+a tavern: the inn; a smithy: the blacksmith; a guardhouse: the barracks; a
+stable: the stable; and so on), seeded, no two alike in a row where another
+fits. Homes and workplaces stay rooms you can walk into, because characters'
+days (jobs) need their beds and work places on the same map. `"generate":
+{ "models": false }` keeps every building as a room.

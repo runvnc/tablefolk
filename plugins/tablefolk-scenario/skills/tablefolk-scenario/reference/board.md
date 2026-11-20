@@ -164,9 +164,10 @@ scenery: nobody can walk there, and characters don't see it.
 
 ## Light
 
-`lighting` sets the time of day: `bright` (default) is mid-morning,
+`lighting` sets the time of day: `bright` (default) is a sunny mid-morning,
 `dim` dusk, `night` a moonlit night (readable, not black). One sun (or the
-moon) casts soft shadows, the sky follows the hour (stars at night), and
+moon) casts soft shadows; the sun crosses the southern sky, the side the
+default camera looks from, so what faces you is lit and shadows fall away; the sky follows the hour (stars at night), and
 fog fades the land into the horizon. In a living world the clock moves
 the sun through the day. Dark worlds have no sun: torches, lamps and fires
 light them. `campfire` and `lantern` bring their own warm light, candles

@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Brighter, clearer days** (look pass 2): a sunny day with the sun in the southern sky (what faces the camera is lit, shadows fall away), golden hour, a blue-violet dusk, a moonlit night; torches and lamps light the ground; generated villages use the real building models for every building nobody lives or works in; roofs vary per house; signposts, lantern posts and fences are real models; grass has patches, paths are worn, the far land has fields; cut walls read solid; dungeon rock shows under the fog of war.
 - **A new look for the world**: matte, weathered, semi-realistic. One sun (or the moon) with soft shadows at every quality, a sky that follows the time of day (`lighting` bright is morning, dim dusk, night moonlit; the world clock moves the sun), fog that fades the land into the horizon; no more glossy plastic finish.
 - **The ground is one continuous terrain**: real textures (meadow, worn paths, cobbles, flagstones, sand, planks) blending into each other instead of a grid of tiles; the squares' lines only with the Graphics pane's **show grid**. Grass tufts, flowers and pebbles on medium/high quality.
 - **No floating boards**: the land runs on past the edge into hills and trees (`"surroundings"` for every outdoor world), dungeons sit in solid rock, a lone building in a cobbled street, islands in open sea (`"outside"` to choose). Walking off the board stops at the edge.
