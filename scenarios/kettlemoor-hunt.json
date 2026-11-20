@@ -1,0 +1,333 @@
+{
+ "v": 1,
+ "title": "The Kettlemoor Hunt",
+ "subtitle": "A dark wood, a hunter gone, and a bear with a taste for camp meat.",
+ "intro": "Three hunters and a cook hold a fire in the deep pines. Old Brannoc went after the bear two nights ago and has not come back. The meat barrels are nearly empty and the nights are getting colder.",
+ "seed": 41,
+ "lighting": "night",
+ "live": true,
+ "time": "06:30",
+ "dayMinutes": 12,
+ "temper": "normal",
+ "monsters": "everyone",
+ "harsh": true,
+ "generate": {
+  "kind": "forest",
+  "style": "pine",
+  "places": [
+   "clearing",
+   "camp",
+   "cave",
+   "grove",
+   "pond"
+  ]
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "emote",
+  "give",
+  "sell",
+  "attack",
+  "wield",
+  "carry",
+  "drop",
+  "look"
+ ],
+ "food": [
+  {
+   "name": "venison stew"
+  },
+  {
+   "name": "pine ale",
+   "drink": true
+  }
+ ],
+ "agents": [
+  {
+   "id": "kestrel",
+   "model": "huntress",
+   "job": "hunter",
+   "home": "camp",
+   "workplace": "grove",
+   "style": "steady huntress in oiled leathers",
+   "wield": "hunting_bow",
+   "hp": 14,
+   "ttsVoiceId": "pack:huntress_f",
+   "allowed": [
+    "say",
+    "walk",
+    "face",
+    "give",
+    "attack",
+    "wield",
+    "emote",
+    "sell"
+   ],
+   "personality": "Kestrel, the camp's lead hunter. You want Brannoc found alive, or the bear's hide if not. You think Dormund the cook burns the good cuts and wastes salt. Use give(meat) to hand over what you kill.",
+   "in": "grove"
+  },
+  {
+   "id": "dormund",
+   "model": "villager",
+   "job": "cook",
+   "home": "camp",
+   "workplace": "camp",
+   "style": "broad cook with soot on his sleeves",
+   "inventory": {
+    "gold": 6,
+    "items": [
+     "venison stew",
+     "salt"
+    ]
+   },
+   "ttsVoiceId": "pack:tavern_m",
+   "personality": "Dormund, the camp cook. You want the meat barrels full before the frost. You think Kestrel takes the north grove alone and will get herself killed. Stew is two gold a bowl; salt is one.",
+   "in": "camp"
+  },
+  {
+   "id": "wren",
+   "model": "villager_woman",
+   "job": "healer",
+   "home": "camp",
+   "workplace": "camp",
+   "style": "quiet young healer with a herb satchel",
+   "inventory": {
+    "gold": 4,
+    "items": [
+     "potion",
+     "bandage"
+    ]
+   },
+   "ttsVoiceId": "pack:shy_f",
+   "personality": "Wren, who tends the camp's wounds. You want someone to walk with you to the pond for lily roots, it is not safe alone. You think Kestrel is braver than she is sensible. Secret: you heard the bear breathing outside the tent last night.",
+   "agenda": "gather herbs at the pond at dawn",
+   "in": "camp"
+  },
+  {
+   "id": "gorm",
+   "model": "guard",
+   "job": "guard",
+   "home": "camp",
+   "workplace": "camp",
+   "style": "scarred guard with a spear",
+   "wield": "spear",
+   "hp": 16,
+   "ttsVoiceId": "pack:captain_m",
+   "allowed": [
+    "say",
+    "walk",
+    "face",
+    "attack",
+    "wield",
+    "emote"
+   ],
+   "personality": "Gorm, the camp's watch. You want the palisade finished, not more hunting trips. You think Dormund drinks more than he cooks. You will not leave the fire unguarded after dark.",
+   "in": "camp"
+  },
+  {
+   "id": "brannoc",
+   "model": "woodsman",
+   "job": "hunter",
+   "home": "camp",
+   "workplace": "cave",
+   "style": "wounded grey-bearded hunter",
+   "hp": 5,
+   "wield": "knife",
+   "ttsVoiceId": "pack:farmer_m",
+   "allowed": [
+    "say",
+    "walk",
+    "face",
+    "emote",
+    "attack",
+    "wield",
+    "give",
+    "sell"
+   ],
+   "personality": "Brannoc, the old hunter, holed up in the cave with a torn leg. You want the bear dead and a fire to sit by. You think Kestrel will come for you, and Gorm will say he told you so.",
+   "in": "cave"
+  },
+  {
+   "id": "ursa",
+   "model": "bear",
+   "hostile": true,
+   "hp": 24,
+   "personality": "A hostile bear."
+  }
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "in": "camp",
+   "items": [
+    {
+     "name": "meat",
+     "qty": 2
+    },
+    {
+     "name": "salt",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "type": "chest",
+   "in": "camp",
+   "items": [
+    {
+     "name": "bandage",
+     "qty": 2
+    },
+    {
+     "name": "arrow",
+     "qty": 6
+    }
+   ]
+  },
+  {
+   "type": "bear_trap",
+   "in": "grove",
+   "crop": "meat",
+   "stock": 3
+  },
+  {
+   "type": "apple_barrel",
+   "in": "camp",
+   "crop": "apple",
+   "stock": 3
+  },
+  {
+   "type": "lily_pad",
+   "in": "pond",
+   "crop": "fish",
+   "stock": 2
+  },
+  {
+   "type": "fire_pit",
+   "in": "camp"
+  },
+  {
+   "type": "pine_tree",
+   "in": "clearing",
+   "crop": "firewood",
+   "stock": 4
+  },
+  {
+   "type": "note",
+   "in": "camp",
+   "text": "Brannoc: gone north to the cave. If I am not back by dark, do not follow.",
+   "wall": "north"
+  },
+  {
+   "type": "picture",
+   "style": "sign",
+   "in": "camp",
+   "title": "Kettlemoor Hunters",
+   "prompt": "a carved wooden sign of a stag and a bear fighting"
+  },
+  {
+   "type": "chest",
+   "in": "grove",
+   "items": []
+  },
+  {
+   "type": "cauldron",
+   "in": "camp"
+  },
+  {
+   "type": "bookcase",
+   "in": "camp"
+  },
+  {
+   "type": "target",
+   "in": "camp"
+  },
+  {
+   "type": "chest",
+   "in": "cave",
+   "items": []
+  },
+  {
+   "type": "bed",
+   "in": "camp"
+  },
+  {
+   "type": "bed",
+   "in": "camp"
+  },
+  {
+   "type": "bed",
+   "in": "camp"
+  },
+  {
+   "type": "bed",
+   "in": "camp"
+  }
+ ],
+ "threats": [
+  {
+   "kind": "raid",
+   "who": "wolf",
+   "count": 2,
+   "when": "night",
+   "every": 1,
+   "from": "edge"
+  },
+  {
+   "kind": "rats",
+   "who": "rat",
+   "count": 2,
+   "when": "night",
+   "every": 2
+  }
+ ],
+ "events": [
+  "A branch cracks somewhere past the firelight.",
+  "A wolf howls, far off and then nearer.",
+  {
+   "text": "{who} finds a torn scrap of Brannoc's cloak.",
+   "spawn": "note",
+   "note": "Blood on the pines, heading north."
+  },
+  {
+   "text": "The fire gutters and Gorm curses.",
+   "round": 6,
+   "to": "gorm"
+  }
+ ],
+ "goal": {
+  "text": "Reach Brannoc in the cave and put down the bear before the second night falls.",
+  "win": {
+   "all": [
+    {
+     "agent_near": [
+      "brannoc",
+      "cave",
+      3
+     ]
+    },
+    {
+     "agent_defeated": "ursa"
+    }
+   ]
+  },
+  "lose": {
+   "any": [
+    {
+     "player_defeated": true
+    },
+    {
+     "not": {
+      "agents_alive": 2
+     }
+    }
+   ]
+  },
+  "maxTurns": 40,
+  "winText": "The bear is down and Brannoc limps home to the fire. Kettlemoor holds.",
+  "loseText": "The fire dies and the pines go quiet."
+ },
+ "wallHeight": 2
+}

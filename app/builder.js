@@ -205,12 +205,17 @@
     return next;
   }
 
+  // the jobs the game has (jobs/<id>/job.json; a package may bring more: kept as written)
+  const JOBS = ['farmer', 'baker', 'innkeeper', 'cook', 'smith', 'woodcutter', 'miner', 'hunter', 'fisher', 'herder', 'merchant', 'guard', 'healer', 'ratcatcher', 'scholar', 'child', 'labourer', 'idler'];
+  const jobOptions = v => [['', '(guessed from its role)'], ...JOBS, ...(v && typeof v === 'string' && !JOBS.includes(v) ? [v] : [])];
+  const placeHint = () => (scn.places || []).map(p => p.id).slice(0, 4).join(', ') || (scn.generate ? 'house 2, smithy' : 'a thing\'s type');
   function agentBox(a, i) {
     const p = 'agents.' + i, hostile = a.hostile == null ? '' : String(!!a.hostile);
     return `<fieldset class="agent"><legend>${esc(a.id || 'character ' + (i + 1))} <button type="button" class="ghost small" data-remove="${i}">remove</button></legend><div class="cols">
       ${field('id', p + '.id')}${field('body', p + '.model', 'select', { options: modelOptions })}${field('voice', p + '.ttsVoiceId', 'select', { options: voiceOptions() })}
       <label><span>hostile</span><select data-path="${p}.hostile" data-type="bool3"><option value=""${hostile === '' ? ' selected' : ''}>auto${MINDLESS.has(a.model) ? ' (yes)' : ' (no)'}</option><option value="true"${hostile === 'true' ? ' selected' : ''}>yes: fights, no LLM</option><option value="false"${hostile === 'false' ? ' selected' : ''}>no: talks</option></select></label>
       ${field('hit points', p + '.hp', 'num', { ph: 'default' })}${field('wields', p + '.wield')}
+      ${field('job (a living world runs it)', p + '.job', 'select', { options: jobOptions(a.job) })}${field('home (a place)', p + '.home', 'text', { ph: placeHint() })}${field('workplace (a place or a thing)', p + '.workplace', 'text', { ph: placeHint() })}${field('temper', p + '.temper', 'select', { options: [['', '(the world\'s)'], 'short', 'normal', 'long'] })}
       ${field('style (a few words)', p + '.style', 'text', { wide: true })}
       ${field('personality / brief', p + '.personality', 'area', { wide: true, rows: 5 })}
       ${field('allowed commands (comma)', p + '.allowed', 'list', { wide: true, ph: 'scenario default' })}
@@ -249,6 +254,11 @@
         ${field('default brain (model this world starts on)', 'defaultModel', 'select', { options: brainOptions })}${simpleSelect('simple', scn.simple)}${spokenSelect('onlySpokenTo', scn.onlySpokenTo)}${directorSelect(scn.director)}
         <label><span>show the intro card</span><select data-path="showIntro" data-type="bool3"><option value=""${scn.showIntro !== false ? ' selected' : ''}>yes</option><option value="false"${scn.showIntro === false ? ' selected' : ''}>no: straight into the world</option></select></label>
         ${field('starting view', 'view', 'select', { options: [['', '(default: free camera)'], ['follow', 'follow camera'], ['first', 'first person']] })}
+        <label><span>living (characters act on their own: jobs, meals, sleep)</span><select data-path="live" data-type="bool3"><option value=""${!scn.live ? ' selected' : ''}>no</option><option value="true"${scn.live ? ' selected' : ''}>yes</option></select></label>
+        ${field('start time (HH:MM)', 'time', 'text', { ph: '08:00' })}${field('day length (real minutes; 0 stops the clock)', 'dayMinutes', 'num', { ph: '12' })}
+        ${field('temper (how fast insults anger them)', 'temper', 'select', { options: [['', '(normal)'], 'short', 'normal', 'long'] })}${field('monsters hunt', 'monsters', 'select', { options: [['', '(default: everyone in a living world)'], 'everyone', 'player'] })}
+        <label><span>talk-only scene (no jobs or threats added by the builder)</span><select data-path="talk" data-type="bool3"><option value=""${scn.talk ? '' : ' selected'}>no</option><option value="true"${scn.talk ? ' selected' : ''}>yes</option></select></label>
+        <div class="wide"><span class="muted">threats (on the clock: raid attacks people, rats eat the stores, bandits steal gold)</span>${(scn.threats || []).map((t, i) => `<div class="cols" style="align-items:end">${field('kind', `threats.${i}.kind`, 'select', { options: [...new Set(['raid', 'rats', 'bandits', t.kind].filter(Boolean))] })}${field('who (a body)', `threats.${i}.who`, 'text', { ph: 'wolf' })}${field('count', `threats.${i}.count`, 'num', { ph: '2' })}${field('when', `threats.${i}.when`, 'select', { options: [['', '(the kind\'s)'], 'night', 'day', 'any'] })}${field('every (days)', `threats.${i}.every`, 'num', { ph: '1' })}<button type="button" class="ghost small" data-act="removeThreat" data-i="${i}">remove</button></div>`).join('')}<button type="button" class="ghost small" data-act="addThreat">+ add a threat</button></div>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
         ${field('win / lose rules (JSON: {"win": ..., "lose": ...})', '__rules', 'json', { wide: true, rows: 3 })}
         ${field('full system prompt for every character (replaces the built one; {name} {style} {personality} {backstory} {commands})', 'systemPrompt', 'area', { wide: true, rows: 3 })}</div></fieldset></div>
@@ -498,6 +508,8 @@
     else if (act === 'sharePic') { msg('drawing the picture…'); try { await mapLaidOut(); const shot = await ed?.snapshot?.({ maxSide: 1000 }), blob = await WF().toImage(scn, { picture: shot?.url }); WF().download(blob, WF().fileName(scn, 'png')); msg(`picture saved (${Math.round(blob.size / 1024)} KB): send the file itself; the game opens it when it is dropped on the page`); } catch (err) { msg('failed: ' + err.message); } }
     else if (act === 'zip') { try { const blob = await WF().toZip(scn); WF().download(blob, WF().fileName(scn, 'zip')); msg(`.zip saved (${Math.round(blob.size / 1024)} KB)`); } catch (err) { msg('failed: ' + err.message); } }
     else if (act === 'openFile') { try { openWorld(await WF().pick()); } catch (err) { msg(err.message); } }
+    else if (act === 'addThreat') { remember(); (scn.threats ||= []).push({ kind: 'raid', who: 'wolf', count: 2, when: 'night', every: 1 }); render(); mapSoon(); }
+    else if (act === 'removeThreat') { remember(); scn.threats.splice(+b.dataset.i, 1); if (!scn.threats.length) delete scn.threats; render(); mapSoon(); }
     else if (act === 'add') { (scn.agents ||= []).push({ id: 'npc' + (scn.agents.length + 1), model: 'villager', style: 'villager', personality: '' }); render(); mapSoon(); }
     else if (act === 'applyRaw') { try { const v = JSON.parse($('rawJson').value); remember(); scn = v; render(); loadMap(); msg('applied'); } catch (err) { msg('bad JSON: ' + err.message); } }
     else if (act === 'ask') ask();

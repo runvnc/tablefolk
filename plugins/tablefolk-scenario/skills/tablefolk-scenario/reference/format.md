@@ -51,6 +51,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "gossip": true, "reflect": true, "reflexes": true, "expect": null, "monsters": null, "remembers": true, "plans": true, "glances": true, "autoThink": true,   // characters.md
   "live": false, "pace": "calm", "director": 5, "events": [],
   "time": "08:00", "dayMinutes": 12, "clock": true,   // the time of day (living.md)
+  "talk": false,                   // true: a talk-only scene (the world builder adds no jobs, threats or living-world rules)
   "threats": [], "harsh": false, "prices": {},          // raids on the clock; starving hurts; the world's prices (living.md, characters.md)
   "goal": { "text": "Get the magic sword.", "win": { "player_has": "magic sword" } }
 }
@@ -87,6 +88,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `live`, `pace`, `director`, `events` | a world that lives on its own | [living.md](living.md) |
 | `time`, `dayMinutes`, `clock` | the time of day: start, real minutes a day (0: frozen), `false`: no clock | [living.md](living.md) |
 | `threats` | raids, rats, bandits (and package kinds) on the clock | [living.md](living.md), [combat.md](combat.md) |
+| `talk` | `true`: a talk-only scene; the world builder leaves it one place with no jobs or threats | [world-builder.md](world-builder.md) |
 | `harsh`, `prices` | starving drains health; the world's prices (`{"bread": 3}`) | [characters.md](characters.md) |
 | `monsters` | `"player"`: monsters go only for the player; `"everyone"`; unset: everyone in a living world, the player otherwise | [combat.md](combat.md) |
 | `goal` | win and lose conditions | [goals.md](goals.md) |
@@ -121,6 +123,7 @@ Without `at` the player starts at the south of the board.
   "in": "tavern",                  // generated maps: put it in that place
   "quest": "",                     // a private aim
   "role": "shopkeeper",            // a job (skills-and-roles.md)
+  "job": "baker", "home": "house 2", "workplace": "shop",   // what it does all day in a living world, where it sleeps and works (living.md)
   "prices": { "magic sword": [50, 40], "healing potion": 8 },  // asking, or [asking, lowest]
   "skills": ["magic"], "skillParams": { "magic": { "spells": ["spark"], "mana": 12 } },
   "workflow": "haggle", "workflows": ["haggle"],   // workflows.md

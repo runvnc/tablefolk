@@ -60,5 +60,16 @@
    "store": "stew",
    "keep": 2
   }
+ ],
+ "fallback": [
+  {
+   "buy": true
+  },
+  {
+   "gather": true
+  },
+  {
+   "idle": "tidy"
+  }
  ]
 }

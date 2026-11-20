@@ -370,6 +370,47 @@ you do now?".
 
 Measured: testing.md, "A whole day".
 
+## Built (2026-11-20, later): quieter rooms, one topic, fallbacks
+
+- **Conversations** (world-integration.js `convoLine`, `activeConvos`,
+  `busyNear`, `lastLine`, `window.tablefolkTalk`): a pair closes after 4
+  lines (`CONVO_LINES`) for 120 s and both are talked out with anyone but
+  the player for 90 s; a new pair cannot start while another pair talks or
+  someone else spoke (not to it) in the last 30 s within earshot (`FLOOR_MS`;
+  every voiced character line, remarks and greetings too, through
+  `tablefolk-say`); such a line counts as overheard, and the turn is muted
+  (`crowded`) unless the player spoke to it. jobs.js asks `mayStart` before
+  an evening talk, a remark or an event's "say something" (offered only
+  to the one the event happened to, not to everyone near).
+- **Short lines**: a say/whisper under four words that does not answer a
+  yes/no question (`yesNoQuestion` over the pending lines) becomes an emote
+  (huff, shush, shrug, wave, frown, scowl, nod). Not in simple mode.
+- **Topics** (jobs.js `NEWS` entries `{id, kind, about}`, `topicFor`,
+  `TOPIC_USED`): kinds made, sold, bought, short, raid, quarrel, insult
+  (mind.js `insult`), event (director.js `happen`); own news first, then the
+  village's, then "Ask x about" x's own; each once per pair. Director
+  rumours skip a hearer named in them, and those near who are named.
+- **Social turns** (`g._callKind === 'social'`): commands limited to
+  `SOCIAL_CMDS`; `use` only on a seat. `drink` is parsed as `eat` with
+  `drink: true`; mind.js `isDrink` (DRINK words, scenario food
+  `"drink": true`, pack tag `drink`) says "drinks"; drinks nourish .25 and
+  are not a meal for jobs.js `foodIn`.
+- **Fallbacks** (jobs.js `fallback`, `idleActivity`, `altSets`, `sourcesOf`):
+  a step's `need` runs the job's `fallback` list (buy from a carrier, ask a
+  maker once an hour, gather from a thing whose stock item matches); none:
+  the step is blocked an hour and the others go on; nothing at all:
+  `decide` keeps busy with the declared idle activity (seated, it mostly
+  stays put) and picks with the model at most once an hour. Recipes take
+  alternatives (`needs`/`fetch` as a list of sets). The old "keep busy at
+  the station" option (the stir loop) is gone.
+- **Steps** `tidy`, `lookout`, `pace`; job `"order": "random"` (idler).
+- **Patrol**: a fighter's patrol counts a cycle per place reached
+  (`s.patrols`), emotes a look round and greets someone within 4 cells by
+  name (each once a game hour; app.js `say`, voiced, not addressed).
+- **Log** (app.js `log`): "facing w" lines only with `TABLEFOLK_DEV`; the
+  same action line within the last five becomes one with "(xN)".
+  live-eval's transcript does the same for consecutive lines.
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

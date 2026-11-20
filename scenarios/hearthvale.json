@@ -396,6 +396,22 @@
    "z": 6,
    "items": [],
    "gold": 0
+  },
+  {
+   "type": "mossy_rock",
+   "x": -3,
+   "z": 13,
+   "crop": "iron ore",
+   "stock": 3,
+   "name": "ore vein"
+  },
+  {
+   "type": "mossy_rock",
+   "x": -3,
+   "z": 14,
+   "crop": "iron ore",
+   "stock": 3,
+   "name": "ore vein"
   }
  ]
 }

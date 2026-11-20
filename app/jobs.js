@@ -159,7 +159,7 @@
     return best;
   }
   const isFood = n => !!M()?.isFood?.(n);
-  const foodIn = g => (inv(g).items || []).find(i => (i.qty ?? 1) > 0 && isFood(i.name) && !/potion|elixir|tonic/i.test(i.name));
+  const foodIn = g => (inv(g).items || []).find(i => (i.qty ?? 1) > 0 && isFood(i.name) && !/potion|elixir|tonic/i.test(i.name) && !M()?.isDrink?.(i.name));
 
   // ---------------------------------------------------------------- moving and acting
   const REACH = 1.9;
@@ -273,12 +273,16 @@
   }
 
   // ---------------------------------------------------------------- what happened (counted from the action lines)
-  const NEWS = [];   // { at: game minute, who, text }
+  const NEWS = [];   // { id, at: game minute, who, text, kind, about: [character ids named in it] }
+  let newsSeq = 0;
   const gm = () => { const k = K()?.now(); return k ? (k.day - 1) * 1440 + k.min : performance.now() / 500; };
-  function addNews(who, text) {
+  const esc = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idsIn = text => state.characters.filter(c => !c._threat && new RegExp('\\b' + esc(c.id) + '\\b', 'i').test(text)).map(c => c.id);
+  // kind: made | sold | bought | short (ran out) | raid | quarrel | insult | event (the director's) | news
+  function addNews(who, text, kind = 'news') {
     const t = gm(), same = NEWS.find(n => n.text === text && t - n.at < 180);
     if (same) { same.at = t; return; }
-    NEWS.push({ at: t, who, text }); if (NEWS.length > 60) NEWS.shift();
+    NEWS.push({ id: ++newsSeq, at: t, who, text, kind, about: idsIn(text) }); if (NEWS.length > 80) NEWS.shift();
   }
   function newsFor(g, n) { const t = gm(); return NEWS.filter(x => t - x.at < 1440 && x.who !== g.id && !x.text.startsWith(g.id + ' ')).slice(-n).map(x => x.text); }
   const bump = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
@@ -286,9 +290,9 @@
     const d = e.detail || {}; if (d.voiced) return;
     const t = String(d.text || ''), g = state.characters.find(c => c.id === d.agentId); if (!g || !g._job) return;
     const s = g._job; let m;
-    if ((m = t.match(/^([\w-]+) sells ([\w-]+) (.+?) for (\d+) gold/))) { bump(s.did.sold, m[3]); const b = state.characters.find(c => c.id === m[2]); if (b?._job) bump(b._job.did.bought, m[3]); addNews(g.id, `${m[1]} sold ${m[2]} ${m[3]}`); return; }
-    if ((m = t.match(/^([\w-]+) buys (?:\d+ )?(.+?) from ([\w-]+)/))) { bump(s.did.bought, m[2]); const o = state.characters.find(c => c.id === m[3]); if (o?._job) bump(o._job.did.sold, m[2]); return; }
-    if ((m = t.match(/\(\+(\d+) ([\w ]+)\)/))) { const made = /\b(bakes|forges|brews|cooks|makes|pours|mills|stews)\b/.test(t); bump(made ? s.did.made : s.did.gathered, m[2], +m[1]); if (made) addNews(g.id, `${g.id} ${t.split(' ').slice(1, 2)[0]} ${m[2]}`); return; }
+    if ((m = t.match(/^([\w-]+) sells ([\w-]+) (.+?) for (\d+) gold/))) { bump(s.did.sold, m[3]); const b = state.characters.find(c => c.id === m[2]); if (b?._job) bump(b._job.did.bought, m[3]); addNews(g.id, `${m[1]} sold ${m[2]} ${m[3]} for ${m[4]} gold`, 'sold'); return; }
+    if ((m = t.match(/^([\w-]+) buys (?:\d+ )?(.+?) from ([\w-]+)/))) { bump(s.did.bought, m[2]); const o = state.characters.find(c => c.id === m[3]); if (o?._job) bump(o._job.did.sold, m[2]); addNews(g.id, `${m[1]} bought ${m[2]} from ${m[3]}`, 'bought'); return; }
+    if ((m = t.match(/\(\+(\d+) ([\w ]+)\)/))) { const made = /\b(bakes|forges|brews|cooks|makes|pours|mills|stews)\b/.test(t); bump(made ? s.did.made : s.did.gathered, m[2], +m[1]); if (made) { const v = t.split(' ')[1], past = { bakes: 'baked', forges: 'forged', brews: 'brewed', cooks: 'cooked', makes: 'made', pours: 'poured', mills: 'milled', stews: 'stewed' }[v] || 'made'; addNews(g.id, `${g.id} ${past} ${m[1]} ${m[2]}`, 'made'); } return; }
     if ((m = t.match(/^[\w-]+ takes (?:an? )?([\w ]+?) from the (apple barrel|apple crate|carrot crate)/))) { bump(s.did.gathered, m[1]); return; }
     if ((m = t.match(/ puts (?:an? )?(?!\d+ gold)(.+?) in the /))) { bump(s.did.stored, m[1]); return; }
     if ((m = t.match(/^[\w-]+ eats the (.+)$/))) { bump(s.did.ate, m[1]); return; }
@@ -302,7 +306,7 @@
   });
   addEventListener('tablefolk-scenario-started', e => {
     if (e.detail?.sub) return;
-    NEWS.length = 0; lastDay = 0;
+    NEWS.length = 0; lastDay = 0; TOPIC_USED.clear();
     for (const g of state.characters) { g._job = undefined; g._jobDef = undefined; }
     // a little money by job, when the scenario gives none
     setTimeout(() => { for (const g of state.characters) { const j = jobOf(g), a = agentOf(g); if (j?.gold && a.inventory?.gold == null) { const i = inv(g); if (!i.gold) { i.gold = +j.gold; W().setBrainConfig(g.id, { inventory: i }); } } } }, 0);
@@ -336,7 +340,7 @@
   const nameOf = c => c === state.playerAvatar ? (document.getElementById('chatName')?.value.trim() || 'a traveller') : c.id;
   // a remark while working: one line, the activity in the prompt
   async function remark(g, s) {
-    if (!brainOk() || gm() - s.lastRemark < 180 || Math.random() > .3 || window.tablefolkLive?.quiet?.() === false) return false;
+    if (!brainOk() || gm() - s.lastRemark < 180 || Math.random() > .3 || window.tablefolkLive?.quiet?.() === false || window.tablefolkTalk?.mayStart?.(g.id) === false) return false;
     const near = nearPeople(g); if (!near.length) return false;
     s.lastRemark = gm();
     const cfg = W().getBrainConfig(g.id), j = jobOf(g), who = near.map(nameOf).slice(0, 3).join(', ');
@@ -352,7 +356,24 @@
   }
 
   // ---------------------------------------------------------------- the steps
-  const stepName = st => Object.keys(st).find(k => ['haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read'].includes(k));
+  const stepName = st => Object.keys(st).find(k => ['haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace'].includes(k));
+  // a recipe's inputs: one set ({"wheat": 2}) or alternatives ([{"wheat": 2}, {"flour sack": 1}])
+  const altSets = v => (Array.isArray(v) ? v : [v || {}]).filter(x => x && typeof x === 'object');
+  const missingIn = (g, set) => Object.entries(set).find(([n, q]) => count(g, n) < q) || null;
+  // where an item could come from: a store, someone carrying it, or a thing on the map that yields it
+  function sourcesOf(g, item, kinds) {
+    const s = S(g), t = gm(), it = String(item).toLowerCase();
+    const list = getObjects().filter(o => { const st = U()?.stockOf(o); return st && st.left > 0 && String(st.item).toLowerCase() === it && !((s.bad || {})[Math.round(o.x) + ',' + Math.round(o.z)] > t); });
+    const hinted = kinds ? list.filter(o => kinds.some(k => matches(o, k))) : [];
+    return hinted.length ? hinted : list;
+  }
+  const inStores = item => stores().some(o => has(o, item));
+  const carriedBy = (g, item) => state.characters.filter(c => c !== g && !c.defeated && count(c, item) > 0 && !P()?.isHostile?.(c) && !P()?.isAnimal?.(c));
+  const supplied = (g, item) => inStores(item) || carriedBy(g, item).length > 0 || sourcesOf(g, item).length > 0;
+  // small loose things worth tidying away, and doors to look out of
+  const LOOSE = /^(bucket|bag|pot|vase|frying_pan|rope|broken_pot|backpack|bone|chalice|candles|sacks)$/;
+  const doors = () => (state.blocks || []).filter(b => b && !b.isDisposed?.() && meta(b)?.type === 'door').map(b => ({ x: b.position.x, z: b.position.z, type: 'door', mesh: b }));
+  const oneOf = a => a[Math.floor(Math.random() * a.length)];
   function stationFor(g, k) {
     const s = S(g), t = gm(), list = things(k).filter(o => { const st = U().stockOf(o); return (!st || st.left > 0) && !((s.bad || {})[Math.round(o.x) + ',' + Math.round(o.z)] > t); });
     if (!list.length) return null;
@@ -372,8 +393,13 @@
     if (kind === 'fetch') { const r = await fetchStep(g, s, j, arg); return r.need && st.optional ? { skip: true } : r; }
     if (kind === 'haul') return haul(g, s);
     if (kind === 'make') {
-      const needs = st.needs || {};
-      for (const [n, q] of Object.entries(needs)) if (count(g, n) < q) return st.optional ? { skip: true } : { need: { item: n, n: q - count(g, n), for: arg } };
+      // the first set of inputs it has in full (bread from wheat, or from a flour sack)
+      const sets = altSets(st.needs), needs = sets.find(x => !missingIn(g, x));
+      if (!needs) {
+        if (st.optional) return { skip: true };
+        const set = sets.find(x => Object.keys(x).every(n => count(g, n) >= x[n] || supplied(g, n))) || sets[0], [n, q] = missingIn(g, set);
+        return { need: { item: n, n: q - count(g, n), for: arg, alts: sets.map(x => missingIn(g, x)?.[0]).filter(Boolean) } };
+      }
       const o = stationFor(g, st.at || (j.workplace || [])[0]); if (!o) return { skip: true, why: `no ${nice(st.at)} to work at` };
       setDoing(g, s, st.doing || `making ${arg}`);
       if (dist(posOf(g), o) <= REACH && !g.turnMove) g._make = { item: arg, needs, gives: st.gives || 1, verb: st.verb || 'makes', time: st.time || 4 };
@@ -438,6 +464,49 @@
       if (r.done || r.fail) { s.sub.to = null; if (r.done && Math.random() < .5) await runLine(g, `emote(${st.emote || 'plays'})`); return { done: true, ms: 4000, worked: true }; }
       return r;
     }
+    if (kind === 'tidy') {
+      // carrying something: to the store (the nearest), set down there
+      const held = state.held?.get(g.id), store = nearest(g, stores().filter(o => dist(posOf(g), o) < 12));
+      const may = c => (W().getAllowedCommands?.(g.id) || []).includes(c);
+      if (held) {
+        setDoing(g, s, 'tidying up');
+        if (store && dist(posOf(g), store) > REACH) { const r = await approach(g, s, store); if (!r.done) return r; }
+        await runLine(g, 'drop()'); return { done: true, ms: 3000, worked: true };
+      }
+      const loose = may('carry') && nearest(g, getObjects().filter(o => LOOSE.test(o.type) && dist(posOf(g), o) < 8 && (!store || dist(store, o) > 2.2) && !state.characters.some(c => state.held?.get(c.id) === o.mesh)));
+      if (loose && store) { setDoing(g, s, `tidying away the ${nice(loose.type)}`); const r = await goDo(g, s, loose, `carry(${loose.type})`); return r.done ? { busy: true, ms: 2000, worked: true } : r; }
+      // nothing out of place: a sweep and a dusting by the store or a table
+      const spot = store || nearest(g, things('seat').filter(o => dist(posOf(g), o) < 10));
+      if (!spot) return { skip: true };
+      setDoing(g, s, 'tidying up');
+      const r = await approach(g, s, spot); if (!r.done) return r;
+      await runLine(g, `emote(${oneOf(['sweeps the floor', 'tidies the shelves', 'dusts things off', 'straightens things up'])})`);
+      return { done: true, ms: 7000, worked: true };
+    }
+    if (kind === 'lookout') {
+      const d = nearest(g, doors().filter(o => dist(posOf(g), o) < 14));
+      if (!d) return { skip: true };
+      setDoing(g, s, 'looking out of the door');
+      const r = await approach(g, s, d); if (!r.done) return r;
+      try { setCharacterFacing(g, new BABYLON.Vector3(d.x - posOf(g).x, 0, d.z - posOf(g).z)); } catch {}
+      await runLine(g, `emote(${oneOf(['looks out of the door', 'peers outside', 'watches the street for a while'])})`);
+      return { done: true, ms: 8000, worked: true };
+    }
+    if (kind === 'pace') {
+      // to a named place, else across the room
+      if (!s.sub.to) {
+        const here = placeAt(posOf(g).x, posOf(g).z), ps = places().filter(p => p !== here && p.x0 != null);
+        const p = Array.isArray(arg) ? arg.map(placeNamed).filter(Boolean)[0] : typeof arg === 'string' ? placeNamed(arg) : ps.length && Math.random() < .5 ? oneOf(ps) : null;
+        let c = p ? spotIn(p, g) : null;
+        for (let k = 0; !c && k < 8; k++) { const x = Math.round(posOf(g).x + rnd(-5, 5)), z = Math.round(posOf(g).z + rnd(-5, 5)); if (dist(posOf(g), { x, z }) >= 3 && cellPassable(x, z) && !occupantAt(x, z, g)) c = { x, z }; }
+        if (!c) return { skip: true };
+        s.sub.to = c; s.sub.label = p ? 'to the ' + p.id : 'up and down';
+      }
+      setDoing(g, s, 'pacing ' + s.sub.label);
+      const r = await goTo(g, s, s.sub.to.x, s.sub.to.z, 'there');
+      if (r.done || r.fail) { s.sub.to = null; if (r.done && Math.random() < .4) await runLine(g, `emote(${oneOf(['looks around', 'stops and thinks', 'stretches'])})`); return { done: true, ms: 5000, worked: !!r.done }; }
+      return r;
+    }
     return { skip: true };
   }
   // fetch what a step needs: own store, the village store, another's store (paid), a seller
@@ -466,7 +535,16 @@
     s.sub.haul = null;
     return { done: true, ms: 2500, worked: true };
   }
+  // alternatives ([{"wheat": 2}, {"flour sack": 1}]): done when one set is in hand; else the first set a store or a seller has
   async function fetchStep(g, s, j, want) {
+    const sets = altSets(want);
+    if (sets.some(x => !missingIn(g, x))) return { skip: true };
+    const avail = sets.find(x => Object.keys(x).every(n => count(g, n) >= x[n] || inStores(n) || carriedBy(g, n).length));
+    const r = await fetchSet(g, s, j, avail || sets[0]);
+    if (r.need && sets.length > 1) r.need.alts = sets.map(x => missingIn(g, x)?.[0]).filter(Boolean);
+    return r;
+  }
+  async function fetchSet(g, s, j, want) {
     const missing = Object.entries(want || {}).map(([n, q]) => [n, q - count(g, n)]).filter(([, q]) => q > 0);
     if (!missing.length) return { skip: true };
     const [item, n] = missing[0];
@@ -535,9 +613,18 @@
     if (!route.length) { setDoing(g, s, 'keeping watch'); return { done: true, ms: 6000, worked: true }; }
     s.sub.i = (s.sub.i || 0) % route.length;
     const p = route[s.sub.i]; s.sub.to ||= spotIn(p, g) || { x: p.center?.[0] || 0, z: p.center?.[1] || 0 };
+    s.patrols = fighter(g, jobOf(g));   // a guard's cycles are places visited (advance() counts none)
     setDoing(g, s, `on patrol (to the ${p.id})`);
     const r = await goTo(g, s, s.sub.to.x, s.sub.to.z, 'the ' + p.id);
-    if (r.done || r.fail) { s.sub.to = null; s.sub.i++; if (s.sub.i >= route.length) { s.sub.i = 0; return { done: true, ms: 3000, worked: true }; } return { busy: true, ms: 2500, worked: true }; }
+    if (r.done && fighter(g, jobOf(g))) {
+      // a guard's stop: a look around, and a word for someone by name (each person once a game hour)
+      s.cycles++;
+      await runLine(g, `emote(${oneOf([`looks around the ${p.id}`, `checks the ${p.id}`, `stops at the ${p.id} and looks about`])})`);
+      const t = gm(); s.greeted ||= {};
+      const who = nearPeople(g, 4).find(c => (c !== state.playerAvatar || !!document.getElementById('chatName')?.value.trim()) && t - (s.greeted[nameOf(c)] ?? -999) >= 60);
+      if (who) { s.greeted[nameOf(who)] = t; const h = K()?.hour() ?? 12; say(g, `${h < 5 || h >= 21 ? 'Quiet night' : h < 12 ? 'Morning' : h < 18 ? 'Good day' : 'Evening'}, ${nameOf(who)}.`, true); }
+    }
+    if (r.done || r.fail) { s.sub.to = null; s.sub.i++; if (s.sub.i >= route.length) { s.sub.i = 0; return { done: true, ms: 4500, worked: true }; } return { busy: true, ms: 4500, worked: true }; }
     return r;
   }
 
@@ -546,31 +633,81 @@
     const steps = j.steps || []; if (!steps.length) return idleAt(g, s, s.work);
     for (let guard = 0; guard < steps.length + 1; guard++) {
       const i = s.step % steps.length, st = steps[i], t = gm();
-      if (s.blocked[i] && t < s.blocked[i]) { advance(s, steps); continue; }
+      if (s.blocked[i] && t < s.blocked[i]) { advance(s, steps, j); continue; }
       const r = await doStep(g, s, j, st);
       if (r.worked) s.pass = true;
-      if (r.skip) { advance(s, steps); continue; }
-      if (r.fail) { s.fails[i] = (s.fails[i] || 0) + 1; console.info('[jobs]', g.id, stepName(st), 'failed:', r.fail); if (s.fails[i] >= 2) { s.fails[i] = 0; s.blocked[i] = t + 60; advance(s, steps); } return { ms: 2500 }; }
-      // out of something: a pick, at most once an hour; meanwhile the other steps go on
-      if (r.need) { if (t - s.lastPick < 60) { s.blocked[i] = t + 60; advance(s, steps); continue; } return decide(g, s, j, r.need, i); }
-      if (r.done) { s.fails[i] = 0; advance(s, steps); }
+      if (r.skip) { advance(s, steps, j); continue; }
+      if (r.fail) { s.fails[i] = (s.fails[i] || 0) + 1; console.info('[jobs]', g.id, stepName(st), 'failed:', r.fail); if (s.fails[i] >= 2) { s.fails[i] = 0; s.blocked[i] = t + 60; advance(s, steps, j); } return { ms: 2500 }; }
+      // out of something: the job's fallbacks in code (buy it, gather it); none works: the step waits an hour and the others go on
+      if (r.need) {
+        const fr = await fallback(g, s, j, r.need);
+        if (fr) return fr;
+        addNews(g.id, `${g.id} ran out of ${r.need.item}`, 'short');
+        s.lastNeed = r.need; s.blocked[i] = t + 60; advance(s, steps, j); continue;
+      }
+      if (r.done) { s.fails[i] = 0; advance(s, steps, j); }
       if (r.done && r.worked && Math.random() < .35) await remark(g, s);
       return { ms: r.ms || 3000 };
     }
-    // no step could go: a decision point
-    return decide(g, s, j, null, -1);
+    // no step could go: a declared idle activity, a pick at most once an hour
+    return decide(g, s, j, s.lastNeed && t0() - s.lastNeedAt < 120 ? s.lastNeed : null, -1);
   }
-  function advance(s, steps) {
+  const t0 = () => gm();
+  function advance(s, steps, j) {
     s.sub = {}; s.step++;
-    if (s.step % steps.length === 0) { if (s.pass) s.cycles++; s.pass = false; }
+    if (s.step % steps.length === 0) { if (s.pass && !s.patrols) s.cycles++; s.pass = false; }
+    // a job whose steps are a choice (the idler): the next one at random
+    if (j?.order === 'random' && steps.length > 1) { let k; do { k = Math.floor(Math.random() * steps.length); } while (k === s.lastRandom); s.lastRandom = k; s.step = s.step - (s.step % steps.length) + k; }
+  }
+  // job.json "fallback": what it does when out of an input, in order:
+  //   {"buy": true}                          buy it from whoever carries it (else ask whoever makes it)
+  //   {"gather": true | {"iron ore": ["mine"]}}   get it itself from a thing on the map that yields it
+  //   {"idle": "tidy" | "rest" | "pace" | "lookout" | "wander" | "read"}   keep busy that way meanwhile
+  const DEFAULT_FALLBACK = [{ buy: true }, { gather: true }];
+  async function fallback(g, s, j, need, withIdle = false) {
+    s.lastNeedAt = gm();
+    const items = [...new Set([need.item, ...(need.alts || [])])];
+    for (const f of Array.isArray(j.fallback) ? j.fallback : DEFAULT_FALLBACK) {
+      if (f.buy) for (const item of items) {
+        // not from someone whose own work needs it (two bakers sold one flour sack back and forth), nor the same thing twice in an hour
+        const needsIt = c => (jobOf(c)?.steps || []).some(x => altSets(x.needs).some(set => item in set) || altSets(x.fetch).some(set => item in set));
+        const holder = gm() - ((s.bought ||= {})[item] ?? -999) >= 60 && carriedBy(g, item).filter(c => c._job && !needsIt(c) && gold(g) >= price(item, c) && !M()?.refuses?.(c, g.id)).sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
+        if (holder) { s.bought[item] = gm(); const r = await buyFrom(g, s, holder, item); return { ms: r.ms || 2500 }; }
+        // whoever makes or gathers it: asked (a cause to speak, one an hour)
+        const maker = state.characters.find(c => c !== g && !c.defeated && c._job && (jobOf(c)?.steps || []).some(x => x.make === item || x.gives === item || (x.gather && U()?.stockOf && sourcesOf(c, item).some(o => matches(o, x.gather)))));
+        if (maker && !(s.ask && s.ask.until > gm()) && gm() - (s.lastAsk ?? -999) >= 60) { s.lastAsk = gm(); s.wantItem = item; s.ask = { who: maker.id, item, until: gm() + 60 }; }
+      }
+      if (f.gather) for (const item of items) {
+        const kinds = f.gather && typeof f.gather === 'object' && f.gather[item] ? [].concat(f.gather[item]) : null;
+        const o = nearest(g, sourcesOf(g, item, kinds)); if (!o) continue;
+        setDoing(g, s, `out of ${item}: getting some from the ${nice(o.type)}`);
+        const r = await goDo(g, s, o, `use(${o.type})`);
+        if (r.fail) continue;
+        if (r.done) s.pass = true;
+        return { ms: r.ms || 3500 };
+      }
+      if (f.idle && withIdle) return idleActivity(g, s, j, f.idle);
+    }
+    return null;
+  }
+  // keeping busy while there is nothing to work at: now its declared
+  // activity, now a seat, a walk, a look out of the door; seated, it mostly
+  // stays put (a sweep every four seconds was the old stir loop again)
+  async function idleActivity(g, s, j, kind) {
+    if (g.pose && Math.random() < .7) return { ms: rnd(12000, 20000) };
+    const k = Math.random() < .5 ? (kind || j.idle || 'tidy') : oneOf(['rest', 'pace', 'lookout', 'tidy']);
+    let r = await doStep(g, s, j, { [k]: true });
+    if (r.skip) r = await doStep(g, s, j, { rest: true });
+    if (r.busy) return { ms: r.ms || 2000 };
+    return { ms: Math.max(r.ms || 0, rnd(12000, 18000)) };
   }
   // the job has no valid next step: one pick, then it keeps to that for an hour
   async function decide(g, s, j, need, i) {
     const t = gm();
-    // keeping busy while stuck: now and then, not every tick ("thistle stirs the cauldron" eight times running)
-    if (s.fallback && t < s.fallback.until) { if (Math.random() < .5) return idleAt(g, s, s.work).then(r => ({ ms: Math.max(r.ms || 0, 9000) })); return s.fallback.run().then(r => ({ ms: Math.max(r?.ms || 0, 12000) })); }
+    // keeping busy while stuck: its declared idle activity ("thistle stirs the cauldron" eight times running was the station)
+    if (s.fallback && t < s.fallback.until) return s.fallback.run().then(r => ({ ms: Math.max(r?.ms || 0, 9000) }));
     // nothing to do (all spent, nothing to sell) is a quieter matter than missing materials: a pick every three hours at most
-    if (t - s.lastPick < (need ? 60 : 180)) { setDoing(g, s, need ? `out of ${need.item}` : 'waiting for work'); return idleAt(g, s, s.work); }
+    if (t - s.lastPick < (need ? 60 : 180)) { if (need) setDoing(g, s, `out of ${need.item}`); return idleActivity(g, s, j, (j.fallback || []).find(f => f.idle)?.idle); }
     s.lastPick = t;
     const opts = [], near = nearPeople(g, 10).filter(c => c !== state.playerAvatar);
     if (need) {
@@ -579,9 +716,9 @@
       const asker = holder || near[0];
       if (asker) opts.push({ label: `ask ${asker.id} for ${need.item}`, run: async () => { s.wantItem = need.item; s.ask = { who: asker.id, item: need.item, until: gm() + 60 }; await goTo(g, s, posOf(asker).x, posOf(asker).z, asker.id); return { ms: 3000 }; } });
     }
-    const station = (j.workplace || []).map(k => stationFor(g, k)).find(Boolean);
-    if (station) opts.push({ label: `keep busy at the ${nice(station.type)} for now`, run: () => goDo(g, s, station, `use(${station.type})`).then(r => ({ ms: r.ms || 4000 })), stay: true });
-    opts.push({ label: 'take a break', run: () => idleAt(g, s, s.work), stay: true });
+    const busyWith = (j.fallback || []).find(f => f.idle)?.idle || 'tidy';
+    opts.push({ label: `keep busy (${busyWith === 'tidy' ? 'tidy up' : busyWith === 'pace' ? 'walk about' : busyWith === 'lookout' ? 'keep an eye on the street' : busyWith}) for now`, run: () => idleActivity(g, s, j, busyWith), stay: true });
+    opts.push({ label: 'take a break', run: () => idleActivity(g, s, j, 'rest'), stay: true });
     setDoing(g, s, need ? `out of ${need.item}` : 'with nothing to do');
     const why = need ? `You need ${need.n || 1} ${need.item}${need.for ? ' to make ' + need.for : ''} and have none.${need.why ? ' ' + need.why + '.' : ''}` : 'Your work is stuck.';
     const ch = await pick(g, 'What now?', opts, why);
@@ -664,19 +801,47 @@
     setDoing(g, s, tav ? `spending the evening at the ${tav.id}` : 'resting after work');
     if (tav && !inPlace(tav, posOf(g).x, posOf(g).z)) { if (!s.sub.eve) s.sub.eve = spotIn(tav, g); const r = await goTo(g, s, s.sub.eve.x, s.sub.eve.z, 'the ' + tav.id); if (!r.fail) return { ms: r.ms || 3000 }; }
     s.sub.eve = null;
-    // the social window: a word with someone near, now and then, about the day
-    const near = nearPeople(g, 4);
-    if (near.length && gm() - s.lastSocial >= 60 && Math.random() < .45 && brainOk() && window.tablefolkLive?.quiet?.() !== false) {
-      s.lastSocial = gm(); s.social = true;
-      // what there is to talk about: its own day and the village's news (a cue, not an order)
-      const news = newsFor(g, 2), cfg = W().getBrainConfig(g.id), who = near.map(nameOf).slice(0, 2).join(' and ');
-      W().setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`(It is evening at the ${tav?.id || 'square'} and ${who} ${near.length > 1 ? 'are' : 'is'} with you. Today you ${todayLine(s)}.${news.length ? ' News: ' + news.join('; ') + '.' : ''} Talk about something real from today, in one short line.)`]).slice(-5) });
-      try { await modelTurn(g, 'social'); } finally { s.social = false; }
-      return { ms: 6000 };
+    // the social window: a word with someone near, now and then, about ONE
+    // concrete thing from the day (topicFor), each topic once per pair; not
+    // while another pair talks nearby or right after its own talk (tablefolkTalk)
+    const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar);
+    if (near.length && gm() - s.lastSocial >= 60 && Math.random() < .45 && brainOk() && window.tablefolkLive?.quiet?.() !== false && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
+      const x = near[Math.floor(Math.random() * near.length)], tp = topicFor(g, x);
+      s.lastSocial = gm();
+      if (tp) {
+        s.social = true;
+        const cfg = W().getBrainConfig(g.id);
+        W().setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`(Evening at the ${tav?.id || 'square'}, ${x.id} beside you. ${tp} Say it to ${x.id} in one or two sentences of your own.)`]).slice(-5) });
+        try { await modelTurn(g, 'social'); } finally { s.social = false; }
+        return { ms: 6000 };
+      }
     }
     if (!g.pose && Math.random() < .4) { const seat = nearest(g, things('seat').filter(o => dist(posOf(g), o) < 5 && !state.characters.some(c => c.pose?.on === o.mesh))); if (seat) { await runLine(g, `use(${seat.type})`); return { ms: 9000 }; } }
     return { ms: rnd(5000, 9000) };
   }
+
+  // ONE thing to talk about with x, from the day's log: "Tell x about: ..."
+  // (its own doings, the village's news) or "Ask x about: ..." (x's own);
+  // a topic about x is never told to x as news; each topic once per pair
+  const TOPIC_USED = new Set();
+  const PREF = { raid: 0, quarrel: 1, insult: 1, short: 2, event: 2, made: 3, sold: 3, bought: 4, news: 4 };
+  function topicFor(g, x) {
+    const t = gm(), pair = [g.id, x.id].sort().join('|'), fresh = n => t - n.at < 1440 && !TOPIC_USED.has(pair + '|' + n.id);
+    const you = text => String(text).replace(new RegExp('\\b' + esc(g.id) + '\\b', 'g'), 'you').replace(/^you\b/, 'You');
+    const byPref = l => l.slice().sort((a, b) => (PREF[a.kind] ?? 5) - (PREF[b.kind] ?? 5) || b.at - a.at);
+    const pool = NEWS.filter(fresh);
+    const tell = byPref(pool.filter(n => !n.about.includes(x.id)))[0];
+    const ask = byPref(pool.filter(n => n.about.includes(x.id) && !n.about.includes(g.id) && n.kind !== 'insult'))[0];
+    // its own news first, then the village's, then a question about the other's day
+    const own = byPref(pool.filter(n => n.about.includes(g.id) && !n.about.includes(x.id)))[0];
+    const n = own || tell || ask;
+    if (n) { TOPIC_USED.add(pair + '|' + n.id); return n === ask ? `Ask ${x.id} about: ${String(n.text).replace(/[.!]+$/, '')}.` : `Tell ${x.id} about: ${you(n.text).replace(/[.!]+$/, '')}.`; }
+    // nothing logged: its own day, once a day per pair
+    const k = K()?.now()?.day || 0, key = pair + '|day' + k + '|' + g.id, day = todayLine(s0(g));
+    if (day !== 'nothing yet' && !TOPIC_USED.has(key)) { TOPIC_USED.add(key); return `Tell ${x.id} about: today you ${day}.`; }
+    return '';
+  }
+  const s0 = g => g._job || S(g);
 
   // ---------------------------------------------------------------- threats (threats.js lists the raiders)
   const fighter = (g, j) => !!(j?.fights || /guard|soldier|knight|hunter|warrior/i.test(j?.id || ''));
@@ -750,7 +915,8 @@
     const near = nearPeople(g, 6), other = near.find(c => c !== state.playerAvatar), pl = near.find(c => c === state.playerAvatar);
     const opts = [{ label: `carry on (${s.doing || 'what you were doing'})`, run: async () => { clearPending(g, cfg); return { ms: 2500 }; } }];
     if (stranger && pl) opts.unshift({ label: `greet ${nameOf(pl)}${j?.steps?.some(x => x.sell || x.serve) ? ' and offer your wares' : ''}`, run: async () => { await modelTurn(g, 'event'); return { ms: 4000 }; } });
-    else if (other || pl) opts.unshift({ label: `say something about it to ${nameOf(other || pl)}`, run: async () => { await modelTurn(g, 'event'); return { ms: 4000 }; } });
+    // (only the one it happened to has something to say about it: everyone near reacting filled the room with talk)
+    else if (events.some(l => /\byour?\b/i.test(l)) && ((other && window.tablefolkTalk?.mayStart?.(g.id) !== false) || pl)) opts.unshift({ label: `say something about it to ${nameOf(other && window.tablefolkTalk?.mayStart?.(g.id) !== false ? other : pl)}`, run: async () => { await modelTurn(g, 'event'); return { ms: 4000 }; } });
     const what = stranger ? events[0].replace(/^\(|\)$/g, '') : events.map(l => l.replace(/^\s*\[event\]\s*/, '')).join(' ');
     const ch = await pick(g, `${what}\nWhat do you do?`, opts);
     if (ch?.open) { await modelTurn(g, 'event'); return { ms: 4000 }; }

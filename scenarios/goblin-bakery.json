@@ -153,7 +153,10 @@
    "z": -2,
    "gold": 4,
    "items": [
-    "flour sack"
+    {
+     "name": "flour sack",
+     "qty": 3
+    }
    ]
   },
   {

@@ -17,16 +17,32 @@
  },
  "steps": [
   {
-   "fetch": {
-    "wheat": 2
-   }
+   "fetch": [
+    {
+     "wheat": 2
+    },
+    {
+     "flour sack": 1
+    },
+    {
+     "flour": 1
+    }
+   ]
   },
   {
    "make": "bread",
    "at": "cauldron",
-   "needs": {
-    "wheat": 2
-   },
+   "needs": [
+    {
+     "wheat": 2
+    },
+    {
+     "flour sack": 1
+    },
+    {
+     "flour": 1
+    }
+   ],
    "gives": 2,
    "verb": "bakes",
    "time": 5,
@@ -62,6 +78,21 @@
     "bread",
     "pie"
    ]
+  }
+ ],
+ "fallback": [
+  {
+   "buy": true
+  },
+  {
+   "gather": {
+    "wheat": [
+     "field"
+    ]
+   }
+  },
+  {
+   "idle": "tidy"
   }
  ]
 }

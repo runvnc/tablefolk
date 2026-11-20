@@ -10,12 +10,25 @@
  "workplace": [],
  "steps": [
   {
+   "rest": true
+  },
+  {
+   "tidy": true
+  },
+  {
+   "pace": true
+  },
+  {
+   "lookout": true
+  },
+  {
+   "read": true
+  },
+  {
    "wander": true,
    "emote": "looks around",
    "doing": "strolling"
-  },
-  {
-   "rest": true
   }
- ]
+ ],
+ "order": "random"
 }

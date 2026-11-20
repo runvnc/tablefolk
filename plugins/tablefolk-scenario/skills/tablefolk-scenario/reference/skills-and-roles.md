@@ -188,13 +188,14 @@ the agent's `"job"`):
   "hours": [6, 16], "sleep": [21, 5], "gold": 10, "fights": false,
   "workplace": ["cauldron"], "prices": { "bread": 3, "pie": 5 },
   "steps": [
-    { "fetch": { "wheat": 2 } },
-    { "make": "bread", "at": "cauldron", "needs": { "wheat": 2 }, "gives": 2, "verb": "bakes", "time": 5, "doing": "baking bread" },
+    { "fetch": [{ "wheat": 2 }, { "flour sack": 1 }] },
+    { "make": "bread", "at": "cauldron", "needs": [{ "wheat": 2 }, { "flour sack": 1 }], "gives": 2, "verb": "bakes", "time": 5, "doing": "baking bread" },
     { "fetch": { "apple": 2 }, "optional": true },
     { "make": "pie", "at": "cauldron", "needs": { "apple": 2 }, "optional": true, "verb": "bakes" },
     { "store": ["bread", "pie"], "keep": 2 },
     { "sell": ["bread", "pie"] }
-  ]
+  ],
+  "fallback": [{ "buy": true }, { "gather": { "wheat": ["field"] } }, { "idle": "tidy" }]
 }
 ```
 
@@ -208,7 +209,10 @@ the agent's `"job"`):
     or a type; `"n"` times. Takes from the thing's stock.
   - `fetch`: `{item: n}`: from its own store, the village store, someone
     else's store (paid to the owner), else bought from someone carrying it.
-  - `make`: at a station, `needs` out of its pack, `gives` of the item in.
+    A list of sets is alternatives (`[{"wheat": 2}, {"flour sack": 1}]`):
+    the first one a store or a seller has.
+  - `make`: at a station, `needs` out of its pack (one set, or a list of
+    alternatives: the first set it has in full), `gives` of the item in.
   - `store`: an item, a list, `"made"` or `"all"` into its store (`keep`
     some).
   - `sell`: to someone near who is hungry (food) or asked for it; else it
@@ -217,10 +221,23 @@ the agent's `"job"`):
   - `patrol`: place ids or kinds, or `"village"`. `tend`: sow a bare field,
     or see to the animals (`"animals"`). `heal`: bandage the wounded nearby.
     `haul`: carry goods from the village store to a worker who lacks them.
-    `read`, `rest`, `wander` (with `"emote"`).
-  - `"optional": true`: skipped quietly when its materials are not there;
-    otherwise missing materials are a decision point (buy, ask, keep busy,
-    something else: the model picks).
+    `read`, `rest`, `wander` (with `"emote"`), `tidy` (a loose bucket or
+    pot carried to the store, else a sweep by it), `lookout` (to a door, a
+    look outside), `pace` (to a named place, `"pace": "square"`, or across
+    the room).
+  - `"optional": true`: skipped quietly when its materials are not there.
+  - `"order": "random"` on the job: the next step is picked at random (the
+    `idler`: sit, tidy, pace, look out, read, stroll), so a single room
+    still has movement.
+- `fallback`: what it does when out of an input, in code and in order:
+  `{"buy": true}` buys it from whoever carries it (else asks whoever makes
+  or gathers it, once an hour), `{"gather": true}` or `{"gather": {"iron
+  ore": ["mine"]}}` gets it itself from a thing on the map that yields it
+  (a rock with `"crop": "iron ore"`, a tree, a field), `{"idle": "tidy"}`
+  keeps busy that way meanwhile. Default: buy, then gather. When none
+  works the step waits an hour and the other steps go on; with nothing at
+  all to do, the model gets one short pick an hour at most (buy, ask, keep
+  busy, a break).
   - `"doing"`: the label shown and put on its card.
 
 Built in: `farmer`, `baker`, `innkeeper`, `cook`, `smith`, `woodcutter`,

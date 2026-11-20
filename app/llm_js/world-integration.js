@@ -376,25 +376,76 @@ function overhear(world, g, who, text) {
   }
 }
 
-// Conversations between two characters end: after three exchanges (six
-// lines) with the player not involved, lines between them count as overheard
-// for 90 s, and each is told it has said its piece (mind.js card).
+// Conversations between two characters end: after four lines with the player
+// not involved, lines between them count as overheard for 120 s, each is told
+// it has said its piece (mind.js card), and both are talked out with anyone
+// but the player for a minute (back to their work: jobs.js).
+// One conversation at a time per earshot group: while two characters are in
+// an exchange (a line between them in the last 25 s), others within earshot
+// of them start none (their lines to each other count as overheard, and
+// their unprompted turns are muted); the player is always answered.
 const convos = new Map();
 const pairKey = (a, b) => [a, b].sort().join('|');
+const CONVO_LINES = 4, CONVO_CLOSED_MS = 120000, CONVO_ACTIVE_MS = 25000, TALKED_OUT_MS = 90000;
+const talkedOut = new Map();   // id -> until (performance.now())
+const charById = id => window.TABLEFOLK_STATE?.characters?.find(q => q.id === id);
+const posById = id => { const g = charById(id); return g ? (g.logicalPos || g.root.position) : null; };
+// the conversations going on now: [{ a, b, n }]
+function activeConvos() {
+  const now = performance.now(), out = [];
+  for (const [k, c] of convos) if (c.n > 0 && now - c.last < CONVO_ACTIVE_MS && now >= c.closedUntil) { const [a, b] = k.split('|'); out.push({ a, b, n: c.n }); }
+  return out;
+}
+// the last line each character said (not to the player): someone else's line
+// in the last 20 s within earshot, not said to this one, holds the floor too
+const lastLine = new Map();   // id -> { at, to }
+const FLOOR_MS = 30000;
+// another pair is talking within earshot of this character (not counting a pair it is in), or someone else just spoke
+function busyNear(id, r = 6) {
+  const p = posById(id); if (!p) return false;
+  const near = x => { const q = posById(x); return q && Math.hypot(q.x - p.x, q.z - p.z) <= r; };
+  const now = performance.now();
+  return activeConvos().some(c => c.a !== id && c.b !== id && [c.a, c.b].some(near))
+    || [...lastLine].some(([who, l]) => who !== id && l.to !== id && now - l.at < FLOOR_MS && near(who));
+}
+const isTalkedOut = id => (talkedOut.get(id) || 0) > performance.now();
 function convoLine(from, to) {
   const k = pairKey(from, to), now = performance.now(), c = convos.get(k) || { n: 0, last: 0, closedUntil: 0 };
-  convos.set(k, c);
   if (now < c.closedUntil) return false;   // closed: overheard
   if (now - c.last > 60000) c.n = 0;
+  if (c.n === 0) {
+    // a new conversation: not while either has just finished one, nor while another pair talks nearby
+    if (isTalkedOut(from) || isTalkedOut(to)) return false;
+    const others = activeConvos().filter(o => pairKey(o.a, o.b) !== k);
+    // the speaker leaves its own conversation for this one: that one is over
+    for (const o of others.filter(o => o.a === from || o.b === from)) { const oc = convos.get(pairKey(o.a, o.b)); if (oc) oc.n = 0; }
+    if (busyNear(from)) return false;
+  }
+  convos.set(k, c);
   c.n++; c.last = now;
-  if (c.n >= 6) {
-    c.closedUntil = now + 90000; c.n = 0;
-    for (const [x, y] of [[from, to], [to, from]]) { const g = window.TABLEFOLK_STATE?.characters?.find(q => q.id === x), m = g && window.tablefolkMind?.mindOf(g); if (m) (m.pieceSaid ||= {})[y] = Date.now() + 90000; }
+  if (c.n >= CONVO_LINES) {
+    c.closedUntil = now + CONVO_CLOSED_MS; c.n = 0;
+    talkedOut.set(from, now + TALKED_OUT_MS); talkedOut.set(to, now + TALKED_OUT_MS);
+    for (const [x, y] of [[from, to], [to, from]]) { const g = charById(x), m = g && window.tablefolkMind?.mindOf(g); if (m) (m.pieceSaid ||= {})[y] = Date.now() + CONVO_CLOSED_MS; }
   }
   return true;
 }
+const SOCIAL_CMDS = new Set(['say', 'whisper', 'emote', 'eat', 'drink', 'give', 'sell', 'use']);
+// a seat is the only thing used on a social turn
+const SEATS = /\b(chair|stool|bench|sofa|armchair|throne|seat|log)\b/i;
+// a short line (under four words) is only spoken as the answer to a yes/no question
+function yesNoQuestion(line) {
+  const t = String(line || '').replace(/^[^:]{0,40}\bsays\b[^:]{0,20}:\s*/i, '').trim();
+  const last = (t.match(/[^.!?]*\?["'”]?\s*$/) || [''])[0].replace(/^["'“\s]+/, '').trim();
+  return !!last && (/^(is|are|was|were|am|do|does|did|can|could|will|would|shall|should|have|has|had|may|might|must|isn't|aren't|don't|doesn't|didn't|won't|can't)\b/i.test(last) || /\b(right|yes or no|isn't it|aren't you|don't you|won't you|eh)\?/i.test(last));
+}
 // the player talking to one of them: their talks start afresh
-function convoReset(id) { for (const k of [...convos.keys()]) if (k.split('|').includes(id)) convos.delete(k); const g = window.TABLEFOLK_STATE?.characters?.find(q => q.id === id), m = g && window.tablefolkMind?.mindOf(g); if (m) m.pieceSaid = {}; }
+function convoReset(id) { for (const k of [...convos.keys()]) if (k.split('|').includes(id)) convos.delete(k); talkedOut.delete(id); const g = charById(id), m = g && window.tablefolkMind?.mindOf(g); if (m) m.pieceSaid = {}; }
+// jobs.js (evening talk, remarks) and live.js ask before starting a conversation
+window.tablefolkTalk = { activeConvos, busyNear, talkedOut: isTalkedOut, mayStart: id => !isTalkedOut(id) && !busyNear(id), spoke: (id, to) => lastLine.set(id, { at: performance.now(), to: to || null }), reset: () => { convos.clear(); talkedOut.clear(); lastLine.clear(); } };
+addEventListener('tablefolk-scenario-started', e => { if (!e.detail?.sub) window.tablefolkTalk.reset(); });
+// every spoken line holds the floor (remarks and greetings from jobs.js too); the player's do not
+addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (!d.voiced) return; const g = charById(d.agentId); if (!g || d.agentId === 'player' || g === window.TABLEFOLK_STATE?.playerAvatar) return; if (g._spoke?.whisper || g._spoke?.to === 'player') return; lastLine.set(g.id, { at: performance.now(), to: g._spoke?.to || null }); });
 // a command as the "You could, right here" menu writes it: carry(note), give(bread, pip)
 const cmdSig = c => (c.kind + '(' + String(c.target ?? c.item ?? c.arg ?? c.destinationText ?? c.emote ?? '') + ')').toLowerCase().replace(/["'\s]/g, '');
 const HISTORY_KEEP = 12;
@@ -909,7 +960,9 @@ async function main() {
     // with sight each look is a picture to describe): not on offer for three
     // turns after one
     const lookedLately = (world.getBrainConfig(g.id).recent || []).slice(-3).some(r => /\blook\b/.test(r));
-    const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => (!enemy || c === 'say' || c === 'whisper' || c === 'emote') && !(lookedLately && c === 'look'));
+    // an evening's talk (jobs.js social turn): words and what goes with them, no carry/dig/build
+    const socialTurn = g._callKind === 'social';
+    const allowedCmds = () => world.getAllowedCommands(g.id).filter(c => (!enemy || c === 'say' || c === 'whisper' || c === 'emote') && !(lookedLately && c === 'look') && (!socialTurn || SOCIAL_CMDS.has(c)));
     if (!world.isTurnReady()) { return false; }
     // Inside a workflow (workflows.js), the workflow drives the turn: it asks
     // the model narrow questions and runs the resulting command.
@@ -944,7 +997,13 @@ async function main() {
       // (someone merely walking up to it is not a reason to talk)
       const told = (cfg.pendingChat || []).some(l => !/\bcomes up to you\b/i.test(String(l)));
       const hadSpeech = (cfg.pendingChat || []).some(l => !/^\s*(\[event\]|\()/.test(String(l)) && !/\bcomes up to you\b/i.test(String(l)));
-      const muted = !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g);
+      const askedYesNo = (cfg.pendingChat || []).some(yesNoQuestion);
+      // (and, the player's words aside, none while another pair talks within
+      // earshot, nor for a minute after its own conversation closed)
+      const pnLow = (world.playerName?.() || document.getElementById('chatName')?.value || '').trim().toLowerCase();
+      const fromPlayer = (cfg.pendingChat || []).some(l => pnLow && String(l).toLowerCase().startsWith(pnLow + ' says'));
+      const crowded = !fromPlayer && !!window.tablefolkMind && world.state?.mind !== false && (busyNear(g.id) || isTalkedOut(g.id)) && !(cfg.pendingChat || []).some(l => activeConvos().some(c => (c.a === g.id || c.b === g.id) && String(l).startsWith((c.a === g.id ? c.b : c.a) + ' says')));
+      const muted = crowded || (!told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g));
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
       const budgetQuiet = !spokenTo && cfg.quietTurns > 0, quiet = budgetQuiet || (muted && !chatTestMode);
@@ -985,7 +1044,7 @@ async function main() {
       }
       if (quiet) {
         const last = messages[messages.length - 1];
-        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + (budgetQuiet ? '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' : '\n\n(Nobody has spoken to you: no need to talk. Do something: one of "You could, right here", or a step toward your goal.)') }]);
+        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + (budgetQuiet ? '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' : crowded ? '\n\n(Others are talking nearby, or you have just had your say: no need to talk now. Do something: one of "You could, right here", or a step toward your goal.)' : '\n\n(Nobody has spoken to you: no need to talk. Do something: one of "You could, right here", or a step toward your goal.)') }]);
       }
       // Show in prompt panel
       let displayText = `[AGENT: ${g.id}]
@@ -1065,7 +1124,7 @@ async function main() {
         return '\n' + name + '(' + args.map(a => /^-?\d+(\.\d+)?$/.test(a) ? a : JSON.stringify(a)).join(', ') + ')\n';
       }).replace(/<\/?tool_call>/g, '');
       // a command line ended like code, say("...");, is the command (E2B copied it from its own history: 'unknown command')
-      line = String(line || '').replace(/\)[ \t]*;[ \t]*$/gm, ')');
+      line = String(line || '').replace(/\)[ \t]*[;.][ \t]*$/gm, ')');   // (and say("..."). at chaos 50: the sword sale's first line was lost)
       if (simple) line = simpleReply(world, g, line);
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
@@ -1152,6 +1211,15 @@ async function main() {
       // With thinking on, reasoning prose that slipped past the worker's split
       // (e.g. markers stripped by the runtime) must not become speech.
       if (thinking) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'unknown') planCmds.splice(i, 1);
+      // a social turn: use() only on a seat
+      if (socialTurn) for (let i = planCmds.length - 1; i >= 0; i--) if (planCmds[i].kind === 'use' && !SEATS.test(String(planCmds[i].target || ''))) planCmds.splice(i, 1);
+      // A line under four words ("Hush." "it is, wren") is not spoken unless it
+      // answers a yes/no question: the character emotes instead.
+      if (!simple && !chatTestMode && !askedYesNo) for (const c of planCmds) {
+        if ((c.kind !== 'say' && c.kind !== 'whisper') || String(c.text || '').split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).length >= 4) continue;
+        const t = String(c.text || '').trim();
+        c.kind = 'emote'; c.emote = /^(hmph|humph|hm+|ugh|bah|pfft|tch)\b/i.test(t) ? 'huff' : /^(hush|shh+|quiet)\b/i.test(t) ? 'shush' : /^(no|nope|never|nah)\b/i.test(t) ? 'shrug' : /^(hello|hi|hey|greetings|good (day|morning|evening|night)|well met)\b/i.test(t) ? 'wave' : /\?$/.test(t) ? 'frown' : /!$/.test(t) ? 'scowl' : 'nod'; delete c.text;
+      }
       // Speech this turn: none while quiet, at most two lines otherwise.
       let lines = 0, droppedSpeech = false;
       for (let i = 0; i < planCmds.length; i++) {
@@ -1245,6 +1313,7 @@ async function main() {
       const actionMsg = turnEntries.length ? turnEntries.map(formatActionSummary).join('\n') : (onlyWhispers || spokenLines.length ? '' : summary);
       const pn = world.playerName?.() || document.getElementById('chatName')?.value.trim() || 'the player', nameOf = id => id === 'player' ? pn : id;
       const toChar = spokenLines.map(sp => ({ ...sp, addressed: !!sp.to && sp.to !== 'player' && !sp.whisper && convoLine(g.id, sp.to) }));
+      for (const sp of spokenLines) if (!sp.whisper && sp.to !== 'player') lastLine.set(g.id, { at: performance.now(), to: sp.to || null });
       const r = earshot(world);
       for (const other of world.getAgents()) {
         if (other.id === g.id || !within(other.root.position, g.root.position, r)) continue;

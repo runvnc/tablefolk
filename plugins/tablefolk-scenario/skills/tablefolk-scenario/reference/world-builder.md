@@ -13,10 +13,29 @@ A built-in agent runs a condensed scenario skill (`server/fast-skill.md`) in
 one pass, plus one repair round if the server's checks fail
 (`server/generate.js`). Map methods: `?mode=generate` (procedural dungeon or
 village, characters put in rooms by role), `?mode=grid` (ASCII map),
-`?mode=map` (layout lines), or the default `auto`. Generated worlds come out
-living (`live`, events, a turning point), with personalities written as a
-name sentence plus traits, conflicts between characters, and double-height
-walls.
+`?mode=map` (layout lines), or the default `auto`.
+
+**What it makes**: unless the request is a talk-only scene (an interview, a
+trial, a conversation, a date, "no combat": then `"talk": true`, one place is
+fine), a living world: a **place** (a generated village, farm, forest, cave
+or dungeon with several buildings or rooms), **people with work** (each with
+a `job`, a `home` and a `workplace` the map has), a **pressure** (threats on
+the clock, low stores, a deadline, a rival) and a **goal** tied to it that
+the game checks (`survived_days`, `stock_at_least`, `threat_defeated`,
+`agents_alive`: [goals.md](goals.md)). The model is offered archetypes by
+name (working village, frontier outpost under raids, dungeon delve with a
+camp at the entrance, wilderness camp, mining camp, market town with bandits
+on the road, farmstead, haunted manor or mystery); the request always wins.
+Each person gets one want, one opinion of a neighbour, maybe a secret or an
+agenda. Then the server's checks make it true rather than hope: a missing job
+is inferred from the role, a workplace and a home are picked from the map,
+the job's station (anvil, cauldron, trees, rocks, a field), a store, a bed
+per resident and food are added where missing and where they can be reached,
+a world with no pressure gets a mild threat (wolves at night), a goal it can
+check, and what fighters and sellers must be allowed. Each repair is listed
+(`repairs` in the answer and the saved generation). Every path (cloud, your
+own key, in this browser) goes through the same checks. Walls are
+double-height.
 
 **Where the model runs** (the form's menus; `GET /api/worldgen/options`):
 
@@ -73,6 +92,11 @@ with a progress bar instead: it never slows down, laps and restarts with a new
 status line, and jumps ahead as tokens arrive. Every result is saved in
 `generated/` (git-ignored). `/api/generate?prompt=...` returns the JSON
 (`&stream=1` for progress events).
+
+The **Story** tab edits living (`live`), the start time, the day length,
+the temper, who monsters hunt, talk-only, and the threats (kind, body,
+count, when, every); the **Characters** tab each one's job (a list of the
+jobs), home, workplace and temper.
 
 ## The workspace
 

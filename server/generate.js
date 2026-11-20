@@ -24,7 +24,7 @@ import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';
 import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, critiqueRequest, parseCritique, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
 export { encodeScenario };
-export const checkScenario = s => checkCore(s, packVoices());
+export const checkScenario = (s, opts) => checkCore(s, packVoices(), opts);
 
 // The last generations, for the admin page: { at, prompt, model, ms, ok, title, error }.
 export const recent = [];
@@ -89,7 +89,7 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
     { role: 'system', content: systemPrompt() },
     { role: 'user', content: user },
   ];
-  let scenario = null, problems = [], raw = '';
+  let scenario = null, problems = [], raw = '', repairs = [];
   for (let round = 0; round < 2; round++) {
     emit('progress', { stage: round ? 'repairing' : 'waiting', model: ep.model });
     let chars = 0, last = 0, lastT = -1;
@@ -100,7 +100,8 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
       if (!chars && (lastT < 0 || thought - lastT > 80)) { lastT = thought; emit('progress', { stage: 'thinking', thought, preview: tail.slice(-220) }); }
     });
     raw = out.text;
-    try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario); }
+    repairs = [];
+    try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario, { prompt, fresh: mode !== 'revise', notes: repairs }); }
     catch (e) { scenario = null; problems = [e.message]; }
     if (!problems.length) break;
     emit('progress', { stage: 'problems', problems });
@@ -112,9 +113,10 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
   const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
   try {
     mkdirSync(join(ROOT, 'generated'), { recursive: true });
-    writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode, model: ep.model, ...scenario }, null, 2) + '\n');
+    writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode, model: ep.model, repairs, ...scenario }, null, 2) + '\n');
   } catch {}
-  return { scenario, code, warnings: problems, ms: Date.now() - t0, model: ep.model };
+  if (repairs.length) emit('progress', { stage: 'repairs', repairs });
+  return { scenario, code, warnings: problems, repairs, ms: Date.now() - t0, model: ep.model };
 }
 
 // POST /api/revise {scenario, request} -> server-sent events like
@@ -239,12 +241,12 @@ export async function handleFinish(req) {
   const { prompt = '', model = 'browser', ms = 0 } = parsed || {};
   const cors = { 'Access-Control-Allow-Origin': '*' };   // tools/browser-test/worldgen-test.html runs on another port
   const r = finishScenario(parsed, packVoices());
-  if (r.problems) return Response.json({ problems: r.problems }, { headers: cors });
+  if (r.problems) return Response.json({ problems: r.problems, repairs: r.repairs }, { headers: cors });
   const { scenario, code } = r;
   recent.push({ at: Date.now(), prompt: String(prompt).slice(0, 300), model, ms, ok: true, title: scenario.title || '' }); if (recent.length > 50) recent.shift();
   const slug = (scenario.title || prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'scenario';
-  try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: String(parsed.mode || 'browser').slice(0, 20), model: String(model).slice(0, 120), ...scenario }, null, 2) + '\n'); } catch {}
-  return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [] }, { headers: cors });
+  try { mkdirSync(join(ROOT, 'generated'), { recursive: true }); writeFileSync(join(ROOT, 'generated', `${slug}-${Date.now()}.json`), JSON.stringify({ prompt, mode: String(parsed.mode || 'browser').slice(0, 20), model: String(model).slice(0, 120), repairs: r.repairs, ...scenario }, null, 2) + '\n'); } catch {}
+  return Response.json({ scenario, code, link: '/app/#s=' + code, ms, model, warnings: [], repairs: r.repairs }, { headers: cors });
 }
 
 

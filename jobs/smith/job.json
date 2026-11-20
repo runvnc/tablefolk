@@ -48,5 +48,24 @@
     "nails"
    ]
   }
+ ],
+ "fallback": [
+  {
+   "buy": true
+  },
+  {
+   "gather": {
+    "iron ore": [
+     "mine",
+     "gather"
+    ],
+    "firewood": [
+     "chop"
+    ]
+   }
+  },
+  {
+   "idle": "tidy"
+  }
  ]
 }

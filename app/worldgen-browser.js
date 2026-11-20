@@ -4,7 +4,13 @@
  * instead of one big JSON answer from the server's model.
  *
  *   1. plan        plain text: title, kind (dungeon, village, outdoor), the
- *                  places, the characters, the treasure, the goal
+ *                  places, the pressure (wolves, raids, rats, hunger, a
+ *                  deadline), the characters each with a job, the treasure,
+ *                  the goal. A request that is not a talk scene (TALK_ONLY)
+ *                  becomes a living world: pressure() turns the PRESSURE line
+ *                  into threats, low stores and a checkable goal in code, and
+ *                  the server's checks (server/worldgen-living.js) add jobs,
+ *                  homes, workplaces, stations, beds and food it left out
  *   2. map         a little JSON: title, intro, light, how many rooms, what
  *                  lies where. Code builds the map (procgen.js, or layout
  *                  lines outdoors).
@@ -39,6 +45,9 @@
   const ENEMY = /\b(villain|necromancer|evil|cultist|cult leader|bandit|brigand|captor|kidnapp\w*|warlord|tyrant|dark lord|lich|enemy|boss|raider|marauder|assassin|monster|warlock)\b/i;
   const HOSTILE_INTENT = /\b(attacks? (anyone|intruders|strangers|the player|on sight)|kills? (anyone|intruders|strangers|the player)|despises (the living|intruders|strangers)|wants (the player|intruders|them) dead)\b/i;
   const COMMANDS = 'say whisper walk face emote give sell inventory look carry drop attack wield'.split(' ');
+  // living worlds (server/worldgen-living.js does the rest): the built-in jobs, and the requests that stay talk scenes
+  const JOBS = 'farmer baker innkeeper cook smith woodcutter miner hunter fisher herder merchant guard healer ratcatcher scholar child labourer idler'.split(' ');
+  const TALK_ONLY = /\b(interview|trial|court ?room|hearing|conversation|dialogue|chat|talk(?:ing)?[ -]only|just talk|negotiat\w*|interrogat\w*|audition|first date|a date\b|debate|confession|tea party|dinner party|no combat|no fighting|without (?:combat|fighting)|therapy|tavern (?:chat|talk|conversation))\b/i;
 
   // ---- the model ----
   // Gemma 4 E2B/E4B on LiteRT-LM, or Bonsai 2 27B on its WebGPU kernels
@@ -110,7 +119,10 @@
     const kindOf = t => /\b(cave|caves|cavern|grotto|mine|mines)\b/i.test(t) ? 'cave' : /\b(farm|farmstead|ranch|pasture|barn|orchard|homestead)\b/i.test(t) ? 'farm'
       : /\b(forest|woods?|woodland|grove|glade|wilds?|wilderness|camp|clearing|thicket)\b/i.test(t) ? 'forest' : /\b(dungeon|crypt|castle|tomb|keep|lair|catacombs?|tower|ruin(ed|s)? fortress)\b/i.test(t) ? 'dungeon'
       : /\b(village|town|hamlet|market|city)\b/i.test(t) ? 'village' : /\b(outdoor|field|road|beach|coast|desert)\b/i.test(t) ? 'outdoor' : '';
-    const kind = kindOf(line('KIND')) || kindOf(prompt) || 'dungeon';
+    const talk = TALK_ONLY.test(prompt);
+    let kind = kindOf(line('KIND')) || kindOf(prompt) || 'dungeon';
+    // a living world needs several places: a loose outdoor scene becomes a forest
+    if (kind === 'outdoor' && !talk) kind = 'forest';
     const placeList = placesOf(kind);
     const places = [...new Set(line('PLACES').split(/[,;]/).map(p => pickFrom(placeList, p)).filter(Boolean))];
     const chars = [];
@@ -120,9 +132,11 @@
       const parts = l.replace(/^\s*[-*\d.)]+\s*/, '').split('|').map(s => s.trim());
       if (parts.length < 3 || !parts[0]) continue;
       const body = pickFrom(PEOPLE.concat(MONSTERS, ANIMALS), parts[1]) || (/goblin/i.test(l) ? 'goblin' : /skelet/i.test(l) ? 'skeleton' : 'villager');
-      chars.push({ name: parts[0].replace(/\*+/g, ''), body, role: parts[2] || '', want: parts[3] || '', know: parts[4] || '' });
+      // name | body | job | role | want | opinion or secret (older plans: no job column)
+      const job = pickFrom(JOBS, parts[2]); if (job || /^(none|-|monster|animal)$/i.test(parts[2] || '')) parts.splice(2, 1);
+      chars.push({ name: parts[0].replace(/\*+/g, ''), body, job: job || '', role: parts[2] || '', want: parts[3] || '', know: parts[4] || '' });
     }
-    return { title: line('TITLE').replace(/\*+/g, '') || prompt, kind, mood: line('MOOD'), places, chars: chars.slice(0, 6), treasure: line('TREASURE'), goal: line('GOAL'), text };
+    return { title: line('TITLE').replace(/\*+/g, '') || prompt, kind, talk, mood: line('MOOD'), places, chars: chars.slice(0, 6), treasure: line('TREASURE'), goal: line('GOAL'), pressure: line('PRESSURE'), text };
   }
 
   // ---- 2./3. the map ----
@@ -215,6 +229,13 @@
       const inv = a.inventory || {}, items = (Array.isArray(inv.items) ? inv.items : Array.isArray(a.items) ? a.items : []).map(String).slice(0, 5);
       if (items.length || inv.gold) ag.inventory = { gold: Math.max(0, Math.round(+inv.gold || 0)), items };
       if (a.wield) ag.wield = String(a.wield);
+      // a living world's work (server/worldgen-living.js fills what is missing)
+      if (!hostile && !ANIMALS.includes(model)) {
+        const job = pickFrom(JOBS, a.job) || plan.chars.find(c => id(c.name) === aid)?.job || plan.chars[i]?.job;
+        if (job) ag.job = job;
+        for (const k of ['home', 'workplace']) if (a[k] && scn.generate) { const p = pickFrom(placeIds.map(x => x.replace(/\s+\d+$/, '')), a[k]); if (p) ag[k] = placeIds.includes(String(a[k]).toLowerCase()) ? String(a[k]).toLowerCase() : p; }
+        if (['short', 'normal', 'long'].includes(a.temper)) ag.temper = a.temper;
+      }
       if (scn.generate) { const p = pickFrom(placeIds.map(x => x.replace(/\s+\d+$/, '')), a.in); if (p) ag.in = p; }
       else ag.near = OUTDOOR_THINGS.includes(a.near) ? a.near : 'campfire';
       return ag;
@@ -254,6 +275,36 @@
     return scn;
   }
 
+  // The plan's PRESSURE line made real, in code (no extra model call): threats on
+  // the clock, low stores, and a goal the game can check when the model gave
+  // none tied to it. The server's checks (worldgen-living.js) add the rest.
+  const THREAT_WORDS = [[/\bwol(f|ves)\b/i, { kind: 'raid', who: 'wolf' }], [/\bgoblins?\b/i, { kind: 'raid', who: 'goblin', name: 'goblin' }], [/\b(orcs?)\b/i, { kind: 'raid', who: 'orc' }],
+    [/\b(skeletons?|undead|dead rise)\b/i, { kind: 'raid', who: 'skeleton' }], [/\bspiders?\b/i, { kind: 'raid', who: 'spider' }], [/\b(bandits?|brigands?|raiders?|thieves)\b/i, { kind: 'bandits' }],
+    [/\brats?\b/i, { kind: 'rats' }], [/\b(bears?)\b/i, { kind: 'raid', who: 'bear', count: 1 }], [/\b(ghosts?|spirits?)\b/i, { kind: 'raid', who: 'ghost' }]];
+  function pressure(plan, scn) {
+    if (plan.talk) { scn.talk = true; return; }
+    scn.live = true; scn.time = '07:00'; scn.dayMinutes = 12;
+    const t = plan.pressure + ' ' + plan.goal;
+    const hit = THREAT_WORDS.find(([re]) => re.test(t));
+    if (hit && !scn.agents.some(a => a.model === hit[1].who && a.hostile !== false && hit[1].count === 1)) {
+      const day = /\b(by day|daylight|road|caravan|market)\b/i.test(t) || hit[1].kind === 'bandits';
+      scn.threats = [{ count: 2, when: day ? 'day' : 'night', every: 1, ...hit[1] }];
+    }
+    const scarce = /\b(food|grain|wheat|harvest|stores?|granary|hunger|starv\w*|famine|winter|supplies|run(s|ning)? (out|short|low))\b/i.test(t);
+    if (scarce) {
+      // low stores: the granary chest holds little
+      const where = (scn.generate?.places || [])[0] || null;
+      scn.objects = [...(scn.objects || []), { type: 'chest', ...(where ? { in: where } : {}), items: [{ name: /\bmeat|hunt/i.test(t) ? 'meat' : 'wheat', qty: 2 }] }];
+    }
+    const g = scn.goal?.win ? JSON.stringify(scn.goal) : '';
+    if (!/survived_days|stock_at_least|threat_defeated|agent_defeated|player_has/.test(g)) {
+      const n = Math.max(1, scn.agents.filter(a => !a.hostile && !MINDLESS.has(a.model) && !ANIMALS.includes(a.model)).length - 1);
+      if (scn.threats?.length && /\b(drive|stop|kill|hunt|defeat|end|destroy)\b/i.test(plan.goal)) scn.goal = { text: plan.goal.slice(0, 160) || 'Stop the raids.', win: { threat_defeated: [scn.threats[0].who || scn.threats[0].kind, 2] }, lose: { not: { agents_alive: n } } };
+      else if (scarce && /\b(fill|restock|gather|bring|harvest|store)\b/i.test(plan.goal)) scn.goal = { text: plan.goal.slice(0, 160), win: { stock_at_least: [/\bmeat/i.test(t) ? 'meat' : 'wheat', 8] }, lose: { not: { agents_alive: n } } };
+      else if (!scn.goal) scn.goal = { text: plan.goal && plan.goal.length < 160 ? plan.goal : 'See them through two nights.', win: { survived_days: 2 }, lose: { not: { agents_alive: n } } };
+    }
+  }
+
   // A key in the story opens something: lock a room it is not in (locks.js).
   function autoLock(scn, built) {
     if (!scn.generate) return;
@@ -283,7 +334,7 @@
       await model(emit);
       // 1. plan
       const planText = await ask(emit, 'plan', 'step 1/5: planning the world', 'You design small adventure scenes for a 3D tabletop game whose characters are played by a small AI. Be concrete and brief.',
-        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village, forest, farm, cave or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}. Forest places: ${FOREST.join(', ')}. Farm places: ${FARM.join(', ')}. Cave places: ${CAVE.join(', ')}.\nCHARACTERS:\n- name | body | role | what they want | what they know or hide\n(3-5 lines: at least one person the player can talk to, and monsters if there is danger. Example: - Brann | woodsman | the gravekeeper | wants the crypt sealed | knows the ghost was his sister. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (they do not talk): ${ANIMALS.join(', ')})\nTREASURE: what is worth finding and where\nGOAL: one thing the player tries to do`);
+        `Request: "${prompt}"\n\nWrite a plan, under 200 words, with exactly these lines:\nTITLE: a short title\nKIND: dungeon, village, forest, farm, cave or outdoor\nMOOD: bright or night, and the feeling\nPLACES: 3-7 places, comma separated. Dungeon places: ${DUNGEON.join(', ')}. Village places: ${VILLAGE.join(', ')}. Forest places: ${FOREST.join(', ')}. Farm places: ${FARM.join(', ')}. Cave places: ${CAVE.join(', ')}.\nPRESSURE: what threatens them (wolves at night, goblin raids, bandits on the road, rats in the stores, food running out, a deadline)${TALK_ONLY.test(prompt) ? ' or none (a talk scene)' : ''}\nCHARACTERS:\n- name | body | job | role | what they want | what they think of a neighbour, or hide\n(3-5 lines: people who live and work here, and monsters if there is danger. Example: - Brann | woodsman | woodcutter | keeps the fires going | wants the wolves gone | thinks Odo is lazy. Jobs: ${JOBS.join(', ')} (none for monsters). Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (they do not talk): ${ANIMALS.join(', ')})\nTREASURE: what is worth finding, or the stores that matter\nGOAL: one thing the player tries to do about the pressure`);
       const plan = parsePlan(planText, prompt);
       // 2. map
       const things = plan.kind === 'outdoor' ? OUTDOOR_THINGS : THINGS;
@@ -309,11 +360,12 @@
       const scn = built.scn;
       // 4. characters
       const where = plan.kind === 'outdoor' ? `"near": one of ${OUTDOOR_THINGS.join(', ')}` : `"in": one of ${[...new Set(built.places.map(p => p.id.replace(/\s+\d+$/, '')))].join(', ')}`;
-      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, what they want, facts they know, what they do", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (no talking: just id, model and where): ${ANIMALS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Each person needs a reason to talk to the player. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
+      const charAsk = `Write the characters as JSON only:\n{"agents": [{"id": "vexa", "model": "witch", "${plan.kind === 'outdoor' ? 'near' : 'in'}": "...", "job": "healer", "home": "house", "workplace": "temple", "temper": "short or normal or long", "style": "a few words", "personality": "Vexa, a witch who ... 2-4 plain sentences: who they are, one want, one opinion of a neighbour, maybe a secret", "allowed": ["say", "give"], "inventory": {"gold": 0, "items": ["silver key"]}}], "goal": {"text": "Get the silver key.", "player_has": "silver key"}}\nJobs: ${JOBS.join(', ')}; home and workplace: places on the map.\n${where}. Bodies: ${PEOPLE.join(', ')}; monsters: ${MONSTERS.join(', ')}; animals (no talking: just id, model and where): ${ANIMALS.join(', ')}. Enemies who attack the player on sight get "hostile": true (with a personality they still talk when spoken to). Monsters that only fight need just id, model, ${plan.kind === 'outdoor' ? 'near' : 'in'} and "hp". Commands for "allowed": ${COMMANDS.join(', ')} (give/sell to hand things over, attack for fighters). Write everyone in the plan (2-5 characters), and add monsters if the place is dangerous. Goal: {"player_has": item} or {"agent_defeated": id}, or null.`;
       const chars = json(await ask(emit, 'characters', 'step 4/5: casting the characters', 'You write game characters as data. Answer with one JSON object, nothing else.', `The plan:\n${planText}\n\n${charAsk}`));
       buildAgents(plan, chars, built, scn);
       if (!scn.agents.length) throw new Error('the model wrote no characters');
       autoLock(scn, built);
+      pressure(plan, scn);
       // 5. what happens now and then (director.js), and the world lives on its own
       scn.live = true;
       try {
@@ -379,5 +431,5 @@
     } catch (e) { emit('failed', { error: String(e.message || e) }); }
   }
 
-  window.tfWorldgen = { run, runOne, parsePlan, json, log };
+  window.tfWorldgen = { run, runOne, parsePlan, pressure, json, log };
 })();

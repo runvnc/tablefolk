@@ -720,6 +720,35 @@
     return out.sort((a, b) => a[2] - b[2]).map(([x, z]) => [x, z]);
   }
 
+  // A free cell of a place where a thing can stand without blocking the way
+  // in (not beside a door or an opening) or cutting the room in two: every
+  // other floor cell of the place stays reachable from its ways in. Walls
+  // first (furniture stands against them). (Placing at the farthest free
+  // cell put hearthvale's beds and a cauldron in doorways, 2026-11-20.)
+  function safeCell(gen, p, occupied, blocked) {
+    const W = gen.size[0], H = gen.size[1], x0 = Math.floor((W - 1) / 2), z0 = Math.floor((H - 1) / 2);
+    const rc = (x, z) => [z + z0, x0 - x], g = gen.grid;
+    const inP = (r, c) => r >= p.r0 && r <= p.r1 && c >= p.c0 && c <= p.c1;
+    const walk = (r, c, extra) => { const ch = g[r]?.[c]; if (ch == null) return false; if (extra && extra.has(r + ',' + c)) return false; if (blocked.has(r + ',' + c)) return false; return FLOOR_GLYPHS.has(ch) || ch === '+'; };
+    const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const ok = (r, c) => {
+      // not beside a door or an opening out of the place
+      if (N4.some(([dr, dc]) => { const ch = g[r + dr]?.[c + dc]; return ch === '+' || (!inP(r + dr, c + dc) && walk(r + dr, c + dc)); })) return false;
+      const extra = new Set([r + ',' + c]), cells = [];
+      for (let rr = p.r0; rr <= p.r1; rr++) for (let cc = p.c0; cc <= p.c1; cc++) if (walk(rr, cc, extra)) cells.push([rr, cc]);
+      if (!cells.length) return false;
+      const entries = cells.filter(([rr, cc]) => N4.some(([dr, dc]) => !inP(rr + dr, cc + dc) && walk(rr + dr, cc + dc)));
+      const seen = new Set(entries.map(([rr, cc]) => rr + ',' + cc)), q = [...entries];
+      while (q.length) { const [rr, cc] = q.pop(); for (const [dr, dc] of N4) { const k = (rr + dr) + ',' + (cc + dc); if (!seen.has(k) && inP(rr + dr, cc + dc) && walk(rr + dr, cc + dc, extra)) { seen.add(k); q.push([rr + dr, cc + dc]); } } }
+      return entries.length > 0 && cells.every(([rr, cc]) => seen.has(rr + ',' + cc));
+    };
+    const free = freeCells(gen, p, occupied).reverse();
+    const byWall = free.filter(([x, z]) => besideWall(gen, x, z));
+    const spot = [...byWall, ...free].find(([x, z]) => ok(...rc(x, z)));
+    if (spot) blocked.add(rc(...spot).join(','));
+    return spot || null;
+  }
+
   // A scenario with "generate": its grid, legend, objects, size and lighting
   // filled from the generator (anything the scenario already sets wins), and
   // every character without "at" put in its place. Returns the new scenario
@@ -774,7 +803,7 @@
     const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? (!outdoor && style !== 'castle'), style };
     let gen = make(genOpts);
     if (make === village && opts.extras !== false) gen = villageExtras(gen, genOpts);
-    const warnings = [], used = new Set(), occupied = new Set(), placed = {};
+    const warnings = [], used = new Set(), occupied = new Set(), placed = {}, blocked = new Set();
     const agents = (scn.agents || []).map(a => {
       if (Array.isArray(a.at)) { occupied.add(a.at[0] + ',' + a.at[1]); return a; }
       let p = a.in != null ? findPlace(a.in, gen.places, used) : null;
@@ -793,9 +822,9 @@
       if (!p) { warnings.push(`object ${o.type}: no place "${o.in}"`); return null; }
       const free = freeCells(gen, p, occupied).reverse();
       // a picture goes on a wall: a free square with a wall beside it
-      // (scenario.js hangs it on that wall)
+      // (scenario.js hangs it on that wall); anything else where it blocks no way in
       const walled = o.type === 'picture' ? free.find(([x, z]) => besideWall(gen, x, z)) : null;
-      const spot = walled || free[0] || p.center;
+      const spot = walled || (o.type !== 'picture' && safeCell(gen, p, occupied, blocked)) || free[0] || p.center;
       occupied.add(spot[0] + ',' + spot[1]);
       return { ...o, x: spot[0], z: spot[1] };
     }).filter(Boolean);
