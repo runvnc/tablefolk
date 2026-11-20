@@ -14,7 +14,8 @@ conversation, a date, "no combat"), make a LIVING WORLD:
 4. A PLAYER GOAL tied to the pressure, with "win"/"lose" the game can check.
 Talk still matters: each person gets ONE want, ONE opinion of a neighbour,
 maybe a secret or an agenda, in 2-4 plain sentences.
-A talk-only scene: "talk": true, one place is fine, no jobs or threats needed.
+A talk-only scene: "talk": true and ONE room drawn with "grid" (B, below), sized
+to the cast; no "generate", no jobs, no threats.
 The request always wins: pick the nearest archetype, or follow it literally.
 
 Archetypes:

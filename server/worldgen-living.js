@@ -84,11 +84,50 @@ export function reach(s) {
   return { b, near, placeReached, seen };
 }
 
+// A talk-only scene is ONE room drawn as a "grid", sized to the cast: a model
+// that built a generated map (a 4-room dungeon for an interview) has it
+// collapsed to the main room, with a table in the middle, the cast around
+// it, the player by the door and the known small things along the walls.
+const ROOM_GLYPH = { chest: 'h', iron_chest: 'h', bookcase: 'K', bookshelf: 'K', cauldron: 'o', anvil: 'a', bench: 'n', stool: 's', crate: 'C', barrel: 'B', lantern: 'j', note: 'N', campfire: 'X', table: 't' };
+export function oneRoom(s, note = () => {}) {
+  const many = s.generate || (Array.isArray(s.map) && s.map.length) ;
+  if (!many || s.grid) return false;
+  const cast = (s.agents || []).slice(0, 9), n = Math.max(1, cast.length);
+  const W = Math.min(15, Math.max(9, 7 + 2 * n)), H = Math.min(11, Math.max(7, 6 + n));
+  const g = Array.from({ length: H }, (_, z) => Array.from({ length: W }, (_, x) => (x === 0 || z === 0 || x === W - 1 || z === H - 1) ? '#' : '.'));
+  const cx = Math.floor(W / 2), cz = Math.floor(H / 2) - 1;
+  for (let dx = -1; dx <= 1; dx++) g[cz][cx + dx] = 't';
+  // the cast around the table: above, below, then the ends
+  const seats = [[cx - 1, cz - 1], [cx + 1, cz + 1], [cx + 1, cz - 1], [cx - 1, cz + 1], [cx - 2, cz], [cx + 2, cz], [cx, cz - 1], [cx, cz + 1], [cx - 3, cz]];
+  cast.forEach((a, i) => { const [x, z] = seats[i]; g[z][x] = String(i + 1); });
+  g[H - 1][cx] = '+'; g[H - 2][cx] = 'Y';
+  // known things along the walls (the north wall first, then the sides)
+  const wall = []; for (let x = 1; x < W - 1; x++) wall.push([x, 1]); for (let z = 2; z < H - 2; z++) { wall.push([1, z]); wall.push([W - 2, z]); }
+  const kept = [], dropped = [];
+  const spare = ['L', 'M', 'P', 'Q', 'R', 'U', 'V', 'W'], legend = { ...(s.legend || {}) };
+  for (const o of s.objects || []) {
+    let ch = ROOM_GLYPH[o.type];
+    if (!ch && o.type && /^[a-z0-9_]+$/.test(o.type)) { ch = Object.keys(legend).find(k => legend[k] === o.type) || spare.find(k => !(k in legend)); if (ch) legend[ch] = o.type; }
+    const spot = ch && wall.find(([x, z]) => g[z][x] === '.');
+    if (spot) { g[spot[1]][spot[0]] = ch; kept.push(o.type); } else dropped.push(o.type);
+  }
+  const was = s.generate ? `generate ${s.generate.kind || ''} (${s.generate.rooms || '?'} rooms)` : 'a map';
+  delete s.generate; delete s.map; delete s.places;
+  s.grid = g.map(r => r.join(''));
+  for (const k of Object.keys(legend)) if (!s.grid.some(r => r.includes(k))) delete legend[k];
+  if (Object.keys(legend).length) s.legend = legend;
+  for (const a of s.agents || []) delete a.in;
+  if (s.player) delete s.player.in;
+  s.objects = [];
+  note(`talk scene: one room (${W}x${H}) instead of ${was}${kept.length ? '; along the walls: ' + kept.join(', ') : ''}${dropped.length ? '; left out: ' + dropped.join(', ') : ''}`);
+  return true;
+}
+
 export function livingWorld(s, { prompt = '', fresh = false, notes = [] } = {}) {
   const problems = [];
   if (!s || typeof s !== 'object' || !Array.isArray(s.agents)) return problems;
   if (fresh && TALK_ONLY.test(String(prompt)) && s.talk == null) s.talk = true;
-  if (s.talk === true) return problems;
+  if (s.talk === true) { if (fresh) oneRoom(s, t => notes.push(t)); return problems; }
   // an edit of an older world (no "generate", or not living) is left as it is
   if (!fresh && !(s.live && s.generate)) return problems;
   const note = t => { notes.push(t); };
