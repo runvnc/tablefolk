@@ -91,6 +91,9 @@ export default function nightwatch(api) {
   });
 
   return {
+    // the scenario is over: put the fires out (particles and lights are not part of the map)
+    dispose() { for (const mesh of [...fires.keys()]) flameOff({ mesh }); },
+
     // E on the beacon, or use(signal_beacon) by a character: a log feeds it
     // (and lights it); the player with no log douses a lit one.
     uses: {

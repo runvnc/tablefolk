@@ -11,7 +11,7 @@
  * tablefolk.json (every section optional; paths are relative to the file):
  *   { "id": "blacksmith", "name": "Blacksmith", "version": "1.0.0",
  *     "description": "...", "author": "...", "license": "CC0-1.0",
- *     "requires": ["npm:tablefolk-ores@1"],              // other packages, loaded first
+ *     "requires": ["npm:tablefolk-ores@1", "../ores/"],  // other packages, loaded first (a relative path: beside this one)
  *     "items":     { "forge": { "file": "models/forge.glb", ..., "loop": "Fire",
  *                    "use": { "anim": "Pump", "text": "{{player}} pumps the bellows", "sound": "chestOpen" } } },
  *     "skills":    { "smithing": { ...skill.json... } } or ["skills/smithing/skill.json"],
@@ -132,7 +132,7 @@
       vec: (x, y, z) => new BABYLON.Vector3(x, y, z), scene: state.scene, BABYLON: window.BABYLON };
   }
   // what a module's listeners and timers are, so reset() stops them
-  const listeners = [], timers = [];
+  const listeners = [], timers = [], disposers = [];
   const invOf = who => who === state.playerAvatar || who === 'player' ? state.player : charInventory(who);
   function giveItem(who, item, n) {
     const inv = invOf(who); if (!inv) return false;
@@ -169,6 +169,8 @@
     for (const [kind, fn] of Object.entries(x?.threats || {})) if (typeof fn === 'function') window.tablefolkThreats?.registerBehaviour(kind, fn);
     // commands (skills.js addCommand): { signal: { run(g, args, ctx), help, example, allowedBy } }
     for (const [name, c] of Object.entries(x?.commands || {})) { try { window.tablefolkSkills?.addCommand(name, c, from); added.commands.push(String(name).toLowerCase()); } catch (e) { console.warn('[packages]', e.message); } }
+    // dispose(): called when the scenario that loaded it ends (its lights, particles, timers of its own)
+    if (typeof x?.dispose === 'function') disposers.push(x.dispose);
     // job step kinds in code (jobs.js): { refuel(g, step, ctx) { return { done: true, ms: 3000 } } }
     for (const [name, fn] of Object.entries(x?.steps || {})) if (typeof fn === 'function') { window.tablefolkJobs?.registerStep?.(name, fn); added.steps.push(name); }
     console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
@@ -187,7 +189,9 @@
       const m = await r.json();
       if (!m.id) throw new Error(`package ${ref}: tablefolk.json has no "id"`);
       const rel = p => new URL(p, url).href, fromRef = (p, kind) => isRef(p) && !/\.json$/.test(p) ? refUrl(p, kind) : rel(p);
-      if (depth < 4) for (const q of m.requires || []) {
+      // a relative path ("../ores/") is another package beside this one, wherever it is hosted
+      if (depth < 4) for (const q0 of m.requires || []) {
+        const q = /^\.\.?\//.test(q0) ? rel(q0) : q0;
         try { warnings.push(...(await load(q, depth + 1)).warnings); } catch (e) { warnings.push(e.message); }
       }
       if (m.items && window.tablefolkPacks) for (const t of window.tablefolkPacks.add({ id: m.id, items: m.items }, url) || []) added.items.add(t);
@@ -252,7 +256,8 @@
     if (loop && typeof loop === 'object') loop = !!loop.loop;
     if (thing && (thing.rigAnims || thing.root && state.characters.concat(state.playerAvatar || []).includes(thing))) return window.tablefolkBodies?.playClip(thing, name, { loop }) || (() => { try { playRig(thing, String(name), !!loop); return thing.rigMode === String(name); } catch { return false; } })();
     const anims = meta(thing)?.anims || [];
-    const ag = name === true || name == null ? anims[0] : anims.find(a => a.name.toLowerCase() === String(name).toLowerCase());
+    // a clip by its name, or by its last part ("RatArmature|Rat_Idle" is "Rat_Idle")
+    const n = String(name).toLowerCase(), ag = name === true || name == null ? anims[0] : anims.find(a => a.name.toLowerCase() === n) || anims.find(a => a.name.toLowerCase().split('|').pop() === n);
     if (!ag) return false;
     ag.stop(); ag.start(loop); return true;
   }
@@ -309,6 +314,7 @@
     for (const n of added.steps) window.tablefolkJobs?.removeStep?.(n);
     for (const id of added.bodies) window.tablefolkBodies?.remove(id);
     for (const n of added.sounds) window.tablefolkSfx?.unregister?.(n);
+    for (const fn of disposers.splice(0)) try { fn(); } catch (e) { console.warn('[packages] dispose', e); }
     for (const [e, fn] of listeners.splice(0)) removeEventListener(e, fn);
     for (const t of timers.splice(0)) clearInterval(t);
     added.items.clear(); added.bodies.clear(); added.sounds.clear(); added.behaviours.length = 0; added.cards.length = 0; added.effects.length = 0; added.commands.length = 0; added.steps.length = 0;

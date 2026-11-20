@@ -1,0 +1,5 @@
+{
+  "id": "pkg_dep", "name": "Fixture: a required package", "version": "1.0.0",
+  "description": "package-test.mjs: loaded through pkg-extra's \"requires\" (a relative path).",
+  "items": { "dep_crate": { "file": "../../../../assets/models/props/village/logs.glb", "w": 1, "h": 0.4, "d": 0.7, "static": true } }
+}

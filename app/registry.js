@@ -3,9 +3,11 @@
  * Three places, all read from the browser (no server of our own):
  *   official   registry/index.json in this repo: the built-in ones, and
  *              community entries added by pull request (reviewed)
- *   npm        packages with the keyword "tablefolk" (and one of
- *              tablefolk-package / -skill / -role / -pack for the kind;
- *              package if none). Referenced as npm:<name>@<version>.
+ *   npm        packages with the keyword "tablefolk" and one of
+ *              tablefolk-package / -skill / -role / -pack for the kind
+ *              (without one they are not listed: the game's own @tablefolk/*
+ *              libraries never are). Referenced as npm:<name>@<version>; an
+ *              asset pack as its jsDelivr pack.json URL (packs load URLs).
  *   GitHub     repos with the topic "tablefolk" (kind topics as above),
  *              manifest at the repo root: gh:<owner>/<repo>@<branch>.
  *              Without a login GitHub allows 10 searches a minute, so it
@@ -20,6 +22,9 @@
   const ROOT = new URL('../', location.href).href;
   const KINDS = ['package', 'skill', 'role', 'pack'];
   const kindFrom = words => KINDS.find(k => (words || []).includes('tablefolk-' + k)) || 'package';
+  const isContent = p => !/^@tablefolk\//.test(p.name) && KINDS.some(k => (p.keywords || p.topics || []).includes('tablefolk-' + k));
+  // an asset pack is named by its pack.json URL (packs.js loads URLs, not npm:/gh: refs)
+  const entry = (kind, ref, rest) => ({ kind, ref: kind === 'pack' ? window.tablefolkPackages?.refUrl(ref, 'pack') || ref : ref, ...rest });
   const cache = new Map();
   async function cached(key, ms, fn) {
     const c = cache.get(key); if (c && Date.now() - c.at < ms) return c.value;
@@ -40,7 +45,9 @@
     return cached('npm:' + text, 10 * 60e3, async () => {
       const r = await fetch(`https://registry.npmjs.org/-/v1/search?size=50&text=${encodeURIComponent(('keywords:tablefolk ' + text).trim())}`);
       if (!r.ok) throw new Error('npm search: ' + r.status);
-      return (await r.json()).objects.map(o => o.package).map(p => ({ kind: kindFrom(p.keywords), ref: `npm:${p.name}@${p.version}`, name: p.name, description: p.description || '', version: p.version, author: p.publisher?.username || '', homepage: p.links?.homepage || p.links?.repository || '', source: 'npm' }));
+      // only real Tablefolk content: a kind keyword (tablefolk-package/-skill/-role/-pack), never the
+      // game's own libraries (@tablefolk/*: device, brain, voice... are code for developers, not packages)
+      return (await r.json()).objects.map(o => o.package).filter(isContent).map(p => entry(kindFrom(p.keywords), `npm:${p.name}@${p.version}`, { name: p.name, description: p.description || '', version: p.version, author: p.publisher?.username || '', homepage: p.links?.homepage || p.links?.repository || '', source: 'npm' }));
     });
   }
   async function github(text) {
@@ -48,7 +55,7 @@
       const r = await fetch(`https://api.github.com/search/repositories?per_page=50&q=${encodeURIComponent((text + ' topic:tablefolk').trim())}`);
       if (r.status === 403 || r.status === 429) throw new Error('GitHub search limit reached (10 a minute without a login); try again in a minute');
       if (!r.ok) throw new Error('GitHub search: ' + r.status);
-      return (await r.json()).items.map(x => ({ kind: kindFrom(x.topics), ref: `gh:${x.full_name}@${x.default_branch}`, name: x.name, description: x.description || '', author: x.owner?.login || '', homepage: x.html_url, stars: x.stargazers_count, source: 'GitHub' }));
+      return (await r.json()).items.filter(x => x.full_name && !/^tablefolk\/libs?$/i.test(x.full_name)).map(x => entry(kindFrom(x.topics), `gh:${x.full_name}@${x.default_branch}`, { name: x.name, description: x.description || '', author: x.owner?.login || '', homepage: x.html_url, stars: x.stargazers_count, source: 'GitHub' }));
     });
   }
   // Everything that matches: official first, then npm, then GitHub (if asked).
@@ -114,5 +121,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-  window.tablefolkRegistry = { search, official, npm, github, addToScenario };
+  window.tablefolkRegistry = { search, official, npm, github, addToScenario, isContent, entry };
 })();

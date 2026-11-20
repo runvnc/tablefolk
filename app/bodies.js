@@ -94,8 +94,20 @@
   // Play one clip on a character by name (a body's clip map name, or the
   // file's own clip name). Once: back to idle when it ends; loop: until the
   // next action. -> true when the character has that clip.
+  // the game's own animation modes (app.js playRig): any body has a clip for them, or idle
+  const MODES = new Set(['idle', 'walk', 'panic', 'talk', 'cast', 'push', 'carry', 'throw', 'dig', 'repair', 'bonk', 'dance', 'laugh', 'sit', 'wave', 'clap', 'cheer', 'sleep', 'bow', 'hammer', 'saw', 'stir', 'chop', 'mine', 'drink', 'read', 'train', 'pickup', 'open']);
   function playClip(g, name, { loop = false, ms = null } = {}) {
-    const ag = clipOf(g, name); if (!ag || !g.rigged) return false;
+    if (!g?.rigged) return false;
+    const ag = clipOf(g, name);
+    if (!ag) {
+      // a mode name ("pickup", "wave", "hammer"): the body's clip for it, through playRig
+      const mode = String(name).toLowerCase(); if (!MODES.has(mode)) return false;
+      if (g._clipTimer) { clearTimeout(g._clipTimer); g._clipTimer = null; }
+      g.rigMode = null; playRig(g, mode, !!loop); g.anim = mode;
+      if (!loop) g._clipTimer = setTimeout(() => { g._clipTimer = null; if (g.anim === mode) { g.anim = 'idle'; playRig(g, 'idle', true); } }, ms ?? 1800);
+      (g._clipsPlayed ||= []).push(mode); if (g._clipsPlayed.length > 20) g._clipsPlayed.shift();
+      return true;
+    }
     try { g.activeRigAnim?.stop(); } catch {}
     if (g._clipTimer) { clearTimeout(g._clipTimer); g._clipTimer = null; }
     ag.start(!!loop, 1.0, ag.from, ag.to, false);
