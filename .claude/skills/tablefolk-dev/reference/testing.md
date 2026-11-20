@@ -150,25 +150,25 @@ help or attacked; his anger read .6 after insult 2 only because he wrote
 disgusting presence away from my kitchen!"). hector (a guard, `evals/roles.json`):
 anger 0 throughout, trust .50 to .53, polite answers, no attack.
 
-After the changes (same day, same settings; bakery "after" is the final code,
-market-village ran before the last tweak that stopped "comes up to you"
-counting as a reason to talk):
+After the changes (same day, same settings, final code):
 
 | | bakery before | bakery after | market before | market after |
 |---|---|---|---|---|
-| model turns | 42 | 60 | 45 | 52 |
-| turns with speech written / actually spoken | 86% / - | 44% / 23% | 93% / - | 42% / 25% |
-| speech-only turns | 2% | 2% | 64% | 37% |
-| spoken lines a minute | 4.7 | 2.0 | 4.0 | 2.5 |
-| replies to overheard talk | 22 | 0 | 0 | 1 |
-| turns muted (no reason to talk) | - | 39 | - | 35 |
+| model turns | 42 | 60 | 45 | 59 |
+| turns with speech written / actually spoken | 86% / - | 44% / 23% | 93% / - | 41% / 14% |
+| speech-only turns | 2% | 2% | 64% | 41% |
+| spoken lines a minute | 4.7 | 2.0 | 4.0 | 1.3 |
+| replies to overheard talk | 22 | 0 | 0 | 0 |
+| turns muted (no reason to talk) | - | 39 | - | 46 |
 | trades or gifts between characters | 0 | 1 (thistle gives grub a bun) | 0 | 0 |
-| tasks done / failed | 12 / 4 | 15 / 4 | 4 / 4 | 10 / 13 |
+| tasks done / failed | 12 / 4 | 15 / 4 | 4 / 4 | 10 / 9 |
 | failures reported as "worked" | 1 | 0 | 0 | 0 |
-| malformed replies | 2% | 2% | 0 | 3% |
+| malformed replies | 2% | 2% | 0 | 2% |
 | "God"/"ready" leaks | 0 | 0 | 0 | 0 |
 
-The first after-run (before the last tweak) had 65% speech turns, mostly 6-line
+("Speech written" counts say lines the model wrote; on a muted turn E2B
+still often writes one and the game drops it.) The first after-run (before
+the last tweak, which stopped "comes up to you" counting as a reason to talk) had 65% speech turns, mostly 6-line
 conversations between characters started by approach notices and director
 events. Seed variants on the bakery (60 turns each): none 1 malformed reply,
 the neutral "(You look around.)" seed 0 (kept). Provocation after: grub
