@@ -230,6 +230,16 @@ on 2026-11-20. After a change to the module API, an event or a supported
 `window.tablefolk` member, run `node tools/check-api-doc.mjs` (the
 scenario skill's `api.md` against the code, grep-level).
 
+One game day with Gemma E2B (`live-eval.mjs scenarios/nightwatch.json --day
+--day-minutes=8`, 2026-11-20): odo (beacon_keeper) ran 18 job cycles,
+gathered 8 firewood and fed the beacon 6 times (it burnt out twice in the
+night and he relit it); 8 model calls in the day (pick 6, danger 1, remark
+1), every live tick in code; nobody used `signal()` (it is offered only by
+the model's own turns, and the day had almost none); the wolfpack came (3),
+circled, none was struck down, all fled at dawn, 84% of the others indoors;
+the idle player standing outside was struck down by direwolf1 while the
+fire was out (the scenario's lose condition).
+
 Traps found writing it: a scenario with `"brain": "none"` switches the
 page's brain, which clears the conversation history once, a moment after
 the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
