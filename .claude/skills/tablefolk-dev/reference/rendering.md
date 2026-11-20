@@ -477,6 +477,12 @@ After pass 2 (same method, 45 s to settle): the Oracle light 4.5 ms CPU,
 3.3 lat, 158 draws, 418-426 MiB; medium 6.8 / 4.6 / 276; market village
 light 6.4 / 3.8 / 251, 858 MiB; medium 9.2 / 5.3 / 358, 1260 MiB.
 
+After pass 3 (props as instances, small things cast no sun shadow): the
+Oracle light 4.1 ms CPU, 3.4 lat, 131 draws; medium 7.2 / 4.8 / 245; market
+village light 6.5 / 3.6 / 149; medium 8.4 / 5.1 / 247. Start-up, warm cache
+(world active / fully dressed, s): hearthvale light main 5.3 / 9.3, now 5.5 /
+10.2; the Oracle 3.8 / 6.6 vs 3.8 / 7.3; goblin-bakery 3.3 / 5.1 vs 4.5 / 6.4.
+
 The extra draw calls are the shadow pass (every caster again), the
 real-model trees (several meshes each), the ground cover kinds and the
 surroundings' tree meshes. Without the shadow map the market village at
