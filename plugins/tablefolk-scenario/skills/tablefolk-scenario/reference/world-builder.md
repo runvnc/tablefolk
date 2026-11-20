@@ -52,6 +52,15 @@ double-height.
   **Size** (every way of building; `?size=large|huge`): a generated map
   made bigger (large 51 by 39, huge 63 by 49; normal leaves it to the
   model). The map editor's generate panel takes any `[cols, rows]`.
+  **World** (`?sections=2..5&shape=levels|region|auto`; on this server
+  and in the browser): one map, or a world **in sections**: several maps
+  joined by links ([things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links)).
+  **Shape**: *levels* (dungeon levels joined by stairs), *a region* (a hub
+  such as a village with the forest, farmland or cave around it, joined by
+  edges) or *let the builder decide*. The model plans the whole world
+  first, then each section is built as its own map; progress names the
+  section being built, and **■ Stop** on the progress card ends the build.
+  With your own key the builder makes one map for now (a note says so).
   Step by step writes it in small steps
   (`app/worldgen-browser.js`): a plan (text), the map (a little JSON; code
   builds it with `procgen.js`, or layout lines outdoors), a review of the map
@@ -115,12 +124,35 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   floor (or hold space) to pan, F to fit. Hover shows a tooltip. Walk-in buildings show their walls,
   door, floor and a ghost of their standard furniture, so things can be
   placed inside ([things.md](things.md)).
+- **Sections**: the bar over the map picks the map being edited: the top
+  map, each section and the sections inside them (a kept building's inside
+  is one too). **+ add a section** makes one (a kind: dungeon, castle,
+  crypt, cave, forest, village, farm, or an empty floor; a size; a title),
+  **Rename** changes its title, **Delete this section** removes it and every
+  way to it. The forms below (story, player, characters) stay the top
+  map's: the world's.
+- **Links** (L, the chain tool): the map's links are drawn on it (a round
+  marker by kind: D door, ↓ stairs down, ↑ stairs up, C cave, G gate, T
+  trapdoor, with its destination; dashed for a link "in" a place, whose
+  square the game picks; a band along an edge that leads on). Click a
+  square to add one: its kind, where it leads (a section of the world,
+  **a new section…** made on the spot with a kind and size, or back where
+  the player came from), its name and, if locked, the key it needs; or one
+  of the **north / south / east / west edge** buttons for a whole edge. The
+  way back is made by the game. Click a link (with this tool or Select) to
+  change its name, kind or edge, where it leads (or another scenario's
+  path, URL or `#s=` code), where the player arrives, or its key, or to
+  remove it; the panel on the right lists every way out of the map.
 - The first edit turns any layout (generated rooms, a drawn grid) into fixed
   positions (`size`, `objects` with walls and doors, `paint`, everyone's
   `at`, `locked` by position); a world laid out by map lines is laid out once
   by the app in a hidden frame first.
 - **Ask the AI for changes** (`POST /api/revise` with the same model choice;
-  **undo** steps back through 20).
+  **undo** steps back through 20). In a world of sections it changes the
+  section shown: it gets that map (without the sections inside it) and a
+  few lines about the whole world, and its answer goes back in that place;
+  the other sections are never sent. **Look it over** works the same way,
+  on the section shown.
 - **Look it over and improve** (beside Ask; on the build form, **Look it
   over**: 2, 3 or 5 rounds, `?improve=N`, for every way of building except
   in this browser): an agent. Each round the map editor draws the whole map
@@ -160,7 +192,9 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   may cast it ([characters.md](characters.md), "Voices").
 - The story, player, characters, layout and raw JSON as forms.
 - **Play**, **play in dev mode**, **print / tabletop** (the `?tabletop=1`
-  view in a frame), **copy link**, **Share as a picture** (a PNG with the
+  view in a frame), **copy link** (a link over 8 KB, common for a world in
+  sections or with voices and pictures, is copied with a warning that chat
+  apps may cut it: share it as a picture or a .zip), **Share as a picture** (a PNG with the
   whole world inside), **.zip**, **.json**, and **Open a file** (a picture,
   .zip or .json; or drop one on the page, also before building anything):
   [links-and-testing.md](links-and-testing.md), "World files".

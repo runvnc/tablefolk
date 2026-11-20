@@ -314,11 +314,14 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <label class="field"><span class="lbl">Model</span><select name="model" id="model"></select></label>
     <label class="field" id="styleBox" hidden><span class="lbl">How</span><select name="style"><option value="steps">step by step</option><option value="one">whole world at once</option></select></label>
     <label class="field" id="sizeBox"><span class="lbl">Size</span><select name="size"><option value="">normal</option><option value="large">large</option><option value="huge">huge</option></select></label>
+    <label class="field" id="sectionsBox" title="A bigger world in several maps joined by links: dungeon levels by stairs, or a village with the forest and the cave next to it; each part is built as its own map and they are joined for you"><span class="lbl">World</span><select name="sections"><option value="">one map</option><option value="2">in 2 sections</option><option value="3">in 3 sections</option><option value="4">in 4 sections</option><option value="5">in 5 sections</option></select></label>
+    <label class="field" id="shapeBox" hidden><span class="lbl">Shape</span><select name="shape"><option value="auto">let the builder decide</option><option value="levels">levels (joined by stairs)</option><option value="region">a region (a hub and the land around it)</option></select></label>
     <label class="field" id="thinkBox" hidden><span class="lbl">Think first</span><input type="checkbox" name="think"></label>
     <label class="field" id="improveBox" title="After the world is built, the AI looks at the whole map, finds problems and things to improve, and changes it; then the pictures it asked for are painted in this browser"><span class="lbl">Look it over</span><select name="improve"><option value="">no</option><option value="2">2 rounds</option><option value="3">3 rounds</option><option value="5">5 rounds</option></select></label>
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
   <p class="note" id="whereNote"></p>
+  <p class="note" id="secNote" hidden>Worlds in sections are built on this server or in the browser: with your own key this builds one map.</p>
   ${view === 'builder' ? '<p class="note">Or <a href="#" id="openWorldFile">open a world file</a> (a picture, .zip or .json shared from Tablefolk), or drop one on this page.</p>' : ''}
   <p id="byoNote" hidden>This site does not pay for the AI that writes worlds: use a model that runs in your browser (free, once downloaded), or your own key (an <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a> account, or your own OpenAI-compatible server).</p>
   <div id="ownBox" class="own" hidden>
@@ -341,7 +344,7 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <p class="muted wide">Kept in this browser only, and sent only to the provider you chose: never to this site's server.</p>
   </div>
 </form></section>
-<div class="card progress" id="card" ${words ? '' : 'hidden'}><div class="row1"><span class="spin" id="spin"></span><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span><span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
+<div class="card progress" id="card" ${words ? '' : 'hidden'}><div class="row1"><span class="spin" id="spin"></span><button type="button" id="stopBuild" hidden title="Stop building this world">■ Stop</button><span id="stage">${saved ? 'saved world' + (saved.prompt ? ': “' + esc(saved.prompt) + '”' : '') : 'starting…'}</span><span id="clock"></span></div><div id="problems"></div><div id="preview"></div><div id="result"></div></div>
 <div id="workspace" hidden>
   <div class="wshead"><div><h2 id="wsTitle"></h2><p class="muted" id="wsSub"></p></div>
     <div class="acts"><button type="button" class="primary" data-act="play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>Play</button><button type="button" data-act="dev">Play in dev mode</button><button type="button" data-act="table">Print / tabletop</button><button type="button" data-act="copy">Copy link</button><button type="button" data-act="sharePic" title="A picture of the world with the whole world inside it (voices and pictures too): send the file itself; the game opens it when it is dropped on the page">Share as a picture</button><button type="button" data-act="zip" title="The world as a .zip: world.json, its voices and pictures as files">.zip</button><button type="button" data-act="download" title="The world as one JSON file">.json</button><button type="button" data-act="openFile" title="Open a world from a picture, a .zip or a .json (or drop it on the page)">Open a file</button><span id="edmsg" class="muted"></span></div></div>
@@ -375,7 +378,9 @@ button.primary{display:inline-flex;align-items:center;gap:7px;background:var(--a
 .field[hidden]{display:none}#byoNote{margin:10px 0 0;font-size:.88rem}
 .own{margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);display:grid;gap:10px}.own[hidden]{display:none}.ownrow{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}.ownrow[hidden]{display:none}.own .grow{flex:1;min-width:200px}.own input:not([type=checkbox]){padding:.45rem .6rem;border-radius:10px;border:1px solid var(--line);background:var(--card);width:100%}.own .wide{margin:0;flex-basis:100%}.own .check{display:flex;gap:6px;align-items:center;font-size:.88rem}button.small2{padding:.45rem .9rem;font-size:.9rem}.own code{font-size:.85em}.muted{color:var(--muted);font-size:.86rem}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:18px}
-.progress .row1{display:flex;align-items:center;gap:10px}#stage{font-weight:600}#clock{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.progress .row1{display:flex;align-items:center;gap:10px}#stopBuild{order:3;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:.25rem .7rem;cursor:pointer;font-weight:600;font-size:.85rem}
+.secbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;margin:0 0 8px;border-radius:12px;background:var(--card);border:1px solid var(--line)}.secbar[hidden]{display:none}.secbar .secsel{display:flex;gap:8px;align-items:center}.secbar select,.secbar input{padding:.35rem .55rem;border-radius:9px;border:1px solid var(--line);background:var(--bg)}
+.secbar button{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:.3rem .7rem;cursor:pointer;font-weight:600;font-size:.85rem}.secbar button.danger{color:var(--bad)}.secbar .secinfo{flex:1;min-width:200px}.secbar details summary{cursor:pointer;font-weight:600;color:var(--accent)}.secbar .secform{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:6px}.secbar .secform label{display:flex;flex-direction:column;gap:2px}#stage{font-weight:600}#clock{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
 .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--track);border-top-color:var(--accent);animation:sp 1s linear infinite;flex:none}.spin.stop{animation:none;border-color:var(--ok)}.spin.fail{animation:none;border-color:var(--bad)}@keyframes sp{to{transform:rotate(1turn)}}
 #preview{font:12px/1.45 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-all;max-height:7.5em;overflow:hidden;margin-top:.5rem;-webkit-mask-image:linear-gradient(transparent,#000 35%);mask-image:linear-gradient(transparent,#000 35%)}#preview:empty{display:none}
 #problems{color:var(--bad);font-size:.88rem}#preview.thought{font-style:italic;font-family:inherit;word-break:normal}#result:empty{display:none}
@@ -405,7 +410,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261120b"></script><script src="/app/map-editor.js?v=20261120a"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120b"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261120b"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120c"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -415,6 +420,9 @@ if(f){
   const remembered=(()=>{ try{ return JSON.parse(localStorage.getItem('tablefolk.worldgen')||'{}'); }catch{ return {}; } })();
   const want={ where: qs.get('where')||(qs.get('how')==='browser'?'browser':null)||remembered.where, model: qs.get('model')||remembered.model };
   f.mode.value=qs.get('mode')||'auto';
+  f.sections.value=qs.get('sections')||remembered.sections||''; f.shape.value=qs.get('shape')||remembered.shape||'auto';
+  const secShow=()=>{ $('shapeBox').hidden=!f.sections.value; $('secNote').hidden=!(f.dataset.where==='own'&&f.sections.value); };
+  f.sections.onchange=secShow; secShow();
   f.style.value=qs.has('oneanswer')?'one':(remembered.style||'steps'); f.think.checked=qs.has('think')||!!remembered.think; f.size.value=qs.get('size')||remembered.size||''; f.improve.value=qs.get('improve')||remembered.improve||'';
   const setWhere=id=>{
     const w=OPTS.where.find(x=>x.id===id)||OPTS.where[0]; if(!w) return;
@@ -430,6 +438,8 @@ if(f){
     // in this browser: step by step (small models) or the whole world in one answer
     // (the larger ones), and reasoning before each answer (slower, better)
     $('styleBox').hidden=$('thinkBox').hidden=w.id!=='browser';
+    // worlds in sections: on this server or in the browser (not yet with your own key)
+    $('secNote').hidden=!(w.id==='own'&&f.sections.value);
     // your own key: its own panel (the model is typed there)
     $('model').closest('.field').hidden=w.id==='own'; $('ownBox').hidden=w.id!=='own';
     if(w.id==='own') ownShow(w);
@@ -467,10 +477,12 @@ if(f){
     const where=f.dataset.where||'cloud';
     if(where==='own'){ const c=ownSave(); const miss=c.provider==='openrouter'&&!c.apiKey?'Sign in with OpenRouter or paste a key first.':c.provider==='custom'&&!/^https?:[/][/]/.test(c.baseURL)?'Type your server’s address first (e.g. http://localhost:8080/v1).':!c.model?'Choose a model first.':''; if(miss){ $('whereNote').textContent=miss; return; } }
     const model=where==='own'?own().get().model:$('model').value;
-    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked,size:f.size.value,improve:f.improve.value})); }catch{}
+    try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked,size:f.size.value,improve:f.improve.value,sections:f.sections.value,shape:f.shape.value})); }catch{}
     const q=new URLSearchParams(); for(const k of ['art','brain','llm','view','go']) if(qs.has(k)) q.set(k,qs.get(k));
     q.set('where',where); if(model) q.set('model',model); if(where!=='browser') q.set('mode',f.mode.value);
     if(f.size.value) q.set('size',f.size.value); else q.delete('size');
+    // a world in sections (server/worldgen-sections.js, app/worldgen-browser.js): how many and their shape
+    if(f.sections.value&&where!=='own'){ q.set('sections',f.sections.value); q.set('shape',f.shape.value||'auto'); }
     if(f.improve.value&&where!=='browser') q.set('improve',f.improve.value);
     if(where==='browser'){ if(f.style.value==='one') q.set('oneanswer','1'); if(f.think.checked) q.set('think','1'); }
     location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
@@ -519,7 +531,7 @@ if(words){
     if(d.stage==='repairing' && !d.chars) seenChars=0;
     if(d.label) $('stage').textContent=d.label+(d.chars?tok(d.chars):'');
     if(d.preview) $('preview').textContent=d.preview; if(d.problems) $('problems').textContent=d.problems.join(' · ');};
-  const onDone=async d=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('stop');
+  const onDone=async d=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('stop'); if($('stopBuild')) $('stopBuild').hidden=true;
     // Size: a generated map's cols and rows (procgen.js takes up to 63)
     const sz={large:[51,39],huge:[63,49]}[f.size?.value||qs.get('size')||''];
     if(sz && d.scenario?.generate){ d.scenario.generate.size=sz; try{ const cs=new CompressionStream('deflate-raw'), w=cs.writable.getWriter(); w.write(new TextEncoder().encode(JSON.stringify(d.scenario))); w.close(); const b=new Uint8Array(await new Response(cs.readable).arrayBuffer()); let t=''; for(let i=0;i<b.length;i+=0x8000) t+=String.fromCharCode(...b.subarray(i,i+0x8000)); d.code=btoa(t).split('+').join('-').split('/').join('_').replace(/=+$/,''); d.link='/app/#s='+d.code; }catch{} }
@@ -530,19 +542,22 @@ if(words){
     $('stage').textContent='Built in '+(d.ms/1000).toFixed(1)+'s with '+d.model; $('preview').textContent='';
     window.tfBuilder?.show(d,{appLink,revise:reviseWith(),improve:+qs.get('improve')||0});
     if(qs.has('go')) setTimeout(()=>location.href=appLink(d.link),700);};
-  const fail=msg=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('fail'); $('stage').textContent=msg;
+  const fail=msg=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('fail'); $('stage').textContent=msg; if($('stopBuild')) $('stopBuild').hidden=true;
     if(view==='loading'){ $('chore').textContent=msg; const b=new URLSearchParams(qs); b.set('view','builder'); $('result').innerHTML='<p><a href="?'+b+'">open the world builder</a></p>'; } };
+  // a world in sections takes a while: it can be stopped
+  let es=null; const nSec=+qs.get('sections')||0;
+  if(nSec>1 && $('stopBuild')){ $('stopBuild').hidden=false; $('stopBuild').onclick=()=>{ if(ended) return; try{ es&&es.close(); }catch{} try{ window.tfWorldgen&&window.tfWorldgen.stop&&window.tfWorldgen.stop(); }catch{} $('stopBuild').hidden=true; fail('stopped'); }; }
   if(qs.get('how')==='browser'||qs.get('where')==='browser'){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261120b').then(()=>load('/app/worldgen-browser.js?v=20261120a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261120b').then(()=>load('/app/worldgen-browser.js?v=20261120c')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261115a'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))
       .then(()=>window.tfOwnModel.run(words,qs.get('mode')||'auto',(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else {
-  const es=new EventSource('/api/generate?'+q);
+  es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));
   es.addEventListener('done',e=>{es.close(); onDone(JSON.parse(e.data));});
   es.addEventListener('failed',e=>{es.close(); fail('failed: '+JSON.parse(e.data).error);});

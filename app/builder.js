@@ -27,6 +27,14 @@
  * scenario ("books"), indexed with EmbeddingGemma in this browser; the AI
  * that changes the world sees only each book's title and summary.
  *
+ * A world in sections (top map + "subworlds", joined by "links"; the scenario
+ * skill's things.md "Sections"): the bar over the map switches the section
+ * being edited (secPath: subworlds keys down from the top), adds, renames and
+ * deletes sections; the map editor's link tool links them. Asking the AI and
+ * "look it over" change only the section shown: it is sent without its
+ * subworlds, with a few lines about the whole world, and put back in place.
+ * The forms (story, player, characters) stay the top map's.
+ *
  * The map editor and the forms change the same scenario: an edit in one
  * redraws the other. A layout written as "map" lines is placed by the app,
  * so the editor has it laid out once by the tabletop page in a hidden frame
@@ -426,32 +434,87 @@
     try { openWorld(await WF().read(f)); } catch (err) { msg('could not open ' + f.name + ': ' + err.message); if (!scn) alert('could not open ' + f.name + ': ' + err.message); }
   });
 
+  // ---- sections: the map being edited ----
+  // secPath: [] the top map, else the subworlds keys down from it (a kept
+  // building's inside is one too); the forms stay the world's (the top map)
+  let secPath = [];
+  const sectionAt = path => path.reduce((o, k) => o && o.subworlds && typeof o.subworlds[k] === 'object' ? o.subworlds[k] : null, scn);
+  function cur() { const c = sectionAt(secPath); if (c) return c; secPath = []; return scn; }
+  function putSection(path, s) { if (!path.length) scn = s; else { const p = sectionAt(path.slice(0, -1)); if (p) (p.subworlds ||= {})[path.at(-1)] = s; } }
+  function allSections() {
+    const out = [];
+    const walk = (o, path, depth) => { out.push({ path, key: path.at(-1) ?? '', title: o.title || (path.length ? path.at(-1) : 'the top map'), depth, kind: o.generate?.kind || '' }); for (const [k, v] of Object.entries(o.subworlds || {})) if (v && typeof v === 'object' && depth < 8) walk(v, [...path, k], depth + 1); };
+    if (scn) walk(scn, [], 0);
+    return out;
+  }
+  const multi = () => allSections().length > 1;
+  // where a link's "to" can point from the section shown: subworlds of it and of every section above it (scenario.js looks a key up the same way)
+  function linkTargets() {
+    const here = secPath.join('/');
+    return allSections().filter(x => x.path.length && x.path.join('/') !== here && secPath.slice(0, x.path.length - 1).join('/') === x.path.slice(0, -1).join('/')).map(x => ({ key: x.key, title: x.title, depth: x.depth - 1 }));
+  }
+  const SECTION_KINDS = ['dungeon', 'castle', 'crypt', 'cave', 'forest', 'village', 'farm', 'empty'];
+  // a new section at the top level (every section can link to it): a generate spec, or an empty floor
+  function newSection({ kind = 'dungeon', size = [33, 25], title = null } = {}) {
+    remember();
+    const t = title || kind.replace(/^\w/, c => c.toUpperCase());
+    let key = String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'section';
+    for (let n = 2; scn.subworlds?.[key]; n++) key = key.replace(/-\d+$/, '') + '-' + n;
+    const sz = Array.isArray(size) && size.length === 2 ? size.map(n => Math.max(9, Math.min(63, +n || 25))) : [33, 25];
+    (scn.subworlds ||= {})[key] = kind === 'empty' ? { title: t, size: sz, floor: 'stone', agents: [], objects: [] }
+      : { title: t, generate: { kind, size: sz, seed: 1 + Math.floor(Math.random() * 9999) }, agents: [], objects: [] };
+    sectionBar(); return key;
+  }
+  function deleteSection(path) {
+    if (!path.length) return;
+    const parent = sectionAt(path.slice(0, -1)), key = path.at(-1); if (!parent?.subworlds?.[key]) return;
+    remember(); delete parent.subworlds[key]; if (!Object.keys(parent.subworlds).length) delete parent.subworlds;
+    // ways to it go too
+    const strip = o => { if (Array.isArray(o.links)) { o.links = o.links.filter(l => l.to !== key); if (!o.links.length) delete o.links; } for (const v of Object.values(o.subworlds || {})) if (v && typeof v === 'object') strip(v); };
+    strip(scn);
+    setSection([]);
+  }
+  function setSection(path) { secPath = path; sectionBar(); if (ed) ed.load(cur()); }
+  function sectionBar() {
+    if (!$('mapEditor')) return;
+    let bar = $('sectionBar');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'sectionBar'; bar.className = 'secbar'; $('mapEditor').insertAdjacentElement('beforebegin', bar); }
+    if (!scn) { bar.hidden = true; return; }
+    const list = allSections(), here = secPath.join('/'), c = cur();
+    bar.hidden = false;
+    bar.innerHTML = `<label class="secsel"><span class="lbl">Map</span><select id="secSelect">${list.map(x => `<option value="${esc(x.path.join('/'))}"${x.path.join('/') === here ? ' selected' : ''}>${'\u2003'.repeat(x.depth)}${esc(x.title)}${x.kind ? ' · ' + esc(x.kind) : ''}</option>`).join('')}</select></label>
+      <span class="muted secinfo">${list.length > 1 ? `a world in ${list.length} sections · ${(c.links || []).length} way${(c.links || []).length === 1 ? '' : 's'} out of this one (the link tool, L, adds them)` : 'one map: add a section to make a bigger world (dungeon levels, the forest next door)'}</span>
+      <details class="secadd"><summary>+ add a section</summary><div class="secform"><label><span class="lbl">Kind</span><select id="secKind">${SECTION_KINDS.map(k => `<option>${k}</option>`).join('')}</select></label><label><span class="lbl">Size</span><select id="secSize"><option value="25,19">small</option><option value="33,25" selected>medium</option><option value="45,35">large</option></select></label><label><span class="lbl">Title</span><input id="secTitle" placeholder="e.g. The Lower Vault"></label><button type="button" id="secAddBtn">Add</button></div></details>
+      ${secPath.length ? `<button type="button" id="secRename">Rename</button><button type="button" id="secDelete" class="danger">Delete this section</button><button type="button" id="secTop">← the top map</button>` : ''}`;
+    $('secSelect').onchange = e => setSection(e.target.value ? e.target.value.split('/') : []);
+    $('secAddBtn').onclick = () => { const key = newSection({ kind: $('secKind').value, size: $('secSize').value.split(',').map(Number), title: $('secTitle').value.trim() || null }); setSection([key]); msg('added the section "' + (scn.subworlds[key].title) + '": link it from another map with the link tool (L)'); };
+    if (secPath.length) {
+      $('secRename').onclick = () => { const t = prompt('Title of this section:', c.title || ''); if (t != null && t.trim()) { remember(); c.title = t.trim(); sectionBar(); ed?.refresh(c); } };
+      $('secDelete').onclick = () => { if (confirm(`Delete the section "${c.title || secPath.at(-1)}" and every way to it?`)) deleteSection(secPath); };
+      $('secTop').onclick = () => setSection([]);
+    }
+  }
+
   // ---- the map editor ----
   function mapEditor() {
     if (ed || !window.tfMapEditor || !$('mapEditor')) return ed;
     ed = window.tfMapEditor.mount($('mapEditor'), {
-      onChange(s) { if (inside) inside.parent.subworlds[inside.id] = s; else scn = s; formsSoon(); },
+      onChange(s) { putSection(secPath, s); formsSoon(); },
+      sections: linkTargets,
+      onNewSection: spec => newSection(spec),
       onEditInside({ id, type }) {
-        const root = inside ? inside.parent : scn;
+        const root = cur();
         (root.subworlds ||= {})[id] ||= window.TablefolkProcgen.interiorScenario(type);
-        inside = { id, parent: root, type }; insideBar(); ed.load(root.subworlds[id]);
+        setSection([...secPath, id]);
       },
     });
     return ed;
-  }
-  // the inside of a kept building is edited as a map of its own; the forms stay the world's
-  let inside = null;
-  function insideBar() {
-    let bar = $('insideBar');
-    if (!bar) { bar = document.createElement('div'); bar.id = 'insideBar'; bar.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px 12px;margin:0 0 8px;border-radius:10px;background:#fff3cf;border:1px solid #e8c547;color:#3a2a08'; $('mapEditor').insertAdjacentElement('beforebegin', bar); }
-    bar.hidden = !inside;
-    if (inside) { bar.innerHTML = `<b>Editing the inside of ${esc(inside.id)}</b><span style="flex:1">Walls, floor, furniture and people here; the player comes in at the gold door square and leaves by the link at the bottom.</span><button type="button" id="insideBack">← back to the world</button>`; $('insideBack').onclick = () => { const p = inside.parent; inside = null; insideBar(); ed.load(p); }; }
   }
   let formsTimer = 0, edTimer = 0;
   // forms follow the map (not while typing in them)
   function formsSoon() { clearTimeout(formsTimer); formsTimer = setTimeout(() => { if (!$('editor')?.contains(document.activeElement)) render(); else formsSoon(); }, 300); }
   // the map follows the forms
-  function mapSoon() { clearTimeout(edTimer); edTimer = setTimeout(() => { if (!inside) ed?.refresh(scn); }, 250); }
+  function mapSoon() { clearTimeout(edTimer); edTimer = setTimeout(() => { if (!secPath.length) ed?.refresh(scn); }, 250); }
   // "map" lines: laid out by the tabletop page once
   function needsLayout(s) { return !s.generate && !(Array.isArray(s.grid) ? s.grid.length : s.grid) && (s.map?.length || 0) > 0; }
   async function layOut() {
@@ -464,8 +527,9 @@
   let layingOut = null;
   function loadMap() {
     if (!mapEditor()) return;
-    ed.load(scn);
-    if (needsLayout(scn)) layOut();
+    sectionBar();
+    ed.load(cur());
+    if (needsLayout(scn) && !secPath.length) layOut();
   }
   function onInput(e) {
     const el = e.target; if (!el.dataset?.path) return;
@@ -504,7 +568,12 @@
     const act = b.dataset.act;
     if (b.dataset.remove != null) { remember(); scn.agents.splice(+b.dataset.remove, 1); render(); mapSoon(); return; }
     if (act === 'play' || act === 'dev') window.open(await link(act === 'dev'), '_blank');
-    else if (act === 'copy') { await navigator.clipboard.writeText(location.origin + await link(false)); msg('link copied'); setTimeout(() => msg(''), 2500); }
+    else if (act === 'copy') {
+      const l = location.origin + await link(false); await navigator.clipboard.writeText(l);
+      // chat apps and some sites cut long links (links-and-testing.md): a big world (sections, voices, pictures) travels better as a file
+      if (l.length > 8000) { msg(`link copied, but it is long (${Math.round(l.length / 1024)} KB): chat apps may cut it; "Share as a picture" or ".zip" carry the whole world as a file`); setTimeout(() => msg(''), 9000); }
+      else { msg('link copied'); setTimeout(() => msg(''), 2500); }
+    }
     else if (act === 'download') { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(scn, null, 2)], { type: 'application/json' })); a.download = (scn.title || 'scenario').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.json'; a.click(); }
     else if (act === 'sharePic') { msg('drawing the picture…'); try { await mapLaidOut(); const shot = await ed?.snapshot?.({ maxSide: 1000 }), blob = await WF().toImage(scn, { picture: shot?.url }); WF().download(blob, WF().fileName(scn, 'png')); msg(`picture saved (${Math.round(blob.size / 1024)} KB): send the file itself; the game opens it when it is dropped on the page`); } catch (err) { msg('failed: ' + err.message); } }
     else if (act === 'zip') { try { const blob = await WF().toZip(scn); WF().download(blob, WF().fileName(scn, 'zip')); msg(`.zip saved (${Math.round(blob.size / 1024)} KB)`); } catch (err) { msg('failed: ' + err.message); } }
@@ -531,8 +600,19 @@
   }
   const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars || 0} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
   // one change by the AI: the new scenario replaces this one (undo steps back)
+  // a world in sections: the AI changes the section shown, told about the rest
+  function worldContext() {
+    if (!multi()) return '';
+    const here = secPath.join('/');
+    const lines = allSections().map(x => `- ${x.path.join('/') || '(top map)'}: "${x.title}"${x.kind ? ' (' + x.kind + ')' : ''}${(sectionAt(x.path).agents || []).length ? ', with ' + sectionAt(x.path).agents.slice(0, 6).map(a => a.id).join(', ') : ''}${x.path.join('/') === here ? '  <- THIS ONE' : ''}`);
+    return `This world is made of ${lines.length} sections (maps joined by links: stairs, doors, edges):\n${lines.join('\n')}\nThe scenario below is only the section "${cur().title || here || 'top map'}". Change only this section; keep its "links" unless asked (they lead to the other sections).\n\n`;
+  }
+  function sectionOut(s) { const { subworlds, ...rest } = s; return rest; }
   async function reviseAI(req, say) {
-    const { light, heavy } = lightImages(lightVoices(lightBooks(scn)));
+    const path = secPath.slice(), base = cur(), top = !path.length;
+    const send = multi() ? sectionOut(base) : base;
+    req = worldContext() + req;
+    const { light, heavy } = lightImages(top ? lightVoices(lightBooks(send)) : send);
     let done = null;
     // the visitor's own key or server: this page calls it (app/worldgen-own.js)
     if (revise.where === 'own' && window.tfOwnModel) {
@@ -557,7 +637,11 @@
       }
       if (!done) throw new Error('no answer');
     }
-    remember(); scn = heavyVoices(heavyBooks(heavy(done.scenario), scn), scn); render(); loadMap();
+    remember();
+    let next = heavy(done.scenario);
+    if (top) next = heavyVoices(heavyBooks(next, scn), scn);
+    if (base.subworlds && next && typeof next === 'object') next.subworlds = base.subworlds;   // the other sections are not the AI's to rewrite
+    putSection(path, next); secPath = path; render(); loadMap();
     return done;
   }
   let asking = false;
@@ -592,14 +676,16 @@
   async function mapLaidOut() {
     // "map" lines are laid out by the tabletop page first (layOut)
     for (let t = 0; layingOut && t < 120; t++) await new Promise(r => setTimeout(r, 250));
-    if (inside) { const p = inside.parent; inside = null; insideBar(); ed?.load(p); }
     await new Promise(r => requestAnimationFrame(() => r()));
   }
   async function critique(round, rounds, history, say) {
     await mapLaidOut();
     const shot = await ed?.snapshot?.(), mapText = ed?.describe?.() || '';
-    const { light } = lightImages(lightVoices(lightBooks(scn)));
-    const body = { scenario: light, mapText, round, rounds, history };
+    const send = multi() ? sectionOut(cur()) : cur();
+    const { light } = lightImages(secPath.length ? send : lightVoices(lightBooks(send)));
+    // a world in sections: the reviewer is told which section this is (as the first "earlier round" line)
+    const ctx = worldContext().replace(/\n+/g, ' ').trim();
+    const body = { scenario: light, mapText, round, rounds, history: ctx ? [ctx + ' Review only this section.', ...history] : history };
     if (revise.where === 'own' && window.tfOwnModel) {
       const r = await window.tfOwnModel.critique(body, shot?.url, say);
       let c; try { c = window.tfOwnModel.parseJSON(r.text); } catch (e) { throw new Error('the review was not JSON: ' + e.message); }
@@ -652,9 +738,9 @@
         if (c.verdict === 'good' || !c.request) break;
         if (agent.stop) break;
         say(`round ${round}/${rounds}: making the changes…`);
-        const before = JSON.parse(JSON.stringify(scn));
+        const before = JSON.parse(JSON.stringify(cur()));
         const done = await reviseAI(c.request, t => say(`round ${round}/${rounds}: ${t}`));
-        const d = diffWorlds(before, scn);
+        const d = diffWorlds(before, cur());
         // what the change lost goes to the next round, which can put it back
         history.push(c.request.slice(0, 300) + (d.lost.length ? ` (this change also lost: ${d.lost.join(', ')}; put back what should stay)` : ''));
         logLine(`changed in ${Math.round((done.ms || 0) / 1000)} s${d.text ? ': ' + esc(d.text) : ''}${d.lost.length ? ` <b>· lost: ${esc(d.lost.join(', '))}</b>` : ''}${done.warnings?.length ? ' · notes: ' + esc(done.warnings.join('; ')) : ''}`, d.lost.length ? 'warn' : 'done');
@@ -692,7 +778,7 @@
         say(head + 'starting…'); render();
         const url = await window.tfPaint.paint(p.prompt, { kind: p.kind, onStatus: t => say(head + t) });
         p.o[p.key || 'image'] = url;
-        ed?.refresh?.(inside ? inside.parent.subworlds[inside.id] : scn);
+        ed?.refresh?.(cur());
       }
       paintMsg = '';
     } catch (e) { paintMsg = ''; msg('painting failed: ' + e.message); }
@@ -721,7 +807,7 @@
 
   window.tfBuilder = {
     show(result, opts = {}) {
-      scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scn = JSON.parse(JSON.stringify(result.scenario)); meta = result; secPath = []; if (opts.appLink) appLink = opts.appLink; if (opts.revise) revise = opts.revise; render(); loadMap(); $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       // the form's "look it over" (?improve=N): the agent starts on the new world
       // (or "always, after every change" is on)
       if (opts.improve > 0 && revise.where !== undefined) { agent.rounds = Math.min(5, +opts.improve); setTimeout(() => improve(agent.rounds), 600); }

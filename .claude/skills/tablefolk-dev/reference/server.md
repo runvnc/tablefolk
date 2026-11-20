@@ -14,6 +14,34 @@ is the scenario skill's `server.md`; this is how it works inside.
 
 ## The world generator
 
+- **Worlds in sections** (2026-11-20; `sections=2..5&shape=levels|region|auto`
+  on `/api/generate`, the builder's "World" choice): `generateWorldScenario`
+  in `generate.js`. One call for the plan (`app/worldgen-plan.js`
+  `planPrompt`: title, intro, pressure, goal, the sections with key, kind,
+  about, who and links; read by `readPlan`, which makes keys and ids unique,
+  keeps forward links only and links every unreached section from the one
+  before it or the hub), then one call per section (`sectionPrompt`: the
+  plan as context, map method A with the section's kind, exactly the
+  planned ids, no world fields after the first; `shapeSection`; one repair
+  round through `checkScenario` with `fresh`, so the living-world rules run
+  per section), a failed section built from the plan by procgen
+  (`fallbackSection`), then `assemble` (the first section on top with the
+  plan's title, intro and goal, the rest as flat `subworlds`, links: an edge
+  between two open-rimmed kinds (village, forest, farm: the first free of
+  east, west, north, south), else stairs down, a cave mouth or a door `in`
+  the place farthest from the start) and `checkWorld` (unknown targets, `in`
+  places that do not exist (moved), `at` squares off the reachable floor,
+  edges with no reachable rim, arrival rims (an edge into a map with no
+  walkable opposite rim becomes a cave mouth), sections no way reaches,
+  locked links whose key lies only beyond them, what the goal names and
+  whether it is reachable). Sections after the first lose `goal`, and
+  `threats` when nobody with a job lives there. Progress events carry
+  `label` and `section`/`sections`; `done` adds `report` and `plan`. The
+  stream's `cancel()` (the page's Stop) stops it between calls. The
+  browser's step-by-step run (`worldgen-browser.js runSections`) asks for a
+  plain-line plan (`SECTION: name | kind | about | who: Name/body/job`) and
+  per section only the characters (the map is `buildMap`'s procgen), checks
+  each through `/api/finish` and assembles and checks with the same module.
 - `runModel({label, mode, ep, emit, user, maxTokens, merge})` streams one
   chat completion through `libs/brain/engines/openai.js` (the same client the
   browser uses), reporting thoughts and token counts as server-sent events.
@@ -80,6 +108,20 @@ is the scenario skill's `server.md`; this is how it works inside.
   Gemma 4 26B. Tested against a mock server (repair round, revision, a
   CORS refusal's message) and with intercepted OpenRouter requests.
 - Every result is saved in `generated/` (`recent` feeds the admin page).
+- **Sections in the builder** (`app/builder.js`, `app/map-editor.js`): the
+  section being edited is `secPath` (subworlds keys down from the top);
+  `sectionBar()` switches, adds (`newSection`: at the top level, a
+  `generate` spec or an empty floor), renames and deletes (and strips links
+  to it). The map editor keeps the map's `links` in its layout (`L.links`,
+  written back), draws them (`drawLinks`), and its link tool (L) calls
+  `opts.sections()` (keys visible from this section: its subworlds and its
+  parents') and `opts.onNewSection(spec)`. `reviseAI` and the critique send
+  the section shown without its `subworlds`, prefixed by `worldContext()`
+  (the critique gets it as its first history line, since `critiqueRequest`
+  has no slot for it), and put the answer back with its subworlds. The form
+  passes `sections`/`shape` to `/api/generate` and to
+  `tfWorldgen.run(words, cb, { sections, shape })`; ■ Stop closes the
+  EventSource or calls `tfWorldgen.stop()`.
 - **The builder's agent** ("look it over and improve", `app/builder.js`
   improve()): `POST /api/critique {scenario, mapText, image, round, rounds,
   history}` runs one review on the server's model (`critiqueRequest` /

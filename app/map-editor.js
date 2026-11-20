@@ -1,7 +1,7 @@
 /* map-editor.js -- the world builder's map: the scenario drawn from 2D tiles
  * (fast: a canvas, no 3D), and edited by hand.
  *
- *   const ed = tfMapEditor.mount(el, { onChange(scn), onSelect(info) })
+ *   const ed = tfMapEditor.mount(el, { onChange(scn), onSelect(info), sections(), onNewSection(spec), onEditInside(info) })
  *   ed.load(scenario)    show a scenario (a copy is laid out; the original
  *                        is changed only when something is edited)
  *   ed.fit()             the whole board in view
@@ -24,6 +24,11 @@
  * on a wall: removes), doors (click a wall; on a door: lock / unlock),
  * floor (drag, with a material), erase, and placing from the palette
  * (monsters, people, objects; drag one in, or click it and click the map).
+ * links (L: a world in sections, things.md "Sections"): the map's links are
+ * drawn (a marker by kind on their square, a band on an edge, "in" links at
+ * their place); the tool adds one on a square or a whole edge, to a section
+ * of the world (opts.sections()) or a new one (opts.onNewSection({kind,
+ * size, title}) makes it and returns its key); the inspector edits a link.
  * Pan: drag empty floor, the middle or right button, or Space + drag; wheel
  * zooms about the pointer; F fits. Ctrl+Z / Ctrl+Shift+Z undo / redo.
  * World coordinates as in the app: column c is x = x0 - c, row r is
@@ -190,6 +195,7 @@
       const x = Math.round(o.x), z = Math.round(o.z), side = [['north', 0, -1], ['south', 0, 1], ['east', -1, 0], ['west', 1, 0]].find(([, dx, dz]) => L.cells.get((x + dx) + ',' + (z + dz))?.type === 'wall');
       if (side) o.wall = side[0];
     }
+    L.links = Array.isArray(s.links) ? clone(s.links) : [];
     L.unplaced = L.agents.filter(a => !Array.isArray(a.at)).map(a => a.id);
     L.base = s.floor && FLOORS[s.floor] ? s.floor : (s.dark || s.base === 'dungeon' || [...L.cells.values()].length > 8) ? 'stone' : 'grass';
     L.src = s;
@@ -211,6 +217,7 @@
     scn.paint = [...L.floor].map(([k, mat]) => { const [x, z] = k.split(',').map(Number); return { x, z, mat }; });
     const locks = [...L.cells].filter(([, c]) => c.type === 'door' && c.locked).map(([k, c]) => ({ at: k.split(',').map(Number), key: c.locked }));
     if (locks.length) scn.locked = locks; else delete scn.locked;
+    if (L.links?.length) scn.links = L.links.map(l => ({ ...l })); else delete scn.links;
     // everyone where the map shows them (their "in" no longer applies)
     scn.agents = L.agents.map(a => { const { in: _in, ...rest } = a; return Array.isArray(a.at) ? rest : a; });
     if (Array.isArray(L.player.at)) { const { in: _in, ...p } = L.player; scn.player = p; }
@@ -253,6 +260,7 @@
           ${tool('door', 'Doors: click a wall; click a door to lock it', 'M6 3h12v18H6zM14 12h1', 'D')}
           ${tool('floor', 'Paint the floor', 'M4 4h16v6H4zM12 10v4M10 14h4v7h-4z', 'G')}
           ${tool('erase', 'Erase', 'M16 4l5 5-10 10H6l-3-3zM9 9l6 6', 'X')}
+          ${tool('link', 'Links: a way to another section (stairs, a door, a cave, an edge)', 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1', 'L')}
         </div>
         <select class="tfme-mat" title="floor material">${FLOOR_NAMES.map(m => `<option value="${m}">${nice(m)}</option>`).join('')}</select>
         <span class="tfme-sep"></span>
@@ -348,6 +356,7 @@
         else if (t.kind === 'object') L.objects.splice(L.objects.indexOf(t.ref), 1);
         else if (t.kind === 'wall' || t.kind === 'door') L.cells.delete(t.key);
         else if (t.kind === 'player') delete L.player.at;
+        else if (t.kind === 'link') L.links.splice(L.links.indexOf(t.ref), 1);
       });
       sel = null; renderInspector();
     }
@@ -391,8 +400,14 @@
       if (type === 'area') return `<label class="wide"><span>${label}</span><textarea data-k="${key}" rows="4">${esc(val)}</textarea></label>`;
       return `<label><span>${label}</span><input data-k="${key}" type="${type}" value="${esc(val ?? '')}" ${extra}></label>`;
     }
+    function linkList() {
+      if (!L.links?.length) return '';
+      return `<p class="tfme-note">Ways to other sections:</p><div class="tfme-chips">${L.links.map((l, i) => `<button type="button" class="tfme-chip" data-sellink="${i}">${esc((l.edge ? l.edge + ' edge' : nice(l.kind || 'door')) + ' → ' + (l.name || linkTarget(l)))}</button>`).join('')}</div>`;
+    }
     function renderInspector() {
       const box = $('.tfme-inspect'); if (!box || !L) return;
+      if (!sel && linkDraft) { box.innerHTML = linkForm(linkDraft.cell); return; }
+      if (!sel && toolName === 'link') { box.innerHTML = `<h3>Links</h3><p class="tfme-muted">Click a square to put a way to another section there (stairs, a door, a cave, a gate, a trapdoor); click a link to change it.</p>${edgeButtons()}${linkList()}`; return; }
       if (!sel) {
         const counts = { monsters: L.agents.filter(isHostile).length, people: L.agents.filter(a => !isHostile(a)).length, things: L.objects.filter(o => o.type !== 'light').length };
         box.innerHTML = `<h3>${esc(scn.title || 'Map')}</h3>
@@ -402,10 +417,11 @@
             <label><span>Height</span><input data-board="rows" type="number" min="5" max="80" value="${L.rows}"></label>
           </div>
           ${L.unplaced.length ? `<p class="tfme-note">Placed by the game when it starts: ${esc(L.unplaced.join(', '))}. Drag them in from here to fix their spot:</p><div class="tfme-chips">${L.unplaced.map(id => `<button type="button" class="tfme-chip" draggable="true" data-unplaced="${esc(id)}">${esc(id)}</button>`).join('')}</div>` : ''}
-          <p class="tfme-muted">Click something on the map to change it. Monsters fight on sight; people talk (their brief is what they know and want).</p>`;
+          <p class="tfme-muted">Click something on the map to change it. Monsters fight on sight; people talk (their brief is what they know and want).</p>${linkList()}`;
         return;
       }
       const t = sel;
+      if (t.kind === 'link') { box.innerHTML = linkInspector(t.ref); return; }
       if (t.kind === 'agent' || t.kind === 'player') {
         const a = t.ref, me = t.kind === 'player';
         box.innerHTML = `<div class="tfme-head">${thumb('characters', a.model || 'adventurer')}<div><h3>${esc(me ? (a.name || 'You') : a.id)}</h3><span class="tfme-muted">${me ? 'the player' : isHostile(a) ? 'hostile: fights' : 'talks'}</span></div></div>
@@ -476,6 +492,17 @@
         const n = Math.max(5, Math.min(80, Math.round(+el.value || 0))); if (!n) return;
         edit(() => { L[el.dataset.board] = n; }); fit(); return;
       }
+      if (el.dataset.lk && sel?.kind === 'link') {
+        const l = sel.ref, k = el.dataset.lk, raw = el.value.trim();
+        if (typing !== el) { snapshot(); typing = el; }
+        if (k === 'toText') { if (raw) l.to = raw; }
+        else if (k === 'arrive') { const m = raw.match(/^(-?\d+)\s*,\s*(-?\d+)$/); if (m) l.arrive = [+m[1], +m[2]]; else if (raw) l.arrive = raw; else delete l.arrive; }
+        else if (raw) l[k] = raw; else if (k !== 'to' && k !== 'edge' && k !== 'kind') delete l[k];
+        writeBack(scn, L); dirty = true; opts.onChange?.(scn);
+        if (el.tagName === 'SELECT') renderInspector();
+        return;
+      }
+      if (el.dataset.lf === 'to') { root.querySelectorAll('[data-lfnew]').forEach(x => { x.hidden = el.value !== '__new'; }); return; }
       if (!el.dataset.k || !sel) return;
       const k = el.dataset.k, raw = el.value;
       let v = el.type === 'number' ? (raw === '' ? undefined : +raw) : raw;
@@ -553,6 +580,7 @@
       for (const f of folk) { const r = f.a.at[1] + z0; push(r + .4, () => drawFolk(ctx, f)); }
       for (const r of [...rows.keys()].sort((a, b) => a - b)) for (const f of rows.get(r)) f();
       if ((showOpt.labels || clean) && s >= 16) for (const f of folk) drawLabel(ctx, f);
+      drawLinks(ctx, clean);
       if (clean) return drawRulers(ctx);
       // hover and selection
       if (hover && inBoard(...hover)) { const [px, py] = cellToPx(...hover); ctx.strokeStyle = 'rgba(255,240,200,.85)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, s - 2, s - 2); }
@@ -611,7 +639,92 @@
       }
       if (s >= 14) { const [px, py] = cellToPx(Math.round(b.x), Math.round(b.z)); ctx.font = `600 ${Math.round(Math.min(16, s * .38))}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText(spec.name, px + s / 2, py + s * .55); }
     }
-    function selCell() { const t = sel; if (!t) return null; if (t.kind === 'agent' || t.kind === 'player') return at(t.ref); if (t.kind === 'object') return [Math.round(t.ref.x), Math.round(t.ref.z)]; return t.key?.split(',').map(Number); }
+    function selCell() { const t = sel; if (!t) return null; if (t.kind === 'link') return linkCell(t.ref); if (t.kind === 'agent' || t.kind === 'player') return at(t.ref); if (t.kind === 'object') return [Math.round(t.ref.x), Math.round(t.ref.z)]; return t.key?.split(',').map(Number); }
+    // ---- links (sections) ----
+    const LINK_MARK = { door: ['D', '#d9a441'], stairs_down: ['↓', '#8f8a80'], stairs_up: ['↑', '#8f8a80'], cave: ['C', '#6c5a4a'], gate: ['G', '#7a5a3a'], trapdoor: ['T', '#8a6a3a'], edge: ['→', '#d9a441'] };
+    const placeOf = name => (L.places || []).find(p => p.id === name) || (L.places || []).find(p => p.kind === name) || (L.places || []).find(p => String(p.id).startsWith(name + ' '));
+    function linkCell(l) {
+      if (Array.isArray(l.at)) return [Math.round(l.at[0]), Math.round(l.at[1])];
+      if (l.in) { const p = placeOf(String(l.in).toLowerCase()); return Array.isArray(p?.center) ? p.center : null; }
+      return null;
+    }
+    const linkTarget = l => l.to === 'back' ? 'back' : typeof l.to === 'object' ? 'a generated ' + (l.to.generate?.kind || 'place') : (opts.sections?.().find(x => x.key === l.to)?.title || l.to);
+    function linkAt(x, z) { return L.links.find(l => { const c = linkCell(l); return c && c[0] === x && c[1] === z; }) || null; }
+    function drawLinks(ctx, clean) {
+      const s = view.s, { x0, z0 } = geo();
+      for (const l of L.links || []) {
+        const [ch, col] = LINK_MARK[l.edge ? 'edge' : l.kind] || LINK_MARK.door, on = !clean && sel?.kind === 'link' && sel.ref === l;
+        const name = (l.name || linkTarget(l)) + (l.key ? ' 🔒' : '');
+        if (l.edge) {
+          // a band along that rim, and the name in the middle of it
+          const vert = l.edge === 'east' || l.edge === 'west', c = l.edge === 'east' ? L.cols - 1 : 0, r = l.edge === 'south' ? L.rows - 1 : 0;
+          const px = view.ox + (vert ? c * s + (l.edge === 'east' ? s * .62 : 0) : 0), py = view.oy + (vert ? 0 : r * s + (l.edge === 'south' ? s * .62 : 0));
+          ctx.fillStyle = on ? 'rgba(255,211,77,.7)' : 'rgba(217,164,65,.5)'; ctx.fillRect(px, py, vert ? s * .38 : L.cols * s, vert ? L.rows * s : s * .38);
+          if (s >= 10) { ctx.save(); ctx.font = `700 ${Math.max(10, Math.min(15, s * .34))}px system-ui,sans-serif`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const cx = vert ? px + s * .19 : view.ox + L.cols * s / 2, cy = vert ? view.oy + L.rows * s / 2 : py + s * .19;
+            ctx.translate(cx, cy); if (vert) ctx.rotate(l.edge === 'east' ? Math.PI / 2 : -Math.PI / 2); ctx.shadowColor = '#000'; ctx.shadowBlur = 3; ctx.fillText('→ ' + name + ' (' + l.edge + ' edge)', 0, 0); ctx.restore(); }
+          continue;
+        }
+        const cell = linkCell(l); if (!cell) continue;
+        const [px, py] = cellToPx(...cell), cx = px + s / 2, cy = py + s / 2;
+        ctx.fillStyle = col; ctx.strokeStyle = on ? '#ffd34d' : '#fff7e0'; ctx.lineWidth = on ? 3 : 2; if (l.in && !l.at) ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.arc(cx, cy, s * .36, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.max(9, Math.round(s * .38))}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, cx, cy + 1);
+        if ((showOpt.labels || clean) && s >= 14) {
+          const fs = Math.max(10, Math.min(14, s * .3)); ctx.font = `700 ${fs}px system-ui,sans-serif`;
+          const t = (l.in && !l.at ? 'in ' + l.in + ': ' : '') + name, tw = ctx.measureText(t).width + fs, th = fs * 1.4;
+          ctx.fillStyle = 'rgba(60,40,8,.88)'; ctx.beginPath(); ctx.roundRect(cx - tw / 2, py - th - 2, tw, th, th / 2); ctx.fill();
+          ctx.fillStyle = '#ffe6a8'; ctx.fillText(t, cx, py - th / 2 - 1);
+        }
+      }
+      void x0; void z0;
+    }
+    // the link tool's chooser (in the inspector): a square, or a whole edge
+    let linkDraft = null;
+    function linkForm(cell) {
+      const secs = opts.sections?.() || [];
+      return `<h3>New link</h3><p class="tfme-muted">${cell ? 'on the square ' + cell.join(', ') : 'a whole edge'}: the player steps onto it (or walks off the edge) to go to another section of the world. The way back is made by the game.</p>
+        <div class="tfme-form" data-linkform>
+          ${cell ? `<label><span>Kind</span><select data-lf="kind">${['door', 'stairs_down', 'stairs_up', 'cave', 'gate', 'trapdoor'].map(k => `<option value="${k}">${nice(k)}</option>`).join('')}</select></label>` : ''}
+          <label class="wide"><span>Leads to</span><select data-lf="to">${secs.map(x => `<option value="${esc(x.key)}">${'· '.repeat(x.depth || 0)}${esc(x.title)}${x.title !== x.key ? ' (' + esc(x.key) + ')' : ''}</option>`).join('')}<option value="__new">a new section…</option><option value="back">back where the player came from</option></select></label>
+          <label data-lfnew ${secs.length ? 'hidden' : ''}><span>New section: kind</span><select data-lf="newkind">${['dungeon', 'castle', 'crypt', 'cave', 'forest', 'village', 'farm', 'empty'].map(k => `<option value="${k}">${k}</option>`).join('')}</select></label>
+          <label data-lfnew ${secs.length ? 'hidden' : ''}><span>Size</span><select data-lf="newsize"><option value="25,19">small</option><option value="33,25" selected>medium</option><option value="45,35">large</option></select></label>
+          <label class="wide"><span>Name (shown, and said when you go)</span><input data-lf="name" placeholder="e.g. the Old Workings"></label>
+          <label class="wide"><span>Locked: the key it needs (optional)</span><input data-lf="key" placeholder="e.g. iron key"></label>
+        </div>
+        <div class="tfme-actions"><button type="button" data-act="linkadd">Add the link</button><button type="button" data-act="linkcancel">Cancel</button></div>`;
+    }
+    function edgeButtons() {
+      return `<p class="tfme-muted">Or make a whole edge a way out (walking off it travels; maps join like a region):</p><div class="tfme-actions">${['north', 'south', 'east', 'west'].map(e => `<button type="button" data-linkedge="${e}">${e} edge</button>`).join('')}</div>`;
+    }
+    function addLinkFromForm() {
+      const box = root.querySelector('[data-linkform]'); if (!box || !linkDraft) return;
+      const v = k => box.querySelector(`[data-lf="${k}"]`)?.value?.trim() || '';
+      let to = v('to'), name = v('name');
+      if (to === '__new') {
+        const kind = v('newkind'), size = v('newsize').split(',').map(Number);
+        to = opts.onNewSection?.({ kind, size, title: name || null });
+        if (!to) { status('could not make the new section'); return; }
+      }
+      const l = { ...(linkDraft.cell ? { at: linkDraft.cell, kind: v('kind') || 'door' } : { edge: linkDraft.edge }), to, ...(name ? { name } : {}), ...(v('key') ? { key: v('key') } : {}) };
+      edit(() => { if (l.edge) L.links = L.links.filter(x => x.edge !== l.edge); L.links.push(l); });
+      linkDraft = null; sel = { kind: 'link', ref: l }; renderInspector();
+      status('link added' + (l.edge ? ': the whole ' + l.edge + ' edge' : ''));
+    }
+    function linkInspector(l) {
+      const secs = opts.sections?.() || [], to = typeof l.to === 'string' ? l.to : '';
+      const known = secs.some(x => x.key === to) || to === 'back';
+      return `<h3>Link${l.edge ? ': the ' + l.edge + ' edge' : ''}</h3><p class="tfme-muted">${l.edge ? 'walking off this edge travels' : l.at ? 'at ' + l.at.join(', ') : 'in the place "' + esc(l.in) + '" (a square there, chosen by the game)'} · to ${esc(linkTarget(l))}</p>
+        <div class="tfme-form">
+          <label class="wide"><span>Name</span><input data-lk="name" value="${esc(l.name || '')}"></label>
+          ${l.edge ? `<label><span>Edge</span><select data-lk="edge">${['north', 'south', 'east', 'west'].map(e => `<option${e === l.edge ? ' selected' : ''}>${e}</option>`).join('')}</select></label>` : `<label><span>Kind</span><select data-lk="kind">${['door', 'stairs_down', 'stairs_up', 'cave', 'gate', 'trapdoor'].map(k => `<option value="${k}"${(l.kind || 'door') === k ? ' selected' : ''}>${nice(k)}</option>`).join('')}</select></label>`}
+          ${typeof l.to === 'object' ? `<p class="tfme-muted wide">Leads to a place built by the generator: ${esc(JSON.stringify(l.to.generate))}</p>` : `<label class="wide"><span>Leads to</span><select data-lk="to">${secs.map(x => `<option value="${esc(x.key)}"${x.key === to ? ' selected' : ''}>${'· '.repeat(x.depth || 0)}${esc(x.title)}</option>`).join('')}<option value="back"${to === 'back' ? ' selected' : ''}>back where the player came from</option>${known ? '' : `<option value="${esc(to)}" selected>${esc(to)}</option>`}</select></label>
+          <label class="wide"><span>…or another scenario (a path, URL or #s= code)</span><input data-lk="toText" value="${known ? '' : esc(to)}" placeholder="scenarios/the-oracle.json"></label>`}
+          <label class="wide"><span>Arrive at (a link's name in the target, or x, z; empty: by its way back)</span><input data-lk="arrive" value="${esc(Array.isArray(l.arrive) ? l.arrive.join(', ') : l.arrive || '')}"></label>
+          <label class="wide"><span>Locked: the key it needs (empty: open)</span><input data-lk="key" value="${esc(l.key || '')}"></label>
+        </div>
+        <div class="tfme-actions"><button type="button" class="danger" data-act="del">Remove the link</button></div>`;
+    }
     const wallAt = (x, z) => L.cells.get(x + ',' + z)?.type === 'wall';
     function drawWall(ctx, x, z) {
       const s = view.s, [px, py] = cellToPx(x, z), face = Math.round(s * .32), open = !L.cells.has(x + ',' + (z + 1));
@@ -700,11 +813,20 @@
       if (e.button === 1 || e.button === 2 || spaceDown) { panning = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; e.preventDefault(); return; }
       if (armed) { place(armed.kind, armed.name, x, z); return; }
       if (toolName === 'select') {
-        const t = inBoard(x, z) ? thingAt(x, z) : null;
+        let t = inBoard(x, z) ? thingAt(x, z) : null;
+        if (!t && inBoard(x, z) && linkAt(x, z)) { sel = { kind: 'link', ref: linkAt(x, z) }; renderInspector(); dirty = true; return; }
         sel = t; renderInspector(); dirty = true;
         if (t) drag = { t, from: [x, z], to: null };
         else panning = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, click: true };
         return;
+      }
+      if (toolName === 'link') {
+        if (!inBoard(x, z)) return;
+        const l = linkAt(x, z);
+        if (l) { linkDraft = null; sel = { kind: 'link', ref: l }; }
+        else if (L.cells.get(x + ',' + z)?.type === 'wall') { status('a link goes on a floor square, not in a wall'); return; }
+        else { sel = null; linkDraft = { cell: [x, z] }; }
+        renderInspector(); dirty = true; return;
       }
       if (toolName === 'door') {
         const c = L.cells.get(x + ',' + z);
@@ -743,6 +865,7 @@
       for (const c of charsAt(x, z)) bits.push(`<b>${esc(c.kind === 'player' ? (c.ref.name || 'you') : c.ref.id)}</b> <span>${esc(nice(c.ref.model || ''))} · ${c.kind === 'player' ? 'the player' : isHostile(c.ref) ? 'hostile' : 'talks'}</span>`);
       for (const o of L.objects.filter(o => Math.round(o.x) === x && Math.round(o.z) === z)) bits.push(`<b>${esc(nice(o.type))}</b>${o.gold ? ` <span>${o.gold} gold</span>` : ''}${o.items?.length ? ` <span>holds ${esc(o.items.map(i => i?.name || i).join(', '))}</span>` : ''}${o.text ? `<br><span>“${esc(String(o.text).slice(0, 80))}”</span>` : ''}`);
       const c = L.cells.get(x + ',' + z); if (c) bits.push(`<b>${c.type}</b>${c.locked ? ` <span>locked: ${esc(c.locked)}</span>` : ''}`);
+      const lk = linkAt(x, z); if (lk) bits.push(`<b>${esc(nice(lk.kind || 'door'))}</b> <span>to ${esc(lk.name || linkTarget(lk))}${lk.key ? ' (locked: ' + esc(lk.key) + ')' : ''}</span>`);
       const pl = (L.places || []).find(p => x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1);
       bits.push(`<span>${x}, ${z}${pl ? ' · ' + esc(nice(pl.id)) : ''}${L.floor.get(x + ',' + z) ? ' · ' + nice(L.floor.get(x + ',' + z)) : ''}</span>`);
       tipEl.innerHTML = bits.join('<br>'); tipEl.hidden = false;
@@ -754,6 +877,10 @@
     root.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b || !root.contains(b)) return;
       if (b.dataset.tool) { setTool(b.dataset.tool); return; }
+      if (b.dataset.sellink != null) { const l = L.links[+b.dataset.sellink]; if (l) { linkDraft = null; sel = { kind: 'link', ref: l }; renderInspector(); dirty = true; } return; }
+      if (b.dataset.linkedge) { sel = null; linkDraft = { edge: b.dataset.linkedge }; renderInspector(); return; }
+      if (b.dataset.act === 'linkadd') { addLinkFromForm(); return; }
+      if (b.dataset.act === 'linkcancel') { linkDraft = null; renderInspector(); return; }
       if (b.dataset.tab) { tab = b.dataset.tab; root.querySelectorAll('.tfme-tabs button').forEach(x => x.classList.toggle('on', x === b)); renderPalette(); return; }
       if (b.dataset.place) { armed = armed?.name === b.dataset.name ? null : { kind: b.dataset.place, name: b.dataset.name }; renderPalette(); status(armed ? `click the map to place ${nice(armed.name)} (Esc: stop)` : ''); return; }
       const act = b.dataset.act;
@@ -798,7 +925,7 @@
       place(d.kind, d.name, x, z);
     });
 
-    function setTool(t) { toolName = t; armed = null; renderPalette(); root.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t)); root.dataset.tool = t; status(''); }
+    function setTool(t) { toolName = t; armed = null; linkDraft = null; if (t === 'link' && sel?.kind !== 'link') sel = null; renderInspector(); renderPalette(); root.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t)); root.dataset.tool = t; status(''); }
     function doUndo() { if (!undo.length) return; redo.push(JSON.stringify(scn)); restore(undo.pop()); }
     function doRedo() { if (!redo.length) return; undo.push(JSON.stringify(scn)); restore(redo.pop()); }
     // keys, while the pointer is over the editor or focus is in it (not in a text box)
@@ -811,7 +938,7 @@
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); doRedo(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (k === ' ') { spaceDown = true; cv.style.cursor = 'grab'; e.preventDefault(); return; }
-      const tools = { v: 'select', w: 'wall', d: 'door', g: 'floor', x: 'erase' };
+      const tools = { v: 'select', w: 'wall', d: 'door', g: 'floor', x: 'erase', l: 'link' };
       if (tools[k]) { setTool(tools[k]); return; }
       if (k === 'escape') { armed = null; sel = null; renderPalette(); renderInspector(); dirty = true; status(''); return; }
       if ((k === 'delete' || k === 'backspace') && sel) { e.preventDefault(); remove(sel); return; }
@@ -869,6 +996,7 @@
       if (L.places?.length) out.push('Rooms: ' + L.places.filter(p => Array.isArray(p.center)).map(p => `${p.id} around [${p.center}]`).join('; ') + '.');
       out.push('Characters: ' + (folk.map((f, i) => `${f.me ? '@' : (i - (at(L.player) ? 1 : 0) + 1) % 10} ${f.me ? 'the player ' + f.id : f.id + ' (' + (f.a.model || 'critter') + (isHostile(f.a) ? ', hostile' : '') + ')'} at [${f.a.at}]`).join('; ') || 'none') + '.');
       if (L.unplaced.length) out.push('Placed by the game at start (no square yet): ' + L.unplaced.join(', ') + '.');
+      if (L.links?.length) out.push('Ways to other sections: ' + L.links.map(l => `${l.edge ? 'the ' + l.edge + ' edge' : (l.kind || 'door') + (l.at ? ' at [' + l.at + ']' : ' in ' + l.in)} to ${l.name || linkTarget(l)}${l.key ? ' (locked: ' + l.key + ')' : ''}`).join('; ') + '.');
       const pics = L.objects.filter(isPicture);
       if (pics.length) out.push('Pictures: ' + pics.map(o => `${o.type}${o.style ? ' (' + o.style + ')' : ''} at [${o.x},${o.z}]${o.wall ? ' on the ' + o.wall + ' wall' : ''}: ${o.image ? 'painted' : o.prompt ? 'to be painted: "' + o.prompt + '"' : 'no picture yet'}`).join('; ') + '.');
       return out.join('\n');
