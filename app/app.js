@@ -2981,8 +2981,11 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   }
   // importPropAsset() is async (GLB load) but registers its physics proxy
   // synchronously, so callers get a usable object right away.
-  let proxy=null;
-  const p=importPropAsset(scene,file,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
+  let proxy=null, url=file;
+  // a variant by the square it stands on (the same tree stays the same tree); the light copy at light quality
+  if(base.variantUrls?.length){ const all=[file,...base.variantUrls], h=((Math.round(x)*73856093)^(Math.round(z)*19349663))>>>0; url=all[h%all.length]; }
+  if(base.tier && window.TABLEFOLK_GFX?.lite) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
+  const p=importPropAsset(scene,url,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
   if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});
   return proxy;

@@ -317,7 +317,9 @@
       const target = Math.max(2, Math.round(W * H / 120));
       for (let t = 0, n = 0; t < 600 && n < target; t++) {
         // half the span: 1 for buildings about 3 cells across, 2 for the big ones
-        const type = kinds[n % kinds.length], h = ['inn', 'sawmill', 'blacksmith', 'barracks', 'barn', 'big_barn', 'open_barn', 'small_barn'].includes(type) ? 2 : 1;
+        // half the span each needs (2h+1 squares across): the env models are real size (2026-11-20; the inn is 7 x 8 m)
+        const HALF = { inn: 4, barracks: 4, barn: 4, big_barn: 4, blacksmith: 3, open_barn: 3, stone_house: 3, tall_house: 3, fantasy_house: 3, mill_house: 2, sawmill: 2, small_barn: 2 };
+        const type = kinds[n % kinds.length], h = HALF[type] ?? 1;
         const r = R.int(1 + h, H - 2 - h), c = R.int(1 + h, W - 2 - h);
         if (!free(r - h, c - h, r + h, c + h)) continue;
         let grass = true; for (let rr = r - h; rr <= r + h; rr++) for (let cc = c - h; cc <= c + h; cc++) if (g[rr][cc] !== ',') grass = false;
@@ -781,9 +783,9 @@
   // middle of its front (+z at ry 0), "inside" its furniture (rows from the
   // back wall; WALK_IN_THINGS). size: [across, deep] with the walls.
   const WALK_IN = {
-    house: { name: 'house', size: [5, 5], floor: 'wood', inside: ['Z.K', '.t.', '(..'], pad: 2 },
-    fantasy_house: { name: 'timber house', size: [6, 5], floor: 'oak', inside: ['Z)K(', 'z.t.', '....'], pad: 2 },
-    stable: { name: 'stable', size: [7, 5], floor: 'dirt', inside: ['dfBfu', '.....', '|...C'], pad: 2 },
+    house: { name: 'house', size: [5, 5], floor: 'wood', inside: ['Z.K', '.t.', '(..'], pad: 3 },
+    fantasy_house: { name: 'timber house', size: [6, 5], floor: 'oak', inside: ['Z)K(', 'z.t.', '....'], pad: 3 },
+    stable: { name: 'stable', size: [7, 5], floor: 'dirt', inside: ['dfBfu', '.....', '|...C'], pad: 3 },
   };
   const WALK_IN_THINGS = { Z: 'bed', K: 'bookcase', t: 'table', ')': 'nightstand', '(': 'cabinet', z: 'wooden_chair', B: 'barrel', u: 'bucket', f: 'fence', d: 'logs', '|': 'apple_barrel', C: 'crate' };
   // its squares: cell(i, j) for i across (0..size[0]-1), j from the back
