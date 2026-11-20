@@ -4840,13 +4840,15 @@ function disposeOwnMaterial(m){
 // a scenario agent). 'woman' is the rogue in everyday clothes: the same
 // palette texture recoloured (cream top, denim, dark shoes) and no cape.
 const AVATAR_MODELS={rogue:'Rogue_Hooded.glb',knight:'Knight.glb',mage:'Mage.glb',ranger:'Ranger.glb',barbarian:'Barbarian.glb',woman:'Rogue.glb'};
+// the chibi KayKit bodies stay reachable as <name>_classic (their plain names point at newer bodies in FIGURES, 2026-11-20)
+for(const k of Object.keys(AVATAR_MODELS)) AVATAR_MODELS[k+'_classic']=AVATAR_MODELS[k];
 const MODEL_LOOKS={woman:{texture:'rogue_modern.png?v=20261018a',hide:/Cape/}};
 const PERSON_H=1.3;
 // Voices: a character without "ttsVoiceId" gets one that fits its body
 // (female or male), the same one every time for the same id. Genders and
 // descriptions come from the server's /api/voices (set on its admin page),
 // else these defaults.
-const FEMALE_MODELS=new Set(['elf','woman','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
+const FEMALE_MODELS=new Set(['elf','woman','ranger','woman_classic','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
 const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
 fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
 // The designed voice library (assets/voices/, tools/fal-voices.py): samples
@@ -4896,6 +4898,9 @@ const FIGURES={
   // more monsters (Quaternius Ultimate Monsters and Animated Enemies, CC0)
   wyrmling:{h:1.0,v:'20261114a'}, imp:{dir:'meshy',h:.85,v:'20261115a'}, imp_classic:{file:'imp',h:0.9,v:'20261114a'}, mushroom_warrior:{h:1.0,v:'20261114a'}, bunny:{h:0.8,v:'20261114a'}, snake:{h:0.45,v:'20261114a'}, wasp:{h:0.6,v:'20261114a',lift:.45}, frog:{h:0.35,v:'20261114a'},
   bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
+  // the old chibi KayKit names point at newer bodies (look pass 3, 2026-11-20); the chibi ones are <name>_classic (AVATAR_MODELS)
+  knight:{dir:'meshy',file:'guard',h:1.38,v:'20261114a'}, mage:{file:'wizard',h:1.28,lift:.016,v:'20261109g'}, rogue:{dir:'meshy',file:'wanderer',h:1.36,v:'20261101a'},
+  ranger:{dir:'meshy',file:'huntress',h:1.3,v:'20261101a'}, barbarian:{dir:'meshy',file:'swordsman',h:1.36,v:'20261101a'}, woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'},
 };
 const FIG_CLIPS={
   Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],

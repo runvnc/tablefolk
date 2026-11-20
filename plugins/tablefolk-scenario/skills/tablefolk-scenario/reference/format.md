@@ -171,9 +171,13 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   Quaternius bodies stay as `adventurer_classic`, `adventurer_woman_classic`,
   `woodsman_classic`, `huntress_classic`, `peasant_woman_classic`,
   `villager_classic`, `witch_classic`. Also `hooded king farmer wizard peasant`
-  (Quaternius Universal rig, built by `tools/build-figures.sh`); the older
-  chibi KayKit `woman rogue knight mage ranger barbarian`; the clay
-  `critter` (the default).
+  (Quaternius Universal rig, built by `tools/build-figures.sh`). The old chibi
+  KayKit names point at the newer bodies (2026-11-20): `knight` is the guard,
+  `mage` the wizard, `rogue` the wanderer, `ranger` the huntress,
+  `barbarian` the swordsman, `woman` the village woman; the chibi ones stay as
+  `knight_classic mage_classic rogue_classic ranger_classic barbarian_classic
+  woman_classic`. The clay `critter` is the default for a character with no
+  `model` (and the blank sandbox world's first character).
 - **Monsters**: `skeleton skeleton_warrior zombie goblin kobold orc troll
   skeleton_farmer rat spider wolf bat ghost slime demon giant dragon`.
   `orc goblin skeleton skeleton_warrior troll skeleton_farmer` are the
