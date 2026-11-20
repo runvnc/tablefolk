@@ -768,7 +768,8 @@
     return '';
   }
   // what it asks for, on the card (an ask turn)
-  function askLine(g) { const s = g._job; return s?.ask && s.ask.until > gm() ? `You need ${s.ask.item}${s.ask.who ? `: ask ${s.ask.who} for some` : ': ask someone nearby for some'}.` : ''; }
+  // (worded with no "ask X": E2B wrote ask(grub) as a command)
+  function askLine(g) { const s = g._job; return s?.ask && s.ask.until > gm() ? `You need ${s.ask.item} and have none: say so to ${s.ask.who || 'someone nearby'}, in your own words.` : ''; }
   function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, did: g._job.did, doing: g._job.doing }; return out; }
   window.tablefolkJobs = { load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
 })();
