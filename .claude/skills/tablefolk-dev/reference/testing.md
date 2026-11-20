@@ -322,3 +322,39 @@ suggested as `use()`, fixed, 2/2); shop-chaos potion 0/2 then 2/2;
 feelings 'hit' 0/2, 1/2, 1/2, and 1/4 on the code from before this work
 (ccae1fd), so noise there, not a regression. With the fixes: 36 - 1 to 3
 (feelings 'hit').
+
+## Quieter rooms, one topic, fallbacks (2026-11-20, later)
+
+Same settings (E2B, lively, player idle), code at the Part A commit plus
+the flour ping-pong fix (bakers no longer buy an input from someone whose
+own work needs it). The bakery now has 3 flour sacks (bread from a flour
+sack works), hearthvale two ore rocks by the smithy.
+
+| | bakery before | bakery after | market before | market after |
+|---|---|---|---|---|
+| model turns (6 min) | 26 | 9 | 9 | 16 |
+| spoken lines a minute | 4.3 | 1.3 | 1.2 | 1.5 |
+| tasks done / failed | 40 / 0 | 18 / 1 | 92 / 1 | 56 / 0 |
+| malformed replies | 0% | 0% | 0% | 0% |
+
+(An intermediate run, before the floor rule and with every character near an
+event offered "say something": 2.5 a minute. The first run with fallbacks
+had the two bakers selling one flour sack back and forth every two seconds:
+fixed.) After the flour runs out the bakers sit or tidy; the room is quiet
+rather than chatty.
+
+| hearthvale, one game day (8 min) | final before | after |
+|---|---|---|
+| model calls (a game hour) | 53 (2.2) | 26 (1.1) |
+| idle open turns / ticks in code | 0% / 96% | 0% / 98% |
+| job cycles farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker | 6, 2, 4, 3, 3, 1, 4, 7 | 7, 3, 4, 6, 4, 14 (places visited), 4, 7 |
+| sales between characters | 11 | 17 |
+| meals | everyone once | everyone once or more |
+| spoken lines a game hour | 1.0 | 0.6 |
+| raid | 4 came, 1 down, 3 fled, 74% indoors | 4 came, 1 down, 3 fled, 90% indoors; hector hurt |
+
+The smith works all day now (ore from the rocks, firewood bought from jory
+or chopped). Evening talk has topics ("Odo paid me one gold for the wheat
+today.", "Rosa sold you ale for two gold, tam."), but only two social turns
+came in the evening window.
+

@@ -79,7 +79,8 @@ export function reach(s) {
   seen.add(q[0].join(','));
   while (q.length) { const [x, z] = q.pop(); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = (x + dx) + ',' + (z + dz); if (!seen.has(k) && walk(x + dx, z + dz)) { seen.add(k); q.push([x + dx, z + dz]); } } }
   const near = t => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]].some(([dx, dz]) => seen.has((Math.round(t.x) + dx) + ',' + (Math.round(t.z) + dz)));
-  const placeReached = p => { for (let x = Math.ceil(p.x0); x <= p.x1; x++) for (let z = Math.ceil(p.z0); z <= p.z1; z++) if (seen.has(x + ',' + z)) return true; return false; };
+  // (a place counts as reached when one of its squares is, or one right beside it: a 3x1 strip in front of a barn may be all hay and chests)
+  const placeReached = p => { for (let x = Math.ceil(p.x0) - 1; x <= p.x1 + 1; x++) for (let z = Math.ceil(p.z0) - 1; z <= p.z1 + 1; z++) if (seen.has(x + ',' + z)) return true; return false; };
   return { b, near, placeReached, seen };
 }
 
