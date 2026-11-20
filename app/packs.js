@@ -35,6 +35,11 @@
     // "use": what pressing E on it does: a behaviour a package module adds
     // ("lever_pull"), or data: { anim, text, sound, give, gold, once, state }
     if (typeof it.use === 'string' || (it.use && typeof it.use === 'object')) out.use = it.use;
+    // living worlds (uses.js): what it holds and gives until spent, how it
+    // grows back; how gathering from it looks; a kind of station it is
+    if (it.stock && typeof it.stock === 'object' && it.stock.item) out.stock = { item: String(it.stock.item), count: Math.max(0, Math.round(+it.stock.count || 1)), regrow: Math.max(0, +it.stock.regrow || 0), ...(typeof it.stock.spent === 'string' ? { spent: it.stock.spent } : {}) };
+    if (it.gather && typeof it.gather === 'object') out.gather = Object.fromEntries(['gives', 'anim', 'verb'].filter(k => typeof it.gather[k] === 'string').map(k => [k, it.gather[k]]).concat(Number.isFinite(+it.gather.time) ? [['time', +it.gather.time]] : []));
+    if (typeof it.station === 'string' && /^[a-z][a-z0-9_]*$/.test(it.station)) out.station = it.station;
     return out;
   }
 

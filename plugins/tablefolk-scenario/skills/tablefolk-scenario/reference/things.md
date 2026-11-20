@@ -285,6 +285,36 @@ its name that matches (a picked-up `key` object is called "key"); it then
 stays open. Without the key a note says what it needs. Put the key
 somewhere: the generators check it exists.
 
+## Stock and stores
+
+In a world with a clock ([living.md](living.md#the-clock-time-daymINUTES-clock)) things run out and come back.
+A thing with stock holds a count of an item; each `use()` takes one, and at
+0 it fades and cannot be used until it grows back:
+
+| thing | gives | count | grows back (game hours a unit) |
+|---|---|---|---|
+| trees (`tree`, `pine_tree`, `oak_tree`, ...) | firewood | 3 | 8 |
+| `logs`, `log`, `dead_tree` | firewood | 4, 2, 2 | never |
+| `boulder`, `mossy_rock` | stone | 4, 3 | 12 |
+| `crystals` | crystal | 3 | 24 |
+| `apple_barrel`, `apple_crate`, `carrot_crate` | apple, carrot | 6 | never: `put(apple, apple_barrel)` refills it |
+| `tall_grass` (a field) | wheat | 3 | 3 (twice as fast once someone sows it: `use()` on a bare field) |
+| `pumpkin` (a field) | pumpkin | 2 | 6 |
+| `bear_trap` (a snare) | meat | 1 | 4 |
+| `lily_pad` (a fishing spot) | fish | 3 | 3 |
+| `well` | water to drink | always | |
+
+On a scenario object, `"stock": 5` sets the count and `"crop": "carrot"`
+what a field gives: `{"type": "tall_grass", "x": 3, "z": 1, "crop": "wheat", "stock": 2}`.
+A pack or package item says the same in data ([packages.md](packages.md)).
+
+**Stores.** A chest, `barrel`, `crate` or `iron_crate` holds things:
+`put(item, barrel)` and `take(item, barrel)` work on all of them, and
+`"items"`/`"gold"` fill one at the start. Jobs keep what they make in the
+store in their workplace or home (a chest in the bakery); a store in no
+one's house or workplace (a granary in the open) belongs to the village, and
+taking from someone else's store is paid for.
+
 ## Asset packs (`packs`)
 
 More object types come from **asset packs**: a folder with a `pack.json`
