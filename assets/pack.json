@@ -7,13 +7,11 @@
  "items": {
   "chest": {
    "static": true,
-   "file": "models/props/Chest_Wood.gltf",
-   "w": 1.05,
-   "h": 0.75,
-   "d": 0.75,
+   "file": "models/props/env/chest.glb",
+   "w": 0.93,
+   "h": 0.76,
+   "d": 0.76,
    "mass": 1.2,
-   "scale": 0.55,
-   "visualYOffset": 0.38,
    "flammable": true,
    "tags": [
     "fantasy"
@@ -21,33 +19,35 @@
    "aliases": [
     "trunk",
     "treasure"
-   ]
+   ],
+   "tier": "1k",
+   "fit": "footprint"
   },
   "table": {
-   "file": "models/props/Table_Large.gltf",
-   "w": 1.35,
-   "h": 0.85,
-   "d": 0.95,
+   "file": "models/props/env/table.glb",
+   "w": 1.41,
+   "h": 0.77,
+   "d": 0.87,
    "static": true,
-   "scale": 0.72,
-   "visualYOffset": 0.43,
    "flammable": true,
    "tags": [
     "fantasy"
-   ]
+   ],
+   "tier": "1k",
+   "fit": "footprint"
   },
   "bench": {
-   "file": "models/props/Bench.gltf",
-   "w": 1.35,
-   "h": 0.55,
-   "d": 0.55,
+   "file": "models/props/env/bench.glb",
+   "w": 1.4,
+   "h": 0.48,
+   "d": 0.4,
    "static": true,
-   "scale": 0.88,
-   "visualYOffset": 0.28,
    "flammable": true,
    "tags": [
     "fantasy"
-   ]
+   ],
+   "tier": "1k",
+   "fit": "footprint"
   },
   "stool": {
    "file": "models/props/Stool.gltf",
@@ -80,13 +80,11 @@
   },
   "cauldron": {
    "static": true,
-   "file": "models/props/Cauldron.gltf",
-   "w": 0.8,
-   "h": 0.7,
-   "d": 0.8,
+   "file": "models/props/env/cauldron.glb",
+   "w": 0.85,
+   "h": 0.54,
+   "d": 0.74,
    "mass": 1.4,
-   "scale": 0.68,
-   "visualYOffset": 0.34,
    "flammable": false,
    "material": "metal",
    "tags": [
@@ -94,22 +92,24 @@
    ],
    "aliases": [
     "pot"
-   ]
+   ],
+   "tier": "1k",
+   "fit": "footprint"
   },
   "anvil": {
    "static": true,
-   "file": "models/props/Anvil.gltf",
-   "w": 0.9,
-   "h": 0.55,
-   "d": 0.48,
+   "file": "models/props/env/anvil.glb",
+   "w": 0.97,
+   "h": 0.85,
+   "d": 0.55,
    "mass": 2.4,
-   "scale": 0.75,
-   "visualYOffset": 0.28,
    "flammable": false,
    "material": "metal",
    "tags": [
     "fantasy"
-   ]
+   ],
+   "tier": "1k",
+   "fit": "footprint"
   },
   "weapon_stand": {
    "file": "models/props/WeaponStand.gltf",
@@ -467,10 +467,10 @@
    ]
   },
   "bed": {
-   "file": "models/props/village/bed.glb",
+   "file": "models/props/env/bed.glb",
    "w": 1.0,
    "h": 0.7,
-   "d": 1.9,
+   "d": 1.95,
    "static": true,
    "fit": "footprint",
    "aliases": [
@@ -480,7 +480,8 @@
    "tags": [
     "fantasy",
     "village"
-   ]
+   ],
+   "tier": "1k"
   },
   "double_bed": {
    "file": "models/props/village/double_bed.glb",
@@ -496,12 +497,12 @@
    ]
   },
   "bookcase": {
-   "file": "models/props/village/bookcase.glb",
-   "w": 1.0,
-   "h": 1.8,
-   "d": 0.45,
+   "file": "models/props/env/bookcase.glb",
+   "w": 0.96,
+   "h": 1.9,
+   "d": 0.54,
    "static": true,
-   "fit": "height",
+   "fit": "footprint",
    "aliases": [
     "books",
     "library_shelf"
@@ -510,7 +511,8 @@
    "tags": [
     "fantasy",
     "village"
-   ]
+   ],
+   "tier": "1k"
   },
   "banner": {
    "file": "models/props/village/banner.glb",
@@ -617,10 +619,10 @@
    ]
   },
   "torch": {
-   "file": "models/props/village/torch.glb",
-   "w": 0.3,
-   "h": 1.4,
-   "d": 0.3,
+   "file": "models/props/env/torch.glb",
+   "w": 0.5,
+   "h": 1.6,
+   "d": 0.49,
    "static": true,
    "fit": "height",
    "flammable": false,
@@ -631,7 +633,8 @@
    "tags": [
     "fantasy",
     "village"
-   ]
+   ],
+   "tier": "1k"
   },
   "iron_chest": {
    "static": true,
@@ -2431,6 +2434,143 @@
     "classic"
    ],
    "flammable": true
+  },
+  "anvil_classic": {
+   "static": true,
+   "file": "models/props/Anvil.gltf",
+   "w": 0.9,
+   "h": 0.55,
+   "d": 0.48,
+   "mass": 2.4,
+   "scale": 0.75,
+   "visualYOffset": 0.28,
+   "flammable": false,
+   "material": "metal",
+   "tags": [
+    "fantasy",
+    "classic"
+   ]
+  },
+  "bed_classic": {
+   "file": "models/props/village/bed.glb",
+   "w": 1.0,
+   "h": 0.7,
+   "d": 1.9,
+   "static": true,
+   "fit": "footprint",
+   "flammable": true,
+   "tags": [
+    "fantasy",
+    "village",
+    "classic"
+   ]
+  },
+  "bench_classic": {
+   "file": "models/props/Bench.gltf",
+   "w": 1.35,
+   "h": 0.55,
+   "d": 0.55,
+   "static": true,
+   "scale": 0.88,
+   "visualYOffset": 0.28,
+   "flammable": true,
+   "tags": [
+    "fantasy",
+    "classic"
+   ]
+  },
+  "bookcase_classic": {
+   "file": "models/props/village/bookcase.glb",
+   "w": 1.0,
+   "h": 1.8,
+   "d": 0.45,
+   "static": true,
+   "fit": "height",
+   "flammable": true,
+   "tags": [
+    "fantasy",
+    "village",
+    "classic"
+   ]
+  },
+  "cauldron_classic": {
+   "static": true,
+   "file": "models/props/Cauldron.gltf",
+   "w": 0.8,
+   "h": 0.7,
+   "d": 0.8,
+   "mass": 1.4,
+   "scale": 0.68,
+   "visualYOffset": 0.34,
+   "flammable": false,
+   "material": "metal",
+   "tags": [
+    "fantasy",
+    "classic"
+   ]
+  },
+  "chest_classic": {
+   "static": true,
+   "file": "models/props/Chest_Wood.gltf",
+   "w": 1.05,
+   "h": 0.75,
+   "d": 0.75,
+   "mass": 1.2,
+   "scale": 0.55,
+   "visualYOffset": 0.38,
+   "flammable": true,
+   "tags": [
+    "fantasy",
+    "classic"
+   ]
+  },
+  "table_classic": {
+   "file": "models/props/Table_Large.gltf",
+   "w": 1.35,
+   "h": 0.85,
+   "d": 0.95,
+   "static": true,
+   "scale": 0.72,
+   "visualYOffset": 0.43,
+   "flammable": true,
+   "tags": [
+    "fantasy",
+    "classic"
+   ]
+  },
+  "torch_classic": {
+   "file": "models/props/village/torch.glb",
+   "w": 0.3,
+   "h": 1.4,
+   "d": 0.3,
+   "static": true,
+   "fit": "height",
+   "flammable": false,
+   "tags": [
+    "fantasy",
+    "village",
+    "classic"
+   ]
+  },
+  "bar_counter": {
+   "file": "models/props/env/bar_counter.glb",
+   "tier": "1k",
+   "w": 3.0,
+   "h": 1.19,
+   "d": 0.86,
+   "fit": "footprint",
+   "static": true,
+   "flammable": true,
+   "aliases": [
+    "bar",
+    "counter",
+    "tavern_counter"
+   ],
+   "tags": [
+    "fantasy",
+    "village",
+    "tavern"
+   ]
   }
  }
 }
