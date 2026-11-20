@@ -372,7 +372,9 @@
       const match = n => !query || n.includes(query);
       if (tab === 'people') return [['People', PEOPLE.filter(match)]];
       const rest = Object.keys(m.characters).filter(k => !MONSTERS.includes(k) && !PEOPLE.includes(k) && !ANIMALS.includes(k));
-      return [['Monsters', MONSTERS.concat(rest).filter(match)], ['Animals', ANIMALS.filter(match)]].filter(g => g[1].length);
+      // bodies the scenario's packs and packages bring (its "bodies" hint): a lettered token, no tile
+      const pkg = (scn?.bodies || []).filter(b => !rest.includes(b) && !MONSTERS.includes(b));
+      return [['Monsters', MONSTERS.concat(rest).filter(match)], ['Animals', ANIMALS.filter(match)], ['From packages', pkg.filter(match)]].filter(g => g[1].length);
     }
     function renderPalette() {
       const box = $('.tfme-items'); if (!box) return;
@@ -384,7 +386,7 @@
     }
 
     // ---- inspector ----
-    const BODIES = () => [...MONSTERS, ...PEOPLE, ...ANIMALS];
+    const BODIES = () => [...new Set([...MONSTERS, ...PEOPLE, ...ANIMALS, ...(scn?.bodies || [])])];   // + a package's bodies (the scenario's "bodies" hint)
     function field(label, key, val, type = 'text', extra = '') {
       if (type === 'area') return `<label class="wide"><span>${label}</span><textarea data-k="${key}" rows="4">${esc(val)}</textarea></label>`;
       return `<label><span>${label}</span><input data-k="${key}" type="${type}" value="${esc(val ?? '')}" ${extra}></label>`;
