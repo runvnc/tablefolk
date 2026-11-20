@@ -58,7 +58,7 @@
     const glass = new BABYLON.PBRMaterial('wall_window', state.scene);
     glass.albedoColor = new BABYLON.Color3(.05, .05, .06); glass.metallic = 0; glass.roughness = .35; glass.environmentIntensity = .6; glass.maxSimultaneousLights = 8; glass._tfMatte = true;
     // made on first use: a world with only rubble walls loads no plaster or timber textures
-    const lazy = { rubble: () => pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]), blocks: () => pbr('blocks', 'stone_blocks_large', [.78, .77, .74]),
+    const lazy = { rubble: () => pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]), blocks: () => pbr('blocks', 'stone_blocks_large', [.74, .77, .84]),
       cap: () => pbr('cap', 'stone_blocks_large', [.82, .8, .77]), plaster: () => pbr('plaster', 'plaster_aged', [.95, .92, .86], { bump: .7 }),
       timber: () => pbr('timber', 'timber_dark', [1, 1, 1]), door: () => pbr('door', 'wood_planks_dark', [1.15, 1.1, 1.05]) };
     const made = {};

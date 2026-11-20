@@ -180,8 +180,10 @@
     sun.direction.copyFrom(dir);
     sun.diffuse = day ? L.sunC : MOON_C; sun.specular = sun.diffuse.scale(.5);
     sun.intensity = u ? 0 : (day ? L.sunI : L.moonI);
-    hemi.diffuse = u ? C3(.5, .58, .78) : L.hs; hemi.groundColor = u ? C3(.14, .14, .17) : L.hg;
-    hemi.intensity = u ? .32 : L.hi;   // underground: a faint cool ambient, unlit explored stone dim but legible
+    hemi.diffuse = u ? C3(.46, .56, .82) : L.hs; hemi.groundColor = u ? C3(.14, .14, .17) : L.hg;
+    hemi.intensity = u ? .42 : L.hi;   // underground: a faint cool ambient, unlit explored stone dim but legible
+    // a lone building (terrain.js "street"), at dusk and night: its fires and lamps warm the room (a warm fill from below)
+    if (world.indoor && !u && L.sunI < 1.2) { const k = 1 - Math.max(0, L.sunI) / 1.2; hemi.groundColor = lc(hemi.groundColor, C3(.42, .26, .13), .8 * k); hemi.intensity = Math.max(hemi.intensity, .5 * k + hemi.intensity * (1 - k)); }
     sc.environmentIntensity = u ? .1 : L.env;
     const ip = sc.imageProcessingConfiguration; ip.exposure = u ? 1.25 : L.exp;
     // haze: the horizon colour leaned a little blue (aerial perspective)

@@ -183,6 +183,45 @@
       }
     }
   }
+  function lanternVisual(sc, r, L) {
+    const iron = mat('lantern_iron', C3(.06, .06, .065), { rough: .55, metallic: .6 });
+    const glow = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
+    const p = r.getAbsolutePosition(), cx = Math.round(p.x), cz = Math.round(p.z), key = (a, b) => a + ',' + b;
+    const mode = window.tablefolkTerrain?.mode?.(), rooms = window.tablefolkRoofs?.findRooms?.();
+    const inRoom = !!rooms?.rooms?.some(room => room.cells.has(key(cx, cz)));
+    const indoor = mode === 'rock' || mode === 'street' || inRoom;
+    const walls = new Set((state.blocks || []).filter(b => !b.isDisposed?.() && meta(b)?.type === 'wall').map(b => key(Math.round(b.position.x), Math.round(b.position.z))));
+    const parts = [], bulbs = [];
+    const box = (name, w, h, d, x, y, z, m, rz = 0) => { const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, sc); b.position.set(x, y, z); b.rotation.z = rz; b.material = m; b.parent = r; parts.push(b); return b; };
+    const cage = (x, y, z) => { const c = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .28, diameterTop: .12, diameterBottom: .18, tessellation: 6 }, sc); c.position.set(x, y, z); c.material = iron; c.parent = r; parts.push(c);
+      const cap = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .09, diameterTop: 0, diameterBottom: .22, tessellation: 6 }, sc); cap.position.set(x, y + .18, z); cap.material = iron; cap.parent = r; parts.push(cap);
+      const bulb = BABYLON.MeshBuilder.CreateSphere('lantern_bulb', { diameter: .13, segments: 7 }, sc); bulb.position.set(x, y, z); bulb.material = glow; bulb.parent = r; bulbs.push(bulb); L.position.set(x, y, z); };
+    if (!indoor) {
+      const wood = window.tablefolkWalls?.timber?.() || mat('darkwood', C3(.115, .072, .042), { rough: .92 });
+      box('lantern_post', .14, 2.2, .14, 0, 1.1, 0, wood); box('lantern_post', .24, .12, .24, 0, .06, 0, wood);
+      box('lantern_arm', .5, .045, .045, .25, 2.0, 0, iron); box('lantern_arm', .32, .035, .035, .14, 1.88, 0, iron, .65);
+      cage(.45, 1.76, 0);
+    } else {
+      // the nearest wall face: the lantern goes on it (the root's frame may be turned: work in world offsets)
+      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => walls.has(key(cx + dx, cz + dz)));
+      const toLocal = (wx, wz) => { const ry = r.rotation?.y || 0, c = Math.cos(ry), s2 = Math.sin(ry); return [wx * c - wz * s2, wx * s2 + wz * c]; };
+      if (dir) {
+        // a sconce: an iron plate on the wall face (the wall's face is .16 from its cell centre), a bracket, a hanging cage
+        const face = 1 - .17, [px, pz] = toLocal(dir[0] * face, dir[1] * face), [ax, az] = toLocal(dir[0] * (face - .16), dir[1] * (face - .16)), [lx, lz] = toLocal(dir[0] * (face - .3), dir[1] * (face - .3));
+        const plate = box('lantern_arm', .06, .26, .06, px, 1.75, pz, iron); plate.scaling.set(1, 1, 1);
+        box('lantern_arm', .045, .045, .045, ax, 1.92, az, iron); box('lantern_arm', .045, .3, .045, (px + lx) / 2, 1.92, (pz + lz) / 2, iron);
+        cage(lx, 1.62, lz);
+      } else {
+        // away from the walls: a short iron stand
+        box('lantern_post', .06, 1.3, .06, 0, .65, 0, iron); box('lantern_post', .34, .04, .34, 0, .02, 0, iron);
+        cage(0, 1.45, 0);
+      }
+      // indoors the light reaches a little further: rooms lit by their lamps feel warm, not dark wood
+      L.range = Math.max(L.range, 8); L.intensity = Math.max(L.intensity, 3);
+    }
+    const one = window.mergeUnder?.(r, parts, 'lantern_post') || null;
+    own(r, one ? [one] : parts); own(r, bulbs, { shadow: false });
+  }
   function hexColor(v, fallback) { try { return v ? BABYLON.Color3.FromHexString(String(v)) : fallback; } catch { return fallback; } }
 
   // ---------- arcane pieces: shared textures, materials, parts ----------
@@ -334,24 +373,14 @@
       return r;
     },
     lantern(sc, x, z, opts) {
-      // pass 2: a dark timber post (the walls' timber texture) with an iron bracket and a caged lantern, 2.2 m
-      const r = rootAt('lantern', x, z, opts), wood = window.tablefolkWalls?.timber?.() || mat('darkwood', C3(.115, .072, .042), { rough: .92 });
-      const iron = mat('lantern_iron', C3(.06, .06, .065), { rough: .55, metallic: .6 });
-      const post = BABYLON.MeshBuilder.CreateBox('lantern_post', { width: .14, height: 2.2, depth: .14 }, sc); post.position.y = 1.1; post.material = wood;
-      const foot = BABYLON.MeshBuilder.CreateBox('lantern_post', { width: .24, height: .12, depth: .24 }, sc); foot.position.y = .06; foot.material = wood;
-      const arm = BABYLON.MeshBuilder.CreateBox('lantern_arm', { width: .5, height: .045, depth: .045 }, sc); arm.position.set(.25, 2.0, 0); arm.material = iron;
-      const brace = BABYLON.MeshBuilder.CreateBox('lantern_arm', { width: .32, height: .035, depth: .035 }, sc); brace.position.set(.14, 1.88, 0); brace.rotation.z = .65; brace.material = iron;
-      const cage = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .32, diameterTop: .13, diameterBottom: .2, tessellation: 6 }, sc);
-      cage.position.set(.45, 1.76, 0); cage.material = iron;
-      const cap = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .1, diameterTop: 0, diameterBottom: .24, tessellation: 6 }, sc); cap.position.set(.45, 1.97, 0); cap.material = iron;
-      const bulb = BABYLON.MeshBuilder.CreateSphere('lantern_bulb', { diameter: .14, segments: 7 }, sc);
-      bulb.position.set(.45, 1.75, 0); bulb.material = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
-      for (const m of [post, foot]) m.parent = r; for (const m of [arm, brace, cage, cap]) m.parent = r;
-      const pole = window.mergeUnder?.(r, [post, foot], 'lantern_post') || post, irons = window.mergeUnder?.(r, [arm, brace, cage, cap], 'lantern_cage') || cage;
-      own(r, [pole, irons]); own(r, [bulb], { shadow: false });
+      // outdoors: a dark timber post with an iron bracket and a caged lantern (2.2 m). Indoors and
+      // underground (pass 3): an iron sconce on the nearest wall face, or a short iron stand away from
+      // the walls. Decided a moment after placing, once the walls stand.
+      const r = rootAt('lantern', x, z, opts);
       finish(r, 'lantern', { material: 'wood' }, opts);
       addLampPool(sc, r, { warm: true });
-      pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
+      const L = pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
+      setTimeout(() => { if (!r.isDisposed?.()) lanternVisual(sc, r, L); }, 250);
       return r;
     },
     light(sc, x, z, opts) {

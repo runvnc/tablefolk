@@ -91,7 +91,7 @@
       case 'concrete': return 'stone_floor_rough';
       case 'water': return 'mud';
       case 'lava': return 'stone_floor_rough';
-      case 'sea': return 'sand';
+      case 'sea': return m === 'rock' ? 'stone_floor_rough' : 'sand';
       case 'carpet': return 'wood_planks_worn';
     }
     return indoor ? (m === 'rock' ? 'flagstone' : 'wood_planks_worn') : dflt;
@@ -420,8 +420,11 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const top = (state.terrainTopY ?? 0) + wallH() + .03;
     const wallSet = new Set(); for (const b of state.blocks || []) { if (!b || b.isDisposed?.()) continue; const t = meta(b)?.type; if (t === 'wall' || t === 'door') wallSet.add(Math.round(b.position.x) + ',' + Math.round(b.position.z)); }
     const bx = WORLD.halfW - 1, bz = WORLD.halfH - 1, E = 10;
-    const isRock = (x, z) => { const k = x + ',' + z; if (wallSet.has(k)) return false; if (Math.abs(x) > bx || Math.abs(z) > bz) return true; if (!R.outside?.has(k)) return false; const p = paintAt(x, z)?.mat; return !p || p === 'sea'; };
-    T.rockCells = new Set(); for (let z = -bz; z <= bz; z++) for (let x = -bx; x <= bx; x++) if (isRock(x, z)) T.rockCells.add(x + ',' + z);
+    // unexplored squares of a dark world are the same rock until the player finds them (darkness.js asks for a rebuild as it explores)
+    const D = window.tablefolkDark, hid = (x, z) => !!(D?.on && !D.known(x, z));
+    const isSolid = (x, z) => { const k = x + ',' + z; if (wallSet.has(k)) return false; if (Math.abs(x) > bx || Math.abs(z) > bz) return true; if (!R.outside?.has(k)) return false; const p = paintAt(x, z)?.mat; return !p || p === 'sea'; };
+    const isRock = (x, z) => isSolid(x, z) || (!wallSet.has(x + ',' + z) && hid(x, z));
+    T.rockCells = new Set(); for (let z = -bz; z <= bz; z++) for (let x = -bx; x <= bx; x++) if (isSolid(x, z)) T.rockCells.add(x + ',' + z);
     const isWall = (x, z) => wallSet.has(x + ',' + z) && !doorAt(x, z);
     const doorAt = (x, z) => (state.blocks || []).some(b => !b.isDisposed?.() && meta(b)?.type === 'door' && Math.round(b.position.x) === x && Math.round(b.position.z) === z);
     // half-cell quads: rock cells whole, and the half of a wall cell on the rock side
@@ -461,7 +464,6 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     m.albedoTexture = envTex('stone_wall_rubble', 'color', true); m.bumpTexture = envTex('stone_wall_rubble', 'normal'); m.bumpTexture.level = 1.2;
     m.invertNormalMapX = true; m.invertNormalMapY = false;
     m.albedoColor = new BABYLON.Color3(.42, .4, .38); m.metallic = 0; m.roughness = .95; m.backFaceCulling = true;   // single-sided: a close camera behind the player can sit inside the rock
-    window.tablefolkCutaway?.attach(m);   // cut like a wall between the follow camera and the player m.environmentIntensity = .3; m.maxSimultaneousLights = 8; m._tfMatte = true;
     return (T.rockMat = m);
   }
   // open water around an island (and under sea cells)
@@ -578,7 +580,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
         (x, z) => x > I.x0 + step && x < I.x1 - step && z > I.z0 + step && z < I.z1 - step,
         (x, z) => (x > I.x0 && x < I.x1 && z > I.z0 && z < I.z1) ? -.04 : heightAt(x, z), C.colorAt) : null;
       const anySea = [...(state.paint || [])].some(([, v]) => v.mat === 'sea');
-      if (T.mode === 'sea' || anySea) {
+      if (T.mode === 'sea' || (anySea && T.mode !== 'rock')) {   // a dungeon's 'sea' squares are under the rock
         const S = 900;
         T.sea = BABYLON.MeshBuilder.CreateGround('sea', { width: S, height: S, subdivisions: 1 }, sc);
         T.sea.position.y = -.22; T.sea.material = seaMaterial(); T.sea.isPickable = false; T.sea.receiveShadows = true;
@@ -601,7 +603,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     try { T.rock?.dispose(); } catch {} T.rockCells = null; T.rock = T.mode === 'rock' ? buildRock() : null;
     window.tablefolkDark?.update?.();
     state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean);
-    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, fogNear: 8, fogFar: 32 } : { underground: false, fogNear: 30, fogFar: 200 });
+    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, indoor: true, fogNear: 8, fogFar: 32 } : { underground: false, indoor: false, fogNear: 30, fogFar: 200 });
     // the textures (WebGPU only: the plugin's WGSL); kept while the layer set is the same
     const key = C.names.join(',') + '|' + (hi ? 2 : 1);
     // the textures wait until the world has started (the mean-colour ground shows until then), so they are
@@ -637,5 +639,8 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const cx = Math.round(x), cz = Math.round(z), on = Math.abs(cx) <= WORLD.halfW - 1 && Math.abs(cz) <= WORLD.halfH - 1;
     return on ? seaCell(cx, cz) : (T.mode === 'sea' || rimSea(cx, cz));
   }
-  window.tablefolkTerrain = { rebuild, mode: () => T.mode, heightAt, waterAt, isRock: (x, z) => T.mode === 'rock' && !!T.rockCells?.has(Math.round(x) + ',' + Math.round(z)), setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
+  // darkness.js: the explored area grew; the rock over unexplored rooms follows (throttled)
+  let rockTimer = null;
+  function refreshRock() { if (T.mode !== 'rock' || rockTimer) return; rockTimer = setTimeout(() => { rockTimer = null; try { const old = T.rock; T.rock = buildRock(); old?.dispose(); state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean); } catch (e) { console.warn('[terrain] rock', e); } }, 350); }
+  window.tablefolkTerrain = { rebuild, refreshRock, mode: () => T.mode, heightAt, waterAt, isRock: (x, z) => T.mode === 'rock' && !!T.rockCells?.has(Math.round(x) + ',' + Math.round(z)), setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
 })();

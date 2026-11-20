@@ -130,8 +130,9 @@
       // nothing stands where there is neither floor nor wall (the sea round a
       // dungeon): a flat lid at floor level, so the outsides of the walls of
       // the rooms you see stay in view
-      // the dungeon's rock (terrain.js) stays in view, fading into the black fog
-      if (!explored.has(k)) { if (window.tablefolkTerrain?.isRock?.(x, z)) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
+      // the dungeon's rock (terrain.js) stays in view, fading into the black fog; in a rock world the unexplored
+      // is that same rock (terrain.js covers it), so no box there either
+      if (!explored.has(k)) { if (window.tablefolkTerrain?.mode?.() === 'rock' || window.tablefolkTerrain?.isRock?.(x, z)) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
       else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
@@ -274,7 +275,8 @@
     }
   }
 
-  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); } catch (e) { console.warn('[dark]', e); } }
+  let rockSeen = -1;
+  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); if (dark && fogOn && explored.size !== rockSeen) { rockSeen = explored.size; window.tablefolkTerrain?.refreshRock?.(); } } catch (e) { console.warn('[dark]', e); } }
   function start(on) {
     if (window.TABLEFOLK_TABLETOP) on = false;
     clearFog(); explored = new Set(); seen = new Set();
