@@ -55,7 +55,7 @@
       "hours": [16, 8], "sleep": [9, 15], "watch": "night", "fights": false, "gold": 3,
       "workplace": ["signal_beacon"],
       "commands": ["signal",
-        { "run": "signal()", "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and raider_near < 10 and not world.militia_called",
+        { "run": "signal()", "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and not world.militia_called",
           "doing": "running to the beacon to signal" }],
       "steps": [
         { "gather": "woodpile", "when": "world.beacon_fuel < 5 and not me has firewood", "doing": "fetching firewood" },

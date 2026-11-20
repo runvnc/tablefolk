@@ -117,8 +117,9 @@ The day, by the clock:
 - **the evening** (17-21) at the tavern, or the square: the time for talk.
   A character with someone beside it opens a talk with one line, chosen by
   the game and written by one short model call: first one concrete thing
-  from the day's log ("Tell wren about: you baked 4 bread", or a question
-  about wren's own news: made, sold, bought, who ran out of what, a raid
+  from the day's log, told and followed by a question about it ("Wren, I
+  baked four loaves today. Did you get one?"), or a question about wren's
+  own news: made, sold, bought, who ran out of what, a raid
   and who fought, who insulted whom, what the player did, a director
   event), each topic once per pair; when the day's topics are used up, an
   open prompt grounded in its sheet and the world, a different one each
@@ -129,8 +130,10 @@ The day, by the clock:
   rumour, what it makes of the player, a question about the other's family.
   A question must come out as a question (it ends with "?"; one retry, else
   nothing is said). The other answers it, and the two talk a few lines;
-  partners who have talked least that evening go first, and a finished
-  talk frees the room for the next pair after 5 s. News about someone is
+  partners who have talked least that evening go first; in a gathering of
+  four or more, talk goes quicker (a finished talk frees the room for the
+  next pair after 5 s, answers come sooner), while a small room keeps the
+  day's pace. News about someone is
   never told to them as news; a rumour is never overheard by the one it
   is about;
 - **night**: home to its bed, up at dawn (a guard on night watch sleeps by

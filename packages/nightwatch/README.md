@@ -108,9 +108,8 @@ It exports one function that receives `api` and returns what it adds.
 ## The keeper, the militia and the goal
 
 - The keeper's job lists `signal` and a **rule**: `{"run": "signal()",
-  "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and
-  raider_near < 10 and not world.militia_called"}`: when the wolves come
-  near and the fire burns, the game walks Odo to the beacon and signals,
+  "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and not
+  world.militia_called"}`: when the wolves come and the fire burns, the game walks Odo to the beacon and signals,
   with no model call.
 - `signal`'s **`offer(g)`** returns "signal the militia from the beacon"
   when it would work (a lit beacon within 8 cells, wolves about, not yet

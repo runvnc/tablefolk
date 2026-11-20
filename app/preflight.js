@@ -78,10 +78,10 @@
     ['roles.js?v=20261120c'],
     ['play.js?v=20261120e'],
     ['animals.js?v=20261114c'],
-    ['live.js?v=20261120f'],
+    ['live.js?v=20261120g'],
     ['director.js?v=20261120c'],
     ['clock.js?v=20261120c'],
-    ['jobs.js?v=20261120z'],
+    ['jobs.js?v=20261120ab'],
     ['threats.js?v=20261120j'],
     ['chatter.js?v=20261120c'],
     ['speech-input.js?v=20261113a'],
@@ -98,7 +98,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261120n', 'module'],
+    ['llm_js/world-integration.js?v=20261120o', 'module'],
   ];
 
   function browserSummary() {

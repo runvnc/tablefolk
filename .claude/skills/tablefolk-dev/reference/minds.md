@@ -445,9 +445,12 @@ Measured: testing.md, "A whole day".
   relations only), a question must end with "?" (one retry at .9), spoken
   with `tablefolkTalk.speak(..., { answer: true })` so the other replies by a
   normal model turn; `PAIR_LINES` per day picks the least-talked partner.
-  In 17-21: world-integration.js `busyNear` holds the floor 10 s (not 30),
-  a closed conversation releases it after 5 s, and live.js answers a
-  character's words after half the quiet gap without the idle tempo.
+  In 17-21 with four or more mindful characters within earshot
+  (world-integration.js `socialHour`, `tablefolkTalk.socialHour`):
+  `busyNear` holds the floor 10 s (not 30), a closed conversation releases
+  it after 5 s, talked out 20 s (not 90), and live.js answers a
+  character's words after half the quiet gap without the idle tempo (the
+  bakery's three went to 3.2 model lines a minute with it everywhere).
 - **The player's deeds** (NEWS kind `player`): mind.js `event` (attacked,
   given, sold to the player), `insult` (only for words), threats.js
   allClear (fought), play.js `openChest` fires `tablefolk-player-took`

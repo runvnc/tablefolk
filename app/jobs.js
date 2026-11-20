@@ -1057,9 +1057,13 @@
 
   // ---------------------------------------------------------------- sleeping
   function bedFor(g, s) {
-    const beds = things('bed');
+    // (not one it could not get to lately, nor one sharing its cell with a bed someone is in: generated
+    // rooms sometimes put two beds in one cell or wall a row of them in)
+    const t = gm(), bad = o => (s.bad || {})[Math.round(o.x) + ',' + Math.round(o.z)] > t;
+    const beds = things('bed').filter(o => !bad(o));
     const mine = beds.filter(o => inPlace(s.home, o.x, o.z));
-    const free = o => !state.characters.some(c => c !== g && c.pose?.on === o.mesh);
+    const taken = o => state.characters.some(c => c !== g && c.pose?.on && (c.pose.on === o.mesh || things('bed').some(b => b.mesh === c.pose.on && Math.round(b.x) === Math.round(o.x) && Math.round(b.z) === Math.round(o.z))));
+    const free = o => !taken(o);
     return nearest(g, mine.filter(free)) || nearest(g, beds.filter(o => free(o) && dist(posOf(g), o) < 14));
   }
   async function bedtime(g, s) {
@@ -1069,7 +1073,8 @@
     const night = Math.floor((gm() + 360) / 1440);
     if (s.bedSaid !== night) { const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar || !!nameOf(c)); if (C()?.say(g, 'bed', {}, { to: near[0] || null })) s.bedSaid = night; else if (!near.length) s.bedSaid = night; }
     setDoing(g, s, bed ? 'going home to bed' : 'settling down for the night');
-    if (!bed) { const h = s.home && spotIn(s.home, g); if (h && !inPlace(s.home, posOf(g).x, posOf(g).z)) { const r = await goTo(g, s, h.x, h.z, 'home'); return { ms: r.ms || 3000 }; } return { ms: 8000 }; }
+    // no bed it can reach: home, and down on the floor there
+    if (!bed) { const h = s.home && spotIn(s.home, g); if (h && !inPlace(s.home, posOf(g).x, posOf(g).z)) { const r = await goTo(g, s, h.x, h.z, 'home'); if (!r.fail) return { ms: r.ms || 3000 }; } if (s.floorSlept !== Math.floor((gm() + 360) / 1440)) { s.floorSlept = Math.floor((gm() + 360) / 1440); await runLine(g, 'emote(sleep)'); } setDoing(g, s, 'asleep on the floor'); return { ms: 8000 }; }
     const r = await goDo(g, s, bed, `use(${bed.type})`);
     if (r.done) setDoing(g, s, 'asleep');
     return { ms: r.ms || 4000 };
@@ -1092,7 +1097,7 @@
     if (tav && !inPlace(tav, posOf(g).x, posOf(g).z)) { if (!s.sub.eve) s.sub.eve = spotIn(tav, g); const r = await goTo(g, s, s.sub.eve.x, s.sub.eve.z, 'the ' + tav.id); if (!r.fail) return { ms: r.ms || 3000 }; }
     s.sub.eve = null;
     const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar && c.pose?.mode !== 'lie');
-    if (near.length && gm() - s.lastSocial >= 40 && Math.random() < .6 && brainOk() && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
+    if (near.length && gm() - s.lastSocial >= 40 && Math.random() < .8 && brainOk() && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
       const day = K()?.now()?.day || 0, n = x => PAIR_LINES.get(day + '|' + [g.id, x.id].sort().join('|')) || 0;
       const free = near.filter(x => window.tablefolkTalk?.mayStart?.(x.id) !== false);
       const x = (free.length ? free : near).slice().sort((a, b) => n(a) - n(b) || Math.random() - .5)[0];
@@ -1129,7 +1134,8 @@
       const fact = String(n.text).replace(/[.!]+$/, '');
       if (n === ask) return { kind: 'ask', question: true, text: `Today ${fact}. Ask ${x.id} about it.` };
       if (n.kind === 'player') return { kind: 'player', question: Math.random() < .5, text: `Today ${fact}. ${Math.random() < .5 ? `Say what you think of that to ${x.id}.` : ''}` };
-      return { kind: 'tell', text: `Tell ${x.id} about this: ${you(fact)}.` };
+      // (told, then a question back: a line nobody needs to answer ended most evening talks at one line)
+      return { kind: 'tell', question: true, text: `Tell ${x.id} about this in one short sentence, then ask ${x.id} a short question about it: ${you(fact)}.` };
     }
     return null;
   }
@@ -1200,7 +1206,7 @@
     const card = (M()?.cardLines?.(g) || []).filter(l => /^(You feel|You like|You dislike|What you are quietly after)/.test(l)).join('\n');
     const who = `${x.id}${xj && xj.id !== 'idler' ? ', the ' + (xj.name || xj.id).toLowerCase() : xcfg.style ? ', ' + xcfg.style : ''}`;
     const how = cue.question
-      ? `Write ONE short question to ${x.id}, under 20 words. Start with "${x.id}," and end with a question mark.`
+      ? (cue.kind === 'tell' ? `Under 30 words in all. Start with "${x.id}," and end with the question mark of your question.` : `Write ONE short question to ${x.id}, under 20 words. Start with "${x.id}," and end with a question mark.`)
       : `Say it to ${x.id} in one or two short sentences, under 30 words, in your own voice.`;
     const user = `${card ? card + '\n' : ''}Evening at the ${tav?.id || 'square'}. ${who} is beside you.\n${cue.text}\n${how} Only the words.`;
     for (let attempt = 0; attempt < 2; attempt++) {

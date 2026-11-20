@@ -405,12 +405,21 @@ function busyNear(id, r = 6) {
   const p = posById(id); if (!p) return false;
   const near = x => { const q = posById(x); return q && Math.hypot(q.x - p.x, q.z - p.z) <= r; };
   const now = performance.now();
-  // the evening's social window (17-21 on the clock): someone else's line holds the floor 10 s, not 30
-  const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null, floor = hr != null && hr >= 17 && hr < 21 ? 10000 : FLOOR_MS;
+  // the evening's social window in a gathering (socialHour): someone else's line holds the floor 10 s, not 30
+  const floor = socialHour(id) ? 10000 : FLOOR_MS;
   return activeConvos().some(c => c.a !== id && c.b !== id && [c.a, c.b].some(near))
     || [...lastLine].some(([who, l]) => who !== id && l.to !== id && now - l.at < floor && near(who));
 }
 const isTalkedOut = id => (talkedOut.get(id) || 0) > performance.now();
+// the evening's social window (17-21 on the clock) in a gathering (four or more with a mind within
+// earshot): talk goes faster there (a shorter floor, a shorter talked-out time, quicker answers);
+// a small room (the bakery's three) keeps the day's pace
+function socialHour(id) {
+  const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null; if (hr == null || hr < 17 || hr >= 21) return false;
+  const p = posById(id); if (!p) return false;
+  const P = window.tablefolkPlay, st = window.TABLEFOLK_STATE;
+  return (st?.characters || []).filter(c => !c.defeated && !c._threat && !P?.isAnimal?.(c) && !P?.isHostile?.(c) && Math.hypot((c.logicalPos || c.root.position).x - p.x, (c.logicalPos || c.root.position).z - p.z) <= 6).length >= 4;
+}
 function convoLine(from, to) {
   const k = pairKey(from, to), now = performance.now(), c = convos.get(k) || { n: 0, last: 0, closedUntil: 0 };
   if (now < c.closedUntil) return false;   // closed: overheard
@@ -427,12 +436,14 @@ function convoLine(from, to) {
   c.n++; c.last = now;
   if (c.n >= CONVO_LINES) {
     c.closedUntil = now + CONVO_CLOSED_MS; c.n = 0;
-    // (in the evening's social window, 17-21: talked out for 20 s only, so they turn to someone else)
-    const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null, out = hr != null && hr >= 17 && hr < 21 ? 20000 : TALKED_OUT_MS;
+    // (in the evening's social window, in a gathering: talked out for 20 s only, so they turn to someone else)
+    const out = socialHour(from) ? 20000 : TALKED_OUT_MS;
     talkedOut.set(from, now + out); talkedOut.set(to, now + out);
-    // a conversation that has ended holds the floor only 5 s more: the next pair may start
-    for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, now - FLOOR_MS + 5000); }
-    setTimeout(() => { for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, performance.now() - FLOOR_MS + 5000); } }, 50);
+    // in a gathering at evening, a conversation that has ended holds the floor only 5 s more: the next pair may start
+    if (socialHour(from)) {
+      for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, now - FLOOR_MS + 5000); }
+      setTimeout(() => { for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, performance.now() - FLOOR_MS + 5000); } }, 50);
+    }
     for (const [x, y] of [[from, to], [to, from]]) { const g = charById(x), m = g && window.tablefolkMind?.mindOf(g); if (m) (m.pieceSaid ||= {})[y] = Date.now() + CONVO_CLOSED_MS; }
   }
   return true;
@@ -484,7 +495,7 @@ function speakAs(gOrId, text, { to = null, answer = false, templated = false } =
   }
   return { to: sp.to, addressed };
 }
-window.tablefolkTalk = { activeConvos, busyNear, talkedOut: isTalkedOut, mayStart: id => !isTalkedOut(id) && !busyNear(id), spoke: (id, to) => lastLine.set(id, { at: performance.now(), to: to || null }), speak: speakAs, reset: () => { convos.clear(); talkedOut.clear(); lastLine.clear(); } };
+window.tablefolkTalk = { activeConvos, busyNear, talkedOut: isTalkedOut, mayStart: id => !isTalkedOut(id) && !busyNear(id), spoke: (id, to) => lastLine.set(id, { at: performance.now(), to: to || null }), speak: speakAs, socialHour, reset: () => { convos.clear(); talkedOut.clear(); lastLine.clear(); } };
 addEventListener('tablefolk-scenario-started', e => { if (!e.detail?.sub) window.tablefolkTalk.reset(); });
 // every spoken line holds the floor (remarks and greetings from jobs.js too); the player's do not
 addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (!d.voiced || d.templated) return; const g = charById(d.agentId); if (!g || d.agentId === 'player' || g === window.TABLEFOLK_STATE?.playerAvatar) return; if (g._spoke?.whisper || g._spoke?.to === 'player') return; lastLine.set(g.id, { at: performance.now(), to: g._spoke?.to || null }); });
