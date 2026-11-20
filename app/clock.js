@@ -112,7 +112,7 @@
     if (e.detail?.sub) return;
     const s = scn() || {};
     presets = null; baseColors = null;
-    cfg = { on: s.clock !== false, dayMinutes: urlDay > 0 ? urlDay : Number.isFinite(+s.dayMinutes) ? Math.max(0, +s.dayMinutes) : 12, dark: !!(s.dark || s.base === 'dungeon' || (s._gen && /cave|dungeon|castle|crypt|keep/i.test(String(s.generate?.kind || '')))) };
+    cfg = { on: s.clock !== false, dayMinutes: urlDay > 0 ? urlDay : s.dayMinutes != null && Number.isFinite(+s.dayMinutes) ? Math.max(0, +s.dayMinutes) : 12, dark: !!(s.dark || s.base === 'dungeon' || (s._gen && /cave|dungeon|castle|crypt|keep/i.test(String(s.generate?.kind || '')))) };
     // a restored world keeps its saved time (restoreWorldState put it back)
     if (!state.clock || !state.clockRestored) state.clock = { min: parseTime(s.time, s.lighting === 'night' ? 21 * 60 : 8 * 60), day: 1 };
     state.clockRestored = false;

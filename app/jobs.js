@@ -617,7 +617,8 @@
     if (!opts.length) {
       // nothing to be had: ask someone (a cause to speak), or wait
       setDoing(g, s, 'hungry, looking for food');
-      s.ask = { item: 'food', until: gm() + 60, who: nearPeople(g, 8).filter(c => c !== state.playerAvatar)[0]?.id || '' };
+      // (one ask an hour: a new one each tick had it begging every few seconds)
+      if (!(s.ask && s.ask.until > gm())) s.ask = { item: 'food', until: gm() + 60, who: nearPeople(g, 8).filter(c => c !== state.playerAvatar)[0]?.id || '' };
       return null;
     }
     setDoing(g, s, 'getting something to eat');
@@ -666,6 +667,9 @@
     const near = nearPeople(g, 4);
     if (near.length && gm() - s.lastSocial >= 60 && Math.random() < .45 && brainOk() && window.tablefolkLive?.quiet?.() !== false) {
       s.lastSocial = gm(); s.social = true;
+      // what there is to talk about: its own day and the village's news (a cue, not an order)
+      const news = newsFor(g, 2), cfg = W().getBrainConfig(g.id), who = near.map(nameOf).slice(0, 2).join(' and ');
+      W().setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`(It is evening at the ${tav?.id || 'square'} and ${who} ${near.length > 1 ? 'are' : 'is'} with you. Today you ${todayLine(s)}.${news.length ? ' News: ' + news.join('; ') + '.' : ''} Talk about something real from today, in one short line.)`]).slice(-5) });
       try { await modelTurn(g, 'social'); } finally { s.social = false; }
       return { ms: 6000 };
     }
@@ -712,9 +716,9 @@
     const th = await threatened(g, s, j); if (th) return th;
     // a word to say (mind.js speechCause): an answer to a want, a temper, a warning; at most one an hour
     const cause = M()?.speechCause?.(g);
-    if (cause && cause !== 'news' && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g).length) { s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
+    if (cause && cause !== 'news' && cause !== 'ask' && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g).length) { s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
     // its own ask (out of materials, hungry with nothing to buy): one line, at the person
-    if (s.ask && s.ask.until > gm() && !s.ask.said && nearPeople(g, 5).some(c => c.id === s.ask.who || !s.ask.who)) { s.ask.said = true; await modelTurn(g, 'cause'); return { ms: 5000 }; }
+    if (s.ask && s.ask.until > gm() && !s.ask.said && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g, 5).some(c => c.id === s.ask.who || !s.ask.who)) { s.ask.said = true; s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
     const sleepH = j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]), workH = j.hours || [7, 17];
     const asleep = inHours(h, sleepH);
     if (!asleep && g.pose?.mode === 'lie') wake(g, s);

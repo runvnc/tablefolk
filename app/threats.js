@@ -68,6 +68,7 @@
     const pl = state.playerAvatar && posOf(state.playerAvatar);
     return xs.sort((a, b) => (pl ? dist(b, pl) - dist(a, pl) : 0))[0] || { x: 0, z: 0 };
   }
+  const plural = n => /f$/.test(n) ? n.slice(0, -1) + 'ves' : /(s|x|ch|sh)$/.test(n) ? n + 'es' : n + 's';
   const HP = { wolf: 6, rat: 3, bat: 3, rogue: 8, spider: 4, goblin: 6, skeleton: 6, bear: 12 };
   async function spawn(entry) {
     const spec = { ...(KINDS[entry.kind] || KINDS.raid), ...entry };
@@ -89,7 +90,7 @@
     }
     gr.startAlive = gr.ids.length;
     groups.push(gr);
-    const text = String(spec.announce || `${name}s are coming!`).replace(/\{name\}/g, name).replace(/^\w/, c => c.toUpperCase());
+    const text = String(spec.announce || `{name}s are coming!`).replace(/\{name\}s\b/g, plural(name)).replace(/\{name\}/g, name).replace(/^\w/, c => c.toUpperCase());
     try { window.tablefolkDirector?.narrate?.(text); } catch {}
     try { log('[threat] ' + text); } catch {}
     J()?.addNews?.('', text);
@@ -147,12 +148,12 @@
     const names = [...gr.fought].map(k => k === 'player' ? pn : k);
     const down = gr.ids.filter(id => state.characters.find(c => c.id === id)?.defeated).length;
     const what = gr.spec.behaviour === 'pilfer' ? ` (they ate ${gr.ate} from the stores)` : gr.spec.behaviour === 'rob' ? ` (they stole ${gr.stole} gold)` : '';
-    const text = `${gr.startAlive} ${gr.spec.name}${gr.startAlive > 1 ? 's' : ''} came${gr.spec.when === 'night' ? ' in the night' : ''}${what}; ${names.length ? names.join(' and ') + ' drove them off' : 'they left on their own'}${down ? ` (${down} struck down)` : ''}.`;
+    const text = `${gr.startAlive} ${gr.startAlive > 1 ? plural(gr.spec.name) : gr.spec.name} came${gr.spec.when === 'night' ? ' in the night' : ''}${what}; ${names.length ? names.join(' and ') + ' drove them off' : 'they left on their own'}${down ? ` (${down} struck down)` : ''}.`;
     J()?.addNews?.('', text);
     for (const c of state.characters) {
       if (c._threat || c.defeated || P()?.isAnimal?.(c)) continue;
       try { window.tablefolkMind?.addMemory?.(c, text, 2, 'event'); } catch {}
-      for (const k of gr.fought) { if (k === c.id) continue; if (k === 'player') { const m = window.tablefolkMind?.mindOf?.(c); if (m) m.mood.trust = Math.min(1, m.mood.trust + .12); } else window.tablefolkMind?.opinion?.(c, k, .25, `fought off the ${gr.spec.name}s`); }
+      for (const k of gr.fought) { if (k === c.id) continue; if (k === 'player') { const m = window.tablefolkMind?.mindOf?.(c); if (m) m.mood.trust = Math.min(1, m.mood.trust + .12); } else window.tablefolkMind?.opinion?.(c, k, .25, `fought off the ${plural(gr.spec.name)}`); }
     }
     try { log('[threat] all clear: ' + text); } catch {}
     console.info('[threats] all clear:', text);
