@@ -117,10 +117,13 @@
     if (!localLights.size || !state.scene) return;
     for (const L of localLights) if (L.isDisposed()) localLights.delete(L);
     const others = state.scene.lights.filter(L => !localLights.has(L) && L.isEnabled()).length, PER_MESH = Math.max(1, MAX_LIGHTS - others);
-    const meshes = state.scene.meshes.filter(m => !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
+    // the terrain and the dungeon rock (terrain.js) are one mesh each: they take the lights nearest the camera's target
+    const ground = m => /^board_(terrain|rock)$/.test(m.name), tgt = state.camera?.target || BABYLON.Vector3.Zero();
+    const meshes = state.scene.meshes.filter(m => ground(m) || !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
     const per = new Map([...localLights].map(L => [L, []])), pos = new Map([...localLights].map(L => [L, L.getAbsolutePosition()]));
     for (const m of meshes) {
-      const s = m.getBoundingInfo?.().boundingSphere; if (!s) continue;
+      const s0 = m.getBoundingInfo?.().boundingSphere; if (!s0) continue;
+      const s = ground(m) ? { centerWorld: tgt, radiusWorld: 9 } : s0;
       const near = [];
       for (const L of localLights) { const gap = BABYLON.Vector3.Distance(s.centerWorld, pos.get(L)) - s.radiusWorld; if (gap < L.range + 1) near.push([gap, L]); }
       near.sort((a, b) => a[0] - b[0]);

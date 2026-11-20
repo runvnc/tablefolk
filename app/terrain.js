@@ -539,7 +539,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     // rock
     try { T.rock?.dispose(); } catch {} T.rock = T.mode === 'rock' ? buildRock() : null;
     state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean);
-    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 3, fogFar: 22 } : T.mode === 'street' ? { underground: false, fogNear: 3, fogFar: 26 } : { underground: false, fogNear: 10, fogFar: 150 });
+    window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, fogNear: 8, fogFar: 32 } : { underground: false, fogNear: 30, fogFar: 200 });
     // the textures (WebGPU only: the plugin's WGSL); kept while the layer set is the same
     const key = C.names.join(',') + '|' + (hi ? 2 : 1);
     {

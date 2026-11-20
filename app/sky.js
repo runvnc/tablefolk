@@ -34,17 +34,19 @@
   // keyframes: hour, sun colour, sun intensity, moon intensity, sky top, horizon, hemi sky, hemi ground, hemi intensity, environment, exposure, clouds, stars
   const K = (h, sunC, sunI, moonI, top, hor, hs, hg, hi, env, exp, cl, stars) => ({ h, sunC: hex(sunC), sunI, moonI, top: hex(top), hor: hex(hor), hs: hex(hs), hg: hex(hg), hi, env, exp, cl: hex(cl), stars });
   const KEYS = [
-    K(0, '#ffffff', 0, .62, '#0a1124', '#202c48', '#5a6f9e', '#16161c', .42, .14, 1.2, '#283048', 1),
-    K(4.6, '#ffffff', 0, .55, '#0c142a', '#26324f', '#5a6f9e', '#16161c', .40, .14, 1.2, '#2c3450', .9),
-    K(5.7, '#ff9a72', .5, .08, '#405585', '#e2a184', '#8c8ca8', '#3a3029', .38, .24, 1.08, '#d79a8a', .25),
-    K(7, '#ffd9b0', 2.2, 0, '#5d86c6', '#e8d3b8', '#9fb0cc', '#4c4134', .46, .38, 1.0, '#f2ddd0', 0),
-    K(10, '#ffeccc', 2.5, 0, '#4a7cc6', '#cbdbe9', '#a6b8d6', '#52473a', .52, .45, 1.0, '#ffffff', 0),
-    K(14, '#ffeccc', 2.5, 0, '#4a7cc6', '#cddbe6', '#a6b8d6', '#52473a', .52, .45, 1.0, '#ffffff', 0),
-    K(16.5, '#ffdcb0', 2.3, 0, '#577fc0', '#dfd4c0', '#aab4cc', '#54473a', .48, .4, 1.0, '#fbeee0', 0),
-    K(18, '#ffad66', 2.1, 0, '#6780b4', '#f0b47c', '#b8a8a8', '#4c3c30', .42, .32, 1.02, '#f6c9a0', 0),
-    K(19, '#ff7a4e', .45, 0, '#2e3c68', '#c87c5e', '#7e7896', '#2a2428', .34, .22, 1.08, '#a86e64', .25),
-    K(20.3, '#ffffff', 0, .42, '#0e1630', '#2a3456', '#5a6c98', '#18181e', .38, .15, 1.18, '#323a56', .8),
-    K(24, '#ffffff', 0, .62, '#0a1124', '#202c48', '#5a6f9e', '#16161c', .42, .14, 1.2, '#283048', 1),
+    // pass 2 (2026-11-20): brighter, clearer days; blue-warm haze; golden 17:30; blue-violet dusk; moonlit blue night
+    K(0, '#ffffff', 0, .75, '#0b1430', '#25345c', '#6a82c0', '#1a1c26', .55, .18, 1.3, '#2c3656', 1),
+    K(4.6, '#ffffff', 0, .7, '#0e1834', '#2c3a62', '#6a82c0', '#1a1c26', .52, .18, 1.3, '#303a5a', .9),
+    K(5.7, '#ffa47a', .8, .1, '#4a6094', '#e6b49c', '#a0a4c0', '#4a4038', .5, .3, 1.15, '#e0a898', .25),
+    K(7, '#ffe2c0', 3.0, 0, '#5a8ad0', '#d6dfe8', '#b4c4de', '#5a5040', .62, .5, 1.12, '#f6eee6', 0),
+    K(10, '#fff2dc', 3.6, 0, '#4a82d0', '#d2e0ee', '#bccce6', '#5e5444', .7, .55, 1.12, '#ffffff', 0),
+    K(15, '#fff0d8', 3.6, 0, '#4a82d0', '#d4e0ec', '#bccce6', '#5e5444', .7, .55, 1.12, '#ffffff', 0),
+    K(16.6, '#ffe0b4', 3.3, 0, '#5684cc', '#e2dccc', '#c0c4d4', '#5e5040', .65, .5, 1.12, '#fff0e0', 0),
+    K(17.5, '#ffb468', 2.9, 0, '#6a88c0', '#f4c48c', '#d0bcb0', '#5a4434', .6, .45, 1.15, '#ffd2a0', 0),
+    K(18.6, '#ff8a52', 1.2, 0, '#46508a', '#e09a78', '#a69cb8', '#3a3036', .5, .32, 1.2, '#d89a88', .1),
+    K(19.4, '#ff6a48', .15, .1, '#262e66', '#7a6496', '#7a7cb8', '#262434', .5, .26, 1.3, '#6a5a86', .35),
+    K(20.4, '#ffffff', 0, .6, '#101a3c', '#2c3c66', '#6a80bc', '#1c1e28', .52, .2, 1.3, '#323c5e', .8),
+    K(24, '#ffffff', 0, .75, '#0b1430', '#25345c', '#6a82c0', '#1a1c26', .55, .18, 1.3, '#2c3656', 1),
   ];
   const MOON_C = C3(.62, .72, 1.0);
   const lerp = (a, b, k) => a + (b - a) * k;
@@ -56,14 +58,15 @@
     for (const key of Object.keys(a)) o[key] = typeof a[key] === 'number' ? lerp(a[key], b[key], k) : lc(a[key], b[key], k);
     return o;
   }
-  // where the sun is: rises in the east (-x), highest in the north (-z, behind
-  // what the default camera looks at, so it lights the scene from the back
-  // and shadows fall toward the viewer), sets in the west (+x)
+  // where the sun is: rises in the east (-x), highest in the south (+z, the
+  // default follow camera's side: faces toward the camera are lit and
+  // shadows fall away from the viewer, to the side and back), sets in the west
+  // (+x); morning from the south-east, evening from the south-west
   function sunVector(h) {
     const t = Math.min(1, Math.max(0, (h - 5.6) / 13.2)), E = Math.max(.05, Math.sin(Math.PI * t)) * 0.95, A = Math.PI * t;
-    return new BABYLON.Vector3(-Math.cos(A) * Math.cos(E), Math.sin(E), -Math.sin(A) * Math.cos(E) * .85 - .25).normalize();
+    return new BABYLON.Vector3(-Math.cos(A) * Math.cos(E), Math.sin(E), Math.sin(A) * Math.cos(E) * .85 + .3).normalize();
   }
-  const MOON_V = new BABYLON.Vector3(.45, .78, -.42).normalize();
+  const MOON_V = new BABYLON.Vector3(.4, .78, .45).normalize();
 
   // ---- the dome's picture for an hour ----
   function paintDome(L) {
@@ -177,11 +180,12 @@
     sun.direction.copyFrom(dir);
     sun.diffuse = day ? L.sunC : MOON_C; sun.specular = sun.diffuse.scale(.5);
     sun.intensity = u ? 0 : (day ? L.sunI : L.moonI);
-    hemi.diffuse = u ? C3(.42, .48, .62) : L.hs; hemi.groundColor = u ? C3(.08, .07, .07) : L.hg;
-    hemi.intensity = u ? .16 : L.hi;
-    sc.environmentIntensity = u ? .06 : L.env;
-    const ip = sc.imageProcessingConfiguration; ip.exposure = u ? 1.15 : L.exp;
-    const fog = u ? C3(0, 0, 0) : lc(L.hor, C3(.5, .5, .52), .12);
+    hemi.diffuse = u ? C3(.5, .58, .78) : L.hs; hemi.groundColor = u ? C3(.14, .14, .17) : L.hg;
+    hemi.intensity = u ? .32 : L.hi;   // underground: a faint cool ambient, unlit explored stone dim but legible
+    sc.environmentIntensity = u ? .1 : L.env;
+    const ip = sc.imageProcessingConfiguration; ip.exposure = u ? 1.25 : L.exp;
+    // haze: the horizon colour leaned a little blue (aerial perspective)
+    const fog = u ? C3(0, 0, 0) : lc(L.hor, C3(.62, .72, .86), .18 * Math.min(1, L.sunI / 2));
     sc.fogColor = fog; sc.clearColor = new BABYLON.Color4(fog.r, fog.g, fog.b, 1);
     if (dome) { dome.setEnabled(!u && world.sky && !window.TABLEFOLK_TABLETOP); paintDome(L); }
     if (cloudMat) { cloudMat.emissiveColor = L.cl; cloudMat.alpha = .75; clouds.setEnabled(!u && world.sky && !window.TABLEFOLK_TABLETOP); }

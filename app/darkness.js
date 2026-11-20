@@ -237,7 +237,7 @@
     // Not one of scenery.js's local lights: those reach only the meshes they
     // are nearest to (by bounding sphere, once a second), and the big floor
     // mesh always counted the room's own lights as nearer.
-    t.light.parent = t.holder; t.light.diffuse = C3(1, .64, .3); t.light.intensity = 1.7; t.light.range = 7.5;
+    t.light.parent = t.holder; t.light.diffuse = C3(1, .64, .3); t.light.intensity = 5; t.light.range = 8;   // a bright pool that falls off over ~5 squares (it lights the terrain too since 2026-11-20)
     t.light.falloffType = BABYLON.Light.FALLOFF_STANDARD;
     try { addLampPool(sc, t.holder, { warm: true }); } catch {}
     t.obs = sc.onBeforeRenderObservable.add(() => {
@@ -251,7 +251,7 @@
         t.mesh.root.rotation.set(.22, g.root.rotation.y + Math.PI, 0);
       }
       const f = performance.now() * .006;
-      t.light.intensity = 1.7 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
+      t.light.intensity = 5 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
       t.mesh.flame.scaling.set(1, 1.4 * (1 + Math.sin(f * 1.7) * .15), 1);
     });
     g._torch = t;
