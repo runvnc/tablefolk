@@ -105,6 +105,25 @@ It exports one function that receives `api` and returns what it adds.
 - **`dispose()`**: when the scenario ends, the fires go out (particles and
   lights are not part of the map, so nothing else would remove them).
 
+## The keeper, the militia and the goal
+
+- The keeper's job lists `signal` and a **rule**: `{"run": "signal()",
+  "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and
+  raider_near < 10 and not world.militia_called"}`: when the wolves come
+  near and the fire burns, the game walks Odo to the beacon and signals,
+  with no model call.
+- `signal`'s **`offer(g)`** returns "signal the militia from the beacon"
+  when it would work (a lit beacon within 8 cells, wolves about, not yet
+  called tonight): the game's short picks (danger, a stuck job, an event)
+  then include it, for whoever may use it (Brenna too).
+- The **`militia`** job (`"fights": true`, `"defends": "signal_beacon"`):
+  the spearmen signal() brings (`api.spawn(..., { job: 'militia' })`) keep
+  to the beacon and take on the wolves that come within 8 cells of it.
+- **`goals.beacon_burning`**: the scenario's win needs the beacon still
+  lit at the second dawn.
+- **`lines`**: its own raid shouts, a challenge and a call for firewood
+  (the game's templated lines).
+
 ## Tested
 
 `tools/browser-test/package-test.mjs` checks every part above with no

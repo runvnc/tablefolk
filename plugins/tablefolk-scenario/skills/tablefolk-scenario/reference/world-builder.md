@@ -16,8 +16,9 @@ village, characters put in rooms by role), `?mode=grid` (ASCII map),
 `?mode=map` (layout lines), or the default `auto`.
 
 **What it makes**: unless the request is a talk-only scene (an interview, a
-trial, a conversation, a date, "no combat": then `"talk": true`, one place is
-fine), a living world: a **place** (a generated village, farm, forest, cave
+trial, a conversation, a date, "no combat": then `"talk": true` and one room
+drawn as a grid, sized to the cast; a model that builds more is cut back to
+that one room), a living world: a **place** (a generated village, farm, forest, cave
 or dungeon with several buildings or rooms), **people with work** (each with
 a `job`, a `home` and a `workplace` the map has), a **pressure** (threats on
 the clock, low stores, a deadline, a rival) and a **goal** tied to it that

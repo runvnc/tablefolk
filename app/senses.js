@@ -56,7 +56,7 @@
     for (const o of getObjects()) {
       if (DECOR.has(o.type) || meta(o.mesh)?.decor) continue;
       const d = Math.hypot(o.x - p0.x, o.z - p0.z);
-      if (d <= radius && d > .2 && seen(o.x, o.z)) out.push({ kind: 'thing', id: o.type, name: o.type.replace(/_/g, ' '), state: o.state, x: Math.round(o.x), z: Math.round(o.z), d, rawX: o.x, rawZ: o.z });
+      if (d <= radius && d > .2 && seen(o.x, o.z)) out.push({ kind: 'thing', id: o.type, name: o.type.replace(/_/g, ' '), state: o.state, x: Math.round(o.x), z: Math.round(o.z), d, rawX: o.x, rawZ: o.z, mesh: o.mesh });
     }
     return out.sort((a, b) => a.d - b.d);
   }
@@ -142,7 +142,9 @@
     const p0 = pos(g), px = Math.round(p0.x), pz = Math.round(p0.z);
     const near = things(g, 6);
     const fmt = t => `${steps(t.d)}${t.d < 1.5 ? '' : ' ' + compass(t.x - px, t.z - pz)}`;
-    if (can.has('carry')) for (const t of near.filter(t => t.kind === 'thing' && SMALL.test(t.id)).slice(0, 2)) out.push(`carry(${t.name}) (${fmt(t)}${t.id === 'note' ? ', and read it' : ''})`);
+    // (not a barrel or crate with stock in it: app.js carry refuses those)
+    const stocked = t => { try { const o = getObjects().find(x => x.mesh === t.mesh); const c = o && ['store', 'chest'].includes(window.tablefolkUses?.kindOf?.(o.type)) && window.tablefolkUses.contents(o.mesh); return !!c && ((c.items || []).some(i => (i.qty ?? 1) > 0) || c.gold > 0); } catch { return false; } };
+    if (can.has('carry')) for (const t of near.filter(t => t.kind === 'thing' && SMALL.test(t.id) && !stocked(t)).slice(0, 2)) out.push(`carry(${t.name}) (${fmt(t)}${t.id === 'note' ? ', and read it' : ''})`);
     const inv = (charInventory(g).items || []).filter(i => (i.qty ?? 1) > 0).map(i => String(i.name || i));
     if (can.has('eat')) { const food = inv.find(n => window.tablefolkMind?.isFood?.(n)); if (food) out.push(`eat(${food})`); }
     // use(bed) (2 steps north: lie down and rest): uses.js

@@ -103,7 +103,7 @@
   function untrust(scope) { try { localStorage.setItem(TRUST_KEY, JSON.stringify(allowedList().filter(s => s !== scope))); } catch {} }
 
   // ---- what modules add ----
-  const uses = {}, workflows = {}, added = { behaviours: [], cards: [], effects: [], commands: [], steps: [], items: new Set(), bodies: new Set(), sounds: new Set() };
+  const uses = {}, workflows = {}, goals = {}, added = { goals: [], behaviours: [], cards: [], effects: [], commands: [], steps: [], items: new Set(), bodies: new Set(), sounds: new Set() };
   // The api handed to a module (and a skill's module): the supported surface,
   // documented in the scenario skill's reference/api.md. Keep it stable.
   function api() {
@@ -149,7 +149,7 @@
     inventoryChanged(); return true;
   }
   // a character a module adds (reinforcements, a visitor): a body, a place,
-  // its brain config (personality, style, hp, allowed, hostile...)
+  // its brain config (personality, style, hp, allowed, hostile, job...)
   async function spawnCharacterAt(id, model, x, z, cfg = {}) {
     const T = window.tablefolk; let n = 1, unique = id;
     while (state.characters.some(c => c.id === unique)) unique = id + (++n);
@@ -157,7 +157,7 @@
     if (!g) return null;
     const hp = Math.max(1, +cfg.hp || window.tablefolkBodies?.get(model)?.hp || 10);
     T.setBrainConfig(unique, { enabled: true, style: cfg.style || model, personality: cfg.personality || `A ${String(model).replace(/_/g, ' ')}.`, mind: null, messages: [], pendingChat: [], maxHp: hp, hp, defeated: false,
-      inventory: { gold: +cfg.gold || 0, items: (cfg.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : i) }, ttsEnabled: false, allowed: cfg.allowed || null, role: cfg.role || '',
+      inventory: { gold: +cfg.gold || 0, items: (cfg.items || []).map(i => typeof i === 'string' ? { name: i, qty: 1 } : i) }, ttsEnabled: false, allowed: cfg.allowed || null, role: cfg.role || '', ...(cfg.job ? { job: cfg.job } : {}),
       ...(cfg.hostile != null ? { hostile: !!cfg.hostile } : {}) });
     return g;
   }
@@ -172,9 +172,11 @@
     for (const [name, c] of Object.entries(x?.commands || {})) { try { window.tablefolkSkills?.addCommand(name, c, from); added.commands.push(String(name).toLowerCase()); } catch (e) { console.warn('[packages]', e.message); } }
     // dispose(): called when the scenario that loaded it ends (its lights, particles, timers of its own)
     if (typeof x?.dispose === 'function') disposers.push(x.dispose);
+    // goal predicates in code (scenario.js): { beacon_held(args, world) { return true } } -> "win": { "beacon_held": 3 }
+    for (const [name, fn] of Object.entries(x?.goals || {})) if (typeof fn === 'function') { goals[name] = fn; added.goals.push(name); }
     // job step kinds in code (jobs.js): { refuel(g, step, ctx) { return { done: true, ms: 3000 } } }
     for (const [name, fn] of Object.entries(x?.steps || {})) if (typeof fn === 'function') { window.tablefolkJobs?.registerStep?.(name, fn); added.steps.push(name); }
-    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
+    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps', 'goals'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
   }
 
   // ---- loading ----
@@ -315,6 +317,7 @@
     for (const n of added.effects) delete window.tablefolkSkills?.effects?.[n];
     for (const n of added.commands) window.tablefolkSkills?.removeCommand?.(n);
     for (const n of added.steps) window.tablefolkJobs?.removeStep?.(n);
+    for (const n of added.goals) delete goals[n]; added.goals.length = 0;
     for (const id of added.bodies) window.tablefolkBodies?.remove(id);
     for (const n of added.sounds) window.tablefolkSfx?.unregister?.(n);
     for (const fn of disposers.splice(0)) try { fn(); } catch (e) { console.warn('[packages] dispose', e); }
@@ -326,5 +329,5 @@
     window.tablefolkThreats?.resetPackaged?.();
     window.tablefolkChatter?.reset?.();
   }
-  window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, askTrust, api, useThing, playClip, uses, workflows, ROOT, dataOnly, loaded };
+  window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, askTrust, api, useThing, playClip, uses, workflows, goals, ROOT, dataOnly, loaded };
 })();

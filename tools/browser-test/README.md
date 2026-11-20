@@ -135,7 +135,7 @@ pictures. Details: the maintainer skill's testing.md, "Sections".
 ## Packages (`package-test.mjs`)
 
 ```bash
-node package-test.mjs          # 50 checks, no model, about 40 s; exits 1 on a failure
+node package-test.mjs          # 59 checks, no model, about 60 s; exits 1 on a failure
 ```
 
 Plays the Night Watch (`packages/nightwatch`) with `"brain": "none"` from

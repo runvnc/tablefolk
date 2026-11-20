@@ -1,6 +1,6 @@
 {
   "id": "pkg_extra", "name": "Fixture: the documented options", "version": "1.0.0",
-  "description": "package-test.mjs: loop, use (anim, who, give, gold, once, state, sound), requires, workflows, module cards and effects.",
+  "description": "package-test.mjs: loop, use (anim, who, give, gold, once, state, sound), requires, workflows, module cards and effects, command offers (data and code), a skill cue starting a workflow, lines, module goals.",
   "requires": ["../pkg-dep/"],
   "items": {
     "music_box": {
@@ -14,10 +14,14 @@
   "skills": {
     "fx_skill": {
       "name": "Fixture skill", "card": ["fx_card"],
-      "commands": { "fx": { "usage": "fx()", "help": "the fixture's effect", "target": "self", "effects": [{ "fx_effect": 2 }], "text": "{{me}} does the fixture thing" } }
+      "commands": { "fx": { "usage": "fx()", "help": "the fixture's effect", "target": "self", "effects": [{ "fx_effect": 2 }], "text": "{{me}} does the fixture thing",
+                            "when": "world.fx_offer_on", "offer": "do the fixture thing" } },
+      "on": { "event": "player-chat", "start": "fx_cue", "once": true }
     }
   },
+  "lines": { "greet": ["Fixture hello, {name}."] },
   "workflows": {
+    "fx_cue": { "description": "started by a skill's cue", "steps": [ { "set": { "world.fx_cue_ran": true } }, { "do": { "reply": "The cue workflow ran." }, "end": true } ] },
     "fx_flow": { "description": "a package's workflow", "steps": [
       { "set": { "world.fx_flow_ran": true } },
       { "do": { "reply": "The fixture workflow ran.", "anim": "wave", "sound": "chime" }, "end": true } ] }

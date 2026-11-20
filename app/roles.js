@@ -64,7 +64,10 @@
 
   // ---- prompt ----
   function duty(g) { const r = roleOf(g); return r?.duty ? r.duty.replace(/\{player\}/g, playerName()) : ''; }
-  function commands(g) { return roleOf(g)?.commands || []; }
+  // a role's commands: names, or { "run": "signal()", "when": "...", "at": "signal_beacon" } run by code (jobs.js)
+  const cmdName = c => typeof c === 'string' ? c : String(c?.command || c?.run || '').match(/^\s*(\w+)/)?.[1] || '';
+  function commands(g) { return (roleOf(g)?.commands || []).map(cmdName).filter(Boolean); }
+  function commandRules(g) { return (roleOf(g)?.commands || []).filter(c => c && typeof c === 'object'); }
 
   // ---- behaviours (code-run, no model call) ----
   const behaviours = {
@@ -95,5 +98,5 @@
   // a package's behaviour goes with its scenario (packages.js reset); the built-in ones stay
   function removeBehaviour(name) { if (name !== 'follow') delete behaviours[name]; }
 
-  window.tablefolkRoles = { load, loadOne, register, get, roleOf, withRole, duty, commands, behaviours, addBehaviour, removeBehaviour, behavioursOf, registry: reg };
+  window.tablefolkRoles = { load, loadOne, register, get, roleOf, withRole, duty, commands, commandRules, cmdName, behaviours, addBehaviour, removeBehaviour, behavioursOf, registry: reg };
 })();

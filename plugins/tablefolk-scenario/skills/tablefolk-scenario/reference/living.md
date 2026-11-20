@@ -98,12 +98,22 @@ The day, by the clock:
   ordinary commands, so results, sounds and memories are as if it chose
   them. A step that fails twice is skipped for an hour. Out of an input it
   falls back on its job's `fallback`: buys it, else gathers it itself (the
-  smith to the ore rock or a tree, the baker to the field), else keeps busy
-  (tidying, pacing); a guard stops at each place on its round, looks about
-  and greets people by name (once an hour each);
+  smith to the ore rock or a tree, the baker to the field), else does
+  **chores**, whatever the village lacks most: fetching another worker's
+  missing input and giving it to them, hauling goods to a store that lacks
+  them, gathering a staple the stores are short of (firewood, food, a job's
+  input), standing watch at dusk, tidying; work never just stops (a
+  `labourer` does chores all day); a guard stops at each place on its
+  round, looks about and greets people by name (once an hour each;
+  at night it challenges the player);
 - **eating** when hungry: its own food, its store, the village store,
-  buying from a seller, foraging (an apple tree, a food barrel), or asking
-  someone;
+  buying from a seller or from someone's store, foraging anything that
+  yields food and that it can reach (a fruit tree, a field, a snare: a
+  hunter eats what it catches), or, with no gold, asking someone who
+  carries food to share it (they give it, or say no, by code). Raw grain
+  and flour are not a meal unless it is starving. When none of it works the
+  reason is kept (live-eval's day report names everyone who ends the day
+  hungry, and why);
 - **the evening** (17-21) at the tavern, or the square: the time for talk.
   A character with someone beside it opens a talk with one line, chosen by
   the game and written by one short model call: first one concrete thing

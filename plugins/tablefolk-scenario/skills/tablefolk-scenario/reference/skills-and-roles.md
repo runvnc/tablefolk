@@ -107,6 +107,13 @@ Example: `scenarios/the-studio.json` (a painter certain of his own genius).
 - `commands`: `usage`, `example`, `help` for the prompt. With `variants`, the
   first argument picks an entry of that table (and `param` limits it to the
   character's own list); otherwise the command itself is the entry.
+  `"when"` (a condition, as a job rule's) and `"offer"` (a label) put it
+  among the options of the game's short picks (a decision point, danger,
+  a stuck job, something that happened) while the condition holds; the
+  pick runs `usage` (or `offerLine`, or `example`). A skill module's
+  `offers: { name(g, world) { return 'label' | null } }` does the same in
+  code.
+- `on`: start a workflow on a cue, as a role's (below).
 - Entry: `limit` (don't make more of what its `give` effect makes while
   the character already has that many: a smith forged a second dagger it
   didn't need), `cost` (resources), `needs` (items; a seller's materials
@@ -164,6 +171,14 @@ The server lists the built-in ones at `/api/roles`.
 - `skills` / `skillParams`: skills it brings, with defaults; the agent's own
   `skills` are added and its `skillParams` win.
 - `temperament`: used when the agent names none (mind.js).
+- `commands`: names, or rules as a job's (below: `{"run": ..., "when":
+  ..., "at": ...}`).
+- `on`: start a workflow on a cue: `{"event": "approached", "start":
+  "greeting", "when": "...", "once": true}` (or a list). `event` is a game
+  event ([api.md](api.md#events), the `tablefolk-` prefix optional); the
+  workflow starts for the character the event is about (`agentId`), else
+  for everyone with the cue, unless it is already in one. Skills take
+  `on` too.
 - `behaviours`: routines run by code with no model call. Built in: `follow`
   (keeps up with the player after each move; the `companion` role). A skill
   module adds more with `behaviours: { name: { on: 'tablefolk-player-turn',
@@ -239,9 +254,15 @@ the agent's `"job"`):
   ore": ["mine"]}}` gets it itself from a thing on the map that yields it
   (a rock with `"crop": "iron ore"`, a tree, a field), `{"idle": "tidy"}`
   keeps busy that way meanwhile. Default: buy, then gather. When none
-  works the step waits an hour and the other steps go on; with nothing at
-  all to do, the model gets one short pick an hour at most (buy, ask, keep
-  busy, a break).
+  works, it does **chores**: what the settlement lacks, the most needed
+  first: fetch the missing input of another worker and give it to them,
+  haul goods to a worker's store that lacks them, gather a staple the
+  stores are short of (firewood, food, any job's input) into a store,
+  stand watch at dusk, tidy. Only with no chore at all does the step wait
+  an hour while the other steps go on, and the model get one short pick an
+  hour at most (buy, ask, keep busy, a break, a fitting package command).
+  A `{"chores": true}` step does chores as the work itself (the
+  `labourer`).
   - `"doing"`: the label shown and put on its card.
   - `use`: go to a thing (a type or a kind) and use it, as `use(thing)`
     does (a package item's `use` runs, data or code); `"needs": {"firewood":
@@ -252,7 +273,22 @@ the agent's `"job"`):
     own or a game mode such as `pickup`) and `"sound"`.
   - a package module may add step kinds ([api.md](api.md)).
 - `commands`: package commands its workers may use (those with
-  `"allowedBy": "listed"`, [api.md](api.md)).
+  `"allowedBy": "listed"`, [api.md](api.md)). An entry may also be a
+  **rule** the game runs as a step: `{"run": "signal()", "when":
+  "world.beacon_lit and raider_near < 10", "at": "signal_beacon", "every":
+  60, "once": false, "doing": "running to the beacon"}`: when the condition
+  holds (checked before anything else on each of its ticks, raids
+  included), it walks beside `at` (a thing's type) and runs the line; then
+  not again for `every` game minutes. Conditions may use the variables
+  `raiders` (how many are about), `raider_near` (cells to the nearest),
+  `hour` and `hungry` (0-1) besides flags and `me`.
+- `defends`: a thing's type, a place id or a character id a fighter
+  (`"fights": true`) protects: while raiders are about it stays within 3
+  cells of it and takes on only the raiders within 8 cells of it, instead
+  of chasing them all (the Night Watch's militia: `"defends":
+  "signal_beacon"`).
+- `lines`: its own templated lines, used before the shared ones
+  ([living.md](living.md#spoken-life-templated-lines)).
 
 Built in: `farmer`, `baker`, `innkeeper`, `cook`, `smith`, `woodcutter`,
 `miner`, `hunter`, `fisher`, `herder`, `merchant`, `guard`, `healer`,

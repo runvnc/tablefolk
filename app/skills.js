@@ -131,10 +131,34 @@
   function pkgAllowed(g, name) {
     const c = PKG[name]; if (!c || !g) return false;
     if (isPlayer(g)) return true;
-    const listed = () => commandsFor(g).has(name) || [].concat(window.tablefolkJobs?.jobOf?.(g)?.commands || []).includes(name);
+    const listed = () => commandsFor(g).has(name) || [].concat(window.tablefolkJobs?.jobOf?.(g)?.commands || []).map(c => window.tablefolkRoles?.cmdName?.(c) ?? c).includes(name);
     if (c.allowedBy === 'listed') return listed();
     // "default": characters with a mind (not mindless monsters or animals)
     return listed() || !(window.tablefolkPlay?.isHostile?.(g) || window.tablefolkPlay?.isAnimal?.(g) || g._threat);
+  }
+  // ---- offers: package and skill commands that fit the moment, as options for the
+  // game's pick menus (jobs.js decision points, danger, stuck turns). A module
+  // command's offer(g, world) returns a label (or { label, line }) or null; a data
+  // command (a skill's, or a module's) may say "when" (a story.js condition; vars:
+  // raiders, raider_near, hour, hungry, from jobs.js) and "offer" (the label).
+  function offers(g) {
+    if (!g || isPlayer(g)) return [];
+    const out = [], vars = window.tablefolkJobs?.condVars?.(g) || {}, world = window.tablefolk;
+    const test = c => { try { return !!window.tablefolkStory?.check(c.when, { me: g.id, vars }); } catch { return false; } };
+    const push = (name, c, r) => {
+      if (!r) return;
+      const label = typeof r === 'string' ? r : r.label || c.offer || name;
+      const line = (typeof r === 'object' && r.line) || c.offerLine || (c.usage && !/[<\[]|\b(target|item|name)\b/.test(c.usage) ? c.usage : c.example) || name + '()';
+      out.push({ name, label: String(label), line: String(line) });
+    };
+    for (const [name, c] of Object.entries(PKG)) {
+      if (!pkgAllowed(g, name)) continue;
+      try { if (typeof c.offer === 'function') push(name, c, c.offer(g, world)); else if (c.when) push(name, c, test(c) && (c.offer || name + '()')); } catch (e) { console.warn('[skills] offer', name, e); }
+    }
+    for (const m of skillsOf(g)) for (const [name, c] of Object.entries(m.commands || {})) {
+      try { if (typeof m.api?.offers?.[name] === 'function') push(name, c, m.api.offers[name](g, world)); else if (c.when) push(name, c, test(c) && (c.offer || name + '()')); } catch (e) { console.warn('[skills] offer', name, e); }
+    }
+    return out;
   }
   // State-card lines a skill names ("card": ["wares", "offer"]): providers
   // from the game (trade.js adds wares and offer) or the skill's own module.
@@ -321,5 +345,5 @@
   }
 
   function api() { return { state, narrate, findTarget, combat: window.tablefolkCombat, say, log, getBrainConfig, setBrainConfig, effects: EFFECTS }; }
-  window.tablefolkSkills = { load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, urgentLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor, addCommand, removeCommand, packageCommands: PKG, mayUse: pkgAllowed };
+  window.tablefolkSkills = { offers, load, loadOne, register, grant, skillsOf, has, promptLines, commandLines, cardLines, urgentLines, allowedBy, cards, api, effects: EFFECTS, isCommand, commandFor, run, playerCommand, registry: reg, urlFor, addCommand, removeCommand, packageCommands: PKG, mayUse: pkgAllowed };
 })();

@@ -11,6 +11,10 @@
  "workplace": [],
  "steps": [
   {
+   "chores": true,
+   "doing": "doing odd jobs"
+  },
+  {
    "haul": true,
    "doing": "carrying goods"
   },

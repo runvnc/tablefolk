@@ -20,7 +20,9 @@ optional.
 ```js
 export default function (api) {
   return {
-    commands:   { signal: { run(g, args, ctx) {}, help: 'signal() - light the beacon', usage: 'signal()', example: 'signal()', allowedBy: 'listed' } },
+    commands:   { signal: { run(g, args, ctx) {}, help: 'signal() - light the beacon', usage: 'signal()', example: 'signal()', allowedBy: 'listed',
+                            offer(g, world) { return 'signal the militia' /* or null */; } } },
+    goals:      { beacon_burning(args, world) { return true; } },
     uses:       { tend_beacon(thing, who, api) { return 'feeds the fire'; } },
     threats:    { wolfpack(c, ctx) { return true; } },
     cards:      { beacon(g, data) { return 'The beacon burns.'; } },
@@ -35,6 +37,8 @@ export default function (api) {
 | key | signature | what it does |
 |---|---|---|
 | `commands` | `run(g, args, ctx)` | a command characters (and the player, `/signal`) can use. `g` the actor, `args` the words between the brackets split on commas. Return a string (it worked: the result line everyone reads), `true` (worked; you called `ctx.narrate`), or `ctx.fail("why")` / `false` / throw (the actor's next prompt reads `signal FAILED: why`). `ctx`: `{ name, args, narrate(text), fail(text), findTarget(word), api }`. `help` is the prompt's line (start it with the usage, `signal() - ...`), `example` follows it. `allowedBy`: `"default"` every character with a mind in a scenario that loads the package, `"listed"` only those whose `allowed`, role `commands` or job `commands` name it. The player may always use them. |
+| `commands[name].offer` | `(g, world)` | optional: a label (or `{ label, line }`) when the command fits the moment, else `null`; the game's short picks (a decision point, danger, a stuck job, an event; jobs.js) then include it as an option that runs `usage` (or `line`). Without code, `when` (a condition with `me`, flags and the variables `raiders`, `raider_near`, `hour`, `hungry`) and `offer` (the label) do the same. |
+| `goals` | `(args, world)` | a goal predicate: `"win": { "beacon_burning": true }` calls it with `true`; return a boolean. |
 | `uses` | `(thing, who, api)` | what using an item whose `"use"` is this name does: E by the player (`who` the player's avatar) or `use(thing)` by a character (`who` that character). Return a string (what happened), `true`, `false` (nothing happens), or `{ fail: "why" }`. |
 | `threats` | `(c, ctx)` | one turn of a raider of the threat kind with this name. `ctx`: `{ spec, group, retreat(why), despawn(), walkTo(x, z), attack(target), api }`; `group.ids` are its pack. Return `false` to let the kind's `behaviour` (`raid`, `pilfer`, `rob`) take the turn. |
 | `cards` | `(g, data)` | a state-card line for characters whose skills name it (`"card": ["beacon"]`); a line starting with `!` is urgent and goes at the very end of the prompt. Return a string, a list, or `''`. |
@@ -213,7 +217,15 @@ Steps and fields: [skills-and-roles.md](skills-and-roles.md#jobs). Any step
 takes `when` (a story.md condition, `me` the worker), `anim` and `sound`
 (once it is done); `use` goes to a thing and uses it; a module's `steps`
 add kinds. `commands` lets the job's workers use package commands with
-`allowedBy: "listed"`.
+`allowedBy: "listed"`, and its rules run one by code:
+
+```json
+"commands": ["signal", { "run": "signal()", "at": "signal_beacon", "when": "world.beacon_lit and raiders > 0 and raider_near < 10 and not world.militia_called" }],
+"defends": "signal_beacon"
+```
+
+`defends` (fighters): stay by that thing, place or person and take on the
+raiders near it. `lines`: the job's own templated lines.
 
 ### Threats
 
@@ -254,8 +266,12 @@ Fields: [skills-and-roles.md](skills-and-roles.md#writing-a-skill).
 ### Roles
 
 ```json
-"roles": { "keeper": { "duty": "You keep the beacon burning.", "commands": ["say", "signal"], "skills": ["watchkeeping"], "temperament": "gruff" } }
+"roles": { "keeper": { "duty": "You keep the beacon burning.", "commands": ["say", "signal"], "skills": ["watchkeeping"], "temperament": "gruff",
+  "on": { "event": "approached", "start": "briefing", "once": true } } }
 ```
+
+`on` (roles and skills): start a workflow when an event happens to the
+character (`agentId`), `when` a condition holds, `once` at most.
 
 ### Workflows, menus and triggers
 
@@ -282,5 +298,4 @@ and `sound`. Start one from the scenario: `"triggers": [{ "on": "start",
   the ways to talk to the player).
 - Replace the prompt's built-in parts or the reply parser; only add lines
   (cards, a skill's prompt, command help).
-- Add goal predicates (use flags: `{"if": "world.beacon_lit"}`).
 - New map generators or base maps.

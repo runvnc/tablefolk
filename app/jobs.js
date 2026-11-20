@@ -99,8 +99,9 @@
     if (g._jobDef !== undefined) return g._jobDef;
     const a = agentOf(g), cfg = W().getBrainConfig(g.id);
     let def = null;
+    const jn = a.job || cfg.job;
     if (a.job && typeof a.job === 'object') def = REG.get(a.id + '_job');
-    else if (a.job) def = REG.get(String(a.job).toLowerCase()) || null;
+    else if (jn) def = REG.get(String(jn).toLowerCase()) || null;
     if (!def) {
       // its role, then how it looks, then its personality
       for (const text of [cfg.role, [a.style, g.style].join(' '), cfg.personality]) {
@@ -164,7 +165,10 @@
     return best;
   }
   const isFood = n => !!M()?.isFood?.(n);
-  const foodIn = g => (inv(g).items || []).find(i => (i.qty ?? 1) > 0 && isFood(i.name) && !/potion|elixir|tonic/i.test(i.name) && !M()?.isDrink?.(i.name));
+  // raw ingredients (wheat, flour) are not a meal unless it is starving ("jory eats the wheat")
+  const RAW = /^(wheat|flour|flour sack|grain|barley|oats|rye|corn|dough|raw .+)$/i;
+  const edible = (n, g) => isFood(n) && !/potion|elixir|tonic/i.test(n) && !M()?.isDrink?.(n) && (!RAW.test(String(n).trim()) || (g && (M()?.mindOf?.(g)?.hunger || 0) >= .85));
+  const foodIn = g => (inv(g).items || []).find(i => (i.qty ?? 1) > 0 && edible(i.name, g));
 
   // ---------------------------------------------------------------- moving and acting
   const REACH = 1.9;
@@ -211,7 +215,9 @@
     }
     s.sub.walkTries = 0;
     if (!line) return { done: true };
-    const r = await runLine(g, line);
+    // the very thing it walked to (uses.js find), not another of its type nearby
+    g._useTarget = o.mesh;
+    let r; try { r = await runLine(g, line); } finally { g._useTarget = null; }
     return r.ok ? { done: true, ms: 3800, text: r.text } : { fail: r.text || 'it did not work' };
   }
   // a free cell beside a thing that a route reaches (a cluttered room can wall a station in)
@@ -394,12 +400,85 @@
     } catch (e) { console.warn('[jobs] remark', e); return false; }
   }
 
+  // ---------------------------------------------------------------- package and skill commands in code and in picks
+  // the variables a "when" may use besides flags and "me": raiders (how many
+  // are about), raider_near (cells to the nearest), hour, hungry (0-1)
+  function condVars(g) {
+    const raiders = window.tablefolkThreats?.active?.() || [], p = g && posOf(g);
+    const near = p && raiders.length ? Math.min(...raiders.map(r => dist(posOf(r), p))) : 99;
+    return { raiders: raiders.length, raider_near: +near.toFixed(1), hour: +(K()?.hour() ?? 12).toFixed(2), hungry: +(M()?.mindOf?.(g)?.hunger || 0).toFixed(2) };
+  }
+  const check = (g, when) => { if (when == null || when === '') return true; try { return !!window.tablefolkStory?.check(when, { me: g.id, vars: condVars(g) }); } catch { return false; } };
+  // offers (skills.js): options for a pick menu that run a package or skill command
+  const offerOpts = g => (window.tablefolkSkills?.offers?.(g) || []).slice(0, 2).map(o => ({ label: o.label, offer: true, run: async () => { const r = await runLine(g, o.line); if (r.ok) addNews(g.id, `${g.id}: ${r.text || o.label}`, 'event'); return { ms: 3500 }; } }));
+  // job and role "commands" written as rules: { "run": "signal()", "when": "...", "at": "signal_beacon", "every": 60 }:
+  // the game runs the command as a step when the condition holds (walking beside "at" first)
+  function rulesOf(g, j) { return [...[].concat(j?.commands || []), ...(window.tablefolkRoles?.commandRules?.(g) || [])].filter(c => c && typeof c === 'object' && (c.run || c.command)); }
+  async function rules(g, s, j) {
+    const t = gm();
+    for (const [i, c] of rulesOf(g, j).entries()) {
+      const key = c.run || c.command, last = (s.rules ||= {})[key];
+      if (last != null && (c.once || t - last < (+c.every || 60))) continue;
+      if (!check(g, c.when)) continue;
+      const line = c.run || `${c.command}()`;
+      if (c.at) {
+        const o = nearest(g, things(c.at)); if (!o) continue;
+        setDoing(g, s, c.doing || `going to ${nice(c.at)}`);
+        const r = await goDo(g, s, o, line);
+        if (r.busy) return { ms: r.ms || 1500 };
+        s.rules[key] = t;
+        if (r.done) console.info('[jobs] rule', g.id, line, '->', r.text);
+        return { ms: r.ms || 2500 };
+      }
+      s.rules[key] = t;
+      await runLine(g, line);
+      return { ms: 3000 };
+    }
+    return null;
+  }
+  // roles and skills start a workflow on a cue: "on": { "event": "approached", "start": "greeting",
+  // "when": "...", "once": true } (or a list); the event's character (detail.agentId), else everyone with the cue
+  const CUE_ON = new Set(), CUE_DONE = new Set();
+  const evName = e => /^tablefolk-/.test(e) ? e : 'tablefolk-' + e;
+  function cuesOf(g) {
+    const r = window.tablefolkRoles?.roleOf?.(g);
+    return [...[].concat(r?.on || []), ...(window.tablefolkSkills?.skillsOf?.(g) || []).flatMap(m => [].concat(m.on || []))].filter(c => c && c.event && c.start);
+  }
+  function armCues() {
+    for (const g of state.characters) for (const c of cuesOf(g)) {
+      const ev = evName(c.event); if (CUE_ON.has(ev)) continue;
+      CUE_ON.add(ev);
+      addEventListener(ev, e => {
+        const d = e.detail || {}, id = d.agentId ?? d.id, targets = id ? state.characters.filter(x => x.id === id) : state.characters;
+        for (const t of targets) for (const cue of cuesOf(t)) {
+          if (evName(cue.event) !== ev || t.defeated) continue;
+          const key = t.id + '|' + ev + '|' + cue.start;
+          if (cue.once && CUE_DONE.has(key)) continue;
+          if (window.tablefolkWorkflows?.active?.(t.id) || !check(t, cue.when)) continue;
+          if (!window.tablefolkWorkflows?.start?.(t.id, cue.start)) continue;
+          CUE_DONE.add(key);
+          console.info('[jobs] cue', t.id, ev, '-> workflow', cue.start);
+          setTimeout(() => { try { W().driveWorkflow?.(t.id); } catch {} }, 0);
+        }
+      });
+    }
+  }
+  addEventListener('tablefolk-scenario-started', e => { if (!e.detail?.sub) { CUE_DONE.clear(); setTimeout(armCues, 1500); } });
+  // what a fighter defends (job "defends": a thing's type, a place id, or a character id): its position
+  function defended(j) {
+    const d = j?.defends; if (!d) return null;
+    const c = state.characters.find(x => x.id === d && !x.defeated); if (c) return { ...posOf(c), label: c.id };
+    const o = things(d)[0]; if (o) return { x: o.x, z: o.z, label: 'the ' + nice(o.type) };
+    const p = placeNamed(d); if (p) { const c2 = spotIn(p); return c2 ? { ...c2, label: 'the ' + p.id } : null; }
+    return null;
+  }
+
   // ---------------------------------------------------------------- the steps
   // step kinds a package module adds (packages.js adopt "steps"): name -> fn(g, step, ctx)
   const STEPS = {};
   const registerStep = (name, fn) => { STEPS[name] = fn; };
   const removeStep = name => { delete STEPS[name]; };
-  const stepName = st => Object.keys(st).find(k => ['haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace', 'use'].includes(k) || STEPS[k]);
+  const stepName = st => Object.keys(st).find(k => ['chores', 'haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace', 'use'].includes(k) || STEPS[k]);
   // any step: "when" (a story.js condition, "me" the worker: "world.beacon_fuel < 4"),
   // and once it is done, "anim" (a clip of the worker's body, bodies.js) and "sound" (sfx.js, a package's too)
   async function doStep(g, s, j, st) {
@@ -465,6 +544,7 @@
     }
     if (kind === 'fetch') { const r = await fetchStep(g, s, j, arg); return r.need && st.optional ? { skip: true } : r; }
     if (kind === 'haul') return haul(g, s);
+    if (kind === 'chores') { const r = await chores(g, s, j); return r ? { done: !s.chore, busy: !!s.chore, ms: r.ms, worked: true } : { skip: true }; }
     if (kind === 'make') {
       // the first set of inputs it has in full (bread from wheat, or from a flour sack)
       const sets = altSets(st.needs), needs = sets.find(x => !missingIn(g, x));
@@ -733,7 +813,8 @@
       if (r.done && r.worked && Math.random() < .35) await remark(g, s);
       return { ms: r.ms || 3000 };
     }
-    // no step could go: a declared idle activity, a pick at most once an hour
+    // no step could go: chores (what the village lacks), else a declared idle activity, a pick at most once an hour
+    const ch = await chores(g, s, j); if (ch) return ch;
     return decide(g, s, j, s.lastNeed && t0() - s.lastNeedAt < 120 ? s.lastNeed : null, -1);
   }
   const t0 = () => gm();
@@ -749,7 +830,7 @@
   //   {"idle": "tidy" | "rest" | "pace" | "lookout" | "wander" | "read"}   keep busy that way meanwhile
   const DEFAULT_FALLBACK = [{ buy: true }, { gather: true }];
   async function fallback(g, s, j, need, withIdle = false) {
-    s.lastNeedAt = gm();
+    s.lastNeedAt = gm(); s.lastNeed = need;
     const items = [...new Set([need.item, ...(need.alts || [])])];
     for (const f of Array.isArray(j.fallback) ? j.fallback : DEFAULT_FALLBACK) {
       if (f.buy) for (const item of items) {
@@ -772,7 +853,102 @@
       }
       if (f.idle && withIdle) return idleActivity(g, s, j, f.idle);
     }
+    // nothing of its own works: someone else's need, or what the village lacks
+    return chores(g, s, j);
+  }
+  // ---- chores: useful generic work chosen by what the settlement lacks
+  // (the end of every job's fallback chain, and a labourer's whole job):
+  // help a worker whose input is missing (fetch it and give it to them),
+  // haul goods to a worker's store that lacks them, gather a staple the
+  // stores are short of (firewood, food, a job's input) into a store, stand
+  // watch at dusk, tidy. Scored; the most needed one, kept up to 90 game
+  // minutes over several ticks (s.chore).
+  function staples() {
+    const need = new Set(['firewood']);
+    for (const c of state.characters) { const cj = c._job && jobOf(c); if (!cj) continue; for (const st of cj.steps || []) for (const set of [...altSets(st.fetch), ...altSets(st.needs)].slice(0, 1)) for (const k of Object.keys(set)) need.add(k); }
+    return [...need];
+  }
+  const stocked = item => stores().reduce((a, o) => a + (contentsOf(o).items || []).filter(i => i.name.toLowerCase() === String(item).toLowerCase()).reduce((b, i) => b + (i.qty ?? 1), 0), 0);
+  function choreList(g, s, j) {
+    const out = [], t = gm(), h = K()?.hour() ?? 12;
+    // a worker out of something it needs (its lastNeed in the last two game hours)
+    for (const w of state.characters) {
+      const ws = w !== g && !w.defeated && w._job; if (!ws || !ws.lastNeed || t - (ws.lastNeedAt ?? -999) > 120 || count(w, ws.lastNeed.item) >= (ws.lastNeed.n || 1)) continue;
+      const item = ws.lastNeed.item, src = count(g, item) > 0 || communal().some(o => has(o, item)) || sourcesOf(g, item).length;
+      if (src && !(ws.helpedBy && ws.helpedBy !== g.id && t - ws.helpedAt < 60)) out.push({ score: 6, label: `fetching ${item} for ${w.id}`, step: () => { ws.helpedBy = g.id; ws.helpedAt = gm(); return helpChore(g, s, w, item); } });
+    }
+    // haul to a worker's store
+    out.push({ score: 4, label: 'hauling goods', step: () => haul(g, s) });
+    // a staple the stores are short of, from a thing on the map that yields it
+    for (const item of staples()) {
+      const n = stocked(item); if (n >= 3) continue;
+      const src = nearest(g, sourcesOf(g, item)); if (!src || src.d0 > 30) continue;
+      out.push({ score: 3 + (3 - n) * .3 + (item === 'firewood' ? .2 : 0), label: `gathering ${item} for the stores`, step: () => supplyChore(g, s, item) });
+    }
+    // stand watch at dusk
+    if (h >= 17 && h < 20 && !fighter(g, j)) out.push({ score: 2.5, label: 'standing watch at dusk', step: () => watchChore(g, s) });
+    out.push({ score: 1, label: 'tidying up', step: () => doStep(g, s, j, { tidy: true }) });
+    return out.sort((a, b) => b.score - a.score);
+  }
+  async function chores(g, s, j) {
+    if (s.chore && s.chore.until > gm()) {
+      const r = await s.chore.step();
+      if (r && (r.busy || (!r.done && !r.skip && !r.fail && !r.need))) { setDoing(g, s, s.chore.label); return { ms: r.ms || 2500 }; }
+      const was = s.chore; s.chore = null;
+      if (r?.done) { s.pass = true; s.choreDone = (s.choreDone || 0) + 1; return { ms: r.ms || 3000 }; }
+      (s.choreBad ||= {})[was.label] = gm() + 60;
+    }
+    for (const c of choreList(g, s, j)) {
+      if ((s.choreBad || {})[c.label] > gm()) continue;
+      s.chore = { label: c.label, until: gm() + 90, step: c.step };
+      const r = await c.step();
+      if (!r || r.skip || r.fail || r.need) { (s.choreBad ||= {})[c.label] = gm() + 60; s.chore = null; continue; }
+      setDoing(g, s, c.label);
+      if (r.done) { s.chore = null; s.pass = true; s.choreDone = (s.choreDone || 0) + 1; }
+      return { ms: r.ms || 3000 };
+    }
     return null;
+  }
+  // get the item (carried, the village store, a thing that yields it) and give it to w
+  async function helpChore(g, s, w, item) {
+    if (g.turnMove) return { busy: true, ms: 700 };
+    if (count(g, item) > 0) {
+      setDoing(g, s, `bringing ${item} to ${w.id}`);
+      if (dist(posOf(g), posOf(w)) > 2.2) { const r = await goTo(g, s, posOf(w).x, posOf(w).z, w.id); return r.fail ? r : { busy: true, ms: r.ms || 2000 }; }
+      const r = await runLine(g, `give(${item}, ${w.id})`);
+      if (!r.ok) return { fail: r.text };
+      C()?.say(g, 'help', { item }, { to: w });
+      if (w._job) { w._job.lastNeed = null; w._job.blocked = {}; }
+      addNews(g.id, `${g.id} brought ${w.id} ${item}`, 'news');
+      return { done: true, ms: 2500 };
+    }
+    const store = nearest(g, communal().filter(o => has(o, item)));
+    if (store) { setDoing(g, s, `fetching ${item} for ${w.id}`); if (dist(posOf(g), store) > REACH) { const r = await approach(g, s, store); return r.fail ? r : { busy: true, ms: r.ms || 2000 }; } const r = await runLine(g, `take(${item}, ${store.type})`); return r.ok ? { busy: true, ms: 1500 } : { fail: r.text }; }
+    const src = nearest(g, sourcesOf(g, item)); if (!src) return { skip: true };
+    setDoing(g, s, `getting ${item} for ${w.id}`);
+    const r = await goDo(g, s, src, `use(${src.type})`);
+    return r.fail ? r : { busy: true, ms: r.ms || 3000 };
+  }
+  // gather two of a staple, then put them in a store (the village's, else its own, else the nearest)
+  async function supplyChore(g, s, item) {
+    if (g.turnMove) return { busy: true, ms: 700 };
+    const n = count(g, item), src = nearest(g, sourcesOf(g, item));
+    if (n < 2 && src) { setDoing(g, s, `gathering ${item} for the stores`); const r = await goDo(g, s, src, `use(${src.type})`); return r.fail ? r : { busy: true, ms: r.ms || 3000 }; }
+    if (!n) return { skip: true };
+    const store = nearest(g, communal().length ? communal() : myStores(g).length ? myStores(g) : stores()); if (!store) return { done: true, ms: 2000 };
+    setDoing(g, s, `carrying ${item} to the ${nice(store.type)}`);
+    if (dist(posOf(g), store) > REACH) { const r = await approach(g, s, store); return r.fail ? r : { busy: true, ms: r.ms || 2000 }; }
+    for (let k = count(g, item); k > 0; k--) { const r = await runLine(g, `put(${item}, ${store.type})`); if (!r.ok) break; }
+    return { done: true, ms: 2500 };
+  }
+  async function watchChore(g, s) {
+    const sq = places().find(p => p.kind === 'square') || places().find(p => p.kind === 'gate');
+    const spot = sq && (s.watchSpot ||= spotIn(sq, g)); if (!spot) return { skip: true };
+    setDoing(g, s, 'standing watch at dusk');
+    const r = await goTo(g, s, spot.x, spot.z, 'the ' + sq.id); if (!r.done) return r.fail ? r : { busy: true, ms: r.ms || 2500 };
+    s.watchSpot = null;
+    await runLine(g, `emote(${oneOf(['looks out over the fields', 'watches the road', 'peers into the dusk'])})`);
+    return { done: true, ms: 9000 };
   }
   // keeping busy while there is nothing to work at: now its declared
   // activity, now a seat, a walk, a look out of the door; seated, it mostly
@@ -800,6 +976,7 @@
       const asker = holder || near[0];
       if (asker) opts.push({ label: `ask ${asker.id} for ${need.item}`, run: async () => { s.wantItem = need.item; s.ask = { who: asker.id, item: need.item, until: gm() + 60 }; await goTo(g, s, posOf(asker).x, posOf(asker).z, asker.id); return { ms: 3000 }; } });
     }
+    opts.push(...offerOpts(g));
     const busyWith = (j.fallback || []).find(f => f.idle)?.idle || 'tidy';
     opts.push({ label: `keep busy (${busyWith === 'tidy' ? 'tidy up' : busyWith === 'pace' ? 'walk about' : busyWith === 'lookout' ? 'keep an eye on the street' : busyWith}) for now`, run: () => idleActivity(g, s, j, busyWith), stay: true });
     opts.push({ label: 'take a break', run: () => idleActivity(g, s, j, 'rest'), stay: true });
@@ -823,34 +1000,51 @@
   // ---------------------------------------------------------------- eating
   async function eat(g, s) {
     const f = foodIn(g);
-    if (f) { setDoing(g, s, 'eating'); await runLine(g, `eat(${f.name})`); s.meal = null; return { ms: 3500 }; }
-    // the ways to get some
-    const opts = [], foodStores = list => list.map(o => ({ o, it: (contentsOf(o).items || []).find(i => (i.qty ?? 1) > 0 && isFood(i.name)) })).filter(x => x.it);
+    if (f) { setDoing(g, s, 'eating'); await runLine(g, `eat(${f.name})`); s.meal = null; s.hungerWhy = ''; return { ms: 3500 }; }
+    // the ways to get some: its stores, the village store, a seller, another's store (paid), foraging anywhere reachable
+    const opts = [], foodStores = list => list.map(o => ({ o, it: (contentsOf(o).items || []).find(i => (i.qty ?? 1) > 0 && edible(i.name, g)) })).filter(x => x.it);
     const own = nearest(g, foodStores(myStores(g)).map(x => ({ ...x.o, item: x.it.name })));
     const com = nearest(g, foodStores(communal()).map(x => ({ ...x.o, item: x.it.name })));
     const other = nearest(g, foodStores(stores().filter(o => !myStores(g).some(m => m.mesh === o.mesh) && ownerOf(o) && ownerOf(o) !== g)).map(x => ({ ...x.o, item: x.it.name })));
-    const sellers = state.characters.filter(c => c !== g && !c.defeated && c._job && foodIn(c) && !P()?.isHostile?.(c) && gold(g) >= price(foodIn(c).name, c)).sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)));
-    const forage = nearest(g, getObjects().filter(o => { const st = U().stockOf(o); return st && st.left > 0 && isFood(st.item) && dist(posOf(g), o) < 18; }));
+    const carriers = state.characters.filter(c => c !== g && !c.defeated && c._job && foodIn(c) && !P()?.isHostile?.(c) && !M()?.refuses?.(c, g.id)).sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)));
+    const sellers = carriers.filter(c => gold(g) >= price(foodIn(c).name, c));
+    const t = gm(), bad = o => (s.bad || {})[Math.round(o.x) + ',' + Math.round(o.z)] > t;
+    const forage = nearest(g, getObjects().filter(o => { const st = U().stockOf(o); return st && st.left > 0 && edible(st.item, g) && !bad(o); }));
     if (own) opts.push({ label: `take ${own.item} from your ${nice(own.type)}`, run: () => takeFood(g, s, own, null) });
     if (com) opts.push({ label: `take ${com.item} from the village ${nice(com.type)}`, run: () => takeFood(g, s, com, null) });
     if (sellers[0]) opts.push({ label: `buy ${foodIn(sellers[0]).name} from ${sellers[0].id} (${price(foodIn(sellers[0]).name, sellers[0])} gold)`, run: () => buyFrom(g, s, sellers[0], foodIn(sellers[0]).name).then(r => ({ ms: r.ms || 2500 })) });
     if (other && gold(g) >= price(other.item, ownerOf(other))) opts.push({ label: `buy ${other.item} from ${ownerOf(other).id}'s ${nice(other.type)}`, run: () => takeFood(g, s, other, ownerOf(other)) });
-    if (forage) opts.push({ label: `pick ${U().stockOf(forage).item} from the ${nice(forage.type)}`, run: () => goDo(g, s, forage, `use(${forage.type})`).then(r => ({ ms: r.ms || 3000 })) });
+    if (forage) opts.push({ label: `${/meat|fish/.test(U().stockOf(forage).item) ? 'catch' : 'pick'} ${U().stockOf(forage).item} from the ${nice(forage.type)}`, run: () => goDo(g, s, forage, `use(${forage.type})`).then(r => { if (r.fail) s.meal = null; return { ms: r.ms || 3000 }; }) });
+    // nobody sells and nothing to take: ask someone who carries food to share it (in code: they give, or say no)
+    const sharer = carriers.find(c => gm() - ((s.askedFood ||= {})[c.id] ?? -999) >= 30);
+    if (!opts.length && sharer) opts.push({ label: `ask ${sharer.id} to share some food`, run: () => askFood(g, s, sharer) });
     if (!opts.length) {
-      // nothing to be had: ask someone (a cause to speak), or wait
       setDoing(g, s, 'hungry, looking for food');
-      // (one ask an hour: a new one each tick had it begging every few seconds)
+      s.hungerWhy = carriers.length ? 'nobody would share and it has no gold to buy' : gold(g) < 2 && other ? `no gold to buy from ${ownerOf(other).id}'s ${nice(other.type)}` : 'no food in any store, carried by anyone, or to forage';
       if (!(s.ask && s.ask.until > gm())) s.ask = { item: 'food', until: gm() + 60, who: nearPeople(g, 8).filter(c => c !== state.playerAvatar)[0]?.id || '' };
       return null;
     }
     setDoing(g, s, 'getting something to eat');
-    // several ways and none chosen for this meal yet: a pick
     if (s.meal && s.meal.until > gm()) return s.meal.run();
     let ch = opts[0];
     if (opts.length >= 2 && gm() - s.lastPick > 120) { s.lastPick = gm(); ch = await pick(g, 'You are hungry. How do you get something to eat?', opts.slice(0, 4)); if (ch?.open) { await modelTurn(g, 'choice'); return { ms: 4000 }; } }
     ch ||= opts[0];
     s.meal = { until: gm() + 45, run: ch.run };
     return ch.run();
+  }
+  // asking for food: walk over, ask (a templated line), and they share one if they can spare it
+  async function askFood(g, s, c) {
+    if (g.turnMove) return { ms: 700 };
+    setDoing(g, s, `asking ${c.id} for food`);
+    if (dist(posOf(g), posOf(c)) > 2.2) { const r = await goTo(g, s, posOf(c).x, posOf(c).z, c.id); if (r.fail) { s.askedFood[c.id] = gm(); s.meal = null; } return { ms: r.ms || 2500 }; }
+    s.askedFood[c.id] = gm(); s.meal = null;
+    C()?.say(g, 'ask_food', {}, { to: c, force: true });
+    await sleep(1500);
+    const f = foodIn(c), spare = f && (count(c, f.name) > 1 || (M()?.mindOf?.(c)?.hunger || 0) < .5);
+    if (!f || !spare || M()?.refuses?.(c, g.id)) { C()?.say(c, 'refuse_food', {}, { to: g, force: true }); return { ms: 2500 }; }
+    const r = await runLine(c, `give(${f.name}, ${g.id})`);
+    if (r.ok) { C()?.say(c, 'share_food', { item: f.name }, { to: g, force: true }); addNews(c.id, `${c.id} shared ${f.name} with ${g.id}`, 'news'); }
+    return { ms: 2500 };
   }
   async function takeFood(g, s, o, owner) {
     if (g.turnMove) return { ms: 700 };
@@ -1039,9 +1233,19 @@
       const near = raiders.slice().sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
       if (g.pose) U().standUp(g);
       // go after them: hostility to each raider (lethal: they are monsters); live.js fights from 8 cells
-      const h = { ...(cfg.hostileTo || {}) }; for (const r of raiders) h[r.id] ??= Date.now();
+      // (a defender only takes on those near what it defends)
+      const dd = defended(j), h = { ...(cfg.hostileTo || {}) }; for (const r of raiders) if (!dd || dist(posOf(r), dd) <= 8) h[r.id] ??= Date.now();
       W().setBrainConfig(g.id, { hostileTo: h });
       if (!cfg.wielding) { const w = (inv(g).items || []).map(i => window.tablefolkCombat?.weaponFor?.(i.name) && i.name).find(Boolean); if (w) await runLine(g, `wield(${w})`); }
+      // "defends": it keeps to what it guards and takes on the raiders that come near it (8 cells)
+      const d = defended(j);
+      if (d) {
+        const threat = raiders.filter(r => dist(posOf(r), d) <= 8).sort((a, b) => dist(posOf(a), d) - dist(posOf(b), d))[0];
+        if (threat) { setDoing(g, s, `defending ${d.label} from the ${T.label?.(threat) || threat.id}`); if (dist(posOf(threat), posOf(g)) > 5) { const r = await goTo(g, s, posOf(threat).x, posOf(threat).z, threat.id); return { ms: Math.min(r.ms || 2000, 2500) }; } return { ms: 1500 }; }
+        setDoing(g, s, `guarding ${d.label}`);
+        if (dist(posOf(g), d) > 3) { const r = await goTo(g, s, d.x, d.z, d.label); return { ms: Math.min(r.ms || 2000, 2500) }; }
+        return { ms: 2000 };
+      }
       setDoing(g, s, `going after the ${T.label?.(near) || near.id}`);
       if (dist(posOf(near), posOf(g)) > 6) { const r = await goTo(g, s, posOf(near).x, posOf(near).z, near.id); return { ms: Math.min(r.ms || 2000, 2500) }; }
       return { ms: 1500 };
@@ -1067,7 +1271,18 @@
     const h = K()?.hour() ?? 10, m = M()?.mindOf?.(g);
     // in danger and no fighter: the game's reflexes (or the model) as before
     const foes = M()?.foes?.(g, 4) || [];
-    if (foes.length && !fighter(g, j)) { await modelTurn(g, 'danger'); return { ms: 1800 }; }
+    if (foes.length && !fighter(g, j)) {
+      // a package or skill command that fits (signal the militia, a spell): offered first
+      const offs = offerOpts(g);
+      if (offs.length && gm() - (s.lastDangerPick ?? -999) >= 20) {
+        s.lastDangerPick = gm();
+        const ch = await pick(g, `Danger: ${foes.map(f => f.id).slice(0, 3).join(', ')} close by!`, [...offs, { label: 'deal with it yourself', run: async () => { await modelTurn(g, 'danger'); return { ms: 1800 }; } }]);
+        if (ch && !ch.open) return ch.run();
+      }
+      await modelTurn(g, 'danger'); return { ms: 1800 };
+    }
+    // job and role command rules (the keeper signals when the wolves come)
+    const rr = await rules(g, s, j); if (rr) return rr;
     const th = await threatened(g, s, j, inHours(h, j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]))); if (th) return th;
     // a word to say (mind.js speechCause): an answer to a want, a temper, a warning; at most one an hour
     const cause = M()?.speechCause?.(g);
@@ -1106,6 +1321,7 @@
     if (stranger && pl) opts.unshift({ label: `greet ${nameOf(pl)}${j?.steps?.some(x => x.sell || x.serve) ? ' and offer your wares' : ''}`, run: async () => { await modelTurn(g, 'event'); return { ms: 4000 }; } });
     // (only the one it happened to has something to say about it: everyone near reacting filled the room with talk)
     else if (events.some(l => /\byour?\b/i.test(l)) && ((other && window.tablefolkTalk?.mayStart?.(g.id) !== false) || pl)) opts.unshift({ label: `say something about it to ${nameOf(other && window.tablefolkTalk?.mayStart?.(g.id) !== false ? other : pl)}`, run: async () => { await modelTurn(g, 'event'); return { ms: 4000 }; } });
+    opts.splice(opts.length - 1, 0, ...offerOpts(g));
     const what = stranger ? events[0].replace(/^\(|\)$/g, '') : events.map(l => l.replace(/^\s*\[event\]\s*/, '')).join(' ');
     const ch = await pick(g, `${what}\nWhat do you do?`, opts);
     if (ch?.open) { await modelTurn(g, 'event'); return { ms: 4000 }; }
@@ -1126,6 +1342,6 @@
   // what it asks for, on the card (an ask turn)
   // (worded with no "ask X": E2B wrote ask(grub) as a command)
   function askLine(g) { const s = g._job; return s?.ask && s.ask.until > gm() ? `You need ${s.ask.item} and have none: say so to ${s.ask.who || 'someone nearby'}, in your own words.` : ''; }
-  function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, did: g._job.did, doing: g._job.doing }; return out; }
-  window.tablefolkJobs = { registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
+  function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, chores: g._job.choreDone || 0, did: g._job.did, doing: g._job.doing, hungerWhy: (M()?.mindOf?.(g)?.hunger || 0) >= .55 ? (g._job.hungerWhy || (g._job.doing === 'asleep' ? 'asleep' : 'had not got round to eating')) : '' }; return out; }
+  window.tablefolkJobs = { condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
 })();

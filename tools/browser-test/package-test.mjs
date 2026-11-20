@@ -130,6 +130,36 @@ try {
     return [pile1 < pile && fuel1 > fuel0 && (odo._job?.ticks || 0) > ticks0, `woodpile ${pile} -> ${pile1}, fuel ${fuel0} -> ${fuel1}, ticks ${ticks0} -> ${odo._job?.ticks}, doing "${odo._job?.doing}"`];
   });
 
+  // the keeper signals by rule, the militia defend the beacon, signal() is offered in picks
+  await check('rule: the keeper signals by code when wolves are near and the beacon is lit (job "commands" rule)', async () => {
+    const o = __t.beacon(), odo = __t.agent('odo'), k = tablefolkClock.now(); tablefolkClock.set(k.min, k.day + 1); tablefolkStory.set('militia_called', false);
+    if (__t.mm(o).state !== 'lit') { const p = tablefolk.getPlayerAvatar(); tablefolkPackages.api().give(p, 'firewood'); await tablefolkPackages.useThing(o.mesh, p); }
+    window.__gr2 = await tablefolkThreats.now('wolfpack'); await __t.sleep(2500);
+    const w = __t.agent(__gr2.ids[0]), c = tablefolkPackages.api().freeCell(o.x + 4, o.z, 3); __t.put(w, c.x, c.z);
+    const n0 = tablefolk.getAgents().filter(a => /^militia/.test(a.id)).length;
+    for (let i = 0; i < 30 && !tablefolkStory.get('militia_called'); i++) { const r = await tablefolkJobs.tick(odo); await __t.sleep(Math.min(1200, Math.max(300, r?.ms || 600))); }
+    await __t.sleep(2500);
+    const n1 = tablefolk.getAgents().filter(a => /^militia/.test(a.id)).length;
+    return [tablefolkStory.get('militia_called') === true && n1 === n0 + 2, `militia ${n0} -> ${n1}, odo "${odo._job?.doing}" last ${__t.last('odo')}`];
+  });
+  await check('offer: signal() is offered to the keeper in a pick when it would work (module offer)', async () => {
+    const k = tablefolkClock.now(); tablefolkClock.set(k.min, k.day + 1);
+    const o = __t.beacon(), odo = __t.agent('odo'), c = tablefolkPackages.api().freeCell(o.x, o.z + 1, 3); __t.put(odo, c.x, c.z);
+    const offs = tablefolkSkills.offers(odo), wren = tablefolkSkills.offers(__t.agent('wren'));
+    return [offs.some(x => x.name === 'signal' && x.line === 'signal()') && !wren.some(x => x.name === 'signal') && tablefolkJobs.offers(odo).length > 0, JSON.stringify(offs)];
+  });
+  await check('defends: the militia keep to the beacon and take on wolves near it', async () => {
+    const o = __t.beacon(), m = tablefolk.getAgents().find(a => /^militia/.test(a.id) && !a.defeated), j = tablefolkJobs.jobOf(m);
+    const far = tablefolkPackages.api().freeCell(o.x + 9, o.z + 2, 3); __t.put(m, far.x, far.z);
+    for (const id of __gr2.ids) { const w = __t.agent(id); if (w) __t.put(w, o.x - 14, o.z - 14); }
+    for (let i = 0; i < 12; i++) { const r = await tablefolkJobs.tick(m); await __t.sleep(Math.min(1500, Math.max(300, r?.ms || 600))); }
+    const p = m.logicalPos || m.root.position, d = Math.hypot(p.x - o.x, p.z - o.z);
+    return [j?.id === 'militia' && j.defends === 'signal_beacon' && d <= 4.5 && /guarding|defending/.test(m._job?.doing || ''), `job ${j?.id} defends ${j?.defends}, ${d.toFixed(1)} cells from the beacon, "${m._job?.doing}"`];
+  });
+  await check('goal predicate from the module: beacon_burning', () => [typeof tablefolkPackages.goals.beacon_burning === 'function' && tablefolkPackages.goals.beacon_burning(true) === (__t.mm(__t.beacon()).state === 'lit'), Object.keys(tablefolkPackages.goals).join(',')]);
+  await check('package lines: the Night Watch\'s pools are added (chatter.js)', () => [tablefolkChatter.pools.packages.some(p => p.from === 'nightwatch' && p.pools.raid_fighter), tablefolkChatter.pools.packages.map(p => p.from).join(',')]);
+  await page.evaluate(() => { for (const id of window.__gr2?.ids || []) { const w = __t.agent(id); if (w) { tablefolk.getBrainConfig(id).defeated = true; w.defeated = true; } } }).catch(() => {});
+
   // the goal: two nights with the keeper alive, by moving the clock on
   await check('goal: survive two nights with odo alive (clock advanced)', async () => { tablefolkClock.set(6 * 60 + 30, 3); for (let i = 0; i < 20 && !tablefolkScenario.active.ended; i++) await __t.sleep(300); return [tablefolkScenario.active.ended && tablefolkScenario.active.result === true, `ended ${tablefolkScenario.active.ended} result ${tablefolkScenario.active.result} clock ${JSON.stringify(tablefolkClock.now())}`]; });
 
@@ -146,6 +176,10 @@ try {
   await check('a character uses it too (use() by a character: "once" already spent)', async () => { const g = __t.agent('fixa'), o = tablefolk.getObjects().find(x => x.type === 'music_box'); __t.put(g, o.x - 1, o.z); await tablefolk.runAs('fixa', 'use(music_box)', 'test'); await __t.sleep(400); return [__t.failed('fixa') || /already|nothing/i.test(__t.last('fixa')), __t.last('fixa')]; });
   await check('module card named by a package skill', () => { const l = tablefolkSkills.cardLines(__t.agent('fixa')); return [l.includes('fixture card for fixa'), l.join(' | ')]; });
   await check('module effect used by a package skill\'s command', async () => { await tablefolk.runAs('fixa', 'fx()', 'test'); return [tablefolkStory.get('fx_effect') === 2 && /fixture effect/.test(__t.last('fixa')), __t.last('fixa')]; });
+  await check('offers: a data command with when/offer and a module command with offer()', async () => { const g = __t.agent('fixa'); const none = tablefolkSkills.offers(g).length; tablefolkStory.set('fx_offer_on', true); const o = tablefolkSkills.offers(g); return [none === 0 && o.some(x => x.name === 'fx' && x.label === 'do the fixture thing') && o.some(x => x.name === 'fx_code' && /fixture code command, fixa/.test(x.label)), JSON.stringify(o)]; });
+  await check('a skill\'s cue starts a workflow ("on": player-chat)', async () => { dispatchEvent(new CustomEvent('tablefolk-player-chat', { detail: { agentId: 'fixa', text: 'hello' } })); for (let i = 0; i < 20 && !tablefolkStory.get('fx_cue_ran'); i++) await __t.sleep(200); return [tablefolkStory.get('fx_cue_ran') === true, __t.last('fixa')]; });
+  await check('module goal predicate in a scenario goal', () => { tablefolkStory.set('fx_count', 3); return [tablefolkPackages.goals.fx_goal(3) === true && tablefolkPackages.goals.fx_goal(4) === false, '']; });
+  await check('package lines reach the pools', () => [tablefolkChatter.pools.packages.some(p => p.pools.greet?.any?.includes('Fixture hello, {name}.')), '']);
   await check('package workflow runs (do: reply, anim, sound)', async () => { tablefolkWorkflows.start('fixa', 'fx_flow'); await tablefolkWorkflows.drive('fixa'); await __t.sleep(500); return [tablefolkStory.get('fx_flow_ran') === true && /fixture workflow ran/.test(__t.last('fixa')), __t.last('fixa')]; });
   await check('reset: the Night Watch\'s things are gone in another scenario', () => [!tablefolkPacks.items.signal_beacon && !tablefolkBodies.list().includes('dire_wolf') && !tablefolkSkills.packageCommands.signal && !tablefolkSfx.names.includes('howl') && !tablefolkJobs.registry.has('beacon_keeper'), '']);
 

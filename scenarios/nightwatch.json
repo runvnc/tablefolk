@@ -44,7 +44,7 @@
   "triggers": [{ "on": "start", "as": "brenna", "once": true, "do": { "start": "briefing" } }],
   "goal": {
     "text": "Keep the beacon burning and Odo alive for two nights.",
-    "win": { "all": [{ "survived_days": 2 }, { "not": { "agent_defeated": "odo" } }] },
+    "win": { "all": [{ "survived_days": 2 }, { "not": { "agent_defeated": "odo" } }, { "beacon_burning": true }] },
     "lose": { "any": [{ "agent_defeated": "odo" }, { "player_defeated": true }] },
     "winText": "The second dawn comes up grey over the valley. The beacon is still smoking, Odo is still grumbling, and the relief is on the road.",
     "loseText": "Odo lies still by the cold beacon. Below the walls, the wolves sing."

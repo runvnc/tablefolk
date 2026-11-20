@@ -36,7 +36,10 @@ is the scenario skill's `server.md`; this is how it works inside.
   called at the end of `checkScenario(s, packVoices, { prompt, fresh,
   notes })` when there are no other problems): a new world (`fresh`: the
   generate path, `/api/finish` with a prompt) that is not talk-only
-  (`TALK_ONLY` on the request, or `"talk": true`) gets `live`, `time`,
+  (`TALK_ONLY` on the request, or `"talk": true`; a talk scene with a
+  `generate` or `map` is collapsed by `oneRoom` into one `grid` room sized
+  to the cast, the known small things along its walls, others by legend
+  letters) gets `live`, `time`,
   `dayMinutes`; a minimum size; for each talking character a job (the
   jobs' match regexes, `server/jobs-table.js`, generated from
   `jobs/*/job.json` by `node tools/jobs-table.mjs`: run it after editing a

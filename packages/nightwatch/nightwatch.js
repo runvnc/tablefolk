@@ -4,7 +4,8 @@
 // into the game's own files.
 //
 // It adds: the beacon's "use" (tend_beacon) and its fire, burning down on the
-// clock; the signal() command; the beacon line on the watch's state card;
+// clock; the signal() command (offered in the game's picks when it fits);
+// the beacon_burning goal; the beacon line on the watch's state card;
 // the "kindle" effect for the watchkeeping skill; and the wolf pack's way of
 // moving (it circles while the fire burns, and attacks when it is out).
 
@@ -114,6 +115,12 @@ export default function nightwatch(api) {
     commands: {
       signal: {
         usage: 'signal()', example: 'signal()', allowedBy: 'listed',
+        // offered in the game's pick menus (danger, stuck turns) when it would work and is needed
+        offer(g) {
+          const b = beacons().find(isLit), wolves = api.state.characters.filter(c => c._threat && !c.defeated);
+          if (!b || militiaNight === (api.clock()?.day ?? 1) || !wolves.length || !near(g, b, 8)) return null;
+          return 'signal the militia from the beacon';
+        },
         help: 'signal() - at a lit beacon: wave a burning brand to call the militia from the valley (once a night)',
         async run(g, args, ctx) {
           const b = nearestBeacon(g);
@@ -125,7 +132,7 @@ export default function nightwatch(api) {
           api.playClip(g, 'wave') || api.playClip(g, 'cast');
           for (const i of [0, 1]) {
             const c = api.freeCell(b.x + (i ? 3 : -3), b.z + 3, 5); if (!c) continue;
-            const m = await api.spawn('militia', 'guard', c.x, c.z, { style: 'militia spearman', role: 'militia', hp: 12, items: ['spear'],
+            const m = await api.spawn('militia', 'guard', c.x, c.z, { style: 'militia spearman', role: 'militia', job: 'militia', hp: 12, items: ['spear'],
               personality: 'A militia spearman from the valley, come up the hill at the beacon\'s call. Few words; sharp eyes.', allowed: ['say', 'walk', 'attack', 'wield'] });
             if (m) api.combat?.wield?.(m, 'spear');
           }
@@ -142,6 +149,11 @@ export default function nightwatch(api) {
         if (!isLit(b)) return '!The beacon is OUT: the wolves will close in. Feed it firewood now: use(signal_beacon).';
         return `The beacon burns (fire for about ${Math.ceil(fuelOf(b))} hours).${fuelOf(b) < 2 ? ' It needs a log soon.' : ''}`;
       },
+    },
+
+    // goal predicates: "win": { "beacon_burning": true } holds while the beacon is lit
+    goals: {
+      beacon_burning(want) { const lit = beacons().some(isLit); return want === false ? !lit : lit; },
     },
 
     // { "kindle": 3 } in a skill's effects: that many hours of fire for the beacon beside the user

@@ -427,7 +427,9 @@ function convoLine(from, to) {
   c.n++; c.last = now;
   if (c.n >= CONVO_LINES) {
     c.closedUntil = now + CONVO_CLOSED_MS; c.n = 0;
-    talkedOut.set(from, now + TALKED_OUT_MS); talkedOut.set(to, now + TALKED_OUT_MS);
+    // (in the evening's social window, 17-21: talked out for 20 s only, so they turn to someone else)
+    const hr = window.tablefolkClock?.running ? window.tablefolkClock.hour?.() : null, out = hr != null && hr >= 17 && hr < 21 ? 20000 : TALKED_OUT_MS;
+    talkedOut.set(from, now + out); talkedOut.set(to, now + out);
     // a conversation that has ended holds the floor only 5 s more: the next pair may start
     for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, now - FLOOR_MS + 5000); }
     setTimeout(() => { for (const x of [from, to]) { const l = lastLine.get(x); if (l) l.at = Math.min(l.at, performance.now() - FLOOR_MS + 5000); } }, 50);

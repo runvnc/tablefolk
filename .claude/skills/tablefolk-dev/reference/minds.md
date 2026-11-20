@@ -455,6 +455,33 @@ Measured: testing.md, "A whole day".
   `insult` tick); jobs.js checks every second for the player in a `house`
   place at 21-05 with someone whose `home` it is inside: `intruder` line
   (wakes it), `insult` tick, news, once a night each.
+- **Chores** (jobs.js `choreList`, `chores`, `helpChore`, `supplyChore`,
+  `watchChore`; `s.chore` holds one up to 90 game minutes, `s.choreBad`
+  skips a failing one an hour): scored help (6: a worker's `lastNeed`,
+  now set at the start of `fallback`) > haul (4) > a short staple (3+,
+  `staples()`: firewood and every job's first input set, under 3 in the
+  stores, a source within 30 cells) > dusk watch (2.5, 17-20, not fighters)
+  > tidy (1). Called at the end of `fallback` and when `work` finds no step;
+  step kind `chores` (the labourer). `stats()` has `chores` and
+  `hungerWhy`.
+- **Eating**: `edible` (raw grain/flour only at hunger .85), foraging any
+  reachable food stock (failed walks mark it bad), `askFood` (templated
+  ask, the carrier gives one if it has two or is not hungry, else
+  `refuse_food`), `s.hungerWhy`.
+- **Commands in code** (item 5): skills.js `offers(g)` (module `offer(g,
+  world)`, data `when` + `offer`, a skill module's `offers`), jobs.js
+  `offerOpts` in `decide`, `eventPick` and a danger pick before the open
+  danger turn; `rules` (job/role `commands` objects: `run`, `when`, `at`,
+  `every`, `once`, run before threats in `tick`), `condVars` (raiders,
+  raider_near, hour, hungry); `defended(j)` (a fighter's hostility only
+  for raiders within 8 cells of it; it keeps within 3 cells); cues (`on`
+  in roles and skills, `armCues` 1.5 s after the scenario starts);
+  packages.js `goals` (scenario.js evalCond's default), spawn `job`;
+  roles.js `commandRules`, `cmdName`.
+- **Odd actions** (item 6): app.js `carryMesh` refuses furniture and
+  stocked stores for characters (unless `g._carryOk`), senses.js does not
+  suggest carrying a stocked barrel; jobs.js `goDo` sets `g._useTarget`
+  so uses.js `find` uses the thing it walked to.
 
 ## Order of work
 
