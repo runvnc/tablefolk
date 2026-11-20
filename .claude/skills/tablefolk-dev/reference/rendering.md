@@ -437,6 +437,10 @@ job's model, so expect +-1-2 ms noise):
 | market village | light | 6.7 / 7.4 | 3.2 / 4.9 | 79 / 328 | 815 / 850-863 |
 | market village | medium | 8.7 / 10.6 | 4.0 / 6.5-10.9 | 172 / 202 | 953 / 1204 |
 
+After pass 2 (same method, 45 s to settle): the Oracle light 4.5 ms CPU,
+3.3 lat, 158 draws, 418-426 MiB; medium 6.8 / 4.6 / 276; market village
+light 6.4 / 3.8 / 251, 858 MiB; medium 9.2 / 5.3 / 358, 1260 MiB.
+
 The extra draw calls are the shadow pass (every caster again), the
 real-model trees (several meshes each), the ground cover kinds and the
 surroundings' tree meshes. Without the shadow map the market village at
