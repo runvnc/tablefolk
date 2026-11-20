@@ -49,6 +49,7 @@
     m.metallic = 0; m.roughness = window.TABLEFOLK_GFX?.lite ? .9 : 1;
     if (!window.TABLEFOLK_GFX?.lite) { m.ambientTexture = tex(env, 'ao'); m.useAmbientInGrayScale = true; }
     m.albedoColor = new BABYLON.Color3(...tint); m.environmentIntensity = .45; m.maxSimultaneousLights = 8; m._tfMatte = true;
+    m.backFaceCulling = false;   // cutaway.js draws the insides seen through a cut as a dark section
     state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
     return m;
   }

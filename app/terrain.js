@@ -133,9 +133,13 @@
     return c.getImageData(0, 0, n, n).data;
   }
   async function buildArrays(names, hi) {
-    const n = hi ? 2048 : 1024, sfx = hi ? '' : '_1k', N = n * n, sc = state.scene;
+    // light quality: 512 (the ground is seen from a few metres up at least)
+    const lite = !!GFX().lite, n = hi ? 2048 : lite ? 512 : 1024, sfx = hi ? '' : '_1k', N = n * n, sc = state.scene;
     const alb = new Uint8Array(N * 4 * names.length), nrm = new Uint8Array(N * 4 * names.length);
-    await Promise.all(names.map(async (name, i) => {
+    // one layer a frame (off the critical path: decoding and packing took long frames at start-up)
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      await new Promise(r => requestAnimationFrame(() => r()));
       const base = ENV() + name + '_';
       const [col, nor, rough, ao] = await Promise.all([decode(base + 'color' + sfx + '.webp', n), decode(base + 'normal' + sfx + '.webp', n), decode(base + 'rough' + sfx + '.webp', n).catch(() => null), decode(base + 'ao' + sfx + '.webp', n).catch(() => null)]);
       const o = i * N * 4;
@@ -144,7 +148,7 @@
         nrm[q] = nor[p]; nrm[q + 1] = nor[p + 1]; nrm[q + 2] = ao ? ao[p] : 255;
         nrm[q + 3] = (col[p] * 77 + col[p + 1] * 150 + col[p + 2] * 29) >> 8;   // height: brightness
       }
-    }));
+    }
     const mk = (data, name) => { const t = new BABYLON.RawTexture2DArray(data, n, n, names.length, BABYLON.Engine.TEXTUREFORMAT_RGBA, sc, true, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE); t.name = name; t.wrapU = t.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; return t; };
     return { alb: mk(alb, 'terrain_alb'), nrm: mk(nrm, 'terrain_nrm'), n };
   }
@@ -414,6 +418,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const wallSet = new Set(); for (const b of state.blocks || []) { if (!b || b.isDisposed?.()) continue; const t = meta(b)?.type; if (t === 'wall' || t === 'door') wallSet.add(Math.round(b.position.x) + ',' + Math.round(b.position.z)); }
     const bx = WORLD.halfW - 1, bz = WORLD.halfH - 1, E = 10;
     const isRock = (x, z) => { const k = x + ',' + z; if (wallSet.has(k)) return false; if (Math.abs(x) > bx || Math.abs(z) > bz) return true; if (!R.outside?.has(k)) return false; const p = paintAt(x, z)?.mat; return !p || p === 'sea'; };
+    T.rockCells = new Set(); for (let z = -bz; z <= bz; z++) for (let x = -bx; x <= bx; x++) if (isRock(x, z)) T.rockCells.add(x + ',' + z);
     const isWall = (x, z) => wallSet.has(x + ',' + z) && !doorAt(x, z);
     const doorAt = (x, z) => (state.blocks || []).some(b => !b.isDisposed?.() && meta(b)?.type === 'door' && Math.round(b.position.x) === x && Math.round(b.position.z) === z);
     // half-cell quads: rock cells whole, and the half of a wall cell on the rock side
@@ -481,7 +486,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
   async function buildCover(C) {
     for (const m of T.cover) try { m.dispose(); } catch {}
     T.cover = [];
-    if (window.TABLEFOLK_TABLETOP || T.mode === 'rock' || T.mode === 'street') return;
+    if (window.TABLEFOLK_TABLETOP || T.mode === 'rock' || T.mode === 'street' || /nocover/.test(location.search)) return;
     const lite = !!GFX().lite, models = await loadCover(); if (!models.length) return;
     const blocked = new Set();
     for (const b of state.blocks || []) if (!b.isDisposed?.()) blocked.add(Math.round(b.position.x) + ',' + Math.round(b.position.z));
@@ -575,12 +580,13 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     for (const t of T.ctrl) try { t.dispose(); } catch {}
     T.ctrl = C.tex; T.layers = C.names;
     // rock
-    try { T.rock?.dispose(); } catch {} T.rock = T.mode === 'rock' ? buildRock() : null;
+    try { T.rock?.dispose(); } catch {} T.rockCells = null; T.rock = T.mode === 'rock' ? buildRock() : null;
+    window.tablefolkDark?.update?.();
     state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean);
     window.tablefolkSky?.setWorld?.(T.mode === 'rock' ? { underground: true, fogNear: 6, fogFar: 26 } : T.mode === 'street' ? { underground: false, fogNear: 8, fogFar: 32 } : { underground: false, fogNear: 30, fogFar: 200 });
     // the textures (WebGPU only: the plugin's WGSL); kept while the layer set is the same
     const key = C.names.join(',') + '|' + (hi ? 2 : 1);
-    {
+    if (!/notex/.test(location.search)) {
       if (key !== T.arraysKey) {
         T.arraysKey = key;
         const arr = await buildArrays(C.names, hi);
@@ -609,5 +615,5 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const cx = Math.round(x), cz = Math.round(z), on = Math.abs(cx) <= WORLD.halfW - 1 && Math.abs(cz) <= WORLD.halfH - 1;
     return on ? seaCell(cx, cz) : (T.mode === 'sea' || rimSea(cx, cz));
   }
-  window.tablefolkTerrain = { rebuild, mode: () => T.mode, heightAt, waterAt, setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
+  window.tablefolkTerrain = { rebuild, mode: () => T.mode, heightAt, waterAt, isRock: (x, z) => T.mode === 'rock' && !!T.rockCells?.has(Math.round(x) + ',' + Math.round(z)), setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
 })();

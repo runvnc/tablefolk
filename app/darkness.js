@@ -109,6 +109,7 @@
     const sc = state.scene, m = BABYLON.MeshBuilder.CreateBox(name, { width: 1.003, depth: 1.003, height: h }, sc);
     const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
     mat.diffuseColor = mat.specularColor = mat.emissiveColor = BABYLON.Color3.Black(); mat.disableLighting = true;
+    if (alpha >= 1 && h === FOG_H) mat.emissiveColor = new BABYLON.Color3(.034, .032, .03);   // the unexplored: as dark as the rock round it
     if (alpha < 1) { mat.alpha = alpha; mat.disableDepthWrite = true; }
     // the follow camera cuts the tall boxes to a stub in front of the player
     // (cutaway.js); their insides, drawn too, close the cut top in black
@@ -129,7 +130,8 @@
       // nothing stands where there is neither floor nor wall (the sea round a
       // dungeon): a flat lid at floor level, so the outsides of the walls of
       // the rooms you see stay in view
-      if (!explored.has(k)) (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k);
+      // the dungeon's rock (terrain.js) stays in view, fading into the black fog
+      if (!explored.has(k)) { if (window.tablefolkTerrain?.isRock?.(x, z)) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
       else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
