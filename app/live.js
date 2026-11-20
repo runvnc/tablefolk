@@ -101,7 +101,7 @@
     const cfg = getBrainConfig(c.id);
     if (cfg.pendingChat?.length) return 'pending';
     const card = (window.tablefolkMind?.cardLines?.(c) || []).join(' ');
-    if (/You want: (stay safe|get away|tell .* attacked|let .* stand for|eat something)/.test(card)) return 'urgent';
+    if (/You want: (stay safe|get away|tell .* attacked|let .* stand for|eat something|get something to eat|find something to eat|rest:)/.test(card)) return 'urgent';
     return '';
   }
   // a turn without the brain: a step, a look elsewhere, or nothing

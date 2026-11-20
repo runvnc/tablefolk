@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Hunger and tiredness grow with real time in a living world**: hungry after about 8 minutes, tired after about 12, whatever the pace; a hungry or tired character counts as having something to do.
+
 - **Characters trade with each other**: `sell(bread, 2, pip)` (or to whoever it is talking with); the buyer pays when it has the gold and wants it (hungry for food, asked for it, or it is on its goal) and says no otherwise. A character with food next to someone hungry is offered the sale or the gift.
 
 - **Characters tell talk to them from talk they overhear**: a line is said to someone (named, or who just spoke to the speaker, or who it faces), who answers it; the others only overhear it and need not answer. Two characters stop after three exchanges for a while, and a character nobody has spoken to talks only with a reason (news, something it needs from someone, a goal naming someone near); otherwise it gets on with things.
