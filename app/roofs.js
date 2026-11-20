@@ -87,7 +87,7 @@
       for (const c of cells) { const [x, z] = c.split(',').map(Number); for (const n of [cellKey(x + 1, z), cellKey(x - 1, z), cellKey(x, z + 1), cellKey(x, z - 1)]) if (D.has(n)) r.here.add(n); }
       rooms.push(r);
     }
-    return { rooms, outsideShare: ground ? outside / ground : 0 };
+    return { rooms, outsideShare: ground ? outside / ground : 0, outside: out };
   }
   function wanted() {
     const s = window.tablefolkScenario?.active?.scn || {};
@@ -265,5 +265,7 @@
   setInterval(() => { if (!enabled || !state.scene) return; const s = signature(walls()); if (sig && s !== sig) rebuild(); }, 2500);
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });
-  window.tablefolkRoofs = { rebuild, toggle, get rooms() { return roofs.map(r => r.room); } };
+  // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
+  function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
+  window.tablefolkRoofs = { rebuild, toggle, findRooms: plan, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
 })();

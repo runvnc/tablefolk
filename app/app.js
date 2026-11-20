@@ -2327,7 +2327,8 @@ function paintMaterial(mat,tint){
   // Relief from the floor's own texture (brightness as height), so painted
   // floors aren't flat decals beside the sculpted tiles. Water stays smooth.
   const HD=window.TablefolkHD;
-  if(mat==='water'){ m.roughness=.06; m.alpha=.86; plasticFinish(m,{coat:.9,coatRough:.04}); }
+  // water: dark, calm, a little reflective (the terrain under it is mud, so the shore blends)
+  if(mat==='water'){ m._tfMatte=true; m.albedoColor=new BABYLON.Color3(.05,.09,.10); m.roughness=.12; m.alpha=.8; m.environmentIntensity=.9; m.specularIntensity=1; m.emissiveColor=new BABYLON.Color3(0,0,0); }
   if(mat==='lava'){ m.roughness=.55; m.emissiveTexture=lavaTextures(sc).glow; m.emissiveColor=new BABYLON.Color3(1.4,1.4,1.4); }
   if(FLOWING[mat]) animateFlow();
   if(HD && tx){
@@ -2497,7 +2498,8 @@ function buildRug(cells){
 // Height of the solid floor (planks, tiles, slabs, rug) on a cell, so feet
 // stand on it instead of sinking into it.
 const FLOOR_LIFT={ planks:.048, squares:.034, slab:.045, crust:.07, pile:RUG_H };
-function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d && !d.overlay ? (FLOOR_LIFT[d.layout]||0) : 0; }
+// Only the rug stands on the ground now: planks, tiles and slabs are flat textures in the terrain (terrain.js).
+function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d?.layout==='pile' ? FLOOR_LIFT.pile : 0; }
 function buildFloor(type,cells){
   if(SOLID_FLOORS[type]?.layout==='pile') return buildRug(cells);
   const def=SOLID_FLOORS[type], b=boxBatch(), top=state.terrainTopY??0;
@@ -2546,6 +2548,7 @@ function rebuildPaint(){
   const top=state.terrainTopY??0, groups=new Map();
   const planks=new Map();
   for(const [k,v] of state.paint){
+    if(SOLID_FLOORS[v.mat] && SOLID_FLOORS[v.mat].layout!=='pile') continue;   // in the terrain
     if(SOLID_FLOORS[v.mat]){ let tint=null; if(v.tint && !SOLID_FLOORS[v.mat].overlay) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{}
       if(!planks.has(v.mat)) planks.set(v.mat,[]); planks.get(v.mat).push([...k.split(',').map(Number),tint]);
       if(!SOLID_FLOORS[v.mat].overlay) continue; }
@@ -2686,54 +2689,13 @@ function tileColor(cell){
 }
 function rebuildBoard(){
   const sc=state.scene; if(!sc || LEGACY_ISLAND) return;
-  for(const m of state.boardMeshes||[]) try{ m.dispose(); }catch{}
-  const cells=boardCellList(), {top,side}=boardMaterials(), mat=new BABYLON.Matrix();
-  const file=boardTileFile(cells.length), model=file && boardTileReady.get(file);
-  if(file && !model) loadBoardTile(file).then(()=>rebuildBoard()).catch(e=>console.warn('board tile model unavailable; plain tiles',e));
-  const tileH=model ? BOARD_MODEL_H : BOARD_TILE_H;
-  const place=(m,list,y,{turn=false,colors=null}={})=>{
-    m.isPickable=false; m.receiveShadows=true;
-    if(!list.length){ m.setEnabled(false); return m; }
-    m.setEnabled(true);
-    const buf=new Float32Array(list.length*16), q=new BABYLON.Quaternion(), one=new BABYLON.Vector3(1.006,1,1.006), v=new BABYLON.Vector3();
-    list.forEach(([x,z],i)=>{
-      const k=turn ? (((x*73856093)^(z*19349663))>>>0)%4 : 0;
-      BABYLON.Quaternion.RotationYawPitchRollToRef(k*Math.PI/2,0,0,q); v.set(x,y,z);
-      BABYLON.Matrix.ComposeToRef(turn?one:BABYLON.Vector3.One(),q,v,mat); mat.copyToArray(buf,i*16);
-    });
-    m.thinInstanceSetBuffer('matrix',buf,16,true);
-    if(colors) m.thinInstanceSetBuffer('color',colors,4,true);
-    return m;
-  };
-  const meshes=[];
-  if(model){
-    const isGrass=c=>{ const p=paintAt(c[0],c[1]); return p?.mat==='grass' && !p.tint; };
-    const grassCells=cells.filter(isGrass), plainCells=cells.filter(c=>!isGrass(c));
-    const y=-model.top;
-    // Own geometry each: the plain tiles' per-instance colour buffer must not
-    // land on geometry the grass tiles share (wrong-sized buffer, black frame).
-    const g=model.src.clone('board_tile_grass'); g.makeGeometryUnique(); g.material=model.grass; meshes.push(place(g,grassCells,y,{turn:true}));
-    const colors=new Float32Array(plainCells.length*4);
-    plainCells.forEach((c,i)=>{ const [r,gg,b]=tileColor(c); colors.set([r,gg,b,1],i*4); });
-    const p=model.src.clone('board_tile_plain'); p.makeGeometryUnique(); p.material=model.plain; meshes.push(place(p,plainCells,y,{turn:true,colors}));
-  } else {
-    meshes.push(place(BABYLON.MeshBuilder.CreateBox('board_tile',{width:.965,height:BOARD_TILE_H,depth:.965},sc),cells,-BOARD_TILE_H/2));
-    meshes[0].material=top;
-  }
-  // Columns only under cells on an edge (of the board or a hole): the others
-  // are never seen, but were drawn and shaded under the tiles (3.4 ms of the
-  // Oracle's 9 ms GPU frame).
-  const cellSet=new Set(cells.map(([x,z])=>x+','+z));
-  const edge=cells.filter(([x,z])=>[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>!cellSet.has((x+dx)+','+(z+dz))));
-  const col=BABYLON.MeshBuilder.CreateBox('board_column',{width:1,height:BOARD_COLUMN_H,depth:1},sc); col.material=side;
-  meshes.push(place(col,edge,-tileH-BOARD_COLUMN_H/2+.02));
-  state.boardMeshes=meshes; state.boardModel=!!model;
+  // The ground is one blended terrain (terrain.js, 2026-11-20); the cells
+  // stay the logic's grid. The old tiles and edge columns are gone.
+  const cells=boardCellList();
   state.boardCells=new Set(cells.map(([x,z])=>x+','+z));
-  state.terrainTopY=0;
+  state.boardModel=true; state.terrainTopY=0;
   sceneryCells=null; groundCache.clear();
-  // Floors the tiles now show themselves need no overlay (and vice versa).
-  if(state.paintOverlayModel!==state.boardModel){ state.paintOverlayModel=state.boardModel; schedulePaintRebuild(); }
-  window.TablefolkHD?.setShore?.(boardShoreEdges());
+  if(window.tablefolkTerrain) window.tablefolkTerrain.rebuild();
 }
 // Outward edges of the land, for the sea's foam: [{x,z,nx,nz}] at each edge's middle.
 function boardShoreEdges(){
@@ -6228,7 +6190,7 @@ async function addTerrainPolish(scene){
   if(!LEGACY_ISLAND){
     // The board in the sea: the simple sea and sky at every quality (the HD
     // ocean was dropped from high on 2026-11-07; TablefolkHD.buildSea is unused).
-    makeSea(scene); if(window.TABLEFOLK_GFX?.lite) state.lite=true;
+    if(window.TABLEFOLK_GFX?.lite) state.lite=true;
     state.terrainTopY=0;
     rebuildBoard(); rebuildBoardSupport(); fitBoardView();
     makeSelectionRing(scene);
