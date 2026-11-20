@@ -140,7 +140,11 @@
     for (const c of all) if (!nextAt.has(c)) schedule(c, true);
     const quietOk = now - lastSpeechAt >= P0().quiet * 1000 * tempo();
     // even an answer waits a little after the last line (a third of the quiet gap)
-    const pend = all.filter(c => reason(c) === 'pending' && now - lastSpeechAt >= Math.max(1500, P0().quiet * 333 * tempo()));
+    // (the player's words are answered after a third of the quiet gap; one character's to another after the whole gap and a half:
+    // with idle turns gone, characters' talk ran back to back, 6.7 lines a minute in the bakery)
+    const pn = (document.getElementById('chatName')?.value || '').trim().toLowerCase();
+    const fromPlayer = c => (getBrainConfig(c.id).pendingChat || []).some(l => pn && String(l).toLowerCase().startsWith(pn + ' says'));
+    const pend = all.filter(c => reason(c) === 'pending' && now - lastSpeechAt >= Math.max(1500, P0().quiet * (fromPlayer(c) ? 333 : 1500) * tempo()));
     if (pend.length) return pend.sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
     // fighters don't wait for a quiet moment
     const fight = all.filter(c => nextAt.get(c) <= now && fighting(c)).sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];

@@ -454,6 +454,8 @@
   async function fighterTurn(c) {
     const pl = preyFor(c); if (!pl || pl.defeated) return;
     const tgt = pl === me() ? 'player' : pl.id;
+    // a quarrel (mind.js tempers), not a monster's hunt: no blow at someone already down to a third of their health
+    if (!isHostile(c) && !pl._threat && !(pl !== me() && isHostile(pl))) { const hp = pl === me() ? { hp: state.player?.hp ?? 20, max: state.player?.maxHp ?? 20 } : { hp: getBrainConfig(pl.id).hp ?? 10, max: getBrainConfig(pl.id).maxHp ?? 10 }; if (hp.hp <= hp.max / 3) { window.tablefolkMind?.standDown?.(c); return; } }
     const a = c.logicalPos || c.root.position, b = pl.logicalPos || pl.root.position, d = Math.hypot(b.x - a.x, b.z - a.z);
     const C = window.tablefolkCombat;
     if (d > 8) return;

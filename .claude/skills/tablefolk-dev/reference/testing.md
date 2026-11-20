@@ -262,3 +262,62 @@ without the model; no job cycles, nothing made, 0 sales between characters,
 0.7 spoken lines a game hour; no raids (no threats). Stores at the end: 17
 items in chests (about 18 at the start: the first run counted 0 because
 chests fill lazily; fixed in the tool), 10 firewood carried by jory.
+
+After the clock, stock, jobs and threats (same day, same settings; final
+code for hearthvale except the last two fixes, which touch quarrels and
+`say(...);` lines):
+
+| hearthvale, one game day | before | after |
+|---|---|---|
+| model calls (a game hour) | 113 (4.7) | 58 (2.4) |
+| idle open turns | 73% | 0% |
+| live ticks handled in code | 41% | 95% |
+| job cycles (farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker) | none | 6, 3, 5, 3, 3, 1 (a patrol loop of 7 places), 4, 7 |
+| things made / gathered / stored | 0 / 11 / 4 | 13 / 51 / 69 |
+| sales between characters | 0 | 13 |
+| meals (people who ate) | 5 (3 of 8) | 9 (7 of 8: tam ended at hunger .64) |
+| slept at night (game minutes, of 480) | nobody | 6 of 8 (243-441); hector keeps the night watch and sleeps by day; tam 0 in the first run (the nearer bed was taken: fixed, 423 after) |
+| hunger at the end | .36-.73 | .03-.64 |
+| spoken lines a game hour (a real minute per person) | 0.7 (0.25) | 1.5 (0.58; the bakery's 2.0 a minute for 3 was 0.67) |
+| model calls by kind | open 83, reply 14, event 8, cause 8 | reply 24, pick 18, cause 8, remark 3, social 2, event 2, danger 1 |
+| stores: in chests / carried at the end (start: 18 / 8) | 17 / 18 | 62 / 10 |
+| raids | none | 2 wolves at night, 2 crows by day: 2 struck down, 2 fled; hector and wren came within a cell; 85% of the others indoors while raiders were about; hector and wren hurt |
+
+The evening talk is still thin ("Hush." "Hmph." "Keep working."): it has a
+cue with the day's news since (jobs.js evening), not measured yet.
+
+Final code (after the quarrel, `say(...);`, ask, evening cue, quiet-gap and
+seat fixes; hearthvale `final`): 53 model calls (2.2 a game hour), 0% idle
+open turns, 96% of ticks in code; cycles farmer 6, baker 2, innkeeper 4,
+smith 3, woodcutter 3, guard 1, hunter 4, picker 7; 11 sales; everyone ate
+once, nobody above hunger .66; all but hector (night watch) slept at night
+(108-396 game minutes); 1.0 spoken lines a game hour (0.36 a real minute
+per person); raid: 4 spawned, 1 struck down, 3 fled, 74% of the others
+indoors meanwhile, nobody hurt.
+
+Old evals on the final code (E2B, same day):
+
+| | bakery before (prev. job) | bakery after | market before | market after |
+|---|---|---|---|---|
+| model turns (6 min) | 60 | 26 | 59 | 9 |
+| muted (idle) model turns | 39 | 0 | 46 | 2 |
+| spoken lines a minute | 2.0 | 4.3 | 1.3 | 1.2 |
+| tasks done / failed | 15 / 4 | 40 / 0 | 10 / 9 | 92 / 1 |
+| trades between characters | 1 | 0 | 0 | 0 |
+| malformed replies | 2% | 0% | 2% | 0% |
+
+The bakery talks more than after the last job: with no idle model turns
+filling the time, its three characters stand together and talk back to
+back (6.7 lines a minute before the quiet-gap change, 4.3 after); worse
+than the 2.0 target. Provocation: grub refuses at insult 3, hostile and
+first blow at 4, stops at a third of the player's health ("That's enough.
+Get out of here"); hector refuses at 3, orders out at 2, attacks at 4,
+stood down at 5 hp but was pushed into a second fight and beat the player
+to 0 (fixed: no new fight or blow at someone at a third of their health;
+re-run: the player ends at 3/20); greta (calm) refuses at 4 (was 5) and
+calls for help. `run-evals.sh`: 30/36 on the first pass (smithy ran out of
+GPU memory beside the Blender jobs; dagger 0/2 twice: a package anvil
+suggested as `use()`, fixed, 2/2); shop-chaos potion 0/2 then 2/2;
+feelings 'hit' 0/2, 1/2, 1/2, and 1/4 on the code from before this work
+(ccae1fd), so noise there, not a regression. With the fixes: 36 - 1 to 3
+(feelings 'hit').
