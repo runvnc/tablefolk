@@ -25,8 +25,9 @@ So a skill is **data first**: a `skill.json` with commands, tables
 (spellbooks, songs), resources, a prompt line and a list of declarative
 effects. Data skills are safe to load from anywhere, so they can travel inside
 scenario links. A skill can add a **JS module** for anything the effects can't
-express; code loads only from the same site (the built-in `skills/` folder)
-unless the page is opened with `?trustSkills=1`.
+express; code from another site runs only after the player allows it, the
+same rule as a package's ([packages.md](packages.md#code)); declined, the
+skill works as data only.
 
 ## Using skills in a scenario
 
@@ -125,10 +126,12 @@ Example: `scenarios/the-studio.json` (a painter certain of his own genius).
 ```
 
 ```js
-export default function (api) {   // api: state, narrate, findTarget, combat, say, log, getBrainConfig, setBrainConfig, effects
+export default function (api) {   // api: the package api (api.md), plus narrate, findTarget, combat, effects
   return {
     commands: { sing(g, [song], { narrate, data, manifest }) { /* ... */ return true; } },
     effects:  { freeze(g, value, target, how) { /* ... */ } },
+    cards:    { mood(g, data) { return 'a state-card line'; } },
+    behaviours: { strum: { on: 'tablefolk-player-turn', run(g) {} } },
   };
 }
 ```
@@ -169,8 +172,9 @@ The server lists the built-in ones at `/api/roles`.
 Built in: `shopkeeper` and `innkeeper` (trade), `guard`, `quest_giver`,
 `companion` (follow), `villager`.
 
-Roles, skills and asset packs are the three kinds of shareable package:
-what a character's job is, what it can do, and what things look like.
+Roles, skills, asset packs and packages (`tablefolk.json`, any mix of
+them plus bodies, sounds, jobs, threats and code) are the four kinds of
+shareable package: [packages.md](packages.md).
 
 ## Jobs
 
@@ -239,6 +243,16 @@ the agent's `"job"`):
   all to do, the model gets one short pick an hour at most (buy, ask, keep
   busy, a break).
   - `"doing"`: the label shown and put on its card.
+  - `use`: go to a thing (a type or a kind) and use it, as `use(thing)`
+    does (a package item's `use` runs, data or code); `"needs": {"firewood":
+    1}` is fetched first by the fallbacks.
+  - any step: `"when"`: a condition ([story.md](story.md#conditions), `me`
+    is the worker: `"world.beacon_fuel < 5 and not me has firewood"`; false:
+    skipped), `"anim"` (a clip of its body when the step is done, a body's
+    own or a game mode such as `pickup`) and `"sound"`.
+  - a package module may add step kinds ([api.md](api.md)).
+- `commands`: package commands its workers may use (those with
+  `"allowedBy": "listed"`, [api.md](api.md)).
 
 Built in: `farmer`, `baker`, `innkeeper`, `cook`, `smith`, `woodcutter`,
 `miner`, `hunter`, `fisher`, `herder`, `merchant`, `guard`, `healer`,
@@ -261,8 +275,9 @@ they are found (the official list, npm, GitHub) and the trust rules for code.
 
 ## Ideas next
 
-- Skills that start their package's workflows on cue (a "merchant" skill
-  with a haggle routine).
+- Skills or roles that start their package's workflows on cue (a "merchant"
+  skill with a haggle routine); today a trigger, a menu choice or the
+  `workflow` command starts one.
 - Passive skills: modifiers instead of commands (armour that reduces damage,
   "keen eyes" that widens the senses' radius).
 - Learning: a `teach(skill)` command so characters pass skills on, with

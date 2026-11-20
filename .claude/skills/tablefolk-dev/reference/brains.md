@@ -390,8 +390,9 @@ the card, offers read from the buyer's words by `amountIn`/`itemIn`, the
 lowest price, buyer consent with a buy / no-thanks card for the player, a
 seller walking over when the buyer is beyond 3 squares). Roles
 (`roles/*/role.json`, `app/roles.js`) and skills (`skills/*/skill.json`,
-`app/skills.js`) are data packages; code modules load only from this site,
-with `?trustSkills=1`, or after the player allows that package.
+`app/skills.js`) are data packages; code modules (a package's or a skill's)
+load only from this site, with `?trustSkills=1`, or after the player allows
+that folder (`packages.js askTrust`, one rule for both).
 
 ## Speech
 

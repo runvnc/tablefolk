@@ -154,7 +154,8 @@ id, a lair): `raid` attacks people, `rats` go for the food in the stores and
 eat it, `bandits` snatch gold and run. `when`: `night` (22:00), `day`
 (10:00), `any`, or `[from, to]` hours; `every`: days between visits. They
 leave at dawn (or 17:00 by day) or when half of them are down. A package can
-define more kinds ([packages.md](packages.md)). Afterwards everyone knows
+define more kinds, with a behaviour of their own in code and a `"sound"`
+played as they come ([api.md](api.md#threats)). Afterwards everyone knows
 what happened ("2 wolfs came in the night; hector and wren drove them
 off") and thinks better of those who fought, the player included.
 

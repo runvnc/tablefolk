@@ -26,7 +26,7 @@ trading, `emote` for flavour.
 | `dig(direction)` | through a wall, else a hole in the floor |
 | `build(thing[, at])` | `build(wall)`, `build(crate, "3,5")`; never on top of something |
 | `repair()`, `panic()` | |
-| `emote(name)` | dance, laugh, sit, wave, clap, cheer, sleep, bow (unknown ones read as "(grub frowns)") |
+| `emote(name)` | dance, laugh, sit, wave, clap, cheer, sleep, bow, and a package body's own (`emote(howl)`; `emote(howl, loop)` keeps it going until the next action) (unknown ones read as "(grub frowns)") |
 | `note(text)` | write a note others can pick up and read; facing a wall, it is pinned there |
 | `give(item[, name])` | hand an item to the player, or to another character: `give(bread, pip)`, `give(10 gold, pip)`; giving what it doesn't have fails |
 | `sell(item, price)` | sell to the person it is talking with; `sell(item, price, name)` to someone else ([below](#trading)) |

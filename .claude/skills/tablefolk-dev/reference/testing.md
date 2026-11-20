@@ -60,6 +60,7 @@ node close.mjs                                         # always close it: it hol
 | `gen-eval.mjs [--browser] [--only=village,talk] [--label=]` | the world builder on 8 one-line requests (village, outpost, dungeon, forest, mine, market, farm, a talk scene) through `/api/generate` (the server's cloud model) or the in-browser step-by-step path; per world: places, people with job/home/workplace set and reachable, pressure, goal predicates, live/time, repairs; saves `results/gen-<label>-<key>.json` to play with live-eval |
 | `live-pending-test.mjs` | a monster told something must not starve the others' live turns |
 | `editor-test.mjs` | the world builder's map editor: every tool against the scenario it writes (18 checks) |
+| `package-test.mjs` | packages with no model (`?art=1`, `brain: none`): the Night Watch from this site and from a second origin (its own CORS server on 8014: the trust question answered in the page, data only, allowed, remembered, revoked), the documented options on `fixtures/pkg-extra` and `pkg-dep`, a skill's code from another site, `npm:`/`gh:` mapping, the Library's npm filter (50 checks, about 40 s) |
 | `render-tiles.mjs [base] [only=a,b] [ppu]` | render the 2D tiles into `assets/tiles/` (about 4 minutes) |
 | `jank.mjs [url] [seconds]` | frame gaps, GPU frame time and input delay during start-up |
 | `gpu-profile/profile.mjs <url> <out.json>` | graphics profile: GPU time per frame (timestamp queries), CPU phases, per-callback cost, JS profile, ablations (usage in its header; findings in rendering.md, Light quality) |
@@ -215,6 +216,25 @@ per-tactic `win:` / `lose:` (scenario skill, `links-and-testing.md`).
 - `runAgentCommand` takes the space syntax (`walk n`), not `walk(n)`.
 - From Claude Code: run `launch-chrome.sh` with `run_in_background`, and
   stream long runs through a Monitor.
+
+## Packages (`package-test.mjs`, `tools/check-api-doc.mjs`)
+
+`node package-test.mjs` (the test Chrome on any app origin, `BASE=` for
+another port) needs no model: it plays `scenarios/nightwatch.json` with
+`"brain": "none"` and drives what a model would (commands through
+`tablefolk.runAs`, the keeper's job through `tablefolkJobs.tick`, since
+`?art=1` has no brain and live.js waits for one), then the fixtures, then
+the same package from `http://localhost:8014` (a static server the test
+starts and stops) to exercise URL resolution and the code question. 50/50
+on 2026-11-20. After a change to the module API, an event or a supported
+`window.tablefolk` member, run `node tools/check-api-doc.mjs` (the
+scenario skill's `api.md` against the code, grep-level).
+
+Traps found writing it: a scenario with `"brain": "none"` switches the
+page's brain, which clears the conversation history once, a moment after
+the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
+dialog stays in the page for a moment after a click (count each element
+once).
 
 ## The libraries (libs/)
 

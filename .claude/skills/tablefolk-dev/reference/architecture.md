@@ -14,7 +14,7 @@ read whole.
 | `app/` | the app at `/app/` (below) |
 | `app/llm_js/` | the bridge from the language models to the world, the older engines (ES modules) |
 | `app/tts/` | the game's voice: playback, voices, Breeze on a server (the engines' workers are in `libs/voice/`); `app/world-file.js`: a world as a file (a PNG card with the world in a `tfWd` chunk and in the pixels' low bits, a .zip, .json), opened by dropping it on the game or the builder; `voice-sample.js`: a world's own voices (scenario `voices`: an Ogg Opus sample written with WebCodecs, the ZONOS3-Mini embedding) and "my voices" (IndexedDB `tablefolk-my-voices`), shared by the builder and the game, which speaks them as `pack:<id>` (`TABLEFOLK_SCENARIO_VOICES`, checked before the library by `tablefolkPackVoice`) |
-| `libs/` | the standalone libraries `@tablefolk/*` the game is built on: models, device, brain, decider, voice, hear, menus ([below](#libraries-libs)) |
+| `libs/` | the standalone libraries `@tablefolk/*` the game is built on: models, device, brain, decider, voice, hear, menus, paint, script ([below](#libraries-libs)) |
 | `server/` | the Bun server: static files, AI proxies, world builder, admin |
 | `server/fast-skill.md` | the condensed scenario skill the world generator's model reads |
 | `assets/` | the core asset pack (`pack.json`), models, textures, sounds, 2D tiles |
@@ -69,11 +69,12 @@ the CDN as fallback; `window.tablefolkVendorUrl(url)` maps a URL for later
 scripts, e.g. the `studio.env` environment texture) and the app's own scripts, each with a `?v=` version:
 
 ```
+(abridged; app/preflight.js has the full list)
 note-svg recorder confirm-dialog toast sfx ui-polish tabs library packs
 tts/pocket-tts-manager tts/tts-ui look perf-monitor graphics-settings
-terrain-hd app scenery combat darkness roofs cutaway locks fp-hands senses
-packages embed mind roles play live director clock jobs threats speech-input workflows skills
-trade procgen scenario registry tabletop welcome tile-render
+terrain-hd app bodies scenery combat spells reactions darkness roofs cutaway locks fp-hands senses
+packages embed books mind uses roles play animals live director clock jobs threats speech-input
+menus (module) story (module) skills trade procgen scenario registry tabletop welcome tile-render
 llm_js/world-integration (module)
 ```
 
@@ -93,6 +94,7 @@ scenario.js, the tests and packages use.
 
 | file | job |
 |---|---|
+| `bodies.js` | bodies from packs and packages (`"bodies"`: a GLB, height, clip map, emotes, kind, natural attack, hp) as `FIGURES` entries with a `url`, forgotten with their package; `mapClips` for `createFigure`; named clips on characters (`playClip`, `emote`), `tablefolkBodies` |
 | `app.js` | scene, board, walls, doors, objects, characters (`FIGURES`, `createFigure`), animation, cameras (follow, free, first person), commands (`COMMANDS`, `parseCommand`, `runAgentCommand`), perception (`buildVisiblePerception`), prompts (`buildAgentPrompt`, `buildCommandExamples`), say/give/sell, save and load, `window.tablefolk` |
 | `look.js` | the shared "painted clay" materials and post-processing (`TABLEFOLK_LOOK`) |
 | `terrain-hd.js` | floor tiles, water, lava, the shelved HD island (`TablefolkHD`) |
@@ -109,10 +111,10 @@ scenario.js, the tests and packages use.
 | `senses.js` | what characters perceive, in words ("Around you", places, `look()`) |
 | `mind.js` | mood, needs, memory, goals, opinions, the state card, who gets a turn |
 | `embed.js`, `embed-worker.js` | EmbeddingGemma 2 recall |
-| `roles.js`, `trade.js`, `skills.js`, `packages.js`, `registry.js` | roles, selling rules, skills, packages, the Library pane's search |
+| `roles.js`, `trade.js`, `skills.js`, `packages.js`, `registry.js` | roles, selling rules, skills (and package modules' commands: `addCommand`, `allowedBy`), packages (loading, the module `api`, one code-trust rule for packages and skills: `askTrust`, reset per scenario), the Library pane's search. The supported surface for package authors is the scenario skill's `api.md`; `node tools/check-api-doc.mjs` checks it against the code |
 | `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
 | `menus.js` | JRPG-style menus (`tablefolkMenu`): a character's `menu` on E, the scenario's `menus`; words from the chat box or the 🎤 matched to a choice (number, label, keyword, shared words, EmbeddingGemma when its best is 0.74+ and 0.06 ahead, then the brain picks a number greedily: 12/12 paraphrase and none-of-these cases with Gemma E2B, 2026-11-12); `pick()` lets the brain choose from any list; scripted choices (`reply`, `act` through `world.runAs`, `set`, `take`, `workflow` through `world.driveWorkflow`), `if` conditions and lists of menus (2026-11-13) |
-| `story.js` | the game's host for `@tablefolk/script` (libs/script), a module: flags in `state.flags` (saved), runs in each brain config's `wf` (by step id, version 2), facts for mind.js, conditions, actions, the workflow runner (`tablefolkWorkflows`: start, turn, drive, pause, resume), triggers (`start` fired by scenario.js), `validate` (load warnings; the world generator's checks). A menu choice's sale counts as the player's agreement; a workflow's does not. Replaces `workflows.js` (2026-11-13) |
+| `story.js` | the game's host for `@tablefolk/script` (libs/script), a module: flags in `state.flags` (saved), runs in each brain config's `wf` (by step id, version 2), facts for mind.js, conditions, actions, the workflow runner (`tablefolkWorkflows`: start, turn, drive, pause, resume), triggers (`start` fired by scenario.js), `validate` (load warnings; the world generator's checks). A menu choice's sale counts as the player's agreement; a workflow's does not. It replaced the old `workflows.js` (2026-11-13) |
 | `clock.js`, `jobs.js`, `threats.js` | the time of day (`tablefolkClock`, `tablefolk.setTimeOfDay`), jobs and the day run in code (`tablefolkJobs`; `jobs/<id>/job.json`), raids on the clock (`tablefolkThreats`) (minds.md, "busy by default") |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
@@ -149,9 +151,9 @@ is silently dropped.
 | event | fired by | used for |
 |---|---|---|
 | `tablefolk-scene-ready` | app.js | start-up |
-| `tablefolk-clock` | clock.js, every game quarter hour ({min, day, hour}) | regrowth (uses.js), threats, jobs' daily tallies |
+| `tablefolk-clock` | clock.js, every game quarter hour ({min, day, hour}) | regrowth (uses.js), threats, jobs' daily tallies, package modules |
 | `tablefolk-model-call` | jobs.js, world-integration.js ({agentId, kind}) | live-eval --day counts the model calls by kind |
-| `tablefolk-scenario-started` | scenario.js | live.js, roofs, director, welcome |
+| `tablefolk-scenario-started` | scenario.js ({title, live, sub}) | live.js, roofs, director, welcome, package modules |
 | `tablefolk-player-turn` | play.js | nearby characters act; companions follow; pacing |
 | `tablefolk-player-chat` | world-integration | pacing |
 | `tablefolk-agent-turn` | world-integration | turn counting, mind ticks, goals, pacing |
@@ -159,7 +161,10 @@ is silently dropped.
 | `tablefolk-attacked`, `tablefolk-defeated` | combat.js | minds, play |
 | `tablefolk-approached` | senses | approach notices |
 | `tablefolk-thinking` | model-loader-litert | the model's status (thinking, loading) |
-| `tablefolk-workflow` | workflows.js | workflow progress |
+| `tablefolk-workflow` | story.js | a workflow ended ({agentId, name, ended, vars}) |
+| `tablefolk-flag` | story.js | a world flag changed ({name, value, was}) |
+| `tablefolk-menu` | menus.js | a menu choice ({menu, item, agentId, how, text}) |
+| `tablefolk-load` | speech-input.js | download progress ({key, label, state, ...}) for load-status.js |
 | `speechstart`, `speechend` | TTS | talk animation |
 
 ## Coordinates and units
@@ -176,4 +181,5 @@ follows it. Procgen grids: row 0 north, `x = x0 - c`, `z = r - z0` with
 
 `tablefolkState` (sandbox), `tablefolkScenarioState` (scenario mode),
 `tablefolk.dev`, `tablefolk.pace`, `tablefolk_model`, `tablefolkTtsEnabled`,
-`tablefolkEmbed`, `character.library.*`, and per-package code trust.
+`tablefolkEmbed`, `character.library.*`, and `tablefolkTrustedCode` (the
+folders whose package or skill code the player allowed; packages.js).

@@ -119,6 +119,21 @@ turns hostile. `--model=`, `--llm=`/`--llm-model=` as for agenttest;
 starve everyone else's turns in a living world (survival-one, busy pace);
 PASS when the woodcutter took turns and the wolf is not left pending.
 
+## Packages (`package-test.mjs`)
+
+```bash
+node package-test.mjs          # 50 checks, no model, about 40 s; exits 1 on a failure
+```
+
+Plays the Night Watch (`packages/nightwatch`) with `"brain": "none"` from
+the app's own origin and from `http://localhost:8014` (a static server with
+CORS the test starts and stops; `PORT2=` to move it), answering the "Run
+code from a package?" question through the page; then the fixtures in
+`fixtures/pkg-extra` and `fixtures/pkg-dep` (loop, use fields, relative
+`requires`, package workflows, module cards and effects), a skill's code
+from the other origin, and reference mapping. `BASE=http://localhost:8001`
+for another app port. It clears the page's code trust before and after.
+
 ## Poking at the page
 
 `node eval.mjs` prints a status summary; `node eval.mjs "<js expression>"`

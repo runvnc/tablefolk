@@ -24,7 +24,7 @@ nothing important lives only in the conversation history.
 | Don't rely on history for what matters | the **state card** (below), and a shorter history |
 | No hand-written logic per character | **roles** (job templates) and generic **needs, moods, triggers**, all data |
 | Don't use the LLM where code is enough | the harness keeps memories, mood and needs, fires triggers; **workflows** run the fiddly transactions |
-| Workflows, how do they fit? | the rails for multi-step jobs a 2B model fumbles (haggle, sell, quest hand-in); roles start them on cue |
+| Workflows, how do they fit? | the rails for multi-step jobs a 2B model fumbles (haggle, sell, quest hand-in); started by an agent's `workflow`, a trigger, a menu choice or the `workflow` command (roles do not start them on cue yet) |
 | goal() on by default | yes, for every talking character |
 | remember() | yes: the model notes facts; the game also records important events by itself |
 | External triggers | the **director**: generic events become short nudges (attacked, gift, hungry, stuck on a goal, someone walks up) |
@@ -101,8 +101,10 @@ programming: the same rules for everyone, worded by role and mood.
 Workflows (`libs/script` run.js, through `app/story.js`) are the rails: a 2B model answers one narrow
 question at a time and code decides what happens next. They suit anything
 transactional with steps and rules (haggling, a quest hand-in, a riddle
-gate). Roles start them on cue, so an author gets reliable selling by
-writing `"role": "shopkeeper"`, and free conversation stays with the model.
+gate). The plan was for roles to start them on cue (reliable selling from
+`"role": "shopkeeper"` alone); not built: an agent's `"workflow"`, a
+trigger, a menu choice or the `workflow` command starts one. Free
+conversation stays with the model.
 
 ## Testing without the visible browser
 

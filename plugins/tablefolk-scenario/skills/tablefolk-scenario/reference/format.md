@@ -82,6 +82,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `agents` | the characters (below) | [characters.md](characters.md) |
 | `packs` | extra asset packs (object types) | [things.md](things.md) |
 | `packages`, `skills`, `workflows` | shareable content | [packages.md](packages.md), [skills-and-roles.md](skills-and-roles.md), [workflows.md](workflows.md) |
+| `bodies` | the ids of the bodies its packs and packages bring (`["dire_wolf"]`), so the world builder and `scenario_link.py` keep them as `"model"` | [api.md](api.md#bodies) |
 | `lore`, `needs`, `mind`, `food` | world facts, hunger on/off, the mind on/off, extra food | [characters.md](characters.md) |
 | `tempers`, `temper` | insults anger characters, who may refuse, call for help or fight (`false`: off); how quickly | [characters.md](characters.md) |
 | `live`, `pace`, `director`, `events` | a world that lives on its own | [living.md](living.md) |
