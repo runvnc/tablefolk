@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **A monster told something no longer hogs the turns**: in a living world a monster, an animal or a skipped turn left a character waiting to answer for good, served before everyone else.
+
 - **Fights in a living world go at fight speed**: a fighter with someone to fight in sight acts every 1.5-2.5 s, whatever the pace. `?pace=lively` in the page address sets the pace for that page.
 
 - **Hunger and tiredness grow with real time in a living world**: hungry after about 8 minutes, tired after about 12, whatever the pace; a hungry or tired character counts as having something to do.

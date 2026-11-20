@@ -151,16 +151,25 @@
       if (!c) { await sleep(300); continue; }
       turns++;
       const hostile = P()?.isHostile?.(c), mind = !hostile || P()?.talksToo?.(c), why = reason(c);
+      const pendBefore = JSON.stringify(getBrainConfig(c.id).pendingChat || []);
       try {
         if (hostile && !mind) await monsterTurn(c);
         else if (P()?.isAnimal?.(c)) await animalTurn(c);
+        // pushed too far (mind.js tempers): a blow, or a step closer; its model
+        // turn when something was said to it (the line before the fight)
+        else if (why !== 'pending' && P()?.hostileTarget?.(c)) await monsterTurn(c);
         else if (!why && Math.random() < P0().idle) await idle(c);
         else {
-          if (hostile) await monsterTurn(c);
+          if (hostile || P()?.hostileTarget?.(c)) await monsterTurn(c);
           status(`${c.id} is thinking…`);
           await w.runAgentTurn(c);
         }
       } catch (e) { console.warn('[live]', c.id, e); }
+      // A turn that did not take in what was waiting for it (a monster, an
+      // animal, a skipped turn) must not leave it "pending" for good: due()
+      // serves pending characters first, and nobody else got a turn.
+      { const cfg = getBrainConfig(c.id), now = JSON.stringify(cfg.pendingChat || []);
+        if (now !== '[]' && now === pendBefore) { cfg.pendingChat = []; console.info('[live] cleared what', c.id, 'never took in'); } }
       status('');
       schedule(c);
       try { window.tablefolkDirector?.tick?.(c); } catch (e) { console.warn('[director]', e); }

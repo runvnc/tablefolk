@@ -1410,11 +1410,20 @@ async function main() {
       while (!world.isTurnReady()) await sleep(100);
       // mind.js reflexes: the game acts for a character in danger or starving
       // when its brain is small (or let things get bad); no model call
-      const rx = window.tablefolkMind?.reflex?.(g), rcmd = rx && world.parseLLMCommandLine(rx.line);
+      // (spoken to and in no danger: it answers instead; the hunger reflex can wait a turn)
+      const c0 = world.getBrainConfig(g.id), talkPending = (c0.pendingChat || []).some(l => !/^\s*(\[event\]|\()/.test(String(l)));
+      const rx = !(talkPending && !window.tablefolkMind?.foes?.(g, 4)?.length) && window.tablefolkMind?.reflex?.(g), rcmd = rx && world.parseLLMCommandLine(rx.line);
       if (rcmd) {
         appendLog(`${g.id} (reflex: ${rx.why}): ${rx.line}`);
         await world.stepAgentTurn(g.id, rcmd, 'reflex');
         while (!world.isTurnReady()) await sleep(100);
+        // H: what was waiting for it goes into its history, so it is not left
+        // "pending" (live.js serves pending characters first: it starved the others)
+        const c3 = world.getBrainConfig(g.id);
+        if (c3.pendingChat?.length) {
+          const lines = c3.pendingChat.map(l => /^\s*\[event\]/.test(String(l)) ? '[happened] ' + String(l).replace(/^\s*\[event\]\s*/, '') : String(l).replace(/^(.+?)\s+says:\s*/, '[$1] '));
+          world.setBrainConfig(g.id, { pendingChat: [], messages: (c3.messages || []).concat([{ role: 'user', content: lines.join('\n') }]).slice(-40) });
+        }
         try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line: rx.line, reflex: true } })); } catch {}
         return;
       }
