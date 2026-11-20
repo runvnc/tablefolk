@@ -608,6 +608,8 @@
     a.level = Math.max(was, lv);
     if (lv < 4 || was >= 4) return;
     const cfg = getBrainConfig(g.id), t = temperament(cfg), name = nameOfKey(key), other = charOf(key);
+    // already beaten down to a third of their health: not another fight, only the door
+    if (fighterish(g) && beaten(key)) { a.orderedOut = true; a.level = 3; setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${name} is hurt and still insulting you. Tell them to get out; you will not fight them again.`]).slice(-5) }); return; }
     if (fighterish(g)) {
       // one fight between characters at a time, started this way
       if (key !== 'player' && state.ladderFight && !(state.ladderFight.a === g.id || state.ladderFight.b === g.id)) { a.level = 3; a.capped = true; return; }
@@ -643,8 +645,11 @@
       setBrainConfig(c.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${g.id} shouts for help: ${name} will not leave them alone.`]).slice(-5) });
     }
   }
+  // down to a third of their health (a quarrel stops there)
+  function beaten(key) { const hp = key === 'player' ? { hp: state.player?.hp ?? 20, max: state.player?.maxHp ?? 20 } : { hp: getBrainConfig(key)?.hp ?? 10, max: getBrainConfig(key)?.maxHp ?? 10 }; return hp.hp <= hp.max / 3; }
   // a guard watching someone: they did it again, so it fights them
   function watchers(key, what) {
+    if (beaten(key)) return;
     for (const c of state.characters) {
       const w = getBrainConfig(c.id).mind?.watch;
       if (!w || w.who !== key || !w.warned || Date.now() > w.until || c.id === key) continue;
