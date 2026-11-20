@@ -29,7 +29,7 @@ trading, `emote` for flavour.
 | `emote(name)` | dance, laugh, sit, wave, clap, cheer, sleep, bow (unknown ones read as "(grub frowns)") |
 | `note(text)` | write a note others can pick up and read; facing a wall, it is pinned there |
 | `give(item[, name])` | hand an item to the player, or to another character: `give(bread, pip)`, `give(10 gold, pip)`; giving what it doesn't have fails |
-| `sell(item, price)` | sell to the person it is talking with ([below](#trading)) |
+| `sell(item, price)` | sell to the person it is talking with; `sell(item, price, name)` to someone else ([below](#trading)) |
 | `inventory()` | check gold and items |
 | `give_quest(text)` | give the player a quest |
 | `goal(text)` | set what it is working toward |
@@ -210,6 +210,14 @@ you, a riddle).
 it for `price` gold, which the character chooses. Either way the item lands in
 the player's inventory, so `player_has` sees it. `give` and `sell` need the
 player within 3 cells (a seller walks over).
+
+Between characters: `give(bread, pip)`, and `sell(bread, 2, pip)` (or
+`sell(bread, 2)` to the character it is talking with). The buyer decides in
+code: it buys when it has the gold and wants the thing (hungry and it is
+food, it asked for it lately, or it is on its goal), else it says no in a
+short line. Gold and the item move, and both remember it. When someone
+hungry stands beside a character with food, its "You could, right here"
+menu offers the sale (or the gift).
 
 The game keeps the rules (`app/trade.js`): a seller's `"prices"` (asking, or
 `[asking, lowest]`) are shown to it each turn ("You sell: magic sword 50 gold

@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Characters trade with each other**: `sell(bread, 2, pip)` (or to whoever it is talking with); the buyer pays when it has the gold and wants it (hungry for food, asked for it, or it is on its goal) and says no otherwise. A character with food next to someone hungry is offered the sale or the gift.
+
 - **Characters tell talk to them from talk they overhear**: a line is said to someone (named, or who just spoke to the speaker, or who it faces), who answers it; the others only overhear it and need not answer. Two characters stop after three exchanges for a while, and a character nobody has spoken to talks only with a reason (news, something it needs from someone, a goal naming someone near); otherwise it gets on with things.
 
 - **Insults count now**: a character insulted to its face gets angry at whoever did it (player or character); it tells them to stop, then refuses to sell, give or help them until they apologise, and if pushed further a brave one or a guard fights that one only, a calm one orders them out and calls for help, a timid one backs away and calls for help. A guard called over warns once, then steps in. An apology or a gift calms things; `"temper": "short" | "long"` on a character or world sets how fast, `"tempers": false` turns it off.

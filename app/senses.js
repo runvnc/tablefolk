@@ -148,10 +148,19 @@
     // use(bed) (2 steps north: lie down and rest): uses.js
     if (can.has('use')) out.push(...(window.tablefolkUses?.menu(g, fmt) || []));
     const people = near.filter(t => t.kind !== 'thing' && t.d < 2.5);
-    // give(bun, pip): the receiver named (give(bun) alone goes to the player)
+    // give(bun, pip): the receiver named (give(bun) alone goes to the player);
+    // not to someone it is too angry with (mind.js tempers)
+    const M = window.tablefolkMind, ok = id => !M?.refuses?.(g, id);
     const to = people[0] && (people[0].kind === 'player' ? 'player' : people[0].id);
-    if (can.has('give') && to && inv.length) out.push(`give(${inv[0]}, ${to})`);
-    else if (can.has('give') && to && (+charInventory(g).gold || 0) >= 5) out.push(`give(5 gold, ${to})`);
+    // someone hungry beside it and it has food: sell it (they have the gold) or give it
+    const hungry = people.map(t => t.kind !== 'player' && state.characters.find(c => c.id === t.id)).find(c => c && ok(c.id) && (M?.mindOf(c)?.hunger || 0) >= .55);
+    const food = inv.find(n => M?.isFood?.(n));
+    if (hungry && food) {
+      const price = window.tablefolkTrade?.priceOf?.(g, food)?.ask;
+      if (can.has('sell') && price && (+charInventory(hungry).gold || 0) >= price) out.push(`sell(${food}, ${price}, ${hungry.id}) (${hungry.id} is hungry)`);
+      else if (can.has('give')) out.push(`give(${food}, ${hungry.id}) (${hungry.id} is hungry)`);
+    } else if (can.has('give') && to && ok(to) && inv.length) out.push(`give(${inv[0]}, ${to})`);
+    else if (can.has('give') && to && ok(to) && (+charInventory(g).gold || 0) >= 5) out.push(`give(5 gold, ${to})`);
     if (can.has('dig')) for (const [w, [dx, dz]] of Object.entries(DIRS)) {
       const b = (state.blocks || []).find(b => { const q = b.getAbsolutePosition?.() || b.position; return meta(b)?.type === 'wall' && Math.round(q.x) === px + dx && Math.round(q.z) === pz + dz; });
       if (b) { out.push(`dig(${w}) (breaks the wall ${w} of you)`); break; }

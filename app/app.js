@@ -3496,7 +3496,7 @@ function parseLLMCommandLine(line){
 // what a seated or lying character does without getting up (uses.js)
 const SEATED_OK=new Set(['say','whisper','look','inventory','goal','remember','feel','eat','emote','give_quest','note','workflow']);
 function executeGameCommandImmediate(cmd,actor=null){ const g=actor||state.selected||state.characters[0]; if(!g||!cmd||g.defeated) return; if(!canRun(cmd.kind,cmd.spell,g)) return denied(g,cmd.kind==='spell'?cmd.spell:cmd.kind); if(g.pose && !SEATED_OK.has(cmd.kind)) window.tablefolkUses?.standUp(g); const cfg=getBrainConfig(g.id); const temptation=Number(cfg.fireballTemptation ?? g.traits?.fireball ?? document.getElementById('fireballTemptation')?.value ?? 0); if(cmd.kind!=='spell' && allowedFor(g).has('spell.fireball') && temptation>88 && Math.random()<.12){ say(g,'small correction: fireball first'); castSpell(g,'fireball'); return; }
-  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark',cmd.target||''); case 'spawn': return window.tablefolkSpells?.spawn(g,cmd.thing||'',cmd.count); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : quietFail(g,`no routine called ${cmd.name}`); case 'unknown': return quietFail(g,cmd.text||'unknown command'); default: return quietFail(g,'unknown command object'); } }
+  switch(cmd.kind){ case 'say': return say(g,cmd.text||pickRandom(['hmm','bonk?','this is load-bearing']),true); case 'whisper': return say(g,cmd.text||'psst',true,{whisper:true}); case 'walk': return walk(g,cmd.destination||cmd.dir||'n'); case 'look': return look(g); case 'touch': return touch(g,cmd.target); case 'push': return push(g,1); case 'pull': return push(g,-.55); case 'carry': return carry(g,cmd.target||cmd.targetId||''); case 'drop': return drop(g,false); case 'throw': return drop(g,true); case 'dig': return dig(g,cmd.target||cmd.targetId||''); case 'repair': return repair(g); case 'panic': return panic(g); case 'emote': return emote(g,cmd.emote||'dance'); case 'build': return build(g,cmd.thing||'wall',cmd.at||null); case 'face': return face(g,cmd.dir||'n'); case 'spell': return castSpell(g,cmd.spell||'spark',cmd.target||''); case 'spawn': return window.tablefolkSpells?.spawn(g,cmd.thing||'',cmd.count); case 'note': return note(g,cmd.html||cmd.text||''); case 'goal': return setGoal(g,cmd.text||''); case 'remember': return window.tablefolkMind?.remember(g,cmd.text); case 'feel': return window.tablefolkMind?.feel(g,cmd.text); case 'eat': return window.tablefolkMind?.eat(g,cmd.item); case 'use': return window.tablefolkUses?.use(g,cmd.target||''); case 'close': return window.tablefolkUses?.shut(g,cmd.target||''); case 'put': return window.tablefolkUses?.put(g,cmd.arg||''); case 'take': return window.tablefolkUses?.take(g,cmd.arg||''); case 'give_quest': return giveQuest(g,cmd.text||''); case 'give': return give(g,cmd.item||''); case 'sell': return sell(g,cmd.item||'',cmd.price,cmd.to||''); case 'inventory': return inventory(g); case 'attack': return window.tablefolkCombat?.attack(g,cmd.target||''); case 'wield': return window.tablefolkCombat?.wield(g,cmd.item||''); case 'skill': return window.tablefolkSkills?.run(g,cmd.name,cmd.args||[]); case 'workflow': return window.tablefolkWorkflows?.start(g,cmd.name,cmd.input) ? say(g,`(starts ${cmd.name})`,false) : quietFail(g,`no routine called ${cmd.name}`); case 'unknown': return quietFail(g,cmd.text||'unknown command'); default: return quietFail(g,'unknown command object'); } }
 function runCommand(raw){ beginTurn(parseCommand(raw),'text'); }
 window.splitPlanLines=splitPlanLines; window.runCommand=runCommand; window.executeCommand=(cmd)=>beginTurn(cmd,'object'); window.stepTurn=(cmd)=>{ if(typeof cmd==='string') return runCommand(cmd); return beginTurn(cmd,'object'); }; window.runAgentCommand=(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'); window.executeAgentCommand=(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'); window.endTurn=()=>settleWorld('manual settle'); window.setTurnMode=(on=true)=>{ state.turn.mode=!!on; const el=document.getElementById('turnMode'); if(el) el.checked=!!on; updateTurnUI(); };
 
@@ -3966,26 +3966,74 @@ function renderPlayerInventory(){
 // sell(item, price): the character sells one of an item it has to the player
 // at the agreed price. Checks the character has it and the player can pay,
 // then moves the gold and the item in one step.
+// sell(item, price) or sell(item, price, name): to the one named, else to
+// the person it is talking with (a character it spoke to or that spoke to it
+// lately), else the player.
 function parseSellArgs(arg){
   arg=String(arg||'').trim();
-  const m=arg.match(/^(.*?)[,\s]+(?:for\s+)?["']?(\d+)\s*(?:gold|g|coins?)?\s*["']?\s*$/i);
+  const m=arg.match(/^(.*?)[,\s]+(?:for\s+)?["']?(\d+)\s*(?:gold|g|coins?)?\s*["']?\s*(?:,\s*(?:to\s+)?["']?([A-Za-z][\w -]{0,30}?)["']?)?\s*$/i);
   const unq=v=>String(v||'').trim().replace(/^["']|["']$/g,'').trim();
-  return m ? {kind:'sell',item:unq(m[1]).replace(/[,\s]+$/,''),price:Number(m[2])} : {kind:'sell',item:unq(arg),price:null};
+  return m ? {kind:'sell',item:unq(m[1]).replace(/[,\s]+$/,''),price:Number(m[2]),to:m[3]?unq(m[3]):''} : {kind:'sell',item:unq(arg),price:null};
 }
-function sell(g,item,price){
+// whom it is dealing with: the one named, else the one it is talking with
+function tradePartner(g,to=''){
+  const isP=n=>['you','player','the player',playerName().toLowerCase()].includes(String(n).toLowerCase());
+  if(to) return isP(to) ? 'player' : (state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===String(to).toLowerCase()) || null);
+  const now=performance.now(), near=c=>c && c.root && Math.hypot(c.root.position.x-g.root.position.x,c.root.position.z-g.root.position.z)<=(state.earshot||6);
+  const spoke=g._spoke && now-g._spoke.at<30000 && g._spoke.to, heard=g._heard && now-g._heard.at<30000 && g._heard.who;
+  const pick=spoke && spoke!=='player' ? state.characters.find(c=>c.id===spoke) : heard && heard!==state.playerAvatar ? heard : null;
+  // the player spoke last or is who it talks to: the usual sale to the player
+  if(spoke==='player' || heard===state.playerAvatar || (window.tablefolkMind?.mindOf(g)?.pf?.last??-99) >= (window.tablefolkMind?.mindOf(g)?.turn??0)-1) return 'player';
+  return pick && near(pick) && !pick.defeated ? pick : 'player';
+}
+// A character buying from another: by code. It buys when it has the gold
+// and wants the thing (hungry and it is food, it asked for it lately, or it
+// is on its goal); otherwise it says no in a short line. Both remember it.
+function sellToCharacter(g,b,stock,price){
+  const inv=charInventory(g), binv=charInventory(b), name=stock.name, m=window.tablefolkMind?.mindOf(b);
+  const a=g.logicalPos||g.root.position, q=b.logicalPos||b.root.position, d=Math.hypot(a.x-q.x,a.z-q.z);
+  if(d>(state.earshot||6)) return fail(g,`sale failed: ${b.id} is too far away; walk over to them first`);
+  if(window.tablefolkMind?.refuses(g,b.id)) return fail(g,`sale refused: you will not deal with ${b.id} until they apologise`);
+  const low=window.tablefolkTrade?.floor(g,name);
+  if(low!=null && price<low) return fail(g,`sale refused: you never sell ${name} for less than ${low} gold`);
+  const words=t=>String(t||'').toLowerCase().match(/[a-z]{3,}/g)||[], key=words(name).filter(w=>!['the','and'].includes(w));
+  const asked=(b._lines||[]).slice(-4).some(l=>key.some(w=>String(l.text).toLowerCase().includes(w.replace(/s$/,''))));
+  const food=!!window.tablefolkMind?.isFood(name), hungry=(m?.hunger||0)>=.55;
+  const onGoal=key.some(w=>String(getBrainConfig(b.id).goal||'').toLowerCase().includes(w.replace(/s$/,'')));
+  const say2=t=>{ try{ say(b,t,true); }catch{} };
+  if(window.tablefolkMind?.refuses(b,g.id)){ say2(`Not from you, ${g.id}.`); return fail(g,`sale failed: ${b.id} will not buy from you`); }
+  if((+binv.gold||0)<price){ say2(price>0?`I can't afford ${price} gold for that.`:'No thanks.'); return fail(g,`sale failed: ${b.id} has only ${+binv.gold||0} gold, ${name} costs ${price}`); }
+  if(!((food && hungry) || asked || onGoal)){ say2(`No thanks, I don't need ${/s$/.test(name)?'':'a '}${name}.`); return fail(g,`sale failed: ${b.id} does not want ${name}`); }
+  if(d>GIVE_RANGE){ try{ walk(g,{type:'coord',x:Math.round(q.x),z:Math.round(q.z)}); }catch{} }
+  binv.gold=(+binv.gold||0)-price; inv.gold=(+inv.gold||0)+price;
+  stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
+  if(stock.text!=null) binv.items.push({name,qty:1,text:stock.text}); else addItem(binv.items,name);
+  setBrainConfig(g.id,{inventory:inv}); setBrainConfig(b.id,{inventory:binv});
+  emitBadge(g,`+${price} gold`); startHandover(g,b,name);
+  window.tablefolkMind?.event(g,'sold',{item:name,price,buyer:b.id});
+  window.tablefolkMind?.addMemory(b,`You bought ${name} from ${g.id} for ${price} gold.`,2);
+  window.tablefolkMind?.opinion(b,g.id,.1,`sold you ${name}`);
+  try{ inventoryChanged(); }catch{}
+  return say(g,`${g.id} sells ${b.id} ${name} for ${price} gold (${b.id} has ${binv.gold} gold left)`);
+}
+function sell(g,item,price,to=''){
   item=String(item||'').trim(); price=(price==null || price==='') ? NaN : Math.round(Number(price));
-  if(!item) return say(g,'sell what, exactly?');
-  if(!Number.isFinite(price) || price<0) return say(g,`what price for ${item}? sell needs a number of gold`);
+  if(!item) return fail(g,'sell what, exactly?');
+  if(!Number.isFinite(price) || price<0) return fail(g,`what price for ${item}? sell needs a number of gold`);
   const inv=charInventory(g), stock=findItem(inv.items.filter(i=>(i.qty??1)>0),item), buyer=playerName();
-  if(!stock) return say(g,`sale failed: ${g.id} has no ${item} to sell`);
+  if(!stock) return fail(g,`sale failed: ${g.id} has no ${item} to sell`);
+  const partner=tradePartner(g,to);
+  if(!partner) return fail(g,`sale failed: there is nobody called ${to} here`);
+  if(partner!=='player') return sellToCharacter(g,partner,stock,price);
+  if(window.tablefolkMind?.refuses(g,'player')) return fail(g,`sale refused: you will not serve ${buyer} until they apologise`);
   const av=state.playerAvatar?.root?.position;
-  if(!comeOver(g)) return say(g,`sale failed: ${buyer} is too far away; walk over to them first`);
+  if(!comeOver(g)) return fail(g,`sale failed: ${buyer} is too far away; walk over to them first`);
   // trade.js: the lowest price, and the buyer has to agree to the price
   const low=window.tablefolkTrade?.floor(g,stock.name);
-  if(low!=null && price<low) return say(g,`sale refused: you never sell ${stock.name} for less than ${low} gold`,false);
+  if(low!=null && price<low) return fail(g,`sale refused: you never sell ${stock.name} for less than ${low} gold`,false);
   const consent=window.tablefolkTrade?.consent(g,stock.name,price);
   if(consent===false){ window.tablefolkTrade.offer(g,stock.name,price); return say(g,`${g.id} offers ${buyer} ${stock.name} for ${price} gold (not sold yet: ${buyer} has to agree to that price)`,false); }
-  if((state.player.gold||0)<price) return say(g,`sale failed: ${buyer} has only ${state.player.gold||0} gold, ${stock.name} costs ${price}`);
+  if((state.player.gold||0)<price) return fail(g,`sale failed: ${buyer} has only ${state.player.gold||0} gold, ${stock.name} costs ${price}`);
   state.player.gold-=price; inv.gold=(inv.gold||0)+price;
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
   addItem(state.player.items,stock.name);
@@ -4504,7 +4552,7 @@ function buildCommandExamples(g=null){
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
-  if(allowed.has('sell')) ex.push('sell(item, price) e.g. sell("magic sword", 30) - sell an item from your inventory to the person you are chatting with for that many gold');
+  if(allowed.has('sell')) ex.push('sell(item, price) e.g. sell("magic sword", 30) - sell an item from your inventory to the person you are chatting with for that many gold; sell(item, price, name) to someone else, e.g. sell(bread, 2, pip)');
   if(allowed.has('give')) ex.push('give(item) e.g. give(magic sword) - hand an item to the player; give(item, name) to another character, e.g. give(bread, pip); give(10 gold, name) for money');
   if(allowed.has('wield')) ex.push('wield(item) e.g. wield(iron sword) - hold a weapon from your inventory; wield(none) puts it away');
   if(window.tablefolkSkills) ex.push(...window.tablefolkSkills.commandLines(g));
