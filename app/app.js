@@ -1277,7 +1277,7 @@ async function spawnAgent(id,x,z,facing='s',model){
 }
 function makeObject(type,x,z,opts={}){
   const sc=state.scene;
-  if(type==='barrel') return makeBarrel(sc,x,z);
+  if(type==='barrel') return keepLoot(makeBarrel(sc,x,z),opts);
   if(type==='mushroom') return makeMushroom(sc,x,z);
   if(type==='lamp') return makeLamp(sc,x,z);
   // a note with a picture ("image": a wanted poster, a map, a drawing) shows it above its words
@@ -1295,7 +1295,7 @@ function makeObject(type,x,z,opts={}){
 // the object's opts, which saves and restores with it.
 function keepLoot(m,opts){
   const mm=m&&meta(m); if(!mm) return m;
-  const o={}; for(const k of ['gold','items','name','opened','left','book']) if(opts?.[k]!=null) o[k]=opts[k];
+  const o={}; for(const k of ['gold','items','name','opened','left','book','stock','crop','tended','contents']) if(opts?.[k]!=null) o[k]=opts[k];
   if(Object.keys(o).length) mm.opts={...(mm.opts||{}),...o};
   return m;
 }
@@ -3999,7 +3999,7 @@ function sellToCharacter(g,b,stock,price){
   const words=t=>String(t||'').toLowerCase().match(/[a-z]{3,}/g)||[], key=words(name).filter(w=>!['the','and'].includes(w));
   const asked=(b._lines||[]).slice(-4).some(l=>key.some(w=>String(l.text).toLowerCase().includes(w.replace(/s$/,''))));
   const food=!!window.tablefolkMind?.isFood(name), hungry=(m?.hunger||0)>=.55 || (b._lines||[]).slice(-3).some(l=>Date.now()-l.at<90000 && /\b(hungry|starving|starved|eat|food|bite)\b/i.test(l.text));
-  const onGoal=key.some(w=>String(getBrainConfig(b.id).goal||'').toLowerCase().includes(w.replace(/s$/,'')));
+  const onGoal=key.some(w=>String(getBrainConfig(b.id).goal||'').toLowerCase().includes(w.replace(/s$/,''))) || !!(b._wants && b._wants.until>performance.now() && key.some(w=>String(b._wants.item).toLowerCase().includes(w.replace(/s$/,''))));   // jobs.js: on its way to buy it
   const say2=t=>{ try{ say(b,t,true); }catch{} };
   if(window.tablefolkMind?.refuses(b,g.id)){ say2(`Not from you, ${g.id}.`); return fail(g,`sale failed: ${b.id} will not buy from you`); }
   if((+binv.gold||0)<price){ say2(price>0?`I can't afford ${price} gold for that.`:'No thanks.'); return fail(g,`sale failed: ${b.id} has only ${+binv.gold||0} gold, ${name} costs ${price}`); }
@@ -5523,7 +5523,7 @@ function worldStateData() {
         return { type: mm?.type || 'wall', x: m.position.x, z: m.position.z, state: mm?.state || 'intact', health: mm?.health ?? 3, ...(mm?.rim ? {rim:true} : {}), ...(mm?.locked ? {locked:mm.locked} : {}) };
       }),
       brainConfigs: Array.from(state.brainConfigs.entries()),
-      player: state.player, flags: state.flags || {},
+      player: state.player, flags: state.flags || {}, ...(state.clock ? { clock: { ...state.clock } } : {}),   // clock.js
       playerAvatar: state.playerAvatar ? { model: state.playerAvatar.avatarModel, x: state.playerAvatar.logicalPos?.x ?? state.playerAvatar.root.position.x, z: state.playerAvatar.logicalPos?.z ?? state.playerAvatar.root.position.z, dx: state.playerAvatar.dir.x, dz: state.playerAvatar.dir.z } : null,
       paint: state.paint ? [...state.paint].map(([k,v])=>[...k.split(',').map(Number),v.mat,v.tint||null]) : [],
       baseMap: state.baseMap||'island', campfire: state.campfire!==false, worldSize: [WORLD.cols, WORLD.rows],
@@ -5573,9 +5573,10 @@ async function restoreWorldState(input) {
   setPaint((data.paint||[]).map(([x,z,mat,tint])=>({x,z,mat,tint})),{replace:true});
   if(data.player) state.player={gold:Number(data.player.gold)||0,items:Array.isArray(data.player.items)?data.player.items:[]};
   if(data.flags && typeof data.flags==='object') state.flags={...data.flags};   // story.js
+  if(data.clock && Number.isFinite(+data.clock.min)){ state.clock={min:+data.clock.min,day:Math.max(1,+data.clock.day||1)}; state.clockRestored=true; }   // clock.js
   for(const p of (data.props||[])){
       let obj;
-      if (p.type === 'barrel') obj = makeBarrel(state.scene, p.x, p.z);
+      if (p.type === 'barrel') obj = keepLoot(makeBarrel(state.scene, p.x, p.z), p.opts);
       else if (p.type === 'mushroom') obj = makeMushroom(state.scene, p.x, p.z);
       else if (p.type === 'lamp') obj = makeLamp(state.scene, p.x, p.z);
       else if (p.type === 'note') obj = makeNote(state.scene, p.x, p.z, p.noteHtml||p.noteText||'<p>note</p>');
