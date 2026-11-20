@@ -36,7 +36,9 @@ export function finishScenario(body, packVoices = []) {
 }
 
 export const COMMANDS = new Set(['say', 'whisper', 'walk', 'face', 'look', 'touch', 'push', 'pull', 'carry', 'drop', 'throw', 'dig', 'build', 'repair',
-  'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing']);
+  'panic', 'emote', 'note', 'give', 'give_quest', 'sell', 'inventory', 'goal', 'spell.push', 'spell.spark', 'spell.fireball', 'attack', 'wield', 'workflow', 'cast', 'steal', 'bandage', 'sing',
+  // the mind commands (every character has them; listing them is harmless)
+  'eat', 'drink', 'use', 'put', 'take', 'close', 'remember', 'feel']);
 export const VOICES = new Set(['alba', 'azelma', 'cosette', 'eponine', 'fantine', 'javert', 'jean', 'marius']);
 // ZONOS3-Mini's built-in voices (libs/voice/zonos-web-worker.js); other engines speak them as a Pocket-TTS one
 export const ZONOS_VOICES = new Set(['cillian', 'imogen', 'jett', 'morgana', 'rupert', 'sakura', 'savannah', 'thaddeus', 'willow', 'wyatt']);
@@ -84,6 +86,7 @@ export function checkScenario(s, packVoices = [], opts = {}) {
     if (a.model && !MODELS.has(a.model)) a.model = 'critter';
     // monsters that only fight need no brief
     if (!a.personality && (a.hostile || (a.hostile == null && MINDLESS.has(a.model)))) a.personality = `A hostile ${String(a.model).replace(/_/g, ' ')}.`;
+    if (!a.personality && ANIMALS.has(a.model)) a.personality = `A ${String(a.model).replace(/_/g, ' ')}.`;   // animals never talk
     if (!a.personality) problems.push(`agent ${a.id}: needs a "personality"`);
     // a voice of the world's own ("voices", made in the builder) keeps its exact id
     if (a.ttsVoiceId && Array.isArray(s.voices) && s.voices.some(v => 'pack:' + v?.id === String(a.ttsVoiceId))) {}
@@ -127,13 +130,13 @@ export function checkScenario(s, packVoices = [], opts = {}) {
   };
   walk(s.goal);
   // a locked door's key must be somewhere: carried, in a chest, or lying about
-  const keyNames = [...new Set([...(s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]), ...(s.agents || []).flatMap(a => (a?.inventory?.items || []).map(i => i?.name || i)), ...(s.player?.items || []).map(i => i?.name || i)].filter(Boolean).map(i => String(i).toLowerCase()))];
+  const keyNames = [...new Set([...(s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items.map(i => i?.name || i) : []), PICKUPS[o?.type]]), ...(s.agents || []).flatMap(a => (a?.inventory?.items || []).map(i => i?.name || i)), ...(s.player?.items || []).map(i => i?.name || i)].filter(Boolean).map(i => String(i).toLowerCase()))];
   for (const l of Array.isArray(s.locked) ? s.locked : []) {
     const k = String(l?.key || 'key').toLowerCase();
     if (!keyNames.some(n => n === k || (/key/.test(n) && (n.includes(k) || k.includes(n))))) problems.push(`"locked": nobody has the "${k}" and it lies nowhere: put it in a chest or give it to a character`);
   }
   // the player gets things from characters (give/sell), chests, or the floor
-  const lying = new Set((s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items : []), PICKUPS[o?.type]]).filter(Boolean).map(i => String(i).toLowerCase()));
+  const lying = new Set((s.objects || []).flatMap(o => [...(Array.isArray(o?.items) ? o.items.map(i => i?.name || i) : []), PICKUPS[o?.type]]).filter(Boolean).map(i => String(i).toLowerCase()));
   const want = String(s.goal?.win?.player_has || '').toLowerCase();
   if (want && !lying.has(want) && !(s.allowed || []).concat(...(s.agents || []).map(a => a.allowed || [])).some(c => c === 'give' || c === 'sell')) problems.push('a player_has goal needs some character allowed "give" or "sell" (or the item in a chest)');
   if (!problems.length) try { problems.push(...livingWorld(s, opts)); } catch (e) { (opts.notes || []).push('living-world checks failed: ' + e.message); }

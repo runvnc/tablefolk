@@ -1,0 +1,275 @@
+{
+ "v": 1,
+ "title": "Deepdelve Camp",
+ "subtitle": "The seam runs rich, but Tobin never came back up.",
+ "intro": "A mining camp clings to the mountain above a cold, dripping shaft. The ore carts are half full and one miner is missing somewhere below.",
+ "seed": 41,
+ "live": true,
+ "time": "06:30",
+ "dayMinutes": 12,
+ "temper": "normal",
+ "monsters": "everyone",
+ "lighting": "bright",
+ "generate": {
+  "kind": "cave",
+  "rooms": 8,
+  "style": "mine",
+  "places": [
+   "camp",
+   "mine",
+   "crystals",
+   "pool",
+   "lair",
+   "treasure",
+   "bones"
+  ],
+  "size": [
+   39,
+   29
+  ]
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "emote",
+  "give",
+  "dig",
+  "carry",
+  "drop",
+  "attack",
+  "wield"
+ ],
+ "harsh": true,
+ "food": [
+  {
+   "name": "ale",
+   "drink": true
+  }
+ ],
+ "player": {
+  "name": "Traveller",
+  "gold": 12,
+  "items": [
+   "lantern"
+  ],
+  "model": "adventurer"
+ },
+ "agents": [
+  {
+   "id": "brom",
+   "model": "dwarf",
+   "job": "miner",
+   "home": "camp",
+   "workplace": "mine",
+   "style": "gruff foreman",
+   "wield": "war_hammer",
+   "ttsVoiceId": "pack:dwarf_m",
+   "personality": "Brom, foreman of Deepdelve. You want the seam worked and Tobin found, in that order. You think Halvor the smith drinks too much of the ale he is paid in. Say it plain and gruff."
+  },
+  {
+   "id": "halvor",
+   "model": "dwarf",
+   "job": "smith",
+   "home": "camp",
+   "workplace": "mine",
+   "style": "soot-stained smith",
+   "inventory": {
+    "gold": 9,
+    "items": [
+     "iron ore"
+    ]
+   },
+   "ttsVoiceId": "pack:squire_m",
+   "personality": "Halvor, the camp smith. You want ore in your hands and a full mug after. You think Brom works men too hard and won't say so to his face. Use sell to trade a pick for gold."
+  },
+  {
+   "id": "merta",
+   "model": "peasant_woman",
+   "job": "cook",
+   "home": "camp",
+   "workplace": "camp",
+   "style": "tired camp cook",
+   "inventory": {
+    "gold": 4,
+    "items": [
+     "stew",
+     "bread"
+    ]
+   },
+   "ttsVoiceId": "pack:innkeeper_f",
+   "personality": "Merta, who feeds the whole camp from one pot. You want the stores filled before the week turns. You like Halvor, but he eats double. Use give(stew) to feed a hungry soul."
+  },
+  {
+   "id": "sable",
+   "model": "huntress",
+   "job": "guard",
+   "home": "camp",
+   "workplace": "camp",
+   "style": "scarred watchwoman",
+   "wield": "spear",
+   "hp": 14,
+   "ttsVoiceId": "pack:huntress_f",
+   "allowed": [
+    "say",
+    "walk",
+    "attack",
+    "wield",
+    "face"
+   ],
+   "personality": "Sable, who guards the shaft mouth. You want nobody going below alone again. You trust Merta and nobody else down there. Secret: you heard something large moving in the lower galleries."
+  },
+  {
+   "id": "tobin",
+   "model": "peasant",
+   "job": "miner",
+   "home": "camp",
+   "workplace": "mine",
+   "style": "lost, lantern-less miner",
+   "hp": 7,
+   "ttsVoiceId": "pack:shy_f",
+   "personality": "Tobin, the young miner who got turned around in the dark. You want to get back to the fire and a hot bowl from Merta. You are terrified of the bats past the pool. Ask anyone to walk you up.",
+   "in": "mine"
+  }
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "in": "camp",
+   "gold": 15,
+   "items": [
+    {
+     "name": "iron ore",
+     "qty": 2
+    },
+    {
+     "name": "bread",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "type": "iron_crate",
+   "in": "mine",
+   "items": [
+    {
+     "name": "iron ore",
+     "qty": 1
+    },
+    {
+     "name": "silver key"
+    }
+   ]
+  },
+  {
+   "type": "mossy_rock",
+   "in": "mine",
+   "crop": "iron ore",
+   "stock": 3
+  },
+  {
+   "type": "mossy_rock",
+   "in": "crystals",
+   "crop": "crystals",
+   "stock": 2
+  },
+  {
+   "type": "anvil",
+   "in": "camp"
+  },
+  {
+   "type": "cauldron",
+   "in": "camp"
+  },
+  {
+   "type": "campfire",
+   "in": "camp"
+  },
+  {
+   "type": "cage",
+   "in": "lair"
+  },
+  {
+   "type": "chest",
+   "in": "treasure",
+   "gold": 20,
+   "items": [
+    "crystals"
+   ]
+  },
+  {
+   "type": "note",
+   "in": "bones",
+   "text": "Water rising in the low gallery. Don't send the boy.",
+   "wall": "north"
+  },
+  {
+   "type": "picture",
+   "style": "sign",
+   "in": "camp",
+   "title": "Deepdelve Charter",
+   "prompt": "a painted mine sign with crossed picks and a mountain"
+  }
+ ],
+ "locked": [
+  {
+   "in": "treasure",
+   "key": "silver key"
+  }
+ ],
+ "threats": [
+  {
+   "kind": "raid",
+   "who": "bat",
+   "count": 3,
+   "when": "night",
+   "every": 1,
+   "from": "lair"
+  },
+  {
+   "kind": "rats",
+   "who": "rat",
+   "count": 2,
+   "when": "any",
+   "every": 2,
+   "from": "mine"
+  }
+ ],
+ "events": [
+  "A lantern gutters and steadies.",
+  "Water drips somewhere deeper.",
+  "{who} wipes soot from their brow.",
+  {
+   "text": "The shaft bell clangs twice.",
+   "round": 6,
+   "to": "brom"
+  },
+  "A cart wheel groans on wet stone."
+ ],
+ "goal": {
+  "text": "Find Tobin in the deep galleries and bring back ore.",
+  "win": {
+   "all": [
+    {
+     "agent_near": [
+      "tobin",
+      "camp",
+      6
+     ]
+    },
+    {
+     "stock_at_least": [
+      "iron ore",
+      4
+     ]
+    }
+   ]
+  },
+  "lose": {
+   "player_defeated": true
+  },
+  "winText": "Tobin climbs into the light, and the carts roll full again.",
+  "loseText": "The mountain keeps what it takes."
+ },
+ "wallHeight": 2
+}

@@ -1,5 +1,75 @@
 [
  {
+  "file": "hearthvale.json",
+  "title": "Hearthvale",
+  "pitch": "A village that has to feed itself before the wolves come.",
+  "who": [
+   "farmer",
+   "villager",
+   "guard"
+  ],
+  "tags": [
+   "working village",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "frontier-outpost.json",
+  "title": "Thornwake Outpost",
+  "pitch": "The last stockade before goblin country.",
+  "who": [
+   "guard",
+   "huntress",
+   "dwarf"
+  ],
+  "tags": [
+   "raids at night",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "harrow-keep.json",
+  "title": "The Hoard Beneath Harrow Keep",
+  "pitch": "Old stone, old gold, and things that never learned to die.",
+  "who": [
+   "dwarf",
+   "villager",
+   "huntress"
+  ],
+  "tags": [
+   "dungeon delve",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "kettlemoor-hunt.json",
+  "title": "The Kettlemoor Hunt",
+  "pitch": "A dark wood, a hunter gone, and a bear with a taste for camp meat.",
+  "who": [
+   "huntress",
+   "villager",
+   "villager_woman"
+  ],
+  "tags": [
+   "wolves and a bear",
+   "lives on its own"
+  ]
+ },
+ {
+  "file": "deepdelve-camp.json",
+  "title": "Deepdelve Camp",
+  "pitch": "The seam runs rich, but Tobin never came back up.",
+  "who": [
+   "dwarf",
+   "dwarf",
+   "peasant_woman"
+  ],
+  "tags": [
+   "mining camp",
+   "lives on its own"
+  ]
+ },
+ {
   "file": "goblin-bakery.json",
   "title": "The Goblin Bakery",
   "pitch": "Grub's secret pie recipe is gone and everyone is a suspect.",

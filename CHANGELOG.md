@@ -6,6 +6,14 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **The world builder makes places where people live under pressure**: unless you ask for a talk scene, a new world is a generated village, farm, forest, cave or dungeon whose people each have a job, a home and a workplace, with a pressure (raids on the clock, low stores, a deadline) and a goal tied to it. Archetypes by name (working village, frontier outpost, dungeon delve, wilderness camp, mining camp, market town, farmstead, haunted manor). What the model leaves out the checks fill in, the same for every way of building: jobs from the role, stations, stores, beds, food, a mild threat, a goal the game checks; each repair is listed. Things placed in a room no longer block its doorway.
+
+- **New goals for living worlds**: `survived_days`, `stock_at_least`, `threat_defeated`, `agents_alive`.
+
+- **The builder's forms**: living, start time, day length, temper, who monsters hunt, talk-only and a threats list on Story; job, home, workplace and temper on Characters.
+
+- **New showcase worlds first**: Hearthvale, Thornwake Outpost (goblin raids), the Hoard Beneath Harrow Keep (a delve with a camp at the entrance), the Kettlemoor Hunt (wolves and a bear), Deepdelve Camp (a mining camp); the one-room worlds follow.
+
 - **Quieter rooms**: two characters stop talking after four lines (for two minutes) and get back to work; while two talk, the others nearby do not start a conversation of their own (you are always answered). A line under four words ("Hush.") is an emote instead unless it answers a yes/no question.
 
 - **Evening talk with something to say**: each character is handed one concrete thing from the day (what was made, sold or bought, who ran out of what, a raid and who fought, a quarrel, an event) to tell or ask its neighbour, once per pair; rumours never reach the one they are about. Evening turns only talk, eat, drink, give, sell or sit.

@@ -74,7 +74,8 @@ Each `.json` (and most have an `.html` page that opens it):
 
 | file | shows |
 |---|---|
-| `goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`, `haunted-tavern` | showcase living worlds (`showcase.json`) |
+| `hearthvale`, `frontier-outpost`, `harrow-keep`, `kettlemoor-hunt`, `deepdelve-camp` | the first showcase worlds (`showcase.json`): a working village, a frontier outpost under goblin raids, a dungeon delve with a camp at the entrance, a hunters' camp with wolves and a bear, a mining camp; made by the world builder (2026-11-20) and lightly hand-tuned |
+| `goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`, `haunted-tavern` | the older one-room showcase worlds, after the new ones |
 | `the-oracle` | a very small brain (`defaultModel`, `simple`, `systemPrompt`): he knows everything and is wrong |
 | `alchemist` | an ASCII-grid workshop |
 | `low-tide` | earshot, whispers, a password hand-over |

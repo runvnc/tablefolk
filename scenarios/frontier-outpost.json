@@ -1,0 +1,274 @@
+{
+ "v": 1,
+ "title": "Thornwake Outpost",
+ "subtitle": "The last stockade before goblin country.",
+ "intro": "Thornwake holds the pass with nine souls, a palisade and not much else. The granary is thin and the goblins come down the ridge most nights. Hold three nights and the relief column will find you standing.",
+ "seed": 19,
+ "live": true,
+ "time": "06:30",
+ "dayMinutes": 12,
+ "temper": "short",
+ "monsters": "everyone",
+ "lighting": "bright",
+ "harsh": true,
+ "generate": {
+  "kind": "village",
+  "buildings": 6,
+  "style": "hamlet",
+  "places": [
+   "square",
+   "guardhouse",
+   "smithy",
+   "tavern",
+   "house",
+   "house 2",
+   "garden"
+  ]
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "emote",
+  "give",
+  "sell",
+  "attack",
+  "wield",
+  "drop",
+  "carry",
+  "look"
+ ],
+ "player": {
+  "name": "Traveller",
+  "gold": 12,
+  "items": [
+   "bread"
+  ],
+  "model": "adventurer"
+ },
+ "agents": [
+  {
+   "id": "rook",
+   "model": "guard",
+   "job": "guard",
+   "home": "guardhouse",
+   "workplace": "guardhouse",
+   "style": "scarred captain",
+   "wield": "iron sword",
+   "hp": 16,
+   "temper": "short",
+   "allowed": [
+    "say",
+    "walk",
+    "attack",
+    "wield",
+    "give"
+   ],
+   "ttsVoiceId": "pack:captain_m",
+   "personality": "Rook, captain of a garrison of three. You want the palisade manned and the gate shut by dusk. You think Halden drinks his pay and you say so to his face. Use give(spear) if the traveller looks worth arming.",
+   "in": "guardhouse"
+  },
+  {
+   "id": "mira",
+   "model": "huntress",
+   "job": "hunter",
+   "home": "house",
+   "workplace": "garden",
+   "style": "lean ridge hunter",
+   "wield": "hunting_bow",
+   "hp": 12,
+   "ttsVoiceId": "pack:huntress_f",
+   "personality": "Mira, who knows every goblin trail on the ridge. You want the east wall raised before the next raid. You respect Rook's caution but think he should have chased the goblins home weeks ago. You will trade dried meat for arrowheads.",
+   "in": "garden"
+  },
+  {
+   "id": "halden",
+   "model": "dwarf",
+   "job": "smith",
+   "home": "house 2",
+   "workplace": "smithy",
+   "style": "soot-stained smith",
+   "hp": 14,
+   "inventory": {
+    "gold": 6,
+    "items": [
+     "iron dagger"
+    ]
+   },
+   "ttsVoiceId": "pack:dwarf_m",
+   "personality": "Halden, the outpost smith, broad and tired. You want iron and the coin to buy it; you sell a dagger for 8 gold. You call Rook a coward who never leaves the tower, loudly, when you have been drinking.",
+   "secret": "You sold a barrel of nails to a goblin trader for three silver and never told anyone.",
+   "in": "smithy"
+  },
+  {
+   "id": "pell",
+   "model": "villager",
+   "job": "cook",
+   "home": "tavern",
+   "workplace": "tavern",
+   "style": "wiry camp cook",
+   "temper": "long",
+   "ttsVoiceId": "pack:innkeeper_f",
+   "personality": "Pell, who runs the tavern and its pot. You want the granary above half before the cold. You think Mira eats more than she kills and you have said so, gently. You sell bread at 3 gold a loaf and stew at 2.",
+   "agenda": "You quietly shave a handful of wheat each day into your own sack, for the winter.",
+   "in": "tavern"
+  }
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "in": "tavern",
+   "items": [
+    {
+     "name": "wheat",
+     "qty": 3
+    },
+    {
+     "name": "bread",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "type": "chest",
+   "in": "guardhouse",
+   "items": [
+    {
+     "name": "spear",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "type": "tall_grass",
+   "in": "garden",
+   "crop": "wheat",
+   "stock": 3
+  },
+  {
+   "type": "mossy_rock",
+   "in": "smithy",
+   "crop": "iron ore",
+   "stock": 3
+  },
+  {
+   "type": "target",
+   "in": "square"
+  },
+  {
+   "type": "well",
+   "in": "square"
+  },
+  {
+   "type": "market_stand",
+   "in": "square"
+  },
+  {
+   "type": "picture",
+   "style": "tapestry",
+   "in": "tavern",
+   "title": "The Pass Held",
+   "prompt": "muddy soldiers holding a wooden gate against small dark shapes",
+   "wall": "north"
+  },
+  {
+   "type": "target",
+   "in": "guardhouse"
+  },
+  {
+   "type": "bear_trap",
+   "in": "square"
+  },
+  {
+   "type": "bear_trap",
+   "in": "square"
+  },
+  {
+   "type": "bear_trap",
+   "in": "square"
+  },
+  {
+   "type": "chest",
+   "in": "garden",
+   "items": []
+  },
+  {
+   "type": "anvil",
+   "in": "smithy"
+  },
+  {
+   "type": "chest",
+   "in": "smithy",
+   "items": []
+  },
+  {
+   "type": "cauldron",
+   "in": "tavern"
+  },
+  {
+   "type": "bed",
+   "in": "tavern"
+  }
+ ],
+ "threats": [
+  {
+   "kind": "raid",
+   "who": "goblin",
+   "count": 3,
+   "when": "night",
+   "every": 1,
+   "from": "edge"
+  },
+  {
+   "kind": "raid",
+   "who": "goblin",
+   "count": 5,
+   "when": "night",
+   "every": 2,
+   "from": "edge"
+  }
+ ],
+ "events": [
+  "A horn sounds from the watch tower.",
+  {
+   "text": "{who} finds a goblin totem by the gate.",
+   "spawn": "skull",
+   "note": "Two moons. Then we come for the grain."
+  },
+  "A rat bolts across the yard.",
+  {
+   "text": "The gate creaks open on its own.",
+   "round": 6,
+   "to": "rook"
+  },
+  "{who} hears scratching along the east wall."
+ ],
+ "goal": {
+  "text": "Hold Thornwake for three nights against the goblins.",
+  "win": {
+   "all": [
+    {
+     "survived_days": 3
+    },
+    {
+     "agents_alive": 3
+    }
+   ]
+  },
+  "lose": {
+   "any": [
+    {
+     "player_defeated": true
+    },
+    {
+     "not": {
+      "agents_alive": 2
+     }
+    }
+   ]
+  },
+  "winText": "On the third dawn the relief column comes over the pass and finds Thornwake still standing.",
+  "loseText": "The palisade falls. Goblin fires burn in the pass."
+ },
+ "wallHeight": 2
+}

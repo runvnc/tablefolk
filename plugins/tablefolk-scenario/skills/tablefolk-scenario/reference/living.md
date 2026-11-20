@@ -204,8 +204,10 @@ What characters can do with each other and the world (besides talking):
 ## Showcase worlds
 
 The welcome screen (`app/welcome.js`) lists `scenarios/showcase.json`:
-`goblin-bakery`, `necromancer-interview`, `goblin-builders`,
-`dragon-tax-audit`, `haunted-tavern`, each tested live with E2B. Entries are
+first the living worlds with work and a pressure (`hearthvale`,
+`frontier-outpost`, `harrow-keep`, `kettlemoor-hunt`, `deepdelve-camp`),
+then the one-room ones (`goblin-bakery`, `necromancer-interview`,
+`goblin-builders`, `dragon-tax-audit`, `haunted-tavern`). Entries are
 `{ "file", "title", "pitch", "who": [body names for the card], "tags" }`.
 
 `tools/browser-test/live-watch.mjs <scenario> [seconds]` plays one live with

@@ -1,0 +1,334 @@
+{
+ "v": 1,
+ "title": "The Hoard Beneath Harrow Keep",
+ "subtitle": "Old stone, old gold, and things that never learned to die.",
+ "intro": "Harrow Keep fell a century ago and nobody carted away its treasury. A small camp squats in the entrance hall; deeper in, the dark has teeth. Bring back the Sunstone Relic, or join the bones.",
+ "seed": 41,
+ "lighting": "night",
+ "dark": true,
+ "live": true,
+ "time": "08:00",
+ "dayMinutes": 14,
+ "temper": "normal",
+ "monsters": "everyone",
+ "harsh": true,
+ "generate": {
+  "kind": "dungeon",
+  "rooms": 10,
+  "style": "crypt",
+  "places": [
+   "entrance",
+   "kitchen",
+   "barracks",
+   "lair",
+   "treasure",
+   "crypt",
+   "shrine"
+  ]
+ },
+ "allowed": [
+  "say",
+  "whisper",
+  "walk",
+  "face",
+  "emote",
+  "give",
+  "sell",
+  "inventory",
+  "look",
+  "carry",
+  "drop",
+  "throw",
+  "attack",
+  "wield",
+  "spell.spark",
+  "spell.fireball",
+  "note"
+ ],
+ "food": [
+  {
+   "name": "mushroom stew"
+  },
+  {
+   "name": "ale",
+   "drink": true
+  }
+ ],
+ "agents": [
+  {
+   "id": "brom",
+   "model": "dwarf",
+   "job": "smith",
+   "home": "entrance",
+   "workplace": "entrance",
+   "style": "gruff camp smith",
+   "wield": "war_hammer",
+   "hp": 18,
+   "inventory": {
+    "gold": 14,
+    "items": [
+     "iron sword",
+     "torch"
+    ]
+   },
+   "ttsVoiceId": "pack:dwarf_m",
+   "personality": "Brom, the camp smith, thick-armed and short-tempered. You want the relic sold and the camp struck before winter. You think Corin the cook waters the stew and hoards the salt. Use sell to trade goods to the traveller.",
+   "in": "entrance"
+  },
+  {
+   "id": "corin",
+   "model": "villager",
+   "job": "cook",
+   "home": "entrance",
+   "workplace": "kitchen",
+   "style": "nervous camp cook",
+   "hp": 11,
+   "inventory": {
+    "gold": 5,
+    "items": [
+     "bread",
+     "bread",
+     "potion"
+    ]
+   },
+   "ttsVoiceId": "pack:scholar_m",
+   "personality": "Corin, camp cook and reluctant ledger-keeper. You want everyone fed and nobody going deeper than the kitchen stair. You think Brom would sell his own grandmother for a decent price. Use give(bread) to feed the traveller.",
+   "in": "kitchen"
+  },
+  {
+   "id": "kesh",
+   "model": "huntress",
+   "job": "hunter",
+   "home": "entrance",
+   "workplace": "barracks",
+   "style": "scarred scout",
+   "wield": "hunting_bow",
+   "hp": 14,
+   "allowed": [
+    "say",
+    "walk",
+    "attack",
+    "wield",
+    "emote",
+    "give",
+    "sell"
+   ],
+   "ttsVoiceId": "pack:huntress_f",
+   "personality": "Kesh, the scout who has mapped three rooms and lost two torches doing it. You want someone to watch your back past the barracks. You think Corin's fear will get a person killed. You will not go past the crypt alone.",
+   "in": "barracks"
+  },
+  {
+   "id": "skel1",
+   "model": "skeleton_warrior",
+   "hp": 12,
+   "wield": "sword",
+   "style": "rattling dead guard",
+   "hostile": true,
+   "personality": "A hostile skeleton warrior."
+  },
+  {
+   "id": "skel2",
+   "model": "skeleton",
+   "hp": 10,
+   "wield": "spear",
+   "style": "bone sentinel",
+   "hostile": true,
+   "personality": "A hostile skeleton."
+  },
+  {
+   "id": "ghost1",
+   "model": "ghost",
+   "hp": 9,
+   "style": "pale keeper of the shrine",
+   "hostile": true,
+   "personality": "A hostile ghost."
+  }
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "in": "entrance",
+   "items": [
+    {
+     "name": "rope",
+     "qty": 1
+    },
+    {
+     "name": "torch",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "type": "chest",
+   "in": "kitchen",
+   "items": [
+    {
+     "name": "bread",
+     "qty": 3
+    },
+    {
+     "name": "mushroom stew",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "type": "chest",
+   "in": "treasure",
+   "gold": 45,
+   "items": [
+    "silver key",
+    "gold_bars",
+    "necklace"
+   ]
+  },
+  {
+   "type": "chest",
+   "in": "crypt",
+   "items": [
+    "potion",
+    "silver key"
+   ]
+  },
+  {
+   "type": "iron_chest",
+   "in": "shrine",
+   "items": [
+    "Sunstone Relic"
+   ]
+  },
+  {
+   "type": "cauldron",
+   "in": "kitchen"
+  },
+  {
+   "type": "anvil",
+   "in": "entrance"
+  },
+  {
+   "type": "candelabra",
+   "in": "crypt"
+  },
+  {
+   "type": "cage",
+   "in": "barracks"
+  },
+  {
+   "type": "workbench",
+   "in": "barracks"
+  },
+  {
+   "type": "candles",
+   "in": "shrine"
+  },
+  {
+   "type": "note",
+   "in": "barracks",
+   "wall": "north",
+   "text": "The shrine door answers to silver. Do not wake the keeper."
+  },
+  {
+   "type": "picture",
+   "style": "tapestry",
+   "in": "entrance",
+   "title": "Harrow's Last Feast",
+   "prompt": "a long table of knights now dust and cobwebs"
+  },
+  {
+   "type": "bear_trap",
+   "in": "barracks"
+  },
+  {
+   "type": "bear_trap",
+   "in": "barracks"
+  },
+  {
+   "type": "bear_trap",
+   "in": "barracks"
+  },
+  {
+   "type": "chest",
+   "in": "barracks",
+   "items": []
+  },
+  {
+   "type": "bed",
+   "in": "entrance"
+  },
+  {
+   "type": "bed",
+   "in": "entrance"
+  },
+  {
+   "type": "bed",
+   "in": "entrance"
+  }
+ ],
+ "locked": [
+  {
+   "in": "shrine",
+   "key": "silver key"
+  }
+ ],
+ "threats": [
+  {
+   "kind": "raid",
+   "who": "rat",
+   "count": 3,
+   "when": "night",
+   "every": 1,
+   "from": "lair"
+  },
+  {
+   "kind": "raid",
+   "who": "skeleton",
+   "count": 2,
+   "when": "night",
+   "every": 2,
+   "from": "crypt"
+  }
+ ],
+ "events": [
+  "A drop of water falls somewhere far below.",
+  "{who} hears bone scrape on stone and goes quiet.",
+  {
+   "text": "A cold draft snuffs a candle.",
+   "round": 6
+  },
+  {
+   "text": "Something in the dark answers the anvil's ring.",
+   "round": 10,
+   "to": "brom"
+  },
+  "A rat drags a crust into a crack in the wall."
+ ],
+ "goal": {
+  "text": "Carry the Sunstone Relic out of the keep alive.",
+  "win": {
+   "all": [
+    {
+     "player_has": "Sunstone Relic"
+    },
+    {
+     "survived_days": 1
+    }
+   ]
+  },
+  "lose": {
+   "player_defeated": true
+  },
+  "winText": "You climb into grey daylight with the relic warm in your pack. Brom is already arguing about the price.",
+  "loseText": "The keep keeps you. Another rattle in the dark."
+ },
+ "player": {
+  "name": "Traveller",
+  "gold": 12,
+  "items": [
+   "torch",
+   "bread"
+  ],
+  "model": "adventurer"
+ },
+ "wallHeight": 2
+}
