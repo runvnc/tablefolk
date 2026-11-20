@@ -390,6 +390,35 @@ y .075 (they were buried) and turn to read from the south.
 
 ## Light quality (`?gfx=light`, Graphics pane)
 
+Since 2026-11-20 (the new look): light has the sun's shadow map (1024,
+QUALITY_LOW, every second frame), 1k terrain textures with at most 4 layers
+and constant roughness, walls and roofs with colour and normal maps only,
+the `.med` trees and `.1k` env models, pebbles but no grass or flowers, no
+post-process pipeline, SSAO or glow, `adaptToDeviceRatio` off, at most 6
+lights per material. Medium: shadow every second frame, 1k terrain with
+roughness and AO (8 layers), 1k env models, ground cover, bloom; high: 2k
+everything, SSAO, the shadow every frame.
+
+Measured 2026-11-20 (RTX 2060, 1920x1080, headless Chrome, `profile.mjs`
+QUICK with 40 s to settle; WebGPU timestamps read 0 on this driver, so the
+GPU figure is the median submit-to-done latency, `lat`; memory is the Chrome
+GPU process in a fresh Chrome after 35 s; the GPU is shared with another
+job's model, so expect +-1-2 ms noise):
+
+| scene | tier | CPU render ms before / after | lat ms before / after | draw calls before / after | GPU MiB before / after |
+|---|---|---|---|---|---|
+| the Oracle | light | 5.8 / 4.6 | 4.3 / 3.9 | 72 / 164 | 304 / 525-602 |
+| the Oracle | medium | 5.8 / 6.9 | 3.8 / 4.9 | 154 / 274 | - |
+| market village | light | 6.7 / 7.4 | 3.2 / 4.9 | 79 / 328 | 815 / 850-863 |
+| market village | medium | 8.7 / 10.6 | 4.0 / 6.5-10.9 | 172 / 202 | 953 / 1204 |
+
+The extra draw calls are the shadow pass (every caster again), the
+real-model trees (several meshes each), the ground cover kinds and the
+surroundings' tree meshes. Without the shadow map the market village at
+medium drew 200 calls instead of 442 (before the every-second-frame refresh).
+
+Before 2026-11-20:
+
 Measured on the haunted tavern (2026-10-31): the test Chrome's GPU process
 281 MiB at light, 620 at medium. Light: the simple voxel island and sea, no
 post-process pipeline, SSAO or glow; no shadow generators at all (the key
