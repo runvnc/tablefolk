@@ -476,3 +476,64 @@ bedtime). Left: a single snare starves a hunter (one meat every 4 game
 hours), a labourer with nothing to haul does nothing, a cook without meat
 cooks once.
 
+
+## Spoken life, evenings, chores, commands in code (2026-11-20, evening)
+
+`live-eval.mjs` now ends with a talk report (`talk-report.mjs`, also run
+over saved results): lines split into templated (said by code from a pool)
+and model lines, by day (05-17), evening (17-21) and night per game hour,
+the pairs that talked and the biggest pair's share, questions, and (with
+`--day`) everyone who ends hungry with the reason. The "before" columns are
+today's earlier runs re-scored (hearthvale `a3`, the generated village
+`after2`, the bakery `a3`, the Night Watch run above); E2B, lively, the
+player idle, the test worktree served on :8000.
+
+| hearthvale, one game day (8 min) | before | after |
+|---|---|---|
+| spoken lines a game hour (templated / model) | 0.6 (0.1 / 0.5) | 1.7 (0.9 / 0.9) |
+| model lines a game hour: day / evening / night | 0.2 / 1.5 / 0.4 | 0.2 / 3.7 / 0.4 |
+| templated lines a game hour: day / evening / night | 0 / 0.2 / 0.1 | 1.2 / 0.5 / 0.6 |
+| pairs that talked (in the evening), top pair's share | 3 (2), .50 | 5 (5), .25 |
+| questions (to characters) | 1 (0) | 5 (5) |
+| model calls (a game hour) | 26 (1.1) | 32 (1.3) |
+| job cycles farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker | 7, 3, 4, 6, 4, 14, 4, 7 | 8, 3, 4, 6, 6, 6, 3, 7 |
+| sales between characters | 17 | 12 |
+| hungry at the end | nobody | brann .72, tam .65 (stuck "running home" all night, below) |
+
+| generated village (Harvestmere, 6 min day) | before | after |
+|---|---|---|
+| spoken lines a game hour (templated / model) | 0.6 (0.1 / 0.5) | 1.3 (0.6 / 0.6) |
+| model lines in the evening a game hour | 1.0 | 2.5 |
+| pairs / questions | 3 / 0 | 4 / 5 |
+| model calls | 18 | 25 |
+| slept at night (of 4 sleepers) | 2 | 3 (hob and odo had stood all night in the first after-run: a row of beds walled in) |
+| hungry at the end | nobody | hob .68 |
+
+The bakery (6 minutes): model lines 1.3 a minute before and after (the
+limit is 2.0; 3.2 in the first after-run, when the quicker evening pace
+applied to every room: now only to a gathering of four or more), templated
+0.5 a minute, malformed 0%, tasks 18 / 17. Provocations unchanged: grub
+refuses at 3, orders out and strikes at 4; hector calls for help at 1,
+orders out at 3, refuses at 3, first blow at 4; greta refuses at 4, hostile
+at 5.
+
+The Night Watch day: before, nobody used `signal()` (8 model calls all
+day), no wolf struck down, the player struck down; after (the keeper's
+command rule, the militia's `defends`): Odo signalled at 22:04 as the
+wolves came, the two spearmen shouted and held the beacon, all three dire
+wolves struck down, nobody hurt; 18 model calls; 0.7 spoken lines a game
+hour (was 0.04).
+
+The world builder (`gen-eval --only=talk,village,forest`, after): the
+interview is one 7x7 grid room (was a 4-room dungeon); village 9 places
+5/5 with work, forest 5 places 4/4.
+
+Found while measuring: four of eight villagers in hearthvale and two in the
+generated village stood all night "going home to bed" (a row of beds
+walled in by each other, two beds generated in one cell): bedtime now
+skips beds it failed to reach or that share a cell with an occupied one,
+else sleeps on the floor at home. Then two stood all night "running home to
+hide" from a raid (the route home never worked): they now stay put and
+sleep where they are. The first full run stalled with 100 s model calls
+(the test Chrome's GPU state after many reloads, with the rendering job's
+Chrome on the same card): a fresh Chrome per run fixed it.

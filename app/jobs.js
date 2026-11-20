@@ -1056,7 +1056,7 @@
   }
 
   // ---------------------------------------------------------------- sleeping
-  function bedFor(g, s) {
+  function bedFor(g, s, homeOnly = false) {
     // (not one it could not get to lately, nor one sharing its cell with a bed someone is in: generated
     // rooms sometimes put two beds in one cell or wall a row of them in)
     const t = gm(), bad = o => (s.bad || {})[Math.round(o.x) + ',' + Math.round(o.z)] > t;
@@ -1064,11 +1064,12 @@
     const mine = beds.filter(o => inPlace(s.home, o.x, o.z));
     const taken = o => state.characters.some(c => c !== g && c.pose?.on && (c.pose.on === o.mesh || things('bed').some(b => b.mesh === c.pose.on && Math.round(b.x) === Math.round(o.x) && Math.round(b.z) === Math.round(o.z))));
     const free = o => !taken(o);
-    return nearest(g, mine.filter(free)) || nearest(g, beds.filter(o => free(o) && dist(posOf(g), o) < 14));
+    return nearest(g, mine.filter(free)) || (homeOnly ? null : nearest(g, beds.filter(o => free(o) && dist(posOf(g), o) < 14)));
   }
-  async function bedtime(g, s) {
+  // homeOnly: hiding from a raid, it does not go out to a bed elsewhere
+  async function bedtime(g, s, homeOnly = false) {
     if (g.pose?.mode === 'lie') { setDoing(g, s, 'asleep'); return { ms: rnd(5000, 8000) }; }
-    const bed = bedFor(g, s);
+    const bed = bedFor(g, s, homeOnly);
     // a goodnight to whoever is near, once a night
     const night = Math.floor((gm() + 360) / 1440);
     if (s.bedSaid !== night) { const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar || !!nameOf(c)); if (C()?.say(g, 'bed', {}, { to: near[0] || null })) s.bedSaid = night; else if (!near.length) s.bedSaid = night; }
@@ -1260,12 +1261,14 @@
     // the rest go home and stay in until the all-clear
     const home = s.home || placeAt(s.start.x, s.start.z) || places().find(p => !['square', 'pond', 'garden'].includes(p.kind) && p.x0 != null);
     // home: indoors till the all-clear, and in bed at bedtime (a raid at 22:00 kept two villagers standing all night)
-    if (home && inPlace(home, posOf(g).x, posOf(g).z)) { if (asleep) return bedtime(g, s); setDoing(g, s, 'hiding indoors'); return { ms: 4000 }; }
+    if (home && inPlace(home, posOf(g).x, posOf(g).z)) { if (asleep) return bedtime(g, s, true); setDoing(g, s, 'hiding indoors'); return { ms: 4000 }; }
+    // no way home (a blocked route kept two villagers "running home" all night): it stays put, and sleeps there at bedtime
+    if (s.noWayHome && gm() - s.noWayHome < 90) { if (asleep) return bedtime(g, s); setDoing(g, s, 'keeping out of sight'); return { ms: 5000 }; }
     if (asleep && g.pose?.mode === 'lie') { setDoing(g, s, 'asleep'); return { ms: 6000 }; }
     setDoing(g, s, 'running home to hide');
     if (g.pose) U().standUp(g, true);
     const spot = home ? spotIn(home, g) : null;
-    if (spot) { const r = await goTo(g, s, spot.x, spot.z, 'home'); return { ms: Math.min(r.ms || 2000, 3000) }; }
+    if (spot) { const r = await goTo(g, s, spot.x, spot.z, 'home'); if (r.fail) { s.noWayHome = gm(); console.info('[jobs]', g.id, 'no way home:', r.fail); } return { ms: Math.min(r.ms || 2000, 3000) }; }
     return null;
   }
 
