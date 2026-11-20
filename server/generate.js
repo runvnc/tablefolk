@@ -168,7 +168,8 @@ async function runModel({ label, mode, ep, emit, user, maxTokens, merge = null }
     });
     raw = out.text;
     repairs = [];
-    try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario, { prompt, fresh: mode !== 'revise', notes: repairs }); }
+    // a section of a world in sections (the builder says so first) may have nobody in it
+    try { scenario = parseJSON(raw); if (merge) scenario = merge(scenario); problems = checkScenario(scenario, { prompt, fresh: mode !== 'revise', notes: repairs, section: mode === 'revise' && /^change: This world is made of \d+ sections/.test(label) }); }
     catch (e) { scenario = null; problems = [e.message]; }
     if (!problems.length) break;
     emit('progress', { stage: 'problems', problems });

@@ -78,7 +78,8 @@ export function checkScenario(s, packVoices = [], opts = {}) {
   const problems = [];
   if (!s || typeof s !== 'object' || Array.isArray(s)) return ['the answer must be one JSON object'];
   s.v = 1;
-  if (!Array.isArray(s.agents) || !s.agents.length) problems.push('"agents" must list at least one character');
+  // (a section of a world in sections may have nobody in it: a vault, an empty level)
+  if (!Array.isArray(s.agents) || (!s.agents.length && !opts.section)) problems.push('"agents" must list at least one character');
   const ids = (s.agents || []).map(a => a?.id);
   // bodies and commands a scenario's packs and packages bring cannot be fetched
   // here: a body is kept when the scenario lists it in "bodies" (its hint), a
