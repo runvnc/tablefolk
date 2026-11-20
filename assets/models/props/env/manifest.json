@@ -722,6 +722,184 @@
    "notes": "one 2 m straight length, a post at each end, rails run along x; pack.json fence_section is 1.0 long and 0.41 high (toy scale): scale or space them 2 m apart."
   },
   {
+   "type": "signpost",
+   "files": {
+    "full": "signpost.glb",
+    "1k": "signpost.1k.glb"
+   },
+   "footprint_m": [
+    1.63,
+    1.99
+   ],
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "height_m": 2.3,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 5999,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1249,
+    "1k": 406
+   },
+   "replaces": "new type",
+   "notes": "code-built in app.js (no pack.json item; glyph I). New file."
+  },
+  {
+   "type": "hay",
+   "files": {
+    "full": "hay.glb",
+    "1k": "hay.1k.glb"
+   },
+   "footprint_m": [
+    1.92,
+    1.91
+   ],
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "height_m": 1.71,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "door",
+   "triangles": 10424,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 2617,
+    "1k": 989
+   },
+   "replaces": {
+    "hay": {
+     "file": "models/props/village/hay.glb",
+     "w": 0.88,
+     "h": 1.3,
+     "d": 0.91,
+     "fit": "height",
+     "static": true,
+     "tags": [
+      "farm",
+      "village"
+     ],
+     "aliases": [
+      "haystack",
+      "hay_bale"
+     ],
+     "flammable": true
+    }
+   },
+   "notes": "pack.json hay 0.88x0.91, h 1.3, fit height."
+  },
+  {
+   "type": "table",
+   "files": {
+    "full": "table.glb",
+    "1k": "table.1k.glb"
+   },
+   "footprint_m": [
+    1.41,
+    0.87
+   ],
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "height_m": 0.77,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "long side",
+   "triangles": 8000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1328,
+    "1k": 495
+   },
+   "replaces": {
+    "table": {
+     "file": "models/props/Table_Large.gltf",
+     "w": 1.35,
+     "h": 0.85,
+     "d": 0.95,
+     "static": true,
+     "scale": 0.72,
+     "visualYOffset": 0.43,
+     "flammable": true,
+     "tags": [
+      "fantasy"
+     ]
+    }
+   },
+   "notes": "pack.json table 1.35x0.95 h 0.85 (Table_Large.gltf)."
+  },
+  {
+   "type": "bench",
+   "files": {
+    "full": "bench.glb",
+    "1k": "bench.1k.glb"
+   },
+   "footprint_m": [
+    1.4,
+    0.4
+   ],
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "height_m": 0.48,
+   "front": "+z (glTF; the game's +z at ry 0)",
+   "front_is": "long side",
+   "triangles": 6000,
+   "textures_px": {
+    "full": [
+     2048
+    ],
+    "1k": [
+     1024
+    ]
+   },
+   "kb": {
+    "full": 1122,
+    "1k": 405
+   },
+   "replaces": {
+    "bench": {
+     "file": "models/props/Bench.gltf",
+     "w": 1.35,
+     "h": 0.55,
+     "d": 0.55,
+     "static": true,
+     "scale": 0.88,
+     "visualYOffset": 0.28,
+     "flammable": true,
+     "tags": [
+      "fantasy"
+     ]
+    }
+   },
+   "notes": "pack.json bench 1.35x0.55."
+  },
+  {
    "type": "bar_counter",
    "files": {
     "full": "bar_counter.glb",
