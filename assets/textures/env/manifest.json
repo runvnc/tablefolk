@@ -21,12 +21,12 @@
      "license": "CC0"
     }
    ],
-   "made": "blend of ambientCG Grass004 (3x3, native 1.4 m) and Grass001 (2x2, 2.1 m) through a tileable ~1 m noise mask; colour-corrected to a fresh mid-green",
-   "meanColor": "#51652c",
+   "made": "blend of ambientCG Grass004 (3x3, native 1.4 m) and Grass001 (2x2, 2.1 m) through a tileable ~1 m noise mask; large-scale light/dark tone flattened (high-pass) so 4.2 m repeats do not show; colour-corrected to a fresh mid-green",
+   "meanColor": "#52652c",
    "meanSRGB": [
     0.32,
     0.398,
-    0.173
+    0.174
    ],
    "meanLinear": [
     0.0887,

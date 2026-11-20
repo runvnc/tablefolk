@@ -23,7 +23,7 @@ Q = dict(color=76, normal=66, rough=50, ao=45)          # WebP qualities (size b
 # name: kind, tile (m one repeat covers), src (site:id) or blend, colour target (sRGB mean), sat, contrast,
 # flat: 0..1 how much of the large-scale (> ~1/6 tile) light/dark blotching to remove, so repeats do not show
 R = {
-    'grass_meadow':      dict(kind='ground', tile=4.2, blend='grass', target=(84, 104, 46), sat=0.9, note='blend of ambientCG Grass004 (3x3, native 1.4 m) and Grass001 (2x2, 2.1 m) through a tileable ~1 m noise mask; colour-corrected to a fresh mid-green'),
+    'grass_meadow':      dict(kind='ground', tile=4.2, blend='grass', target=(84, 104, 46), sat=0.9, flat=0.9, note='blend of ambientCG Grass004 (3x3, native 1.4 m) and Grass001 (2x2, 2.1 m) through a tileable ~1 m noise mask; large-scale light/dark tone flattened (high-pass) so 4.2 m repeats do not show; colour-corrected to a fresh mid-green'),
     'grass_dry':         dict(kind='ground', tile=1.4, src='acg:Grass003', target=(116, 108, 68), sat=0.75),
     'forest_floor':      dict(kind='ground', tile=3.15, src='ph:forest_ground_04', target=(92, 78, 60), sat=0.9, flat=0.6),
     'dirt_path':         dict(kind='ground', tile=2.0, src='ph:rocky_trail', target=(136, 112, 84), sat=0.85, flat=0.5),
@@ -141,8 +141,8 @@ def blend_grass():
         mm = m if g else m[..., None]
         if k == 'color':
             # match the two grasses' means before mixing so the mask makes patches of tone, not of species colour
-            la, lb = to_lin(a), to_lin(b); lb = lb * (la.reshape(-1, 3).mean(0) / lb.reshape(-1, 3).mean(0)) * np.array([0.9, 0.95, 0.92])
-            v = la * (1 - mm) + lb * mm; v = v * (0.9 + 0.2 * m2[..., None]); out[k] = to_srgb(v)
+            la, lb = to_lin(a), to_lin(b); lb = lb * (la.reshape(-1, 3).mean(0) / lb.reshape(-1, 3).mean(0)) * np.array([0.98, 0.99, 0.98])
+            v = la * (1 - mm) + lb * mm; v = v * (0.97 + 0.06 * m2[..., None]); out[k] = to_srgb(v)
         elif k == 'normal':
             v = (a * 2 - 1) * (1 - mm) + (b * 2 - 1) * mm; v /= np.linalg.norm(v, axis=2, keepdims=True) + 1e-6; out[k] = v * 0.5 + 0.5
         else:
