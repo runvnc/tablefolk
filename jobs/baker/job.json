@@ -1,0 +1,67 @@
+{
+ "id": "baker",
+ "version": "1.0.0",
+ "name": "Baker",
+ "match": "\\b(baker|bakes|bakery|pastry|pastries)\\b",
+ "hours": [
+  6,
+  16
+ ],
+ "gold": 10,
+ "workplace": [
+  "cauldron"
+ ],
+ "prices": {
+  "bread": 3,
+  "pie": 5
+ },
+ "steps": [
+  {
+   "fetch": {
+    "wheat": 2
+   }
+  },
+  {
+   "make": "bread",
+   "at": "cauldron",
+   "needs": {
+    "wheat": 2
+   },
+   "gives": 2,
+   "verb": "bakes",
+   "time": 5,
+   "doing": "baking bread"
+  },
+  {
+   "fetch": {
+    "apple": 2
+   },
+   "optional": true
+  },
+  {
+   "make": "pie",
+   "at": "cauldron",
+   "needs": {
+    "apple": 2
+   },
+   "gives": 1,
+   "verb": "bakes",
+   "time": 5,
+   "optional": true,
+   "doing": "baking an apple pie"
+  },
+  {
+   "store": [
+    "bread",
+    "pie"
+   ],
+   "keep": 2
+  },
+  {
+   "sell": [
+    "bread",
+    "pie"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+ "id": "hunter",
+ "version": "1.0.0",
+ "name": "Hunter",
+ "match": "\\b(hunter|huntress|ranger|trapper|poacher)\\b",
+ "hours": [
+  6,
+  16
+ ],
+ "gold": 6,
+ "fights": true,
+ "workplace": [
+  "hunt"
+ ],
+ "prices": {
+  "meat": 3,
+  "hide": 3
+ },
+ "steps": [
+  {
+   "gather": "hunt",
+   "doing": "checking the snares"
+  },
+  {
+   "store": "meat",
+   "keep": 1
+  },
+  {
+   "sell": "meat"
+  }
+ ]
+}

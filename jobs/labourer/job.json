@@ -1,0 +1,21 @@
+{
+ "id": "labourer",
+ "version": "1.0.0",
+ "name": "Labourer",
+ "match": "\\b(labou?rer|porter|carrier|hauler|helper|apprentice|odd jobs)\\b",
+ "hours": [
+  7,
+  17
+ ],
+ "gold": 4,
+ "workplace": [],
+ "steps": [
+  {
+   "haul": true,
+   "doing": "carrying goods"
+  },
+  {
+   "rest": true
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "id": "cook",
+ "version": "1.0.0",
+ "name": "Cook",
+ "match": "\\b(cook|chef|kitchen)\\b",
+ "hours": [
+  7,
+  19
+ ],
+ "gold": 8,
+ "workplace": [
+  "cauldron"
+ ],
+ "prices": {
+  "stew": 4
+ },
+ "steps": [
+  {
+   "fetch": {
+    "meat": 1
+   },
+   "optional": true
+  },
+  {
+   "make": "stew",
+   "at": "cauldron",
+   "needs": {
+    "meat": 1
+   },
+   "gives": 2,
+   "verb": "cooks",
+   "time": 5,
+   "optional": true,
+   "doing": "cooking stew"
+  },
+  {
+   "fetch": {
+    "carrot": 2
+   },
+   "optional": true
+  },
+  {
+   "make": "stew",
+   "at": "cauldron",
+   "needs": {
+    "carrot": 2
+   },
+   "gives": 2,
+   "verb": "cooks",
+   "time": 5,
+   "optional": true,
+   "doing": "cooking stew"
+  },
+  {
+   "serve": [
+    "stew"
+   ]
+  },
+  {
+   "store": "stew",
+   "keep": 2
+  }
+ ]
+}

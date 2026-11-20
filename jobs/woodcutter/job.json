@@ -1,0 +1,31 @@
+{
+ "id": "woodcutter",
+ "version": "1.0.0",
+ "name": "Woodcutter",
+ "match": "\\b(woodcutter|woodsman|lumberjack|forester|logger)\\b",
+ "hours": [
+  6,
+  17
+ ],
+ "gold": 4,
+ "workplace": [
+  "chop"
+ ],
+ "prices": {
+  "firewood": 1
+ },
+ "steps": [
+  {
+   "gather": "chop",
+   "n": 2,
+   "doing": "chopping wood"
+  },
+  {
+   "store": "firewood",
+   "keep": 0
+  },
+  {
+   "sell": "firewood"
+  }
+ ]
+}

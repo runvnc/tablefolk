@@ -1,0 +1,40 @@
+{
+ "id": "miner",
+ "version": "1.0.0",
+ "name": "Miner",
+ "match": "\\b(miner|mason|quarr\\w*|stonecutter|prospector)\\b",
+ "hours": [
+  6,
+  17
+ ],
+ "gold": 6,
+ "workplace": [
+  "mine"
+ ],
+ "prices": {
+  "stone": 1,
+  "crystal": 4,
+  "iron ore": 2
+ },
+ "steps": [
+  {
+   "gather": "mine",
+   "n": 2,
+   "doing": "breaking stone"
+  },
+  {
+   "store": [
+    "stone",
+    "crystal",
+    "iron ore"
+   ],
+   "keep": 0
+  },
+  {
+   "sell": [
+    "stone",
+    "crystal"
+   ]
+  }
+ ]
+}

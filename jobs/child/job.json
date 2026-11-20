@@ -1,0 +1,24 @@
+{
+ "id": "child",
+ "version": "1.0.0",
+ "name": "Child",
+ "match": "\\b(child|kid|boy|girl|urchin|youngster|toddler)\\b",
+ "hours": [
+  8,
+  18
+ ],
+ "gold": 1,
+ "workplace": [],
+ "steps": [
+  {
+   "wander": true,
+   "emote": "plays",
+   "doing": "playing"
+  },
+  {
+   "wander": true,
+   "emote": "skips about",
+   "doing": "running about"
+  }
+ ]
+}

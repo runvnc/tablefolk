@@ -1,0 +1,27 @@
+{
+ "id": "scholar",
+ "version": "1.0.0",
+ "name": "Scholar",
+ "match": "\\b(scholar|scribe|wizard|mage|sage|librarian|teacher|sorcer\\w*|alchemist)\\b",
+ "hours": [
+  8,
+  20
+ ],
+ "gold": 10,
+ "workplace": [
+  "read"
+ ],
+ "steps": [
+  {
+   "read": true,
+   "doing": "reading"
+  },
+  {
+   "rest": true
+  },
+  {
+   "read": true,
+   "doing": "writing notes"
+  }
+ ]
+}

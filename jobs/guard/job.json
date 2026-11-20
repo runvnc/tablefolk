@@ -1,0 +1,31 @@
+{
+ "id": "guard",
+ "version": "1.0.0",
+ "name": "Guard",
+ "match": "\\b(guard|soldier|knight|watchman|sentry|captain|sheriff|constable|militia)\\b",
+ "hours": [
+  16,
+  6
+ ],
+ "sleep": [
+  8,
+  15
+ ],
+ "watch": "night",
+ "gold": 10,
+ "fights": true,
+ "workplace": [
+  "train"
+ ],
+ "steps": [
+  {
+   "patrol": "village",
+   "doing": "on patrol"
+  },
+  {
+   "gather": "train",
+   "optional": true,
+   "doing": "practising"
+  }
+ ]
+}

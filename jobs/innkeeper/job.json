@@ -1,0 +1,77 @@
+{
+ "id": "innkeeper",
+ "version": "1.0.0",
+ "name": "Innkeeper",
+ "match": "\\b(innkeeper|innkeep|barkeep|bartender|barmaid|tavern ?keeper|keeps the tavern|runs the tavern|publican|landlady|landlord)\\b",
+ "hours": [
+  8,
+  23
+ ],
+ "sleep": [
+  23,
+  6
+ ],
+ "gold": 15,
+ "workplace": [
+  "cauldron"
+ ],
+ "prices": {
+  "stew": 4,
+  "ale": 2
+ },
+ "steps": [
+  {
+   "fetch": {
+    "meat": 1
+   },
+   "optional": true
+  },
+  {
+   "make": "stew",
+   "at": "cauldron",
+   "needs": {
+    "meat": 1
+   },
+   "gives": 2,
+   "verb": "cooks",
+   "time": 5,
+   "optional": true,
+   "doing": "cooking meat stew"
+  },
+  {
+   "fetch": {
+    "pumpkin": 1
+   },
+   "optional": true
+  },
+  {
+   "make": "stew",
+   "at": "cauldron",
+   "needs": {
+    "pumpkin": 1
+   },
+   "gives": 2,
+   "verb": "cooks",
+   "time": 5,
+   "optional": true,
+   "doing": "cooking pumpkin stew"
+  },
+  {
+   "fetch": {
+    "ale": 2
+   },
+   "optional": true
+  },
+  {
+   "serve": [
+    "stew",
+    "ale",
+    "bread"
+   ]
+  },
+  {
+   "store": "stew",
+   "keep": 3
+  }
+ ]
+}

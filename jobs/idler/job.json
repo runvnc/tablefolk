@@ -1,0 +1,21 @@
+{
+ "id": "idler",
+ "version": "1.0.0",
+ "name": "Villager",
+ "hours": [
+  8,
+  18
+ ],
+ "gold": 3,
+ "workplace": [],
+ "steps": [
+  {
+   "wander": true,
+   "emote": "looks around",
+   "doing": "strolling"
+  },
+  {
+   "rest": true
+  }
+ ]
+}

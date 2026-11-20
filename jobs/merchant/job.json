@@ -1,0 +1,40 @@
+{
+ "id": "merchant",
+ "version": "1.0.0",
+ "name": "Merchant",
+ "match": "\\b(merchant|shopkeeper|trader|peddler|vendor|runs the stall|stall)\\b",
+ "hours": [
+  8,
+  18
+ ],
+ "gold": 25,
+ "workplace": [],
+ "prices": {},
+ "steps": [
+  {
+   "fetch": {
+    "bread": 1
+   },
+   "optional": true
+  },
+  {
+   "fetch": {
+    "apple": 2
+   },
+   "optional": true
+  },
+  {
+   "sell": [
+    "bread",
+    "apple",
+    "firewood",
+    "meat",
+    "wheat",
+    "pie"
+   ]
+  },
+  {
+   "rest": true
+  }
+ ]
+}

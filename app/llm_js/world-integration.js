@@ -943,6 +943,7 @@ async function main() {
       // quiet turn, and it is pointed at what it could do instead.
       // (someone merely walking up to it is not a reason to talk)
       const told = (cfg.pendingChat || []).some(l => !/\bcomes up to you\b/i.test(String(l)));
+      const hadSpeech = (cfg.pendingChat || []).some(l => !/^\s*(\[event\]|\()/.test(String(l)) && !/\bcomes up to you\b/i.test(String(l)));
       const muted = !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g);
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
@@ -1000,6 +1001,8 @@ async function main() {
       appendLog(g.id + ' sending ' + messages.length + ' messages to LLM (' + (cfg.messages||[]).length + ' history)' + (chatTestMode ? ' [CHAT TEST]' : ''));
       console.log('[tablefolk-world] ABOUT TO CALL manager.decide for agent', g.id, 'with', messages.length, 'messages', 'at', new Date().toISOString());
       const decideT0 = performance.now();
+      // what this model call is for (live-eval --day counts them): jobs.js names its own (agenda, social, choice, danger)
+      try { window.dispatchEvent(new CustomEvent('tablefolk-model-call', { detail: { agentId: g.id, kind: g._callKind || (hadSpeech ? 'reply' : told ? 'event' : quiet ? 'open' : 'cause') } })); } catch {}
       // Vision (Brain options): what the character sees, as an image on its
       // newest message, for endpoint brains whose model takes images.
       let sendMessages = messages;

@@ -1,0 +1,29 @@
+{
+ "id": "healer",
+ "version": "1.0.0",
+ "name": "Healer",
+ "match": "\\b(healer|priest|priestess|cleric|nun|monk|herbalist|physician|doctor|apothecary)\\b",
+ "hours": [
+  7,
+  19
+ ],
+ "gold": 10,
+ "workplace": [
+  "read"
+ ],
+ "prices": {
+  "bandage": 2
+ },
+ "steps": [
+  {
+   "heal": true
+  },
+  {
+   "read": true,
+   "doing": "reading"
+  },
+  {
+   "rest": true
+  }
+ ]
+}

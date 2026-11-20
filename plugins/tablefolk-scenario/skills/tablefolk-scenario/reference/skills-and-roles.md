@@ -172,6 +172,64 @@ Built in: `shopkeeper` and `innkeeper` (trade), `guard`, `quest_giver`,
 Roles, skills and asset packs are the three kinds of shareable package:
 what a character's job is, what it can do, and what things look like.
 
+## Jobs
+
+A role says what a character is for in words; a **job** is what it does
+all day, run by the game in a living world with a clock
+([living.md](living.md#busy-by-default-jobs-and-the-day)). A job is a
+`job.json` named like roles (`jobs/<name>/job.json` on this site, a URL,
+`npm:`, `gh:`, a package's `"jobs"` section, or an object written inline as
+the agent's `"job"`):
+
+```json
+{
+  "id": "baker", "name": "Baker", "version": "1.0.0",
+  "match": "\\b(baker|bakes|bakery)\\b",
+  "hours": [6, 16], "sleep": [21, 5], "gold": 10, "fights": false,
+  "workplace": ["cauldron"], "prices": { "bread": 3, "pie": 5 },
+  "steps": [
+    { "fetch": { "wheat": 2 } },
+    { "make": "bread", "at": "cauldron", "needs": { "wheat": 2 }, "gives": 2, "verb": "bakes", "time": 5, "doing": "baking bread" },
+    { "fetch": { "apple": 2 }, "optional": true },
+    { "make": "pie", "at": "cauldron", "needs": { "apple": 2 }, "optional": true, "verb": "bakes" },
+    { "store": ["bread", "pie"], "keep": 2 },
+    { "sell": ["bread", "pie"] }
+  ]
+}
+```
+
+- `match`: a regex on the role, then the look (`style`), then the
+  personality, for agents that name no job.
+- `hours` (work), `sleep` (default 21-5; `"watch": "night"` sleeps by day),
+  `gold` (start money when the scenario gives none), `fights` (goes to
+  raiders), `prices`, `workplace` (kinds or types of things it works at).
+- Steps, done in order, again and again (one pass is a cycle):
+  - `gather`: a kind (`chop`, `mine`, `field`, `hunt`, `fish`, a package's)
+    or a type; `"n"` times. Takes from the thing's stock.
+  - `fetch`: `{item: n}`: from its own store, the village store, someone
+    else's store (paid to the owner), else bought from someone carrying it.
+  - `make`: at a station, `needs` out of its pack, `gives` of the item in.
+  - `store`: an item, a list, `"made"` or `"all"` into its store (`keep`
+    some).
+  - `sell`: to someone near who is hungry (food) or asked for it; else it
+    minds the stall at its workplace. `serve`: the same for whoever is in its
+    workplace (an inn: ale in the evening).
+  - `patrol`: place ids or kinds, or `"village"`. `tend`: sow a bare field,
+    or see to the animals (`"animals"`). `heal`: bandage the wounded nearby.
+    `haul`: carry goods from the village store to a worker who lacks them.
+    `read`, `rest`, `wander` (with `"emote"`).
+  - `"optional": true`: skipped quietly when its materials are not there;
+    otherwise missing materials are a decision point (buy, ask, keep busy,
+    something else: the model picks).
+  - `"doing"`: the label shown and put on its card.
+
+Built in: `farmer`, `baker`, `innkeeper`, `cook`, `smith`, `woodcutter`,
+`miner`, `hunter`, `fisher`, `herder`, `merchant`, `guard`, `healer`,
+`ratcatcher`, `scholar`, `child`, `labourer` and `idler` (the default).
+The orchard package adds `picker`. With no `job` and no match, a character
+whose role or look names a trade gets that job (smith: `smith`, carpenter:
+`labourer`, cook: `cook`, woodcutter, miner, scholar, guard), else `idler`.
+
 ## Publishing
 
 - **Static folder**: any host with CORS; reference it by URL.

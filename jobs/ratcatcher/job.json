@@ -1,0 +1,27 @@
+{
+ "id": "ratcatcher",
+ "version": "1.0.0",
+ "name": "Rat-catcher",
+ "match": "\\b(rat-?catcher|ratter|exterminator|pest)\\b",
+ "hours": [
+  7,
+  19
+ ],
+ "gold": 3,
+ "fights": true,
+ "workplace": [],
+ "steps": [
+  {
+   "patrol": [
+    "tavern",
+    "shop",
+    "garden",
+    "square"
+   ],
+   "doing": "looking for rats"
+  },
+  {
+   "rest": true
+  }
+ ]
+}

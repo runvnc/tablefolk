@@ -77,6 +77,13 @@ it is a few steps away (to a free cell beside it), and the prompt names
 | `lectern`, `bookcase`, `open_book` | reads |
 | `target`, `dummy` | practises |
 | `apple_barrel`, `apple_crate`, `carrot_crate` | takes an apple or a carrot (food: `eat` it) |
+| `barrel`, `crate`, `iron_crate` | looks inside: stores like a chest (`take`, `put`) |
+| `tall_grass`, `pumpkin` (fields) | harvests wheat, a pumpkin; a bare field is sown |
+| `bear_trap` | checks the snare (meat) |
+| `lily_pad` | fishes (fish) |
+| a package's item with a `use` or `station` | what the package says ([packages.md](packages.md)) |
+
+Many of these run out and grow back on the clock ([things.md](things.md#stock-and-stores)).
 
 A sitting or lying character stays so while it talks; anything else gets it
 up, beside the seat. A tired character's want says `use(bed)` when a bed or
@@ -363,6 +370,31 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 Each turn's prompt ends with "Stay yourself: ..." and one sentence of the
 personality, so write several short sentences of what the character does
 ([living.md](living.md)).
+
+## Jobs, homes and money
+
+In a living world with a clock each character has a job and a day, run by
+the game ([living.md](living.md#busy-by-default-jobs-and-the-day)):
+
+```json
+{ "id": "odo", "job": "baker", "home": "house 2", "workplace": "shop", "personality": "..." }
+```
+
+- `job`: a built-in job (`farmer`, `baker`, `innkeeper`, `cook`, `smith`,
+  `woodcutter`, `miner`, `hunter`, `fisher`, `herder`, `merchant`, `guard`,
+  `healer`, `ratcatcher`, `scholar`, `child`, `labourer`, `idler`), a
+  package's, a reference (URL, `npm:`, `gh:`) or a job written inline
+  ([skills-and-roles.md](skills-and-roles.md#jobs)); with none it is guessed
+  from the role, style and personality.
+- `home`, `workplace`: a place of a generated map or a thing's type; by
+  default the place it starts in (`"in"`).
+- Money: a character without `inventory.gold` starts with a little by job.
+  Producers earn by selling; prices come from the agent's `prices`, the
+  world's `"prices": {"bread": 3}`, the job's, then a default list.
+- A personality that says the character is starving, hungry or has not
+  eaten starts it hungry. Starving for a third of a day makes it weak: slow,
+  no work, "weak from hunger" on its card ("harsh": true worlds: it loses
+  health too).
 
 ## Hostile characters and monsters
 

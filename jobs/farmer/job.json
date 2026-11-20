@@ -1,0 +1,38 @@
+{
+ "id": "farmer",
+ "version": "1.0.0",
+ "name": "Farmer",
+ "match": "\\b(farmer|farmhand|farming|ploughman|plowman|crofter|shepherdess)\\b",
+ "hours": [
+  6,
+  17
+ ],
+ "gold": 8,
+ "workplace": [
+  "field"
+ ],
+ "prices": {
+  "wheat": 1,
+  "pumpkin": 2,
+  "carrot": 1
+ },
+ "steps": [
+  {
+   "tend": "field",
+   "doing": "sowing a bare field"
+  },
+  {
+   "gather": "field",
+   "n": 2,
+   "doing": "harvesting"
+  },
+  {
+   "store": [
+    "wheat",
+    "carrot",
+    "pumpkin"
+   ],
+   "keep": 0
+  }
+ ]
+}

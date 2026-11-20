@@ -1,0 +1,52 @@
+{
+ "id": "smith",
+ "version": "1.0.0",
+ "name": "Smith",
+ "match": "\\b(smith|blacksmith|forge|farrier|armou?rer)\\b",
+ "hours": [
+  7,
+  17
+ ],
+ "gold": 12,
+ "workplace": [
+  "anvil"
+ ],
+ "prices": {
+  "horseshoe": 6,
+  "nails": 2,
+  "knife": 5
+ },
+ "steps": [
+  {
+   "fetch": {
+    "iron ore": 1,
+    "firewood": 1
+   }
+  },
+  {
+   "make": "horseshoe",
+   "at": "anvil",
+   "needs": {
+    "iron ore": 1,
+    "firewood": 1
+   },
+   "gives": 2,
+   "verb": "forges",
+   "time": 5,
+   "doing": "forging horseshoes"
+  },
+  {
+   "store": [
+    "horseshoe"
+   ],
+   "keep": 0
+  },
+  {
+   "sell": [
+    "horseshoe",
+    "knife",
+    "nails"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "id": "herder",
+ "version": "1.0.0",
+ "name": "Herder",
+ "match": "\\b(herder|shepherd|goatherd|cowherd|swineherd|stable ?hand|groom)\\b",
+ "hours": [
+  6,
+  18
+ ],
+ "gold": 5,
+ "workplace": [],
+ "prices": {
+  "milk": 2
+ },
+ "steps": [
+  {
+   "tend": "animals",
+   "doing": "tending the animals"
+  },
+  {
+   "wander": true,
+   "doing": "walking the pasture"
+  },
+  {
+   "rest": true
+  }
+ ]
+}

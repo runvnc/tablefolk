@@ -1,0 +1,31 @@
+{
+ "id": "fisher",
+ "version": "1.0.0",
+ "name": "Fisher",
+ "match": "\\b(fisher|fisherman|fisherwoman|angler)\\b",
+ "hours": [
+  5,
+  15
+ ],
+ "gold": 5,
+ "workplace": [
+  "fish"
+ ],
+ "prices": {
+  "fish": 3
+ },
+ "steps": [
+  {
+   "gather": "fish",
+   "n": 2,
+   "doing": "fishing"
+  },
+  {
+   "store": "fish",
+   "keep": 1
+  },
+  {
+   "sell": "fish"
+  }
+ ]
+}

@@ -29,10 +29,11 @@ Pacing runs on real time:
 - each character has its own next-turn time; out of the player's sight,
   twice as long;
 - a spoken line holds the next one back a quiet gap;
-- a character with nothing to react to (nothing said or happened to it,
-  nothing urgent) mostly idles without the model: a step, a turn,
-  nothing, or a **routine** with the things around it: with the `night`
-  lighting, a bed within 10 cells is slept in (up again by day); by day, a
+- with the clock running, characters are busy with their jobs and their
+  day (below); without it, a character with nothing to react to (nothing
+  said or happened to it, nothing urgent) mostly idles without the model: a
+  step, a turn, nothing, or a **routine** with the things around it: at
+  night, a bed within 10 cells is slept in (up again by day); by day, a
   character whose role, look or personality names a trade works at its
   station within 9 cells (smith: `anvil`, carpenter: `workbench`, cook,
   innkeeper or alchemist: `cauldron`, woodcutter: a `tree` or `logs`, miner
@@ -60,7 +61,91 @@ event about every two minutes), `lively` (7-14 s, 4 s, 45-80 s), `busy`
 (1-3 s, no gap, 20-30 s). The player's own choice in the select by the live
 button wins and is remembered in the browser; `?pace=lively` in the page
 address sets it for that page only (tests). Mindless monsters come for the
-player (when near and in sight) or wander.
+player and the characters (when near and in sight) or wander.
+
+## The clock (`time`, `dayMinutes`, `clock`)
+
+A living world has a time of day: `"time": "08:00"` is the start (default
+08:00, or 21:00 when `lighting` is `night`), `"dayMinutes": 12` the real
+minutes a game day takes (default 12; `0` freezes it), `"clock": false` no
+clock at all (then everything below is off and the world behaves as it did
+before: night is only the lighting). The clock runs while the world lives
+and stops when it is paused; it is saved with the world and shown at the
+top of the screen ("07:45 · day 2"). The light follows it: day, dusk
+(18-20), night, dawn (5-7). Dark worlds (dungeons, caves, `"dark": true`)
+keep their lighting; only the clock runs.
+
+## Busy by default: jobs and the day
+
+With the clock running, every character with a mind has a job and a day,
+and the game runs them in code; the model is used for words and for real
+choices. A character's job is its `"job"` (a built-in job, a package's, or
+a reference: [skills-and-roles.md](skills-and-roles.md#jobs)); with none,
+one is guessed from its role, look and personality (a "baker" bakes, a
+"guard" patrols; else it is a villager who strolls about). `"home"` and
+`"workplace"` name a place of a generated map (`"house 2"`, `"smithy"`) or a
+thing's type; by default the place it starts in.
+
+The day, by the clock:
+
+- **work** in the job's hours: its steps, one after another (gather from a
+  tree or a field, fetch materials from a store, make bread at the oven, put
+  it in its store, sell it to someone hungry, patrol...), each done with the
+  ordinary commands, so results, sounds and memories are as if it chose
+  them. A step that fails twice is skipped for an hour;
+- **eating** when hungry: its own food, its store, the village store,
+  buying from a seller, foraging (an apple tree, a food barrel), or asking
+  someone;
+- **the evening** (18-21) at the tavern, or the square: the time for talk,
+  about what happened that day (what was made and sold, raids, quarrels);
+- **night**: home to its bed, up at dawn (a guard on night watch sleeps by
+  day instead);
+- **threats**: fighters (guards, hunters) go to raiders; the others run
+  home and stay in until the all-clear.
+
+The model is asked only to answer when spoken to (the task waits, then goes
+on), to speak when there is a cause (news, a want that needs someone, a
+temper, the evening, asking for materials it lacks), to pick one of a few
+options at a decision point (out of materials, several ways to eat,
+something happened, a stranger at the workplace; "something else" gives it
+a free turn), for a free turn now and then when it has an `agenda`, `quest`
+or goal, and for a one-line remark while it works (at most once per three
+game hours, only with someone to hear it). An idle turn never asks the model
+"what do you do now?". Its card says what it is doing: "You are a baker.
+Right now: baking bread. Today: made 4 bread; sold 2 bread." Over a busy
+character the activity shows when it starts ("chopping wood"); the
+Character pane says it too.
+
+Things run out and come back (stock: [things.md](things.md#stock-and-stores)),
+food is eaten, gold changes hands (everyone starts with a little by job
+unless the scenario gives some). Hunger keeps growing with real time; a
+character whose description says it is starving or has not eaten starts
+hungry. Starving (`.8`) for a third of a day it is **weak**: it walks
+slowly and cannot work. It does not die of it unless the world is
+`"harsh": true` (then it loses health).
+
+## Threats (`threats`)
+
+```json
+"threats": [
+  { "kind": "raid", "who": "wolf", "count": 2, "when": "night", "every": 1, "from": "edge" },
+  { "kind": "rats", "count": 3 },
+  { "kind": "bandits", "when": "day", "every": 2 }
+]
+```
+
+On the clock, the threat comes from the map's edge (or `"from"`: a place
+id, a lair): `raid` attacks people, `rats` go for the food in the stores and
+eat it, `bandits` snatch gold and run. `when`: `night` (22:00), `day`
+(10:00), `any`, or `[from, to]` hours; `every`: days between visits. They
+leave at dawn (or 17:00 by day) or when half of them are down. A package can
+define more kinds ([packages.md](packages.md)). Afterwards everyone knows
+what happened ("2 wolfs came in the night; hector and wren drove them
+off") and thinks better of those who fought, the player included.
+
+In a living world monsters go for the characters as well as the player
+(`"monsters": "player"` keeps the old way: only the player). See also
+[combat.md](combat.md).
 
 ## The director (`director`, `events`)
 
@@ -109,4 +194,5 @@ The welcome screen (`app/welcome.js`) lists `scenarios/showcase.json`:
 `{ "file", "title", "pitch", "who": [body names for the card], "tags" }`.
 
 `tools/browser-test/live-watch.mjs <scenario> [seconds]` plays one live with
-the real model and keeps the transcript.
+the real model and keeps the transcript. `scenarios/hearthvale.json` is a
+village with jobs, stock, a clock and wolves at night.

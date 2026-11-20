@@ -22,6 +22,14 @@
  * director (director.js) gets a tick after each turn and asks eventGap() for
  * its own spacing.
  *
+ * With the clock running (clock.js), characters with a job (jobs.js: every
+ * one with a mind, inferred when the scenario names none) are busy in code:
+ * their tick is jobs.tick (work, meals, sleep, the evening, threats), on
+ * their own timer (no quiet gap: no model call); something that only
+ * happened to them is a short pick (jobs.eventPick); speech to them is
+ * answered by the model as before. A muted idle turn never calls the model.
+ * Raiders (threats.js) take their turns through tablefolkThreats.turn.
+ *
  * The player can move, talk and act at any time: the live round waits while
  * the player's own turn round runs (play.js), and the brains take one
  * decision at a time (world.runAgentTurn).
@@ -30,7 +38,7 @@
  */
 (function () {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  let on = false, loop = null, turns = 0;
+  let on = false, loop = null, turns = 0, ticks = 0;
   const W = () => window.tablefolk;
   const P = () => window.tablefolkPlay;
   const me = () => state.playerAvatar;
@@ -71,6 +79,8 @@
     const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][Math.floor(Math.random() * 4)]; try { setCharacterFacing(c, new BABYLON.Vector3(d[0], 0, d[1])); } catch {}
   }
   async function monsterTurn(c) {
+    // a raider with its own way (threats.js: rats go for the stores, bandits for gold, and away at dawn)
+    if (c._threat && await window.tablefolkThreats?.turn?.(c)) return;
     const near = P()?.preyFor?.(c);
     if (near) await P()?.fighterTurn?.(c); else await wander(c);
   }
@@ -92,7 +102,9 @@
   // engaged: faster; left alone for a while: slower
   function tempo() { const idle = (performance.now() - lastPlayerAt) / 1000; return idle < 30 ? .6 : idle > 180 ? 1.7 : 1; }
   const rand = ([a, b]) => a + Math.random() * (b - a);
-  function schedule(c, first = false) {
+  function schedule(c, first = false, ms = null) {
+    // jobs.js: a busy character's next step comes when this one is done, whatever the pace (no model call)
+    if (ms != null && Number.isFinite(ms)) { nextAt.set(c, performance.now() + Math.max(500, ms)); return; }
     // a follower (animals.js) keeps up: a turn every second or two
     if (window.tablefolkAnimals?.following(c)) { nextAt.set(c, performance.now() + 900 + Math.random() * 700); return; }
     // a fight goes at its own speed, whatever the pace: a blow every 1.5-2.5 s
@@ -111,6 +123,8 @@
     if (/You want: (stay safe|get away|tell .* attacked|let .* stand for|eat something|get something to eat|find something to eat|rest:)/.test(card)) return 'urgent';
     return '';
   }
+  // nothing said to it: events and approach notices only
+  const onlyHappened = c => (getBrainConfig(c.id).pendingChat || []).every(l => /^\s*(\[event\]|\()/.test(String(l)) || /\bcomes up to you\b/i.test(String(l)));
   // a turn without the brain: a step, a look elsewhere, or nothing
   async function idle(c) {
     // routines first: a bed at night, the anvil for a smith by day (uses.js)
@@ -131,6 +145,9 @@
     // fighters don't wait for a quiet moment
     const fight = all.filter(c => nextAt.get(c) <= now && fighting(c)).sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
     if (fight) return fight;
+    // characters busy in code (jobs.js) need no quiet moment either
+    const J = window.tablefolkJobs, busy = all.filter(c => nextAt.get(c) <= now && J?.handles?.(c) && !reason(c)).sort((a, b) => nextAt.get(a) - nextAt.get(b))[0];
+    if (busy) return busy;
     if (!quietOk) return null;
     const ready = all.filter(c => nextAt.get(c) <= now).sort((a, b) => nextAt.get(a) - nextAt.get(b));
     return ready[0] || null;
@@ -149,15 +166,20 @@
       while (on && (P()?.busy || state.npcBusy)) await sleep(150);
       const c = on && due();
       if (!c) { await sleep(300); continue; }
-      turns++;
+      turns++; ticks++;
       const hostile = P()?.isHostile?.(c), mind = !hostile || P()?.talksToo?.(c), why = reason(c);
       const pendBefore = JSON.stringify(getBrainConfig(c.id).pendingChat || []);
+      const J = window.tablefolkJobs, jobbed = !hostile && !P()?.isAnimal?.(c) && !!J?.handles?.(c);
+      let next = null;
       try {
         if (hostile && !mind) await monsterTurn(c);
         else if (P()?.isAnimal?.(c)) await animalTurn(c);
         // pushed too far (mind.js tempers): a blow, or a step closer; its model
         // turn when something was said to it (the line before the fight)
         else if (why !== 'pending' && P()?.hostileTarget?.(c)) await monsterTurn(c);
+        // jobs.js: busy in code; something that only happened to it is a short pick, not an open turn
+        else if (jobbed && why === 'pending' && onlyHappened(c)) next = (await J.eventPick(c))?.ms ?? null;
+        else if (jobbed && why !== 'pending') { status(''); next = (await J.tick(c))?.ms ?? null; }
         else if (!why && Math.random() < P0().idle) await idle(c);
         else {
           if (hostile || P()?.hostileTarget?.(c)) await monsterTurn(c);
@@ -171,7 +193,7 @@
       { const cfg = getBrainConfig(c.id), now = JSON.stringify(cfg.pendingChat || []);
         if (now !== '[]' && now === pendBefore) { cfg.pendingChat = []; console.info('[live] cleared what', c.id, 'never took in'); } }
       status('');
-      schedule(c);
+      schedule(c, false, next);
       try { window.tablefolkDirector?.tick?.(c); } catch (e) { console.warn('[director]', e); }
       await sleep(250);
     }
@@ -207,8 +229,10 @@
   addEventListener('change', e => { if (e.target.id === 'paceSel') setPace(e.target.value); });
   addEventListener('tablefolk-scenario-started', () => { const p = window.tablefolkScenario?.active?.scn?.pace; let mine = null; try { mine = localStorage.getItem('tablefolk.pace'); } catch {} if (!urlPace && !mine && PACES[p]) setPace(p); const sel = document.getElementById('paceSel'); if (sel) sel.value = pace; });
   // a new scenario starts paused (its settings may start it: "live": true)
-  addEventListener('tablefolk-scenario-started', e => { stop(); turns = 0; if (e.detail?.live) setTimeout(start, 1500); });
-  window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; },
+  addEventListener('tablefolk-scenario-started', e => { stop(); turns = 0; if (!e.detail?.sub) ticks = 0; if (e.detail?.live) setTimeout(start, 1500); });
+  window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; }, get ticks() { return ticks; },
+    // a moment for a line (jobs.js remarks and evening talk wait for it)
+    quiet: () => performance.now() - lastSpeechAt >= P0().quiet * 1000 * tempo(),
     // rounds: as many turns as there are characters (the timed events' "round")
     get round() { return Math.floor(turns / Math.max(1, state.characters.filter(alive).length)); } };
 })();
