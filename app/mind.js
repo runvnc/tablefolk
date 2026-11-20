@@ -746,7 +746,7 @@
     item = String(item || '').replace(/^["']|["']$/g, '').trim();
     const inv = charInventory(g), items = (inv.items || []).filter(i => (i.qty ?? 1) > 0);
     const it = item ? findItem(items, item) : items.find(i => isFood(i.name));
-    if (!it) return say(g, item ? `eat failed: ${g.id} has no ${item}` : 'eat failed: nothing to eat', false);
+    if (!it) return fail(g, item ? `eat failed: ${g.id} has no ${item}` : 'eat failed: nothing to eat', false);
     if (POTION.test(it.name)) {
       it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
       setBrainConfig(g.id, { inventory: inv });
@@ -755,7 +755,7 @@
       return say(g, `${g.id} drinks the ${it.name}${healed ? ' and heals ' + healed : ''}`, false);
     }
     const nourish = isFood(it.name);
-    if (!nourish) return say(g, `eat failed: ${it.name} is not food`, false);
+    if (!nourish) return fail(g, `eat failed: ${it.name} is not food`, false);
     it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) inv.items = inv.items.filter(i => i !== it);
     setBrainConfig(g.id, { inventory: inv });
     const m = mindOf(g); m.hunger = Math.max(0, m.hunger - nourish); push(g, 'joy', .1);

@@ -158,7 +158,10 @@
     }
     if (can.has('build') && Math.random() < .5) out.push('build(wall) or build(crate) (in front of you)');
     if ((can.has('throw') || can.has('drop')) && state.held?.get(g.id)) out.push(`${can.has('throw') ? 'throw' : 'drop'}() (what you are carrying)`);
-    return out.length ? 'You could, right here: ' + out.slice(0, 5).join(', ') + '.' : '';
+    // C: what failed last turn is not offered again straight away
+    const failed = new Set(getBrainConfig(g.id).failedLast || []), sig = t => String(t).split(') ')[0].replace(/\)?$/, ')').toLowerCase().replace(/["'\s]/g, '');
+    const menu = out.filter(t => !failed.has(sig(t)));
+    return menu.length ? 'You could, right here: ' + menu.slice(0, 5).join(', ') + '.' : '';
   }
 
   // look(): the action's result is a fuller description.

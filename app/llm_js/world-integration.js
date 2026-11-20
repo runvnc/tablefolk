@@ -229,7 +229,10 @@ function appendLog(text) {
 // Also handles say entries like 'T3 folk1: folk1 say "hello" -> hello' into 'folk1 says hello'
 // "RESULT OF YOUR LAST ACTION: sell("magic sword", 35) FAILED: ..." from the
 // global history entries this turn added ('T5 mog: mog sell ... -> result').
-const FAILURE = /\b(fail(ed|s)?|can'?t|cannot|unable|nothing|not enough|has only|no \w+ to|found no|no (object|target)|is disabled|unknown command|blocked|in the way|too (spiritually )?heavy)\b/i;
+// A result is FAILED when its handler said so (app.js fail(): the entry is
+// marked) or, for handlers that only word it, when it reads like a failure.
+const FAILURE = /\b(fail(ed|s)?|refused|can'?t|cannot|could not|couldn'?t|unable|nothing|not enough|has only|has no|there is no|no \w+( \w+)? (to|in sight)|found no|no (object|target|room)|is disabled|unknown command|blocked|in the way|too (spiritually )?heavy|already|is locked|is spent|not carrying)\b/i;
+const failedResult = (world, e, result) => !!world.isFailedEntry?.(e) || FAILURE.test(result);
 function ownActionResults(world, agentId, n) {
   const entries = (world.state?.globalHistory || []).slice(-Math.max(1, n)).filter(e => new RegExp('^T\\d+\\s+' + agentId + ':').test(e));
   const lines = [];
@@ -239,7 +242,7 @@ function ownActionResults(world, agentId, n) {
     const arrow = body.indexOf(' -> ');
     const action = arrow >= 0 ? body.slice(0, arrow) : body, result = arrow >= 0 ? body.slice(arrow + 4) : '';
     if (/^(say|whisper)\b/.test(action)) continue;          // speech: nothing to report
-    lines.push(result ? `${action} ${FAILURE.test(result) ? 'FAILED' : 'worked'}: ${result}` : `${action} done`);
+    lines.push(result ? `${action} ${failedResult(world, e, result) ? 'FAILED' : 'worked'}: ${result.replace(/^\w+ (failed|refused):\s*/i, '')}` : `${action} done`);
   }
   return lines.length ? 'RESULT OF YOUR LAST ACTION: ' + lines.join('; ') : '';
 }
@@ -368,12 +371,34 @@ function overhear(world, g, who, text) {
   for (const other of world.getAgents()) {
     if (other.id === g.id || !within(other.root.position, src, r)) continue;
     const ocfg = world.getBrainConfig(other.id);
-    ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: `[${who}] (to ${g.id}) ${text}` }]).slice(-40);
+    ocfg.messages = (ocfg.messages || []).concat([{ role: 'user', content: `You overhear ${who} telling ${g.id}: ${text}` }]).slice(-40);
     world.setBrainConfig(other.id, ocfg);
   }
 }
 
+// Conversations between two characters end: after three exchanges (six
+// lines) with the player not involved, lines between them count as overheard
+// for 90 s, and each is told it has said its piece (mind.js card).
+const convos = new Map();
+const pairKey = (a, b) => [a, b].sort().join('|');
+function convoLine(from, to) {
+  const k = pairKey(from, to), now = performance.now(), c = convos.get(k) || { n: 0, last: 0, closedUntil: 0 };
+  convos.set(k, c);
+  if (now < c.closedUntil) return false;   // closed: overheard
+  if (now - c.last > 60000) c.n = 0;
+  c.n++; c.last = now;
+  if (c.n >= 6) {
+    c.closedUntil = now + 90000; c.n = 0;
+    for (const [x, y] of [[from, to], [to, from]]) { const g = window.TABLEFOLK_STATE?.characters?.find(q => q.id === x), m = g && window.tablefolkMind?.mindOf(g); if (m) (m.pieceSaid ||= {})[y] = Date.now() + 90000; }
+  }
+  return true;
+}
+// the player talking to one of them: their talks start afresh
+function convoReset(id) { for (const k of [...convos.keys()]) if (k.split('|').includes(id)) convos.delete(k); const g = window.TABLEFOLK_STATE?.characters?.find(q => q.id === id), m = g && window.tablefolkMind?.mindOf(g); if (m) m.pieceSaid = {}; }
+// a command as the "You could, right here" menu writes it: carry(note), give(bread, pip)
+const cmdSig = c => (c.kind + '(' + String(c.target ?? c.item ?? c.arg ?? c.destinationText ?? c.emote ?? '') + ')').toLowerCase().replace(/["'\s]/g, '');
 const HISTORY_KEEP = 12;
+const SEED = new URLSearchParams(location.search).get('seed') || 'none';
 // Simple mode (app.js isSimpleBrain): the last few things said, as plain talk.
 // No seed, no reports of its own actions or corrections: a tiny model repeats
 // those instead of answering. Six messages, and a short prompt: wllama reads a
@@ -1153,7 +1178,16 @@ async function main() {
       appendLog(`${g.id} brain -> ${line || 'look()'}`);
       // One brain decision = one scenario turn (scenario.js counts these).
       try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line } })); } catch {}
-      for (const planCmd of planCmds) await world.stepAgentTurn(g.id, planCmd, 'llm');
+      const spokenLines = [], failedNow = [];
+      for (const planCmd of planCmds) {
+        g._spoke = null;
+        await world.stepAgentTurn(g.id, planCmd, 'llm');
+        if (planCmd.kind === 'say' && g._spoke) spokenLines.push(g._spoke);
+        // C: a command that failed is left out of next turn's suggestions
+        const last = (world.state?.globalHistory || []).slice(-1)[0] || '', res = last.split(' -> ').slice(1).join(' -> ');
+        if (planCmd.kind !== 'say' && planCmd.kind !== 'whisper' && last.startsWith('T') && last.includes(g.id + ':') && res && failedResult(world, last, res)) failedNow.push(cmdSig(planCmd));
+      }
+      cfg.failedLast = failedNow;
       // After turn resolves, add system result as user message
       const resultDesc = world.state?.globalHistory?.slice(-1)?.[0] || 'turn resolved';
       const summary = formatActionSummary(resultDesc);

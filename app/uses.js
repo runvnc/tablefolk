@@ -115,7 +115,7 @@
       const q = posOf(g);
       if (o.mesh.isDisposed?.()) return;
       if (Math.hypot(o.x - q.x, o.z - q.z) <= REACH + .4) then();
-      else say(g, `${g.id} could not get to the ${nice(o.type)}`, false);
+      else fail(g, `${g.id} could not get to the ${nice(o.type)}`, false);
     }, ms);
   }
   // a jump, not a sweep: an ANIMATED collider sent somewhere with the usual
@@ -143,14 +143,14 @@
   function use(g, name) {
     if (!g) return;
     const o = find(g, name);
-    if (!o) return say(g, `there is no ${name || 'thing'} in sight to use`, false);
+    if (!o) return fail(g, `there is no ${name || 'thing'} in sight to use`, false);
     return useThing(g, o);
   }
   function useThing(g, o) {
     const k = kindOf(o.type);
-    if (!k) return say(g, `${g.id} cannot think of a use for the ${nice(o.type)}`, false);
+    if (!k) return fail(g, `${g.id} cannot think of a use for the ${nice(o.type)}`, false);
     if (k === 'chest') return reach(g, o, () => toggleChest(g, o));
-    if ((k === 'bed' || k === 'seat') && occupied(o, g)) return say(g, `someone is already on the ${nice(o.type)}`, false);
+    if ((k === 'bed' || k === 'seat') && occupied(o, g)) return fail(g, `someone is already on the ${nice(o.type)}`, false);
     if (k === 'bed' || k === 'seat') return reach(g, o, () => settle(g, o, k === 'bed' ? 'lie' : 'sit'));
     return reach(g, o, () => work(g, o, k));
   }
@@ -166,7 +166,7 @@
     if (crystal) {
       const m = meshOf(o), mm = meta(m) || {}; mm.opts ||= {};
       const left = mm.opts.left ?? 3;
-      if (left <= 0) return say(g, `the ${nice(o.type)} is spent: no crystals are left on it`, false);
+      if (left <= 0) return fail(g, `the ${nice(o.type)} is spent: no crystals are left on it`, false);
       mm.opts.left = left - 1;
       try { const s = .35 + .65 * (mm.opts.left / 3); m.scaling.setAll(s); if (!mm.opts.left) m.getChildMeshes?.(false).forEach(c => c.visibility = .35); saveWorldState(); } catch {}
     }
@@ -183,8 +183,8 @@
   // close(chest): shut an open chest
   function shut(g, name) {
     const o = find(g, name || 'chest');
-    if (!o || kindOf(o.type) !== 'chest') return say(g, `there is no ${name || 'chest'} in sight to close`, false);
-    return reach(g, o, () => { const m = meshOf(o); face(g, o); if (!isOpen(m)) return say(g, `the ${nice(o.type)} is already closed`, false); setOpen(m, false); emitBadge(g, 'closes'); return act(g, `${g.id} closes the ${nice(o.type)}`, 'open', 1300, false); });
+    if (!o || kindOf(o.type) !== 'chest') return fail(g, `there is no ${name || 'chest'} in sight to close`, false);
+    return reach(g, o, () => { const m = meshOf(o); face(g, o); if (!isOpen(m)) return fail(g, `the ${nice(o.type)} is already closed`, false); setOpen(m, false); emitBadge(g, 'closes'); return act(g, `${g.id} closes the ${nice(o.type)}`, 'open', 1300, false); });
   }
   // walk(bed), walk("-2,-2") onto a bed's or seat's cell: that is getting
   // on it (small models told to go to bed walk to it and stop beside it)
@@ -250,7 +250,7 @@
     // already open: what is in it (small models repeat use(chest); closing
     // it again undid what they meant). close(chest) shuts it.
     if (isOpen(m)) { const w = describe(contents(m)); return act(g, `the ${nice(o.type)} is open: ${w ? 'inside are ' + w : 'it is empty'} (take(item, ${o.type}) takes one, put(item, ${o.type}) stores one)`, 'open', 1300, false); }
-    if (meta(m).locked) return say(g, `the ${nice(o.type)} is locked`, false);
+    if (meta(m).locked) return fail(g, `the ${nice(o.type)} is locked`, false);
     const c = contents(m), what = describe(c);   // before it counts as opened
     setOpen(m, true); emitBadge(g, 'opens');
     toastIfPlayer(g, what ? 'Inside: ' + what : 'It is empty');
@@ -269,11 +269,11 @@
   }
   function take(g, arg) {
     const { item, where } = parse(arg, 'chest'), { o, err } = chestFor(g, where);
-    if (err) return say(g, 'take failed: ' + err, false);
+    if (err) return fail(g, 'take failed: ' + err, false);
     return reach(g, o, () => {
       const m = meshOf(o); face(g, o);
       // a closed chest is opened on the way (one turn, not two)
-      if (!isOpen(m)) { if (meta(m).locked) return say(g, `take failed: the ${nice(o.type)} is locked`, false); contents(m); setOpen(m, true); }
+      if (!isOpen(m)) { if (meta(m).locked) return fail(g, `take failed: the ${nice(o.type)} is locked`, false); contents(m); setOpen(m, true); }
       const c = contents(m), gm = item.match(/^(\d+)?\s*(?:gold|coins?|gold coins?)$/i), mine = g === state.playerAvatar ? state.player : charInventory(g);
       let got = '';
       if (/^(all|everything)$/i.test(item)) {
@@ -285,11 +285,11 @@
         if (n > 0) { c.gold -= n; mine.gold = (+mine.gold || 0) + n; got = n + ' gold'; }
       } else {
         const it = findItem(c.items.filter(i => (i.qty ?? 1) > 0), item);
-        if (!it) return say(g, `take failed: there is no ${item} in the ${nice(o.type)}` + (describe(c) ? ` (it holds ${describe(c)})` : ' (it is empty)'), false);
+        if (!it) return fail(g, `take failed: there is no ${item} in the ${nice(o.type)}` + (describe(c) ? ` (it holds ${describe(c)})` : ' (it is empty)'), false);
         it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) c.items.splice(c.items.indexOf(it), 1);
         addItem(mine.items, it.name); got = it.name;
       }
-      if (!got) return say(g, `take failed: the ${nice(o.type)} ${/gold/i.test(item) ? 'has no gold' : 'is empty'}`, false);
+      if (!got) return fail(g, `take failed: the ${nice(o.type)} ${/gold/i.test(item) ? 'has no gold' : 'is empty'}`, false);
       if (g !== state.playerAvatar) setBrainConfig(g.id, { inventory: mine });
       window.tablefolkSfx?.play(/gold/.test(got) ? 'coins' : 'pickup', m.getAbsolutePosition?.() || m.position);
       emitBadge(g, '+' + got); inventoryChanged();
@@ -303,20 +303,20 @@
   }
   function put(g, arg) {
     const { item, where } = parse(arg, 'chest'), { o, err } = chestFor(g, where);
-    if (err) return say(g, 'put failed: ' + err, false);
+    if (err) return fail(g, 'put failed: ' + err, false);
     return reach(g, o, () => {
       const m = meshOf(o); face(g, o);
       // a closed chest is opened on the way (one turn, not two)
-      if (!isOpen(m)) { if (meta(m).locked) return say(g, `put failed: the ${nice(o.type)} is locked`, false); contents(m); setOpen(m, true); }
+      if (!isOpen(m)) { if (meta(m).locked) return fail(g, `put failed: the ${nice(o.type)} is locked`, false); contents(m); setOpen(m, true); }
       const c = contents(m), mine = g === state.playerAvatar ? state.player : charInventory(g), gm = item.match(/^(\d+)?\s*(?:gold|coins?|gold coins?)$/i);
       let put = '';
       if (gm) {
         const have = +mine.gold || 0, n = Math.min(have, +(gm[1] || have));
-        if (n <= 0) return say(g, `put failed: ${g.id} has no gold`, false);
+        if (n <= 0) return fail(g, `put failed: ${g.id} has no gold`, false);
         mine.gold = have - n; c.gold = (+c.gold || 0) + n; put = n + ' gold';
       } else {
         const it = findItem((mine.items || []).filter(i => (i.qty ?? 1) > 0), item);
-        if (!it) return say(g, `put failed: ${g.id} has no ${item}`, false);
+        if (!it) return fail(g, `put failed: ${g.id} has no ${item}`, false);
         if (state.player.wielding && g === state.playerAvatar && state.player.wielding.toLowerCase() === it.name.toLowerCase()) window.tablefolkCombat?.wield(g, 'none');
         if (g !== state.playerAvatar && getBrainConfig(g.id).wielding?.toLowerCase?.() === it.name.toLowerCase()) setBrainConfig(g.id, { wielding: null });
         it.qty = (it.qty ?? 1) - 1; if (it.qty <= 0) mine.items.splice(mine.items.indexOf(it), 1);

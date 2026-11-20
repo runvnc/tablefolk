@@ -157,7 +157,7 @@
     log(text);
     if (isPlayer(g)) window.tablefolkToast?.(text);
   }
-  const fail = (g, text) => { narrate(g, text); return false; };
+  const fail = (g, text) => { narrate(g, text); window.tablefolk?.markFailed?.(g); return false; };
 
   const V3 = (x, y, z) => new BABYLON.Vector3(x, y, z);
   const EFFECTS = {

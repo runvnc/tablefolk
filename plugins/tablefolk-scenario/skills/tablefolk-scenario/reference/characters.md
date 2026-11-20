@@ -108,6 +108,9 @@ a ring in, and the player finds it there. The player does the same with E.
   is cut at a sentence; a repeat of one of its last 8 lines is not spoken,
   and a line that echoes what someone just said is dropped (the character is
   told). Two unprompted talking turns, then quiet ones unless spoken to.
+- What a command did is told back plainly: "carry FAILED: there is no bread
+  in sight to carry", or "use worked: grub sits down on the stool"; a command
+  that failed is not suggested again on the next turn.
 - The dead say nothing.
 
 ## Menus: choices instead of (or beside) free talk

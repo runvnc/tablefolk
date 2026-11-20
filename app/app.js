@@ -3348,6 +3348,15 @@ window.tablefolkTTS?.addEventListener('speechstart',e=>voiceBubble(e,b=>b.div.cl
 window.tablefolkTTS?.addEventListener('speechend',e=>voiceBubble(e,b=>{ b.waitVoice=false; b.div.classList.remove('talking'); b.ttl=e.detail.ok===false?readingTime(b.div.textContent):1.4; }));
 // whisper: speech only the player hears (other characters never get it); a
 // smaller, dimmer bubble.
+// Command results that did not work: fail(g,text) marks the history entry
+// the result goes to, so the actor's next prompt reads "carry FAILED: ..."
+// (world-integration.js ownActionResults), never "carry worked: there is no
+// bread". Every handler's "could not" path calls it (or quietFail).
+const failedEntries=new Set();
+const entryKey=e=>String(e||'').split(' -> ')[0].replace(/^(T\d+ [^:]+):.*$/s,'$1');
+function markFailed(g){ const h=state.globalHistory, last=h?.[h.length-1]; if(g && g!==state.playerAvatar && last && last.startsWith('T') && last.includes(g.id+':')){ failedEntries.add(entryKey(last)); if(failedEntries.size>200) failedEntries.delete(failedEntries.values().next().value); } }
+function isFailedEntry(e){ return failedEntries.has(entryKey(e)); }
+function fail(g,text){ markFailed(g); return say(g,text,false); }
 function say(g,text,voiced=false,{whisper=false}={}){
   // The dead say nothing (a turn that was thinking when it died ends here).
   if(g?.defeated){ clearStreamingBubble(g); return; }
@@ -3645,7 +3654,7 @@ function walk(g,destination){
     const thing=(!target || target.isDisposed?.()) && namedThing(g,destination.label);
     if(thing){ destination={type:'coord',x:Math.round(thing.x),z:Math.round(thing.z),label:'the '+thing.type.replace(/_/g,' '),object:true}; }
     else {
-    if(!target || target.isDisposed?.()) return say(g,`can't see map label ${destination.label}`);
+    if(!target || target.isDisposed?.()) return fail(g,`can't see map label ${destination.label}`);
     const p=target.getAbsolutePosition?.()||target.position;
     destination={type:'coord',x:Math.round(p.x),z:Math.round(p.z),label:destination.label,object:true};
     }
@@ -3687,7 +3696,7 @@ function walk(g,destination){
     travel=Math.max(0,distance-(targetObject?1:0));
     description=destination.label||`(${tx},${tz})`;
   }
-  if(!d) return say(g,'walk needs an absolute coordinate or visible map label');
+  if(!d) return fail(g,'walk needs an absolute coordinate or visible map label');
   // Walk around walls/water/props instead of stopping at the first one, as
   // long as the destination is on the island (walking off it still falls).
   // Single-step direction walks stay straight. state.pathfinding=false
@@ -3702,7 +3711,7 @@ function walk(g,destination){
         setTimeout(()=>{ if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+80);
         return;
       }
-      if(route===null){ say(g,`can't find a way to ${description}`); return; }
+      if(route===null){ fail(g,`can't find a way to ${description}`); return; }
     }
   }
   // Sweep the straight segment in small increments. Stop before the first
@@ -3717,7 +3726,7 @@ function walk(g,destination){
   }
   if(requested>0 && safeTravel<requested && requested-safeTravel<sample) safeTravel=requested;
   if(safeTravel<.05){
-    say(g,`can't walk toward ${description}, something is in the way`);
+    fail(g,`can't walk toward ${description}, something is in the way`);
     log(g.id+' blocked walking toward '+description);
     return;
   }
@@ -3755,7 +3764,7 @@ function touch(g,targetId=''){
       }
       t=best;
     }
-    if(!t) return say(g,'cannot find a '+targetId+' to touch');
+    if(!t) return fail(g,'cannot find a '+targetId+' to touch');
   } else {
     t=nearestTarget(g);
   }
@@ -3764,7 +3773,7 @@ function touch(g,targetId=''){
   if(m?.soft){ impulse(t,g.root.position,1.7,.45); say(g,'boing verified'); } 
   else { damage(t,.35,'touch'); say(g,'texture report: probably real'); } 
 }
-function push(g,sign=1){ const t=nearestTarget(g); if(!t) return say(g,'nothing to push here'); const from=sign>0?g.root.position:t.position.add(g.root.position.subtract(t.position).scale(2)); impulse(t,from,sign>0?4.8:2.2,.18); const m=meta(t); if(m?.type==='barrel') { m.state='rolling'; emitBadge(t,'roll'); } if(m?.type==='mushroom') emitBadge(t,'boing'); damage(t,.25,'push'); g.anim='push'; playRig(g,'push',false); say(g,`${g.id} ${sign>0?'pushes':'pulls'} the ${(m?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); },540); }
+function push(g,sign=1){ const t=nearestTarget(g); if(!t) return fail(g,'nothing to push here'); const from=sign>0?g.root.position:t.position.add(g.root.position.subtract(t.position).scale(2)); impulse(t,from,sign>0?4.8:2.2,.18); const m=meta(t); if(m?.type==='barrel') { m.state='rolling'; emitBadge(t,'roll'); } if(m?.type==='mushroom') emitBadge(t,'boing'); damage(t,.25,'push'); g.anim='push'; playRig(g,'push',false); say(g,`${g.id} ${sign>0?'pushes':'pulls'} the ${(m?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>{ g.anim='idle'; playRig(g,'idle',true); },540); }
 // The nearest thing called `name` ("note", "the barrel", "pie recipe") that g
 // can see within `radius`; null if none.
 function namedThing(g,name,radius=10){
@@ -3785,7 +3794,7 @@ function namedThing(g,name,radius=10){
 function carry(g,name=''){
   if(name && !/^(it|that|this|something|object|item)$/i.test(name)){
     const o=namedThing(g,name);
-    if(!o) return say(g,`there is no ${name} in sight to carry`,false);
+    if(!o) return fail(g,`there is no ${name} in sight to carry`,false);
     if(o.d>1.8){
       walk(g,{type:'coord',x:Math.round(o.x),z:Math.round(o.z),label:'the '+o.type.replace(/_/g,' ')});
       const dur=(g.turnMove?.dur||1)*1000+150;
@@ -3796,7 +3805,7 @@ function carry(g,name=''){
   }
   return carryMesh(g,nearestTarget(g,1.8));
 }
-function carryMesh(g,t){ if(!t) return say(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','picture','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','crystal_ball','scrying_pool','rune_circle','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return say(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
+function carryMesh(g,t){ if(!t) return fail(g,'nothing you can carry is right next to you'); const m=meta(t); if(!m || ['wall','door','picture','bakery','crystal','house','fantasy_house','stable','windmill','bell_tower','watch_tower','well','chest','iron_chest','bed','double_bed','bookcase','bookshelf','cabinet','anvil','cauldron','crystal_ball','scrying_pool','rune_circle','market_stand','market_stalls','cart','statue','tent'].includes(m.type)) return fail(g,`the ${(m?.type||'thing').replace(/_/g,' ')} is far too heavy to carry`); if(state.held.get(g.id)) drop(g,false); state.held.set(g.id,t); playRig(g,'carry',true); t.physicsBody?.setMotionType(BABYLON.PhysicsMotionType.ANIMATED); beginCarry(g,t); if(m.type==='note'){ const txt=(m.noteText||noteTextFromHtml(m.noteHtml||''))||'blank'; say(g,`${g.id} picks up the note. It says: `+txt); } else { say(g,`${g.id} picks up the ${m.type.replace(/_/g,' ')}`); } }
 // Where a gently dropped item should go: in front of the carrier, or beside
 // it if something is already there (characters stop right next to whatever
 // they walked to, so "in front" is often inside that object). If every spot
@@ -3822,10 +3831,10 @@ function dropSpot(g,h){
   const stackTop=Math.max(top,...hits(p).map(b=>b.max.y));
   return new BABYLON.Vector3(p.x,stackTop+halfH-centerDy+.03,p.z);
 }
-function drop(g,thrown=false){ const h=state.held.get(g.id); if(!h) return say(g,`${g.id} is not carrying anything`); state.held.delete(g.id); const dropAt=thrown ? null : dropSpot(g,h); endCarry(h,thrown ? h.position.clone() : dropAt, !thrown); if(thrown) h.physicsBody?.applyImpulse(g.dir.add(new BABYLON.Vector3(0,.28,0)).scale(4.4),h.position); playRig(g,thrown?'throw':'idle',false); say(g,`${g.id} ${thrown?'throws':'puts down'} the ${(meta(h)?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>playRig(g,'idle',true),650); }
+function drop(g,thrown=false){ const h=state.held.get(g.id); if(!h) return fail(g,`${g.id} is not carrying anything`); state.held.delete(g.id); const dropAt=thrown ? null : dropSpot(g,h); endCarry(h,thrown ? h.position.clone() : dropAt, !thrown); if(thrown) h.physicsBody?.applyImpulse(g.dir.add(new BABYLON.Vector3(0,.28,0)).scale(4.4),h.position); playRig(g,thrown?'throw':'idle',false); say(g,`${g.id} ${thrown?'throws':'puts down'} the ${(meta(h)?.type||'thing').replace(/_/g,' ')}`); setTimeout(()=>playRig(g,'idle',true),650); }
 // dig(north) / dig(wall to the east): turn that way first
 function dig(g,where=''){ const w=String(where||'').toLowerCase().match(/\b(north|south|east|west|n|s|e|w)\b/); if(w){ const d=FACING_DIRS[w[1][0]]; if(d) setCharacterFacing(g,new BABYLON.Vector3(...d)); } playRig(g,'dig',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,1.8); if(t && state.blocks.includes(t)){ damage(t,99,'dig'); say(g,`${g.id} digs through the ${meta(t)?.type||'wall'}`); } else { const p=g.root.position.add(g.dir.scale(1.0)); const hole=BABYLON.MeshBuilder.CreateCylinder('tiny_hole',{diameter:.55,height:.035,tessellation:12},state.scene); hole.position.set(Math.round(p.x),(state.terrainTopY??0)+.015,Math.round(p.z)); hole.material=state.materials.hole; tag(hole,'hole',{interactive:false}); state.props.push(hole); say(g,`${g.id} digs a hole in the floor`); } }
-function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,2.5); if(!t) return say(g,'nothing to repair here'); const m=meta(t); if(!m) return; m.health=Math.max(m.health,2); if(m.state==='cracked'||m.state==='burned'){ m.state='intact'; if(m.material==='wood') t.material=state.materials.wood; else if(m.material==='stone') t.material=state.materials.stone; else t.material=state.materials.canvas; emitBadge(t,'fixed'); say(g,`${g.id} repairs the ${m.type}`); } else say(g,`the ${m.type} does not need repairing`); }
+function repair(g){ playRig(g,'repair',false); setTimeout(()=>playRig(g,'idle',true),900); const t=nearestTarget(g,2.5); if(!t) return fail(g,'nothing to repair here'); const m=meta(t); if(!m) return; m.health=Math.max(m.health,2); if(m.state==='cracked'||m.state==='burned'){ m.state='intact'; if(m.material==='wood') t.material=state.materials.wood; else if(m.material==='stone') t.material=state.materials.stone; else t.material=state.materials.canvas; emitBadge(t,'fixed'); say(g,`${g.id} repairs the ${m.type}`); } else fail(g,`the ${m.type} does not need repairing`); }
 
 function note(g,html='<p>empty note</p>'){
   if(!html || !String(html).trim()) html='<p>empty note</p>';
@@ -3840,7 +3849,7 @@ function note(g,html='<p>empty note</p>'){
 function face(g,dir){ const dirs={n:[0,0,-1],north:[0,0,-1],s:[0,0,1],south:[0,0,1],e:[-1,0,0],east:[-1,0,0],w:[1,0,0],west:[1,0,0]}; const v=dirs[String(dir||'n').toLowerCase()]||dirs.n; setCharacterFacing(g,new BABYLON.Vector3(v[0],v[1],v[2])); say(g,'facing '+String(dir||'n')); }
 function build(g,thing='wall',at=null){
   let x,z;
-  if(at?.type==='label'){ const t=state.perceptionLabels?.get(String(at.label||'').toLowerCase()); if(!t||t.isDisposed?.()) return say(g,'cannot build at unknown label '+at.label); const tp=t.getAbsolutePosition?.()||t.position; x=clamp(Math.round(tp.x),-15,15); z=clamp(Math.round(tp.z),-15,15); }
+  if(at?.type==='label'){ const t=state.perceptionLabels?.get(String(at.label||'').toLowerCase()); if(!t||t.isDisposed?.()) return fail(g,'cannot build at unknown label '+at.label); const tp=t.getAbsolutePosition?.()||t.position; x=clamp(Math.round(tp.x),-15,15); z=clamp(Math.round(tp.z),-15,15); }
   else if(at?.type==='coord'){ x=clamp(Math.round(at.x),-15,15); z=clamp(Math.round(at.z),-15,15); }
   else { const p=g.root.position.add(g.dir.scale(1.25)); x=clamp(Math.round(p.x),-15,15); z=clamp(Math.round(p.z),-15,15); }
   // keep the builder out of its own construction
@@ -3850,7 +3859,7 @@ function build(g,thing='wall',at=null){
   const taken=(cx,cz)=>!hasGroundAt(cx,cz) || isBlocked(cx,cz) || occupantAt(cx,cz,null) || (Math.abs(cx-lp.x)<.5&&Math.abs(cz-lp.z)<.5) || getObjects().some(o=>Math.round(o.x)===cx&&Math.round(o.z)===cz&&!['tile','light','hole','flowers','grass_tuft'].includes(o.type));
   if(taken(x,z)){
     const near=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]].map(([dx,dz])=>[x+dx,z+dz]).filter(([cx,cz])=>!taken(cx,cz)).sort((a,b)=>Math.hypot(a[0]-lp.x,a[1]-lp.z)-Math.hypot(b[0]-lp.x,b[1]-lp.z));
-    if(!near.length) return say(g,'no room to build there',false);
+    if(!near.length) return fail(g,'no room to build there',false);
     [x,z]=near[0];
   }
   setCharacterFacing(g,new BABYLON.Vector3(Math.sign(x-lp.x),0,Math.sign(z-lp.z)));
@@ -3894,7 +3903,7 @@ function emote(g,name){
 }
 // the same goal again (small models re-set it every turn) is a wasted turn:
 // it is told so, and nothing changes
-function setGoal(g,text){ const cfg=getBrainConfig(g.id); text=String(text||'').replace(/^["']|["']$/g,'').trim(); if(text && String(cfg.goal||'').toLowerCase()===text.toLowerCase()) return say(g,`that is already your goal: now do something toward it`,false); cfg.goal=text||''; setBrainConfig(g.id,cfg); say(g,text?`goal set: ${text}`:'goal cleared'); updatePerceptionUI(); }
+function setGoal(g,text){ const cfg=getBrainConfig(g.id); text=String(text||'').replace(/^["']|["']$/g,'').trim(); if(text && String(cfg.goal||'').toLowerCase()===text.toLowerCase()) return fail(g,`that is already your goal: now do something toward it`,false); cfg.goal=text||''; setBrainConfig(g.id,cfg); say(g,text?`goal set: ${text}`:'goal cleared'); updatePerceptionUI(); }
 // ---- inventories (shop) ----
 // A character's inventory lives in its brain config (so it is saved with the
 // world, in character snapshots and in recordings): {gold, items:[{name,
@@ -4074,20 +4083,23 @@ function poseReach(g){
 // not have now fails, and says so (a pretend hand-over confused the others).
 function give(g,item){
   item=String(item||'').trim().replace(/^["']|["']$/g,'');
-  if(!item) return say(g,'give what, exactly?');
+  if(!item) return fail(g,'give what, exactly?');
   const playerName=document.getElementById('chatName')?.value.trim() || 'God';
   let to='', m=item.match(/^(.*?)\s*(?:,|\bto\b)\s*["']?([\w -]+?)["']?$/i);
   if(m && m[2]){ item=m[1].trim().replace(/^["']|["']$/g,''); to=m[2].trim().toLowerCase(); }
   const other=to && !['you','player','the player',playerName.toLowerCase()].includes(to) ? state.characters.find(c=>c!==g && !c.defeated && c.id.toLowerCase()===to) : null;
-  if(to && !other && !['you','player','the player',playerName.toLowerCase()].includes(to)) return say(g,`give failed: there is nobody called ${to} here`);
+  if(to && !other && !['you','player','the player',playerName.toLowerCase()].includes(to)) return fail(g,`give failed: there is nobody called ${to} here`);
   const inv=charInventory(g);
+  // mind.js tempers: it will not hand anything to someone it is too angry with
+  const toKey=other?other.id:'player';
+  if(window.tablefolkMind?.refuses(g,toKey)) return fail(g,`give refused: you will not help ${other?other.id:playerName} until they apologise`);
   // gold: give(50 gold), give(gold, pip)
   const gm=item.match(/^(\d+)?\s*(?:gold|coins?|gold coins?)$/i);
   if(gm){
     const amt=Math.max(1,+(gm[1]||1)), have=+inv.gold||0;
-    if(have<amt) return say(g,`give failed: ${g.id} has only ${have} gold`);
+    if(have<amt) return fail(g,`give failed: ${g.id} has only ${have} gold`);
     if(other){ const oinv=charInventory(other); inv.gold=have-amt; oinv.gold=(+oinv.gold||0)+amt; setBrainConfig(g.id,{inventory:inv}); setBrainConfig(other.id,{inventory:oinv}); window.tablefolkMind?.event(other,'given',{who:g.id,what:amt+' gold'}); emitBadge(g,'gave '+amt+' gold'); startHandover(g,other,'gold'); return say(g,`${g.id} gives ${other.id} ${amt} gold`); }
-    if(state.playerAvatar && !comeOver(g)) return say(g,`give failed: ${playerName} is too far away; walk over to them first`);
+    if(state.playerAvatar && !comeOver(g)) return fail(g,`give failed: ${playerName} is too far away; walk over to them first`);
     inv.gold=have-amt; setBrainConfig(g.id,{inventory:inv}); state.player.gold=(+state.player.gold||0)+amt; inventoryChanged(); emitBadge(g,'gave '+amt+' gold'); startHandover(g,state.playerAvatar,'gold');
     return say(g,`${g.id} gives ${playerName} ${amt} gold`);
   }
@@ -4098,7 +4110,7 @@ function give(g,item){
   if(!stock && heldType && (heldType===item.toLowerCase() || item.toLowerCase().includes(heldType) || heldType.includes(item.toLowerCase()))){
     if(other){
       const a=g.logicalPos||g.root.position, b=other.logicalPos||other.root.position;
-      if(Math.hypot(a.x-b.x,a.z-b.z)>(state.earshot||6)) return say(g,`give failed: ${other.id} is too far away; walk over first`);
+      if(Math.hypot(a.x-b.x,a.z-b.z)>(state.earshot||6)) return fail(g,`give failed: ${other.id} is too far away; walk over first`);
       state.held.delete(g.id); if(state.held.get(other.id)) drop(other,false);
       state.held.set(other.id,held); beginCarry(other,held); playRig(g,'idle',true);
       emitBadge(g,'gave '+heldType);
@@ -4107,11 +4119,11 @@ function give(g,item){
     drop(g,false);
     return say(g,`${g.id} hands ${playerName} the ${heldType} (it is on the floor in front of ${g.id})`);
   }
-  if(!stock) return say(g,`give failed: ${g.id} has no ${item} (it has ${inv.items.filter(i=>(i.qty??1)>0).map(i=>i.name).join(', ')||'nothing'})`);
+  if(!stock) return fail(g,`give failed: ${g.id} has no ${item} (it has ${inv.items.filter(i=>(i.qty??1)>0).map(i=>i.name).join(', ')||'nothing'})`);
   if(other){
     const a=g.logicalPos||g.root.position, b=other.logicalPos||other.root.position, d=Math.hypot(a.x-b.x,a.z-b.z);
     if(d>GIVE_RANGE){
-      if(d>(state.earshot||6)) return say(g,`give failed: ${other.id} is too far away; walk over first`);
+      if(d>(state.earshot||6)) return fail(g,`give failed: ${other.id} is too far away; walk over first`);
       try{ walk(g,{type:'coord',x:Math.round(b.x),z:Math.round(b.z)}); }catch{}
     }
     stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
@@ -4125,7 +4137,7 @@ function give(g,item){
   // Handing over needs the player within reach (when they have an avatar).
   const av=state.playerAvatar?.root?.position;
   if(av && !comeOver(g))
-    return say(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
+    return fail(g,`give failed: ${recipient} is too far away to hand ${stock.name} to; walk over to them first`);
   stock.qty=(stock.qty??1)-1; if(stock.qty<=0) inv.items=inv.items.filter(i=>i!==stock);
   if(stock.text!=null) state.player.items.push({name:stock.name,qty:1,text:stock.text}); else addItem(state.player.items,stock.name); setBrainConfig(g.id,{inventory:inv});
   emitBadge(g,'gave '+stock.name); inventoryChanged(); startHandover(g,state.playerAvatar,stock.name);
@@ -5593,7 +5605,7 @@ function installWorldAPI(){
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),
     executeAgentCommand:(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'),
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),
-    stepAgentTurn:beginTurnForAgent, renderPlayerInventory:()=>renderPlayerInventory(),
+    stepAgentTurn:beginTurnForAgent, markFailed, isFailedEntry, fail, addresseeOf, renderPlayerInventory:()=>renderPlayerInventory(),
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,

@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-20
+
+- **Characters are told plainly when a command did not work**: "carry FAILED: there is no bread in sight to carry" instead of "carry worked: ..." (every command's could-not path now says so), and a command that just failed is not suggested to it again on its next turn.
+
 ## 2026-11-19
 
 - **The red dragon's tail and mouth fixed**: its tail no longer snaps and kinks as it walks (it was moving with the hind legs; it now has its own bones along its whole length), and its mouth closes to a clean line and opens dark inside, the same on both sides (a spike of big triangles and see-through gaps are gone). It stands a little lower and longer, closer to its picture, and takes the same room as before. It already turned its head to whoever talks to it.

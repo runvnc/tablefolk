@@ -65,6 +65,8 @@
   function narrate(g, text) {
     const h = state.globalHistory;
     if (h?.length && !isPlayer(g)) { const last = h[h.length - 1]; if (last.startsWith('T') && last.includes(g.id + ':')) h[h.length - 1] = last + ' -> ' + text; }
+    // "attack failed: ...", "wield failed: ...": marked, so the actor reads FAILED
+    if (/^\w+ failed:/.test(text)) window.tablefolk?.markFailed?.(g);
     log(text);
   }
   // The struck character's next prompt hears about it; it answers now if idle.
