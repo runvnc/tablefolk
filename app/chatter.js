@@ -64,9 +64,13 @@
     if (state.playerAvatar && !state.playerAvatar.defeated && dist(p, posOf(state.playerAvatar)) <= r) return true;
     return state.characters.some(c => c !== g && mindful(c) && dist(p, posOf(c)) <= r);
   }
+  // guards, militia and other fighters greet as a watch, not as a shop ("I'm working here")
+  const GUARD_KIND = { greet: 'greet_guard' };
   function candidates(g, kind) {
     const v = voiceOf(g), out = [];
-    const job = window.tablefolkJobs?.jobOf?.(g), own = norm(job?.lines?.[kind]);
+    const job = window.tablefolkJobs?.jobOf?.(g);
+    if (GUARD_KIND[kind] && (job?.fights || /guard|militia|watch|soldier/i.test(job?.id || ''))) { const k2 = GUARD_KIND[kind]; const own2 = norm(job?.lines?.[k2] || job?.lines?.[kind]); kind = k2; const o = []; for (const key of [v, 'any']) o.push(...(own2[key] || [])); for (const p of PKG) for (const key of [v, 'any']) o.push(...((p.pools[k2] || {})[key] || [])); for (const key of [v, 'any']) o.push(...((BASE[k2] || {})[key] || [])); return o; }
+    const own = norm(job?.lines?.[kind]);
     const take = n => { for (const key of [v, 'any', ...(v === 'plain' ? [] : [])]) out.push(...(n[key] || [])); };
     take(own);
     for (const p of PKG) take(p.pools[kind] || {});

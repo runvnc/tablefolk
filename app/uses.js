@@ -50,7 +50,7 @@
  * The clips are the KayKit ones (Meshy people carry them too:
  * tools/retarget-people.sh). Figures without them play their idle.
  *
- *   window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe, register, stockOf, ... }
+ *   window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, standUp, lieOnFloor, lieOnFloor, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe, register, stockOf, ... }
  */
 (function () {
   const KIND = {
@@ -537,6 +537,21 @@
       g.rigRoot.position.x -= lx; g.rigRoot.position.z -= lz;
     }
   }
+  // No bed to be had: down on the floor where it stands (jobs.js bedtime).
+  // A lying pose like a bed's, a little above the ground, counted as sleep.
+  function lieOnFloor(g) {
+    if (!g || g.defeated || g.pose?.mode === 'lie') return false;
+    standUp(g, true);
+    const yaw = g.root.rotation.y || 0;
+    g._rigBaseY ??= g.rigRoot?.position.y ?? 0;
+    g._rigBaseX ??= g.rigRoot?.position.x ?? 0; g._rigBaseZ ??= g.rigRoot?.position.z ?? 0;
+    g.pose = { mode: 'lie', yaw, on: null, type: 'floor', top: .06, held: null };
+    g.anim = 'idle'; g.rigMode = null; playRig(g, 'idle', true);
+    state.scene.onAfterRenderObservable.addOnce(() => state.scene.onAfterRenderObservable.addOnce(() => fit(g)));
+    const mind = getBrainConfig(g.id).mind; if (mind) mind.tired = 0;
+    emitBadge(g, 'sleeps');
+    return say(g, `${g.id} lies down on the floor to sleep`, false);
+  }
   // the next action that is not talk stands it up, beside the thing
   function standUp(g, quiet) {
     if (!g?.pose) return false;
@@ -546,7 +561,7 @@
     const p = posOf(g), fx = Math.round(-Math.sin(pose.yaw)), fz = Math.round(-Math.cos(pose.yaw));
     const tries = [[fx, fz], [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([x, z]) => x || z);
     const free = (x, z) => typeof cellPassable !== 'function' || cellPassable(x, z);
-    for (const [dx, dz] of tries) { const x = Math.round(p.x + dx), z = Math.round(p.z + dz); if (free(x, z) && (typeof hasGroundAt !== 'function' || hasGroundAt(x, z))) { teleport(g, x, z); break; } }
+    if (pose.type !== 'floor') for (const [dx, dz] of tries) { const x = Math.round(p.x + dx), z = Math.round(p.z + dz); if (free(x, z) && (typeof hasGroundAt !== 'function' || hasGroundAt(x, z))) { teleport(g, x, z); break; } }
     // the seat moves freely again once its sitter is off it
     if (pose.held && !pose.on?.isDisposed?.()) setTimeout(() => { try { pose.held.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC); } catch {} }, 250);
     g.rigMode = null; if (!quiet) { g.anim = 'idle'; playRig(g, 'idle', true); }
@@ -633,5 +648,5 @@
       (chest ? `; take(item, ${chest.type}) and put(item, ${chest.type}) to take from or store in a chest` : '');
   }
 
-  window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, standUp, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe, register, resetRegistered, stockOf, useThing, besideCell, REACH, KIND, CORE_STOCK, registered: REGISTERED, STATION };
+  window.tablefolkUses = { use, put, take, shut, emoteUse, walkOnto, routine, standUp, lieOnFloor, kindOf, menu, exampleLine, contents, close, setOpen, nearby, describe, register, resetRegistered, stockOf, useThing, besideCell, REACH, KIND, CORE_STOCK, registered: REGISTERED, STATION };
 })();

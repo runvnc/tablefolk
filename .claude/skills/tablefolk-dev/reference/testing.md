@@ -311,6 +311,10 @@ by kind) and totals (model calls per game hour, idle open turns' share,
 live ticks handled in code, spoken lines per game hour, stores at the start
 and the end, raids, who was hurt, who was indoors while raiders were about).
 A world without a clock is timed from its `time` and the real minutes.
+After the table: `NO JOB CYCLES` for every working job that finished none
+(its step at the end and the last thing that held a step up, from
+`tablefolkJobs.stats()` `step`/`stuck`) and `HUNGRY at the end` with the
+reason (`stats().hungerWhy`).
 
 Baseline, before jobs (2026-11-20, E2B, hearthvale, pace lively, 8 minutes,
 code at ccae1fd): 113 model calls (4.7 a game hour), 73% of them idle open

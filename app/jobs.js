@@ -395,13 +395,27 @@
     const cfg = W().getBrainConfig(g.id), j = jobOf(g), who = near.map(nameOf).slice(0, 3).join(', ');
     event(g, 'remark');
     try {
-      const r = await window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: `You are ${g.id}${cfg.style ? ', ' + cfg.style : ''}. ${String(cfg.personality || '').slice(0, 260)}` }, { role: 'user', content: `You are the village ${j.name || j.id}, ${s.doing || 'at work'}. Today you have ${todayLine(s)}. ${who} ${near.length > 1 ? 'are' : 'is'} nearby. Say one short thing out loud (under 15 words) about your work or your day, in your own voice. Only the words.` }], max_tokens: 40, temperature: .8, agentId: 'remark' });
+      const r = await window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: `You are ${g.id}${cfg.style ? ', ' + cfg.style : ''}. ${String(cfg.personality || '').slice(0, 260)}` }, { role: 'user', content: `You are the village ${j.name || j.id}, ${s.doing || 'at work'}. Today you have ${todayLine(s)}. ${who} ${near.length > 1 ? 'are' : 'is'} nearby. Say one short thing out loud (under 15 words) about your work or your day, in your own voice${s.lastRemarkText ? `, something new (you last said "${s.lastRemarkText}")` : ''}. Only the words.` }], max_tokens: 40, temperature: .8, agentId: 'remark' });
       let t = String(r?.choices?.[0]?.message?.content || '').split('\n')[0].replace(/^say\s*\(|\)\s*$/g, '').replace(/^["“']+|["”']+$/g, '').replace(/^[\w-]+:\s*/, '').trim();
       if (t.length < 3 || /[{}<>]/.test(t)) return false;
       t = t.slice(0, 140);
+      // never the same remark twice in a row: not close to its own last one, nor to one of the
+      // last few anyone made (two militiamen took turns at "Scouting ahead. Nothing seen yet.")
+      if ([s.lastRemarkText, ...recentRemarks].some(r => r && sameRemark(r, t))) { console.info('[jobs] remark dropped (a repeat):', g.id, t); return false; }
+      s.lastRemarkText = t; recentRemarks.push(t); if (recentRemarks.length > 6) recentRemarks.shift();
       await runLine(g, `say(${JSON.stringify(t)})`);
       return true;
     } catch (e) { console.warn('[jobs] remark', e); return false; }
+  }
+  const recentRemarks = [];
+  const STOP = new Set(['the', 'a', 'an', 'and', 'of', 'to', 'is', 'it', 'in', 'on', 'for', 'my', 'i', 'we', 'yet', 'still', 'now', 'all', 'just', 'so', 'be', 'are', 'at', 'with', 'this', 'that']);
+  const words = t => new Set(String(t).toLowerCase().replace(/[^a-z' ]+/g, ' ').split(/\s+/).filter(w => w.length > 1 && !STOP.has(w)));
+  // two remarks are the same when half the words of the shorter are in the other, or they start alike
+  function sameRemark(a, b) {
+    const A = words(a), B = words(b); if (!A.size || !B.size) return a.trim().toLowerCase() === b.trim().toLowerCase();
+    let n = 0; for (const w of A) if (B.has(w)) n++;
+    const first = x => [...words(x)].slice(0, 2).join(' ');
+    return n / Math.min(A.size, B.size) >= .5 || (first(a) && first(a) === first(b));
   }
 
   // ---------------------------------------------------------------- package and skill commands in code and in picks
@@ -482,6 +496,7 @@
   const STEPS = {};
   const registerStep = (name, fn) => { STEPS[name] = fn; };
   const removeStep = name => { delete STEPS[name]; };
+  const stepLabel = st => { const k = stepName(st), a = st[k]; return k + (typeof a === 'string' ? ' ' + a : Array.isArray(a) ? ' ' + a.join('/') : ''); };
   const stepName = st => Object.keys(st).find(k => ['chores', 'haul', 'gather', 'fetch', 'make', 'store', 'sell', 'serve', 'patrol', 'tend', 'heal', 'rest', 'wander', 'read', 'tidy', 'lookout', 'pace', 'use'].includes(k) || STEPS[k]);
   // any step: "when" (a story.js condition, "me" the worker: "world.beacon_fuel < 4"),
   // and once it is done, "anim" (a clip of the worker's body, bodies.js) and "sound" (sfx.js, a package's too)
@@ -799,8 +814,11 @@
     for (let guard = 0; guard < steps.length + 1; guard++) {
       const i = s.step % steps.length, st = steps[i], t = gm();
       if (s.blocked[i] && t < s.blocked[i]) { advance(s, steps, j); continue; }
+      s.at = stepLabel(st);
       const r = await doStep(g, s, j, st);
       if (r.worked) s.pass = true;
+      // the last thing that held a step up (the day report names it for a job with no cycles)
+      if (r.fail) s.stuck = `${stepLabel(st)}: ${r.fail}`; else if (r.need) s.stuck = `${stepLabel(st)}: out of ${r.need.item}`;
       if (r.skip) { advance(s, steps, j); continue; }
       if (r.fail) { s.fails[i] = (s.fails[i] || 0) + 1; console.info('[jobs]', g.id, stepName(st), 'failed:', r.fail); if (s.fails[i] >= 2) { s.fails[i] = 0; s.blocked[i] = t + 60; advance(s, steps, j); } return { ms: 2500 }; }
       // out of something: the job's fallbacks in code (buy it, gather it); none works: the step waits an hour and the others go on
@@ -1024,7 +1042,7 @@
     if (!opts.length && sharer) opts.push({ label: `ask ${sharer.id} to share some food`, run: () => askFood(g, s, sharer) });
     if (!opts.length) {
       setDoing(g, s, 'hungry, looking for food');
-      s.hungerWhy = carriers.length ? 'nobody would share and it has no gold to buy' : gold(g) < 2 && other ? `no gold to buy from ${ownerOf(other).id}'s ${nice(other.type)}` : 'no food in any store, carried by anyone, or to forage';
+      s.hungerWhy = carriers.length ? `no gold (${gold(g)}) and nobody shared (asked ${Object.keys(s.askedFood || {}).join(', ') || 'nobody yet'})` : gold(g) < 2 && other ? `no gold to buy from ${ownerOf(other).id}'s ${nice(other.type)}` : 'no food reachable (no store, seller, carrier or forage it can get to)';
       if (!(s.ask && s.ask.until > gm())) s.ask = { item: 'food', until: gm() + 60, who: nearPeople(g, 8).filter(c => c !== state.playerAvatar)[0]?.id || '' };
       return null;
     }
@@ -1079,7 +1097,7 @@
     if (s.bedSaid !== night) { const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar || !!nameOf(c)); if (C()?.say(g, 'bed', {}, { to: near[0] || null })) s.bedSaid = night; else if (!near.length) s.bedSaid = night; }
     setDoing(g, s, bed ? 'going home to bed' : 'settling down for the night');
     // no bed it can reach: home, and down on the floor there
-    if (!bed) { const h = s.home && spotIn(s.home, g); if (h && !inPlace(s.home, posOf(g).x, posOf(g).z)) { const r = await goTo(g, s, h.x, h.z, 'home'); if (!r.fail) return { ms: r.ms || 3000 }; } if (s.floorSlept !== Math.floor((gm() + 360) / 1440)) { s.floorSlept = Math.floor((gm() + 360) / 1440); await runLine(g, 'emote(sleep)'); } setDoing(g, s, 'asleep on the floor'); return { ms: 8000 }; }
+    if (!bed) { const h = s.home && spotIn(s.home, g); if (h && !inPlace(s.home, posOf(g).x, posOf(g).z)) { const r = await goTo(g, s, h.x, h.z, 'home'); if (!r.fail) return { ms: r.ms || 3000 }; } if (s.floorSlept !== Math.floor((gm() + 360) / 1440) || g.pose?.mode !== 'lie') { s.floorSlept = Math.floor((gm() + 360) / 1440); if (!U()?.lieOnFloor?.(g)) await runLine(g, 'emote(sleep)'); } setDoing(g, s, 'asleep on the floor'); return { ms: 8000 }; }
     const r = await goDo(g, s, bed, `use(${bed.type})`);
     if (r.done) setDoing(g, s, 'asleep');
     return { ms: r.ms || 4000 };
@@ -1295,8 +1313,9 @@
       await modelTurn(g, 'danger'); return { ms: 1800 };
     }
     // job and role command rules (the keeper signals when the wolves come)
-    const rr = await rules(g, s, j); if (rr) return rr;
-    const th = await threatened(g, s, j, inHours(h, j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]))); if (th) return th;
+    const rr = await rules(g, s, j); if (rr) { s.busyWith = s.doing || 'its job\u2019s orders'; return rr; }
+    const th = await threatened(g, s, j, inHours(h, j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]))); if (th) { s.busyWith = s.doing || 'the raid'; return th; }
+    s.busyWith = '';
     // a word to say (mind.js speechCause): an answer to a want, a temper, a warning; at most one an hour
     const cause = M()?.speechCause?.(g);
     if (cause && cause !== 'news' && cause !== 'ask' && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g).length) { s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
@@ -1304,6 +1323,8 @@
     if (s.ask && s.ask.until > gm() && !s.ask.said && gm() - (s.lastCause ?? -999) >= 60 && nearPeople(g, 5).some(c => c.id === s.ask.who || !s.ask.who)) { s.ask.said = true; s.lastCause = gm(); await modelTurn(g, 'cause'); return { ms: 5000 }; }
     const sleepH = j.sleep || (j.watch === 'night' ? [9, 16] : [21, 5]), workH = j.hours || [7, 17];
     const asleep = inHours(h, sleepH);
+    // when it got hungry, for the day report's reason (stats().hungerWhy)
+    if ((m?.hunger ?? 0) >= .55) { if (s.hungrySince == null) { s.hungrySince = gm(); s.hungryAsleep = asleep; } } else { s.hungrySince = null; s.hungerWhy = ''; }
     if (!asleep && g.pose?.mode === 'lie') wake(g, s);
     // hungry (or weak): eat first, awake
     if (!asleep && (m?.hunger ?? 0) >= .55) { const r = await eat(g, s); if (r) return r; }
@@ -1355,6 +1376,15 @@
   // what it asks for, on the card (an ask turn)
   // (worded with no "ask X": E2B wrote ask(grub) as a command)
   function askLine(g) { const s = g._job; return s?.ask && s.ask.until > gm() ? `You need ${s.ask.item} and have none: say so to ${s.ask.who || 'someone nearby'}, in your own words.` : ''; }
-  function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, chores: g._job.choreDone || 0, did: g._job.did, doing: g._job.doing, hungerWhy: (M()?.mindOf?.(g)?.hunger || 0) >= .55 ? (g._job.hungerWhy || (g._job.doing === 'asleep' ? 'asleep' : 'had not got round to eating')) : '' }; return out; }
+  // why someone is hungry, specifically: what eat() found, else what kept it from eating since it got hungry
+  const hhmm = t => { const v = ((Math.round(t) % 1440) + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0'); };
+  function hungerWhy(g) {
+    const s = g._job; if ((M()?.mindOf?.(g)?.hunger || 0) < .55) return '';
+    if (s.hungerWhy) return s.hungerWhy;
+    const since = s.hungrySince != null ? hhmm(s.hungrySince) : '?';
+    if (/asleep/.test(s.doing || '')) return s.hungryAsleep ? `got hungry asleep at ${since}; asleep until now` : `went to bed hungry (hungry since ${since})`;
+    return `busy since ${since} (${s.busyWith || s.doing || 'working'}); had not reached food by ${hhmm(gm())}`;
+  }
+  function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, chores: g._job.choreDone || 0, did: g._job.did, doing: g._job.doing, step: g._job.at || '', stuck: g._job.stuck || '', hungerWhy: hungerWhy(g) }; return out; }
   window.tablefolkJobs = { condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm };
 })();

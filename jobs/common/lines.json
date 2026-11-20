@@ -69,6 +69,28 @@
       "Oh, you startled me, {name}."
     ]
   },
+  "greet_guard": {
+    "any": [
+      "{greeting}, {name}. Keep to the lit paths.",
+      "{name}. All's in order here.",
+      "Stay where I can see you, {name}.",
+      "{greeting}. Nothing to report, {name}.",
+      "Eyes open out there, {name}."
+    ],
+    "gruff": [
+      "Move along, {name}.",
+      "Hm. {name}. Don't loiter.",
+      "Keep your hands where I can see them, {name}."
+    ],
+    "cheerful": [
+      "{greeting}, {name}! Quiet watch so far.",
+      "Ah, {name}. Safe enough while I'm here."
+    ],
+    "timid": [
+      "Oh, {name}. I thought I heard something.",
+      "{name}... did you see anything out there?"
+    ]
+  },
   "out": {
     "any": [
       "We're out of {item}!",

@@ -38,6 +38,7 @@
     { "type": "bed", "in": "tavern" },
     { "type": "bed", "in": "guardhouse" },
     { "type": "cauldron", "in": "tavern" },
+    { "type": "carrot_crate", "in": "tavern" },
     { "type": "target", "in": "guardhouse" }
   ],
   "threats": [{ "kind": "wolfpack", "count": 3 }],

@@ -113,7 +113,11 @@ The day, by the clock:
   carries food to share it (they give it, or say no, by code). Raw grain
   and flour are not a meal unless it is starving. When none of it works the
   reason is kept (live-eval's day report names everyone who ends the day
-  hungry, and why);
+  hungry, and why: no food reachable, no gold and nobody shared (and whom
+  it asked), or what kept it busy since it got hungry and when);
+- **sleeping** at night in a bed at home, else a free bed nearby; with
+  no bed it can reach (all taken, walled in) it lies down on the floor at
+  home, which counts as sleep;
 - **the evening** (17-21) at the tavern, or the square: the time for talk.
   A character with someone beside it opens a talk with one line, chosen by
   the game and written by one short model call: first one concrete thing
@@ -195,7 +199,8 @@ later lines stay consistent) and into the history of those who hear it, but
 asks nobody for an answer and holds no conversational floor.
 
 The pools are data: `jobs/common/lines.json` (kinds `sale`, `thanks`,
-`greet`, `out`, `raid`, `raid_fighter`, `allclear`, `bed`, `patrol`,
+`greet`, `greet_guard` (what a guard, militia or other fighting job says
+instead of `greet`: a watch, not a shop), `out`, `raid`, `raid_fighter`, `allclear`, `bed`, `patrol`,
 `challenge`, `ask_food`, `share_food`, `refuse_food`, `help`, `intruder`,
 `thief`, `wake`), each a list or lists by voice (`any`, `plain`, `gruff`, `cheerful`,
 `timid`: from the character's temperament and personality), with slots

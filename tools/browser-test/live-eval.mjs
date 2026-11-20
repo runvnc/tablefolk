@@ -286,7 +286,7 @@ if (dayMode) {
   // sleep at night, hunger, hurt
   for (let i = 1; i < S.length; i++) { const dt = S[i].gm - S[i - 1].gm, h = ((S[i].gm % 1440) + 1440) % 1440 / 60; for (const c of S[i].chars) { const r = per[c.id]; if (!r) continue; if (c.lie && (h >= 21 || h < 5)) r.nightSleepMin += dt; if (c.hp != null && c.maxHp && c.hp < c.maxHp) r.hurt = true; } }
   for (const c of last.chars) if (per[c.id]) { per[c.id].hungerEnd = c.hunger; per[c.id].job = c.job; }
-  if (D.stats) for (const [id, st] of Object.entries(D.stats)) if (per[id]) { per[id].cycles = st.cycles || 0; if (st.hungerWhy) per[id].hungerWhy = st.hungerWhy; }
+  if (D.stats) for (const [id, st] of Object.entries(D.stats)) if (per[id]) { per[id].cycles = st.cycles || 0; if (st.hungerWhy) per[id].hungerWhy = st.hungerWhy; per[id].step = st.step || ''; per[id].stuck = st.stuck || ''; per[id].doingEnd = st.doing || ''; }
   // model calls by kind: page events when there are any (after the jobs change), else read from the prompts
   const calls = [];
   const runCalls = D.calls.filter(c => c.kind && !['pick', 'remark'].includes(c.kind));
@@ -335,6 +335,7 @@ if (dayMode) {
 summary.talk = talkReport({ says: cap.says, day: dayCap, summary });
 console.log('\n==== talk');
 for (const [k, v] of Object.entries(summary.talk)) console.log(k.padEnd(22), typeof v === 'object' ? JSON.stringify(v) : v);
+if (summary.day) for (const [id, r] of Object.entries(summary.day.per)) if (r.job && r.job !== 'idler' && !r.cycles) console.log(`NO JOB CYCLES: ${id} (${r.job}) at step "${r.step || '?'}"${r.stuck ? ', last held up by ' + r.stuck : ''}; doing at the end: ${r.doingEnd || '?'}`);
 if (summary.day) for (const [id, r] of Object.entries(summary.day.per)) if ((r.hungerEnd ?? 0) >= .55) console.log(`HUNGRY at the end: ${id} (${r.job}) ${r.hungerEnd}${r.hungerWhy ? ': ' + r.hungerWhy : ''}`);
 fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
