@@ -74,7 +74,7 @@
     ['embed.js?v=20261115c'],
     ['books.js?v=20261115f'],
     ['mind.js?v=20261120g'],
-    ['uses.js?v=20261120f'],
+    ['uses.js?v=20261120g'],
     ['roles.js?v=20261120c'],
     ['play.js?v=20261120e'],
     ['animals.js?v=20261114c'],

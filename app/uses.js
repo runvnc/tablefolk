@@ -147,7 +147,7 @@
   function find(g, name) {
     // a job step names the very thing it walked to (jobs.js goDo: g._useTarget), not the nearest of its type
     const tg = g?._useTarget && getObjects().find(t => t.mesh === g._useTarget);
-    if (tg && String(name || '').trim().replace(/^["']|["']$/g, '').toLowerCase() === tg.type) { const p = posOf(g); return { ...tg, d: Math.hypot(tg.x - p.x, tg.z - p.z) }; }
+    if (tg && String(name || '').trim().replace(/^["']|["']$/g, '').toLowerCase() === tg.type && !(['bed', 'seat'].includes(kindOf(tg.type)) && occupied(tg, g))) { const p = posOf(g); return { ...tg, d: Math.hypot(tg.x - p.x, tg.z - p.z) }; }
     const o = find0(g, name); if (!o) return o;
     // a bed or seat someone is on: a free one of the same kind close by
     if (['bed', 'seat'].includes(kindOf(o.type)) && occupied(o, g)) { const p = posOf(g); let best = null; for (const t of getObjects()) if (t.type === o.type && t.mesh !== o.mesh && !occupied(t, g)) { const d = Math.hypot(t.x - p.x, t.z - p.z); if (d <= 10 && (!best || d < best.d)) best = { ...t, d }; } if (best) return best; }
