@@ -7,6 +7,7 @@
 //        [--base=http://localhost:8000] [--model=<key>] [--llm=<url> --llm-model=<name>]
 //        [--label=before] [--provoke=<id> [--k=8] [--insults=bakery|generic]]
 //        [--query=a=1&b=2] (more URL parameters for the page)
+//        [--day [--day-minutes=8]] (one whole game day: the scored day below)
 //
 // <scenario.json> is a path under the repository (scenarios/goblin-bakery.json,
 // tools/browser-test/evals/roles.json); the page opens it with ?scenario=.
@@ -16,6 +17,18 @@
 // threats), one per turn of its own, recording its mood, trust, anger level,
 // reply, and the first turn it refuses, orders the player off, calls for help
 // or attacks. Prints the numbers and saves results/live-<name>-<label>-<ts>.json.
+//
+// --day: one full game day (dayMinutes real minutes, 8 by default, passed to
+// the page as ?dayMinutes=), then per character: job cycles (tablefolkJobs, 0
+// without it), items made / gathered / stored / sold / bought and meals (read
+// from the action lines everyone says, the same before and after), minutes
+// asleep at night (game time lying in a bed between 21:00 and 05:00), hunger
+// at the end, model calls by kind (reply, event, cause speech, idle open turn,
+// pick, remark, agenda); totals: model calls per game hour, share of live
+// ticks handled in code, spoken lines per game hour, stores at the start and
+// the end, raids (spawned, defeated, fled), who was hurt, where people were
+// while raiders were about. A world without a clock is timed from its
+// scenario's "time" and the real minutes.
 //
 // Numbers (best effort, parsed from the replies, the prompts and the world's
 // history; the same parser before and after a change):
@@ -35,10 +48,11 @@ const args = process.argv.slice(2), flag = n => { const a = args.find(x => x ===
 const scnPath = args.find(a => !a.startsWith('--'));
 if (!scnPath) { console.log('usage: node live-eval.mjs <scenario.json> [--minutes=6] [--turns=60] [--pace=lively] [--provoke=<id>] ...'); process.exit(1); }
 const name = path.basename(scnPath, '.json');
-const minutes = +(flag('minutes') || 6), maxTurns = +(flag('turns') || 60), pace = flag('pace') || 'lively';
+const dayMode = !!flag('day'), dayMinutes = +(flag('day-minutes') || 8);
+const minutes = dayMode ? dayMinutes : +(flag('minutes') || 6), maxTurns = dayMode ? 1e9 : +(flag('turns') || 60), pace = flag('pace') || 'lively';
 const base = flag('base') || 'http://localhost:8000', label = flag('label') || 'run';
 const provoke = flag('provoke'), K = +(flag('k') || 8), insultSet = flag('insults') || (name === 'goblin-bakery' ? 'bakery' : 'generic');
-const pick = [flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
+const pick = [dayMode && 'dayMinutes=' + dayMinutes, flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
 const INSULTS = {
   bakery: [
     'You are a useless, smelly little goblin and your pies taste like mud.',
@@ -94,12 +108,43 @@ await page.evaluate(() => {
   const po = document.getElementById('promptOut');
   if (po) new MutationObserver(() => { const tx = po.dataset.baseText; if (tx && tx !== C.prompts.at(-1)?.text) C.prompts.push({ t: now(), agent: (tx.match(/^\[AGENT: (\S+)\]/) || [])[1], text: tx }); }).observe(po, { attributes: true, attributeFilter: ['data-base-text'] });
   addEventListener('tablefolk-agent-turn', e => C.turns.push({ t: now(), agent: e.detail?.agentId, line: String(e.detail?.line || ''), reflex: !!e.detail?.reflex }));
-  addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (d.voiced && TABLEFOLK_STATE.characters.some(c => c.id === d.agentId)) C.says.push({ t: now(), agent: d.agentId, text: d.text }); });
+  addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (d.voiced && TABLEFOLK_STATE.characters.some(c => c.id === d.agentId)) C.says.push({ t: now(), agent: d.agentId, text: d.text }); if (!d.voiced) (C.acts ||= []).push({ t: now(), agent: d.agentId, text: String(d.text || '') }); });
+  // jobs.js and world-integration.js name each model call's kind (absent before the jobs change)
+  addEventListener('tablefolk-model-call', e => (C.calls ||= []).push({ t: now(), agent: e.detail?.agentId, kind: e.detail?.kind }));
+  addEventListener('tablefolk-attacked', e => (C.hits ||= []).push({ t: now(), agent: e.detail?.agentId }));
   // the history keeps 20 entries and results are appended to them: keep the fullest text of each
   setInterval(() => { for (const e of TABLEFOLK_STATE.globalHistory || []) { const k = e.split(' -> ')[0].slice(0, 90); if (!(k in C.hist)) { C.order.push(k); C.hist[k] = { t: now(), e }; } else if (e.length > C.hist[k].e.length) C.hist[k].e = e; } }, 400);
   document.querySelectorAll('.scn-intro, #scenarioIntro').forEach(e => e.remove());
 });
 const hookT = ts();
+// --day: the world sampled every 3 s (clock, poses, hunger, health, where everyone is, raiders, stores)
+if (dayMode) await page.evaluate(() => {
+  const C = window.__cap, scn = window.tablefolkScenario?.active?.scn || {};
+  const t0 = performance.now(), hm = String(scn.time || '').match(/^(\d{1,2}):(\d{2})$/);
+  const startMin = hm ? +hm[1] * 60 + +hm[2] : (scn.lighting === 'night' ? 21 * 60 : 8 * 60), dayMin = +new URLSearchParams(location.search).get('dayMinutes') || scn.dayMinutes || 12;
+  // game minutes since the start of day 1: the page's clock, else counted from real time
+  C.gameMin = () => { const k = window.tablefolkClock?.now?.(); if (k) return (k.day - 1) * 1440 + k.min; return startMin + (performance.now() - t0) / 1000 / (dayMin * 60) * 1440; };
+  C.startMin = C.gameMin(); C.initial = new Set(TABLEFOLK_STATE.characters.map(c => c.id)); C.samples = [];
+  const W = window.tablefolk, P = window.tablefolkPlay;
+  const placeOf = (x, z) => (TABLEFOLK_STATE.places || []).find(p => p.x0 != null && x >= p.x0 - .5 && x <= p.x1 + .5 && z >= p.z0 - .5 && z <= p.z1 + .5);
+  C.stores = () => {
+    const out = { containers: {}, things: 0, carried: {} };
+    for (const o of W.getObjects()) {
+      const mm = W.state.meta?.get?.(o.mesh) || (typeof meta === 'function' ? meta(o.mesh) : null);
+      const k = window.tablefolkUses?.kindOf?.(o.type), c = ['chest', 'store'].includes(k) ? window.tablefolkUses.contents(o.mesh) : mm?.opts?.contents; if (c) for (const i of c.items || []) out.containers[i.name] = (out.containers[i.name] || 0) + (i.qty ?? 1);
+      if (Number.isFinite(mm?.opts?.stock)) out.things += mm.opts.stock;
+    }
+    for (const g of TABLEFOLK_STATE.characters) for (const i of (W.getBrainConfig(g.id).inventory?.items || [])) out.carried[i.name] = (out.carried[i.name] || 0) + (i.qty ?? 1);
+    return out;
+  };
+  C.storesStart = C.stores();
+  const sample = () => {
+    const chars = TABLEFOLK_STATE.characters.map(g => { const cfg = W.getBrainConfig(g.id), p = g.logicalPos || g.root.position, pl = placeOf(p.x, p.z);
+      return { id: g.id, x: +p.x.toFixed(1), z: +p.z.toFixed(1), lie: g.pose?.mode === 'lie', hunger: +(cfg.mind?.hunger || 0).toFixed(2), hp: cfg.hp ?? null, maxHp: cfg.maxHp ?? null, defeated: !!(g.defeated || cfg.defeated), hostile: !!P?.isHostile?.(g), animal: !!P?.isAnimal?.(g), place: pl ? pl.id : '', indoors: !!pl && !['square', 'pond', 'garden'].includes(pl.kind), job: window.tablefolkJobs?.jobOf?.(g)?.id || '', doing: window.tablefolkJobs?.doing?.(g) || '' }; });
+    C.samples.push({ t: +((performance.now() - C.t0) / 1000).toFixed(1), gm: C.gameMin(), chars, ids: TABLEFOLK_STATE.characters.map(c => c.id), ticks: window.tablefolkLive?.ticks ?? null, round: window.tablefolkLive?.round ?? 0 });
+  };
+  sample(); C.sampler = setInterval(sample, 3000);
+});
 await page.evaluate(p => { window.tablefolkLive.setPace(p); if (!window.tablefolkLive.on) window.tablefolkLive.start(); }, pace);
 const agents = await page.evaluate(() => TABLEFOLK_STATE.characters.map(c => c.id));
 const playerName = await page.evaluate(() => document.getElementById('chatName')?.value.trim() || 'God');
@@ -144,6 +189,7 @@ if (provoke) {
     if (Date.now() - lastP >= 60000) { lastP = Date.now(); const c = await page.evaluate(() => ({ turns: __cap.turns.length, says: __cap.says.length, round: window.tablefolkLive.round })); console.log(`[${ts()} s] model turns ${raws.length}, agent turns ${c.turns}, spoken lines ${c.says}, live round ${c.round}; last: ${raws.at(-1) ? raws.at(-1).agent + ': ' + raws.at(-1).raw.replace(/\s+/g, ' ').slice(0, 110) : '-'}`); }
   }
 }
+const dayCap = dayMode ? await page.evaluate(() => { clearInterval(__cap.sampler); return { samples: __cap.samples, acts: __cap.acts || [], calls: __cap.calls || [], hits: __cap.hits || [], initial: [...__cap.initial], storesStart: __cap.storesStart, storesEnd: __cap.stores(), startMin: __cap.startMin, endMin: __cap.gameMin(), stats: window.tablefolkJobs?.stats?.() || null, ticks: window.tablefolkLive?.ticks ?? null, alive: TABLEFOLK_STATE.characters.filter(c => !c.defeated).length }; }) : null;
 const cap = await page.evaluate(() => ({ prompts: __cap.prompts, turns: __cap.turns, says: __cap.says, hist: __cap.order.map(k => __cap.hist[k]), round: window.tablefolkLive.round, t: +((performance.now() - __cap.t0) / 1000).toFixed(1) }));
 await page.evaluate(() => window.tablefolkLive.stop());
 const minds = {}; for (const id of agents) minds[id] = await mindOf(id);
@@ -216,9 +262,75 @@ if (provoke) {
   summary.provocation = { target: provoke, first, steps: prov.map(p => ({ step: p.step, line: p.line, reply: p.reply, anger: p.mind?.mood?.anger, trust: p.mind?.mood?.trust, fear: p.mind?.mood?.fear, angryAt: p.mind?.angryAt, hostileTo: p.mind?.hostileTo })) };
   console.log('first turn:', JSON.stringify(first));
 }
+// ---- the day ----
+let day = null;
+if (dayMode) {
+  const D = dayCap, S = D.samples, last = S.at(-1) || { chars: [] }, people = (last.chars.length ? last.chars : S[0].chars).filter(c => !c.hostile && !c.animal && D.initial.includes(c.id)).map(c => c.id);
+  const gameHours = Math.max(.1, (D.endMin - D.startMin) / 60);
+  const per = Object.fromEntries(people.map(id => [id, { job: '', cycles: 0, made: 0, gathered: 0, stored: 0, sold: 0, bought: 0, meals: 0, nightSleepMin: 0, hungerEnd: null, hurt: false, calls: {} }]));
+  const MAKE = /\b(bakes|forges|brews|cooks|makes|pours|mills|stews)\b/;
+  for (const a of D.acts) {
+    const t = a.text, who = (t.match(/^([\w-]+) /) || [])[1];
+    let m;
+    if ((m = t.match(/^([\w-]+) sells ([\w-]+) (.+?) for (\d+) gold/)) && per[m[1]] && per[m[2]]) { per[m[1]].sold++; per[m[2]].bought++; continue; }
+    if ((m = t.match(/^([\w-]+) buys (.+?) from ([\w-]+)/)) && per[m[1]] && per[m[3]]) { per[m[1]].bought++; per[m[3]].sold++; continue; }
+    if (!who || !per[who]) continue;
+    if (/\(\+\d+ [\w ]+\)/.test(t)) { if (MAKE.test(t)) per[who].made++; else per[who].gathered++; }
+    else if (/^[\w-]+ takes (an? |\d+ )?\w[\w ]* from the (apple barrel|apple crate|carrot crate)/.test(t)) per[who].gathered++;
+    if (/ puts (?!\d+ gold).+? in the /.test(t)) per[who].stored++;
+    if (/^[\w-]+ eats the /.test(t)) per[who].meals++;
+  }
+  // sleep at night, hunger, hurt
+  for (let i = 1; i < S.length; i++) { const dt = S[i].gm - S[i - 1].gm, h = ((S[i].gm % 1440) + 1440) % 1440 / 60; for (const c of S[i].chars) { const r = per[c.id]; if (!r) continue; if (c.lie && (h >= 21 || h < 5)) r.nightSleepMin += dt; if (c.hp != null && c.maxHp && c.hp < c.maxHp) r.hurt = true; } }
+  for (const c of last.chars) if (per[c.id]) { per[c.id].hungerEnd = c.hunger; per[c.id].job = c.job; }
+  if (D.stats) for (const [id, st] of Object.entries(D.stats)) if (per[id]) per[id].cycles = st.cycles || 0;
+  // model calls by kind: page events when there are any (after the jobs change), else read from the prompts
+  const calls = [];
+  const runCalls = D.calls.filter(c => c.kind && !['pick', 'remark'].includes(c.kind));
+  if (runCalls.length) calls.push(...D.calls);
+  else {
+    for (const tn of turns) calls.push({ agent: tn.agent, kind: tn.addressed ? 'reply' : tn.events ? 'event' : tn.muted ? 'open' : 'cause' });
+    calls.push(...D.calls);
+  }
+  for (const c of calls) { const r = per[c.agent]; if (r) r.calls[c.kind] = (r.calls[c.kind] || 0) + 1; }
+  const byKind = {}; for (const c of calls) byKind[c.kind] = (byKind[c.kind] || 0) + 1;
+  const ticks = D.ticks ?? (last.round || 0) * Math.max(1, D.alive);
+  const modelTurns = turns.length;
+  // raiders: hostile characters that were not there at the start
+  const raiders = new Map(); for (const smp of S) for (const c of smp.chars) if (c.hostile && !D.initial.includes(c.id)) raiders.set(c.id, c);
+  const lastIds = new Set(last.ids || []);
+  const raid = { spawned: raiders.size, defeated: [...raiders.values()].filter(c => last.chars.find(x => x.id === c.id)?.defeated).length, fled: [...raiders.keys()].filter(id => !lastIds.has(id)).length };
+  // while raiders were about: who was indoors, and how close the guard and the hunter came
+  let rs = 0, inside = 0, outside = 0; const closest = {};
+  for (const smp of S) {
+    const live = smp.chars.filter(c => c.hostile && !c.defeated && !D.initial.includes(c.id)); if (!live.length) continue; rs++;
+    for (const c of smp.chars) { if (!per[c.id] || c.defeated) continue; const d = Math.min(...live.map(r => Math.hypot(r.x - c.x, r.z - c.z)));
+      if (/guard|hunter/.test(c.job) || /hector|wren/.test(c.id)) closest[c.id] = Math.min(closest[c.id] ?? 99, +d.toFixed(1)); else if (c.indoors) inside++; else outside++; }
+  }
+  const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
+  day = {
+    gameHours: +gameHours.toFixed(1), per,
+    totals: {
+      modelCallsPerGameHour: +(calls.length / gameHours).toFixed(1), modelCalls: calls.length, callsByKind: byKind,
+      idleOpenShare: calls.length ? +((byKind.open || 0) / calls.length).toFixed(2) : 0,
+      liveTicks: ticks, tickHandledInCodeShare: ticks ? +Math.max(0, 1 - modelTurns / ticks).toFixed(2) : null,
+      spokenLinesPerGameHour: +(cap.says.length / gameHours).toFixed(1), spokenLinesPerRealMinutePerPerson: +(cap.says.length / Math.max(.1, cap.t / 60) / Math.max(1, people.length)).toFixed(2),
+      salesBetweenCharacters: Object.values(per).reduce((a, r) => a + r.sold, 0),
+      storesStart: { containers: sum(D.storesStart.containers), things: D.storesStart.things, carried: sum(D.storesStart.carried) }, storesEnd: { containers: sum(D.storesEnd.containers), things: D.storesEnd.things, carried: sum(D.storesEnd.carried) },
+      storesEndDetail: D.storesEnd,
+      raid, raidSamples: rs, othersIndoorsDuringRaid: inside + outside ? +(inside / (inside + outside)).toFixed(2) : null, fightersClosestToRaider: closest,
+      hurt: Object.entries(per).filter(([, r]) => r.hurt).map(([id]) => id),
+    },
+  };
+  console.log('\n==== the day: ' + day.gameHours + ' game hours');
+  console.log('who'.padEnd(8), 'job'.padEnd(11), 'cyc made gath stor sold bght meal sleep hunger calls');
+  for (const [id, r] of Object.entries(per)) console.log(id.padEnd(8), String(r.job || '-').padEnd(11), [r.cycles, r.made, r.gathered, r.stored, r.sold, r.bought, r.meals].map(n => String(n).padStart(4)).join(' '), String(Math.round(r.nightSleepMin)).padStart(5), String(r.hungerEnd).padStart(6), JSON.stringify(r.calls));
+  for (const [k, v] of Object.entries(day.totals)) console.log(k.padEnd(34), typeof v === 'object' ? JSON.stringify(v) : v);
+  summary.day = day;
+}
 fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
-fs.writeFileSync(out, JSON.stringify({ summary, url, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
+fs.writeFileSync(out, JSON.stringify({ summary, url, day: dayCap, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
 console.log('saved', out);
 await page.close().catch(() => {}); await b.close().catch(() => {});
 process.exit(0);

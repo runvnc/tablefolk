@@ -1,0 +1,40 @@
+{
+  "id": "orchard",
+  "name": "Orchard",
+  "version": "1.0.0",
+  "description": "An example package for living worlds: an apple tree that runs out and grows back, an apple picker's job, and crows that raid the apple stores. Data only, no code.",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "farming", "jobs"],
+  "items": {
+    "apple_tree": {
+      "file": "../../assets/models/props/nature/autumn_tree.glb",
+      "w": 0.9, "h": 3.0, "d": 0.9, "fit": "height", "static": true, "flammable": true,
+      "tags": ["nature", "orchard"], "aliases": ["apple_trees", "fruit_tree"],
+      "stock": { "item": "apple", "count": 6, "regrow": 2 },
+      "gather": { "gives": "apple", "time": 3, "anim": "pickup", "verb": "picks an apple from" }
+    }
+  },
+  "jobs": {
+    "picker": {
+      "name": "Apple picker",
+      "match": "\\b(picker|picks apples|orchard|fruit picker)\\b",
+      "hours": [7, 17],
+      "gold": 2,
+      "workplace": ["apple_tree"],
+      "prices": { "apple": 1 },
+      "steps": [
+        { "gather": "apple_tree", "n": 2 },
+        { "store": "apple" },
+        { "sell": "apple" }
+      ]
+    }
+  },
+  "threats": {
+    "crows": {
+      "who": "bat", "name": "crow", "count": 2, "when": "day", "every": 1, "from": "edge",
+      "behaviour": "pilfer", "targets": ["apple", "wheat"], "retreat": "half",
+      "announce": "A flock of crows swoops down on the village stores!"
+    }
+  }
+}

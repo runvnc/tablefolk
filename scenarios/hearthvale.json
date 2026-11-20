@@ -1,0 +1,396 @@
+{
+ "v": 1,
+ "title": "Hearthvale",
+ "subtitle": "A village that has to feed itself before the wolves come.",
+ "intro": "Hearthvale lives from one harvest to the next. Maren grows the wheat, Odo bakes it, Rosa feeds the tired, Brann shoes the horses, Jory keeps the fires going, Wren brings in meat and Hector keeps the wolves out after dark. The stores are low. Watch a day go by, or lend a hand.",
+ "live": true,
+ "pace": "lively",
+ "time": "06:00",
+ "dayMinutes": 12,
+ "seed": 5,
+ "generate": {
+  "kind": "village",
+  "seed": 5,
+  "size": [
+   45,
+   35
+  ],
+  "places": [
+   "shop",
+   "tavern",
+   "smithy",
+   "guardhouse",
+   "stable",
+   "alchemist",
+   "temple",
+   "library"
+  ]
+ },
+ "packages": [
+  "orchard"
+ ],
+ "player": {
+  "name": "Traveller",
+  "gold": 15,
+  "items": [
+   "bread"
+  ],
+  "model": "adventurer"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "use",
+  "take",
+  "put",
+  "close",
+  "remember",
+  "feel",
+  "inventory"
+ ],
+ "food": [
+  "bread",
+  "pie",
+  "stew",
+  "meat",
+  "apple",
+  "wheat",
+  "pumpkin",
+  "ale"
+ ],
+ "prices": {
+  "bread": 3,
+  "pie": 5,
+  "stew": 4,
+  "ale": 2,
+  "meat": 3,
+  "wheat": 1,
+  "firewood": 1,
+  "apple": 1,
+  "horseshoe": 6,
+  "iron ore": 2,
+  "pumpkin": 2
+ },
+ "lore": [
+  "Hearthvale's stores are nearly empty after a long winter.",
+  "Wolves come down from the hills at night when the village is hungry.",
+  "The baker needs the farmer's wheat; the smith needs the woodcutter's firewood."
+ ],
+ "threats": [
+  {
+   "kind": "raid",
+   "who": "wolf",
+   "count": 2,
+   "when": "night",
+   "every": 1,
+   "from": "edge"
+  },
+  {
+   "kind": "crows",
+   "count": 2,
+   "when": "day",
+   "every": 1
+  }
+ ],
+ "agents": [
+  {
+   "id": "maren",
+   "model": "farmer",
+   "job": "farmer",
+   "home": "house 3",
+   "in": "house 3",
+   "style": "weathered farmer",
+   "personality": "Maren, the farmer. You get up before the sun and go to bed with it. You want a good harvest before the frost. You think Odo the baker pays too little for wheat.",
+   "inventory": {
+    "gold": 6,
+    "items": [
+     "apple"
+    ]
+   }
+  },
+  {
+   "id": "odo",
+   "model": "peasant",
+   "job": "baker",
+   "home": "house 4",
+   "workplace": "shop",
+   "in": "shop",
+   "style": "floury baker",
+   "personality": "Odo, the baker. You are proud of your bread and fuss over the oven. You want to bake a pie that people talk about. You think Maren is slow to bring the wheat.",
+   "inventory": {
+    "gold": 10,
+    "items": [
+     "bread",
+     "bread"
+    ]
+   }
+  },
+  {
+   "id": "rosa",
+   "model": "woman",
+   "job": "innkeeper",
+   "home": "house 1",
+   "workplace": "tavern",
+   "in": "tavern",
+   "style": "cheerful innkeeper",
+   "personality": "Rosa, who keeps the tavern. You know everyone's business and like to feed people. You want the tavern full every evening. You think Hector drinks too much ale on duty.",
+   "inventory": {
+    "gold": 20,
+    "items": [
+     "stew"
+    ]
+   }
+  },
+  {
+   "id": "brann",
+   "model": "barbarian",
+   "job": "smith",
+   "home": "smithy",
+   "workplace": "smithy",
+   "in": "smithy",
+   "style": "gruff blacksmith",
+   "personality": "Brann, the blacksmith. You talk little and work hard. You want enough iron to make tools for the whole village. You think Jory never brings enough firewood.",
+   "inventory": {
+    "gold": 12,
+    "items": []
+   }
+  },
+  {
+   "id": "jory",
+   "model": "villager",
+   "job": "woodcutter",
+   "home": "alchemist",
+   "in": "alchemist",
+   "style": "lanky woodcutter",
+   "personality": "Jory, the woodcutter. You are always hungry and have not eaten since yesterday. You want to buy a proper axe one day. You like Wren, who once shared her meat with you.",
+   "inventory": {
+    "gold": 3,
+    "items": []
+   }
+  },
+  {
+   "id": "hector",
+   "model": "knight",
+   "job": "guard",
+   "home": "guardhouse",
+   "in": "guardhouse",
+   "style": "stern village guard",
+   "wield": "sword",
+   "personality": "Hector, the village guard. You take the night watch seriously. You want the wolves gone for good. You think Rosa gossips too much.",
+   "inventory": {
+    "gold": 8,
+    "items": [
+     "sword",
+     "bread"
+    ]
+   }
+  },
+  {
+   "id": "wren",
+   "model": "huntress",
+   "job": "hunter",
+   "home": "stable",
+   "in": "stable",
+   "style": "quiet hunter",
+   "wield": "spear",
+   "personality": "Wren, the hunter. You are quiet and watchful and happiest in the woods. You want to track down the wolf pack's den. You think Brann's spear heads are the best in the valley.",
+   "inventory": {
+    "gold": 6,
+    "items": [
+     "spear",
+     "meat"
+    ]
+   }
+  },
+  {
+   "id": "tam",
+   "model": "villager",
+   "scale": 0.75,
+   "job": "picker",
+   "home": "house 3",
+   "in": "square",
+   "style": "small child",
+   "personality": "Tam, Maren's child. You are curious and never sit still. You pick apples for a copper each. You want a honey cake more than anything. You think Hector is the bravest person alive.",
+   "inventory": {
+    "gold": 1,
+    "items": []
+   }
+  },
+  {
+   "id": "daisy",
+   "model": "cow",
+   "in": "stable"
+  },
+  {
+   "id": "patch",
+   "model": "dog",
+   "in": "square"
+  }
+ ],
+ "objects": [
+  {
+   "type": "cauldron",
+   "in": "shop"
+  },
+  {
+   "type": "chest",
+   "in": "shop",
+   "items": [
+    {
+     "name": "wheat",
+     "qty": 2
+    },
+    {
+     "name": "bread",
+     "qty": 2
+    }
+   ],
+   "gold": 0
+  },
+  {
+   "type": "cauldron",
+   "in": "tavern"
+  },
+  {
+   "type": "chest",
+   "in": "tavern",
+   "items": [
+    {
+     "name": "ale",
+     "qty": 6
+    },
+    {
+     "name": "pumpkin",
+     "qty": 1
+    }
+   ],
+   "gold": 0
+  },
+  {
+   "type": "chest",
+   "in": "smithy",
+   "items": [
+    {
+     "name": "iron ore",
+     "qty": 3
+    },
+    {
+     "name": "firewood",
+     "qty": 1
+    }
+   ],
+   "gold": 0
+  },
+  {
+   "type": "chest",
+   "in": "stable",
+   "items": [],
+   "gold": 0
+  },
+  {
+   "type": "bed",
+   "in": "stable"
+  },
+  {
+   "type": "chest",
+   "in": "alchemist",
+   "items": [],
+   "gold": 0
+  },
+  {
+   "type": "bed",
+   "in": "alchemist"
+  },
+  {
+   "type": "bed",
+   "in": "house 3"
+  },
+  {
+   "type": "chest",
+   "in": "house 3",
+   "items": [
+    {
+     "name": "wheat",
+     "qty": 1
+    }
+   ],
+   "gold": 0
+  },
+  {
+   "type": "tall_grass",
+   "x": 12,
+   "z": -7,
+   "crop": "wheat",
+   "stock": 2
+  },
+  {
+   "type": "tall_grass",
+   "x": 11,
+   "z": -7,
+   "crop": "wheat",
+   "stock": 2
+  },
+  {
+   "type": "tall_grass",
+   "x": 10,
+   "z": -7,
+   "crop": "wheat",
+   "stock": 2
+  },
+  {
+   "type": "tall_grass",
+   "x": 9,
+   "z": -7,
+   "crop": "wheat",
+   "stock": 2
+  },
+  {
+   "type": "tall_grass",
+   "x": 8,
+   "z": -7,
+   "crop": "wheat",
+   "stock": 2
+  },
+  {
+   "type": "chest",
+   "x": 12,
+   "z": -8,
+   "name": "granary",
+   "items": [
+    {
+     "name": "wheat",
+     "qty": 2
+    }
+   ],
+   "gold": 0
+  },
+  {
+   "type": "apple_tree",
+   "x": 4,
+   "z": -4
+  },
+  {
+   "type": "apple_tree",
+   "x": 1,
+   "z": -3
+  },
+  {
+   "type": "bear_trap",
+   "x": -13,
+   "z": -13
+  },
+  {
+   "type": "bear_trap",
+   "x": -16,
+   "z": -12
+  }
+ ]
+}

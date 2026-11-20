@@ -241,3 +241,24 @@ voices off in the test profile (`tablefolkTtsEnabled` 0): a Breeze server
 started for the page beside the test Chrome filled the 6 GB card and the
 LiteRT worker hung (2026-11-13); after that the shared worker needs a Chrome
 restart.
+
+## A whole day (`live-eval.mjs --day`)
+
+`node live-eval.mjs scenarios/hearthvale.json --day [--day-minutes=8]`
+plays one game day (the page gets `?dayMinutes=8`: 8 real minutes) and
+prints a table per character (job cycles, made / gathered / stored / sold /
+bought, meals, game minutes asleep at night, hunger at the end, model calls
+by kind) and totals (model calls per game hour, idle open turns' share,
+live ticks handled in code, spoken lines per game hour, stores at the start
+and the end, raids, who was hurt, who was indoors while raiders were about).
+A world without a clock is timed from its `time` and the real minutes.
+
+Baseline, before jobs (2026-11-20, E2B, hearthvale, pace lively, 8 minutes,
+code at ccae1fd): 113 model calls (4.7 a game hour), 73% of them idle open
+turns ("Nobody has spoken to you: do something"), 41% of live ticks handled
+without the model; no job cycles, nothing made, 0 sales between characters,
+5 meals for 8 people (3 of them `eat` lines the model wrote), nobody slept
+(no clock: the lighting never turns to night), hunger at the end .36-.73;
+0.7 spoken lines a game hour; no raids (no threats). Stores at the end: 17
+items in chests (about 18 at the start: the first run counted 0 because
+chests fill lazily; fixed in the tool), 10 firewood carried by jory.
