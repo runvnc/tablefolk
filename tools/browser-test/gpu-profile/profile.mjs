@@ -44,7 +44,7 @@ if (process.env.NOMSAA) await c.send('Page.addScriptToEvaluateOnNewDocument', { 
 await c.send('Page.navigate', { url });
 const t0 = Date.now();
 while (Date.now() - t0 < 40000) { await sleep(500); try { if (await c.ev('!!window.TABLEFOLK_SCENE_READY')) break; } catch {} }
-console.log('ready', (Date.now() - t0) / 1000); await sleep(7000);
+console.log("ready", (Date.now() - t0) / 1000); await sleep(+(process.env.SETTLE || 7000));
 console.log(await c.ev(fs.readFileSync(new URL('./inpage.js', import.meta.url), 'utf8')));
 const res = {};
 const run = async (label, ms = 3000) => { await c.ev('__P.start()'); await sleep(ms); const r = await c.ev('__P.stop()'); res[label] = r; console.log(`${label.padEnd(28)} fps ${String(r.fps).padStart(6)} render ${r.renderMs.toFixed(2)} (p95 ${r.renderP95.toFixed(2)}) ms  gpu ${r.gpuMs.toFixed(2)} (p95 ${r.gpuP95.toFixed(2)}, n ${r.gpuFrames}) ms  lat ${r.latMs}  dc ${r.drawCalls} active ${r.active}`); return r; };
