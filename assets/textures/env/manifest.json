@@ -1,0 +1,783 @@
+{
+ "about": "Tileable CC0 PBR environment textures. tileMeters: real-world size one texture repeat covers. Each material: <name>_color (sRGB), _normal, _rough, _ao (linear) as 2048 px WebP, and _1k variants (1024 px). Built by tools/blender/make-textures.py.",
+ "normalConvention": "Normal maps are OpenGL (+Y green up), like glTF and Poly Haven nor_gl. Babylon's glTF loader sets invertNormalMapX = !scene.useRightHandedSystem and invertNormalMapY = scene.useRightHandedSystem for glTF's OpenGL maps; code-built StandardMaterial/PBRMaterial in the game's left-handed scene need the same flags (invertNormalMapX = true, invertNormalMapY = false). Needs one visual check in the game (light from a known side on cobblestone).",
+ "roughness": "single-channel greyscale WebP (read the R channel); ao likewise. ao exists only when the source provided one.",
+ "materials": [
+  {
+   "name": "grass_meadow",
+   "kind": "ground",
+   "tileMeters": 4.2,
+   "sources": [
+    {
+     "id": "Grass004",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Grass004",
+     "license": "CC0"
+    },
+    {
+     "id": "Grass001",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Grass001",
+     "license": "CC0"
+    }
+   ],
+   "made": "blend of ambientCG Grass004 (3x3, native 1.4 m) and Grass001 (2x2, 2.1 m) through a tileable ~1 m noise mask; colour-corrected to a fresh mid-green",
+   "meanColor": "#51652c",
+   "meanSRGB": [
+    0.32,
+    0.398,
+    0.173
+   ],
+   "meanLinear": [
+    0.0887,
+    0.1384,
+    0.0273
+   ],
+   "files": [
+    "grass_meadow_ao.webp",
+    "grass_meadow_ao_1k.webp",
+    "grass_meadow_color.webp",
+    "grass_meadow_color_1k.webp",
+    "grass_meadow_normal.webp",
+    "grass_meadow_normal_1k.webp",
+    "grass_meadow_rough.webp",
+    "grass_meadow_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "grass_dry",
+   "kind": "ground",
+   "tileMeters": 1.4,
+   "sources": [
+    {
+     "id": "Grass003",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Grass003",
+     "license": "CC0"
+    }
+   ],
+   "made": "Grass003 (ambientcg.com), colour-corrected to mean #746c44, saturation x0.75",
+   "meanColor": "#716942",
+   "meanSRGB": [
+    0.443,
+    0.412,
+    0.258
+   ],
+   "meanLinear": [
+    0.1747,
+    0.15,
+    0.0578
+   ],
+   "files": [
+    "grass_dry_ao.webp",
+    "grass_dry_ao_1k.webp",
+    "grass_dry_color.webp",
+    "grass_dry_color_1k.webp",
+    "grass_dry_normal.webp",
+    "grass_dry_normal_1k.webp",
+    "grass_dry_rough.webp",
+    "grass_dry_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "forest_floor",
+   "kind": "ground",
+   "tileMeters": 3.15,
+   "sources": [
+    {
+     "id": "forest_ground_04",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/forest_ground_04",
+     "license": "CC0"
+    }
+   ],
+   "made": "forest_ground_04 (polyhaven.com), large-scale blotches flattened x0.6, colour-corrected to mean #5c4e3c, saturation x0.9",
+   "meanColor": "#594b38",
+   "meanSRGB": [
+    0.349,
+    0.293,
+    0.22
+   ],
+   "meanLinear": [
+    0.107,
+    0.0762,
+    0.0452
+   ],
+   "files": [
+    "forest_floor_ao.webp",
+    "forest_floor_ao_1k.webp",
+    "forest_floor_color.webp",
+    "forest_floor_color_1k.webp",
+    "forest_floor_normal.webp",
+    "forest_floor_normal_1k.webp",
+    "forest_floor_rough.webp",
+    "forest_floor_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "dirt_path",
+   "kind": "ground",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "rocky_trail",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/rocky_trail",
+     "license": "CC0"
+    }
+   ],
+   "made": "rocky_trail (polyhaven.com), large-scale blotches flattened x0.5, colour-corrected to mean #887054, saturation x0.85",
+   "meanColor": "#866e52",
+   "meanSRGB": [
+    0.524,
+    0.432,
+    0.323
+   ],
+   "meanLinear": [
+    0.2462,
+    0.162,
+    0.0887
+   ],
+   "files": [
+    "dirt_path_ao.webp",
+    "dirt_path_ao_1k.webp",
+    "dirt_path_color.webp",
+    "dirt_path_color_1k.webp",
+    "dirt_path_normal.webp",
+    "dirt_path_normal_1k.webp",
+    "dirt_path_rough.webp",
+    "dirt_path_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "mud",
+   "kind": "ground",
+   "tileMeters": 2.25,
+   "sources": [
+    {
+     "id": "muddy_tracks",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/muddy_tracks",
+     "license": "CC0"
+    }
+   ],
+   "made": "muddy_tracks (polyhaven.com), large-scale blotches flattened x0.5, colour-corrected to mean #544436, saturation x0.9",
+   "meanColor": "#544335",
+   "meanSRGB": [
+    0.328,
+    0.264,
+    0.208
+   ],
+   "meanLinear": [
+    0.0887,
+    0.0578,
+    0.0369
+   ],
+   "files": [
+    "mud_ao.webp",
+    "mud_ao_1k.webp",
+    "mud_color.webp",
+    "mud_color_1k.webp",
+    "mud_normal.webp",
+    "mud_normal_1k.webp",
+    "mud_rough.webp",
+    "mud_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "sand",
+   "kind": "ground",
+   "tileMeters": 1.8,
+   "sources": [
+    {
+     "id": "dense_sand",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/dense_sand",
+     "license": "CC0"
+    }
+   ],
+   "made": "dense_sand (polyhaven.com), large-scale blotches flattened x0.5, colour-corrected to mean #b29e7a, saturation x0.9",
+   "meanColor": "#b59d7a",
+   "meanSRGB": [
+    0.71,
+    0.616,
+    0.478
+   ],
+   "meanLinear": [
+    0.4452,
+    0.342,
+    0.1946
+   ],
+   "files": [
+    "sand_ao.webp",
+    "sand_ao_1k.webp",
+    "sand_color.webp",
+    "sand_color_1k.webp",
+    "sand_normal.webp",
+    "sand_normal_1k.webp",
+    "sand_rough.webp",
+    "sand_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "gravel",
+   "kind": "ground",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "rocks_ground_01",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/rocks_ground_01",
+     "license": "CC0"
+    }
+   ],
+   "made": "rocks_ground_01 (polyhaven.com), large-scale blotches flattened x0.6, colour-corrected to mean #80786c, saturation x0.85",
+   "meanColor": "#7a7165",
+   "meanSRGB": [
+    0.477,
+    0.445,
+    0.395
+   ],
+   "meanLinear": [
+    0.2159,
+    0.1878,
+    0.15
+   ],
+   "files": [
+    "gravel_ao.webp",
+    "gravel_ao_1k.webp",
+    "gravel_color.webp",
+    "gravel_color_1k.webp",
+    "gravel_normal.webp",
+    "gravel_normal_1k.webp",
+    "gravel_rough.webp",
+    "gravel_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "cobblestone",
+   "kind": "ground",
+   "tileMeters": 2.4,
+   "sources": [
+    {
+     "id": "cobblestone_05",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/cobblestone_05",
+     "license": "CC0"
+    }
+   ],
+   "made": "cobblestone_05 (polyhaven.com), large-scale blotches flattened x0.4, colour-corrected to mean #787166, saturation x0.85",
+   "meanColor": "#766f63",
+   "meanSRGB": [
+    0.464,
+    0.436,
+    0.389
+   ],
+   "meanLinear": [
+    0.1878,
+    0.1651,
+    0.1329
+   ],
+   "files": [
+    "cobblestone_ao.webp",
+    "cobblestone_ao_1k.webp",
+    "cobblestone_color.webp",
+    "cobblestone_color_1k.webp",
+    "cobblestone_normal.webp",
+    "cobblestone_normal_1k.webp",
+    "cobblestone_rough.webp",
+    "cobblestone_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "flagstone",
+   "kind": "ground",
+   "tileMeters": 3.0,
+   "sources": [
+    {
+     "id": "grey_stone_path",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/grey_stone_path",
+     "license": "CC0"
+    }
+   ],
+   "made": "grey_stone_path (polyhaven.com), large-scale blotches flattened x0.5, colour-corrected to mean #706d66, saturation x0.75",
+   "meanColor": "#6e6a63",
+   "meanSRGB": [
+    0.43,
+    0.417,
+    0.388
+   ],
+   "meanLinear": [
+    0.162,
+    0.1529,
+    0.1329
+   ],
+   "files": [
+    "flagstone_ao.webp",
+    "flagstone_ao_1k.webp",
+    "flagstone_color.webp",
+    "flagstone_color_1k.webp",
+    "flagstone_normal.webp",
+    "flagstone_normal_1k.webp",
+    "flagstone_rough.webp",
+    "flagstone_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "stone_floor_rough",
+   "kind": "ground",
+   "tileMeters": 3.0,
+   "sources": [
+    {
+     "id": "rock_ground_02",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/rock_ground_02",
+     "license": "CC0"
+    }
+   ],
+   "made": "rock_ground_02 (polyhaven.com), large-scale blotches flattened x0.8, colour-corrected to mean #625e58, saturation x0.8",
+   "meanColor": "#5b5751",
+   "meanSRGB": [
+    0.358,
+    0.343,
+    0.319
+   ],
+   "meanLinear": [
+    0.1221,
+    0.1119,
+    0.0976
+   ],
+   "files": [
+    "stone_floor_rough_ao.webp",
+    "stone_floor_rough_ao_1k.webp",
+    "stone_floor_rough_color.webp",
+    "stone_floor_rough_color_1k.webp",
+    "stone_floor_rough_normal.webp",
+    "stone_floor_rough_normal_1k.webp",
+    "stone_floor_rough_rough.webp",
+    "stone_floor_rough_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "wood_planks_worn",
+   "kind": "ground",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "wood_floor_worn",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/wood_floor_worn",
+     "license": "CC0"
+    }
+   ],
+   "made": "wood_floor_worn (polyhaven.com), large-scale blotches flattened x0.6, colour-corrected to mean #7a5c40, saturation x0.85",
+   "meanColor": "#7a5c3f",
+   "meanSRGB": [
+    0.479,
+    0.359,
+    0.249
+   ],
+   "meanLinear": [
+    0.1946,
+    0.107,
+    0.0513
+   ],
+   "files": [
+    "wood_planks_worn_ao.webp",
+    "wood_planks_worn_ao_1k.webp",
+    "wood_planks_worn_color.webp",
+    "wood_planks_worn_color_1k.webp",
+    "wood_planks_worn_normal.webp",
+    "wood_planks_worn_normal_1k.webp",
+    "wood_planks_worn_rough.webp",
+    "wood_planks_worn_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "wood_planks_dark",
+   "kind": "ground",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "dark_wooden_planks",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/dark_wooden_planks",
+     "license": "CC0"
+    }
+   ],
+   "made": "dark_wooden_planks (polyhaven.com), large-scale blotches flattened x0.4, colour-corrected to mean #48382c, saturation x0.9",
+   "meanColor": "#47372c",
+   "meanSRGB": [
+    0.279,
+    0.217,
+    0.171
+   ],
+   "meanLinear": [
+    0.0648,
+    0.0395,
+    0.0252
+   ],
+   "files": [
+    "wood_planks_dark_ao.webp",
+    "wood_planks_dark_ao_1k.webp",
+    "wood_planks_dark_color.webp",
+    "wood_planks_dark_color_1k.webp",
+    "wood_planks_dark_normal.webp",
+    "wood_planks_dark_normal_1k.webp",
+    "wood_planks_dark_rough.webp",
+    "wood_planks_dark_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "snow",
+   "kind": "ground",
+   "tileMeters": 2.5,
+   "sources": [
+    {
+     "id": "Snow006",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Snow006",
+     "license": "CC0"
+    }
+   ],
+   "made": "Snow006 (ambientcg.com), colour-corrected to mean #dcdee2, saturation x0.7",
+   "meanColor": "#d3d8e8",
+   "meanSRGB": [
+    0.829,
+    0.845,
+    0.911
+   ],
+   "meanLinear": [
+    0.7179,
+    0.7321,
+    0.7594
+   ],
+   "files": [
+    "snow_ao.webp",
+    "snow_ao_1k.webp",
+    "snow_color.webp",
+    "snow_color_1k.webp",
+    "snow_normal.webp",
+    "snow_normal_1k.webp",
+    "snow_rough.webp",
+    "snow_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "farmland",
+   "kind": "ground",
+   "tileMeters": 2.1,
+   "sources": [
+    {
+     "id": "farm_furrows",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/farm_furrows",
+     "license": "CC0"
+    }
+   ],
+   "made": "farm_furrows (polyhaven.com), large-scale blotches flattened x0.3, colour-corrected to mean #64503a, saturation x0.6",
+   "meanColor": "#614e38",
+   "meanSRGB": [
+    0.38,
+    0.305,
+    0.218
+   ],
+   "meanLinear": [
+    0.1274,
+    0.0802,
+    0.0423
+   ],
+   "files": [
+    "farmland_ao.webp",
+    "farmland_ao_1k.webp",
+    "farmland_color.webp",
+    "farmland_color_1k.webp",
+    "farmland_normal.webp",
+    "farmland_normal_1k.webp",
+    "farmland_rough.webp",
+    "farmland_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "stone_wall_rubble",
+   "kind": "wall",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "stone_wall",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/stone_wall",
+     "license": "CC0"
+    }
+   ],
+   "made": "stone_wall (polyhaven.com), large-scale blotches flattened x0.5, colour-corrected to mean #827a6c, saturation x0.8",
+   "meanColor": "#80786a",
+   "meanSRGB": [
+    0.501,
+    0.471,
+    0.416
+   ],
+   "meanLinear": [
+    0.2232,
+    0.1946,
+    0.15
+   ],
+   "files": [
+    "stone_wall_rubble_ao.webp",
+    "stone_wall_rubble_ao_1k.webp",
+    "stone_wall_rubble_color.webp",
+    "stone_wall_rubble_color_1k.webp",
+    "stone_wall_rubble_normal.webp",
+    "stone_wall_rubble_normal_1k.webp",
+    "stone_wall_rubble_rough.webp",
+    "stone_wall_rubble_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "stone_blocks_large",
+   "kind": "wall",
+   "tileMeters": 3.5,
+   "sources": [
+    {
+     "id": "Bricks076A",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Bricks076A",
+     "license": "CC0"
+    }
+   ],
+   "made": "Bricks076A (ambientcg.com), large-scale blotches flattened x0.4, colour-corrected to mean #706e68, saturation x0.8",
+   "meanColor": "#6d6b65",
+   "meanSRGB": [
+    0.429,
+    0.421,
+    0.396
+   ],
+   "meanLinear": [
+    0.162,
+    0.1559,
+    0.1384
+   ],
+   "files": [
+    "stone_blocks_large_ao.webp",
+    "stone_blocks_large_ao_1k.webp",
+    "stone_blocks_large_color.webp",
+    "stone_blocks_large_color_1k.webp",
+    "stone_blocks_large_normal.webp",
+    "stone_blocks_large_normal_1k.webp",
+    "stone_blocks_large_rough.webp",
+    "stone_blocks_large_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "plaster_aged",
+   "kind": "wall",
+   "tileMeters": 4.0,
+   "sources": [
+    {
+     "id": "plastered_wall_03",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/plastered_wall_03",
+     "license": "CC0"
+    }
+   ],
+   "made": "plastered_wall_03 (polyhaven.com), colour-corrected to mean #c4baa2, saturation x0.9",
+   "meanColor": "#c2bca2",
+   "meanSRGB": [
+    0.763,
+    0.737,
+    0.635
+   ],
+   "meanLinear": [
+    0.5521,
+    0.491,
+    0.3613
+   ],
+   "files": [
+    "plaster_aged_ao.webp",
+    "plaster_aged_ao_1k.webp",
+    "plaster_aged_color.webp",
+    "plaster_aged_color_1k.webp",
+    "plaster_aged_normal.webp",
+    "plaster_aged_normal_1k.webp",
+    "plaster_aged_rough.webp",
+    "plaster_aged_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "timber_dark",
+   "kind": "wall",
+   "tileMeters": 1.0,
+   "sources": [
+    {
+     "id": "Wood062",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=Wood062",
+     "license": "CC0"
+    }
+   ],
+   "made": "Wood062 (ambientcg.com), colour-corrected to mean #44362a",
+   "meanColor": "#413328",
+   "meanSRGB": [
+    0.254,
+    0.202,
+    0.158
+   ],
+   "meanLinear": [
+    0.0578,
+    0.0369,
+    0.0232
+   ],
+   "files": [
+    "timber_dark_ao.webp",
+    "timber_dark_ao_1k.webp",
+    "timber_dark_color.webp",
+    "timber_dark_color_1k.webp",
+    "timber_dark_normal.webp",
+    "timber_dark_normal_1k.webp",
+    "timber_dark_rough.webp",
+    "timber_dark_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "brick_old",
+   "kind": "wall",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "medieval_red_brick",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/medieval_red_brick",
+     "license": "CC0"
+    }
+   ],
+   "made": "medieval_red_brick (polyhaven.com), large-scale blotches flattened x0.6, colour-corrected to mean #745042, saturation x0.5",
+   "meanColor": "#724d40",
+   "meanSRGB": [
+    0.446,
+    0.303,
+    0.25
+   ],
+   "meanLinear": [
+    0.1747,
+    0.0802,
+    0.0545
+   ],
+   "files": [
+    "brick_old_ao.webp",
+    "brick_old_ao_1k.webp",
+    "brick_old_color.webp",
+    "brick_old_color_1k.webp",
+    "brick_old_normal.webp",
+    "brick_old_normal_1k.webp",
+    "brick_old_rough.webp",
+    "brick_old_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "thatch",
+   "kind": "roof",
+   "tileMeters": 2.0,
+   "sources": [
+    {
+     "id": "ThatchedRoof001A",
+     "site": "ambientcg.com",
+     "url": "https://ambientcg.com/view?id=ThatchedRoof001A",
+     "license": "CC0"
+    }
+   ],
+   "made": "ThatchedRoof001A (ambientcg.com), large-scale blotches flattened x0.4, colour-corrected to mean #927850",
+   "meanColor": "#8f764e",
+   "meanSRGB": [
+    0.563,
+    0.464,
+    0.307
+   ],
+   "meanLinear": [
+    0.2874,
+    0.1878,
+    0.0802
+   ],
+   "files": [
+    "thatch_ao.webp",
+    "thatch_ao_1k.webp",
+    "thatch_color.webp",
+    "thatch_color_1k.webp",
+    "thatch_normal.webp",
+    "thatch_normal_1k.webp",
+    "thatch_rough.webp",
+    "thatch_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "clay_roof_tiles",
+   "kind": "roof",
+   "tileMeters": 2.5,
+   "sources": [
+    {
+     "id": "clay_roof_tiles_02",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/clay_roof_tiles_02",
+     "license": "CC0"
+    }
+   ],
+   "made": "clay_roof_tiles_02 (polyhaven.com), large-scale blotches flattened x0.4, colour-corrected to mean #7e503e, saturation x0.55",
+   "meanColor": "#794d3b",
+   "meanSRGB": [
+    0.474,
+    0.301,
+    0.233
+   ],
+   "meanLinear": [
+    0.2086,
+    0.0802,
+    0.0482
+   ],
+   "files": [
+    "clay_roof_tiles_ao.webp",
+    "clay_roof_tiles_ao_1k.webp",
+    "clay_roof_tiles_color.webp",
+    "clay_roof_tiles_color_1k.webp",
+    "clay_roof_tiles_normal.webp",
+    "clay_roof_tiles_normal_1k.webp",
+    "clay_roof_tiles_rough.webp",
+    "clay_roof_tiles_rough_1k.webp"
+   ]
+  },
+  {
+   "name": "slate_roof",
+   "kind": "roof",
+   "tileMeters": 1.5,
+   "sources": [
+    {
+     "id": "grey_roof_tiles_02",
+     "site": "polyhaven.com",
+     "url": "https://polyhaven.com/a/grey_roof_tiles_02",
+     "license": "CC0"
+    }
+   ],
+   "made": "grey_roof_tiles_02 (polyhaven.com), large-scale blotches flattened x0.8, colour-corrected to mean #54585e, saturation x0.8",
+   "meanColor": "#54585b",
+   "meanSRGB": [
+    0.329,
+    0.343,
+    0.357
+   ],
+   "meanLinear": [
+    0.0887,
+    0.0976,
+    0.1119
+   ],
+   "files": [
+    "slate_roof_ao.webp",
+    "slate_roof_ao_1k.webp",
+    "slate_roof_color.webp",
+    "slate_roof_color_1k.webp",
+    "slate_roof_normal.webp",
+    "slate_roof_normal_1k.webp",
+    "slate_roof_rough.webp",
+    "slate_roof_rough_1k.webp"
+   ]
+  }
+ ]
+}

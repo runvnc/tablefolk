@@ -1,0 +1,31 @@
+Environment textures in this folder (assets/textures/env/) are derived from CC0 (public domain) sources.
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Poly Haven license: https://polyhaven.com/license
+ambientCG license: https://docs.ambientcg.com/license/
+
+Sources (all CC0):
+  ambientcg.com Bricks076A  https://ambientcg.com/view?id=Bricks076A  -> stone_blocks_large
+  ambientcg.com Grass001  https://ambientcg.com/view?id=Grass001  -> grass_meadow
+  ambientcg.com Grass003  https://ambientcg.com/view?id=Grass003  -> grass_dry
+  ambientcg.com Grass004  https://ambientcg.com/view?id=Grass004  -> grass_meadow
+  ambientcg.com Snow006  https://ambientcg.com/view?id=Snow006  -> snow
+  ambientcg.com ThatchedRoof001A  https://ambientcg.com/view?id=ThatchedRoof001A  -> thatch
+  ambientcg.com Wood062  https://ambientcg.com/view?id=Wood062  -> timber_dark
+  polyhaven.com clay_roof_tiles_02  https://polyhaven.com/a/clay_roof_tiles_02  -> clay_roof_tiles
+  polyhaven.com cobblestone_05  https://polyhaven.com/a/cobblestone_05  -> cobblestone
+  polyhaven.com dark_wooden_planks  https://polyhaven.com/a/dark_wooden_planks  -> wood_planks_dark
+  polyhaven.com dense_sand  https://polyhaven.com/a/dense_sand  -> sand
+  polyhaven.com farm_furrows  https://polyhaven.com/a/farm_furrows  -> farmland
+  polyhaven.com forest_ground_04  https://polyhaven.com/a/forest_ground_04  -> forest_floor
+  polyhaven.com grey_roof_tiles_02  https://polyhaven.com/a/grey_roof_tiles_02  -> slate_roof
+  polyhaven.com grey_stone_path  https://polyhaven.com/a/grey_stone_path  -> flagstone
+  polyhaven.com medieval_red_brick  https://polyhaven.com/a/medieval_red_brick  -> brick_old
+  polyhaven.com muddy_tracks  https://polyhaven.com/a/muddy_tracks  -> mud
+  polyhaven.com plastered_wall_03  https://polyhaven.com/a/plastered_wall_03  -> plaster_aged
+  polyhaven.com rock_ground_02  https://polyhaven.com/a/rock_ground_02  -> stone_floor_rough
+  polyhaven.com rocks_ground_01  https://polyhaven.com/a/rocks_ground_01  -> gravel
+  polyhaven.com rocky_trail  https://polyhaven.com/a/rocky_trail  -> dirt_path
+  polyhaven.com stone_wall  https://polyhaven.com/a/stone_wall  -> stone_wall_rubble
+  polyhaven.com wood_floor_worn  https://polyhaven.com/a/wood_floor_worn  -> wood_planks_worn
+
+Changes: resized, blended (grass_meadow), colour-corrected and re-encoded as WebP. The derived files are also CC0.
