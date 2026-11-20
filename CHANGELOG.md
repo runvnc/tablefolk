@@ -6,7 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
-- **Bedtime**: a villager whose bed it cannot reach (walled in by others, or two beds generated in one cell) takes another or sleeps on the floor at home, and one whose way home is blocked during a raid stays put and sleeps there, instead of standing all night.
+- **Bedtime**: a villager whose bed it cannot reach (walled in by others, or two beds generated in one cell) takes another or sleeps on the floor at home, and one whose way home is blocked during a raid stays put and sleeps there, instead of standing all night; someone pushed into a barrel's square steps out before walking.
 - **A talk scene is one room**: asking the world builder for an interview, a trial or a date gives one room sized to the cast, even when the model built a dungeon around it.
 - **Animals and mindless monsters** hear no rumours and get no events of their own.
 - **Work never just stops**: a job out of materials (and a labourer all day) does chores the village needs: fetches another worker's missing input and hands it over, hauls goods, gathers firewood or food the stores lack, stands watch at dusk, tidies. A hungry worker finds food wherever it can be had (stores, sellers, foraging anywhere reachable, a hunter's own catch, asking someone to share); raw wheat is no meal.

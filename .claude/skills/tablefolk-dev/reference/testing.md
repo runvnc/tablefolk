@@ -488,17 +488,21 @@ today's earlier runs re-scored (hearthvale `a3`, the generated village
 `after2`, the bakery `a3`, the Night Watch run above); E2B, lively, the
 player idle, the test worktree served on :8000.
 
-| hearthvale, one game day (8 min) | before | after |
+| hearthvale, one game day (8 min) | before | after (final code) |
 |---|---|---|
-| spoken lines a game hour (templated / model) | 0.6 (0.1 / 0.5) | 1.7 (0.9 / 0.9) |
-| model lines a game hour: day / evening / night | 0.2 / 1.5 / 0.4 | 0.2 / 3.7 / 0.4 |
-| templated lines a game hour: day / evening / night | 0 / 0.2 / 0.1 | 1.2 / 0.5 / 0.6 |
-| pairs that talked (in the evening), top pair's share | 3 (2), .50 | 5 (5), .25 |
-| questions (to characters) | 1 (0) | 5 (5) |
-| model calls (a game hour) | 26 (1.1) | 32 (1.3) |
-| job cycles farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker | 7, 3, 4, 6, 4, 14, 4, 7 | 8, 3, 4, 6, 6, 6, 3, 7 |
-| sales between characters | 17 | 12 |
-| hungry at the end | nobody | brann .72, tam .65 (stuck "running home" all night, below) |
+| spoken lines a game hour (templated / model) | 0.6 (0.1 / 0.5) | 1.6 (0.8 / 0.8) |
+| model lines a game hour: day / evening / night | 0.2 / 1.5 / 0.4 | 0.3 / 4.0 / 0.1 |
+| templated lines a game hour: day / evening / night | 0 / 0.2 / 0.1 | 0.8 / 1.0 / 0.6 |
+| pairs that talked (in the evening), top pair's share | 3 (2), .50 | 7 (5), .21 |
+| questions (to characters) | 1 (0) | 7 (7) |
+| model calls (a game hour) | 26 (1.1) | 36 (1.5) |
+| job cycles farmer, baker, innkeeper, smith, woodcutter, guard, hunter, picker | 7, 3, 4, 6, 4, 14, 4, 7 | 7, 4, 7, 7, 6, 4, 3, 8 |
+| sales between characters | 17 | 18 |
+| slept at night (of 7, the guard keeps watch) | 7 | 6 (rosa on the floor: her bed taken; fixed after) |
+| hungry at the end | nobody | nobody |
+
+(Earlier after-runs on the way: evening 2.2 and 3.7 model lines a game
+hour; up to four villagers stood all night, fixed below.)
 
 | generated village (Harvestmere, 6 min day) | before | after |
 |---|---|---|
