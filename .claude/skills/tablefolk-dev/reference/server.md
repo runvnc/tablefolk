@@ -78,12 +78,21 @@ is the scenario skill's `server.md`; this is how it works inside.
   (`survived_days` + `agents_alive` by default), `allowed` for fighters and
   sellers, and a reachability pass from the player's start (`reach`:
   unreachable homes or workplaces are problems for the model; unreachable
-  beds, stores and stations are moved to a free cell of their place). Each
+  beds, stores and stations, ones sharing a square, and ones with no free
+  side reachable (`reach().side`, four neighbours) are moved to a free cell
+  of their place). Each
   repair is a line in `notes`, returned as `repairs` (and saved with the
   generation). Without `generate` a living world is a problem for the model
   (one room); an edit (`fresh` false) only touches a world that is already
   living and generated. procgen.js `safeCell` places objects with `"in"`
-  where they block no doorway and leave the room connected.
+  where they block no doorway and leave the room connected, and where the
+  new thing and every bed, station and store already in the room
+  (`USE_GLYPHS`) keep a free side reachable from the way in, looking one
+  thing ahead (a corner that leaves the next thing nowhere is passed over);
+  a small room that cannot stay in one piece keeps at least the sides.
+  Objects at an `x`/`z` take their squares first; one that lands on the
+  map's own furniture or another placed thing moves to a free cell of its
+  place (a warning).
 - `reviseScenario` (`POST /api/revise`): big fixed layouts keep their
   objects on the server (`mergeKept`); the model answers with edit
   commands (`remove_objects`/`move_objects`/`add_objects`, `paint_area`/

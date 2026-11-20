@@ -725,26 +725,54 @@
   // other floor cell of the place stays reachable from its ways in. Walls
   // first (furniture stands against them). (Placing at the farthest free
   // cell put hearthvale's beds and a cauldron in doorways, 2026-11-20.)
+  // Things someone walks up to and uses (beds, stations, stores): each keeps a
+  // free side reachable from the way in. (A row of beds against a wall walled
+  // the inner ones in: villagers stood all night, 2026-11-20.)
+  // (beds, anvils, cauldrons, workbenches, chests, barrels, crates; a table or a
+  // bookcase may stand closed in)
+  const USE_GLYPHS = new Set(['Z', 'a', 'o', 'w', '&', 'h', 'm', 'B', 'C', ']', '|']);
   function safeCell(gen, p, occupied, blocked) {
     const W = gen.size[0], H = gen.size[1], x0 = Math.floor((W - 1) / 2), z0 = Math.floor((H - 1) / 2);
     const rc = (x, z) => [z + z0, x0 - x], g = gen.grid;
     const inP = (r, c) => r >= p.r0 && r <= p.r1 && c >= p.c0 && c <= p.c1;
     const walk = (r, c, extra) => { const ch = g[r]?.[c]; if (ch == null) return false; if (extra && extra.has(r + ',' + c)) return false; if (blocked.has(r + ',' + c)) return false; return FLOOR_GLYPHS.has(ch) || ch === '+'; };
     const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const ok = (r, c) => {
-      // not beside a door or an opening out of the place
-      if (N4.some(([dr, dc]) => { const ch = g[r + dr]?.[c + dc]; return ch === '+' || (!inP(r + dr, c + dc) && walk(r + dr, c + dc)); })) return false;
-      const extra = new Set([r + ',' + c]), cells = [];
+    // the place's floor reachable from its ways in, with `extra` blocked too
+    const reach = extra => {
+      const cells = [];
       for (let rr = p.r0; rr <= p.r1; rr++) for (let cc = p.c0; cc <= p.c1; cc++) if (walk(rr, cc, extra)) cells.push([rr, cc]);
-      if (!cells.length) return false;
       const entries = cells.filter(([rr, cc]) => N4.some(([dr, dc]) => !inP(rr + dr, cc + dc) && walk(rr + dr, cc + dc)));
       const seen = new Set(entries.map(([rr, cc]) => rr + ',' + cc)), q = [...entries];
       while (q.length) { const [rr, cc] = q.pop(); for (const [dr, dc] of N4) { const k = (rr + dr) + ',' + (cc + dc); if (!seen.has(k) && inP(rr + dr, cc + dc) && walk(rr + dr, cc + dc, extra)) { seen.add(k); q.push([rr + dr, cc + dc]); } } }
-      return entries.length > 0 && cells.every(([rr, cc]) => seen.has(rr + ',' + cc));
+      return { cells, entries, seen };
+    };
+    const sideIn = (seen, rr, cc) => N4.some(([dr, dc]) => seen.has((rr + dr) + ',' + (cc + dc)));
+    // the things in the place that can be used now (recounted as squares are tried)
+    const usableNow = () => {
+      const used = [];
+      for (let rr = p.r0; rr <= p.r1; rr++) for (let cc = p.c0; cc <= p.c1; cc++) if (USE_GLYPHS.has(g[rr]?.[cc]) || blocked.has(rr + ',' + cc)) used.push([rr, cc]);
+      const before = reach(null).seen; return used.filter(([rr, cc]) => sideIn(before, rr, cc));
+    };
+    let usable = usableNow();
+    // strict: the room stays in one piece too (a small room may only manage the sides)
+    const ok = (r, c, strict = true) => {
+      // not beside a door or an opening out of the place
+      if (N4.some(([dr, dc]) => { const ch = g[r + dr]?.[c + dc]; return ch === '+' || (!inP(r + dr, c + dc) && walk(r + dr, c + dc)); })) return false;
+      const { cells, entries, seen } = reach(new Set([r + ',' + c]));
+      if (!cells.length || !entries.length || (strict && !cells.every(([rr, cc]) => seen.has(rr + ',' + cc)))) return false;
+      // the new thing, and every thing in the place that could be used before, keep a reachable free side
+      return sideIn(seen, r, c) && usable.every(([rr, cc]) => sideIn(seen, rr, cc));
     };
     const free = freeCells(gen, p, occupied).reverse();
     const byWall = free.filter(([x, z]) => besideWall(gen, x, z));
-    const spot = [...byWall, ...free].find(([x, z]) => ok(...rc(x, z)));
+    // walls first, but not a square that leaves no room for the next thing
+    // (a cauldron in the shop's corner left its chest nowhere)
+    const order = [...byWall, ...free.filter(f => !byWall.includes(f))];
+    const good = order.filter(([x, z]) => ok(...rc(x, z)));
+    const after = ([x, z]) => { const k = rc(x, z).join(','), keep = usable; blocked.add(k); usable = usableNow(); const n = order.filter(f => (f[0] !== x || f[1] !== z) && ok(...rc(...f))).length; blocked.delete(k); usable = keep; return n; };
+    let spot = null;
+    if (good.length) { const room = good.slice(0, 12).map(after), want = Math.min(2, Math.max(...room)); spot = good[room.findIndex(n => n >= want)]; }
+    spot = spot || order.find(([x, z]) => ok(...rc(x, z), false));
     if (spot) blocked.add(rc(...spot).join(','));
     return spot || null;
   }
@@ -815,9 +843,28 @@
       occupied.add(spot[0] + ',' + spot[1]); placed[a.id] = p.id;
       return { ...a, at: spot, in: p.id };
     });
+    // Objects placed at x/z take their squares first (safeCell keeps them
+    // usable); one that lands on the map's own furniture or on another placed
+    // thing goes to a free cell of its place instead (hearthvale's second bed
+    // in house 3 stood in the first one's square).
+    const W0 = gen.size[0], H0 = gen.size[1], gx0 = Math.floor((W0 - 1) / 2), gz0 = Math.floor((H0 - 1) / 2);
+    const SMALL = new Set(['light', 'tile', 'note', 'picture', 'coin_pile', 'key', 'potion', 'scroll', 'flowers', 'grass_tuft', 'tall_grass', 'heather', 'flower_patch', 'fern', 'bear_trap', 'lily_pad', 'torch', 'wall_banner', 'rug', 'door', 'wall']);
+    const hasXZ = o => Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.x !== '' && o.z !== '';
+    const placeAt = (r, c) => gen.places.find(q => r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1);
+    const objCells = new Set();
+    for (const o of gen.objects || []) if (o && hasXZ(o) && !SMALL.has(o.type)) { const x = Math.round(+o.x), z = Math.round(+o.z); objCells.add(x + ',' + z); occupied.add(x + ',' + z); blocked.add((z + gz0) + ',' + (gx0 - x)); }
+    const fixed = (scn.objects || []).map(o => {
+      if (!o || !hasXZ(o) || SMALL.has(o.type)) return o;
+      const x = Math.round(+o.x), z = Math.round(+o.z), r = z + gz0, c = gx0 - x, k = x + ',' + z, ch = gen.grid[r]?.[c];
+      const clash = objCells.has(k) || (ch != null && USE_GLYPHS.has(ch));
+      const p = clash && placeAt(r, c);
+      if (p) { warnings.push(`object ${o.type} at ${x},${z}: the square is taken; moved to a free one in ${p.id}`); const { x: _x, z: _z, ...rest } = o; return { ...rest, in: p.id }; }
+      objCells.add(k); occupied.add(k); blocked.add(r + ',' + c);
+      return o;
+    });
     // Objects with "in" (and no x/z) go to a free cell of that place.
-    const objects = (scn.objects || []).map(o => {
-      if (o.in == null || (Number.isFinite(+o.x) && Number.isFinite(+o.z) && o.x !== '' && o.z !== '')) return o;
+    const objects = fixed.map(o => {
+      if (!o || o.in == null || hasXZ(o)) return o;
       const p = findPlace(o.in, gen.places, new Set());
       if (!p) { warnings.push(`object ${o.type}: no place "${o.in}"`); return null; }
       const free = freeCells(gen, p, occupied).reverse();

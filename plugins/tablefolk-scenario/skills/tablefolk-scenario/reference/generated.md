@@ -126,7 +126,10 @@ generated the first time the player goes in ([things.md](things.md#sections-worl
 
 - `"in": "<place>"` on an agent, an object or the player puts it in a free
   cell of that place (`house` = any house; `room 3`). Any place named in an
-  `in` is always built.
+  `in` is always built. Things go one to a square, by a wall, never in a
+  doorway, and every bed, station and store keeps a free side reachable
+  from the door. An object given `x`/`z` on a square the map already
+  furnished is moved to a free cell of the same place.
 - An agent with neither `at` nor `in` is matched by words in its id, style
   and personality: goblins and monsters to the lair, rulers and sorcerers to
   the throne room, guards to barracks, priests to the shrine or temple,

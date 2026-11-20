@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Rooms that work**: generated rooms put one thing in a square, and every bed, station and store keeps a free side you can walk up to from the door (a row of beds no longer walls the inner ones in); a thing placed on a square the map already filled moves to a free one in its place. The world builder's checks look for both.
 - **Bedtime**: a villager whose bed it cannot reach (walled in by others, or two beds generated in one cell) takes another or sleeps on the floor at home, and one whose way home is blocked during a raid stays put and sleeps there, instead of standing all night; someone pushed into a barrel's square steps out before walking.
 - **A talk scene is one room**: asking the world builder for an interview, a trial or a date gives one room sized to the cast, even when the model built a dungeon around it.
 - **Animals and mindless monsters** hear no rumours and get no events of their own.

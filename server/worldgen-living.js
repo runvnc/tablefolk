@@ -81,7 +81,9 @@ export function reach(s) {
   const near = t => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]].some(([dx, dz]) => seen.has((Math.round(t.x) + dx) + ',' + (Math.round(t.z) + dz)));
   // (a place counts as reached when one of its squares is, or one right beside it: a 3x1 strip in front of a barn may be all hay and chests)
   const placeReached = p => { for (let x = Math.ceil(p.x0) - 1; x <= p.x1 + 1; x++) for (let z = Math.ceil(p.z0) - 1; z <= p.z1 + 1; z++) if (seen.has(x + ',' + z)) return true; return false; };
-  return { b, near, placeReached, seen };
+  // a thing someone uses: a free square on one of its four sides is reachable
+  const side = t => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => seen.has((Math.round(t.x) + dx) + ',' + (Math.round(t.z) + dz)));
+  return { b, near, side, placeReached, seen };
 }
 
 // A talk-only scene is ONE room drawn as a "grid", sized to the cast: a model
@@ -232,8 +234,16 @@ export function livingWorld(s, { prompt = '', fresh = false, notes = [] } = {}) 
   try {
     const R = reach(s);
     for (const a of folk) for (const k of ['home', 'workplace']) { const p = a[k] && R.b.r.places.find(q => q.id === String(a[k]).toLowerCase()); if (p && !R.placeReached(p)) problems.push(`${a.id}: its ${k} "${a[k]}" cannot be reached from the player's start`); }
-    const bad = R.b.things.filter(t => t.src && (BEDS.has(t.type) || STORES.has(t.type) || Object.values(KIND_TYPES).flat().includes(t.type)) && !R.near(t));
-    for (const t of bad) { const o = t.src; if (o && s.objects?.includes(o)) { delete o.x; delete o.z; const p = R.b.r.places.find(q => R.b.inP(q, t)); if (p) { o.in = p.id; note(`${o.type} at an unreachable square moved to a free one in ${p.id}`); } } else note(`unreachable: ${t.type} at ${t.x},${t.z}`); }
+    // beds, stores and stations: one thing a square, and a free side someone can walk up to
+    const USED = t => BEDS.has(t.type) || STORES.has(t.type) || Object.values(KIND_TYPES).flat().includes(t.type);
+    const cellOf = new Map(), twice = new Set();
+    for (const t of R.b.things) { if (!USED(t) && !['table', 'bench', 'bookcase', 'cabinet', 'nightstand', 'workbench'].includes(t.type)) continue; const k = Math.round(t.x) + ',' + Math.round(t.z); if (cellOf.has(k)) twice.add(t.src ? t : cellOf.get(k)); else cellOf.set(k, t); }
+    const bad = R.b.things.filter(t => USED(t) && (twice.has(t) || !R.side(t)));
+    for (const t of bad) {
+      const o = t.src, why = twice.has(t) ? 'sharing a square' : 'with no free side to reach';
+      if (o && s.objects?.includes(o)) { delete o.x; delete o.z; const p = R.b.r.places.find(q => R.b.inP(q, t)); if (p) { o.in = p.id; note(`${o.type} ${why} moved to a free square in ${p.id}`); } else note(`${o.type} at ${t.x},${t.z} ${why}`); }
+      else note(`unreachable: ${t.type} at ${t.x},${t.z} (${why})`);
+    }
   } catch (e) { note('reachability check skipped: ' + e.message); }
   return problems;
 }
