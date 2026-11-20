@@ -48,6 +48,7 @@
     ['tts/tts-ui.js?v=20261115c'],
     ['load-status.js?v=20261115a'],
     ['look.js?v=20261018b'],
+    ['sky.js?v=20261120a'],
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261108a'],
     ['terrain-hd.js?v=20261019c'],

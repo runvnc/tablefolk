@@ -18,6 +18,8 @@
     // HD diorama, and no SSAO / bloom / glow / real-time shadow maps. For when
     // a large model (Gemma 4 E4B) and the scene don't both fit in GPU memory.
     lite: true, quality: 'light',
+    // the terrain's cell grid (terrain.js): off by default
+    showGrid: false,
   };
 
   function load() {
@@ -49,7 +51,7 @@
   const gfxParam = new URLSearchParams(location.search).get('gfx');
   if (['high', 'medium', 'light'].includes(gfxParam)) {
     Object.assign(settings, { quality: gfxParam, lite: gfxParam === 'light' });
-    if (gfxParam !== 'high') Object.assign(settings, { keyShadowEnabled: false, campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
+    if (gfxParam !== 'high') Object.assign(settings, { campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
     window.TABLEFOLK_GFX_NOSAVE = true;
   }
   window.TABLEFOLK_GFX = settings;
@@ -96,7 +98,8 @@
   }
   function applyShadows() {
     const st = window.TABLEFOLK_STATE;
-    applyShadow(st?.shadow, settings.keyShadowEnabled && !settings.lite, clampEvery(settings.keyShadowEvery));
+    // the sun's shadow map (sky.js): every frame at medium/high, every second frame at light
+    applyShadow(st?.shadow, settings.keyShadowEnabled, Math.max(settings.lite ? 2 : 1, clampEvery(settings.keyShadowEvery)));
     applyShadow((st?.extraShadows || [])[0], settings.campfireShadowEnabled && !settings.lite, clampEvery(settings.campfireShadowEvery));
   }
   // Both ShadowGenerators exist by the time main() dispatches this (it's the
@@ -111,6 +114,8 @@
     const fireEn = el('gfxCampfireShadowEnabled'), fireEv = el('gfxCampfireShadowEvery');
     const waveEn = el('gfxSeaWaveEnabled'), foamEn = el('gfxSeaFoamEnabled');
     const resetBtn = el('gfxResetDefaults');
+    const gridEn = el('gfxShowGrid');
+    if (gridEn) { gridEn.checked = !!settings.showGrid; gridEn.addEventListener('change', () => { settings.showGrid = gridEn.checked; save(); window.tablefolkTerrain?.setGrid?.(gridEn.checked); }); }
     const qualitySel = el('gfxQuality');
     if (qualitySel) {
       qualitySel.value = settings.quality;

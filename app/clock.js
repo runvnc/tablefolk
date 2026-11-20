@@ -58,6 +58,8 @@
     return ['dim', 'dim', 0];
   }
   function setTimeOfDay(h) {
+    // sky.js owns the light (sun, moon, sky, fog by the hour); the preset blend below is the fallback
+    if (window.tablefolkSky) { if (!cfg.dark) window.tablefolkSky.setTimeOfDay(h); return; }
     const sc = state.scene; if (!sc || cfg.dark) return;
     presets ||= snapshot(); if (!presets) return;
     baseColors ||= { clear: sc.clearColor?.clone?.(), fog: sc.fogColor?.clone?.() };

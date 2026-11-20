@@ -1008,7 +1008,7 @@ function addShadow(mesh){
 function registerAllShadowMeshes(scene){
   if(!state.shadow) return;
   for(const mesh of scene.meshes){
-    if(!mesh || mesh.isDisposed?.() || mesh.name==='hd_sea' || mesh.name==='sky_dome') continue;
+    if(!mesh || mesh.isDisposed?.() || mesh.name==='hd_sea' || /^sky_/.test(mesh.name)) continue;
     mesh.receiveShadows=true;
     try { state.shadow.addShadowCaster(mesh,true); } catch{}
   }
@@ -1911,7 +1911,7 @@ function meshBounds(meshes){
   return {min,max};
 }
 const GEN_ASSET=()=>ASSET_BASE+'models/props/gen/';
-const genPrepare=c=>{ applyClayLookToMeshes(c.meshes,c.scene||state.scene,{detail:.11,detailScale:5}); for(const m of c.materials) plasticFinish(m,{coat:.5,coatRough:.14}); };
+const genPrepare=c=>{ for(const m of c.materials) LOOK()?.matte(m); };
 const CRATE_SIZE=.5;
 function makeCrate(scene,x,z){
   // Keep the simple box as the physics/picking proxy, but make it invisible and
@@ -1992,37 +1992,10 @@ function addLampPool(scene,root,{warm=false,y=.025}={}){
   disc.rotation.x=Math.PI/2; disc.parent=root; disc.position.y=.025; disc.material=state.lampPoolMat; disc.isPickable=false; disc.alphaIndex=5;
   disc.metadata={proxy:root};
 }
-// Scene lighting presets. 'night' is the normal diorama look; 'bright' raises
-// and strengthens the key light so its falloff no longer leaves the north half
-// of the island in the dark (the sky-dome light never reaches materials: it is
-// fifth in priority under the four-light cap). 'dim' is night at half ambient
-// (key, fill, rim, sky dome and environment), so lamps and fires stand out.
-// Used by scenarios.
-let lightingDefaults=null;
+// Scene lighting presets ("lighting" in a scenario): a time of day in sky.js.
 function setLighting(mode='night'){
-  const sc=state.scene; if(!sc) return;
-  const key=sc.getLightByName('tree_key_moved'), rim=sc.getLightByName('teal_rim');
-  if(!lightingDefaults) lightingDefaults={keyPos:key?.position.clone(), keyI:key?.intensity, rimI:rim?.intensity};
-  const d=lightingDefaults, amb=mode==='dim' ? .5 : 1;
-  const hemi=sc.getLightByName('sky_dome_light');
-  if(hemi){ d.hemiI ??= hemi.intensity; hemi.intensity=d.hemiI*amb; }
-  if(sc.environmentTexture){ d.envI ??= sc.environmentIntensity; sc.environmentIntensity=d.envI*amb; }
-  // Bigger boards: move the key and fill out with the board and raise their
-  // intensity by the square of the distance, so the middle stays as lit.
-  const k=LEGACY_ISLAND ? 1 : boardScale(), fill=sc.getLightByName('cool_fill');
-  if(fill){ d.fillPos ||= fill.position.clone(); d.fillI ??= fill.intensity; d.fillR ??= fill.range;
-    fill.position.copyFrom(d.fillPos.scale(k)); fill.intensity=d.fillI*k*k*amb; fill.range=d.fillR*k; }
-  if(key) key.range=46*k;
-  if(mode==='bright'){
-    // Raised less and only 2.2x (was y14, 4x): enough to light the north
-    // half, while keeping the glancing highlights that give the glossy
-    // "plastic miniature" look (4x from overhead flattened it).
-    if(key){ key.position.set(-1,9*k,10.5*k); key.intensity=d.keyI*2.2*k*k; }
-    if(rim) rim.intensity=Math.max(d.rimI,.34);
-  } else {
-    if(key && d.keyPos){ key.position.copyFrom(d.keyPos.scale(k)); key.intensity=d.keyI*k*k*amb; }
-    if(rim) rim.intensity=d.rimI*amb;
-  }
+  // sky.js: bright 10:00, dim 19:00, night 23:00 (moonlit); dark worlds have no sun
+  window.tablefolkSky?.setLighting(mode);
   state.lighting=mode;
 }
 function makeLamp(scene,x,z){ const root=new BABYLON.TransformNode('lamp_root',scene); root.position.set(x,state.terrainTopY??0,z); const pole=BABYLON.MeshBuilder.CreateCylinder('lamp_pole',{height:.85,diameter:.07,tessellation:6},scene); pole.parent=root; pole.position.y=.46; pole.material=state.materials.darkwood; addShadow(pole); const c=createCrystal('lamp_crystal',scene,.38,.14); c.parent=root; c.position.y=.98; c.material=state.materials.magic; addShadow(c); const light=new BABYLON.PointLight('lamp_light',new BABYLON.Vector3(0,.96,0),scene); light.parent=root; light.diffuse=new BABYLON.Color3(.37,.78,.72); light.intensity=.34; light.range=3.1; if(window.TABLEFOLK_GFX?.lite) window.tablefolkScenery?.trackLight(light); tag(root,'lamp',{health:1,material:'crystal'}); pole.metadata={proxy:root}; c.metadata={proxy:root}; addLampPool(scene,root); state.props.push(root); return root; }
@@ -3057,7 +3030,7 @@ async function importPropAsset(scene,file,opts={}){
   try{
     // Pack items carry full URLs; the glTF's textures resolve from its folder.
     const abs=/^[a-z]+:/i.test(file), dir=abs?file.slice(0,file.lastIndexOf('/')+1):PROP_ASSET, name=abs?file.slice(dir.length):file;
-    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ m.backFaceCulling=false; if('roughness' in m) m.roughness=.42; plasticFinish(m,{coat:.55,coatRough:.12}); } if(opts.clay) applyClayLookToMeshes(c.meshes,scene,{detail:.11,detailScale:5}); });
+    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ if(!(m.needAlphaTesting?.())) m.backFaceCulling=false; LOOK()?.matte(m); } });
     // Some props (the chest) bring a skeleton and animation clips; free those
     // with the object (disposeWorldObject runs meta.cleanup).
     for(const ag of result.animationGroups||[]) ag.stop();
@@ -4865,34 +4838,16 @@ async function spawnAt(type, x, z) {
 // Toy-plastic finish: a glossy clear coat over the base material. This is
 // what reads as "plastic miniature" on flat surfaces (the grass gets its
 // sheen from its normal map; blocks and props have none).
-function plasticFinish(m,{coat=.6,coatRough=.1,rough=null}={}){
-  if(!(m instanceof BABYLON.PBRMaterial)) return m;
-  if(rough!==null) m.roughness=rough;
-  // Light quality has no post effects to soften highlights: a 0.1 coat on
-  // small facets (pine needles, leaves) lit up single pixels, a scatter of
-  // little glowing dots instead of a sheen (2026-11-14). Specular
-  // anti-aliasing widens a highlight where the surface turns fast, and the
-  // coat is a little less sharp there.
-  m.enableSpecularAntiAliasing=true;
-  if(window.TABLEFOLK_GFX?.lite) coatRough=Math.max(coatRough,.3);
-  m.clearCoat.isEnabled=true; m.clearCoat.intensity=coat; m.clearCoat.roughness=coatRough;
-  m.environmentIntensity=Math.max(m.environmentIntensity||0,.85);
-  return m;
-}
-// Characters get the same toy-plastic finish as the tiles and props
-// (2026-11-07; they were matte, roughness 1): one gloss for the whole
-// figure (the baked roughness and metalness maps are ignored, their AO
-// stays), a clear coat for the sharp highlight, and the environment
-// reflection, which is what reads as glossy on light quality (no SSR, no
-// post effects there).
+// The glossy "plastic" finish is gone (2026-11-20): every caller gets the
+// matte finish (look.js matte: own maps, roughness >= .55, no clear coat).
+function plasticFinish(m){ return LOOK()?.matte(m) ?? m; }
+// Characters: their own PBR maps (base colour, normal, metallic-roughness,
+// AO), matte (look.js matte): roughness at least .55 (metals .3), no clear
+// coat, moderate environment light.
 function toyFinish(m){
   if(!(m instanceof BABYLON.PBRMaterial) || m._tfToy) return m;
   m._tfToy=true; m.maxSimultaneousLights=8;
-  m.metallic=0; m.useMetallnessFromMetallicTextureBlue=false;
-  m.useRoughnessFromMetallicTextureGreen=false; m.useRoughnessFromMetallicTextureAlpha=false;
-  m.roughness=.4; m.specularIntensity=.8;
-  plasticFinish(m,{coat:.6,coatRough:.12}); m.environmentIntensity=1;
-  return m;
+  return LOOK()?.matte(m) ?? m;
 }
 // Dispose a material and its own textures, but not textures shared across
 // materials: look.js gives every clay material the same detail-normal
@@ -5659,7 +5614,7 @@ function installWorldAPI(){
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
     spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, getCameraView, setCameraView, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
     setWallHeight:v=>{ state.wallHeightScale=Number.isFinite(+v) && +v>0 ? Math.min(4,Math.max(.25,+v)) : 1; },
-    setLighting,
+    setLighting, setTimeOfDay:h=>window.tablefolkSky?.setTimeOfDay(h),
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),
     executeAgentCommand:(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'),
@@ -6273,7 +6228,7 @@ async function addTerrainPolish(scene){
   if(!LEGACY_ISLAND){
     // The board in the sea: the simple sea and sky at every quality (the HD
     // ocean was dropped from high on 2026-11-07; TablefolkHD.buildSea is unused).
-    makeSkyDome(scene); makeSea(scene); if(window.TABLEFOLK_GFX?.lite) state.lite=true;
+    makeSea(scene); if(window.TABLEFOLK_GFX?.lite) state.lite=true;
     state.terrainTopY=0;
     rebuildBoard(); rebuildBoardSupport(); fitBoardView();
     makeSelectionRing(scene);
@@ -6349,58 +6304,17 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   });
   canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); const pick=scene.pick(scene.pointerX,scene.pointerY); if(pick?.hit && pick.pickedPoint){ const tx=Math.round(pick.pickedPoint.x), tz=Math.round(pick.pickedPoint.z); let info=`tile (${tx},${tz})`; const m=pick.pickedMesh; const mm=meta(m); if(mm?.type && mm.type!=='tile') info+=` - ${mm.type} (${mm.state||'intact'})`; const owner=m?.metadata?.ownerId; if(owner){ const g=state.characters.find(x=>x.id===owner); if(g) info+=` - ${g.id} (${g.anim||'idle'})`; } log(info); } });
   canvas.addEventListener('pointermove',e=>{ if(e.buttons&2){ e.preventDefault(); const dx=e.movementX*0.02, dy=e.movementY*0.02; const right=camera.getDirection(BABYLON.Vector3.Right()); const up=camera.getDirection(BABYLON.Vector3.Up()); const newTarget=camera.target.add(right.scale(dx)).subtract(up.scale(dy)); newTarget.y=camera.target.y; camera.target.copyFrom(newTarget); state.zoomFocus=camera.target.clone(); } });
-  // Diorama lighting: cool moonlit sky dome + a warm angled key so the island
-  // reads as a lit model on a dark table, plus a teal rim to separate the
-  // silhouette from the water.
-  const hemi=new BABYLON.HemisphericLight('sky_dome_light',new BABYLON.Vector3(.15,1,.05),scene);
-  hemi.intensity=.16; hemi.diffuse=new BABYLON.Color3(.42,.55,.76); hemi.groundColor=new BABYLON.Color3(.10,.12,.11); hemi.specular=new BABYLON.Color3(.05,.08,.11);
-  const sun=new BABYLON.DirectionalLight('warm_key',new BABYLON.Vector3(-.48,-.86,.62),scene);
-  sun.position=new BABYLON.Vector3(11,17,-12); sun.intensity=0; sun.diffuse=new BABYLON.Color3(1,.82,.58); sun.specular=new BABYLON.Color3(.50,.45,.38); // Directional flood intentionally disabled.
-  // A zero-intensity enabled light still consumes one of Babylon's material
-  // light slots and one shader uniform buffer.
-  sun.setEnabled(false);
-  // Broad point source at the front-left corner, opposite the house.
-  // Its finite range equals the island's 14-unit width.
-  const cornerKey=new BABYLON.PointLight('composition_opposite_corner_point',new BABYLON.Vector3(-1.0,5.0,10.5),scene); cornerKey.name='tree_key_moved';
-  cornerKey.diffuse=new BABYLON.Color3(1,.82,.55); cornerKey.specular=new BABYLON.Color3(.34,.26,.17);
-  cornerKey.intensity=200; cornerKey.range=46; cornerKey.radius=4.5; cornerKey.falloffType=BABYLON.Light.FALLOFF_GLTF;
-  // Point-light shadows render a cubemap (six directions), so keep this at
-  // 1024 rather than duplicating the old 2048 directional-map cost sixfold.
-  // PERF NOTE: this is a real-time ShadowGenerator (default refreshRate),
-  // so those 6 cubemap faces re-render every frame even though almost
-  // nothing in the scene moves out of shadow frame-to-frame (camera pans
-  // are the main exception). makeCampfire() below adds a second point-light
-  // cubemap shadow (512, QUALITY_LOW) on top of this one - so every frame
-  // pays for 12 extra shadow-map passes combined. Candidates worth
-  // measuring later: RenderTargetTexture.refreshRate = REFRESHRATE_RENDER_ONCE
-  // (or every Nth frame) on generators whose casters aren't moving much, or
-  // swapping this key light for a DirectionalLight shadow (1 pass instead
-  // of 6) since it's meant to read as a fixed diorama key, not an
-  // omnidirectional source.
-  // Light quality: no key shadow map (a 1024 cubemap, 32 MB and six passes a frame).
-  const cornerShadow=window.TABLEFOLK_GFX?.lite ? null : new BABYLON.ShadowGenerator(1024,cornerKey);
-  if(cornerShadow){
-    cornerShadow.usePercentageCloserFiltering=true;
-    cornerShadow.filteringQuality=BABYLON.ShadowGenerator.QUALITY_MEDIUM;
-    cornerShadow.bias=.0004; cornerShadow.normalBias=.004; cornerShadow.darkness=.38;
-  }
-  const rim=new BABYLON.DirectionalLight('teal_rim',new BABYLON.Vector3(.62,-.34,-.68),scene);
-  rim.intensity=.22; rim.diffuse=new BABYLON.Color3(.34,.72,.82); rim.specular=new BABYLON.Color3(.20,.42,.48);
-  const fill=new BABYLON.PointLight('cool_fill',new BABYLON.Vector3(-9,5,7),scene);
-  fill.intensity=.35; fill.diffuse=new BABYLON.Color3(.48,.66,1); fill.range=24;
-  state.sun=sun;
-  // addShadow() and the HD builders now populate the active point-light map.
-  // Keep the disabled directional light object for an easy rollback, but do not
-  // spend a shadow map on a zero-intensity source.
-  state.shadow=cornerShadow;
-  // Neutral environment reflections give PBR clay broad shape cues without making it glossy.
+  // The light (sky.js, 2026-11-20): one directional sun/moon with a shadow
+  // map fitted around the camera's target, a hemispheric sky fill, the time
+  // of day; local lights (lamps, fires, spells) are added by their objects.
+  // The old diorama rig (a point "key" with a cubemap shadow, a teal rim and
+  // a cool fill) is gone.
+  LOOK()?.applyTonemap(scene,{exposure:1.0,contrast:1.06,tonemap:'neutral',grade:false});
+  const rig=window.tablefolkSky.init(scene,camera);
+  state.sun=rig.sun; state.shadow=rig.shadow;
+  // Image-based light: broad, soft shape cues; its strength follows the time of day (sky.js).
   const envTexture=BABYLON.CubeTexture.CreateFromPrefilteredData((window.tablefolkVendorUrl||(u=>u))('https://assets.babylonjs.com/environments/studio.env'),scene);
   scene.environmentTexture=envTexture;
-  scene.environmentIntensity=.10;
-  // Tonemap + diorama grade (teal-lifted shadows, warm highlights). The old
-  // ACES at contrast/exposure 1.34 was crushing shadows and desaturating the
-  // olive greens relative to the concept art.
-  LOOK()?.applyTonemap(scene,{exposure:1.34,contrast:1.12,tonemap:'neutral',grade:true});
   // Diorama polish: soft bloom on emissives, gentle vignette, and a subtle tilt-shift depth of field.
   if(window.TABLEFOLK_GFX?.lite || window.TABLEFOLK_TABLETOP){
     // Light mode: no post-process pipeline, SSAO or glow layer (each holds
@@ -6409,9 +6323,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   } else try{
     const rp=new BABYLON.DefaultRenderingPipeline('drp',true,scene,[camera]);
     rp.fxaaEnabled=true;
-    rp.bloomEnabled=true; rp.bloomThreshold=.82; rp.bloomWeight=.26; rp.bloomScale=.6; rp.bloomKernel=48;
-    rp.vignetteEnabled=true; rp.vignetteWeight=1.05; rp.vignetteStretch=.42; rp.vignetteColor=new BABYLON.Color4(0,.02,.05,0);
-    rp.sharpenEnabled=true; rp.sharpen.edgeAmount=.28; rp.sharpen.colorAmount=1;
+    // subtle bloom (lamps, fire, spells), a very light neutral vignette
+    rp.bloomEnabled=true; rp.bloomThreshold=.9; rp.bloomWeight=.14; rp.bloomScale=.5; rp.bloomKernel=48;
+    rp.vignetteEnabled=true; rp.vignetteWeight=.45; rp.vignetteStretch=.6; rp.vignetteColor=new BABYLON.Color4(0,0,0,0);
+    rp.sharpenEnabled=true; rp.sharpen.edgeAmount=.12; rp.sharpen.colorAmount=1;
     rp.imageProcessing.vignetteBlendMode=BABYLON.ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
     rp.samples=4;
    
@@ -6423,9 +6338,9 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     // rather than flat colour. Neither the imported GLBs (Tripo bakes a pure
     // white AO channel) nor the procedural terrain carried any before this.
     // Medium quality: no SSAO (several full-screen render targets).
-    if(window.TABLEFOLK_GFX?.quality!=='medium') state.ssao=LOOK()?.setupSSAO(scene,camera,{radius:.62,strength:3.1,samples:20,maxZ:60});
+    if(window.TABLEFOLK_GFX?.quality!=='medium') state.ssao=LOOK()?.setupSSAO(scene,camera,{radius:.7,strength:1.6,samples:16,maxZ:60});
     const gl=new BABYLON.GlowLayer('hd_glow',scene,{ mainTextureFixedSize:512, blurKernelSize:44 });
-    gl.intensity=.38;
+    gl.intensity=.3;
     state.glowLayer=gl;
   }catch(e){ console.warn('render pipeline unavailable, continuing without post fx',e); }
   state.materials={
@@ -6443,23 +6358,13 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // Babylon otherwise takes the first N scene lights, so the late-created
   // campfire/lantern lose to broad fill lights. Put practicals first; material
   // shaders then get both practical pools plus the shared key/rim within four.
-  const lightPriority={campfire_light:0,hd_lantern_light:1,tree_key_moved:2,composition_opposite_corner_point:2,teal_rim:3,sky_dome_light:4,cool_fill:5};
+  const lightPriority={campfire_light:0,hd_lantern_light:1,sun:2,sky_fill:3};
   scene.lights.sort((a,b)=>(lightPriority[a.name]??50)-(lightPriority[b.name]??50));
-  // Keep PBR light shaders within WebGPU's portable uniform-buffer budget.
-  // Four slots are sufficient once the disabled sun is removed and practical
-  // lights are explicitly prioritized per mesh.
+  // Everything matte (look.js matte): no forced gloss; water keeps its sheen.
   for(const material of scene.materials){
-    if(material instanceof BABYLON.PBRMaterial){
-      material.maxSimultaneousLights=8;
-      material.useRoughnessFromMetallicTextureGreen=false;
-      material.useRoughnessFromMetallicTextureAlpha=false;
-      material.roughness=.24;
-      material.environmentIntensity=Math.max(.85,material.environmentIntensity||0);
-      material.specularIntensity=material.name.includes('water') || material.name.includes('sea') ? 1 : .5;
-    } else if(material instanceof BABYLON.StandardMaterial){
-      material.specularColor=(material.name.includes('water') || material.name.includes('sea')) ? new BABYLON.Color3(1,1,1) : new BABYLON.Color3(.5,.5,.5);
-      material.specularPower=128;
-    }
+    if('maxSimultaneousLights' in material) material.maxSimultaneousLights=8;
+    if(/water|sea/.test(material.name)) continue;
+    LOOK()?.matte(material);
   }
   // Light mode's legacy sea/tiles are StandardMaterials: the pass above gives
   // them full-white specular, which under the strong key light turned the
