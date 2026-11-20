@@ -246,8 +246,10 @@ var tfRough: f32 = uniforms.tfFlags.y; var tfAO: f32 = 1.0;
     if (uniforms.tfExtra.x > 0.5) {
       let q = vec2f(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + (n1 * 3.0);
       let cell = floor(q / vec2f(26.0, 17.0)); let h = tfHash(cell);
-      let tint = select(select(vec3f(1.35, 1.18, 0.62), vec3f(1.12, 1.16, 0.84), h > 0.33), vec3f(0.95, 0.82, 0.62), h > 0.72);
-      col = mix(col, col * tint, smoothstep(10.0, 28.0, tfOut) * 0.85);
+      let tint = select(select(vec3f(1.3, 1.16, 0.66), vec3f(1.1, 1.14, 0.86), h > 0.33), vec3f(0.96, 0.85, 0.66), h > 0.72);
+      // soft field edges (a hedge-dark seam), never a hard step
+      let fe = abs(fract(q / vec2f(26.0, 17.0)) - vec2f(0.5)) * 2.0; let edge = smoothstep(0.78, 1.0, max(fe.x, fe.y));
+      col = mix(col, mix(col * tint, col * 0.8, edge * 0.6), smoothstep(12.0, 34.0, tfOut) * 0.55 * (1.0 - edge * 0.6));
     }
     surfaceAlbedo = pow(max(col, vec3f(0.0)), vec3f(2.2));
     let tn = tfAccN / tfSum; let tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
@@ -294,8 +296,9 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     if (tfExtra.x > 0.5) {
       vec2 q = vec2(tfP.x * 0.94 + tfP.y * 0.34, tfP.y * 0.94 - tfP.x * 0.34) + n1 * 3.0;
       float h = tfHash(floor(q / vec2(26.0, 17.0)));
-      vec3 tint = h > 0.72 ? vec3(0.95, 0.82, 0.62) : h > 0.33 ? vec3(1.12, 1.16, 0.84) : vec3(1.35, 1.18, 0.62);
-      col = mix(col, col * tint, smoothstep(10.0, 28.0, tfOut) * 0.85);
+      vec3 tint = h > 0.72 ? vec3(0.96, 0.85, 0.66) : h > 0.33 ? vec3(1.1, 1.14, 0.86) : vec3(1.3, 1.16, 0.66);
+      vec2 fe = abs(fract(q / vec2(26.0, 17.0)) - 0.5) * 2.0; float edge = smoothstep(0.78, 1.0, max(fe.x, fe.y));
+      col = mix(col, mix(col * tint, col * 0.8, edge * 0.6), smoothstep(12.0, 34.0, tfOut) * 0.55 * (1.0 - edge * 0.6));
     }
     surfaceAlbedo = pow(max(col, vec3(0.0)), vec3(2.2));
     vec3 tn = tfAccN / tfSum; float tz = sqrt(max(0.0, 1.0 - dot(tn.xy, tn.xy)));
@@ -498,7 +501,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const green = L => L === 'grass_meadow' || L === 'forest_floor' || L === 'grass_dry';
     const push = (kind, mi, x, z, s, ry) => { const k = kind + ':' + mi; if (!lists.has(k)) lists.set(k, []); const pt = patchAt(x, z), dry = sm(.5, .8, pt) * .75, lush = sm(.5, .82, 1 - pt) * .5;
-      const col = kind === 'grass_tufts' ? [(1 + .2 * dry - .14 * lush) * 1.06, (1 + .12 * dry + .04 * lush) * 1.06, (1 - .26 * dry - .14 * lush) * 1.0] : kind === 'pebbles' ? [1.25, 1.22, 1.18] : [1, 1, 1];
+      const col = kind === 'grass_tufts' ? [(1 + .2 * dry - .14 * lush) * 1.25, (1 + .12 * dry + .04 * lush) * 1.25, (1 - .26 * dry - .14 * lush) * 1.15] : kind === 'pebbles' ? [1.25, 1.22, 1.18] : [1, 1, 1];
       lists.get(k).push([BABYLON.Matrix.Compose(new BABYLON.Vector3(s, s, s), BABYLON.Quaternion.RotationYawPitchRoll(ry, 0, 0), new BABYLON.Vector3(x, 0, z)), col]); };
     let total = 0; const CAP = lite ? 500 : 3500;
     for (let z = -bz - 3; z <= bz + 3; z++) for (let x = -bx - 3; x <= bx + 3; x++) {
@@ -515,7 +518,8 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
         if (!green(n) && !wall) { if (dx > 0) lim.x1 = .05; if (dx < 0) lim.x0 = -.05; if (dz > 0) lim.z1 = .05; if (dz < 0) lim.z0 = -.05; }
       }
       const px = () => x + lim.x0 + rnd() * (lim.x1 - lim.x0), pz = () => z + lim.z0 + rnd() * (lim.z1 - lim.z0);
-      const busy = objs.has(k) ? .5 : 1, n = lite ? 0 : Math.round((.7 + edge * 1.5) * busy * (onBoard ? 1 : .7));
+      // open grass: a tuft on about one cell in three (from above the cards read as dark specks); edges keep their clumps
+      const busy = objs.has(k) ? .5 : 1, n = lite ? 0 : edge ? Math.round((.6 + edge * 1.5) * busy) : (rnd() < .33 * (onBoard ? 1 : .6) ? 1 : 0);
       for (let i = 0; i < n; i++) push('grass_tufts', (rnd() * 4) | 0, px(), pz(), .6 + rnd() * .6, rnd() * 6.28);
       if (!lite && rnd() < .22 + edge * .08) push('flowers', (rnd() * 3) | 0, px(), pz(), .8 + rnd() * .5, rnd() * 6.28);
       if ((edge || objs.has(k)) && rnd() < .14) push('pebbles', (rnd() * 5) | 0, x + rnd() - .5, z + rnd() - .5, .7 + rnd() * .6, rnd() * 6.28);
