@@ -174,6 +174,10 @@
   const REACH = 1.9;
   // a quiet walk (no "walks toward" line): routed like live.js's wander
   function walkTo(g, x, z) {
+    // standing in a blocked cell (pushed into a barrel's square, left on a seat's): first a step out
+    // to the nearest free cell, or no route starts from there (villagers slept in the tavern's barrels)
+    { const p = posOf(g), cx = Math.round(p.x), cz = Math.round(p.z);
+      if (!cellPassable(cx, cz) && !g.pose) { const out = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].map(([dx, dz]) => [cx + dx, cz + dz]).filter(([qx, qz]) => cellPassable(qx, qz) && !occupantAt(qx, qz, g)).sort((u, v) => Math.hypot(u[0] - p.x, u[1] - p.z) - Math.hypot(v[0] - p.x, v[1] - p.z))[0]; if (out) setCharacterLogicalPosition(g, new BABYLON.Vector3(out[0], 0, out[1])); } }
     const a = posOf(g);
     if (Math.round(a.x) === Math.round(x) && Math.round(a.z) === Math.round(z)) return true;
     let tx = Math.round(x), tz = Math.round(z);

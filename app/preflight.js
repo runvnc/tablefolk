@@ -81,7 +81,7 @@
     ['live.js?v=20261120g'],
     ['director.js?v=20261120c'],
     ['clock.js?v=20261120c'],
-    ['jobs.js?v=20261120ac'],
+    ['jobs.js?v=20261120ad'],
     ['threats.js?v=20261120j'],
     ['chatter.js?v=20261120c'],
     ['speech-input.js?v=20261113a'],
