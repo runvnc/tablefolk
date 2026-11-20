@@ -1469,6 +1469,8 @@ function rebuildWallVisuals(){
   const mats=wallMaterials(), top=state.terrainTopY??0;
   const cell=new Map(walls.map(w=>[Math.round(w.position.x)+','+Math.round(w.position.z),w]));
   if(state.wallStyle==='modern') return buildModernWalls(cell,top);
+  // stone and tabletop: real textured walls (walls.js: rubble, dungeon blocks, timber-framed houses)
+  if(window.tablefolkWalls) return window.tablefolkWalls.build(cell,top);
   if(state.wallStyle==='stone') return buildFieldstoneWalls(cell,top);
   const stones=boxBatch(), core=boxBatch(), trim=boxBatch(), cap=boxBatch();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };

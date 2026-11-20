@@ -59,6 +59,7 @@
     ['reactions.js?v=20261115b'],
     ['terrain.js?v=20261120a'],
     ['surroundings.js?v=20261120a'],
+    ['walls.js?v=20261120a'],
     ['darkness.js?v=20261114c'],
 
     ['roofs.js?v=20261031a'],

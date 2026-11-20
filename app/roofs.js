@@ -90,7 +90,7 @@
     return { rooms, outsideShare: ground ? outside / ground : 0, outside: out };
   }
   function wanted() {
-    const s = window.tablefolkScenario?.active?.scn || {};
+    const s = state.envScn || window.tablefolkScenario?.active?.scn || {};
     if (s.roofs === false) return false;
     if (s.roofs === true) return true;
     return !s.dark && s.base !== 'dungeon';
@@ -222,7 +222,7 @@
     const W = walls(); if (!W.size) return;
     const { rooms, outsideShare } = findRooms(W, doors());
     // a world that is all one building has no outside to see a roof from
-    const s = window.tablefolkScenario?.active?.scn || {};
+    const s = state.envScn || window.tablefolkScenario?.active?.scn || {};
     if (s.roofs !== true && outsideShare < .25) return;
     for (const room of rooms) {
       const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1;
@@ -265,7 +265,15 @@
   setInterval(() => { if (!enabled || !state.scene) return; const s = signature(walls()); if (sig && s !== sig) rebuild(); }, 2500);
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });
+  // walls.js: the rooms that get (or will get) a roof, by the same rule as rebuild()
+  function planned() {
+    if (!wanted() || !state.scene || !window.tablefolk?.WORLD) return [];
+    const W = walls(); if (!W.size) return [];
+    const { rooms, outsideShare } = findRooms(W, doors()), s = state.envScn || window.tablefolkScenario?.active?.scn || {};
+    if (s.roofs !== true && outsideShare < .25) return [];
+    return rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); });
+  }
   // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
   function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
-  window.tablefolkRoofs = { rebuild, toggle, findRooms: plan, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
+  window.tablefolkRoofs = { rebuild, toggle, findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
 })();
