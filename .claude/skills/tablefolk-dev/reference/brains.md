@@ -218,7 +218,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   Qwen to write `say("[Pilgrim] ...`, and `[Pilgrim]` was copied into replies, so
   names appear only when more than one other person is near. 70 tokens a turn;
   speech is cut to its first two sentences. Off in this mode: the
-  "(You look around.)" seed (`?seed=look`; none by default since 2026-11-20), the
+  neutral "(You look around.)" / `look()` seed (`?seed=none` drops it), the
   planning filter, the repeat guards in `say()` and the copy guard (they left him
   silent), reports and corrections in the history, the "ponders" fallback. A quiet
   turn skips the model. `onlySpokenTo` (on by default here) skips turns with no speech in
@@ -265,10 +265,11 @@ lock) builds the prompt and parses the answer:
    feelings eval fell from 3/3 to 0/2 with the stay line at the end. Card
    lines starting with `!` (an offer to accept now) go at the very end.
 4. **History**: the last 12 messages (`HISTORY_KEEP`); new input split into
-   "WHAT JUST HAPPENED:" (events) and "NEW SPEECH ADDRESSED TO YOU:". No
-   seed exchange (the old 'God says: Are you ready my son?' /
-   `say("Yes I am ready")` leaked into speech; `?seed=look` tries a neutral
-   one). Speech between characters (2026-11-20): `say()` records
+   "WHAT JUST HAPPENED:" (events) and "NEW SPEECH ADDRESSED TO YOU:". The
+   seed exchange is a neutral "(You look around.)" / `look()` (the old 'God
+   says: Are you ready my son?' / `say("Yes I am ready")` leaked into speech;
+   live eval 2026-11-20, bakery, 60 turns each: 0 malformed replies with the
+   neutral seed, 1 with none; `?seed=none` drops it). Speech between characters (2026-11-20): `say()` records
    `g._spoke = { to, text }` from `addresseeOf` (a name in the line, the
    start first; else who spoke to it in the last 20 s and is in earshot;
    else the nearest person it faces within 3 cells; else null). After the
@@ -302,7 +303,8 @@ lock) builds the prompt and parses the answer:
    copy what anyone said lately or the history's "grub says" wording; the
    talk budget (`cfg.talkRun`, `cfg.quietTurns`) allows two unprompted
    talking turns then quiet ones (say and whisper removed from its commands);
-   before that, a turn with nothing in `pendingChat` and no
+   before that, a turn with nothing in `pendingChat` (someone walking up
+   does not count) and no
    `tablefolkMind.speechCause(g)` (news, a want needing a person, a goal
    naming someone in earshot, anger level 2+ at someone near, a guard's
    warning, "You could ask ...") is muted the same way, with a pointer to

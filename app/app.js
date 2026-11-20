@@ -3998,7 +3998,7 @@ function sellToCharacter(g,b,stock,price){
   if(low!=null && price<low) return fail(g,`sale refused: you never sell ${name} for less than ${low} gold`);
   const words=t=>String(t||'').toLowerCase().match(/[a-z]{3,}/g)||[], key=words(name).filter(w=>!['the','and'].includes(w));
   const asked=(b._lines||[]).slice(-4).some(l=>key.some(w=>String(l.text).toLowerCase().includes(w.replace(/s$/,''))));
-  const food=!!window.tablefolkMind?.isFood(name), hungry=(m?.hunger||0)>=.55;
+  const food=!!window.tablefolkMind?.isFood(name), hungry=(m?.hunger||0)>=.55 || (b._lines||[]).slice(-3).some(l=>Date.now()-l.at<90000 && /\b(hungry|starving|starved|eat|food|bite)\b/i.test(l.text));
   const onGoal=key.some(w=>String(getBrainConfig(b.id).goal||'').toLowerCase().includes(w.replace(/s$/,'')));
   const say2=t=>{ try{ say(b,t,true); }catch{} };
   if(window.tablefolkMind?.refuses(b,g.id)){ say2(`Not from you, ${g.id}.`); return fail(g,`sale failed: ${b.id} will not buy from you`); }

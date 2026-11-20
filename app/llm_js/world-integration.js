@@ -398,7 +398,7 @@ function convoReset(id) { for (const k of [...convos.keys()]) if (k.split('|').i
 // a command as the "You could, right here" menu writes it: carry(note), give(bread, pip)
 const cmdSig = c => (c.kind + '(' + String(c.target ?? c.item ?? c.arg ?? c.destinationText ?? c.emote ?? '') + ')').toLowerCase().replace(/["'\s]/g, '');
 const HISTORY_KEEP = 12;
-const SEED = new URLSearchParams(location.search).get('seed') || 'none';
+const SEED = new URLSearchParams(location.search).get('seed') || 'look';
 // Simple mode (app.js isSimpleBrain): the last few things said, as plain talk.
 // No seed, no reports of its own actions or corrections: a tiny model repeats
 // those instead of answering. Six messages, and a short prompt: wllama reads a
@@ -493,8 +493,9 @@ function buildAgentMessages(world, g, cfg) {
   // No seed exchange. It was 'God says: Are you ready my son?' /
   // say("Yes I am ready"), to show the reply format; it leaked into speech
   // ("Aye, I'm ready, God") and made every turn look like an answer to
-  // speech. ?seed=look puts a neutral one instead ("(You look around.)" /
-  // look()), the variant measured against none on the live eval.
+  // speech. Now a neutral one ("(You look around.)" / look()): on the live
+  // eval (bakery, 60 turns each) it gave 0 malformed replies, none 1
+  // (?seed=none drops it).
   const hist = cfg.messages || [];
   if (SEED === 'look') { messages.push({ role: 'user', content: '(You look around.)' }); messages.push({ role: 'assistant', content: 'look()' }); }
   // Only the recent exchange: what matters for longer (feelings, memories,
@@ -940,7 +941,9 @@ async function main() {
       // needs a person, a goal naming someone in earshot, anger at someone
       // here, a guard's warning); otherwise speech is off this turn, as on a
       // quiet turn, and it is pointed at what it could do instead.
-      const muted = !spokenTo && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g);
+      // (someone merely walking up to it is not a reason to talk)
+      const told = (cfg.pendingChat || []).some(l => !/\bcomes up to you\b/i.test(String(l)));
+      const muted = !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g);
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
       const budgetQuiet = !spokenTo && cfg.quietTurns > 0, quiet = budgetQuiet || (muted && !chatTestMode);
@@ -981,7 +984,7 @@ async function main() {
       }
       if (quiet) {
         const last = messages[messages.length - 1];
-        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + (budgetQuiet ? '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' : '\n\n(Nobody has spoken to you: no need to talk. Do something: one of "You could, right here", a step toward your goal, or wait.)') }]);
+        messages = messages.slice(0, -1).concat([{ ...last, content: String(last.content) + (budgetQuiet ? '\n\n(You have talked enough for now. Do not speak this turn: act, look around, or wait.)' : '\n\n(Nobody has spoken to you: no need to talk. Do something: one of "You could, right here", or a step toward your goal.)') }]);
       }
       // Show in prompt panel
       let displayText = `[AGENT: ${g.id}]

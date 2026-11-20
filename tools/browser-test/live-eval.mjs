@@ -75,7 +75,8 @@ page.on('console', m => {
   if (m.type() === 'error' && !/Failed to load resource|favicon/.test(t)) errors.push(ts() + ' ' + t.slice(0, 300));
 });
 page.on('pageerror', e => errors.push(ts() + ' pageerror ' + String(e).slice(0, 300)));
-await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
+// voices off; and no memories of earlier runs (mind.js keeps trust and memories per world between visits)
+await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); for (const k of Object.keys(localStorage)) if (k.startsWith('tablefolk-mind:')) localStorage.removeItem(k); } catch {} });
 const url = `${base}/app/?play=1&gfx=light&fps=10&intro=0${pick ? '&' + pick : ''}&scenario=/${scnPath.replace(/^\/+/, '')}&t=${Date.now()}`;
 console.log('open', url);
 await page.goto(url);

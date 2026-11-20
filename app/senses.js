@@ -153,7 +153,9 @@
     const M = window.tablefolkMind, ok = id => !M?.refuses?.(g, id);
     const to = people[0] && (people[0].kind === 'player' ? 'player' : people[0].id);
     // someone hungry beside it and it has food: sell it (they have the gold) or give it
-    const hungry = people.map(t => t.kind !== 'player' && state.characters.find(c => c.id === t.id)).find(c => c && ok(c.id) && (M?.mindOf(c)?.hunger || 0) >= .55);
+    // (hungry by its needs, or it asked for food in the last minute)
+    const asksFood = c => (c._lines || []).slice(-2).some(l => Date.now() - l.at < 60000 && /\b(hungry|starving|starved|eat|food|bite|crumb|bread|pie|bun|meal)\b/i.test(l.text));
+    const hungry = people.map(t => t.kind !== 'player' && state.characters.find(c => c.id === t.id)).find(c => c && ok(c.id) && ((M?.mindOf(c)?.hunger || 0) >= .55 || asksFood(c)));
     const food = inv.find(n => M?.isFood?.(n));
     if (hungry && food) {
       const price = window.tablefolkTrade?.priceOf?.(g, food)?.ask;
