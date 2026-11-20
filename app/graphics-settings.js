@@ -99,7 +99,7 @@
   function applyShadows() {
     const st = window.TABLEFOLK_STATE;
     // the sun's shadow map (sky.js): every frame at medium/high, every second frame at light
-    applyShadow(st?.shadow, settings.keyShadowEnabled, Math.max(settings.lite ? 2 : 1, clampEvery(settings.keyShadowEvery)));
+    applyShadow(st?.shadow, settings.keyShadowEnabled, Math.max(settings.quality === 'high' ? 1 : 2, clampEvery(settings.keyShadowEvery)));
     applyShadow((st?.extraShadows || [])[0], settings.campfireShadowEnabled && !settings.lite, clampEvery(settings.campfireShadowEvery));
   }
   // Both ShadowGenerators exist by the time main() dispatches this (it's the

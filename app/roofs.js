@@ -147,7 +147,8 @@
     if (envMats.has(key) && !envMats.get(key).isDisposed?.()) return envMats.get(key);
     const m = new BABYLON.PBRMaterial(name, sc);
     m.albedoTexture = envTex(sc, env, 'color', true, rot); m.bumpTexture = envTex(sc, env, 'normal', false, rot); m.invertNormalMapX = true; m.invertNormalMapY = false;
-    m.metallicTexture = envTex(sc, env, 'rough', false, rot); m.useRoughnessFromMetallicTextureGreen = true; m.useMetallnessFromMetallicTextureBlue = false; m.metallic = 0; m.roughness = 1;
+    if (!window.TABLEFOLK_GFX?.lite) { m.metallicTexture = envTex(sc, env, 'rough', false, rot); m.useRoughnessFromMetallicTextureGreen = true; m.useMetallnessFromMetallicTextureBlue = false; }
+    m.metallic = 0; m.roughness = window.TABLEFOLK_GFX?.lite ? .9 : 1;
     m.albedoColor = new BABYLON.Color3(...tint); m.environmentIntensity = .4; m.maxSimultaneousLights = 8; m._tfMatte = true; m._tfTile = TILE[env] || 2;
     envMats.set(key, m); return m;
   }

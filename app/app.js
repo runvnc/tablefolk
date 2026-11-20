@@ -1842,6 +1842,7 @@ function loadModelInstance(scene,dir,name,prepare){
       state.sharedAssetMats ||= new Set();
       for(const m of c.materials) state.sharedAssetMats.add(m);
       try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
+      try{ LOOK()?.shareTextures?.(c.materials); }catch{}
       try{ const n=mergeContainerLooks(c); if(n && window.TABLEFOLK_DEV) console.log('[merge]',name,'-'+n,'draw calls'); }catch(e){ console.warn('[merge] failed',name,e); }
       return c;
     });
@@ -2984,7 +2985,7 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   let proxy=null, url=file;
   // a variant by the square it stands on (the same tree stays the same tree); the light copy at light quality
   if(base.variantUrls?.length){ const all=[file,...base.variantUrls], h=((Math.round(x)*73856093)^(Math.round(z)*19349663))>>>0; url=all[h%all.length]; }
-  if(base.tier && window.TABLEFOLK_GFX?.lite) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
+  if(base.tier && (base.tier==='med' ? window.TABLEFOLK_GFX?.lite : window.TABLEFOLK_GFX?.quality!=='high')) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
   const p=importPropAsset(scene,url,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
   if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});

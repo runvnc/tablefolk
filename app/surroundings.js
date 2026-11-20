@@ -42,6 +42,7 @@
       for (const m of meshes) { m.computeWorldMatrix(true); m.setParent(null); m.bakeCurrentTransformIntoVertices(); m.setEnabled(false); m.isPickable = false;
         const mt = m.material; if (mt) { window.TABLEFOLK_LOOK?.matte?.(mt); mt.maxSimultaneousLights = 4; } }
       for (const m of res.meshes) if (!meshes.includes(m)) m.dispose();
+      window.TABLEFOLK_LOOK?.shareTextures?.(meshes.map(m => m.material).filter(Boolean));
       return meshes;
     }).catch(e => { console.warn('[surroundings]', type, e); models.delete(type); return null; }));
     return models.get(type);

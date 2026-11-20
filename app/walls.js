@@ -44,26 +44,26 @@
     m.albedoTexture = tex(env, 'color', true); m.bumpTexture = tex(env, 'normal'); m.bumpTexture.level = o.bump ?? 1;
     // OpenGL (+Y) normal maps on code-built geometry in Babylon's left-handed scene
     m.invertNormalMapX = true; m.invertNormalMapY = false;
-    m.metallicTexture = tex(env, 'rough'); m.useRoughnessFromMetallicTextureGreen = true; m.useMetallnessFromMetallicTextureBlue = false; m.useRoughnessFromMetallicTextureAlpha = false;
-    m.metallic = 0; m.roughness = 1;
+    // light quality: colour and normal only (memory), constant roughness
+    if (!window.TABLEFOLK_GFX?.lite) { m.metallicTexture = tex(env, 'rough'); m.useRoughnessFromMetallicTextureGreen = true; m.useMetallnessFromMetallicTextureBlue = false; m.useRoughnessFromMetallicTextureAlpha = false; }
+    m.metallic = 0; m.roughness = window.TABLEFOLK_GFX?.lite ? .9 : 1;
     if (!window.TABLEFOLK_GFX?.lite) { m.ambientTexture = tex(env, 'ao'); m.useAmbientInGrayScale = true; }
     m.albedoColor = new BABYLON.Color3(...tint); m.environmentIntensity = .45; m.maxSimultaneousLights = 8; m._tfMatte = true;
     state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
     return m;
   }
   function materials() {
-    if (mats && !mats.rubble.isDisposed?.() && mats.rubble.getScene() === state.scene) return mats;
+    if (mats && mats.glass.getScene() === state.scene) return mats;
     const glass = new BABYLON.PBRMaterial('wall_window', state.scene);
     glass.albedoColor = new BABYLON.Color3(.05, .05, .06); glass.metallic = 0; glass.roughness = .35; glass.environmentIntensity = .6; glass.maxSimultaneousLights = 8; glass._tfMatte = true;
-    mats = {
-      rubble: pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]),
-      blocks: pbr('blocks', 'stone_blocks_large', [.78, .77, .74]),
-      cap: pbr('cap', 'stone_blocks_large', [.82, .8, .77]),
-      plaster: pbr('plaster', 'plaster_aged', [.95, .92, .86], { bump: .7 }),
-      timber: pbr('timber', 'timber_dark', [1, 1, 1]),
-      door: pbr('door', 'wood_planks_dark', [1.15, 1.1, 1.05]),
-      glass,
-    };
+    // made on first use: a world with only rubble walls loads no plaster or timber textures
+    const lazy = { rubble: () => pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]), blocks: () => pbr('blocks', 'stone_blocks_large', [.78, .77, .74]),
+      cap: () => pbr('cap', 'stone_blocks_large', [.82, .8, .77]), plaster: () => pbr('plaster', 'plaster_aged', [.95, .92, .86], { bump: .7 }),
+      timber: () => pbr('timber', 'timber_dark', [1, 1, 1]), door: () => pbr('door', 'wood_planks_dark', [1.15, 1.1, 1.05]) };
+    const made = {};
+    mats = { glass };
+    for (const [k, f] of Object.entries(lazy)) Object.defineProperty(mats, k, { get: () => (made[k] ||= f()), enumerable: true });
+    mats.isMade = k => !!made[k];
     setNight(night);
     return mats;
   }
@@ -100,7 +100,7 @@
         if (!P.length) return null;
         const m = new BABYLON.Mesh(name, state.scene), vd = new BABYLON.VertexData();
         vd.positions = P; vd.normals = N; vd.uvs = U; vd.colors = C; vd.indices = I; vd.applyToMesh(m);
-        m.material = mat; m.isPickable = false; m.receiveShadows = true; window.addShadow?.(m) ?? addShadow(m);
+        m.material = typeof mat === 'function' ? mat() : mat; m.isPickable = false; m.receiveShadows = true; window.addShadow?.(m) ?? addShadow(m);
         return m;
       },
     };
@@ -182,8 +182,8 @@
         }
       }
     }
-    for (const [name, mat] of [['rubble', M.rubble], ['blocks', M.blocks], ['cap', M.cap], ['plaster', M.plaster], ['timber', M.timber], ['glass', M.glass]]) {
-      const m = B[name].mesh('tt_walls_' + name, mat); if (m) out.push(m);
+    for (const name of ['rubble', 'blocks', 'cap', 'plaster', 'timber', 'glass']) {
+      const m = B[name].mesh('tt_walls_' + name, () => M[name]); if (m) out.push(m);
     }
     state.wallVisuals.push(...out);
     buildDoors(cell, top, houses);
@@ -241,7 +241,7 @@
       state.wallVisuals.push(g.pivot);
       (state.doorLeaves = state.doorLeaves || []).push(g);
     }
-    for (const [bb, mat, name] of [[timber, M.timber, 'door_frames'], [stone, M.cap, 'door_frames_stone']]) { const m = bb.mesh(name, mat); if (m) state.wallVisuals.push(m); }
+    for (const [bb, mat, name] of [[timber, () => M.timber, 'door_frames'], [stone, () => M.cap, 'door_frames_stone']]) { const m = bb.mesh(name, mat); if (m) state.wallVisuals.push(m); }
     ensureDoorAnimator();
   }
 

@@ -97,6 +97,20 @@
     }
     return m;
   }
+  // glTF files that use the same image files (the env-nature trees share
+  // their bark and leaf atlases) each decode their own copy: point every
+  // material at one texture per image URL and drop the duplicates.
+  const _shared = new Map();
+  const SLOTS = ['albedoTexture', 'bumpTexture', 'metallicTexture', 'ambientTexture', 'emissiveTexture', 'opacityTexture'];
+  function shareTextures(materials) {
+    for (const m of materials || []) for (const k of SLOTS) {
+      const t = m && m[k]; const url = t && t.url; if (!url || /^(data|blob):/.test(url)) continue;
+      const key = url + '|' + t.coordinatesIndex + '|' + t.uScale + '|' + t.vScale;
+      const have = _shared.get(key);
+      if (have && have !== t && !have.isDisposed?.() && have.getScene?.() === t.getScene?.()) { m[k] = have; try { t.dispose(); } catch {} }
+      else if (!have || have.isDisposed?.()) _shared.set(key, t);
+    }
+  }
   // old names: every caller now gets the matte finish
   function applyClayLook(m, scene, opts) { return matte(m, opts); }
   function applyClayLookToMeshes(meshes, scene, opts) {
@@ -162,6 +176,7 @@
     METAL_RE,
     detailNormal,
     matte,
+    shareTextures,
     applyClayLook,
     applyClayLookToMeshes,
     applyTonemap,

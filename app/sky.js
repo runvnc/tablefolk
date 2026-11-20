@@ -140,7 +140,8 @@
     g.usePercentageCloserFiltering = true;
     g.filteringQuality = q === 'high' ? BABYLON.ShadowGenerator.QUALITY_HIGH : lite ? BABYLON.ShadowGenerator.QUALITY_LOW : BABYLON.ShadowGenerator.QUALITY_MEDIUM;
     g.bias = .0006; g.normalBias = .012; g.darkness = 0; g.transparencyShadow = true; g.useOpacityTextureForTransparentShadow = true;
-    if (lite) { const map = g.getShadowMap(); if (map) map.refreshRate = 2; }
+    // every second frame below high (the shadow pass draws every caster again: 442 -> 200 draws in the market village)
+    if (q !== 'high') { const map = g.getShadowMap(); if (map) map.refreshRate = 2; }
     sun.autoUpdateExtends = false; sun.autoCalcShadowZBounds = false; sun.shadowMinZ = 1; sun.shadowMaxZ = 240;
     return g;
   }
