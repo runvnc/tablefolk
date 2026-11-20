@@ -308,6 +308,34 @@ the ground is outside them (a world that is all one building); else land.
 
 ## Darkness
 
+Reveal modes (`reveal`, 2026-11-20): `start(dark, reveal)`. `"rooms"` uses
+roofs.js `findRooms` (rooms re-found when the room count or sizes change):
+any room with a square in the player's sight is revealed whole
+(`revealedRooms`, `revealedCells` for saving); `known(x, z)` (terrain.js's
+rock) is the revealed rooms (and everything outside rooms) in that mode,
+the explored squares otherwise, so lit dungeons show rooms under solid rock
+until seen into; dark worlds with rooms draw their black boxes only inside
+revealed rooms. roofs.js keeps an unrevealed room's roof or shell at full
+opacity (no camera-ray fade). Outdoors with `"cells"` and no dark: sight is a
+radius of 6 squares (no line of sight); `board_mist_low` (y .12, alpha .68)
+and `board_mist_high` (y 1.4, alpha .22), two ground planes over the board
+and 3 squares round it sharing one `DynamicTexture` opacity mask (8 px a
+square, the unexplored squares white, thinning past the edge, blurred with
+the canvas `filter`), redrawn only when the explored set grows; grey, lit
+(diffuse .36-.55, a little emissive). Characters and loot (`LOOT` types and
+`ITEM_CATALOG`) in what is still hidden are disabled (`_fogHidden`).
+`save()`/`restore()` carry the explored squares and revealed room squares.
+
+Link markers (sections.js): code-built, not saved, `link_*` meshes:
+stairs down (a ground quad with a painted 6-step gradient from stone to
+black, a stone rim of three boxes), stairs up (five stacked boxes, a black
+plane in a stone frame), cave (a squashed sphere of stone, a black disc),
+gate (posts, lintel, iron bars), trapdoor (planks, bands, a ring), each with
+a faint glow disc and a billboard label (DynamicTexture). Materials are env
+textures (`stone_blocks_large`, `wood_planks_dark`) made matte by
+`TABLEFOLK_LOOK.matte`. Edge links: a glow band on the rim and an arrow
+disc where the road leaves.
+
 `app/darkness.js`: fog of war as thin-instance boxes (black for unseen,
 dim for remembered, a flat lid at floor level where there is neither floor
 nor wall, so wall outsides show). Remembered squares are a floor film (boxes

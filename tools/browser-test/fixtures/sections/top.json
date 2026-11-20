@@ -1,0 +1,269 @@
+{
+ "title": "Crossroads",
+ "brain": "none",
+ "live": true,
+ "time": "10:00",
+ "dayMinutes": 12,
+ "size": [
+  17,
+  13
+ ],
+ "flags": {
+  "visited_cellar": false
+ },
+ "player": {
+  "name": "Tester",
+  "gold": 5,
+  "items": [],
+  "at": [
+   0,
+   3
+  ]
+ },
+ "agents": [
+  {
+   "id": "pip",
+   "model": "dog",
+   "at": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": "mara",
+   "model": "peasant_woman",
+   "role": "companion",
+   "at": [
+    -1,
+    3
+   ]
+  },
+  {
+   "id": "odo",
+   "model": "peasant",
+   "job": "farmer",
+   "at": [
+    3,
+    -2
+   ],
+   "home": "hut"
+  }
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "x": 2,
+   "z": 1,
+   "gold": 4
+  },
+  {
+   "type": "crate",
+   "x": -3,
+   "z": 1
+  },
+  {
+   "type": "bed",
+   "x": 6,
+   "z": -4
+  }
+ ],
+ "goal": {
+  "text": "Bring back the crown.",
+  "win": {
+   "player_has": "crown"
+  }
+ },
+ "links": [
+  {
+   "at": [
+    0,
+    -3
+   ],
+   "to": "cellar",
+   "name": "Cellar",
+   "kind": "stairs_down"
+  },
+  {
+   "edge": "east",
+   "to": "field",
+   "name": "the East Field"
+  },
+  {
+   "at": [
+    4,
+    3
+   ],
+   "to": "/tools/browser-test/fixtures/sections/other.json",
+   "name": "the Other Place",
+   "kind": "gate"
+  },
+  {
+   "at": [
+    -4,
+    3
+   ],
+   "to": {
+    "generate": {
+     "kind": "cave",
+     "size": [
+      21,
+      17
+     ],
+     "seed": 5
+    }
+   },
+   "name": "a dark cave",
+   "kind": "cave"
+  },
+  {
+   "at": [
+    -4,
+    -3
+   ],
+   "to": "vault",
+   "name": "Vault",
+   "kind": "trapdoor",
+   "key": "brass key"
+  },
+  {
+   "at": [
+    6,
+    1
+   ],
+   "to": "/tools/browser-test/fixtures/sections/missing.json",
+   "name": "nowhere",
+   "kind": "door"
+  }
+ ],
+ "subworlds": {
+  "cellar": {
+   "title": "The Cellar",
+   "size": [
+    13,
+    11
+   ],
+   "floor": "stone",
+   "lighting": "dim",
+   "agents": [
+    {
+     "id": "rat1",
+     "model": "rat",
+     "at": [
+      3,
+      1
+     ],
+     "hostile": false
+    }
+   ],
+   "objects": [
+    {
+     "type": "barrel",
+     "x": -2,
+     "z": 0
+    },
+    {
+     "type": "chest",
+     "x": 2,
+     "z": -2,
+     "items": [
+      "brass key"
+     ]
+    }
+   ],
+   "links": [
+    {
+     "at": [
+      0,
+      3
+     ],
+     "to": "back",
+     "name": "up to the Crossroads",
+     "kind": "stairs_up"
+    },
+    {
+     "at": [
+      -3,
+      -3
+     ],
+     "to": "deep",
+     "name": "Deeper",
+     "kind": "stairs_down"
+    }
+   ],
+   "subworlds": {
+    "deep": {
+     "title": "The Deep Cellar",
+     "size": [
+      11,
+      9
+     ],
+     "floor": "stone",
+     "objects": [
+      {
+       "type": "skull",
+       "x": 1,
+       "z": 0
+      }
+     ],
+     "agents": [
+      {
+       "id": "bones",
+       "model": "skeleton",
+       "at": [
+        2,
+        1
+       ],
+       "hostile": false
+      }
+     ]
+    }
+   }
+  },
+  "field": {
+   "title": "The East Field",
+   "size": [
+    17,
+    13
+   ],
+   "floor": "grass",
+   "reveal": "cells",
+   "agents": [
+    {
+     "id": "cow1",
+     "model": "cow",
+     "at": [
+      -4,
+      0
+     ]
+    }
+   ],
+   "objects": [
+    {
+     "type": "crown",
+     "x": -6,
+     "z": -4
+    },
+    {
+     "type": "tall_grass",
+     "x": 2,
+     "z": 2
+    }
+   ]
+  },
+  "vault": {
+   "title": "The Vault",
+   "size": [
+    11,
+    9
+   ],
+   "floor": "stone",
+   "objects": [
+    {
+     "type": "gold_bars",
+     "x": 0,
+     "z": 0
+    }
+   ]
+  }
+ }
+}

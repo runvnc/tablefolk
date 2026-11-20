@@ -18,6 +18,8 @@
  * between the camera and the player goes see-through so the player is never
  * lost behind it. The free camera can't peek: roofs stay on. What the
  * characters inside say still shows above the roof (bubbles).
+ * With "reveal": "rooms" a room the player has not seen into keeps its roof
+ * (darkness.js roomRevealed), even between the camera and the player.
  * Off in the tabletop view (a map from above wants the rooms).
  *
  *   window.tablefolkRoofs.rebuild()  .toggle() (lift all, for tests)  .rooms
@@ -355,7 +357,9 @@
       const inside = myCell && r.room.here.has(myCell);
       const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.parts.some(m => ray.intersectsMesh(m, false).hit));
       // in first person the roof overhead stays: it is the ceiling (a shell goes: its walls would hide the room)
-      r.target = lifted || (inside && (!state.firstPerson || r.shell)) ? 0 : blocks ? .22 : 1;
+      // "reveal": "rooms" (darkness.js): a room not yet seen into keeps its roof on, even in the camera's way
+      const hidden = !inside && window.tablefolkDark?.roomRevealed && !window.tablefolkDark.roomRevealed(r.room);
+      r.target = lifted || (inside && (!state.firstPerson || r.shell)) ? 0 : blocks && !hidden ? .22 : 1;
       if (r.shell) shellHide(r, r.target > .5);
       if (Math.abs(r.alpha - r.target) > .005) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7);

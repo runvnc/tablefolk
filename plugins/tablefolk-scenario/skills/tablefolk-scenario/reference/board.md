@@ -199,6 +199,29 @@ testing; the tabletop map never has it.
 What characters themselves see follows the same rule from where they stand:
 [characters.md](characters.md).
 
+## Reveal as you go (`reveal`)
+
+Any world can hide what the player has not found yet (`app/darkness.js`):
+
+- `"rooms"`: every room (a walled patch of floor, corridors too) is hidden
+  until the player sees into it: a door next to them opens the view, or they
+  stand in it. Underground the hidden rooms are solid rock with no outline;
+  in a village they keep their roof or building model on, even between the
+  camera and the player. The default for generated dungeons that are not
+  dark (a castle). In a dark world, a revealed room's squares still need
+  light: `"dark": true, "reveal": "rooms"` is rooms that open as you go, then
+  lit square by square.
+- `"cells"`: square by square. In a dark world as above; underground and lit,
+  the rock covers what you have not seen; outdoors a dim grey mist lies over
+  the unexplored ground and clears around you as you walk (no line of sight
+  needed; tall trees and buildings show faintly through it).
+- `false`: nothing hidden. The default for lit worlds.
+
+Characters, and loot lying about, in what is still hidden are hidden too;
+characters' own sight is unchanged. What you have explored is kept with each
+section of a world ([things.md](things.md)). `?nofog=1` turns it all off;
+the tabletop map shows everything.
+
 ## Roofs
 
 Walled rooms in a world that has an outside get gable roofs (`app/roofs.js`):

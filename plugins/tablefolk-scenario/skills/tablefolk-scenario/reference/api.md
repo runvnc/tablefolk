@@ -105,6 +105,8 @@ supported part (other members are internal and may change).
 | `tablefolkSkills.addCommand(name, def)`, `.commandLines(g)`, `.cardLines(g)`, `.run(g, name, args)` | commands and skills |
 | `tablefolkPackages.load(ref)`, `.refUrl(ref, kind)`, `.api()`, `.useThing(mesh, who)`, `.allowedList()`, `.untrust(scope)` | packages and code trust |
 | `tablefolkCombat.attack(g, target)`, `.hurt(g, n, by, how)`, `.heal(g, n)` | combat |
+| `tablefolkScenario.travel(link)`, `.section`, `.here()`, `.links()`, `.sections()` | a world in sections: follow a link (`{ to: "back" }` goes back), the id of the section the player is in, its scenario, its links, every section with its links (things.md) |
+| `tablefolkDark.mode()`, `.visible(x, z)`, `.save()`, `.restore(data)` | fog of war and reveal: the mode, whether the player sees a square, the explored state |
 
 ## Events
 
@@ -113,7 +115,8 @@ All on `window`, as `CustomEvent`s; read `e.detail`.
 | event | detail | when |
 |---|---|---|
 | `tablefolk-scene-ready` | `{ meshes, materials }` | the 3D scene is up (once) |
-| `tablefolk-scenario-started` | `{ title, live, sub }` | a scenario has been built (`sub`: a subworld walked into) |
+| `tablefolk-scenario-started` | `{ title, live, sub, section }` | a scenario has been built (`sub`: a section walked into; `section`: its id, `''` for the top map) |
+| `tablefolk-section` | `{ from, to, title, kind, via, followers }` | the player went from one section to another (ids; `kind`: the link's, or `back`; `followers`: who came along) |
 | `tablefolk-clock` | `{ min, day, hour }` | every game quarter hour of a living world |
 | `tablefolk-player-turn` | `{ kind }` | the player acted (moved, used, attacked...) |
 | `tablefolk-player-chat` | `{ agentId, text }` | the player said something to a character |

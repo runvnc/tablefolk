@@ -246,6 +246,34 @@ the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
 dialog stays in the page for a moment after a click (count each element
 once).
 
+## Sections (`sections-test.mjs`, 2026-11-20)
+
+`node sections-test.mjs` (no model; `fixtures/sections/top.json` with
+`"brain": "none"`, then `deepdelve-camp` and `hearthvale`) walks the player
+through every link kind (stepping onto a link's square, `playerStep` off an
+edge, `tablefolkScenario.travel`), changes a section (a chest emptied, a
+barrel moved, a rat defeated, a flag set), goes two deep, reloads the page
+inside the cellar and checks everything came back, then: the clock and
+flags carry, a locked trapdoor needs its key, the field's mist and hidden
+crown, explored squares kept, the goal won from inside the field, a gate to
+another scenario file, a missing file (the player stays), a generated cave
+(the same on return), the catch-up (the farmer in bed at 23:00), the map
+card, and both showcase worlds in and out. 37/37 on 2026-11-20 in about 80
+s (`SHOTS=dir` saves pictures). Run it on its own server and Chrome when
+another session uses 8000:
+
+```bash
+bun server/server.js 8003
+TEST_PROFILE=~/.cache/tablefolk-sections-chrome TEST_CDP_PORT=9231 HEADLESS=1 ./launch-chrome.sh "http://localhost:8003/app/?art=1"
+CDP_PORT=9231 BASE=http://localhost:8003 node sections-test.mjs
+```
+
+Traps: app.js disposes the engine on `pagehide`, so the journey is saved
+on `beforeunload` and `visibilitychange` (a save at `pagehide` found no
+objects); a companion follows only when within 7 squares of the player when
+they travel; the test waits for the section id to change before waiting for
+the curtain (the travel starts asynchronously).
+
 ## The libraries (libs/)
 
 `node tools/libs.mjs check` (imports and no game globals), then

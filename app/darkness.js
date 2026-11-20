@@ -1,4 +1,5 @@
-/* darkness.js -- dark dungeons: fog of war and carried torches.
+/* darkness.js -- dark dungeons: fog of war and carried torches; reveal as
+ * you go in any world.
  *
  * A scenario with "dark": true (the default for generated dungeons) starts
  * hidden: unexplored squares are solid black, so the overview camera shows
@@ -13,13 +14,32 @@
  * there they are hidden and the dark is a black distance fog instead (the
  * same squares still hide the characters in them).
  *
+ * Reveal ("reveal" in a scenario, 2026-11-20; start(dark, reveal)):
+ *   "cells"  square by square: in a dark world as above (sight needs light);
+ *            in a lit underground world the rock covers what has not been
+ *            seen (line of sight, no light needed); outdoors a soft, dim mist
+ *            lies over the unexplored ground and clears in a radius around
+ *            the player (no line of sight needed), drawn as two mist sheets
+ *            whose mask follows the explored squares.
+ *   "rooms"  each room (roofs.js findRooms: walled patches, corridors too)
+ *            stays hidden until the player sees into it (a door beside the
+ *            player opens the view) or stands in it: underground under solid
+ *            rock with no outline, outdoors under its roof or building shell
+ *            (which stays on, see-through only once revealed). In a dark
+ *            world the squares of a revealed room still need light ("cells"
+ *            fog inside rooms).
+ *   false    nothing hidden (lit worlds by default).
+ * Characters, and loot lying about, in what is still hidden are hidden. The
+ * explored squares and revealed rooms are part of a section's saved state
+ * (save()/restore(), scenario.js). The characters' own sight is unchanged.
+ *
  * Torches: anyone with a "torch" in their inventory carries it lit, in the
  * left hand (a warm light and a glow on the floor that follow them). Standing
  * torches can be picked up (E). In dark dungeons the player starts with one.
  *
- *   window.tablefolkDark.start(on)   scenario.js, at each scenario start
+ *   window.tablefolkDark.start(dark, reveal)   scenario.js, at each scenario or section start
  *   window.tablefolkDark.setFog(on)  turn the fog off and on (?nofog=1: off)
- *   window.tablefolkDark.visible(x, z)
+ *   window.tablefolkDark.visible(x, z), known(x, z), save(), restore(data), mode()
  *   window.tablefolkDark.sightFor(g)  squares character g sees (its prompt)
  * Loaded after app.js and uses its helpers (state, meta, canSeeCell,
  * gridKey, charInventory, addLampPool); off in tabletop mode.
@@ -30,8 +50,34 @@
   // light radius (cells) of objects that light a room, by type
   const LIGHTS = { light: 5.5, lantern: 5, campfire: 5.5, torch: 3.2, lamp: 3, candelabra: 2.5, candles: 1.8, crystal_ball: 2.2, scrying_pool: 2.2, rune_circle: 1.2 };
   const OPAQUE = new Set(['wall', 'door']);
-  let dark = false, fogOn = !new URLSearchParams(location.search).has('nofog');
+  let dark = false, reveal = false, fogOn = !new URLSearchParams(location.search).has('nofog');
   let explored = new Set(), seen = new Set(), sig = '', black = null, dim = null, flat = null, timer = setInterval(() => tick(), 250);
+  // "rooms": the rooms (roofs.js findRooms) and which of their squares are revealed
+  let roomOf = null, roomList = [], roomSig = '', revealedCells = new Set(), revealedRooms = new Set();
+  const MIST_R = 6;   // outdoors: the mist clears this far round the player
+  const on = () => fogOn && !window.TABLEFOLK_TABLETOP && (dark || !!reveal);
+  const rockWorld = () => window.tablefolkTerrain?.mode?.() === 'rock';
+  const outdoorMist = () => !dark && reveal === 'cells' && !rockWorld();
+  // shown (rock lifted, mist cleared, characters visible), apart from a dark world's light
+  function uncovered(k) {
+    if (reveal === 'rooms') { const r = roomOf?.get(k); return r == null || revealedRooms.has(r); }
+    return explored.has(k);
+  }
+  function roomsNow() {
+    const R = window.tablefolkRoofs?.findRooms?.(); if (!R) return;
+    const s = R.rooms.length + '|' + R.rooms.map(r => r.cells.size).join(',');
+    if (s === roomSig && roomOf) return;
+    roomSig = s; roomOf = new Map(); roomList = R.rooms;
+    R.rooms.forEach((r, i) => { for (const c of r.cells) roomOf.set(c, i); });
+    // revealed squares from before (a restored section) reveal their rooms again
+    for (const c of revealedCells) { const i = roomOf.get(c); if (i != null) revealedRooms.add(i); }
+  }
+  function revealRoomsSeen() {
+    roomsNow(); if (!roomOf) return false;
+    let grew = false;
+    for (const k of seen) { const i = roomOf.get(k); if (i != null && !revealedRooms.has(i)) { revealedRooms.add(i); for (const c of roomList[i].cells) revealedCells.add(c); grew = true; } }
+    return grew;
+  }
 
   // ---- which squares the player sees ----
   const cellOf = p => [Math.round(p.x), Math.round(p.z)];
@@ -93,7 +139,12 @@
     }
     return vis;
   }
-  const compute = () => sight(state.playerAvatar, true);
+  const compute = () => outdoorMist() ? around(state.playerAvatar, MIST_R) : sight(state.playerAvatar, dark);
+  function around(g, r) {
+    const vis = new Set(), p = posOf(g), [px, pz] = cellOf(p);
+    for (let x = px - r; x <= px + r; x++) for (let z = pz - r; z <= pz + r; z++) if (Math.hypot(x - px, z - pz) <= r + .3) vis.add(x + ',' + z);
+    return vis;
+  }
   // What a character sees, for its prompt (senses.js, app.js perception);
   // kept until the current task ends, so one prompt build computes it once.
   let sightCache = null;
@@ -132,7 +183,8 @@
       // the rooms you see stay in view
       // the dungeon's rock (terrain.js) stays in view, fading into the black fog; in a rock world the unexplored
       // is that same rock (terrain.js covers it), so no box there either
-      if (!explored.has(k)) { if (window.tablefolkTerrain?.mode?.() === 'rock' || window.tablefolkTerrain?.isRock?.(x, z)) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
+      // (a revealed room of a dark world: its unlit squares are boxes inside it, under no rock)
+      if (!explored.has(k)) { if ((rockWorld() || window.tablefolkTerrain?.isRock?.(x, z)) && !(reveal === 'rooms' && uncovered(k))) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
       else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
@@ -145,10 +197,18 @@
   function showCharacters(all) {
     for (const g of state.characters) {
       if (!g.root) continue;
-      const show = all || seen.has(cellOf(posOf(g)).join(','));
-      if (!!g._fogHidden === show) { g._fogHidden = !show; g.root.setEnabled(show); }
+      const k = cellOf(posOf(g)).join(','), show = all || (dark ? seen.has(k) : uncovered(k));
+      if (!!g._fogHidden === show) { g._fogHidden = !show; if (!g._shellHidden || show === false) g.root.setEnabled(show); }
+    }
+    // loot lying about in what is still hidden (a lit world's reveal: the dark has its boxes)
+    if (all || !dark) for (const m of state.props) {
+      if (!m || m.isDisposed?.()) continue;
+      const mm = meta(m); if (!mm || !(LOOT.test(mm.type || '') || window.tablefolk?.ITEM_CATALOG?.[mm.type])) continue;
+      const p = m.getAbsolutePosition?.() || m.position, show = all || uncovered(Math.round(p.x) + ',' + Math.round(p.z));
+      if (!!m._fogHidden === show) { m._fogHidden = !show; m.setEnabled(show); }
     }
   }
+  const LOOT = /chest|coin|gold|crown|necklace|chalice|gem|key|potion|scroll|ring/;
   // first person: no boxes, a black fog (the overview's is put back after)
   let fpFog = null;
   function firstPersonFog(want) {
@@ -163,19 +223,67 @@
   }
   function update(force) {
     firstPersonFog(!!(dark && fogOn && state.firstPerson));
-    if (!dark || !fogOn || !state.playerAvatar) return;
+    if (!on() || !state.playerAvatar) return;
     seen = compute();
+    const before = explored.size + revealedRooms.size;
     for (const k of seen) explored.add(k);
-    const s = explored.size + '|' + [...seen].join(';');
-    if (force || s !== sig) { sig = s; paint(); }
+    if (reveal === 'rooms') revealRoomsSeen();
+    const grew = explored.size + revealedRooms.size !== before;
+    if (dark) { const s = explored.size + '|' + revealedRooms.size + '|' + [...seen].join(';'); if (force || s !== sig) { sig = s; paint(); } }
+    if (outdoorMist() && (grew || force || !mist)) drawMist();
+    else if (!outdoorMist() && mist) clearMist();
+    if (grew && rockWorld()) window.tablefolkTerrain?.refreshRock?.();
     showCharacters(false);
   }
   function clearFog() {
     firstPersonFog(false);
     for (const m of [black, dim, flat]) if (m) { m.dispose(false, true); }
     black = dim = flat = null; sig = '';
+    clearMist();
     showCharacters(true);
   }
+
+  // ---- outdoors: a soft mist over the unexplored ground ----
+  // Two sheets (low over the ground, higher through trunks and walls) whose
+  // alpha is a blurred mask of the unexplored squares: tall things show
+  // through faintly as silhouettes; the explored ground is clear.
+  let mist = null;
+  function drawMist() {
+    const sc = state.scene, b = board(), PX = 8, M = 3, Wc = b.cols + 2 * M, Hc = b.rows + 2 * M;
+    if (!mist || mist.w !== Wc || mist.h !== Hc) {
+      clearMist();
+      const tex = new BABYLON.DynamicTexture('board_mist_tex', { width: Wc * PX, height: Hc * PX }, sc, false);
+      tex.hasAlpha = true; tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+      const mk = (name, y, alpha, col) => {
+        const m = BABYLON.MeshBuilder.CreateGround(name, { width: Wc, height: Hc, subdivisions: 1 }, sc);
+        m.position.set(0, (state.terrainTopY ?? 0) + y, 0);   // the board is centred on 0, 0
+        const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
+        mat.diffuseColor = col; mat.emissiveColor = col.scale(.42); mat.specularColor = BABYLON.Color3.Black();
+        mat.opacityTexture = tex; mat.diffuseTexture = null; mat.alpha = alpha; mat.disableDepthWrite = true; mat.backFaceCulling = false;
+        m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.renderingGroupId = 0;
+        return m;
+      };
+      // a ground plane's u runs with +x, v with -z (top row of the canvas is +z)
+      // dim and grey, not white: the ground under it reads darker and drained of colour
+      mist = { tex, w: Wc, h: Hc, M, PX, low: mk('board_mist_low', .12, .68, new BABYLON.Color3(.36, .39, .42)), high: mk('board_mist_high', 1.4, .22, new BABYLON.Color3(.55, .58, .62)) };
+    }
+    const ctx = mist.tex.getContext(), W2 = mist.w * PX, H2 = mist.h * PX;
+    const can = mist.can ||= document.createElement('canvas'); can.width = W2; can.height = H2;
+    const c2 = can.getContext('2d'); c2.clearRect(0, 0, W2, H2);
+    for (let i = -M; i < b.cols + M; i++) for (let j = -M; j < b.rows + M; j++) {
+      const x = Math.round(b.x0 + i), z = Math.round(b.z0 + j);
+      if (explored.has(x + ',' + z)) continue;
+      // thinning out past the board's edge (no hard rim where the sheet ends)
+      const out = Math.max(0, -i, i - (b.cols - 1), -j, j - (b.rows - 1));
+      c2.fillStyle = `rgba(255,255,255,${out ? Math.max(0, 1 - out / (M + .5)) : 1})`;
+      // a ground's u runs from -x (0) to +x, its v from -z (0) to +z, and the canvas's top row is v 1
+      c2.fillRect(Math.round((i + M) * PX), Math.round((b.rows - 1 - j + M) * PX), PX, PX);
+    }
+    ctx.clearRect(0, 0, W2, H2); ctx.filter = 'blur(' + (PX * 1.1) + 'px)'; ctx.drawImage(can, 0, 0); ctx.filter = 'none';
+    mist.tex.update();
+    for (const m of [mist.low, mist.high]) m.setEnabled(!state.firstPerson || m === mist.low);
+  }
+  function clearMist() { if (!mist) return; for (const m of [mist.low, mist.high]) try { m.dispose(false, true); } catch {} try { mist.tex.dispose(); } catch {} mist = null; }
 
   // ---- carried torches ----
   let torchMats = null;
@@ -276,15 +384,30 @@
   }
 
   let rockSeen = -1;
-  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); if (dark && fogOn && explored.size !== rockSeen) { rockSeen = explored.size; window.tablefolkTerrain?.refreshRock?.(); } } catch (e) { console.warn('[dark]', e); } }
-  function start(on) {
-    if (window.TABLEFOLK_TABLETOP) on = false;
-    clearFog(); explored = new Set(); seen = new Set();
-    dark = !!on;
+  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); if (on() && explored.size + revealedRooms.size !== rockSeen) { rockSeen = explored.size + revealedRooms.size; window.tablefolkTerrain?.refreshRock?.(); } } catch (e) { console.warn('[dark]', e); } }
+  function start(isDark, rv) {
+    if (window.TABLEFOLK_TABLETOP) { isDark = false; rv = false; }
+    clearFog(); explored = new Set(); seen = new Set(); revealedCells = new Set(); revealedRooms = new Set(); roomOf = null; roomSig = ''; rockSeen = -1;
+    dark = !!isDark; reveal = rv === 'rooms' || rv === 'cells' ? rv : rv === false ? false : dark ? 'cells' : false;
     clearInterval(timer); timer = setInterval(tick, 250);
-    if (dark && fogOn) setTimeout(() => update(true), 50);
+    if (on()) setTimeout(() => update(true), 50);
   }
-  function setFog(on) { fogOn = !!on; if (fogOn) update(true); else clearFog(); }
+  function setFog(v) { fogOn = !!v; if (on()) update(true); else clearFog(); }
+  // a section's explored squares and revealed rooms (scenario.js keeps them with its state)
+  function save() { return on() || explored.size ? { cells: [...explored], rooms: [...revealedCells] } : null; }
+  function restore(d) {
+    if (!d) return;
+    for (const k of d.cells || []) explored.add(k);
+    for (const k of d.rooms || []) revealedCells.add(k);
+    roomOf = null; roomSig = ''; sig = ''; rockSeen = -1;
+    if (on()) setTimeout(() => update(true), 60);
+  }
   window.addEventListener('tablefolk-inventory', () => setTimeout(tick, 0));
-  window.tablefolkDark = { start, setFog, update: () => update(true), visible: (x, z) => !dark || !fogOn || seen.has(Math.round(x) + ',' + Math.round(z)), known: (x, z) => explored.has(Math.round(x) + ',' + Math.round(z)), exploredCount: () => explored.size, get on() { return dark && fogOn; }, carriesTorch, sightFor, torchMesh };
+  window.tablefolkDark = { start, setFog, save, restore, update: () => update(true),
+    visible: (x, z) => { if (!on()) return true; const k = Math.round(x) + ',' + Math.round(z); return dark ? seen.has(k) : uncovered(k); },
+    // what the rock covers (terrain.js): the unexplored, or in "rooms" the unrevealed rooms
+    known: (x, z) => { const k = Math.round(x) + ',' + Math.round(z); return reveal === 'rooms' ? uncovered(k) : explored.has(k); },
+    roomRevealed: room => { if (reveal !== 'rooms' || !on()) return true; for (const c of room.cells || []) return uncovered(c); return true; },
+    mode: () => ({ dark, reveal: on() ? reveal : false }),
+    exploredCount: () => explored.size + revealedRooms.size, get on() { return on(); }, carriesTorch, sightFor, torchMesh };
 })();

@@ -533,7 +533,19 @@
   function goalContext() {
     const w = W();
     const agents = new Map(w.getAgents().map(g => [g.id.toLowerCase(), g]));
-    return { w, agents, objects: w.getObjects(), anchors: w.sceneryAnchors(), player: w.getPlayer(), speech: active?.speech || [], turns: active?.turns || 0 };
+    const ctx = { w, agents, objects: w.getObjects(), anchors: w.sceneryAnchors(), player: w.getPlayer(), speech: active?.speech || [], turns: active?.turns || 0 };
+    // a world of sections: the characters and things of the others from their
+    // saved states (far apart, so nothing there is near anything here), and
+    // their brain configs (inventories, hit points, defeated)
+    const others = typeof otherSections === 'function' && active ? otherSections() : [];
+    if (!others.length) return ctx;
+    for (const o of others) {
+      for (const c of o.s.characters || []) if (!agents.has(c.id.toLowerCase())) agents.set(c.id.toLowerCase(), { id: c.id, root: { position: { x: c.x + o.off, z: c.z + o.off } }, pose: null, _elsewhere: o.id });
+      for (const p of o.s.props || []) ctx.objects.push({ type: p.type, x: p.x + o.off, z: p.z + o.off, state: p.state || 'intact', opts: p.opts || {}, _elsewhere: o.id });
+    }
+    const live = new Set(w.getAgents().map(g => g.id.toLowerCase()));
+    ctx.w = Object.assign(Object.create(w), { getBrainConfig: id => live.has(String(id).toLowerCase()) ? w.getBrainConfig(id) : savedConfig(id) || (w.state.brainConfigs.has(id) ? w.getBrainConfig(id) : {}) });
+    return ctx;
   }
   function itemCount(items, name) { const i = W().findItem((items || []).filter(i => (i.qty ?? 1) > 0), name); return i ? (i.qty ?? 1) : 0; }
   function positionsOf(target, ctx) {
@@ -608,11 +620,12 @@
       }
       // agents_alive: 4 (or "all"): that many characters with a mind still standing (monsters, raiders and animals not counted)
       case 'agents_alive': {
-        const folk = (active?.scn?.agents || []).filter(a => !a.hostile && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/.test(a.model || '') && !window.tablefolkBodies?.isAnimal(a.model) && !(a.hostile == null && window.tablefolkBodies?.isMindless(a.model)));
+        const folk = (typeof allAgents === 'function' && active ? allAgents() : (active?.scn?.agents || [])).filter(a => !a.hostile && !/^(cow|bull|horse|white_horse|donkey|deer|stag|fox|dog|husky|alpaca|pig|sheep)$/.test(a.model || '') && !window.tablefolkBodies?.isAnimal(a.model) && !(a.hostile == null && window.tablefolkBodies?.isMindless(a.model)));
         const up = folk.filter(a => !ctx.w.getBrainConfig(a.id)?.defeated).length;
         return v === 'all' ? up >= folk.length : up >= +v;
       }
-      default: return false;
+      // a package module's goal predicate (packages.js goals): { "beacon_burning": true }
+      default: { const fn = window.tablefolkPackages?.goals?.[k]; if (typeof fn === 'function') try { return !!fn(v, window.tablefolk); } catch (e) { console.warn('[goal]', k, e); } return false; }
     }
   }
   function scoreFor(goal, ctx, won) {
@@ -924,6 +937,28 @@
   }
 
   const VIEWS = ['overview', 'follow', 'first'];   // "view": the camera a world starts in
+  // A link: { at: [x, z] | edge: "east" | in: "<place>", to, name, kind, arrive, back, key }
+  const LINK_KINDS = ['door', 'stairs_down', 'stairs_up', 'cave', 'gate', 'trapdoor', 'edge'], EDGE_NAMES = ['north', 'south', 'east', 'west'];
+  const cellArr = v => Array.isArray(v) && v.length === 2 && v.every(n => Number.isFinite(+n)) ? [Math.round(+v[0]), Math.round(+v[1])] : null;
+  function normLink(l) {
+    if (!l || typeof l !== 'object' || !l.to) return null;
+    const edge = EDGE_NAMES.includes(l.edge) ? l.edge : null, at = cellArr(l.at);
+    const place = !at && !edge && l.in != null && String(l.in).trim() ? String(l.in).trim().toLowerCase() : null;
+    if (!at && !edge && !place) return null;
+    const to = typeof l.to === 'string' ? l.to : l.to && typeof l.to === 'object' && l.to.generate && typeof l.to.generate === 'object' ? { generate: l.to.generate } : null;
+    if (!to) return null;
+    const key = l.key ? String(l.key) : l.locked ? (typeof l.locked === 'string' ? l.locked : 'key') : null;
+    const out = { ...l, to, kind: edge ? 'edge' : LINK_KINDS.includes(l.kind) ? l.kind : 'door' };
+    if (at) out.at = at; else delete out.at;
+    if (edge) out.edge = edge; else delete out.edge;
+    if (place) out.in = place; else delete out.in;
+    if (cellArr(l.back)) out.back = cellArr(l.back); else delete out.back;
+    if (cellArr(l.arrive)) out.arrive = cellArr(l.arrive); else if (typeof l.arrive === 'string' && l.arrive) out.arrive = String(l.arrive); else delete out.arrive;
+    if (key) out.key = key; else delete out.key;
+    delete out.locked;
+    if (out.name != null) out.name = String(out.name).slice(0, 60);
+    return out;
+  }
   function normalizeScenario(s) {
     if (!s || typeof s !== 'object') throw new Error('scenario must be a JSON object');
     if (s.v && s.v !== 1) throw new Error('unsupported scenario version ' + s.v);
@@ -985,9 +1020,12 @@
       // jobs.js: the world's prices (item: gold), over the jobs' own
       prices: s.prices && typeof s.prices === 'object' && !Array.isArray(s.prices) ? Object.fromEntries(Object.entries(s.prices).filter(([, v]) => Number.isFinite(+v)).map(([k, v]) => [String(k).toLowerCase(), Math.max(0, +v)])) : {},
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
-      // subworlds: other maps (a building's inside, a dungeon) the player walks into through a link at a square
+      // subworlds: other maps (a building's inside, a dungeon level, a forest next door): sections the player walks into through links
       subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},
-      links: Array.isArray(s.links) ? s.links.filter(l => l && Array.isArray(l.at) && l.at.length === 2 && l.at.every(n => Number.isFinite(+n)) && l.to).slice(0, 64).map(l => ({ ...l, at: [Math.round(+l.at[0]), Math.round(+l.at[1])], to: String(l.to) })) : [],
+      // links: squares (or a whole edge) leading to a section: a subworlds key, "back", another scenario (path, URL, #s= code) or {"generate": {...}}
+      links: Array.isArray(s.links) ? s.links.map(normLink).filter(Boolean).slice(0, 64) : [],
+      // darkness.js: what the player has not found yet is hidden: "rooms" (each room until seen into), "cells" (square by square), false (nothing); unset: "cells" in dark worlds, "rooms" in generated lit dungeons, else none
+      reveal: s.reveal === 'rooms' || s.reveal === 'cells' ? s.reveal : s.reveal === false ? false : null,
       // locks.js: locked doors and their keys
       locked: Array.isArray(s.locked) ? s.locked.filter(r => r && (r.in || Array.isArray(r.at))).slice(0, 16) : [],
       // extra things characters can eat (names, or { name, nourish })
@@ -1069,10 +1107,11 @@
   const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24, red_dragon: 30, wyrmling: 9, imp: 7, mushroom_warrior: 8, bunny: 5, minotaur: 18, lizardman: 9, werewolf: 12, mummy: 9, snake: 4, wasp: 3, frog: 2, bull: 12, stag: 9, horse: 10, white_horse: 10, cow: 9, deer: 6, fox: 4, dog: 5, husky: 5, alpaca: 7, donkey: 8, pig: 6, sheep: 5, ogre: 16, gnoll: 9, lich: 16, vampire: 14, cultist: 7, bandit: 7, bear: 12, zombie_classic: 7, kobold_classic: 5, demon_classic: 14, giant_classic: 18, imp_classic: 7, gargoyle: 12, dark_knight: 14 };
   async function playScenarioNow(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
-    // opts.sub: a subworld entered through a link (the player, the goal and the
-    // banner stay the parent's); opts.restore: the parent coming back, its
-    // characters and objects put back from the snapshot taken on leaving
-    if (!opts.sub && !opts.restore) frames.length = 0;
+    // opts.sub: a section entered through a link (opts.section: its id; the
+    // player, the goal, the clock, the flags and the banner stay the world's);
+    // opts.restore: its characters and objects put back from a saved state
+    // (a section coming back, or opts.resume: a saved journey after a reload)
+    if (!opts.sub && !opts.resume) resetJourney();
     const prevView = w.getCameraView?.();   // a door in or out keeps the view you had
     const base = normalizeScenario(input);
     if (!opts.sub && !opts.restore && !opts.testing) window.tablefolkUseModel?.(base.defaultModel);
@@ -1085,7 +1124,8 @@
     if (!opts.sub) window.tablefolkPackages?.reset?.();
     const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages, { testing: !!opts.testing }) : [];
     // jobs.js: the built-in jobs and any the agents name by reference
-    if (!opts.sub && window.tablefolkJobs) packageWarnings.push(...await window.tablefolkJobs.load(base).catch(e => [e.message]));
+    // (a section's agents may name jobs too: load() only adds)
+    if (window.tablefolkJobs) packageWarnings.push(...await window.tablefolkJobs.load(base).catch(e => [e.message]));
     const parentAgents = opts.restore ? base.agents : null;
     // the world's own voices (a subworld keeps its parent's unless it brings its own)
     if (!opts.sub || base.voices.length) try { window.tablefolkTTS?.setScenarioVoices?.(base.voices); } catch (e) { console.warn('[voices]', e); }
@@ -1108,7 +1148,9 @@
     w.state.earshot = scn.earshot;
     w.state.places = scn.places || [];
     w.state.workflows = scn.workflows || {};
-    window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
+    // story.js: a section keeps the world's flags (its own are defaults for new ones), facts and triggers
+    if (opts.sub && active) window.tablefolkStory?.reset({ ...(scn.flags || {}), ...(w.state.flags || {}) }, { ...(active.scn.facts || {}), ...(scn.facts || {}) }, [...(active.scn.triggers || []), ...(scn.triggers || [])]);
+    else window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     window.tablefolkBooks?.load(scn.books, scn.agents);
     w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || null; w.state.harsh = !!scn.harsh; w.state.tempers = scn.tempers !== false; w.state.temper = scn.temper || null; w.state.ladderFight = null;   // workflows.js   // generated maps' rooms and buildings (senses.js)
@@ -1154,9 +1196,11 @@
     // Roles (roles.js) and skills (skills.js): fetch every manifest the
     // scenario names first. A role brings its skills, so agents are read
     // with their role's skills added.
-    const roleWarnings = window.tablefolkRoles ? await window.tablefolkRoles.load(parentAgents ? { ...scn, agents: parentAgents } : scn) : [];
+    // (a section also knows the roles and skills of the characters that came along with the player)
+    const withCarried = list => opts.sub ? [...list, ...Object.values(journey.carried).filter(a => !list.some(x => x.id === a.id))] : list;
+    const roleWarnings = window.tablefolkRoles ? await window.tablefolkRoles.load({ ...scn, agents: withCarried(parentAgents || scn.agents) }) : [];
     const withRole = a => window.tablefolkRoles ? window.tablefolkRoles.withRole(a) : a;
-    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: (parentAgents || scn.agents).map(withRole) }) : [];
+    const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: withCarried(parentAgents || scn.agents).map(withRole) }) : [];
     let first = null;
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
@@ -1238,19 +1282,23 @@
     // triggers "on": "start" (story.js), once the world stands
     else if (!opts.sub && !opts.testing) setTimeout(() => window.tablefolkStory?.fire('start', {}), 0);
     if (!opts.testing) try { w.setCameraView?.(opts.sub || opts.restore ? prevView : startView(scn)); } catch (e) { console.warn('[view]', e); }
-    const code = opts.code || await encodeScenario(base);
-    if (opts.sub) world = { base, scn, links: scn.links };
+    // links placed "in" a place of a generated map: a square in it, by the walls, kept once chosen
+    scn.links = placeLinks(scn.links, w.state.places || [], opts.section || '');
+    const code = opts.sub ? active?.code : opts.code || await encodeScenario(base);
+    if (opts.sub) { world = { id: opts.section || '', base, scn, links: [...scn.links, ...(journey.auto[opts.section || ''] || [])] }; hereCache = null; expandedCache.set(world.id, scn); }
     else {
-      if (!opts.restore) active = { scn: base, code, turns: 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
+      if (!opts.restore || opts.resume) active = { scn: base, code, turns: +opts.resume?.turns || 0, speech: [], ended: false, result: null, testing: !!opts.testing, warnings: plan.warnings };
       else active = { ...opts.keepActive, timer: null };
-      world = { base, scn, links: scn.links };
+      world = { id: '', base, scn, links: [...scn.links, ...(journey.auto[''] || [])] }; hereCache = null; expandedCache.clear(); expandedCache.set('', scn);
       try { history.replaceState(null, '', '#s=' + code); } catch {}
     }
-    window.tablefolkDark?.start(scn.dark);
+    // darkness.js: fog of war and reveal-as-you-go
+    window.tablefolkDark?.start(scn.dark, revealOf(scn));
     window.tablefolkSurroundings?.start(scn).catch?.(e => console.warn('[surroundings]', e));
     placePads(world.links);
-    try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title, live: !!base.live, sub: !!opts.sub } })); } catch {}
-    if (opts.sub) { renderBanner(); return { scenario: base, plan }; }
+    // a section keeps the world living (live.js restarts on this event when "live" is set)
+    try { window.dispatchEvent(new CustomEvent('tablefolk-scenario-started', { detail: { title: base.title, live: !!(opts.sub && active ? active.scn.live : base.live), sub: !!opts.sub, section: world.id } })); } catch {}
+    if (opts.sub) { renderBanner(); startChecker(); return { scenario: base, plan }; }
     renderBanner(); hideEnd();
     if (plan.warnings.length) console.warn('[scenario] layout notes:\n' + plan.warnings.join('\n'));
     showWarnings(plan.warnings);
@@ -1261,78 +1309,481 @@
     return { scenario: base, plan };
   }
 
-  // ---------- subworlds: links from one map into another ----------
-  // A link ({at, to, name, back}) is a glowing square. Stepping onto it (from
-  // another square) swaps the whole map for the subworld "to" (a building's
-  // inside, a dungeon): the map you leave is kept as a snapshot (characters,
-  // objects, doors, brains) and put back, with the player set down at "back",
-  // when you step onto the subworld's "back" link or press "leave". The
-  // player, their pack and hit points carry across; the goal waits.
-  const frames = [];                  // the maps left behind, innermost last
-  let world = { base: null, scn: null, links: [] };   // the map being played, and its links
-  let pads = [], padTimer = 0, lastCell = '', transition = false;
+  // ---------- sections: linked maps ----------
+  // A link ({at: [x, z] | edge, to, name, kind, arrive, back, key}) leads from
+  // one map (a section) to another: a key of "subworlds" (looked up in this
+  // section, then its parents), "back" (where you came from), another
+  // scenario (a path, a URL or a #s= code: fetched the first time, then kept
+  // like a subworld), or {"generate": {...}} (built by procgen.js the first
+  // time). Every section keeps its own state: what it was when the player
+  // left it (characters, objects, doors, stock, explored squares) is put back
+  // on return, however deep; the player, story flags, the clock, gold,
+  // quests and the goal are the world's and carry over. Time passes elsewhere
+  // only coarsely (sections.js catchUp). The whole journey is saved
+  // (localStorage tablefolkJourney), so a reload comes back to the section
+  // the player was in with every visited one as it was left.
+  // Section ids: '' (the top map), a path of subworlds keys ("mine/level-2"),
+  // '~x<hash>' (another scenario), '<parent>/~g<hash>' (a generate spec).
+  const JOURNEY_KEY = 'tablefolkJourney';
+  const freshJourney = () => ({ stack: [], states: {}, defs: {}, visited: {}, unlocked: {}, carried: {}, auto: {}, linkAt: {} });
+  let journey = freshJourney(), hereCache = null;
+  const expandedCache = new Map();
+  let world = { id: '', base: null, scn: null, links: [] };   // the section being played, and its links
+  let pads = [], padTimer = 0, lastCell = '', transition = false, saveTimer = 0;
+  const EDGE_DIR = { north: [0, -1], south: [0, 1], east: [-1, 0], west: [1, 0] }, OPPOSITE = { north: 'south', south: 'north', east: 'west', west: 'east' };
+  const REVERSE_KIND = { stairs_down: 'stairs_up', stairs_up: 'stairs_down', trapdoor: 'stairs_up', cave: 'cave', gate: 'gate', door: 'door' };
+  const isExternal = to => typeof to === 'string' && (/^(https?:|\/|\.\.?\/|#?s=)/.test(to) || /\.json(\?|#|$)/i.test(to) || /^scenarios\//.test(to));
+  const parentOf = id => id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : '';
+  const hashId = v => hashStr(typeof v === 'string' ? v : JSON.stringify(v)).toString(36);
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const toast = (t, type = 'info') => window.tablefolkToast?.(t, { type });
+  const clockNow = () => { const c = W().state.clock; return c ? (c.day - 1) * 1440 + c.min : null; };
+  function resetJourney() {
+    journey = freshJourney(); hereCache = null; expandedCache.clear();
+    try { localStorage.removeItem(JOURNEY_KEY); } catch {}
+  }
+  // what a world's "reveal" is when unset (darkness.js)
+  function revealOf(scn) {
+    if (scn.reveal === 'rooms' || scn.reveal === 'cells' || scn.reveal === false) return scn.reveal;
+    if (scn.dark) return 'cells';
+    const k = String(scn.generate?.kind || '').toLowerCase();
+    return scn._gen && /dungeon|castle|keep|fortress|crypt|tomb|catacomb/.test(k) ? 'rooms' : false;
+  }
+  // the raw definition of a section, and the same expanded (grid, buildings: its links and subworlds)
+  function sectionDef(id) {
+    if (id === '') return active?.scn || null;
+    if (journey.defs[id]) return journey.defs[id];
+    const p = parentOf(id), key = id.slice(p ? p.length + 1 : 0), d = expandedDef(p)?.subworlds?.[key];
+    if (!d || typeof d !== 'object') return null;
+    const owner = sectionDef(p) || {};
+    const inherit = Object.fromEntries(['walls', 'wallHeight', 'lighting'].filter(k => owner[k] != null && d[k] == null).map(k => [k, owner[k]]));
+    return { _sub: true, ...inherit, ...d };
+  }
+  function expandedDef(id) {
+    if (id === world.id && world.scn) return world.scn;
+    if (expandedCache.has(id)) return expandedCache.get(id);
+    const d = sectionDef(id); if (!d) return null;
+    let e = null; try { e = expandBuildings(expandGrid(expandBase(normalizeScenario(clone(d))))); } catch (err) { console.warn('[sections] expand', id, err); }
+    expandedCache.set(id, e); return e;
+  }
+  const titleOf = id => (id === world.id ? world.base?.title : expandedDef(id)?.title) || (id === '' ? active?.scn?.title : '') || 'there';
+  // the section a link leads to, without fetching (null: not known yet)
+  function targetId(l, fromId) {
+    const to = l.to;
+    if (to === 'back') return journey.stack.at(-1)?.id ?? (fromId ? parentOf(fromId) : null);
+    if (to && typeof to === 'object' && to.generate) return (fromId ? fromId + '/' : '') + '~g' + hashId(to.generate);
+    if (isExternal(to)) return '~x' + hashId(to);
+    for (let p = fromId; ; p = parentOf(p)) { if (expandedDef(p)?.subworlds?.[to]) return (p ? p + '/' : '') + to; if (p === '') return null; }
+  }
+  function generatedDef(spec, l) {
+    const { agents, objects, threats, title, dark, reveal, lighting, links, ...gen } = spec;
+    const kind = String(gen.kind || 'dungeon');
+    return { _sub: true, title: title || l.name || kind.replace(/^\w/, c => c.toUpperCase()), seed: Number.isFinite(+gen.seed) ? +gen.seed : hashStr(JSON.stringify(spec)) % 100000,
+      generate: gen, agents: Array.isArray(agents) ? agents : [], objects: Array.isArray(objects) ? objects : [], threats: Array.isArray(threats) ? threats : [], links: Array.isArray(links) ? links : [],
+      ...(dark != null ? { dark: !!dark } : {}), ...(reveal != null ? { reveal } : {}), ...(lighting ? { lighting } : {}) };
+  }
+  async function fetchSection(to) {
+    let scn;
+    const m = String(to).match(/(?:^|[#&])s=([A-Za-z0-9_-]+)/);
+    if (m && !/\.json/i.test(to)) scn = await decodeScenario(m[1]);
+    else {
+      const url = new URL(/^scenarios\//.test(to) ? '../' + to : to, location.href);
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+      try { const r = await fetch(url, { cache: 'no-cache', signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); scn = await r.json(); } finally { clearTimeout(t); }
+    }
+    if (!scn || typeof scn !== 'object' || Array.isArray(scn)) throw new Error('not a scenario');
+    normalizeScenario(clone(scn));   // throws on a bad one, before the player leaves
+    return { _sub: true, ...scn };
+  }
+  async function resolveTarget(l, fromId) {
+    const id = targetId(l, fromId); if (id == null) return null;
+    if (l.to && typeof l.to === 'object') journey.defs[id] ||= generatedDef(l.to.generate, l);
+    else if (isExternal(l.to) && !journey.defs[id]) journey.defs[id] = await fetchSection(l.to);
+    return sectionDef(id) ? id : null;
+  }
+
+  // ---- where things stand ----
   const playerCell = () => { const av = W().getPlayerAvatar?.(), p = av && (av.logicalPos || av.root.position); return p ? Math.round(p.x) + ',' + Math.round(p.z) : ''; };
-  function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; }
+  const playerXZ = () => { const c = playerCell(); return c ? c.split(',').map(Number) : null; };
+  function rimCells(edge) {
+    const Wd = W().WORLD, bx = Wd.halfW - 1, bz = Wd.halfH - 1, out = [];
+    if (edge === 'east' || edge === 'west') { const x = edge === 'east' ? -bx : bx; for (let z = -bz; z <= bz; z++) out.push([x, z]); }
+    else { const z = edge === 'north' ? -bz : bz; for (let x = -bx; x <= bx; x++) out.push([x, z]); }
+    return out;
+  }
+  const passable = (x, z) => typeof cellPassable === 'function' ? cellPassable(x, z) : true;
+  function placeLinks(links, places, id) {
+    if (!links.some(l => l.in && !l.at)) return links;
+    const taken = new Set(links.filter(l => l.at).map(l => l.at.join(',')));
+    const things = new Set(W().getObjects().map(o => Math.round(o.x) + ',' + Math.round(o.z)));
+    const doors = new Set(W().getObjects().filter(o => o.type === 'door').map(o => Math.round(o.x) + ',' + Math.round(o.z)));
+    return links.map((l, i) => {
+      if (!l.in || l.at) return l;
+      const key = id + '#' + i, kept = journey.linkAt?.[key];
+      if (kept) return { ...l, at: kept };
+      const p = places.find(q => q.id === l.in) || places.find(q => q.kind === l.in) || places.find(q => String(q.id).startsWith(l.in + ' '));
+      if (!p || p.x0 == null) { console.warn('[sections] no place', l.in, 'for a link'); return null; }
+      const cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, cells = [];
+      for (let x = Math.ceil(p.x0); x <= p.x1; x++) for (let z = Math.ceil(p.z0); z <= p.z1; z++) {
+        const k = x + ',' + z; if (!passable(x, z) || things.has(k) || taken.has(k)) continue;
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => doors.has((x + dx) + ',' + (z + dz)))) continue;
+        const byWall = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => typeof isBlocked === 'function' && isBlocked(x + dx, z + dz));
+        cells.push({ x, z, s: (byWall ? 0 : 5) + Math.hypot(x - cx, z - cz) * .3 });
+      }
+      cells.sort((a, b) => a.s - b.s);
+      const c = cells[0] || { x: Math.round(cx), z: Math.round(cz) };
+      (journey.linkAt ||= {})[key] = [c.x, c.z]; taken.add(c.x + ',' + c.z);
+      return { ...l, at: [c.x, c.z] };
+    }).filter(Boolean);
+  }
+  // the square where an edge link's road leaves the board: its "at", a path on the rim, else the middle
+  function edgeRoad(l) {
+    if (l.at) return l.at;
+    const cells = rimCells(l.edge).filter(([x, z]) => passable(x, z)); if (!cells.length) return rimCells(l.edge)[0];
+    const pathy = cells.filter(([x, z]) => /dirt|stone|flagstone/.test(W().paintAt?.(x, z)?.mat || ''));
+    const pool = pathy.length ? pathy : cells, mid = pool.reduce((a, c) => Math.abs(c[0]) + Math.abs(c[1]) < Math.abs(a[0]) + Math.abs(a[1]) ? c : a);
+    return mid;
+  }
+  function freeNear(x, z, avoid = new Set()) {
+    const busy = new Set(W().getAgents().map(g => { const p = g.logicalPos || g.root.position; return Math.round(p.x) + ',' + Math.round(p.z); }));
+    const ok = (a, b) => passable(a, b) && !avoid.has(a + ',' + b) && !busy.has(a + ',' + b);
+    for (let r = 0; r <= 6; r++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (Math.max(Math.abs(dx), Math.abs(dz)) === r && ok(x + dx, z + dz)) return [x + dx, z + dz];
+    return [x, z];
+  }
+  // where the player lands in the section just built (null: where the layout put them)
+  function arrival(how, fresh) {
+    if (Array.isArray(how.at)) return freeNear(...how.at);
+    const links = world.links;
+    if (Array.isArray(how.arrive)) return freeNear(...how.arrive);
+    if (typeof how.arrive === 'string') { const t = links.find(k => String(k.name || '').toLowerCase() === how.arrive.toLowerCase()); if (t) return t.edge ? edgeRoad(t) : t.at; }
+    if (how.edge) {
+      const side = OPPOSITE[how.edge], along = side === 'east' || side === 'west' ? 1 : 0, c = how.c ?? 0;
+      const cells = rimCells(side).filter(([x, z]) => passable(x, z)).sort((a, b) => Math.abs(a[along] - c) - Math.abs(b[along] - c));
+      if (cells[0]) return cells[0];
+    }
+    if (fresh && Array.isArray(world.base?.player?.at)) return null;
+    const ret = links.find(k => k.to === 'back' || targetId(k, world.id) === how.fromId);
+    if (ret) return ret.edge ? edgeRoad(ret) : ret.at;
+    return null;
+  }
+  function teleport(g, x, z) {
+    setCharacterLogicalPosition(g, new BABYLON.Vector3(x, 0, z));
+    const pb = g.collider?.physicsBody; if (!pb?.setPrestepType) return;
+    try { pb.setPrestepType(BABYLON.PhysicsPrestepType.TELEPORT); } catch {}
+    W().state.scene.onAfterRenderObservable.addOnce(() => { try { pb.setPrestepType(BABYLON.PhysicsPrestepType.ACTION); } catch {} });
+  }
+
+  // ---- the state of a section ----
+  function snapshot(id, without = new Set()) {
+    const s = clone(W().worldStateData());
+    s.characters = s.characters.filter(c => !without.has(c.id));
+    const ids = new Set(s.characters.map(c => c.id));
+    s.brainConfigs = (s.brainConfigs || []).filter(([k]) => ids.has(k));
+    delete s.player; delete s.flags; delete s.clock;   // the world's, not the section's
+    s.reveal = window.tablefolkDark?.save?.() || null;
+    s.at = clockNow(); s.section = id; s.title = world.base?.title || '';
+    return s;
+  }
+  // companions (a role's "follow" behaviour) and animals following the player, near enough to come along
+  function takeFollowers() {
+    const w = W(), me = playerXZ(), out = [];
+    if (!me) return out;
+    const recs = w.worldStateData().characters;
+    for (const g of w.getAgents()) {
+      const cfg = w.getBrainConfig(g.id) || {}; if (cfg.defeated || g.defeated || g._threat) continue;
+      const q = g.logicalPos || g.root.position; if (Math.hypot(q.x - me[0], q.z - me[1]) > 7) continue;
+      if (!(window.tablefolkAnimals?.following?.(g) || (window.tablefolkRoles?.behavioursOf?.(g) || []).includes('follow'))) continue;
+      out.push({ id: g.id, model: g.charModel, rec: recs.find(r => r.id === g.id), cfg: clone(cfg), def: agentDef(g.id) || { id: g.id, model: g.charModel } });
+    }
+    return out;
+  }
+  async function bringFollowers(list) {
+    const w = W(), me = playerXZ(); if (!me || !list.length) return;
+    const taken = new Set([me.join(',')]);
+    for (const f of list) {
+      const [x, z] = freeNear(me[0], me[1], taken); taken.add(x + ',' + z);
+      const g = await w.spawnAgent(f.id, x, z, 's', f.model); if (!g) continue;
+      w.setBrainConfig(f.id, f.cfg);
+      if (f.rec?.traits) g.traits = f.rec.traits;
+      const a = window.tablefolkRoles ? window.tablefolkRoles.withRole(f.def) : f.def;
+      try { if (window.tablefolkSkills) window.tablefolkSkills.grant(g, a.skills || [], a.skillParams || {}); } catch {}
+      try { if (f.cfg.wielding) window.tablefolkCombat?.showWeapon?.(g, window.tablefolkCombat.weaponFor(f.cfg.wielding) || { dmg: 2, kind: 'club', name: f.cfg.wielding }); } catch {}
+      journey.carried[f.id] = f.def;
+    }
+    hereCache = null;
+  }
+
+  // ---- travelling ----
+  function curtain(show, text = '') {
+    let el = document.getElementById('sectionCurtain');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'sectionCurtain'; el.setAttribute('aria-live', 'polite');
+      el.style.cssText = 'position:fixed;inset:0;z-index:12;background:#08090b;opacity:0;pointer-events:none;transition:opacity .3s ease;display:flex;align-items:center;justify-content:center;color:#efe3c8;font:600 17px/1.4 system-ui,sans-serif;letter-spacing:.03em;text-align:center;padding:24px';
+      document.body.appendChild(el);
+    }
+    el.textContent = text; el.style.opacity = show ? '1' : '0';
+    if (window.TABLEFOLK_ART_MODE || window.TABLEFOLK_TABLETOP) return Promise.resolve();
+    return new Promise(r => setTimeout(r, 320));
+  }
+  const lockKey = (fromId, l) => fromId + '|' + (l.at ? l.at.join(',') : l.edge) + '|' + (typeof l.to === 'string' ? l.to : hashId(l.to));
+  const WHERE = { stairs_down: 'down into', stairs_up: 'up to', trapdoor: 'down through the trapdoor into', cave: 'into', gate: 'through the gate to', edge: 'on to', door: 'into' };
+  // follow a link (from the pads, an edge, the banner's back button, or tablefolkScenario.travel)
+  async function travel(l, opts = {}) {
+    if (transition || !active || !l) return false;
+    const w = W(), fromId = world.id, stack0 = journey.stack.slice();
+    transition = true;
+    try {
+      let toId, how;
+      if (l.to === 'back') {
+        const f = journey.stack.pop();
+        if (!f && fromId === '') return false;
+        toId = f ? f.id : parentOf(fromId); how = { at: f?.at || null, fromId, kind: 'back', name: f?.name || titleOf(toId) };
+      } else {
+        if (l.key && !journey.unlocked[lockKey(fromId, l)]) {
+          const items = (w.state.player.items || []).filter(i => (i.qty ?? 1) > 0), want = String(l.key).toLowerCase();
+          const it = w.findItem(items, l.key) || items.find(i => String(i.name || i).toLowerCase().includes(want));
+          if (!it) { toast(`The ${l.name || 'way'} is locked. It needs the ${l.key}.`, 'error'); return false; }
+          journey.unlocked[lockKey(fromId, l)] = true;
+          toast(`You unlock the ${l.name || 'way'} with the ${it.name || it}.`, 'success');
+        }
+        const fetching = isExternal(l.to) && !journey.defs[targetId(l, fromId)];
+        if (fetching) await curtain(true, `Travelling to ${l.name || 'somewhere new'}...`);
+        try { toId = await resolveTarget(l, fromId); }
+        catch (e) { console.warn('[sections] could not open', l.to, e); await curtain(false); toast(`The way to ${l.name || 'there'} could not be opened (${e.message || e}). You stay where you are.`, 'error'); return false; }
+        if (toId == null) { await curtain(false); toast(`This way leads to "${typeof l.to === 'string' ? l.to : 'a generated place'}", which is not in the scenario.`, 'error'); return false; }
+        const i = journey.stack.findIndex(f => f.id === toId);
+        if (i >= 0) journey.stack.length = i;
+        else journey.stack.push({ id: fromId, at: l.edge ? playerXZ() : (l.back || l.at), name: world.base?.title || titleOf(fromId) });
+        const me = playerXZ();
+        how = { arrive: l.arrive, fromId, edge: l.edge || null, c: l.edge && me ? me[l.edge === 'east' || l.edge === 'west' ? 1 : 0] : null, kind: l.kind, name: l.name };
+      }
+      await go(toId, how, opts);
+      return true;
+    } catch (e) {
+      console.error('[sections]', e); journey.stack = stack0;
+      toast('could not go there: ' + (e?.message || e), 'error');
+      await curtain(false);
+      return false;
+    } finally { transition = false; lastCell = playerCell(); renderBanner(); }
+  }
+  async function go(toId, how = {}, opts = {}) {
+    const w = W(), fromId = world.id, fromTitle = world.base?.title || '';
+    const def = sectionDef(toId); if (!def) throw new Error('no section "' + toId + '"');
+    await curtain(true, opts.text || '');
+    const followers = opts.noSnapshot ? [] : takeFollowers();
+    if (!opts.noSnapshot) { journey.states[fromId] = snapshot(fromId, new Set(followers.map(f => f.id))); journey.visited[fromId] = { title: fromTitle, at: clockNow() }; }
+    const saved = opts.state || journey.states[toId], av = w.getPlayerAvatar?.(), keep = clone(w.state.player);
+    const model = av?.avatarModel || saved?.playerAvatar?.model;
+    stopChecker();
+    if (saved) {
+      const snap = clone(saved);
+      snap.playerAvatar = { dx: 0, dz: -1, ...(snap.playerAvatar || {}), model };
+      await playScenarioNow(toId === '' ? active.scn : def, { sub: true, section: toId, restore: snap });
+    } else {
+      const wield = w.state.player.wielding;
+      await playScenarioNow({ ...def, player: { ...(def.player || {}), model, ...(wield ? { wield } : {}) } }, { sub: true, section: toId });
+    }
+    Object.assign(w.state.player, keep);
+    // the player: where they land
+    const me = w.getPlayerAvatar?.();
+    const spot = arrival(how, !saved);
+    if (me && spot) teleport(me, spot[0], spot[1]);
+    // the way back: made when the section has none (a pad where the player stands, or the opposite edge)
+    if (fromId !== toId && how.kind !== 'back' && !world.links.some(k => k.to === 'back' || targetId(k, toId) === fromId)) {
+      const p = playerXZ(), back = how.edge ? { edge: OPPOSITE[how.edge], to: 'back', kind: 'edge', name: fromTitle, _auto: true }
+        : { at: p, to: 'back', kind: REVERSE_KIND[how.kind] || 'door', name: fromTitle, _auto: true };
+      if (back.edge || p) { (journey.auto[toId] ||= []).push(back); world.links.push(back); }
+    }
+    // weapons in hand and hit points (the restored bodies are new)
+    const C = window.tablefolkCombat;
+    if (C) {
+      for (const g of w.getAgents()) { const n = w.getBrainConfig(g.id).wielding; if (n) try { C.showWeapon(g, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n }); } catch {} }
+      const n = keep.wielding; if (me && n) try { C.showWeapon(me, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n }); } catch {}
+      C.renderPlayerHp?.();
+    }
+    // the fallen stay fallen (a restored body stands up otherwise)
+    for (const g of w.getAgents()) if (w.getBrainConfig(g.id).defeated && !g.defeated) {
+      g.defeated = true; const dead = ['Death_A', 'Death_B'].map(n => g.rigAnims?.[n]).find(Boolean);
+      if (dead) { try { g.activeRigAnim?.stop(); dead.start(false, 1, dead.to, dead.to, false); g.activeRigAnim = dead; g.rigMode = 'defeated'; } catch {} } else g.root.rotation.z = Math.PI / 2;
+    }
+    if (saved?.reveal) window.tablefolkDark?.restore?.(saved.reveal);
+    // time passed here while the player was away: a coarse catch-up in code (sections.js)
+    if (saved && !opts.noCatchUp && saved.at != null && clockNow() != null && clockNow() - saved.at >= 30) {
+      try { window.tablefolkSections?.catchUp?.({ minutes: clockNow() - saved.at, agents: here()?.agents || [], places: w.state.places || [] }); } catch (e) { console.warn('[sections] catch-up', e); }
+    }
+    await bringFollowers(followers);
+    journey.visited[toId] = { title: world.base?.title || '', at: clockNow() };
+    placePads(world.links);
+    w.inventoryChanged();
+    // the light for the hour (one clock: it kept running)
+    try { const c = w.state.clock; if (c && window.tablefolkClock?.enabled) window.tablefolkClock.set(c.min, c.day); } catch {}
+    hereCache = null;
+    await curtain(false);
+    const name = world.base?.title || 'there';
+    const line = how.kind === 'back' ? `You go back to ${name}.` : opts.resumed ? `You are in ${name}.` : `You go ${WHERE[how.kind] || 'into'} ${/^the\b/i.test(name) ? name : name}.`;
+    if (!opts.quiet) { toast(line, 'success'); try { log(line); } catch {} try { window.tablefolkDirector?.narrate?.(line); } catch {} }
+    try { window.dispatchEvent(new CustomEvent('tablefolk-section', { detail: { from: fromId, to: toId, title: name, kind: how.kind || null, via: how.name || null, followers: followers.map(f => f.id) } })); } catch {}
+    saveJourney();
+  }
+
+  // ---- the pads and the edges ----
+  function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; window.tablefolkSections?.clearMarkers?.(); }
   function placePads(links) {
     clearPads();
+    W().state.edgeLinks = links.filter(l => l.edge).map(l => ({ edge: l.edge, road: edgeRoad(l), name: l.name || '' }));
     const sc = W().state.scene; if (!sc || window.TABLEFOLK_TABLETOP) return;
     let mat = sc.getMaterialByName('link_pad_mat');
     if (!mat) { mat = new BABYLON.StandardMaterial('link_pad_mat', sc); mat.disableLighting = true; mat.emissiveColor = new BABYLON.Color3(1, .82, .35); mat.alpha = .32; }
     for (const l of links) {
+      if (l.edge) continue;
+      // a door's glowing disc; stairs, caves, gates and trapdoors get their own look (sections.js)
+      if (l.kind && l.kind !== 'door' && window.tablefolkSections?.marker?.(l)) continue;
       const m = BABYLON.MeshBuilder.CreateCylinder('link_pad', { diameter: .9, height: .03, tessellation: 40 }, sc);
-      m.position.set(l.at[0], .07, l.at[1]); m.material = mat; m.isPickable = false; pads.push(m);
+      m.position.set(l.at[0], (W().state.terrainTopY ?? 0) + .07, l.at[1]); m.material = mat; m.isPickable = false; pads.push(m);
     }
+    for (const e of W().state.edgeLinks) window.tablefolkSections?.edgeMarker?.(e);
     lastCell = playerCell();
     if (links.length) padTimer = setInterval(watchPads, 150);
   }
+  let rimHint = '';
   function watchPads() {
     if (transition || !active) return;
+    edgeFirstPerson();
     const c = playerCell(); if (!c || c === lastCell) return;
     lastCell = c;
-    const l = world.links.find(l => l.at.join(',') === c);
-    if (l) (l.to === 'back' ? leaveWorld() : enterWorld(l));
+    const l = world.links.find(l => l.at && !l.edge && l.at.join(',') === c);
+    if (l) { travel(l); return; }
+    // standing on an edge with a way off it: say so, once per edge
+    const [x, z] = c.split(',').map(Number), Wd = W().WORLD;
+    const e = world.links.find(l => l.edge && ((l.edge === 'east' && x === -(Wd.halfW - 1)) || (l.edge === 'west' && x === Wd.halfW - 1) || (l.edge === 'north' && z === -(Wd.halfH - 1)) || (l.edge === 'south' && z === Wd.halfH - 1)));
+    if (e && rimHint !== world.id + e.edge) { rimHint = world.id + e.edge; toast(`${e.edge[0].toUpperCase() + e.edge.slice(1)}: ${e.name ? 'the way to ' + e.name : 'a way on'}. Keep walking ${e.edge} to go.`); }
   }
-  async function enterWorld(l) {
-    const w = W(), parent = world.base, sub0 = world.scn?.subworlds?.[l.to];
-    if (transition || !active) return;
-    if (!sub0) { window.tablefolkToast?.(`This way leads to "${l.to}", which is not in the scenario.`, { type: 'error' }); return; }
-    transition = true;
+  // walking off the board where an edge leads on: app.js playerStep stops at the rim, so it is wrapped
+  function edgeOff(dir) {
+    const av = W().getPlayerAvatar?.(); if (!av || !active || transition || av.turnMove || av.defeated) return null;
+    const lp = av.logicalPos || av.root.position, nx = Math.round(lp.x + dir.x), nz = Math.round(lp.z + dir.z), Wd = W().WORLD;
+    if (Math.abs(nx) <= Wd.halfW - 1 && Math.abs(nz) <= Wd.halfH - 1) return null;
+    const dx = Math.sign(Math.round(dir.x)), dz = Math.sign(Math.round(dir.z));
+    const edge = Object.keys(EDGE_DIR).find(k => EDGE_DIR[k][0] === dx && EDGE_DIR[k][1] === dz);
+    return edge ? world.links.find(l => l.edge === edge) || null : null;
+  }
+  function hookEdges() {
+    if (typeof window.playerStep !== 'function' || window.playerStep._tfSections) return;
+    const orig = window.playerStep;
+    const hooked = function (dir) { try { const l = dir && edgeOff(dir); if (l) { setCharacterFacing(W().getPlayerAvatar(), dir); travel(l); return true; } } catch (e) { console.warn('[sections] edge', e); } return orig.apply(this, arguments); };
+    hooked._tfSections = true; window.playerStep = hooked;
+  }
+  // first person walks smoothly (fpWalk): held forward at the rim, looking off the board
+  let fpPush = 0;
+  function edgeFirstPerson() {
+    const st = W().state; if (!st.firstPerson || typeof fpHeld === 'undefined' || !fpHeld.has('fwd') || typeof fpForward !== 'function') { fpPush = 0; return; }
+    const l = edgeOff(fpForward()); if (!l) { fpPush = 0; return; }
+    if (++fpPush >= 3) { fpPush = 0; travel(l); }
+  }
+
+  // ---- the world as a whole: the goal across sections, here(), agentDef ----
+  // other sections' characters and things for the goal checker, from their
+  // saved states (never loaded); far apart so nothing there is "near" anything here
+  function otherSections() {
+    const out = []; let k = 0;
+    for (const [id, s] of Object.entries(journey.states)) {
+      if (id === world.id || !s) continue;
+      const off = 100000 * ++k;
+      out.push({ id, off, s, cfg: new Map(s.brainConfigs || []) });
+    }
+    return out;
+  }
+  function savedConfig(id) { const low = String(id).toLowerCase(); for (const o of otherSections()) for (const [k, v] of o.cfg) if (k.toLowerCase() === low) return v; return null; }
+  // every agent of the world: the top map's, each section's and the ones that came along
+  function allAgents() {
+    const out = new Map(), seen = new Set();
+    const add = list => { for (const a of list || []) if (a?.id && !out.has(a.id)) out.set(a.id, a); };
+    const walk = (id, depth) => { if (seen.has(id) || depth > 6) return; seen.add(id); const e = id === '' ? active?.scn : expandedDef(id); if (!e) return; add(e.agents); for (const k of Object.keys(e.subworlds || {})) walk((id ? id + '/' : '') + k, depth + 1); };
+    walk('', 0);
+    for (const id of Object.keys(journey.defs)) add(journey.defs[id].agents);
+    add(Object.values(journey.carried));
+    return [...out.values()];
+  }
+  function agentDef(id) {
+    const low = String(id).toLowerCase();
+    return (world.base?.agents || []).find(a => a.id.toLowerCase() === low) || journey.carried[id] || allAgents().find(a => a.id.toLowerCase() === low) || null;
+  }
+  // the section the player is in, as its scenario (jobs.js, threats.js, menus.js read it):
+  // its own agents (and the ones that came along), the world's prices and food under its own
+  function here() {
+    if (!active) return null;
+    if (hereCache) return hereCache;
+    const top = active.scn, b = world.id === '' || !world.base ? top : world.base;
+    const live = new Set(W().getAgents().map(g => g.id));
+    const carried = Object.values(journey.carried).filter(a => live.has(a.id) && !b.agents.some(x => x.id === a.id));
+    hereCache = b === top && !carried.length ? top : { ...b, agents: [...b.agents, ...carried], prices: { ...(top.prices || {}), ...(b.prices || {}) }, food: [...(top.food || []), ...(b.food || [])], menus: { ...(top.menus || {}), ...(b.menus || {}) } };
+    return hereCache;
+  }
+
+  // ---- saved journeys ----
+  const sectioned = () => !!(active && (Object.keys(journey.states).length || world.id || Object.keys(active.scn.subworlds || {}).length || (active.scn.links || []).length));
+  function trimForSave(s) {
+    if (!s) return s;
+    const t = clone(s);
+    t.brainConfigs = (t.brainConfigs || []).map(([k, c]) => [k, { ...c, messages: (c.messages || []).slice(-12), recent: (c.recent || []).slice(-6) }]);
+    t.globalHistory = (t.globalHistory || []).slice(-20);
+    return t;
+  }
+  function saveJourney() {
+    if (!active || active.testing || !Object.keys(journey.states).length) return;
     try {
-      const snap = JSON.parse(JSON.stringify(w.worldStateData())), av = w.getPlayerAvatar?.(), back = l.back || l.at;
-      if (snap.playerAvatar) { snap.playerAvatar.x = back[0]; snap.playerAvatar.z = back[1]; }
-      frames.push({ scn: parent, snap, active, code: active.code, name: l.name || l.to });
-      stopChecker();
-      const inherit = Object.fromEntries(['walls', 'wallHeight', 'lighting'].filter(k => parent[k] != null && sub0[k] == null).map(k => [k, parent[k]]));
-      const sub = { _sub: true, ...inherit, ...sub0, player: { ...(sub0.player || {}), model: av?.avatarModel, ...(w.state.player.wielding ? { wield: w.state.player.wielding } : {}) } };
-      await playScenarioNow(sub, { sub: true });
-      window.tablefolkToast?.(`You go into the ${l.name || l.to}.`, { type: 'success' });
-    } catch (e) { console.error('[links]', e); window.tablefolkToast?.('could not go in: ' + (e?.message || e), { type: 'error' }); frames.pop(); startChecker(); }
-    finally { transition = false; lastCell = playerCell(); renderBanner(); }
+      const data = { v: 1, code: active.code, id: world.id, stack: journey.stack, defs: journey.defs, visited: journey.visited, unlocked: journey.unlocked, carried: journey.carried, auto: journey.auto, linkAt: journey.linkAt,
+        states: Object.fromEntries(Object.entries(journey.states).filter(([id]) => id !== world.id).map(([id, s]) => [id, trimForSave(s)])),
+        live: trimForSave(snapshot(world.id)), flags: W().state.flags || {}, clock: W().state.clock || null, player: W().state.player, turns: active.turns || 0, ts: Date.now() };
+      localStorage.setItem(JOURNEY_KEY, JSON.stringify(data));
+    } catch (e) { console.warn('[sections] could not save the journey', e); }
   }
-  async function leaveWorld() {
-    const f = frames.pop(); if (!f || transition) return;
-    transition = true;
+  setInterval(() => { if (!transition) saveJourney(); }, 15000);
+  // before the page goes (app.js disposes the engine on pagehide: a save after that would find no objects)
+  const saveIfAlive = () => { const sc = W()?.state?.scene; if (!transition && sc && !sc.isDisposed) saveJourney(); };
+  addEventListener('beforeunload', saveIfAlive);
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveIfAlive(); });
+  function savedJourney(code) {
+    try { const j = JSON.parse(localStorage.getItem(JOURNEY_KEY) || 'null'); return j && j.v === 1 && j.code === code ? j : null; } catch { return null; }
+  }
+  // back where the player was: the top map built as an empty shell (it sets up
+  // the world: packages, jobs, the clock), then the section they were in from its saved state
+  async function resumeJourney(scn, code, j) {
     const w = W();
-    try {
-      const keep = JSON.parse(JSON.stringify(w.state.player));
-      await playScenarioNow(f.scn, { restore: f.snap, code: f.code, keepActive: f.active });
-      Object.assign(w.state.player, keep);
-      // weapons in hand come back (the restored bodies are new)
-      const C = window.tablefolkCombat;
-      if (C) {
-        for (const g of w.getAgents()) { const n = w.getBrainConfig(g.id).wielding; if (n) C.showWeapon(g, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n }); }
-        const av = w.getPlayerAvatar?.(), n = keep.wielding; if (av && n) C.showWeapon(av, C.weaponFor(n) || { dmg: 2, kind: 'club', name: n });
-        C.renderPlayerHp();
-      }
-      w.inventoryChanged();
-      window.tablefolkToast?.(`You step outside.`, { type: 'success' });
-    } catch (e) { console.error('[links]', e); frames.push(f); window.tablefolkToast?.('could not go back: ' + (e?.message || e), { type: 'error' }); }
-    finally { transition = false; lastCell = playerCell(); renderBanner(); }
+    await curtain(true, `Back to ${j.live?.title || 'where you were'}...`);
+    Object.assign(journey, freshJourney(), { stack: j.stack || [], defs: j.defs || {}, visited: j.visited || {}, unlocked: j.unlocked || {}, carried: j.carried || {}, auto: j.auto || {}, linkAt: j.linkAt || {}, states: j.states || {} });
+    if (j.clock) { w.state.clock = { ...j.clock }; w.state.clockRestored = true; }
+    const shell = { characters: [], props: [], blocks: [], paint: [], brainConfigs: [] };
+    const atTop = !j.id;
+    await playScenarioNow(scn, { code, resume: j, restore: atTop ? clone(j.live) : shell });
+    if (atTop) { if (j.live?.reveal) window.tablefolkDark?.restore?.(j.live.reveal); }
+    else await go(j.id, { kind: 'resume' }, { noSnapshot: true, state: j.live, resumed: true, noCatchUp: true, quiet: true });
+    w.state.flags = { ...(j.flags || {}) };
+    if (j.player) { Object.assign(w.state.player, clone(j.player)); w.renderPlayerInventory?.(); window.tablefolkCombat?.renderPlayerHp?.(); }
+    if (j.clock) { w.state.clock = { ...j.clock }; try { window.tablefolkClock?.set(j.clock.min, j.clock.day); } catch {} }
+    lastCell = playerCell(); renderBanner();
+    await curtain(false);
+    toast(`Back where you were: ${world.base?.title || 'the world'}. (Restart from the banner to begin again.)`, 'info');
+  }
+  // the map pane's data: every section reachable from the top, with its links
+  function sectionsMap() {
+    const out = [], seen = new Set();
+    const walk = (id, depth, viaName) => {
+      if (id == null || seen.has(id) || depth > 8) return; seen.add(id);
+      const e = expandedDef(id);
+      if (!e) { out.push({ id, title: viaName || 'unknown', here: false, visited: false, links: [], depth }); return; }
+      const ls = id === world.id ? world.links : [...(e.links || []), ...(journey.auto[id] || [])];
+      const links = ls.map(l => ({ name: l.name || '', kind: l.kind || 'door', edge: l.edge || null, to: l.to === 'back' ? 'back' : targetId(l, id), locked: !!(l.key && !journey.unlocked[lockKey(id, l)]) }));
+      out.push({ id, title: e.title || (id ? id : 'the top map'), here: id === world.id, visited: id === world.id || !!journey.states[id] || !!journey.visited[id], links, depth });
+      for (const [i, k] of links.entries()) if (k.to && k.to !== 'back') walk(k.to, depth + 1, ls[i].name);
+    };
+    walk('', 0);
+    return out;
   }
 
   async function exitScenario() {
     const w = W();
-    stopChecker(); active = null; frames.length = 0; clearPads(); world = { base: null, scn: null, links: [] }; renderBanner(); hideEnd(); window.tablefolkSurroundings?.clear();
+    stopChecker(); active = null; journey = freshJourney(); hereCache = null; clearPads(); world = { id: '', base: null, scn: null, links: [] }; renderBanner(); hideEnd(); window.tablefolkSurroundings?.clear();
     w.state.saveKey = SANDBOX_KEY;
     w.setLighting?.('night');
     w.setWallHeight?.(1);
@@ -1380,7 +1831,7 @@
     el.innerHTML = `<button type="button" class="scn-collapse" data-scn="collapse" title="hide">–</button><div class="scn-title">🎯 ${esc(active.scn.title)}</div>`
       + (g?.text ? `<div class="scn-goal">${esc(g.text)}</div>` : (active.scn.subtitle ? `<div class="scn-goal">${esc(active.scn.subtitle)}</div>` : ''))
       + `<div class="scn-meta">turn ${turns}${max ? ' / ' + max : ''} · you have ${W().getPlayer().gold || 0} gold</div>`
-      + `<div class="scn-actions">${active.scn.intro || g?.text ? '<button type="button" data-scn="intro">intro</button>' : ''}${frames.length ? `<button type="button" data-scn="leave">↩ leave the ${esc(frames.at(-1).name)}</button>` : ''}<button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
+      + `<div class="scn-actions">${active.scn.intro || g?.text ? '<button type="button" data-scn="intro">intro</button>' : ''}${world.id || journey.stack.length ? `<button type="button" data-scn="leave">↩ back to ${esc(journey.stack.at(-1)?.name || titleOf(parentOf(world.id)))}</button>` : ''}${sectioned() ? '<button type="button" data-scn="map">🗺 map</button>' : ''}<button type="button" data-scn="restart">restart</button><button type="button" data-scn="share">share link</button><button type="button" data-scn="exit">exit</button></div>`;
   }
   // The intro card doesn't block or blur the world; players can turn it off
   // (remembered) and bring it back with the banner's "intro" button.
@@ -1440,7 +1891,8 @@
     if ((act === 'collapse' || act === 'expand') && active) { active.collapsed = act === 'collapse'; renderBanner(goalContext()); }
     if (act === 'closesafety') { const s = document.getElementById('scenarioSafety'); if (s) s.hidden = true; }
     if (act === 'exit') exitScenario();
-    if (act === 'leave') leaveWorld();
+    if (act === 'leave') travel({ to: 'back' });
+    if (act === 'map' && active) window.tablefolkSections?.showMap?.(sectionsMap());
     if (act === 'restart' && active) playScenario(active.scn, { code: active.code });
     // a world straight from scenarios/ (unchanged since) shares as its short link: /oracle (server.js scenarioShortLink)
     if (act === 'share' && active) copy(fileLink && fileLink.code === active.code ? location.origin + '/' + fileLink.slug : linkFor(active.code), 'scenario link');
@@ -1921,7 +2373,12 @@ turns: 6`;
     } catch (e) { console.error('[scenario] could not open link', e); window.tablefolkToast?.('could not open scenario link: ' + e.message, { type: 'error' }); return; }
     if (!scn) return;
     try {
-      await playScenario(scn, code ? { code } : {}); writeJson(normalizeScenario(scn));
+      // a world of sections the player was in before this reload: back where they were (?fresh=1: from the start)
+      const c0 = code || await encodeScenario(normalizeScenario(clone(scn)));
+      const j = !q.has('fresh') && savedJourney(c0);
+      if (j) { const run = starting.catch(() => {}).then(() => resumeJourney(scn, c0, j)); starting = run; await run; }
+      else await playScenario(scn, { code: c0 });
+      writeJson(normalizeScenario(scn));
       const f = !code && String(q.get('scenario') || '').match(/(?:^|\/)scenarios\/(?:the-)?([a-z0-9][a-z0-9-]*)\.json$/i);
       fileLink = f && active ? { slug: f[1].toLowerCase(), code: active.code } : null;
     }
@@ -1951,8 +2408,8 @@ turns: 6`;
     catch (err) { console.error(err); window.tablefolkToast?.('could not open ' + f.name + ': ' + err.message, { type: 'error' }); }
   });
   window.addEventListener('hashchange', () => { if (/^#s(cenario)?=/.test(location.hash) && location.hash.slice(3) !== active?.code) openFromUrl({ pasted: true }); });
-  function onReady() { refreshThings(); initPane(); openFromUrl(); }
+  function onReady() { refreshThings(); initPane(); hookEdges(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
 
-  window.tablefolkScenario = { parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, freezeLayout, generateMapLines, EXAMPLES, get active() { return active; } };
+  window.tablefolkScenario = { travel, here, agentDef, sections: sectionsMap, links: () => world.links.slice(), get section() { return world.id; }, get journey() { return journey; }, saveJourney, resetJourney, normLink, revealOf, parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, freezeLayout, generateMapLines, EXAMPLES, get active() { return active; } };
 })();

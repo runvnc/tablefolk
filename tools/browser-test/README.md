@@ -119,6 +119,19 @@ turns hostile. `--model=`, `--llm=`/`--llm-model=` as for agenttest;
 starve everyone else's turns in a living world (survival-one, busy pace);
 PASS when the woodcutter took turns and the wolf is not left pending.
 
+## Sections (`sections-test.mjs`)
+
+```bash
+CDP_PORT=9231 BASE=http://localhost:8003 node sections-test.mjs   # 37 checks, no model, about 80 s
+```
+
+Worlds in sections: `fixtures/sections/top.json` (stairs, nested cellars,
+an edge, another scenario file, a generated cave, a locked trapdoor, a
+missing file), a reload mid-section, flags and clock, the goal from inside a
+section, explored squares, a follower, the catch-up, the map card, and the
+showcase worlds `deepdelve-camp` and `hearthvale`. `SHOTS=dir` saves canvas
+pictures. Details: the maintainer skill's testing.md, "Sections".
+
 ## Packages (`package-test.mjs`)
 
 ```bash

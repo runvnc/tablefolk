@@ -20,6 +20,12 @@ and the intro, restart, share and exit buttons; "–" makes it small again.
 `win`, `lose` and the conditions inside them are plain JSON predicates (a link
 can't run code). `"maxTurns": 12` is short for a `turns_over` lose.
 
+In a world of sections ([things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links))
+the goal is the top map's and is checked in every section. A condition about
+a character or a thing in a section the player is not in reads that
+section's saved state; `agent_near` and `object_near` hold only between
+things in the same section, and `agents_alive` counts every section's folk.
+
 | predicate | example |
 |---|---|
 | `player_has` | `"magic sword"` or `["magic sword", 2]` |

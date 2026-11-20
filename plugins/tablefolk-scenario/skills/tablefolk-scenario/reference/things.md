@@ -131,28 +131,116 @@ buildings, and the inspector has the box for each one.
   out through the inside's door onto its disc (or the banner's "leave"
   button) puts you back, one square outside.
 - What you leave is kept as it was (characters, objects, doors, what they
-  remember); the player, the pack and hit points carry across. The goal
-  waits.
+  remember); the player, the pack and hit points carry across. The goal is
+  checked inside too (below, "Sections").
 - A kept building with no square in front of it on the board has no way in
   (a layout note says so).
 
-The same mechanism is open to authors:
-
-```json
-"links": [{ "at": [4, -2], "to": "cellar", "name": "cellar door", "back": [4, -1] }],
-"subworlds": { "cellar": { "title": "Cellar", "generate": { "kind": "dungeon", "rooms": 4 },
-  "agents": [{ "id": "rat1", "model": "rat" }], "links": [{ "at": [0, 0], "to": "back" }] } }
-```
-
-A link is a square (`at`) and the subworld it leads to (`to`, a key of
-`subworlds`; `to: "back"` returns). `back` is where the player stands on
-returning (default: the link's own square). A subworld is any scenario
-(grid, objects, `generate`, characters); it takes the parent's `walls`,
-`wallHeight` and `lighting` unless it sets its own, and the player appears at
-its `player.at` (or where the layout puts them). Links nest.
+The same mechanism is open to authors: see "Sections" below.
 
 Code: `expandBuildings` in `app/scenario.js`, templates in `WALK_IN` in
 `app/procgen.js` (`walkInFootprint` gives the cells).
+
+## Sections: worlds bigger than one map (`subworlds`, `links`)
+
+A world can be several maps joined by **links**: dungeon levels joined by
+stairs, a village with the forest, the farmland and the cave next to it, a
+house's cellar. Each map is a **section**; only the one the player is in is
+built, and moving between them swaps the map (a short fade).
+
+```json
+"links": [
+  { "in": "mine", "to": "workings", "name": "the Old Workings", "kind": "stairs_down" },
+  { "edge": "east", "to": "wolfwood", "name": "the Wolfwood" },
+  { "at": [4, 3], "to": "scenarios/the-oracle.json", "name": "the Oracle's hut", "kind": "gate" },
+  { "at": [-4, 3], "to": { "generate": { "kind": "cave", "size": [21, 17], "seed": 5 } }, "name": "a dark cave", "kind": "cave" },
+  { "at": [-4, -3], "to": "vault", "name": "the vault", "kind": "trapdoor", "key": "brass key" }
+],
+"subworlds": {
+  "workings": { "title": "The Old Workings", "generate": { "kind": "dungeon", "rooms": 7 },
+    "agents": [{ "id": "bat1", "model": "bat", "in": "lair" }],
+    "links": [{ "in": "lair", "to": "galleries", "kind": "stairs_down", "name": "the Deep Galleries" }],
+    "subworlds": { "galleries": { "title": "The Deep Galleries", "generate": { "kind": "dungeon", "rooms": 6 }, "dark": true, "reveal": "rooms" } } },
+  "wolfwood": { "title": "The Wolfwood", "generate": { "kind": "forest", "places": ["ruins"] } },
+  "vault": { "title": "The Vault", "size": [11, 9], "objects": [{ "type": "gold_bars", "x": 0, "z": 0 }] }
+}
+```
+
+**Where a link is**: `at` (a square; stepping onto it from another square
+travels), `in` (a place of a generated map: a free square in it, by a wall,
+chosen once and kept), or `edge` (`north`, `south`, `east` or `west`: the
+whole rim of that side is a way out; walking off it travels, and you arrive
+at the matching place on the other map's opposite rim, so maps tile like a
+region; `at` on an edge link is where its road leaves the board, default a
+path on the rim, else the middle). The land past an edge link shows a dirt
+road running on, with no trees on it.
+
+**Where it goes** (`to`):
+- a key of `subworlds`: looked up in this section, then in the sections
+  above it (so a forest next to the village can lead to the village's cave);
+- `"back"`: where you came from (you arrive where you left);
+- another scenario: a path (`"scenarios/the-oracle.json"`), a URL or a `#s=`
+  code; fetched the first time ("Travelling..."), then kept like a subworld.
+  A fetch that fails leaves you where you are, with a message;
+- `{ "generate": { "kind", "size", "seed", "style", "agents", "objects",
+  "threats", "dark", "reveal", "title" } }`: built by the procedural
+  generator the first time you go in (no model), the same map ever after.
+
+**What it looks like** (`kind`): `door` (the default: a glowing disc),
+`stairs_down` (steps going down into the dark, a stone rim), `stairs_up`
+(steps rising to a dark opening), `cave` (a dark mouth in a rock mound),
+`gate` (posts and bars), `trapdoor` (a hatch with an iron ring), `edge`. A
+stair runs toward the wall beside it (or `"facing": "n"`). Every one but a
+door has its destination's name on a small label.
+
+**Other fields**: `name` (shown, and said when you go: "You go down into The
+Old Workings."), `arrive` (`[x, z]`, or the `name` of a link in the target:
+where you land; default: on the target's way back to where you came from,
+else its `player.at`), `back` (where you stand when you come back through
+this link; default its own square), `key` (an item: a locked link opens only
+for a player carrying it, like a locked door, and stays open after).
+
+**The way back is made for you**: a section with no link back to where you
+came from gets one where you arrive (stairs up under stairs down, the
+opposite edge for an edge). The banner's "↩ back to ..." button goes back
+too, and its 🗺 map button lists every section (the one you are in, the ones
+you have seen, the ones you have not) and the ways out of each.
+
+**One world**:
+- Every section keeps its state: what it was when you left it (characters
+  and where they stood, objects, chests, doors, stock, what you explored) is
+  what you find when you come back, however deep. Unvisited sections are
+  built from their definition the first time.
+- The player, their pack, gold, hit points and quests, the story flags and
+  facts, the clock (one clock, it keeps running) and the goal belong to the
+  whole world. The goal is checked in every section; a condition about a
+  character or a thing in another section uses that section's saved state
+  (`agent_has`, `agent_defeated`, `chest_has`, `stock_at_least` and the
+  like); `agent_near` and `object_near` are only true in the same section.
+- Time passes elsewhere, coarsely: coming back after game time has passed,
+  the stock has grown back at its rates, the stores have fed the residents,
+  hunger and tiredness are where the day leaves them (never starving),
+  workers stand where their job puts them at this hour (in bed at night, at
+  work by day, the tavern in the evening) and raiders left behind are gone.
+  No model is asked; threats and fights only happen in the section you are
+  in (each section's own `threats`).
+- Companions (the `companion` role, anything with the `follow` behaviour)
+  and animals following you come along when they are near you.
+- The whole journey is saved in the browser: a reload comes back to the
+  section you were in, every visited section as you left it (`?fresh=1` in
+  the address, or the banner's restart, starts again).
+
+A section is any scenario (grid, objects, `generate`, characters, its own
+`threats`, `reveal`, `dark`, `lighting`, `surroundings`); it takes its
+parent's `walls`, `wallHeight` and `lighting` unless it sets its own.
+World-level fields (`goal`, `time`, `live`, `flags`, `packages`) are read
+from the top map; a section's own `flags` only give defaults for new ones.
+The world builder makes such worlds ([world-builder.md](world-builder.md)).
+For package code: `tablefolkScenario.travel(link)`, `.section`, `.here()`,
+`.sections()` and the `tablefolk-section` event ([api.md](api.md)).
+
+Code: `app/scenario.js` (sections: links, travel, saved states, the
+journey), `app/sections.js` (the markers, the catch-up, the map card).
 
 ## Notes
 

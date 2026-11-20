@@ -201,8 +201,9 @@ package its `"lines"` ([packages.md](packages.md#tablefolkjson)).
 ]
 ```
 
-On the clock, the threat comes from the map's edge (or `"from"`: a place
-id, a lair): `raid` attacks people, `rats` go for the food in the stores and
+On the clock, the threat comes from the map's edge (`"side": "east"`: that
+edge only, say the side the forest lies on; or `"from"`: a place id, a
+lair): `raid` attacks people, `rats` go for the food in the stores and
 eat it, `bandits` snatch gold and run. `when`: `night` (22:00), `day`
 (10:00), `any`, or `[from, to]` hours; `every`: days between visits. They
 leave at dawn (or 17:00 by day) or when half of them are down. A package can
@@ -214,6 +215,11 @@ off") and thinks better of those who fought, the player included.
 In a living world monsters go for the characters as well as the player
 (`"monsters": "player"` keeps the old way: only the player). See also
 [combat.md](combat.md).
+
+In a world of sections each section has its own `threats`, and only the
+section the player is in lives: the others stand still and catch up in code
+when the player comes back (stock, meals, where everyone is at that hour;
+[things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links)).
 
 ## The director (`director`, `events`)
 

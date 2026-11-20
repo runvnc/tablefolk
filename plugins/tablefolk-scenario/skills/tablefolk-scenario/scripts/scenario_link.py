@@ -89,7 +89,14 @@ def check(obj):
     for r in obj.get('packages', []) if isinstance(obj.get('packages'), list) else []:
         if isinstance(r, str) and not REF.match(r): problems.append(f'package {r!r}: a built-in name, a URL, npm:<name>@<version> or gh:<user>/<repo>@<tag>')
     problems += check_script(obj)
-    # Goal predicates whose first argument is a character id.
+    problems += check_sections(obj)
+    # Goal predicates whose first argument is a character id (a character of any section).
+    def all_ids(o):
+        out = [a.get('id') for a in o.get('agents', []) or []]
+        for sub in (o.get('subworlds') or {}).values():
+            if isinstance(sub, dict): out += all_ids(sub)
+        return out
+    ids = all_ids(obj)
     def walk_goal(node):
         if isinstance(node, dict):
             for k, v in node.items():
@@ -149,6 +156,44 @@ def check(obj):
     elif grid and isinstance(size, list) and len(size) == 2 and (gw > size[0] or gh > size[1]):
         problems.append(f'"grid" is {gw} x {gh} but "size" is {size[0]} x {size[1]}; cells outside the board are dropped')
     if not isinstance(obj.get('map', []), list): problems.append('"map" must be a list of lines')
+    return problems
+
+
+LINK_KINDS = {'door', 'stairs_down', 'stairs_up', 'cave', 'gate', 'trapdoor', 'edge'}
+EDGES = {'north', 'south', 'east', 'west'}
+
+
+def check_sections(obj, where='', keys_above=()):
+    """A world in sections (things.md "Sections"): "reveal", "links" and "subworlds", recursively."""
+    problems = []
+    rv = obj.get('reveal')
+    if rv is not None and rv not in ('rooms', 'cells', False): problems.append(f'{where}"reveal" must be "rooms", "cells" or false')
+    subs = obj.get('subworlds') or {}
+    if not isinstance(subs, dict): return problems + [f'{where}"subworlds" must be an object of scenarios by key']
+    keys = set(keys_above) | set(subs)
+    links = obj.get('links') or []
+    if not isinstance(links, list): return problems + [f'{where}"links" must be a list']
+    for l in links:
+        if not isinstance(l, dict) or 'to' not in l: problems.append(f'{where}link {l!r} needs "to"'); continue
+        at, edge, place = l.get('at'), l.get('edge'), l.get('in')
+        if at is None and edge is None and place is None: problems.append(f'{where}link to {l["to"]!r} needs "at": [x, z], "in": "<place>" or "edge": "east"')
+        if at is not None and not (isinstance(at, list) and len(at) == 2 and all(isinstance(n, (int, float)) for n in at)): problems.append(f'{where}link "at" must be [x, z]')
+        if edge is not None and edge not in EDGES: problems.append(f'{where}link "edge" must be north, south, east or west')
+        if l.get('kind') is not None and l['kind'] not in LINK_KINDS: problems.append(f'{where}link "kind" {l["kind"]!r}: one of {" ".join(sorted(LINK_KINDS))}')
+        to = l['to']
+        if isinstance(to, dict):
+            g = to.get('generate')
+            if not isinstance(g, dict) or str(g.get('kind', 'dungeon')).lower() not in GEN_KINDS: problems.append(f'{where}link "to": {{"generate": {{"kind": ...}}}} with a kind of {" ".join(sorted(GEN_KINDS))}')
+        elif not isinstance(to, str) or not to: problems.append(f'{where}link "to" must be a subworlds key, "back", a scenario path, URL or #s= code, or {{"generate": {{...}}}}')
+        elif to != 'back' and not re.match(r'^(https?:|/|\.\.?/|#?s=|scenarios/)', to) and not to.endswith('.json') and to not in keys:
+            problems.append(f'{where}link "to": {to!r} is not a key of "subworlds" here or above ({" ".join(sorted(keys)) or "none"})')
+    for k, sub in subs.items():
+        if not isinstance(sub, dict): problems.append(f'{where}subworld {k!r} must be a scenario object'); continue
+        for a in sub.get('agents', []) or []:
+            if not re.fullmatch(r'[A-Za-z0-9_-]{1,24}', str(a.get('id', ''))): problems.append(f'{where}subworld {k!r}: agent id {a.get("id")!r}')
+        g = sub.get('generate')
+        if g is not None and (not isinstance(g, dict) or str(g.get('kind', 'dungeon')).lower() not in GEN_KINDS): problems.append(f'{where}subworld {k!r}: "generate" kind must be one of {" ".join(sorted(GEN_KINDS))}')
+        problems += check_sections(sub, f'{where}subworld {k!r}: ', keys)
     return problems
 
 

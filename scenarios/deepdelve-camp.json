@@ -2,7 +2,7 @@
  "v": 1,
  "title": "Deepdelve Camp",
  "subtitle": "The seam runs rich, but Tobin never came back up.",
- "intro": "A mining camp clings to the mountain above a cold, dripping shaft. The ore carts are half full and one miner is missing somewhere below.",
+ "intro": "A mining camp clings to the mountain above a cold, dripping shaft. The ore carts are half full and one miner is missing somewhere below. The old workings go down two levels under the camp; Tobin went down the stairs in the mine and never came back up.",
  "seed": 41,
  "live": true,
  "time": "06:30",
@@ -118,18 +118,6 @@
     "face"
    ],
    "personality": "Sable, who guards the shaft mouth. You want nobody going below alone again. You trust Merta and nobody else down there. Secret: you heard something large moving in the lower galleries."
-  },
-  {
-   "id": "tobin",
-   "model": "peasant",
-   "job": "miner",
-   "home": "camp",
-   "workplace": "mine",
-   "style": "lost, lantern-less miner",
-   "hp": 7,
-   "ttsVoiceId": "pack:shy_f",
-   "personality": "Tobin, the young miner who got turned around in the dark. You want to get back to the fire and a hot bowl from Merta. You are terrified of the bats past the pool. Ask anyone to walk you up.",
-   "in": "mine"
   }
  ],
  "objects": [
@@ -200,7 +188,7 @@
   {
    "type": "note",
    "in": "bones",
-   "text": "Water rising in the low gallery. Don't send the boy.",
+   "text": "Tobin went down the stairs in the mine. Water rising on the second level. Don't go alone.",
    "wall": "north"
   },
   {
@@ -247,7 +235,7 @@
   "A cart wheel groans on wet stone."
  ],
  "goal": {
-  "text": "Find Tobin in the deep galleries and bring back ore.",
+  "text": "Find Tobin on the second level down, bring him back up to the camp, and get ore into the stores.",
   "win": {
    "all": [
     {
@@ -271,5 +259,123 @@
   "winText": "Tobin climbs into the light, and the carts roll full again.",
   "loseText": "The mountain keeps what it takes."
  },
- "wallHeight": 2
+ "wallHeight": 2,
+ "links": [
+  {
+   "in": "mine",
+   "to": "workings",
+   "name": "the Old Workings",
+   "kind": "stairs_down"
+  }
+ ],
+ "subworlds": {
+  "workings": {
+   "title": "The Old Workings",
+   "subtitle": "Level 1: dwarf-cut halls, long abandoned",
+   "generate": {
+    "kind": "dungeon",
+    "seed": 77,
+    "rooms": 7,
+    "size": [
+     31,
+     23
+    ],
+    "places": [
+     "storage",
+     "barracks",
+     "shrine",
+     "lair"
+    ]
+   },
+   "dark": false,
+   "lighting": "night",
+   "agents": [
+    {
+     "id": "bat1",
+     "model": "bat",
+     "in": "lair",
+     "hostile": true
+    },
+    {
+     "id": "bat2",
+     "model": "bat",
+     "in": "lair",
+     "hostile": true
+    }
+   ],
+   "objects": [
+    {
+     "type": "mossy_rock",
+     "in": "storage",
+     "crop": "iron ore",
+     "stock": 3
+    },
+    {
+     "type": "torch",
+     "in": "barracks"
+    }
+   ],
+   "links": [
+    {
+     "in": "lair",
+     "to": "galleries",
+     "name": "the Deep Galleries",
+     "kind": "stairs_down"
+    }
+   ],
+   "subworlds": {
+    "galleries": {
+     "title": "The Deep Galleries",
+     "subtitle": "Level 2: wet, dark, and someone calling for help",
+     "generate": {
+      "kind": "dungeon",
+      "seed": 131,
+      "rooms": 6,
+      "size": [
+       29,
+       21
+      ],
+      "places": [
+       "prison",
+       "crypt",
+       "treasure"
+      ]
+     },
+     "dark": true,
+     "reveal": "rooms",
+     "agents": [
+      {
+       "id": "tobin",
+       "model": "peasant",
+       "style": "lost, lantern-less miner",
+       "hp": 7,
+       "ttsVoiceId": "pack:shy_f",
+       "personality": "Tobin, the young miner who went down the stairs alone and got lost on the second level. You want to get back to the fire and a hot bowl from Merta. You are terrified of the dark and stay close to anyone with a light.",
+       "in": "prison",
+       "role": "companion"
+      },
+      {
+       "id": "skeleton1",
+       "model": "skeleton",
+       "in": "crypt",
+       "hostile": true
+      }
+     ],
+     "objects": [
+      {
+       "type": "chest",
+       "in": "treasure",
+       "gold": 12,
+       "items": [
+        {
+         "name": "iron ore",
+         "qty": 2
+        }
+       ]
+      }
+     ]
+    }
+   }
+  }
+ }
 }

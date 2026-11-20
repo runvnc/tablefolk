@@ -77,10 +77,14 @@
       lists[t].push(BABYLON.Matrix.Scaling(k, k, k).multiply(BABYLON.Matrix.RotationY(rnd() * 6.283)).multiply(BABYLON.Matrix.Translation(x, H(x, z) - .1, z)));
     };
     const step = kind === 'forest' ? 3.2 : 5, depth = kind === 'forest' ? 60 : 95;
+    // an edge link's road runs straight out from its square on the rim: no trees within 3 m of it
+    const roads = (state.edgeLinks || []).filter(e => Array.isArray(e.road));
+    const onRoad = (x, z) => roads.some(({ edge, road: [rx, rz] }) => edge === 'east' ? x < rx && Math.abs(z - rz) < 3 : edge === 'west' ? x > rx && Math.abs(z - rz) < 3 : edge === 'north' ? z < rz && Math.abs(x - rx) < 3 : z > rz && Math.abs(x - rx) < 3);
     for (let x = -hw - depth; x <= hw + depth; x += step) for (let z = -hh - depth; z <= hh + depth; z += step) {
       const px = x + (rnd() - .5) * step * .9, pz = z + (rnd() - .5) * step * .9;
       const out = Math.max(Math.abs(px) - hw, Math.abs(pz) - hh); if (out < 3.5) continue;
       if (T && H(px, pz) < -.3) continue;   // the sea
+      if (onRoad(px, pz)) continue;   // the road off an edge that leads somewhere (scenario.js edge links)
       const u = out / depth;
       // forest: thickens away from the edge; fields: a few lone trees and clumps, then a tree line
       const clump = window.tablefolkTerrain ? (Math.sin(px * .09 + 1.3) * Math.sin(pz * .07 - .4)) : 0;

@@ -67,6 +67,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `base`, `size`, `floor`, `paint`, `campfire` | the board | [board.md](board.md) |
 | `lighting` | `bright` (10:00), `dim` (19:00), `night` (23:00, moonlit) | [board.md](board.md) |
 | `dark` | fog of war; default true for generated dungeons | [board.md](board.md) |
+| `reveal` | what is hidden until found: `"rooms"` (each room until seen into), `"cells"` (square by square; outdoors a mist), `false`; default `"cells"` in dark worlds, `"rooms"` in generated lit dungeons, else none | [board.md](board.md) |
 | `surroundings` | trees beyond the board's edge: `forest` (thick woods), `fields` (open ground, scattered trees) or `none`; default: forest for a generated forest, fields for every other outdoor board | [board.md](board.md) |
 | `shells` | `false`: walled rooms keep code-built roofs instead of the building models over them | [board.md](board.md) |
 | `outside` | what lies past the board: `land` (hills), `rock` (dungeons), `street` (a lone building), `sea` (islands), `none`; default by the kind of world | [board.md](board.md) |
@@ -78,7 +79,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `map` | layout lines | [map-lines.md](map-lines.md) |
 | `generate` | procedural dungeon or village | [generated.md](generated.md) |
 | `locked` | locked doors and their keys | [things.md](things.md) |
-| `subworlds`, `links` | other maps (a building's inside, a dungeon) and the squares that lead into them | [things.md](things.md) |
+| `subworlds`, `links` | a world in sections: other maps (a building's inside, dungeon levels, the forest next door, another scenario, a generated place) and the squares, places or edges that lead to them | [things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links) |
 | `player` | the player (below) | |
 | `allowed` | default commands for every character | [characters.md](characters.md) |
 | `agents` | the characters (below) | [characters.md](characters.md) |

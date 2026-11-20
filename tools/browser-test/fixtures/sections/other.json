@@ -1,0 +1,1 @@
+{ "title": "The Other Place", "size": [13, 11], "floor": "dirt", "agents": [{ "id": "hermit", "model": "peasant", "at": [2, 0] }], "objects": [{ "type": "campfire", "x": 0, "z": 0 }] }

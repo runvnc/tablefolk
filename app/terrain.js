@@ -34,6 +34,8 @@
  *   street  a world that is all one building: a cobbled street into dusk fog
  *   sea     islands (sea cells at the edge): a sandy shore and open water
  *   none    nothing past the board's margin
+ * An edge link (a section's "edge": "east" link, scenario.js state.edgeLinks)
+ * gets a dirt road running on from its square on the rim past the board.
  * The grid lines are an overlay drawn by the shader: off by default (the
  * Graphics pane's "show grid", tablefolkTerrain.setGrid), on in the tabletop
  * print view.
@@ -350,7 +352,10 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     }
     let outside = m === 'street' ? 'cobblestone' : m === 'sea' ? 'sand' : m === 'rock' ? 'stone_floor_rough' : dflt;
     if (m === 'land' && count.size) outside = [...count].sort((a, b) => b[1] - a[1])[0][0];
-    const off = (x, z) => rimSea(x, z) ? 'sand' : outside;
+    // an edge link (scenario.js state.edgeLinks): a dirt road runs on from its square on the rim
+    const roads = m === 'rock' ? [] : (state.edgeLinks || []).filter(e => Array.isArray(e.road));
+    const onRoad = (x, z) => roads.some(({ edge, road: [rx, rz] }) => { const out = edge === 'east' ? rx - x : edge === 'west' ? x - rx : edge === 'north' ? rz - z : z - rz, side = edge === 'east' || edge === 'west' ? Math.abs(z - rz) : Math.abs(x - rx); return out > 0 && side <= (out < 6 ? 1 : 0); });
+    const off = (x, z) => onRoad(x, z) ? 'dirt_path' : rimSea(x, z) ? 'sand' : outside;
     return { cx0, cx1, cz0, cz1, at: (x, z) => cells.get(x + ',' + z) || off(x, z), outside };
   }
   function buildControl(m, maxLayers) {
@@ -565,7 +570,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     T.mode = mode();
     const lite = !!GFX().lite, hi = GFX().quality === 'high', maxL = lite ? 4 : 8;
     // nothing changed (same size, mode, cell layers, walls): keep everything
-    const inKey = [WORLD.cols, WORLD.rows, T.mode, lite, hi, [...(state.paint || [])].map(([k, v]) => k + v.mat).join(), (state.blocks || []).length, T.grid].join('|');
+    const inKey = [WORLD.cols, WORLD.rows, T.mode, lite, hi, [...(state.paint || [])].map(([k, v]) => k + v.mat).join(), (state.blocks || []).length, T.grid, JSON.stringify(state.edgeLinks || [])].join('|');
     if (inKey === lastKey && T.mesh && !T.mesh.isDisposed()) return;
     lastKey = inKey;
     const tC = performance.now(); const C = buildControl(T.mode, maxL); tfMark('terrain.control', tC);

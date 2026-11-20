@@ -125,7 +125,8 @@ scenario.js, the tests and packages use.
 | `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |
 | `load-status.js` | the download cards under the top bar (`tablefolkLoad.set/clear`): Breeze engines' TTS `status` and `upgrade` events, and `tablefolk-load` events (speech input) |
 | `procgen.js` | dungeon and village generator, walk-in building templates (also imported by the server) |
-| `scenario.js` | the scenario format (`normalizeScenario`), base maps, grid, walk-in buildings, layout engine, goal checker, links, banner, 🎯 pane, tactic tester, `freezeLayout` (`tablefolkScenario`) |
+| `sections.js` | a world in sections, its look and upkeep: the link markers (stairs, cave, gate, trapdoor, edge band and arrow, labels), `catchUp` (a section coming back after game time passed: stock, meals, needs, where workers stand), the 🗺 map card (`tablefolkSections`); the sections themselves are in scenario.js |
+| `scenario.js` | the scenario format (`normalizeScenario`), base maps, grid, walk-in buildings, layout engine, goal checker, sections (links, `travel`, `go`, saved states, `here()`, the journey save and resume), banner, 🎯 pane, tactic tester, `freezeLayout` (`tablefolkScenario`) |
 | `tabletop.js`, `tile-render.js` | `?tabletop=1` view; 2D tile rendering |
 | `welcome.js` | the welcome screen |
 | `tabs.js`, `ui-polish.js`, `toast.js`, `confirm-dialog.js`, `library.js`, `recorder.js`, `video-recorder.js` (the ⏺ video button: canvas + mixed voices and sfx), `perf-monitor.js`, `note-svg.js` | UI shell and helpers. `tabs.js`: rail, panes, user / dev mode. Rail buttons are plain (both modes), `dev-only` (pane only in dev mode), `rail-dev` (pane in both modes, on the rail only in dev mode: Messages, Voice, Graphics) or `user-only` (Settings). In user mode `placeForMode()` moves `#chatNameLabel` into Settings and `#viewBtns` into the Adventurer pane (the same nodes, back to the chat dock in dev mode; comment anchors keep their places), so ids stay unique. Buttons with `data-open` in the panel open a pane; `#chatHistoryBtn` in the dock opens Messages. `ui-polish.js` marks `#chatTarget.single` (hidden in user mode) and sets the box's placeholder |
@@ -157,7 +158,8 @@ is silently dropped.
 | `tablefolk-scene-ready` | app.js | start-up |
 | `tablefolk-clock` | clock.js, every game quarter hour ({min, day, hour}) | regrowth (uses.js), threats, jobs' daily tallies, package modules |
 | `tablefolk-model-call` | jobs.js, world-integration.js ({agentId, kind}) | live-eval --day counts the model calls by kind |
-| `tablefolk-scenario-started` | scenario.js ({title, live, sub}) | live.js, roofs, director, welcome, package modules |
+| `tablefolk-scenario-started` | scenario.js ({title, live, sub, section}) | live.js, roofs, director, welcome, package modules (`sub`: a section build; `live` is the world's) |
+| `tablefolk-section` | scenario.js `go` ({from, to, title, kind, via, followers}) | the map card; package modules |
 | `tablefolk-player-turn` | play.js | nearby characters act; companions follow; pacing |
 | `tablefolk-player-chat` | world-integration | pacing |
 | `tablefolk-agent-turn` | world-integration | turn counting, mind ticks, goals, pacing |
@@ -185,5 +187,51 @@ follows it. Procgen grids: row 0 north, `x = x0 - c`, `z = r - z0` with
 
 `tablefolkState` (sandbox), `tablefolkScenarioState` (scenario mode),
 `tablefolk.dev`, `tablefolk.pace`, `tablefolk_model`, `tablefolkTtsEnabled`,
-`tablefolkEmbed`, `character.library.*`, and `tablefolkTrustedCode` (the
-folders whose package or skill code the player allowed; packages.js).
+`tablefolkEmbed`, `character.library.*`, `tablefolkTrustedCode` (the
+folders whose package or skill code the player allowed; packages.js), and
+`tablefolkJourney` (a world in sections: the code of the world, the section
+the player is in and its state, every visited section's saved state, the
+stack of ways back, fetched and generated definitions, unlocked links,
+flags, clock and player; written on travel, every 15 s, and before the page
+goes; read by `openLink`, which resumes when the code matches unless
+`?fresh=1`).
+
+## Sections (scenario.js, sections.js)
+
+- Ids: `''` the top map, a path of subworlds keys (`workings/galleries`),
+  `~x<hash>` another scenario (fetched), `<parent>/~g<hash>` a generate spec.
+  `sectionDef(id)` is the raw definition (subworld, `journey.defs` for the
+  fetched and generated), `expandedDef(id)` the same after `expandBase`,
+  `expandGrid`, `expandBuildings` (kept buildings add subworlds and links).
+  A key is looked up in the section, then its parents (`targetId`).
+- `travel(link)`: locks, fetch ("Travelling..." card), the stack of ways
+  back (going to a section already on it truncates it), then `go(id, how)`:
+  takes the followers, snapshots the section left (`worldStateData` minus
+  `player`, `flags`, `clock`; brain configs of its own characters only;
+  `reveal`: darkness.js `save()`; `at`: the game minute), builds the target
+  with `playScenarioNow(def, { sub: true, section, restore? })` (a saved
+  state goes through the old restore path: the map without agents and
+  objects, then `restoreWorldState`), puts the player down (`arrival`:
+  `back` frame, `arrive`, the opposite rim for an edge, else the target's
+  link back, else `player.at`), makes the way back if none
+  (`journey.auto`), restores weapons, the fallen, the explored squares,
+  runs `tablefolkSections.catchUp` when 30+ game minutes passed, brings the
+  followers, resets the light for the hour, fires `tablefolk-section`.
+- A section build never touches `active` (the world: goal, code, turns);
+  the checker runs on; story flags are merged (`{...section defaults,
+  ...world}`); jobs.js, threats.js and menus.js read `tablefolkScenario.here()`
+  (the section's scenario with the carried characters and the world's
+  prices, food and menus); `tablefolk-scenario-started` carries the world's
+  `live`, so live.js restarts.
+- Edges: app.js `playerStep` is wrapped (`hookEdges`): a step off the board
+  where an edge link lies travels; in first person `watchPads` sees the held
+  forward key at the rim. `state.edgeLinks` (edge, road square) is read by
+  terrain.js (a dirt road past the rim) and surroundings.js (no trees on it).
+- Links with `in` get a square of the place (`placeLinks`: free, not beside
+  a door, by a wall first, kept in `journey.linkAt`).
+- Resume: the top map is built as an empty shell from a minimal state (it
+  loads packages, jobs, the clock, the goal), then `go` builds the saved
+  section with no snapshot of the shell.
+- The goal context adds the other sections' saved characters and props at
+  an offset of 100000 per section (never near anything here), and a
+  `getBrainConfig` that reads saved configs.

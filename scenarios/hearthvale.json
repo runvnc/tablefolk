@@ -82,7 +82,8 @@
  "lore": [
   "Hearthvale's stores are nearly empty after a long winter.",
   "Wolves come down from the hills at night when the village is hungry.",
-  "The baker needs the farmer's wheat; the smith needs the woodcutter's firewood."
+  "The baker needs the farmer's wheat; the smith needs the woodcutter's firewood.",
+  "East of the village the road runs into the Wolfwood, where the wolves keep their den in the old ruins."
  ],
  "threats": [
   {
@@ -91,7 +92,8 @@
    "count": 2,
    "when": "night",
    "every": 1,
-   "from": "edge"
+   "from": "edge",
+   "side": "east"
   },
   {
    "kind": "crows",
@@ -413,5 +415,68 @@
    "stock": 3,
    "name": "ore vein"
   }
- ]
+ ],
+ "links": [
+  {
+   "edge": "east",
+   "to": "wolfwood",
+   "name": "the Wolfwood"
+  }
+ ],
+ "subworlds": {
+  "wolfwood": {
+   "title": "The Wolfwood",
+   "subtitle": "Pines, old ruins, and the wolves' den",
+   "generate": {
+    "kind": "forest",
+    "seed": 23,
+    "size": [
+     37,
+     29
+    ],
+    "places": [
+     "ruins",
+     "meadow",
+     "clearing"
+    ]
+   },
+   "surroundings": "forest",
+   "agents": [
+    {
+     "id": "greyfang",
+     "model": "wolf",
+     "in": "ruins",
+     "hostile": true,
+     "hp": 8
+    },
+    {
+     "id": "wolf_cub",
+     "model": "wolf",
+     "in": "ruins",
+     "hostile": true,
+     "scale": 0.7,
+     "hp": 4
+    },
+    {
+     "id": "doe",
+     "model": "deer",
+     "in": "meadow"
+    }
+   ],
+   "objects": [
+    {
+     "type": "bone",
+     "in": "ruins"
+    },
+    {
+     "type": "skull",
+     "in": "ruins"
+    },
+    {
+     "type": "bear_trap",
+     "in": "meadow"
+    }
+   ]
+  }
+ }
 }

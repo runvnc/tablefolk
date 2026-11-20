@@ -65,7 +65,7 @@ const log = (...a) => console.info('[menu]', ...a);
 // a scenario's menus by id; a list: the first whose "if" holds; choices whose
 // "if" fails (or that take what the player lacks) are left out
 // (@tablefolk/script pickMenu / visibleMenu through story.js)
-const scnMenus = () => window.tablefolkScenario?.active?.scn?.menus || {};
+const scnMenus = () => (window.tablefolkScenario?.here?.() || window.tablefolkScenario?.active?.scn)?.menus || {};   // a section's menus over the world's
 const S = () => window.tablefolkStory;
 function resolve(menu, me = null) {
   if (!S()) return typeof menu === 'string' ? (scnMenus()[menu] && { id: menu, ...scnMenus()[menu] }) : menu;
