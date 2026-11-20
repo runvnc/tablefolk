@@ -47,6 +47,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "menus": {}, "flags": {}, "facts": {},   // characters.md (menus), story.md
   "brain": "none",                         // optional: no language model (characters.md)
   "lore": [], "needs": true, "mind": true, "food": [],
+  "tempers": true, "temper": "normal",   // insults anger characters (false: off); short | normal | long for everyone (characters.md)
   "gossip": true, "reflect": true, "reflexes": true, "expect": null, "monsters": "player", "remembers": true, "plans": true, "glances": true, "autoThink": true,   // characters.md
   "live": false, "pace": "calm", "director": 5, "events": [],
   "goal": { "text": "Get the magic sword.", "win": { "player_has": "magic sword" } }
@@ -79,6 +80,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `packs` | extra asset packs (object types) | [things.md](things.md) |
 | `packages`, `skills`, `workflows` | shareable content | [packages.md](packages.md), [skills-and-roles.md](skills-and-roles.md), [workflows.md](workflows.md) |
 | `lore`, `needs`, `mind`, `food` | world facts, hunger on/off, the mind on/off, extra food | [characters.md](characters.md) |
+| `tempers`, `temper` | insults anger characters, who may refuse, call for help or fight (`false`: off); how quickly | [characters.md](characters.md) |
 | `live`, `pace`, `director`, `events` | a world that lives on its own | [living.md](living.md) |
 | `goal` | win and lose conditions | [goals.md](goals.md) |
 
@@ -122,7 +124,8 @@ Without `at` the player starts at the south of the board.
   "expect": "capable",             // basic | capable | ambitious: how much the game helps it (characters.md); else by brain
   "reflexes": false,               // no game-made moves for it in danger or hunger
   "hunts": "everyone",             // a monster that goes after characters too, not only the player
-  "temperament": "brave",          // brave | timid | calm (how it takes being hurt); else guessed
+  "temperament": "brave",          // brave | timid | calm (how it takes being hurt or insulted); else guessed
+  "temper": "short",               // short | normal | long: how fast insults anger it (characters.md, Tempers)
   "hostile": false,                // true: fights the player (combat.md)
   "hp": 10, "wield": "club",       // combat.md
   "ttsVoiceId": "builtin:jean",    // alba azelma cosette eponine fantine javert jean marius

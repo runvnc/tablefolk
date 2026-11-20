@@ -414,7 +414,7 @@
   const dist2 = (a, b) => Math.hypot(posOf2(a).x - posOf2(b).x, posOf2(a).z - posOf2(b).z);
   function foes(g, R = 6) {
     const P = window.tablefolkPlay; if (!P?.isHostile || !g.root) return [];
-    return state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && P.isHostile(c) && dist2(g, c) <= R && (window.tablefolk?.canSeeEachOther?.(g, c) ?? true))
+    return state.characters.filter(c => c !== g && !c.defeated && !getBrainConfig(c.id).defeated && (P.isHostile(c) || !!getBrainConfig(c.id).hostileTo?.[g.id]) && dist2(g, c) <= R && (window.tablefolk?.canSeeEachOther?.(g, c) ?? true))
       .sort((a, b) => dist2(g, a) - dist2(g, b));
   }
   function dirWord(dx, dz) { const a = Math.atan2(dx, dz) * 180 / Math.PI; return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((a + 360) % 360) / 45) % 8]; }
@@ -495,8 +495,210 @@
       if (basic && !reach && temperament(cfg) === 'timid') { const sp = spot(); if (sp) return { line: `walk("${sp}")`, why: `keeps away from ${f.id}` }; }
       return null;
     }
+    if (tempersOn()) {
+      for (const [key, a] of Object.entries(m.angryAt || {})) if (a.backAway != null && m.turn - a.backAway <= 2) { const o = charOf(key); const sp = o && dist2(g, o) < 4 && fleeSpot(g, o); if (sp) { a.backAway = -99; return { line: `walk("${sp}")`, why: `backs away from ${nameOfKey(key)}` }; } }
+      const w = m.watch, o = w && Date.now() < w.until && !w.warned && charOf(w.who);
+      if (o && !o.defeated && dist2(g, o) > 2.2) return { line: `walk(${w.name})`, why: `goes over to ${w.name} (${w.for} called for help)` };
+    }
     if (needsOn(g) && m.hunger >= (basic ? .8 : .92)) { const fd = food(g); if (fd) return { line: `eat(${fd})`, why: `starving: eats the ${fd}` }; const src = foodSource(g); if (src) return { line: src, why: `starving: gets food (${src})` }; }
     return null;
+  }
+
+  // ---- tempers: insults, anger at someone, and what it does about it ----
+  // Words alone used to move nothing (eight insults: anger 0, trust up). Now
+  // speech said TO a character (by the player or another character) is read
+  // with plain patterns: an insult (a put-down word near "you/your", a rude
+  // phrase, mockery of what it is proud of) or pestering (the same demand a
+  // third time after a no). Each adds anger toward that one (angryAt[key]),
+  // scaled by temperament and the agent's or world's "temper"; an apology
+  // halves it, a gift calms it. The level decides what happens, in code:
+  //   1 (>= .3) gets on its nerves            2 (>= .5) tell them to stop
+  //   3 (>= .7) refuses to sell, give or help them (app.js sell/give)
+  //   4 (>= .85) brave or a fighter: hostile toward that one only (play.js
+  //     fights them; hostileTo); calm: orders them out, then calls for help;
+  //     timid: backs away and calls for help.
+  // Calling for help tells every guard or fighter within twice the earshot;
+  // one walks over, warns once, and fights the troublemaker if they insult
+  // or hit anyone within 60 s. The scenario's "tempers": false turns it off;
+  // one fight between characters at a time.
+  const PUTDOWN = new Set('stupid idiot idiots idiotic dumb moron morons fool fools foolish ugly liar liars thief thieves coward cowards cowardly worthless useless filthy pathetic stink stinks stinking stinky smelly disgusting loser losers fraud scum vermin oaf imbecile halfwit cretin failure joke rubbish trash lazy freak clown wretch wretched crook cheat cheater incompetent hopeless repulsive vile warty fake hag brute twit dimwit nitwit buffoon bumbling whining'.split(' '));
+  const BEAST = new Set('pig pigs rat rats worm worms pest pests toad slug swine weasel snake dog cur maggot'.split(' '));
+  const SCORN = /\b(mud|awful|terrible|horrible|disgusting|rubbish|joke|worst|nasty|stale|burnt|garbage|trash|poison|vile|pathetic|sad excuse|no good|bad)\b/i;
+  const RUDE = /\b(shut up|shut your (?:mouth|trap)|get lost|nobody (?:likes|cares about|wants|trusts) you|get out of my (?:sight|way|face)|i spit on you|drop dead|you make me sick|piss off|bugger off|go to hell|curse you|damn you|nobody cares)\b/i;
+  const YOUW = new Set(['you', 'your', "you're", 'youre', 'yours', 'ya', 'yer', 'thou', 'thee', 'ye', "you've", "you'll"]);
+  const APOLOGY = /\b(sorry|apologi[sz]e|apologies|forgive me|i was wrong|my bad|i didn'?t mean (?:it|that)|pardon me)\b/i;
+  const DEMAND = /\b(give|sell|hand|bring|gimme|let me have|i want|i need|can i have|feed)\b/i;
+  const NO = /\b(no|not|never|won'?t|can'?t|refuse|stop asking|go away)\b/i;
+  const tempersOn = () => state.tempers !== false && window.tablefolkScenario?.active?.scn?.tempers !== false;
+  const keyOf = who => isPlayerName(who) ? 'player' : String(who);
+  const nameOfKey = k => k === 'player' ? playerName() : k;
+  const charOf = k => k === 'player' ? state.playerAvatar : state.characters.find(c => c.id === k);
+  function temperK(cfg) { const t = String(cfg.temper || state.temper || '').toLowerCase(); return t === 'short' ? 1.6 : t === 'long' ? .6 : 1; }
+  // Is this sentence (or line) an insult to the one it is said to?
+  function insultIn(g, text) {
+    const proud = new Set(words(getBrainConfig(g.id).personality || '').filter(w => w.length >= 4));
+    for (const s of String(text || '').split(/(?<=[.!?;])\s+|\n/)) {
+      if (RUDE.test(s)) return s.trim();
+      const w = s.toLowerCase().match(/[a-z']+/g) || [];
+      const yous = w.map((x, i) => YOUW.has(x) ? i : -1).filter(i => i >= 0);
+      for (let i = 0; i < w.length; i++) {
+        // "you stupid oaf", "your pies are a joke"; "Idiot!" alone; not "that stupid door"
+        if (PUTDOWN.has(w[i]) && (yous.some(j => Math.abs(j - i) <= 5) || w.length <= 3)) return s.trim();
+        if (BEAST.has(w[i]) && (yous.some(j => j < i && i - j <= 4) || w.length <= 3)) return s.trim();
+      }
+      // mockery of what it is proud of: "your pies taste like mud"
+      const yi = w.indexOf('your');
+      if (yi >= 0 && SCORN.test(s) && w.slice(yi + 1, yi + 4).some(x => [...proud].some(p => p.length >= 4 && (x.replace(/(ies|es|s)$/, '').startsWith(p.slice(0, 5)) || p.startsWith(x.replace(/(ies|es|s)$/, '').slice(0, 5)))))) return s.trim();
+    }
+    return '';
+  }
+  // the same demand a third time after it said no
+  function pestering(g, key, text) {
+    const m = mindOf(g); m.pester ||= {};
+    if (!DEMAND.test(text)) return false;
+    const lastSaid = String((g._lines || []).slice(-1)[0]?.text || '');
+    const p = m.pester[key] ||= { n: 0, w: [] }, w = words(text);
+    if (!NO.test(lastSaid)) { p.n = 1; p.w = w; return false; }
+    p.n = p.w.some(x => w.includes(x)) ? p.n + 1 : 1; p.w = w;
+    if (p.n >= 3) { p.n = 0; return true; }
+    return false;
+  }
+  function angerLevel(v) { return v >= .85 ? 4 : v >= .7 ? 3 : v >= .5 ? 2 : v >= .3 ? 1 : 0; }
+  const fighterish = g => { const cfg = getBrainConfig(g.id); return temperament(cfg) === 'brave' || /guard|soldier|knight|warrior|fighter/i.test(cfg.role || '') || (() => { try { return commandsFor(g).has('attack'); } catch { return false; } })(); };
+  // Speech said to g (addressed: by the player, or a character talking to it)
+  function provoked(g, who, text) {
+    if (!g || !tempersOn() || !state.characters.includes(g) || getBrainConfig(g.id).defeated || window.tablefolkPlay?.isAnimal?.(g)) return;
+    const key = keyOf(who);
+    if (APOLOGY.test(text)) return calm(g, key, .5, `${who} apologised`);
+    const s = insultIn(g, text);
+    if (s) return insult(g, key, `${who} insulted you: "${clip(s, 60)}"`, who);
+    if (pestering(g, key, text)) insult(g, key, `${who} kept pestering you after you said no`, who);
+  }
+  function insult(g, key, why, who) {
+    const cfg = getBrainConfig(g.id), t = temperament(cfg), k = temperK(cfg), m = mindOf(g);
+    let da = .22 * k * (t === 'brave' ? 1.2 : t === 'calm' ? .7 : 1), df = 0;
+    if (t === 'timid') { df = da / 2; da = da / 2; }
+    m.angryAt ||= {};
+    const a = m.angryAt[key] ||= { v: 0, level: 0, n: 0 };
+    a.v = clamp01(a.v + da + df * .5); a.n++; a.last = m.turn; a.at = Date.now(); a.why = why;
+    push(g, 'anger', da, why); if (df) push(g, 'fear', df, why);
+    if (key === 'player') m.mood.trust = clamp01(m.mood.trust - .08); else opinion(g, key, -.2, 'insulted you');
+    addMemory(g, why + '.', 2);
+    // someone watching for this troublemaker (a guard called over) steps in
+    watchers(key, 'insulted ' + g.id);
+    // told to leave already (calm, level 4): now it calls for help
+    if (a.orderedOut) callForHelp(g, key);
+    ladder(g, key);
+  }
+  function calm(g, key, by, why) {
+    const a = mindOf(g).angryAt?.[key]; if (!a) return;
+    a.v *= by; a.level = Math.min(a.level, angerLevel(a.v)); a.orderedOut = a.v >= .85 && a.orderedOut;
+    mindOf(g).mood.anger *= .7;
+    addMemory(g, why + '.', 1.5);
+    standDown(g);
+  }
+  function ladder(g, key) {
+    const m = mindOf(g), a = m.angryAt[key], lv = angerLevel(a.v), was = a.level || 0;
+    a.level = Math.max(was, lv);
+    if (lv < 4 || was >= 4) return;
+    const cfg = getBrainConfig(g.id), t = temperament(cfg), name = nameOfKey(key), other = charOf(key);
+    if (fighterish(g)) {
+      // one fight between characters at a time, started this way
+      if (key !== 'player' && state.ladderFight && !(state.ladderFight.a === g.id || state.ladderFight.b === g.id)) { a.level = 3; a.capped = true; return; }
+      if (key !== 'player') state.ladderFight = { a: g.id, b: key };
+      setBrainConfig(g.id, { hostileTo: { ...(getBrainConfig(g.id).hostileTo || {}), [key]: Date.now() }, pendingChat: (getBrainConfig(g.id).pendingChat || []).concat([`[event] You have had enough of ${name}. Say one short line to them; then you fight them.`]).slice(-5) });
+      addMemory(g, `You lost your temper with ${name} and went for them.`, 3);
+      a.hostile = true;
+    } else if (t === 'timid') {
+      a.backAway = m.turn; callForHelp(g, key);
+    } else {
+      a.orderedOut = true;
+      setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] You have had enough of ${name}: order them out. If they insult or hit you again, you will call for help.`]).slice(-5) });
+    }
+    void other;
+  }
+  // a guard, a soldier, anyone who fights (role, commands, or a monster with a mind)
+  function isProtector(c) {
+    if (!c || c.defeated || getBrainConfig(c.id).defeated || window.tablefolkPlay?.isAnimal?.(c)) return false;
+    const cfg = getBrainConfig(c.id);
+    if (/guard|soldier|knight|warrior|captain|sheriff|watch/i.test(cfg.role + ' ' + cfg.style)) return true;
+    try { return commandsFor(c).has('attack') && !window.tablefolkPlay?.isHostile?.(c); } catch { return false; }
+  }
+  function callForHelp(g, key) {
+    const a = mindOf(g).angryAt?.[key]; if (!a || Date.now() - (a.helpAt || 0) < 20000) return;
+    a.helpAt = Date.now();
+    const name = nameOfKey(key), R = (state.earshot || 6) * 2, p = g.root.position;
+    try { say(g, `Help! ${name} will not leave me alone!`, true); } catch {}
+    addMemory(g, `You called for help against ${name}.`, 2);
+    for (const c of state.characters) {
+      if (c === g || c.id === key || !isProtector(c) || Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) > R) continue;
+      const cfg = getBrainConfig(c.id), mc = mindOf(c);
+      mc.watch = { who: key, name, for: g.id, until: Date.now() + 75000, warned: false };
+      setBrainConfig(c.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${g.id} shouts for help: ${name} will not leave them alone.`]).slice(-5) });
+    }
+  }
+  // a guard watching someone: they did it again, so it fights them
+  function watchers(key, what) {
+    for (const c of state.characters) {
+      const w = getBrainConfig(c.id).mind?.watch;
+      if (!w || w.who !== key || !w.warned || Date.now() > w.until || c.id === key) continue;
+      setBrainConfig(c.id, { hostileTo: { ...(getBrainConfig(c.id).hostileTo || {}), [key]: Date.now() }, pendingChat: (getBrainConfig(c.id).pendingChat || []).concat([`[event] ${w.name} ${what} after your warning. Stop them.`]).slice(-5) });
+      addMemory(c, `${w.name} ${what} after you warned them.`, 2.5);
+      w.until = 0;
+    }
+  }
+  // hostility toward someone ends when they are down, out of sight a minute, or it has calmed down
+  function standDown(g) {
+    const cfg = getBrainConfig(g.id), h = cfg.hostileTo; if (!h || !Object.keys(h).length) return;
+    const m = mindOf(g), next = { ...h };
+    for (const key of Object.keys(h)) {
+      const o = charOf(key), a = m.angryAt?.[key];
+      const down = !o || o.defeated || (key !== 'player' && getBrainConfig(key).defeated) || (key === 'player' && (state.player?.hp ?? 1) <= 0);
+      const seen = o && !down && dist2(g, o) <= 10 && (window.tablefolk?.canSeeEachOther?.(g, o) ?? true);
+      if (seen) m.lastSaw = { ...(m.lastSaw || {}), [key]: Date.now() };
+      const gone = !seen && Date.now() - (m.lastSaw?.[key] || h[key]) > 60000;
+      const cooled = a ? a.v < .5 : !m.watch || m.watch.who !== key;
+      if (down || gone || (cooled && Date.now() - h[key] > 3000)) {
+        delete next[key];
+        if (a) { a.hostile = false; a.level = Math.min(a.level, 3); }
+        if (state.ladderFight && (state.ladderFight.a === g.id || state.ladderFight.b === g.id)) state.ladderFight = null;
+        if (m.watch?.who === key) m.watch = null;
+        addMemory(g, `You stopped fighting ${nameOfKey(key)}${down ? ': they are down' : gone ? ': they are gone' : ''}.`, 1.5);
+      }
+    }
+    setBrainConfig(g.id, { hostileTo: Object.keys(next).length ? next : null });
+  }
+  setInterval(() => { try { for (const g of state.characters || []) if (getBrainConfig(g.id).hostileTo) standDown(g); } catch {} }, 2000);
+  // will it deal with them? (app.js sell, give, give_quest; trade)
+  function refuses(g, who) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn(); }
+  function temperLines(g) {
+    const m = mindOf(g), out = [];
+    for (const [key, a] of Object.entries(m.angryAt || {})) {
+      const name = nameOfKey(key), lv = Math.min(a.level || 0, Math.max(angerLevel(a.v), a.hostile || a.orderedOut ? 4 : 0));
+      if (lv >= 4 && a.hostile) out.push(`You are fighting ${name}: they pushed you too far. They can stop it by apologising.`);
+      else if (lv >= 4 && a.orderedOut) out.push(`Order ${name} out of here. If they insult or hit you again, call for help.`);
+      else if (lv >= 4 && a.backAway != null) out.push(`${name} frightens you: keep away from them; you called for help.`);
+      else if (lv >= 3) out.push(`You will not serve or help ${name} until they apologise.`);
+      else if (lv >= 2) out.push(`You have had enough of ${name}. Tell them to stop or leave.`);
+      else if (lv >= 1) out.push(`${name} is getting on your nerves.`);
+    }
+    const w = m.watch; if (w && Date.now() < w.until && !w.warned) out.push(`${w.for} called for help: ${w.name} will not leave them alone. Go to ${w.name} and warn them once to stop.`);
+    else if (w && Date.now() < w.until) out.push(`You warned ${w.name}. If they insult or hit anyone again, stop them.`);
+    for (const [who, until] of Object.entries(m.pieceSaid || {})) if (Date.now() < until) out.push(`You have said your piece to ${who}; back to work.`);
+    return out;
+  }
+  // a reason to speak on a turn when nobody has spoken to it (world-integration.js)
+  function speechCause(g) {
+    const m = mindOf(g), cfg = getBrainConfig(g.id), p = g.root?.position; if (!p) return '';
+    if (gossipLine(g)) return 'news';
+    const w = want(g); if (/\b(buy it|ask for|ask|beg|tell|let .* know|call for help|help)\b/i.test(w)) return 'want';
+    const R = state.earshot || 6, near = [...state.characters.filter(c => c !== g && !c.defeated && Math.hypot(c.root.position.x - p.x, c.root.position.z - p.z) <= R).map(c => c.id), ...(state.playerAvatar && Math.hypot(state.playerAvatar.root.position.x - p.x, state.playerAvatar.root.position.z - p.z) <= R ? [playerName()] : [])];
+    const named = n => new RegExp('\\b' + String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (cfg.goal && near.some(n => named(n).test(cfg.goal))) return 'goal';
+    if (Object.entries(m.angryAt || {}).some(([k, a]) => angerLevel(a.v) >= 2 && near.includes(nameOfKey(k)))) return 'temper';
+    if (m.watch && Date.now() < m.watch.until && !m.watch.warned) return 'warn';
+    if (playerLines(g).some(l => /^You could ask/.test(l))) return 'ask';
+    return '';
   }
 
   // ---- recipes: what worked before ----
@@ -545,6 +747,8 @@
       m.threat = d.by; m.threatTurn = m.turn;
       if (!me) opinion(g, d.by, -.6, 'attacked you');
       addMemory(g, `${d.by} attacked you${d.hit === false ? ' (and missed)' : ''}.`, 3);
+      // a guard watching them steps in; ordered out already: it calls for help
+      if (tempersOn()) { const k = keyOf(d.by); watchers(k, 'attacked ' + g.id); if (m.angryAt?.[k]?.orderedOut) callForHelp(g, k); }
     } else if (kind === 'saw_attack') {
       push(g, t === 'brave' ? 'anger' : 'fear', .25, `${d.by} attacked ${d.victim}`);
       if (!isPlayerName(d.by)) opinion(g, d.by, -.25, `attacked ${d.victim}`);
@@ -556,6 +760,8 @@
       addMemory(g, `${d.by ? d.by + ' struck down ' : 'You saw '}${d.victim}${d.by ? '' : ' fall'}.`, 2.5);
     } else if (kind === 'given') {
       push(g, 'joy', .35, `${d.who} gave you ${d.what}`); m.mood.anger *= .6;
+      // a gift (or paying up) calms anger at the giver too
+      if (m.angryAt?.[keyOf(d.who)]) calm(g, keyOf(d.who), .5, `${d.who} made it up to you with ${d.what}`);
       if (!me) opinion(g, d.who, .35, `gave you ${d.what}`);
       if (me) { m.mood.trust = clamp01(m.mood.trust + .25); keep(pfOf(g).gifts, d.what, 5); promiseKept(g, d.what); }
       addMemory(g, `${d.who} gave you ${d.what}.`, 2);
@@ -570,7 +776,10 @@
     } else if (kind === 'heard') {
       m.heard = String(d.text || '');
       if (me) learnFromPlayer(g, d.text);
-      if (me) m.mood.trust = clamp01(m.mood.trust + .004);
+      // a friendly word nudges trust; an insult does the opposite (provoked)
+      const rude = tempersOn() && !!insultIn(g, d.text);
+      if (me && !rude) m.mood.trust = clamp01(m.mood.trust + .004);
+      provoked(g, d.who, String(d.text || ''));
     }
   }
   // How it feels about the other characters (the player has trust, above):
@@ -598,10 +807,16 @@
     // feelings fade over a few turns (a punch is still felt five turns on), trust over many
     for (const k of MOODS) m.mood[k] += (b[k] - m.mood[k]) * .07;
     m.mood.trust += (b.trust - m.mood.trust) * .015;
+    // anger at someone holds while they keep at it; three of its turns
+    // without a new insult and it starts to fade
+    let held = 0;
+    for (const a of Object.values(m.angryAt || {})) { if (m.turn - (a.last ?? m.turn) >= 3 && !a.hostile) a.v *= .85; held = Math.max(held, a.v); }
+    if (held > m.mood.anger) m.mood.anger = held;
     for (const k of MOODS) if (m.mood[k] < .3) delete m.why[k];
     // slow: a living world gives each character a turn every 15-20 s, and at
     // twice this a meal lasted three minutes ("Thistle keeps saying she's hungry")
-    if (needsOn(g)) { m.hunger = clamp01(m.hunger + .012); m.tired = clamp01(m.tired + .007); }
+    // (while the world lives, needs grow with real time instead: below)
+    if (needsOn(g) && !window.tablefolkLive?.on) { m.hunger = clamp01(m.hunger + .012); m.tired = clamp01(m.tired + .007); }
     if (/emote\(\s*"?sleep/i.test(line)) m.tired = 0;
     const slept = (m.prevTired ?? 0) - m.tired > .3; m.prevTired = m.tired;
     if (slept || m.turn - (m.lastConsolidated ?? 0) >= 12) consolidate(g);
@@ -611,8 +826,28 @@
     if (!getBrainConfig(g.id).goal && m.turn >= 2 && m.turn - (m.lastPlanned ?? -99) >= 40) setTimeout(() => planDay(g), 400);
     if ((cfg.goal || '') !== m.goal) { m.goal = cfg.goal || ''; m.goalTurn = m.turn; }
     if (m.feel && m.turn - m.feel.turn > 4) m.feel = null;
+    const w = m.watch, wo = w && !w.warned && charOf(w.who);
+    if (wo && dist2(g, wo) <= 3.2 && /\b(say|whisper)\s*\(/.test(String(line || ''))) { w.warned = true; w.until = Date.now() + 60000; addMemory(g, `You warned ${w.name} to leave ${w.for} alone.`, 2); }
     if (m.threat && m.mood.fear < .3 && m.mood.anger < .3) m.threat = null;
   }
+
+  // While the world lives (live.js), hunger and tiredness grow with real time,
+  // the same at every pace: from nothing to hungry (.55) in about 8 minutes,
+  // to tired (.7) in about 12. (Per model turn they hardly moved: a living
+  // character mostly idles without its model.) Turn-by-turn play: tick().
+  const HUNGER_PER_S = .55 / 480, TIRED_PER_S = .7 / 720;
+  let needsAt = performance.now();
+  setInterval(() => {
+    const now = performance.now(), dt = Math.min(5, (now - needsAt) / 1000); needsAt = now;
+    if (!window.tablefolkLive?.on) return;
+    for (const g of state.characters || []) {
+      const cfg = getBrainConfig(g.id);
+      if (g.defeated || cfg.defeated || !needsOn(g) || window.tablefolkPlay?.isAnimal?.(g) || window.tablefolkPlay?.isHostile?.(g)) continue;
+      const m = mindOf(g);
+      m.hunger = clamp01(m.hunger + dt * HUNGER_PER_S);
+      if (!g.pose || g.pose.mode !== 'lie') m.tired = clamp01(m.tired + dt * TIRED_PER_S);
+    }
+  }, 1000);
 
   // ---- what goes in the prompt ----
   const LEVELS = { joy: ['cheerful', 'happy'], fear: ['nervous', 'scared'], anger: ['annoyed', 'angry'], sadness: ['a bit down', 'sad'] };
@@ -667,6 +902,7 @@
     const cfg = getBrainConfig(g.id), m = mindOf(g), out = [];
     const danger = dangerLines(g);
     const f = feelLine(g); if (f) out.push(f);
+    out.push(...temperLines(g));
     out.push(...playerLines(g));
     out.push(...secretLines(g));
     const rl = relLine(g); if (rl) out.push(rl);
@@ -773,5 +1009,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

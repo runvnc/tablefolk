@@ -285,6 +285,35 @@ All in `app/mind.js` unless named.
   woodcutter with an axe, bread and a potion, two skeletons, hunger .75; the
   player waits each round).
 
+## Built (2026-11-20): living worlds that talk less and anger properly
+
+The 2026-11-19 survey of living worlds (E2B stand-in) found characters
+answering every overheard line, a seed exchange leaking ("I'm ready, God"),
+failed commands reported as "worked", no trade between characters, and
+insults moving nothing. Changes (scenario skill: characters.md, living.md,
+combat.md; brains.md for the prompt side):
+
+- **Addressed vs overheard** (app.js `addresseeOf`, world-integration.js):
+  see brains.md, History. `speechCause(g)` mutes unprompted turns.
+- **Tempers** (`insultIn`, `provoked`, `insult`, `ladder`, `angryAt[key]`
+  with `v`, `level`, `last`, `orderedOut`, `hostile`, `backAway`;
+  `temperLines` on the card; `refuses(g, who)` in app.js sell/give/
+  give_quest; `callForHelp` and `m.watch` for guards, `watchers()` on a new
+  insult or attack; `standDown` every 2 s). Per-target hostility is
+  `cfg.hostileTo` (play.js `hostileTarget`, `preyFor`; live.js fights on its
+  own fast timer; `foes()` counts it, so the victim's reflexes answer).
+  `state.ladderFight`: one character-vs-character fight at a time. The
+  insult patterns are plain lexicons with "you/your" proximity: "that stupid
+  door" is not an insult, "you stupid oaf" is; mockery is "your" + a word of
+  its personality + a scornful word.
+- **Needs on real time** in live mode (an interval: .55 in 8 min, .7 in 12),
+  per turn otherwise; live.js counts hungry or tired as urgent.
+- **live.js**: a turn that leaves `pendingChat` unchanged clears it
+  (monsters, animals and skipped turns kept a character "pending" and
+  starved the rest: `tools/browser-test/live-pending-test.mjs`); a reflex
+  turn moves what was waiting into history; spoken to and in no danger, the
+  hunger reflex waits.
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

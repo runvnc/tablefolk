@@ -565,7 +565,7 @@ async function linkedScenario(world) {
 // an event told) must not be undone when the turn saves it back.
 function freshen(world, g, cfg) {
   const now = world.getBrainConfig(g.id);
-  for (const k of ['hp', 'maxHp', 'wielding', 'inventory', 'defeated', 'goal', 'mind', 'looted', 'wf', 'quest']) if (k in now) cfg[k] = now[k];
+  for (const k of ['hp', 'maxHp', 'wielding', 'inventory', 'defeated', 'goal', 'mind', 'looted', 'wf', 'quest', 'hostileTo']) if (k in now) cfg[k] = now[k];
   const mine = cfg.pendingChat || [], theirs = now.pendingChat || [];
   cfg.pendingChat = [...theirs, ...mine.filter(x => !theirs.includes(x))].slice(-5);
 }

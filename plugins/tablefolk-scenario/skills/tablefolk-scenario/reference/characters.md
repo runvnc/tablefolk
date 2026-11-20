@@ -226,9 +226,30 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Mood**: joy, fear, anger, sadness and trust toward the player; events
   (attacks, gifts, sales, seeing a fight) move them and they drift back.
   `temperament` (`brave`, `timid`, `calm`; else guessed from the
-  personality) decides how it takes being attacked.
+  personality) decides how it takes being attacked and insulted.
+- **Tempers**: words count. Speech said to a character that insults it
+  ("you stupid oaf", "shut up", "your pies taste like mud": a put-down near
+  "you/your", a rude phrase, or scorn for what it is proud of), or the same
+  demand a third time after a no, makes it angry at the speaker (player or
+  character) and lowers trust; an apology halves the anger and a gift calms
+  it. Anger at someone who keeps at it does not fade. What it does, by level:
+  "X is getting on your nerves"; then "Tell them to stop or leave"; at 0.7
+  it **refuses to sell, give or give quests** to them until they apologise;
+  at 0.85 a brave character or a fighter (a guard, anyone with `attack`)
+  **fights that one** (only them; it stops when they are down, gone a
+  minute, or have apologised), a calm one orders them out and calls for help
+  if they go on, a timid one backs away and calls for help. Calling for
+  help brings a guard or fighter within twice the earshot over; it warns
+  the troublemaker once and fights them if they insult or hit anyone again
+  within a minute. With the default settings a brave character gets there
+  in about four insults, a calm one in six. `"temper"` on an agent (or the
+  scenario) is `"short"` (x1.6), `"normal"` or `"long"` (x0.6);
+  `"tempers": false` on the scenario turns all of this off. At most one
+  such fight between characters runs at a time.
 - **Opinions** of each other: gifts and blows between characters.
-- **Needs**: hunger and tiredness grow slowly; `eat(food)` and
+- **Needs**: hunger and tiredness grow slowly (in a living world with real
+  time: hungry after about 8 minutes, tired after about 12, at any pace;
+  otherwise with its turns); `eat(food)` and
   `emote(sleep)` reset them. Off for skeletons, zombies, ghosts and slimes,
   and with `"needs": false`. Food is anything bread-, apple-, stew-like
   (`FOOD` in `app/mind.js`), pack items tagged `food` (with `nourish`), and
@@ -327,7 +348,8 @@ personality, so write several short sentences of what the character does
 
 `"hostile": true` (the default for mindless monsters) fights the player with a
 built-in routine and takes no model turn; a hostile character with a real
-personality also talks. See [combat.md](combat.md).
+personality also talks. A character pushed too far by insults fights only
+the one who provoked it ([Tempers](#minds-feelings-needs-memory-goals)). See [combat.md](combat.md).
 
 ## Voices
 

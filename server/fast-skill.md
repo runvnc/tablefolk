@@ -30,6 +30,7 @@ else (no prose, no markdown fences). Be quick: keep it compact.
     "inventory": { "gold": 0, "items": ["silver key"] },   // optional
     "secret": "You poisoned the old mayor.",   // optional: what it hides; it keeps it unless it comes to trust the player a lot (give 1-2 characters one)
     "agenda": "become the next mayor",        // optional: what it is quietly after; it nudges its actions
+    "temper": "short",                        // optional: short | long; how fast insults make it refuse, order out or fight (a hothead, a saint)
     "ttsVoiceId": "pack:dwarf_m"  // optional: a voice from the list given with the request ("pack:<id>" or "builtin:<name>")
   } ],
   "goal": null                       // or a goal (below)

@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **Insults count now**: a character insulted to its face gets angry at whoever did it (player or character); it tells them to stop, then refuses to sell, give or help them until they apologise, and if pushed further a brave one or a guard fights that one only, a calm one orders them out and calls for help, a timid one backs away and calls for help. A guard called over warns once, then steps in. An apology or a gift calms things; `"temper": "short" | "long"` on a character or world sets how fast, `"tempers": false` turns it off.
+
 - **No more "God says: Are you ready my son?"**: the made-up opening exchange every character's conversation started with is gone (it leaked into speech: "Aye, I'm ready, God").
 
 - **Characters are told plainly when a command did not work**: "carry FAILED: there is no bread in sight to carry" instead of "carry worked: ..." (every command's could-not path now says so), and a command that just failed is not suggested to it again on its next turn.

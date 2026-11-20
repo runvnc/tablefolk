@@ -381,7 +381,7 @@
         const brains = w?.brainReady?.() && !w?.isBrainLoopRunning?.();
         const actors = near.filter(c => getBrainConfig(c.id).enabled !== false);
         // mind.js decides who has something to say or do this round
-        const fighters = actors.filter(isHostile), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c) && (window.tablefolkMind?.wantsTurn(c) ?? true)) : [];
+        const fighters = actors.filter(c => isHostile(c) || hostileTarget(c)), talkers = brains ? actors.filter(c => !isHostile(c) && sees(c) && (window.tablefolkMind?.wantsTurn(c) ?? true)) : [];
         if (talkers.length && !talking) { const t = talking = talk(talkers); t.finally(() => { if (talking === t) talking = null; }); }
         // after an attack the player waits for the characters with a mind
         // too (they may strike back, or cast), so blows go turn about
@@ -416,6 +416,19 @@
   // the note goes away once the character has decided what to do
   addEventListener('tablefolk-agent-turn', () => banner('npcThinking', ''));
   function isHostile(c) { const cfg = getBrainConfig(c.id); return cfg.hostile ?? MINDLESS.has(c.charModel); }
+  // mind.js tempers: a character pushed too far fights that one only
+  // ("hostileTo": { "player" | id: since }): the nearest of them it can see within 8 cells
+  function hostileTarget(c) {
+    const h = getBrainConfig(c.id).hostileTo; if (!h || c.defeated) return null;
+    const a = c.logicalPos || c.root.position; let best = null, bd = 1e9;
+    for (const k of Object.keys(h)) {
+      const o = k === 'player' ? me() : state.characters.find(x => x.id === k);
+      if (!o || o.defeated || (o !== me() && getBrainConfig(o.id).defeated)) continue;
+      const b = o.logicalPos || o.root.position, d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d <= 8 && d < bd && (window.tablefolk?.canSeeEachOther?.(c, o) ?? true)) { best = o; bd = d; }
+    }
+    return best;
+  }
   // an enemy with a mind: a real personality, not just "A hostile skeleton."
   function talksToo(c) { const p = String(getBrainConfig(c.id).personality || ''); return isHostile(c) && p.length > 60 && !/^A hostile /.test(p); }
 
@@ -426,6 +439,9 @@
   // characters, the nearest it can see within 8 cells (survival worlds).
   function preyFor(c) {
     const pl = me(), a = c.logicalPos || c.root.position, cfg = getBrainConfig(c.id);
+    // hostile toward someone in particular (mind.js tempers): only them
+    const grudge = hostileTarget(c); if (grudge) return grudge;
+    if (!isHostile(c)) return null;
     const all = (cfg.hunts || state.monsters) === 'everyone';
     const cand = [pl, ...(all ? state.characters.filter(o => o !== c && !isHostile(o) && !isAnimal(o)) : [])]
       .filter(o => o && !o.defeated && !(o !== pl && getBrainConfig(o.id).defeated));
@@ -515,5 +531,5 @@
     }, 700);
   });
 
-  window.tablefolkPlay = { isAnimal, ANIMALS, giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, preyFor, get busy() { return busy; } };
+  window.tablefolkPlay = { hostileTarget, isAnimal, ANIMALS, giveTo, remember, renderMessages, hurtFlash, use, acted, openChest, pickUp, takeGold, drink, drop, render, isHostile, talksToo, fighterTurn, preyFor, get busy() { return busy; } };
 })();

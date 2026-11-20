@@ -946,6 +946,8 @@
       // mind.js: news passed between characters, reflection, how much the game helps the characters; play.js: who monsters go after
       gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: s.monsters === 'everyone' ? 'everyone' : 'player',
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
+      // mind.js tempers: insults anger characters and push them to refuse, order out, call for help or fight ("tempers": false: off); how quickly ("temper": short | normal | long, agents may override)
+      tempers: s.tempers !== false, temper: ['short', 'normal', 'long'].includes(s.temper) ? s.temper : null,
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // subworlds: other maps (a building's inside, a dungeon) the player walks into through a link at a square
       subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},
@@ -1066,7 +1068,7 @@
     window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     window.tablefolkBooks?.load(scn.books, scn.agents);
-    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player';   // workflows.js   // generated maps' rooms and buildings (senses.js)
+    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player'; w.state.tempers = scn.tempers !== false; w.state.temper = scn.temper || null; w.state.ladderFight = null;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
@@ -1126,7 +1128,7 @@
         mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
         // mind.js: what it hides and what it is quietly after; how much the game helps it (expect)
         secret: a.secret ? String(a.secret).slice(0, 300) : '', agenda: a.agenda ? String(a.agenda).slice(0, 300) : '', readsBooks: a.readsBooks === true || a.readsBooks === 'true', expect: ['basic', 'capable', 'ambitious'].includes(a.expect) ? a.expect : '', ...(a.reflexes === false ? { reflexes: false } : {}), hunts: a.hunts === 'everyone' ? 'everyone' : '',
-        temperament: withRole(a).temperament || '', role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
+        temperament: withRole(a).temperament || '', temper: ['short', 'normal', 'long'].includes(a.temper) ? a.temper : '', hostileTo: null, role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
         quest: a.quest || '', goal: '', messages: [], recent: [], simple: typeof a.simple === 'boolean' ? a.simple : null, onlySpokenTo: typeof a.onlySpokenTo === 'boolean' ? a.onlySpokenTo : null, systemPrompt: typeof a.systemPrompt === 'string' ? a.systemPrompt : '', thinking: !!a.thinking, showThoughts: a.showThoughts !== false,
