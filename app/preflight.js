@@ -75,7 +75,7 @@
     ['animals.js?v=20261114c'],
     ['live.js?v=20261120c'],
     ['director.js?v=20261120a'],
-    ['clock.js?v=20261120a'],
+    ['clock.js?v=20261120b'],
     ['jobs.js?v=20261120g'],
     ['threats.js?v=20261120d'],
     ['speech-input.js?v=20261113a'],
