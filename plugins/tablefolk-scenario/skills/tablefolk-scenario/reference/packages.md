@@ -9,7 +9,7 @@ browser from wherever they are hosted:
 | **asset pack** | `pack.json` | object types: models, sizes, tags ([things.md](things.md#asset-packs-packs)) |
 | **skill** | `skill.json` | what a character can do: commands, resources, prompt lines ([skills-and-roles.md](skills-and-roles.md)) |
 | **role** | `role.json` | a character's job: duty, commands, skills, behaviours ([skills-and-roles.md](skills-and-roles.md#roles)) |
-| **package** | `tablefolk.json` | any mix of the above, plus workflows and code, in one download |
+| **package** | `tablefolk.json` | any mix of the above, plus jobs, threats, uses, workflows and code, in one download |
 
 ## Naming one
 
@@ -48,6 +48,9 @@ Every section is optional; paths are relative to the file.
   "skills": { "smithing": { "commands": { ... }, "recipes": { ... } } },
   "roles": { "blacksmith": { "duty": "...", "skills": ["smithing", "trade"] } },
   "workflows": { "commission": { ... } },
+  "jobs": { "picker": { "match": "...", "hours": [7, 17], "steps": [ ... ] } },
+  "threats": { "crows": { "who": "bat", "name": "crow", "behaviour": "pilfer", ... } },
+  "uses": { "loom": { "types": ["loom"], "anim": "saw", "time": 4, "verb": "weaves at the {t}", "gives": "cloth", "what": "weave" } },
   "modules": ["smithy.js"]
 }
 ```
@@ -61,13 +64,45 @@ Every section is optional; paths are relative to the file.
     hit, miss, step), `anim` (a clip to play; `loopAnim: true` keeps it
     going), `give` (items), `gold`, `once`, `state`. Or a name: a module's
     `uses.<name>`.
+  - `stock`: `{"item": "apple", "count": 6, "regrow": 2, "spent": "..."}`:
+    what it holds and gives until spent and how fast one comes back (game
+    hours a unit, 0 never). Characters gather from it with `use()` and jobs
+    with `gather` ([things.md](things.md#stock-and-stores): the built-in trees,
+    barrels, fields and snares are the same table). A scenario object's own
+    `"stock": n` sets the count.
+  - `gather`: `{"gives": "apple", "time": 3, "anim": "pickup", "verb":
+    "picks an apple from"}`: how gathering from it looks.
+  - `station`: a kind of use (`anvil`, `cauldron`, `chop`, or a kind from
+    `uses`): characters use it like that thing.
+  - `use` data (`text`, `anim`, `give`, `gold`, `state`) works for
+    characters too: `use(well_of_wishes)` gives the character what it gives
+    the player.
+- `jobs`: job manifests keyed by id, or a list of `job.json` paths
+  ([skills-and-roles.md](skills-and-roles.md#jobs)).
+- `threats`: threat kinds keyed by name, in data: `who` (a body or a
+  list), `name`, `count`, `when` (`night`, `day`, `any`, `[from, to]`),
+  `every` (days), `from` (`edge` or a place id), `behaviour` (`raid`:
+  attacks people; `pilfer`: goes for food in the stores, `targets` names
+  the items; `rob`: snatches gold and runs), `retreat` (`"dawn half"`),
+  `announce` (the narrator's line, `{name}`), `scares` (others hide),
+  `hp`. A scenario's `"threats"` names a kind and overrides fields
+  ([living.md](living.md#threats-threats)).
+- `uses`: kinds characters can use, by name: `types`, `anim`, `time`,
+  `verb` (`{t}` the thing, `{a}` the item), `gives`, `stock`, `what` (the
+  prompt's word for it).
 - `skills`, `roles`: inline manifests keyed by id, or a list of paths
   (`["skills/smithing/skill.json"]`) or references.
 - `workflows`: routines ([workflows.md](workflows.md)), usable by every scenario that
   loads the package (a scenario's own win on a name clash).
 - `modules`: code (below).
 
-The example `packages/smithy/` has one of each.
+The example `packages/smithy/` has one of each; `packages/orchard/` is a
+data-only package for living worlds: an `apple_tree` with stock that grows
+back, a `picker` job and a `crows` threat (used by `scenarios/hearthvale.json`).
+
+A scenario's packages last only while it plays: when another scenario
+starts, what they brought (items, jobs, uses, threat kinds, workflows, code
+additions) is forgotten and that scenario's own packages load fresh.
 
 ## Code
 
@@ -82,6 +117,7 @@ export default function (api) {   // api: state, meta, narrate, findTarget, comb
     cards:      { forge_heat(g, data) { return 'The forge is hot.'; } },
     effects:    { temper(g, value, target, how) { /* ... */ } },
     uses:       { pump_bellows(thing, who, api) { /* ... */ return true; } },
+    threats:    { crows(c, ctx) { /* a raider's turn: ctx.spec, ctx.retreat(why), ctx.walkTo(x, z), ctx.despawn() */ return true; } },
   };
 }
 ```
@@ -90,7 +126,10 @@ export default function (api) {   // api: state, meta, narrate, findTarget, comb
   them by name (`"behaviours": ["hammer"]`).
 - `cards`: state-card lines; skills name them (`"card": ["forge_heat"]`).
 - `effects`: usable in any skill's `effects` list.
-- `uses`: what E does on an item whose `use` is that name.
+- `uses`: what E does on an item whose `use` is that name (for a character
+  using it, `who` is that character; return a string to say what it did).
+- `threats`: a threat kind's own behaviour, run on each of its raiders'
+  turns (return false to fall back to the kind's `behaviour`).
 
 A skill can still bring its own `module` ([skills-and-roles.md](skills-and-roles.md)), and both follow
 the same rule.

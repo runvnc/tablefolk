@@ -314,6 +314,62 @@ combat.md; brains.md for the prompt side):
   turn moves what was waiting into history; spoken to and in no danger, the
   hunger reflex waits.
 
+## Built (2026-11-20): busy by default (clock, stock, jobs, threats)
+
+The owner's complaint after the talking fixes: characters only chatted;
+nothing got done. The principle now: characters are busy in code and the
+model is for words and real choices; an idle live turn never asks "what do
+you do now?".
+
+- `app/clock.js`: `state.clock` {min, day}, runs while live is on (scenario
+  `time`, `dayMinutes`, `clock`; `?dayMinutes=` for tests), saved with the
+  world (app.js worldStateData / restoreWorldState), HUD `#worldClock`,
+  `tablefolk-clock` every game quarter hour, `tablefolk.setTimeOfDay(h)`:
+  blends the four setLighting lights' intensities (and the key light's
+  position) between snapshots of the bright / night / dim presets taken
+  once per scenario, and darkens clear and fog colours; adds no lights.
+  The lighting rework takes this hook over.
+- `app/uses.js`: `CORE_STOCK` (type -> {item, count, regrow, spent}),
+  `stockOf(o)` (pack item `stock` wins; opts.stock / opts.crop from the
+  scenario object, kept by app.js keepLoot), regrowth on `tablefolk-clock`,
+  `looksSpent` (crystals shrink, others fade), `g._make` orders (jobs.js)
+  turn use(station) into make, fields (`tend`), stores (barrel, crate,
+  iron_crate) for put/take, `register(kind, def)`, a pack item's
+  `station`/`use` for characters (`packUse` -> packages.js useThing with
+  who = the character, which then returns the text).
+- `app/jobs.js`: job manifests (`jobs/<id>/job.json`, packages, inline),
+  inference (match regexes over role, style, personality; STATION
+  fallback; idler), per-character state `g._job` (home, work, step, cycles,
+  `did` tallies counted from the unvoiced action lines, news), the step
+  runner (`goDo`: walk to a reachable free cell beside the thing with a
+  quiet routed walk, then `world.runAs` the command; failures twice ->
+  blocked an hour; unreachable things remembered), the day (`tick`), the
+  decision points (`pick`: a numbered pick through tablefolkLLM, agentId
+  `pick`, max 4 tokens, greedy; its own system line, not menus.js's
+  "match what a player said"), remarks (agentId `remark`), `eventPick`,
+  the card line and `speechCause` (social, ask). Every model call fires
+  `tablefolk-model-call` {agentId, kind}; world-integration.js names
+  runOneAgentTurn's (`g._callKind` from jobs, else reply / event / open /
+  cause).
+- `app/threats.js`: kinds (core raid / rats / bandits and package kinds in
+  one table), spawning at the edge on the clock (`spawnAgent`, hostile,
+  `g._threat`), behaviours (raid: play.js fighterTurn, everyone is prey in
+  a living world; pilfer; rob; package module functions), retreat (dawn,
+  half down; despawn within 30 s), all-clear news, memories and opinions.
+- `app/live.js`: `jobs.handles(c)` -> `jobs.tick(c)` on its own timer
+  (schedule with ms, no quiet gap), events only -> `jobs.eventPick`;
+  `tablefolkLive.ticks`, `quiet()`; raiders' turns through threats.turn.
+- `app/mind.js`: starting hunger .7 from the description, `weak(g)`
+  (starving 8 game hours), harsh drain, the card's job lines, speechCause
+  from jobs, calm temper x0.85, non-lethal quarrels (`endQuarrel`: a third
+  of health, yielding words, running off 15 s), monsters and raiders
+  fought to the end (standDown no longer drops them after 3 s).
+- `app/packages.js`: `jobs`, `threats`, `uses` sections, a module's
+  `threats`, item `stock`/`gather`/`station` (packs.js cleanItem),
+  `reset()` before each scenario's packages (scenario.js).
+
+Measured: testing.md, "A whole day".
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

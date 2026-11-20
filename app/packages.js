@@ -17,7 +17,12 @@
  *     "skills":    { "smithing": { ...skill.json... } } or ["skills/smithing/skill.json"],
  *     "roles":     { "blacksmith": { ...role.json... } } or ["roles/blacksmith/role.json"],
  *     "workflows": { "commission": { ...workflow... } },
+ *     "jobs":      { "picker": { ...job.json... } } or ["jobs/picker/job.json"],   // jobs.js
+ *     "threats":   { "crows": { who, count, when, every, from, behaviour, ... } },  // threats.js
+ *     "uses":      { "loom": { types: ["loom"], anim, time, verb, gives } },       // uses.js register
  *     "modules":   ["blacksmith.js"] }                   // code: see below
+ * Items may also carry "stock": {item, count, regrow, spent} and "gather":
+ * {gives, time, anim, verb} (uses.js), and "station": a kind of use.
  *
  * A scenario loads packages with "packages": ["blacksmith", "npm:..."]; its
  * agents can then use the roles and skills by id, its map the items.
@@ -27,6 +32,10 @@
  *   cards:      { name(g, data) { return 'a state-card line' } }       (skills' "card" list)
  *   effects:    { name(g, value, target, how) {} }                      (skills' effect lists)
  *   uses:       { name(thing, who, ctx) { return true } }               (an item's "use": "name")
+ *   threats:    { kind(c, ctx) { return true } }                       (a threat kind's behaviour, threats.js)
+ * reset() (scenario.js, before a scenario's packages load) forgets what the
+ * last scenario's packages brought: items, jobs, uses, threat kinds,
+ * workflows and module additions, so they do not leak into the next one.
  * Data loads from anywhere. Code runs only when it comes from this site,
  * the page has ?trustSkills=1, or the player allowed that package (asked
  * once, remembered in this browser; never asked during tests).
@@ -40,6 +49,7 @@
   const ROOT = new URL('../', location.href).href;
   const KINDS = {
     package: { dir: 'packages', file: 'tablefolk.json' },
+    job: { dir: 'jobs', file: 'job.json' },
     skill: { dir: 'skills', file: 'skill.json' },
     role: { dir: 'roles', file: 'role.json' },
   };
@@ -80,16 +90,18 @@
   function untrust(scope) { try { localStorage.setItem(TRUST_KEY, JSON.stringify(allowedList().filter(s => s !== scope))); } catch {} }
 
   // ---- what modules add ----
-  const uses = {}, workflows = {};
+  const uses = {}, workflows = {}, added = { behaviours: [], cards: [], effects: [], items: new Set() };
   function api() {
     return { ...(window.tablefolkSkills?.api?.() || {}), state, meta, playClip, toast: (t, type) => window.tablefolkToast?.(t, { type }), addMemory: window.tablefolkMind?.addMemory };
   }
   function adopt(x, from) {
-    for (const [name, b] of Object.entries(x?.behaviours || {})) window.tablefolkRoles?.addBehaviour(name, b);
-    Object.assign(window.tablefolkSkills?.cards || {}, x?.cards || {});
-    Object.assign(window.tablefolkSkills?.effects || {}, x?.effects || {});
+    for (const [name, b] of Object.entries(x?.behaviours || {})) { window.tablefolkRoles?.addBehaviour(name, b); added.behaviours.push(name); }
+    Object.assign(window.tablefolkSkills?.cards || {}, x?.cards || {}); added.cards.push(...Object.keys(x?.cards || {}));
+    Object.assign(window.tablefolkSkills?.effects || {}, x?.effects || {}); added.effects.push(...Object.keys(x?.effects || {}));
     Object.assign(uses, x?.uses || {});
-    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
+    // a threat kind's behaviour in code (threats.js): { crows(c, ctx) { ... return true } }
+    for (const [kind, fn] of Object.entries(x?.threats || {})) if (typeof fn === 'function') window.tablefolkThreats?.registerBehaviour(kind, fn);
+    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
   }
 
   // ---- loading ----
@@ -107,7 +119,19 @@
       if (depth < 4) for (const q of m.requires || []) {
         try { warnings.push(...(await load(q, depth + 1)).warnings); } catch (e) { warnings.push(e.message); }
       }
-      if (m.items && window.tablefolkPacks) window.tablefolkPacks.add({ id: m.id, items: m.items }, url);
+      if (m.items && window.tablefolkPacks) for (const t of window.tablefolkPacks.add({ id: m.id, items: m.items }, url) || []) added.items.add(t);
+      // uses.js kinds characters and jobs can use
+      for (const [kind, def] of Object.entries(m.uses && typeof m.uses === 'object' && !Array.isArray(m.uses) ? m.uses : {})) { try { window.tablefolkUses?.register(kind, def); } catch (e) { warnings.push(`package ${m.id}: use ${kind}: ${e.message}`); } }
+      // jobs (jobs.js): inline job.json manifests, or files / references
+      if (m.jobs && window.tablefolkJobs) {
+        const list = Array.isArray(m.jobs) ? m.jobs.map(p => ({ src: fromRef(p, 'job') })) : Object.entries(m.jobs).map(([id, man]) => ({ man: { id, ...man } }));
+        for (const { src, man } of list) {
+          try { if (man) window.tablefolkJobs.register(man, url); else { const res = await fetch(src); if (!res.ok) throw new Error(`job ${src}: ${res.status}`); window.tablefolkJobs.register(await res.json(), src); } }
+          catch (e) { warnings.push(`package ${m.id}: ${e.message}`); }
+        }
+      }
+      // threat kinds (threats.js), in data
+      for (const [kind, def] of Object.entries(m.threats && typeof m.threats === 'object' ? m.threats : {})) { try { window.tablefolkThreats?.registerKind(kind, def, m.id); } catch (e) { warnings.push(`package ${m.id}: threat ${kind}: ${e.message}`); } }
       // skills and roles: inline manifests, or files relative to the package
       for (const [kind, regOf] of [['skill', () => window.tablefolkSkills], ['role', () => window.tablefolkRoles]]) {
         const sec = m[kind + 's'], reg = regOf(); if (!sec || !reg) continue;
@@ -169,15 +193,36 @@
     if (def.state) mm.state = String(def.state);
     if (def.anim) playClip(thing, def.anim, !!def.loopAnim);
     if (def.sound) window.tablefolkSfx?.play(def.sound, thing.getAbsolutePosition?.() || thing.position);
-    const inv = who === state.playerAvatar ? state.player : null;
+    // the player, or a character (uses.js: use(thing) and jobs): what it gives goes to whoever used it
+    const npc = who && who !== state.playerAvatar && state.characters.includes(who);
+    const inv = who === state.playerAvatar ? state.player : npc ? charInventory(who) : null;
     if (inv && def.gold) inv.gold = (inv.gold || 0) + (+def.gold || 0);
     if (inv && def.give) for (const n of [].concat(def.give)) { const have = findItem(inv.items, n); if (have) have.qty = (have.qty ?? 1) + 1; else inv.items.push({ name: String(n), qty: 1 }); }
+    if (npc && (def.gold || def.give)) setBrainConfig(who.id, { inventory: inv });
     if (def.gold || def.give) inventoryChanged();
     const text = String(def.text || `{{player}} uses the ${type.replace(/_/g, ' ')}`).replace(/\{\{\s*(player|me)\s*\}\}/g, nameOf(who));
+    // a character's use is its own turn's result (uses.js says it); the player's goes in the history here
+    if (npc) return text;
     state.globalHistory = (state.globalHistory || []).concat([`T${state.turn?.index ?? 0} player: ${text}`]).slice(-20);
     log(text);
     return true;
   }
 
-  window.tablefolkPackages = { load, loadAll, refUrl, trusted, untrust, allowedList, useThing, playClip, uses, workflows, ROOT };
+  // Forget what the last scenario's packages brought (scenario.js, before
+  // this one's load): they load again, fresh, if this scenario names them.
+  function reset() {
+    loaded.clear();
+    for (const k of Object.keys(uses)) delete uses[k];
+    for (const k of Object.keys(workflows)) delete workflows[k];
+    const items = window.tablefolkPacks?.items || {};
+    for (const t of added.items) delete items[t];
+    for (const n of added.behaviours) window.tablefolkRoles?.removeBehaviour?.(n);
+    for (const n of added.cards) delete window.tablefolkSkills?.cards?.[n];
+    for (const n of added.effects) delete window.tablefolkSkills?.effects?.[n];
+    added.items.clear(); added.behaviours.length = 0; added.cards.length = 0; added.effects.length = 0;
+    window.tablefolkUses?.resetRegistered?.();
+    window.tablefolkJobs?.resetPackaged?.();
+    window.tablefolkThreats?.resetPackaged?.();
+  }
+  window.tablefolkPackages = { load, loadAll, reset, refUrl, trusted, untrust, allowedList, useThing, playClip, uses, workflows, ROOT };
 })();

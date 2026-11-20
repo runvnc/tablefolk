@@ -197,8 +197,8 @@
    "id": "wren",
    "model": "huntress",
    "job": "hunter",
-   "home": "stable",
-   "in": "stable",
+   "home": "temple",
+   "in": "temple",
    "style": "quiet hunter",
    "wield": "spear",
    "personality": "Wren, the hunter. You are quiet and watchful and happiest in the woods. You want to track down the wolf pack's den. You think Brann's spear heads are the best in the valley.",
@@ -227,7 +227,7 @@
   {
    "id": "daisy",
    "model": "cow",
-   "in": "stable"
+   "in": "garden"
   },
   {
    "id": "patch",
@@ -238,7 +238,8 @@
  "objects": [
   {
    "type": "cauldron",
-   "in": "shop"
+   "x": 2,
+   "z": -9
   },
   {
    "type": "chest",
@@ -291,16 +292,6 @@
   },
   {
    "type": "chest",
-   "in": "stable",
-   "items": [],
-   "gold": 0
-  },
-  {
-   "type": "bed",
-   "in": "stable"
-  },
-  {
-   "type": "chest",
    "in": "alchemist",
    "items": [],
    "gold": 0
@@ -311,18 +302,20 @@
   },
   {
    "type": "bed",
-   "in": "house 3"
+   "x": 9,
+   "z": -4
   },
   {
    "type": "chest",
-   "in": "house 3",
    "items": [
     {
      "name": "wheat",
      "qty": 1
     }
    ],
-   "gold": 0
+   "gold": 0,
+   "x": 10,
+   "z": -4
   },
   {
    "type": "tall_grass",
@@ -391,6 +384,18 @@
    "type": "bear_trap",
    "x": -16,
    "z": -12
+  },
+  {
+   "type": "bed",
+   "x": -15,
+   "z": 6
+  },
+  {
+   "type": "chest",
+   "x": -19,
+   "z": 6,
+   "items": [],
+   "gold": 0
   }
  ]
 }

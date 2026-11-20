@@ -92,6 +92,8 @@
   listen('tablefolk-player-turn');
   // Behaviours added later (by skill modules) get their event hooked up when used.
   function addBehaviour(name, b) { behaviours[name] = b; if (b?.on) listen(b.on); }
+  // a package's behaviour goes with its scenario (packages.js reset); the built-in ones stay
+  function removeBehaviour(name) { if (name !== 'follow') delete behaviours[name]; }
 
-  window.tablefolkRoles = { load, loadOne, register, get, roleOf, withRole, duty, commands, behaviours, addBehaviour, behavioursOf, registry: reg };
+  window.tablefolkRoles = { load, loadOne, register, get, roleOf, withRole, duty, commands, behaviours, addBehaviour, removeBehaviour, behavioursOf, registry: reg };
 })();

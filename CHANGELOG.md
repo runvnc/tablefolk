@@ -6,6 +6,18 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-20
 
+- **A world clock**: living worlds have a time of day (`"time"`, `"dayMinutes"`, `"clock": false`), shown at the top of the screen and saved with the world; the light dims at dusk and comes back at dawn (dark worlds keep theirs).
+
+- **Things run out and grow back**: trees, rocks, crystals, food barrels, fields (`tall_grass`: wheat, `pumpkin`), snares (`bear_trap`) and fishing spots hold stock; barrels and crates are stores for `put`/`take`; a pack or package item can say the same (`"stock"`, `"gather"`, `"station"`), and package items' `use` works for characters too.
+
+- **Busy by default: jobs**: in a living world with a clock every character has a job (`"job"`, `"home"`, `"workplace"`, or guessed) and a day run by the game: work, meals, the evening at the tavern, bed at night. The model answers, speaks with a cause, picks at real decision points and makes the odd remark; an idle turn no longer asks it anything. 18 built-in jobs in `jobs/`; packages can ship jobs.
+
+- **Threats on the clock**: `"threats"` brings wolves at night, rats in the stores, bandits by day (and package kinds); guards and hunters meet them, the others hide, and everyone talks about it after. In a living world monsters go for the characters too (`"monsters": "player"` for the old way).
+
+- **Quarrels are not to the death**: a character fighting after insults stops when the other is down to a third of their health, gives in or runs off, and sends them away; monsters still fight to the end. A calm character now refuses service by the 4th insult (was the 5th).
+
+- **Packages reset between scenarios**: what one scenario's packages brought (items, jobs, uses, threats, workflows, code) no longer leaks into the next. New example package: `orchard`; new example world: `hearthvale`.
+
 - **A monster told something no longer hogs the turns**: in a living world a monster, an animal or a skipped turn left a character waiting to answer for good, served before everyone else.
 
 - **Fights in a living world go at fight speed**: a fighter with someone to fight in sight acts every 1.5-2.5 s, whatever the pace. `?pace=lively` in the page address sets the pace for that page.

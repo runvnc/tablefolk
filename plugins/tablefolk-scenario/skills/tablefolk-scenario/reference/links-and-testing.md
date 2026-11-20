@@ -81,6 +81,7 @@ Each `.json` (and most have an `.html` page that opens it):
 | `archipelago`, `archipelago-v2` | islets, jetties, an asset pack |
 | `stonebrook` | a hand-drawn village with stone walls and roofs |
 | `market-village`, `sorceress-dungeon` | a generated village and dungeon |
+| `hearthvale` | a living village with jobs, stock, a clock, wolves at night and crows by day (the orchard package) |
 | `goblin-ambush` | a fight on the road (combat, wielded weapons) |
 | `the-sunken-vault` | a hand-drawn dungeon with stone walls at double height |
 | `skills-demo` | the magic, thievery, bard and healing skills |

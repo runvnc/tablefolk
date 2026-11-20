@@ -19,7 +19,7 @@ read whole.
 | `server/fast-skill.md` | the condensed scenario skill the world generator's model reads |
 | `assets/` | the core asset pack (`pack.json`), models, textures, sounds, 2D tiles |
 | `scenarios/` | example and showcase scenarios (`showcase.json` feeds the welcome screen) |
-| `skills/`, `roles/`, `packages/` | built-in skills, roles and packages |
+| `skills/`, `roles/`, `jobs/`, `packages/` | built-in skills, roles, jobs and packages |
 | `registry/index.json` | the official package list (rebuilt by `tools/registry.mjs`) |
 | `plugins/tablefolk-scenario/` | the public Claude Code plugin: the scenario skill (user and author docs) |
 | `.claude/skills/tablefolk-dev/` | this skill (maintainer docs) |
@@ -72,7 +72,7 @@ scripts, e.g. the `studio.env` environment texture) and the app's own scripts, e
 note-svg recorder confirm-dialog toast sfx ui-polish tabs library packs
 tts/pocket-tts-manager tts/tts-ui look perf-monitor graphics-settings
 terrain-hd app scenery combat darkness roofs cutaway locks fp-hands senses
-packages embed mind roles play live director speech-input workflows skills
+packages embed mind roles play live director clock jobs threats speech-input workflows skills
 trade procgen scenario registry tabletop welcome tile-render
 llm_js/world-integration (module)
 ```
@@ -113,6 +113,7 @@ scenario.js, the tests and packages use.
 | `uses.js` | using things (`tablefolkUses`): chests' contents, seats and beds (poses), work stations, the prompt's use menu, daily routines |
 | `menus.js` | JRPG-style menus (`tablefolkMenu`): a character's `menu` on E, the scenario's `menus`; words from the chat box or the 🎤 matched to a choice (number, label, keyword, shared words, EmbeddingGemma when its best is 0.74+ and 0.06 ahead, then the brain picks a number greedily: 12/12 paraphrase and none-of-these cases with Gemma E2B, 2026-11-12); `pick()` lets the brain choose from any list; scripted choices (`reply`, `act` through `world.runAs`, `set`, `take`, `workflow` through `world.driveWorkflow`), `if` conditions and lists of menus (2026-11-13) |
 | `story.js` | the game's host for `@tablefolk/script` (libs/script), a module: flags in `state.flags` (saved), runs in each brain config's `wf` (by step id, version 2), facts for mind.js, conditions, actions, the workflow runner (`tablefolkWorkflows`: start, turn, drive, pause, resume), triggers (`start` fired by scenario.js), `validate` (load warnings; the world generator's checks). A menu choice's sale counts as the player's agreement; a workflow's does not. Replaces `workflows.js` (2026-11-13) |
+| `clock.js`, `jobs.js`, `threats.js` | the time of day (`tablefolkClock`, `tablefolk.setTimeOfDay`), jobs and the day run in code (`tablefolkJobs`; `jobs/<id>/job.json`), raids on the clock (`tablefolkThreats`) (minds.md, "busy by default") |
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
 | `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |
