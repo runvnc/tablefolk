@@ -109,6 +109,7 @@
     const sc = state.scene, m = BABYLON.MeshBuilder.CreateBox(name, { width: 1.003, depth: 1.003, height: h }, sc);
     const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
     mat.diffuseColor = mat.specularColor = mat.emissiveColor = BABYLON.Color3.Black(); mat.disableLighting = true;
+    if (alpha >= 1 && h === FOG_H) mat.emissiveColor = new BABYLON.Color3(.034, .032, .03);   // the unexplored: as dark as the rock round it
     if (alpha < 1) { mat.alpha = alpha; mat.disableDepthWrite = true; }
     // the follow camera cuts the tall boxes to a stub in front of the player
     // (cutaway.js); their insides, drawn too, close the cut top in black
@@ -129,7 +130,9 @@
       // nothing stands where there is neither floor nor wall (the sea round a
       // dungeon): a flat lid at floor level, so the outsides of the walls of
       // the rooms you see stay in view
-      if (!explored.has(k)) (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k);
+      // the dungeon's rock (terrain.js) stays in view, fading into the black fog; in a rock world the unexplored
+      // is that same rock (terrain.js covers it), so no box there either
+      if (!explored.has(k)) { if (window.tablefolkTerrain?.mode?.() === 'rock' || window.tablefolkTerrain?.isRock?.(x, z)) continue; (w.hasGroundAt(x, z) || walls.has(k) ? unknown : outside).push(k); }
       else if (!seen.has(k)) remembered.push(k);
     }
     // names start "board_" so scenery.js's local lights leave them alone
@@ -237,7 +240,7 @@
     // Not one of scenery.js's local lights: those reach only the meshes they
     // are nearest to (by bounding sphere, once a second), and the big floor
     // mesh always counted the room's own lights as nearer.
-    t.light.parent = t.holder; t.light.diffuse = C3(1, .64, .3); t.light.intensity = 1.7; t.light.range = 7.5;
+    t.light.parent = t.holder; t.light.diffuse = C3(1, .64, .3); t.light.intensity = 5; t.light.range = 8;   // a bright pool that falls off over ~5 squares (it lights the terrain too since 2026-11-20)
     t.light.falloffType = BABYLON.Light.FALLOFF_STANDARD;
     try { addLampPool(sc, t.holder, { warm: true }); } catch {}
     t.obs = sc.onBeforeRenderObservable.add(() => {
@@ -251,7 +254,7 @@
         t.mesh.root.rotation.set(.22, g.root.rotation.y + Math.PI, 0);
       }
       const f = performance.now() * .006;
-      t.light.intensity = 1.7 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
+      t.light.intensity = 5 * (.92 + Math.sin(f) * .05 + Math.sin(f * 2.3) * .04);
       t.mesh.flame.scaling.set(1, 1.4 * (1 + Math.sin(f * 1.7) * .15), 1);
     });
     g._torch = t;
@@ -272,7 +275,8 @@
     }
   }
 
-  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); } catch (e) { console.warn('[dark]', e); } }
+  let rockSeen = -1;
+  function tick() { if (window.TABLEFOLK_TABLETOP || !state.scene) return; try { torches(); update(false); if (dark && fogOn && explored.size !== rockSeen) { rockSeen = explored.size; window.tablefolkTerrain?.refreshRock?.(); } } catch (e) { console.warn('[dark]', e); } }
   function start(on) {
     if (window.TABLEFOLK_TABLETOP) on = false;
     clearFog(); explored = new Set(); seen = new Set();

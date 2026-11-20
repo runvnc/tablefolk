@@ -367,7 +367,7 @@
       <div class="custom-grid">
         <label>Scene <select id="gfxQuality"><option value="light">light (default)</option><option value="medium">medium (detailed models, lighter)</option><option value="high">high (full detail)</option></select></label>
       </div>
-      <small class="pane-note">Light (the default) has no shadow maps or post effects, leaving the graphics card to the characters and their voices. Medium adds detail with 1k textures and no ambient occlusion; high is full detail. Every setting uses the simple sea. Changing this reloads the page.</small>
+      <small class="pane-note">Light (the default) has no post effects and a smaller sun shadow map, lighter ground textures and no ground cover, leaving the graphics card to the characters and their voices. Medium adds grass and flowers, roughness and occlusion on the ground and bloom; high adds ambient occlusion and 2k ground textures. Changing this reloads the page.</small>
       <div class="section-subtitle">While a character is thinking</div>
       <div class="custom-grid">
         <label>Render <select id="gfxThinkFps"><option value="60" selected>full speed (default)</option><option value="15">15 fps</option><option value="5">5 fps</option><option value="0">paused (fastest replies)</option></select></label>
@@ -376,12 +376,16 @@
       <small class="pane-note">The model shares the GPU with the 3D view. Lower = faster replies; paused freezes the view until the reply arrives.</small>
       <div class="section-subtitle">Shadows</div>
       <div class="custom-grid">
-        <label class="spawn-mode-toggle"><input id="gfxKeyShadowEnabled" type="checkbox" checked /> key light shadows (island)</label>
+        <label class="spawn-mode-toggle"><input id="gfxKeyShadowEnabled" type="checkbox" checked /> sun and moon shadows</label>
         <label>Refresh every <input id="gfxKeyShadowEvery" type="number" min="1" max="10" value="1" style="width:52px" /> frame(s)</label>
         <label class="spawn-mode-toggle"><input id="gfxCampfireShadowEnabled" type="checkbox" checked /> campfire shadows</label>
         <label>Refresh every <input id="gfxCampfireShadowEvery" type="number" min="1" max="10" value="1" style="width:52px" /> frame(s)</label>
       </div>
-      <small class="pane-note">Each is a real-time point-light shadow (renders 6 cubemap faces every refresh). "Refresh every 2 frames" halves that cost; disabling stops the map updating entirely.</small>
+      <small class="pane-note">The sun (or moon) casts one shadow map around what the camera looks at (every second frame at light quality); the campfire shadow is the old island's. Disabling stops the map updating.</small>
+      <div class="section-subtitle">Board</div>
+      <div class="custom-grid">
+        <label class="spawn-mode-toggle"><input id="gfxShowGrid" type="checkbox" /> show grid (faint lines between the squares)</label>
+      </div>
       <div class="section-subtitle">Sea</div>
       <div class="custom-grid">
         <label class="spawn-mode-toggle"><input id="gfxSeaWaveEnabled" type="checkbox" checked /> wave animation (vertex displacement)</label>

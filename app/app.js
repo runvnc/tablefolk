@@ -1011,7 +1011,7 @@ function addShadow(mesh){
 function registerAllShadowMeshes(scene){
   if(!state.shadow) return;
   for(const mesh of scene.meshes){
-    if(!mesh || mesh.isDisposed?.() || mesh.name==='hd_sea' || mesh.name==='sky_dome') continue;
+    if(!mesh || mesh.isDisposed?.() || mesh.name==='hd_sea' || /^sky_/.test(mesh.name)) continue;
     mesh.receiveShadows=true;
     try { state.shadow.addShadowCaster(mesh,true); } catch{}
   }
@@ -1472,6 +1472,8 @@ function rebuildWallVisuals(){
   const mats=wallMaterials(), top=state.terrainTopY??0;
   const cell=new Map(walls.map(w=>[Math.round(w.position.x)+','+Math.round(w.position.z),w]));
   if(state.wallStyle==='modern') return buildModernWalls(cell,top);
+  // stone and tabletop: real textured walls (walls.js: rubble, dungeon blocks, timber-framed houses)
+  if(window.tablefolkWalls) return window.tablefolkWalls.build(cell,top);
   if(state.wallStyle==='stone') return buildFieldstoneWalls(cell,top);
   const stones=boxBatch(), core=boxBatch(), trim=boxBatch(), cap=boxBatch();
   const hash=(a,b,c)=>{ let h=Math.imul(a*73856093^b*19349663^c*83492791,2654435761); h^=h>>>15; return ((h>>>0)%10000)/10000; };
@@ -1843,6 +1845,7 @@ function loadModelInstance(scene,dir,name,prepare){
       state.sharedAssetMats ||= new Set();
       for(const m of c.materials) state.sharedAssetMats.add(m);
       try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
+      try{ LOOK()?.shareTextures?.(c.materials); }catch{}
       try{ const n=mergeContainerLooks(c); if(n && window.TABLEFOLK_DEV) console.log('[merge]',name,'-'+n,'draw calls'); }catch(e){ console.warn('[merge] failed',name,e); }
       return c;
     });
@@ -1850,7 +1853,11 @@ function loadModelInstance(scene,dir,name,prepare){
     modelContainers.set(url,p);
   }
   return modelContainers.get(url).then(c=>{
-    const inst=c.instantiateModelsToScene(n=>n,false,{doNotInstantiate:true});
+    // Static models are hardware instances of the container's meshes (one draw per mesh for every copy:
+    // the market village's props were ~170 of its 350 draw calls as clones, 2026-11-20); skinned,
+    // morphing or animated ones are clones (their own bones and clips).
+    const animated=!!(c.skeletons?.length || c.animationGroups?.length);
+    const inst=c.instantiateModelsToScene(n=>n,false,{doNotInstantiate:animated ? true : (node=>!!(node.skeleton || node.morphTargetManager))});
     const meshes=[];
     for(const r of inst.rootNodes){ if(r instanceof BABYLON.AbstractMesh) meshes.push(r); meshes.push(...r.getChildMeshes(false)); }
     return { meshes, rootNodes:inst.rootNodes, animationGroups:inst.animationGroups||[], skeletons:inst.skeletons||[] };
@@ -1914,7 +1921,7 @@ function meshBounds(meshes){
   return {min,max};
 }
 const GEN_ASSET=()=>ASSET_BASE+'models/props/gen/';
-const genPrepare=c=>{ applyClayLookToMeshes(c.meshes,c.scene||state.scene,{detail:.11,detailScale:5}); for(const m of c.materials) plasticFinish(m,{coat:.5,coatRough:.14}); };
+const genPrepare=c=>{ for(const m of c.materials) LOOK()?.matte(m); };
 const CRATE_SIZE=.5;
 function makeCrate(scene,x,z){
   // Keep the simple box as the physics/picking proxy, but make it invisible and
@@ -1995,37 +2002,10 @@ function addLampPool(scene,root,{warm=false,y=.025}={}){
   disc.rotation.x=Math.PI/2; disc.parent=root; disc.position.y=.025; disc.material=state.lampPoolMat; disc.isPickable=false; disc.alphaIndex=5;
   disc.metadata={proxy:root};
 }
-// Scene lighting presets. 'night' is the normal diorama look; 'bright' raises
-// and strengthens the key light so its falloff no longer leaves the north half
-// of the island in the dark (the sky-dome light never reaches materials: it is
-// fifth in priority under the four-light cap). 'dim' is night at half ambient
-// (key, fill, rim, sky dome and environment), so lamps and fires stand out.
-// Used by scenarios.
-let lightingDefaults=null;
+// Scene lighting presets ("lighting" in a scenario): a time of day in sky.js.
 function setLighting(mode='night'){
-  const sc=state.scene; if(!sc) return;
-  const key=sc.getLightByName('tree_key_moved'), rim=sc.getLightByName('teal_rim');
-  if(!lightingDefaults) lightingDefaults={keyPos:key?.position.clone(), keyI:key?.intensity, rimI:rim?.intensity};
-  const d=lightingDefaults, amb=mode==='dim' ? .5 : 1;
-  const hemi=sc.getLightByName('sky_dome_light');
-  if(hemi){ d.hemiI ??= hemi.intensity; hemi.intensity=d.hemiI*amb; }
-  if(sc.environmentTexture){ d.envI ??= sc.environmentIntensity; sc.environmentIntensity=d.envI*amb; }
-  // Bigger boards: move the key and fill out with the board and raise their
-  // intensity by the square of the distance, so the middle stays as lit.
-  const k=LEGACY_ISLAND ? 1 : boardScale(), fill=sc.getLightByName('cool_fill');
-  if(fill){ d.fillPos ||= fill.position.clone(); d.fillI ??= fill.intensity; d.fillR ??= fill.range;
-    fill.position.copyFrom(d.fillPos.scale(k)); fill.intensity=d.fillI*k*k*amb; fill.range=d.fillR*k; }
-  if(key) key.range=46*k;
-  if(mode==='bright'){
-    // Raised less and only 2.2x (was y14, 4x): enough to light the north
-    // half, while keeping the glancing highlights that give the glossy
-    // "plastic miniature" look (4x from overhead flattened it).
-    if(key){ key.position.set(-1,9*k,10.5*k); key.intensity=d.keyI*2.2*k*k; }
-    if(rim) rim.intensity=Math.max(d.rimI,.34);
-  } else {
-    if(key && d.keyPos){ key.position.copyFrom(d.keyPos.scale(k)); key.intensity=d.keyI*k*k*amb; }
-    if(rim) rim.intensity=d.rimI*amb;
-  }
+  // sky.js: bright 10:00, dim 19:00, night 23:00 (moonlit); dark worlds have no sun
+  window.tablefolkSky?.setLighting(mode);
   state.lighting=mode;
 }
 function makeLamp(scene,x,z){ const root=new BABYLON.TransformNode('lamp_root',scene); root.position.set(x,state.terrainTopY??0,z); const pole=BABYLON.MeshBuilder.CreateCylinder('lamp_pole',{height:.85,diameter:.07,tessellation:6},scene); pole.parent=root; pole.position.y=.46; pole.material=state.materials.darkwood; addShadow(pole); const c=createCrystal('lamp_crystal',scene,.38,.14); c.parent=root; c.position.y=.98; c.material=state.materials.magic; addShadow(c); const light=new BABYLON.PointLight('lamp_light',new BABYLON.Vector3(0,.96,0),scene); light.parent=root; light.diffuse=new BABYLON.Color3(.37,.78,.72); light.intensity=.34; light.range=3.1; if(window.TABLEFOLK_GFX?.lite) window.tablefolkScenery?.trackLight(light); tag(root,'lamp',{health:1,material:'crystal'}); pole.metadata={proxy:root}; c.metadata={proxy:root}; addLampPool(scene,root); state.props.push(root); return root; }
@@ -2357,7 +2337,8 @@ function paintMaterial(mat,tint){
   // Relief from the floor's own texture (brightness as height), so painted
   // floors aren't flat decals beside the sculpted tiles. Water stays smooth.
   const HD=window.TablefolkHD;
-  if(mat==='water'){ m.roughness=.06; m.alpha=.86; plasticFinish(m,{coat:.9,coatRough:.04}); }
+  // water: dark, calm, a little reflective (the terrain under it is mud, so the shore blends)
+  if(mat==='water'){ m._tfMatte=true; m.albedoColor=new BABYLON.Color3(.05,.09,.10); m.roughness=.12; m.alpha=.8; m.environmentIntensity=.9; m.specularIntensity=1; m.emissiveColor=new BABYLON.Color3(0,0,0); }
   if(mat==='lava'){ m.roughness=.55; m.emissiveTexture=lavaTextures(sc).glow; m.emissiveColor=new BABYLON.Color3(1.4,1.4,1.4); }
   if(FLOWING[mat]) animateFlow();
   if(HD && tx){
@@ -2527,7 +2508,8 @@ function buildRug(cells){
 // Height of the solid floor (planks, tiles, slabs, rug) on a cell, so feet
 // stand on it instead of sinking into it.
 const FLOOR_LIFT={ planks:.048, squares:.034, slab:.045, crust:.07, pile:RUG_H };
-function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d && !d.overlay ? (FLOOR_LIFT[d.layout]||0) : 0; }
+// Only the rug stands on the ground now: planks, tiles and slabs are flat textures in the terrain (terrain.js).
+function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d?.layout==='pile' ? FLOOR_LIFT.pile : 0; }
 function buildFloor(type,cells){
   if(SOLID_FLOORS[type]?.layout==='pile') return buildRug(cells);
   const def=SOLID_FLOORS[type], b=boxBatch(), top=state.terrainTopY??0;
@@ -2576,6 +2558,7 @@ function rebuildPaint(){
   const top=state.terrainTopY??0, groups=new Map();
   const planks=new Map();
   for(const [k,v] of state.paint){
+    if(SOLID_FLOORS[v.mat] && SOLID_FLOORS[v.mat].layout!=='pile') continue;   // in the terrain
     if(SOLID_FLOORS[v.mat]){ let tint=null; if(v.tint && !SOLID_FLOORS[v.mat].overlay) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{}
       if(!planks.has(v.mat)) planks.set(v.mat,[]); planks.get(v.mat).push([...k.split(',').map(Number),tint]);
       if(!SOLID_FLOORS[v.mat].overlay) continue; }
@@ -2716,54 +2699,13 @@ function tileColor(cell){
 }
 function rebuildBoard(){
   const sc=state.scene; if(!sc || LEGACY_ISLAND) return;
-  for(const m of state.boardMeshes||[]) try{ m.dispose(); }catch{}
-  const cells=boardCellList(), {top,side}=boardMaterials(), mat=new BABYLON.Matrix();
-  const file=boardTileFile(cells.length), model=file && boardTileReady.get(file);
-  if(file && !model) loadBoardTile(file).then(()=>rebuildBoard()).catch(e=>console.warn('board tile model unavailable; plain tiles',e));
-  const tileH=model ? BOARD_MODEL_H : BOARD_TILE_H;
-  const place=(m,list,y,{turn=false,colors=null}={})=>{
-    m.isPickable=false; m.receiveShadows=true;
-    if(!list.length){ m.setEnabled(false); return m; }
-    m.setEnabled(true);
-    const buf=new Float32Array(list.length*16), q=new BABYLON.Quaternion(), one=new BABYLON.Vector3(1.006,1,1.006), v=new BABYLON.Vector3();
-    list.forEach(([x,z],i)=>{
-      const k=turn ? (((x*73856093)^(z*19349663))>>>0)%4 : 0;
-      BABYLON.Quaternion.RotationYawPitchRollToRef(k*Math.PI/2,0,0,q); v.set(x,y,z);
-      BABYLON.Matrix.ComposeToRef(turn?one:BABYLON.Vector3.One(),q,v,mat); mat.copyToArray(buf,i*16);
-    });
-    m.thinInstanceSetBuffer('matrix',buf,16,true);
-    if(colors) m.thinInstanceSetBuffer('color',colors,4,true);
-    return m;
-  };
-  const meshes=[];
-  if(model){
-    const isGrass=c=>{ const p=paintAt(c[0],c[1]); return p?.mat==='grass' && !p.tint; };
-    const grassCells=cells.filter(isGrass), plainCells=cells.filter(c=>!isGrass(c));
-    const y=-model.top;
-    // Own geometry each: the plain tiles' per-instance colour buffer must not
-    // land on geometry the grass tiles share (wrong-sized buffer, black frame).
-    const g=model.src.clone('board_tile_grass'); g.makeGeometryUnique(); g.material=model.grass; meshes.push(place(g,grassCells,y,{turn:true}));
-    const colors=new Float32Array(plainCells.length*4);
-    plainCells.forEach((c,i)=>{ const [r,gg,b]=tileColor(c); colors.set([r,gg,b,1],i*4); });
-    const p=model.src.clone('board_tile_plain'); p.makeGeometryUnique(); p.material=model.plain; meshes.push(place(p,plainCells,y,{turn:true,colors}));
-  } else {
-    meshes.push(place(BABYLON.MeshBuilder.CreateBox('board_tile',{width:.965,height:BOARD_TILE_H,depth:.965},sc),cells,-BOARD_TILE_H/2));
-    meshes[0].material=top;
-  }
-  // Columns only under cells on an edge (of the board or a hole): the others
-  // are never seen, but were drawn and shaded under the tiles (3.4 ms of the
-  // Oracle's 9 ms GPU frame).
-  const cellSet=new Set(cells.map(([x,z])=>x+','+z));
-  const edge=cells.filter(([x,z])=>[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>!cellSet.has((x+dx)+','+(z+dz))));
-  const col=BABYLON.MeshBuilder.CreateBox('board_column',{width:1,height:BOARD_COLUMN_H,depth:1},sc); col.material=side;
-  meshes.push(place(col,edge,-tileH-BOARD_COLUMN_H/2+.02));
-  state.boardMeshes=meshes; state.boardModel=!!model;
+  // The ground is one blended terrain (terrain.js, 2026-11-20); the cells
+  // stay the logic's grid. The old tiles and edge columns are gone.
+  const cells=boardCellList();
   state.boardCells=new Set(cells.map(([x,z])=>x+','+z));
-  state.terrainTopY=0;
+  state.boardModel=true; state.terrainTopY=0;
   sceneryCells=null; groundCache.clear();
-  // Floors the tiles now show themselves need no overlay (and vice versa).
-  if(state.paintOverlayModel!==state.boardModel){ state.paintOverlayModel=state.boardModel; schedulePaintRebuild(); }
-  window.TablefolkHD?.setShore?.(boardShoreEdges());
+  if(window.tablefolkTerrain) window.tablefolkTerrain.rebuild();
 }
 // Outward edges of the land, for the sea's foam: [{x,z,nx,nz}] at each edge's middle.
 function boardShoreEdges(){
@@ -3047,8 +2989,11 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   }
   // importPropAsset() is async (GLB load) but registers its physics proxy
   // synchronously, so callers get a usable object right away.
-  let proxy=null;
-  const p=importPropAsset(scene,file,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
+  let proxy=null, url=file;
+  // a variant by the square it stands on (the same tree stays the same tree); the light copy at light quality
+  if(base.variantUrls?.length){ const all=[file,...base.variantUrls], h=((Math.round(x)*73856093)^(Math.round(z)*19349663))>>>0; url=all[h%all.length]; }
+  if(base.tier && (base.tier==='med' ? window.TABLEFOLK_GFX?.lite : window.TABLEFOLK_GFX?.quality!=='high')) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
+  const p=importPropAsset(scene,url,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
   if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});
   return proxy;
@@ -3060,7 +3005,7 @@ async function importPropAsset(scene,file,opts={}){
   try{
     // Pack items carry full URLs; the glTF's textures resolve from its folder.
     const abs=/^[a-z]+:/i.test(file), dir=abs?file.slice(0,file.lastIndexOf('/')+1):PROP_ASSET, name=abs?file.slice(dir.length):file;
-    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ m.backFaceCulling=false; if('roughness' in m) m.roughness=.42; plasticFinish(m,{coat:.55,coatRough:.12}); } if(opts.clay) applyClayLookToMeshes(c.meshes,scene,{detail:.11,detailScale:5}); });
+    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ if(!(m.needAlphaTesting?.())) m.backFaceCulling=false; LOOK()?.matte(m); } });
     // Some props (the chest) bring a skeleton and animation clips; free those
     // with the object (disposeWorldObject runs meta.cleanup).
     for(const ag of result.animationGroups||[]) ag.stop();
@@ -3079,7 +3024,9 @@ async function importPropAsset(scene,file,opts={}){
     root.scaling.setAll(opts.scale||1);
     root.rotation.y=opts.visualRy||0;
     for(const r of result.rootNodes) r.parent=root;
-    for(const mesh of result.meshes){ mesh.metadata={proxy}; mesh.receiveShadows=true; addShadow(mesh); }
+    // small things cast no sun shadow (each caster is drawn again in the shadow pass); characters keep their contact discs
+    const castsShadow=(opts.h??1)>=.7;
+    for(const mesh of result.meshes){ mesh.metadata={proxy}; mesh.receiveShadows=true; if(castsShadow) addShadow(mesh); }
     // "fit": scale the model to the item's size (footprint w/d, or height h)
     // and stand it on the proxy's floor, centred. For models of unknown scale.
     if(opts.fit){
@@ -4871,34 +4818,16 @@ async function spawnAt(type, x, z) {
 // Toy-plastic finish: a glossy clear coat over the base material. This is
 // what reads as "plastic miniature" on flat surfaces (the grass gets its
 // sheen from its normal map; blocks and props have none).
-function plasticFinish(m,{coat=.6,coatRough=.1,rough=null}={}){
-  if(!(m instanceof BABYLON.PBRMaterial)) return m;
-  if(rough!==null) m.roughness=rough;
-  // Light quality has no post effects to soften highlights: a 0.1 coat on
-  // small facets (pine needles, leaves) lit up single pixels, a scatter of
-  // little glowing dots instead of a sheen (2026-11-14). Specular
-  // anti-aliasing widens a highlight where the surface turns fast, and the
-  // coat is a little less sharp there.
-  m.enableSpecularAntiAliasing=true;
-  if(window.TABLEFOLK_GFX?.lite) coatRough=Math.max(coatRough,.3);
-  m.clearCoat.isEnabled=true; m.clearCoat.intensity=coat; m.clearCoat.roughness=coatRough;
-  m.environmentIntensity=Math.max(m.environmentIntensity||0,.85);
-  return m;
-}
-// Characters get the same toy-plastic finish as the tiles and props
-// (2026-11-07; they were matte, roughness 1): one gloss for the whole
-// figure (the baked roughness and metalness maps are ignored, their AO
-// stays), a clear coat for the sharp highlight, and the environment
-// reflection, which is what reads as glossy on light quality (no SSR, no
-// post effects there).
+// The glossy "plastic" finish is gone (2026-11-20): every caller gets the
+// matte finish (look.js matte: own maps, roughness >= .55, no clear coat).
+function plasticFinish(m){ return LOOK()?.matte(m) ?? m; }
+// Characters: their own PBR maps (base colour, normal, metallic-roughness,
+// AO), matte (look.js matte): roughness at least .55 (metals .3), no clear
+// coat, moderate environment light.
 function toyFinish(m){
   if(!(m instanceof BABYLON.PBRMaterial) || m._tfToy) return m;
   m._tfToy=true; m.maxSimultaneousLights=8;
-  m.metallic=0; m.useMetallnessFromMetallicTextureBlue=false;
-  m.useRoughnessFromMetallicTextureGreen=false; m.useRoughnessFromMetallicTextureAlpha=false;
-  m.roughness=.4; m.specularIntensity=.8;
-  plasticFinish(m,{coat:.6,coatRough:.12}); m.environmentIntensity=1;
-  return m;
+  return LOOK()?.matte(m) ?? m;
 }
 // Dispose a material and its own textures, but not textures shared across
 // materials: look.js gives every clay material the same detail-normal
@@ -4919,13 +4848,15 @@ function disposeOwnMaterial(m){
 // a scenario agent). 'woman' is the rogue in everyday clothes: the same
 // palette texture recoloured (cream top, denim, dark shoes) and no cape.
 const AVATAR_MODELS={rogue:'Rogue_Hooded.glb',knight:'Knight.glb',mage:'Mage.glb',ranger:'Ranger.glb',barbarian:'Barbarian.glb',woman:'Rogue.glb'};
+// the chibi KayKit bodies stay reachable as <name>_classic (their plain names point at newer bodies in FIGURES, 2026-11-20)
+for(const k of Object.keys(AVATAR_MODELS)) AVATAR_MODELS[k+'_classic']=AVATAR_MODELS[k];
 const MODEL_LOOKS={woman:{texture:'rogue_modern.png?v=20261018a',hide:/Cape/}};
 const PERSON_H=1.3;
 // Voices: a character without "ttsVoiceId" gets one that fits its body
 // (female or male), the same one every time for the same id. Genders and
 // descriptions come from the server's /api/voices (set on its admin page),
 // else these defaults.
-const FEMALE_MODELS=new Set(['elf','woman','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
+const FEMALE_MODELS=new Set(['elf','woman','ranger','woman_classic','adventurer_woman','villager','witch','huntress','peasant_woman','swordswoman','sorceress','villager_woman','adventurer_woman_classic','villager_classic','witch_classic','huntress_classic','peasant_woman_classic']);
 const VOICE_GENDER={alba:'female',azelma:'female',cosette:'female',eponine:'female',fantine:'female',javert:'male',jean:'male',marius:'male'};
 fetch('/api/voices').then(r=>r.ok?r.json():null).then(d=>{ if(Array.isArray(d?.voices)){ window.TABLEFOLK_VOICES=d.voices; window.tablefolkTTS?.dispatchEvent(new Event('voiceschanged')); } }).catch(()=>{});
 // The designed voice library (assets/voices/, tools/fal-voices.py): samples
@@ -4975,6 +4906,9 @@ const FIGURES={
   // more monsters (Quaternius Ultimate Monsters and Animated Enemies, CC0)
   wyrmling:{h:1.0,v:'20261114a'}, imp:{dir:'meshy',h:.85,v:'20261115a'}, imp_classic:{file:'imp',h:0.9,v:'20261114a'}, mushroom_warrior:{h:1.0,v:'20261114a'}, bunny:{h:0.8,v:'20261114a'}, snake:{h:0.45,v:'20261114a'}, wasp:{h:0.6,v:'20261114a',lift:.45}, frog:{h:0.35,v:'20261114a'},
   bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
+  // the old chibi KayKit names point at newer bodies (look pass 3, 2026-11-20); the chibi ones are <name>_classic (AVATAR_MODELS)
+  knight:{dir:'meshy',file:'guard',h:1.38,v:'20261114a'}, mage:{file:'wizard',h:1.28,lift:.016,v:'20261109g'}, rogue:{dir:'meshy',file:'wanderer',h:1.36,v:'20261101a'},
+  ranger:{dir:'meshy',file:'huntress',h:1.3,v:'20261101a'}, barbarian:{dir:'meshy',file:'swordsman',h:1.36,v:'20261101a'}, woman:{dir:'meshy',file:'villager_woman',h:1.26,v:'20261101a'},
 };
 const FIG_CLIPS={
   Idle_A:['Idle','Flying_Idle','Idle_Neutral','Flying','Idle_2'], Idle_B:['Idle_Neutral','Idle_2','Idle','Flying_Idle','Flying'],
@@ -5668,7 +5602,7 @@ function installWorldAPI(){
     setPaint, paintAt, PAINT_MATERIALS, setBaseMap, setCampfire,
     spawnPlayerAvatar, removePlayerAvatar, getPlayerAvatar:()=>state.playerAvatar, setFirstPerson, getCameraView, setCameraView, setWallStyle:st=>{ state.wallStyle=['block','modern','stone'].includes(st)?st:'tabletop'; },
     setWallHeight:v=>{ state.wallHeightScale=Number.isFinite(+v) && +v>0 ? Math.min(4,Math.max(.25,+v)) : 1; },
-    setLighting,
+    setLighting, setTimeOfDay:h=>window.tablefolkSky?.setTimeOfDay(h),
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),
     executeAgentCommand:(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'),
@@ -5931,6 +5865,8 @@ function updateCompassHUD(){
 function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); autoChatTarget(); updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
       if(g.turnMove.path){ const pp=pathPoint(g.turnMove,k); p=pp.p; if(pp.dir.lengthSquared()>1e-6) setCharacterFacing(g,legFacing(pp.dir)); } else p=BABYLON.Vector3.Lerp(g.turnMove.start,g.turnMove.end,k);
       // Walked off the island: fall instead of hovering over the sea.
+      // Off the board where there is no water (land, rock, a street): the walk stops at the edge.
+      if(!hasGroundAt(p.x,p.z) && window.tablefolkTerrain && !window.tablefolkTerrain.waterAt(p.x,p.z)){ const q=g.root.position; delete g.turnMove; setCharacterLogicalPosition(g,new BABYLON.Vector3(Math.round(q.x),0,Math.round(q.z))); playRig(g,'idle',true); continue; }
       if(!hasGroundAt(p.x,p.z)){ const tm=g.turnMove, len=BABYLON.Vector3.Distance(tm.start,tm.end)||1; g.lastSafePos=tm.start.clone(); startFall(g,tm.end.subtract(tm.start).scale(clamp(len/tm.dur,1.4,3.4)/len)); continue; }
       g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); continueHeldStep(g); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
     const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=bodyYaw(g,dt); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
@@ -6282,7 +6218,7 @@ async function addTerrainPolish(scene){
   if(!LEGACY_ISLAND){
     // The board in the sea: the simple sea and sky at every quality (the HD
     // ocean was dropped from high on 2026-11-07; TablefolkHD.buildSea is unused).
-    makeSkyDome(scene); makeSea(scene); if(window.TABLEFOLK_GFX?.lite) state.lite=true;
+    if(window.TABLEFOLK_GFX?.lite) state.lite=true;
     state.terrainTopY=0;
     rebuildBoard(); rebuildBoardSupport(); fitBoardView();
     makeSelectionRing(scene);
@@ -6358,58 +6294,17 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   });
   canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); const pick=scene.pick(scene.pointerX,scene.pointerY); if(pick?.hit && pick.pickedPoint){ const tx=Math.round(pick.pickedPoint.x), tz=Math.round(pick.pickedPoint.z); let info=`tile (${tx},${tz})`; const m=pick.pickedMesh; const mm=meta(m); if(mm?.type && mm.type!=='tile') info+=` - ${mm.type} (${mm.state||'intact'})`; const owner=m?.metadata?.ownerId; if(owner){ const g=state.characters.find(x=>x.id===owner); if(g) info+=` - ${g.id} (${g.anim||'idle'})`; } log(info); } });
   canvas.addEventListener('pointermove',e=>{ if(e.buttons&2){ e.preventDefault(); const dx=e.movementX*0.02, dy=e.movementY*0.02; const right=camera.getDirection(BABYLON.Vector3.Right()); const up=camera.getDirection(BABYLON.Vector3.Up()); const newTarget=camera.target.add(right.scale(dx)).subtract(up.scale(dy)); newTarget.y=camera.target.y; camera.target.copyFrom(newTarget); state.zoomFocus=camera.target.clone(); } });
-  // Diorama lighting: cool moonlit sky dome + a warm angled key so the island
-  // reads as a lit model on a dark table, plus a teal rim to separate the
-  // silhouette from the water.
-  const hemi=new BABYLON.HemisphericLight('sky_dome_light',new BABYLON.Vector3(.15,1,.05),scene);
-  hemi.intensity=.16; hemi.diffuse=new BABYLON.Color3(.42,.55,.76); hemi.groundColor=new BABYLON.Color3(.10,.12,.11); hemi.specular=new BABYLON.Color3(.05,.08,.11);
-  const sun=new BABYLON.DirectionalLight('warm_key',new BABYLON.Vector3(-.48,-.86,.62),scene);
-  sun.position=new BABYLON.Vector3(11,17,-12); sun.intensity=0; sun.diffuse=new BABYLON.Color3(1,.82,.58); sun.specular=new BABYLON.Color3(.50,.45,.38); // Directional flood intentionally disabled.
-  // A zero-intensity enabled light still consumes one of Babylon's material
-  // light slots and one shader uniform buffer.
-  sun.setEnabled(false);
-  // Broad point source at the front-left corner, opposite the house.
-  // Its finite range equals the island's 14-unit width.
-  const cornerKey=new BABYLON.PointLight('composition_opposite_corner_point',new BABYLON.Vector3(-1.0,5.0,10.5),scene); cornerKey.name='tree_key_moved';
-  cornerKey.diffuse=new BABYLON.Color3(1,.82,.55); cornerKey.specular=new BABYLON.Color3(.34,.26,.17);
-  cornerKey.intensity=200; cornerKey.range=46; cornerKey.radius=4.5; cornerKey.falloffType=BABYLON.Light.FALLOFF_GLTF;
-  // Point-light shadows render a cubemap (six directions), so keep this at
-  // 1024 rather than duplicating the old 2048 directional-map cost sixfold.
-  // PERF NOTE: this is a real-time ShadowGenerator (default refreshRate),
-  // so those 6 cubemap faces re-render every frame even though almost
-  // nothing in the scene moves out of shadow frame-to-frame (camera pans
-  // are the main exception). makeCampfire() below adds a second point-light
-  // cubemap shadow (512, QUALITY_LOW) on top of this one - so every frame
-  // pays for 12 extra shadow-map passes combined. Candidates worth
-  // measuring later: RenderTargetTexture.refreshRate = REFRESHRATE_RENDER_ONCE
-  // (or every Nth frame) on generators whose casters aren't moving much, or
-  // swapping this key light for a DirectionalLight shadow (1 pass instead
-  // of 6) since it's meant to read as a fixed diorama key, not an
-  // omnidirectional source.
-  // Light quality: no key shadow map (a 1024 cubemap, 32 MB and six passes a frame).
-  const cornerShadow=window.TABLEFOLK_GFX?.lite ? null : new BABYLON.ShadowGenerator(1024,cornerKey);
-  if(cornerShadow){
-    cornerShadow.usePercentageCloserFiltering=true;
-    cornerShadow.filteringQuality=BABYLON.ShadowGenerator.QUALITY_MEDIUM;
-    cornerShadow.bias=.0004; cornerShadow.normalBias=.004; cornerShadow.darkness=.38;
-  }
-  const rim=new BABYLON.DirectionalLight('teal_rim',new BABYLON.Vector3(.62,-.34,-.68),scene);
-  rim.intensity=.22; rim.diffuse=new BABYLON.Color3(.34,.72,.82); rim.specular=new BABYLON.Color3(.20,.42,.48);
-  const fill=new BABYLON.PointLight('cool_fill',new BABYLON.Vector3(-9,5,7),scene);
-  fill.intensity=.35; fill.diffuse=new BABYLON.Color3(.48,.66,1); fill.range=24;
-  state.sun=sun;
-  // addShadow() and the HD builders now populate the active point-light map.
-  // Keep the disabled directional light object for an easy rollback, but do not
-  // spend a shadow map on a zero-intensity source.
-  state.shadow=cornerShadow;
-  // Neutral environment reflections give PBR clay broad shape cues without making it glossy.
+  // The light (sky.js, 2026-11-20): one directional sun/moon with a shadow
+  // map fitted around the camera's target, a hemispheric sky fill, the time
+  // of day; local lights (lamps, fires, spells) are added by their objects.
+  // The old diorama rig (a point "key" with a cubemap shadow, a teal rim and
+  // a cool fill) is gone.
+  LOOK()?.applyTonemap(scene,{exposure:1.0,contrast:1.06,tonemap:'neutral',grade:false});
+  const rig=window.tablefolkSky.init(scene,camera);
+  state.sun=rig.sun; state.shadow=rig.shadow;
+  // Image-based light: broad, soft shape cues; its strength follows the time of day (sky.js).
   const envTexture=BABYLON.CubeTexture.CreateFromPrefilteredData((window.tablefolkVendorUrl||(u=>u))('https://assets.babylonjs.com/environments/studio.env'),scene);
   scene.environmentTexture=envTexture;
-  scene.environmentIntensity=.10;
-  // Tonemap + diorama grade (teal-lifted shadows, warm highlights). The old
-  // ACES at contrast/exposure 1.34 was crushing shadows and desaturating the
-  // olive greens relative to the concept art.
-  LOOK()?.applyTonemap(scene,{exposure:1.34,contrast:1.12,tonemap:'neutral',grade:true});
   // Diorama polish: soft bloom on emissives, gentle vignette, and a subtle tilt-shift depth of field.
   if(window.TABLEFOLK_GFX?.lite || window.TABLEFOLK_TABLETOP){
     // Light mode: no post-process pipeline, SSAO or glow layer (each holds
@@ -6418,9 +6313,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   } else try{
     const rp=new BABYLON.DefaultRenderingPipeline('drp',true,scene,[camera]);
     rp.fxaaEnabled=true;
-    rp.bloomEnabled=true; rp.bloomThreshold=.82; rp.bloomWeight=.26; rp.bloomScale=.6; rp.bloomKernel=48;
-    rp.vignetteEnabled=true; rp.vignetteWeight=1.05; rp.vignetteStretch=.42; rp.vignetteColor=new BABYLON.Color4(0,.02,.05,0);
-    rp.sharpenEnabled=true; rp.sharpen.edgeAmount=.28; rp.sharpen.colorAmount=1;
+    // subtle bloom (lamps, fire, spells), a very light neutral vignette
+    rp.bloomEnabled=true; rp.bloomThreshold=.9; rp.bloomWeight=.14; rp.bloomScale=.5; rp.bloomKernel=48;
+    rp.vignetteEnabled=true; rp.vignetteWeight=.45; rp.vignetteStretch=.6; rp.vignetteColor=new BABYLON.Color4(0,0,0,0);
+    rp.sharpenEnabled=true; rp.sharpen.edgeAmount=.12; rp.sharpen.colorAmount=1;
     rp.imageProcessing.vignetteBlendMode=BABYLON.ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
     rp.samples=4;
    
@@ -6432,9 +6328,9 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     // rather than flat colour. Neither the imported GLBs (Tripo bakes a pure
     // white AO channel) nor the procedural terrain carried any before this.
     // Medium quality: no SSAO (several full-screen render targets).
-    if(window.TABLEFOLK_GFX?.quality!=='medium') state.ssao=LOOK()?.setupSSAO(scene,camera,{radius:.62,strength:3.1,samples:20,maxZ:60});
+    if(window.TABLEFOLK_GFX?.quality!=='medium') state.ssao=LOOK()?.setupSSAO(scene,camera,{radius:.7,strength:1.6,samples:16,maxZ:60});
     const gl=new BABYLON.GlowLayer('hd_glow',scene,{ mainTextureFixedSize:512, blurKernelSize:44 });
-    gl.intensity=.38;
+    gl.intensity=.3;
     state.glowLayer=gl;
   }catch(e){ console.warn('render pipeline unavailable, continuing without post fx',e); }
   state.materials={
@@ -6452,23 +6348,13 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // Babylon otherwise takes the first N scene lights, so the late-created
   // campfire/lantern lose to broad fill lights. Put practicals first; material
   // shaders then get both practical pools plus the shared key/rim within four.
-  const lightPriority={campfire_light:0,hd_lantern_light:1,tree_key_moved:2,composition_opposite_corner_point:2,teal_rim:3,sky_dome_light:4,cool_fill:5};
+  const lightPriority={campfire_light:0,hd_lantern_light:1,sun:2,sky_fill:3};
   scene.lights.sort((a,b)=>(lightPriority[a.name]??50)-(lightPriority[b.name]??50));
-  // Keep PBR light shaders within WebGPU's portable uniform-buffer budget.
-  // Four slots are sufficient once the disabled sun is removed and practical
-  // lights are explicitly prioritized per mesh.
+  // Everything matte (look.js matte): no forced gloss; water keeps its sheen.
   for(const material of scene.materials){
-    if(material instanceof BABYLON.PBRMaterial){
-      material.maxSimultaneousLights=8;
-      material.useRoughnessFromMetallicTextureGreen=false;
-      material.useRoughnessFromMetallicTextureAlpha=false;
-      material.roughness=.24;
-      material.environmentIntensity=Math.max(.85,material.environmentIntensity||0);
-      material.specularIntensity=material.name.includes('water') || material.name.includes('sea') ? 1 : .5;
-    } else if(material instanceof BABYLON.StandardMaterial){
-      material.specularColor=(material.name.includes('water') || material.name.includes('sea')) ? new BABYLON.Color3(1,1,1) : new BABYLON.Color3(.5,.5,.5);
-      material.specularPower=128;
-    }
+    if('maxSimultaneousLights' in material) material.maxSimultaneousLights=8;
+    if(/water|sea/.test(material.name)) continue;
+    LOOK()?.matte(material);
   }
   // Light mode's legacy sea/tiles are StandardMaterials: the pass above gives
   // them full-white specular, which under the strong key light turned the

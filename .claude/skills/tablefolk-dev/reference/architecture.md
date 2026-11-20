@@ -71,8 +71,8 @@ scripts, e.g. the `studio.env` environment texture) and the app's own scripts, e
 ```
 (abridged; app/preflight.js has the full list)
 note-svg recorder confirm-dialog toast sfx ui-polish tabs library packs
-tts/pocket-tts-manager tts/tts-ui look perf-monitor graphics-settings
-terrain-hd app bodies scenery combat spells reactions darkness roofs cutaway locks fp-hands senses
+tts/pocket-tts-manager tts/tts-ui look sky perf-monitor graphics-settings
+terrain-hd app bodies scenery combat spells reactions terrain surroundings walls darkness roofs cutaway locks fp-hands senses
 packages embed books mind uses roles play animals live director clock jobs threats speech-input
 menus (module) story (module) skills trade procgen scenario registry tabletop welcome tile-render
 llm_js/world-integration (module)
@@ -96,7 +96,11 @@ scenario.js, the tests and packages use.
 |---|---|
 | `bodies.js` | bodies from packs and packages (`"bodies"`: a GLB, height, clip map, emotes, kind, natural attack, hp) as `FIGURES` entries with a `url`, forgotten with their package; `mapClips` for `createFigure`; named clips on characters (`playClip`, `emote`), `tablefolkBodies` |
 | `app.js` | scene, board, walls, doors, objects, characters (`FIGURES`, `createFigure`), animation, cameras (follow, free, first person), commands (`COMMANDS`, `parseCommand`, `runAgentCommand`), perception (`buildVisiblePerception`), prompts (`buildAgentPrompt`, `buildCommandExamples`), say/give/sell, save and load, `window.tablefolk` |
-| `look.js` | the shared "painted clay" materials and post-processing (`TABLEFOLK_LOOK`) |
+| `look.js` | the shared matte materials and post-processing (`TABLEFOLK_LOOK`) |
+| `sky.js` | the sun/moon, sky fill, shadow map, time of day, sky dome, clouds, fog (`tablefolkSky`, `tablefolkLook.setTimeOfDay`) |
+| `terrain.js` | the blended ground, ground cover, what lies beyond the board (`tablefolkTerrain`) |
+| `walls.js` | stone, dungeon and timber-framed walls, door frames, windows (`tablefolkWalls`) |
+| `surroundings.js` | trees on the land beyond the board (`tablefolkSurroundings`) |
 | `terrain-hd.js` | floor tiles, water, lava, the shelved HD island (`TablefolkHD`) |
 | `graphics-settings.js` | the Graphics pane and `?gfx=` |
 | `scenery.js` | campfire, lantern, light, fence, signpost, lily pad, crystal ball, scrying pool, rune circle; the local-lights budget |

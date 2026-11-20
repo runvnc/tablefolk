@@ -45,7 +45,7 @@
       }
       bindForSubMesh(ubo) {
         ubo.updateFloat4('tfCut', cut.x, cut.z, this._fog && cut.on === 2 ? 0 : cut.on, cut.y);
-        ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, 0);
+        ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, this._fog ? 0 : 1);
       }
       getCustomCode(type, lang) {
         if (type !== 'fragment') return null;
@@ -56,6 +56,18 @@ if (uniforms.tfCut.z > 0.5 && fragmentInputs.vPositionW.y > uniforms.tfCut.w) {
   let tfc = floor(fragmentInputs.vPositionW.xz + vec2f(0.5)) - uniforms.tfCut.xy;
   if (tfc.y >= 1.0 && tfc.y <= uniforms.tfCutArea.y && abs(tfc.x) <= uniforms.tfCutArea.x + (tfc.y - 1.0) * uniforms.tfCutArea.z) { discard; }
 }
+// walls draw their back faces only where a cut exposes them (below the cut, in a cut square); elsewhere as if culled
+if (uniforms.tfCutArea.w > 0.5 && !fragmentInputs.frontFacing) {
+  let tfb = floor(fragmentInputs.vPositionW.xz + vec2f(0.5)) - uniforms.tfCut.xy;
+  let tfIn = uniforms.tfCut.z > 1.5 || (uniforms.tfCut.z > 0.5 && tfb.y >= 1.0 && tfb.y <= uniforms.tfCutArea.y && abs(tfb.x) <= uniforms.tfCutArea.x + (tfb.y - 1.0) * uniforms.tfCutArea.z);
+  if (!tfIn || fragmentInputs.vPositionW.y > uniforms.tfCut.w + 0.02) { discard; }
+}
+#endif
+`, CUSTOM_FRAGMENT_UPDATE_ALPHA: `
+#ifdef TFCUT
+// a cut wall shows its inside faces through the cut: draw them as a flat, dark
+// section seen from above (the walls are not back-face culled), so the cut reads solid
+if (uniforms.tfCut.z > 0.5 && uniforms.tfCutArea.w > 0.5 && !fragmentInputs.frontFacing) { surfaceAlbedo = vec3f(0.05, 0.048, 0.045); normalW = vec3f(0.0, 1.0, 0.0); }
 #endif
 ` };
         return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
@@ -65,6 +77,15 @@ if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
   vec2 tfc = floor(vPositionW.xz + 0.5) - tfCut.xy;
   if (tfc.y >= 1.0 && tfc.y <= tfCutArea.y && abs(tfc.x) <= tfCutArea.x + (tfc.y - 1.0) * tfCutArea.z) discard;
 }
+if (tfCutArea.w > 0.5 && !gl_FrontFacing) {
+  vec2 tfb = floor(vPositionW.xz + 0.5) - tfCut.xy;
+  bool tfIn = tfCut.z > 1.5 || (tfCut.z > 0.5 && tfb.y >= 1.0 && tfb.y <= tfCutArea.y && abs(tfb.x) <= tfCutArea.x + (tfb.y - 1.0) * tfCutArea.z);
+  if (!tfIn || vPositionW.y > tfCut.w + 0.02) discard;
+}
+#endif
+`, CUSTOM_FRAGMENT_UPDATE_ALPHA: `
+#ifdef TFCUT
+if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec3(0.05, 0.048, 0.045); normalW = vec3(0.0, 1.0, 0.0); }
 #endif
 ` };
       }

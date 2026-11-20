@@ -317,7 +317,9 @@
       const target = Math.max(2, Math.round(W * H / 120));
       for (let t = 0, n = 0; t < 600 && n < target; t++) {
         // half the span: 1 for buildings about 3 cells across, 2 for the big ones
-        const type = kinds[n % kinds.length], h = ['inn', 'sawmill', 'blacksmith', 'barracks', 'barn', 'big_barn', 'open_barn', 'small_barn'].includes(type) ? 2 : 1;
+        // half the span each needs (2h+1 squares across): the env models are real size (2026-11-20; the inn is 7 x 8 m)
+        const HALF = { inn: 4, barracks: 4, barn: 4, big_barn: 4, blacksmith: 3, open_barn: 3, stone_house: 3, tall_house: 3, fantasy_house: 3, mill_house: 2, sawmill: 2, small_barn: 2 };
+        const type = kinds[n % kinds.length], h = HALF[type] ?? 1;
         const r = R.int(1 + h, H - 2 - h), c = R.int(1 + h, W - 2 - h);
         if (!free(r - h, c - h, r + h, c + h)) continue;
         let grass = true; for (let rr = r - h; rr <= r + h; rr++) for (let cc = c - h; cc <= c + h; cc++) if (g[rr][cc] !== ',') grass = false;
@@ -751,6 +753,41 @@
   // filled from the generator (anything the scenario already sets wins), and
   // every character without "at" put in its place. Returns the new scenario
   // plus `places` and warnings.
+  // Generated villages (2026-11-20): a building place nobody lives or works in
+  // becomes one of the real building models (assets/models/props/env) chosen
+  // by its role, seeded, no two alike in a row where another fits; the walled
+  // room is taken off the grid and its path to the road stays. Places that are
+  // a character's home or workplace (or an object's place) stay walk-in rooms,
+  // because jobs (jobs.js) find beds and stations on the same map.
+  // "generate": { "models": false } keeps every room.
+  const MODEL_ROLE = { house: ['house', 'fantasy_house', 'tall_house', 'stone_house'], tavern: ['inn', 'fantasy_house'], smithy: ['blacksmith', 'stone_house'],
+    guardhouse: ['barracks', 'stone_house'], stable: ['stable'], temple: ['stone_house', 'tall_house'], library: ['tall_house', 'stone_house'], shop: ['fantasy_house', 'house'],
+    alchemist: ['tall_house', 'house'] };
+  const MODEL_FOOT = { house: [4.69, 4.99], fantasy_house: [5.44, 5.01], tall_house: [3.68, 6.01], stone_house: [3.82, 5.52], inn: [6.71, 8], blacksmith: [6.94, 6.01],
+    barracks: [7.52, 4.94], stable: [7.05, 4.62], barn: [6.51, 9], mill_house: [4.7, 5] };
+  function modelUnusedBuildings(gen, keep, seed) {
+    if (!gen.grid?.length) return gen;
+    const g = gen.grid.map(r => r.split('')), H = g.length, W = g[0].length, at = toBoard(W, H), R = rng((seed | 0) + 911);
+    const RY = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 }, out = [], gone = new Set();
+    let last = null;
+    for (const p of gen.places) {
+      const roles = MODEL_ROLE[p.kind]; if (!roles || keep.has(p.id) || !p.door) continue;
+      const side = p.door[0] < p.r0 ? 'n' : p.door[0] > p.r1 ? 's' : p.door[1] < p.c0 ? 'w' : 'e';
+      const ow = p.c1 - p.c0 + 3, oh = p.r1 - p.r0 + 3, across = side === 'n' || side === 's' ? ow : oh, deep = side === 'n' || side === 's' ? oh : ow;
+      const fits = roles.filter(m => MODEL_FOOT[m][0] <= across + .4 && MODEL_FOOT[m][1] <= deep + .4);
+      if (!fits.length) continue;
+      const pool = fits.length > 1 ? fits.filter(m => m !== last) : fits, m = pool[Math.floor(R.next() * pool.length)];
+      for (let r = p.r0 - 1; r <= p.r1 + 1; r++) for (let c = p.c0 - 1; c <= p.c1 + 1; c++) if (g[r]?.[c] != null) g[r][c] = ',';
+      const [xa, za] = at(p.r0 - 1, p.c0 - 1), [xb, zb] = at(p.r1 + 1, p.c1 + 1);
+      out.push({ type: m, x: (xa + xb) / 2, z: (za + zb) / 2, ry: +RY[side].toFixed(4) });
+      gone.add(p.id); last = m;
+    }
+    if (!gone.size) return gen;
+    const centres = gen.places.filter(p => gone.has(p.id)).map(p => p.center + '');
+    return { ...gen, grid: g.map(r => r.join('')), places: gen.places.filter(p => !gone.has(p.id)),
+      objects: [...gen.objects.filter(o => !(o.type === 'light' && centres.includes([o.x, o.z] + ''))), ...out] };
+  }
+
   function applyToScenario(scn) {
     const opts = scn.generate || {};
     const kindName = String(opts.kind || opts.type || 'dungeon').toLowerCase();
@@ -791,6 +828,14 @@
       occupied.add(spot[0] + ',' + spot[1]);
       return { ...o, x: spot[0], z: spot[1] };
     }).filter(Boolean);
+    // buildings nobody lives or works in: real models (villages)
+    if (make === village && opts.models !== false) {
+      const keep = new Set(Object.values(placed)), ref = v => { const q = v != null && findPlace(v, gen.places, new Set()); if (q) keep.add(q.id); };
+      for (const a of scn.agents || []) { ref(a.home); ref(a.workplace); ref(a.in); }
+      for (const o of scn.objects || []) ref(o.in);
+      ref(scn.player?.in);
+      gen = modelUnusedBuildings(gen, keep, genOpts.seed);
+    }
     let player = scn.player || {};
     if (!Array.isArray(player.at)) {
       const p = (player.in != null && findPlace(player.in, gen.places, new Set())) || gen.places.find(q => q.id === gen.start) || gen.places[0];
@@ -810,9 +855,9 @@
   // middle of its front (+z at ry 0), "inside" its furniture (rows from the
   // back wall; WALK_IN_THINGS). size: [across, deep] with the walls.
   const WALK_IN = {
-    house: { name: 'house', size: [5, 5], floor: 'wood', inside: ['Z.K', '.t.', '(..'], pad: 2 },
-    fantasy_house: { name: 'timber house', size: [6, 5], floor: 'oak', inside: ['Z)K(', 'z.t.', '....'], pad: 2 },
-    stable: { name: 'stable', size: [7, 5], floor: 'dirt', inside: ['dfBfu', '.....', '|...C'], pad: 2 },
+    house: { name: 'house', size: [5, 5], floor: 'wood', inside: ['Z.K', '.t.', '(..'], pad: 3 },
+    fantasy_house: { name: 'timber house', size: [6, 5], floor: 'oak', inside: ['Z)K(', 'z.t.', '....'], pad: 3 },
+    stable: { name: 'stable', size: [7, 5], floor: 'dirt', inside: ['dfBfu', '.....', '|...C'], pad: 3 },
   };
   const WALK_IN_THINGS = { Z: 'bed', K: 'bookcase', t: 'table', ')': 'nightstand', '(': 'cabinet', z: 'wooden_chair', B: 'barrel', u: 'bucket', f: 'fence', d: 'logs', '|': 'apple_barrel', C: 'crate' };
   // its squares: cell(i, j) for i across (0..size[0]-1), j from the back

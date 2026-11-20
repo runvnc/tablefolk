@@ -28,6 +28,10 @@
     for (const k of NUM) if (it[k] != null) { if (!Number.isFinite(+it[k])) throw new Error(`item "${type}": ${k} must be a number`); out[k] = +it[k]; }
     for (const k of ['static', 'flammable', 'decor', 'clay']) if (it[k] != null) out[k] = !!it[k];
     if (it.fit === 'height' || it.fit === 'footprint') out.fit = it.fit;
+    // "tier": a lighter copy for light quality next to the file ("med": name.med.gltf, "1k": name.1k.glb);
+    // "variants": other files of the same thing, one chosen per placed copy by its square
+    if (it.tier === 'med' || it.tier === '1k') out.tier = it.tier;
+    if (Array.isArray(it.variants)) out.variantUrls = it.variants.filter(f => typeof f === 'string').map(f => new URL(f, packUrl).href);
     if (typeof it.material === 'string') out.material = it.material;
     if (typeof it.shape === 'string') out.shape = it.shape.toUpperCase();
     out.aliases = Array.isArray(it.aliases) ? it.aliases.map(String).filter(a => /^[a-z][a-z0-9_]*$/.test(a)) : [];

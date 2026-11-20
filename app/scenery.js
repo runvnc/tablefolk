@@ -117,10 +117,13 @@
     if (!localLights.size || !state.scene) return;
     for (const L of localLights) if (L.isDisposed()) localLights.delete(L);
     const others = state.scene.lights.filter(L => !localLights.has(L) && L.isEnabled()).length, PER_MESH = Math.max(1, MAX_LIGHTS - others);
-    const meshes = state.scene.meshes.filter(m => !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
+    // the terrain and the dungeon rock (terrain.js) are one mesh each: they take the lights nearest the camera's target
+    const ground = m => /^board_(terrain|rock)$/.test(m.name), tgt = state.camera?.target || BABYLON.Vector3.Zero();
+    const meshes = state.scene.meshes.filter(m => ground(m) || !/^(board_|paint_|hd_|sky|sea|lamp_pool)/.test(m.name));
     const per = new Map([...localLights].map(L => [L, []])), pos = new Map([...localLights].map(L => [L, L.getAbsolutePosition()]));
     for (const m of meshes) {
-      const s = m.getBoundingInfo?.().boundingSphere; if (!s) continue;
+      const s0 = m.getBoundingInfo?.().boundingSphere; if (!s0) continue;
+      const s = ground(m) ? { centerWorld: tgt, radiusWorld: 9 } : s0;
       const near = [];
       for (const L of localLights) { const gap = BABYLON.Vector3.Distance(s.centerWorld, pos.get(L)) - s.radiusWorld; if (gap < L.range + 1) near.push([gap, L]); }
       near.sort((a, b) => a[0] - b[0]);
@@ -138,6 +141,86 @@
     mm.cleanup = () => { try { prev?.(); } catch {} localLights.delete(L); L.dispose(); };
     queueMicrotask(refreshLocalLights);
     return L;
+  }
+  // an environment model (assets/models/props/env) under a scenery root, fitted to a height and standing on the ground
+  const ENV_MODELS = () => (window.tablefolkPacks?.base || '/assets/') + 'models/props/env/';
+  function envModel(r, name, h, { ry = 0, x = 0, len = null } = {}) {
+    const file = name + (window.TABLEFOLK_GFX?.quality === 'high' ? '.glb' : '.1k.glb');
+    return loadModelInstance(state.scene, ENV_MODELS(), file, c => { for (const m of c.materials) window.TABLEFOLK_LOOK?.matte?.(m); }).then(res => {
+      if (r.isDisposed?.()) { for (const m of res.meshes) m.dispose(); return null; }
+      const node = new BABYLON.TransformNode(name + '_visual', state.scene); node.parent = r;
+      for (const n of res.rootNodes) n.parent = node;
+      node.rotation.y = ry; node.computeWorldMatrix(true);
+      let lo = new BABYLON.Vector3(1e9, 1e9, 1e9), hi = lo.scale(-1);
+      for (const m of res.meshes) { if (!(m.getTotalVertices?.() > 0)) continue; m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox; lo = BABYLON.Vector3.Minimize(lo, b.minimumWorld); hi = BABYLON.Vector3.Maximize(hi, b.maximumWorld); }
+      const k = h / Math.max(.01, hi.y - lo.y); node.scaling.setAll(k);
+      if (len != null) { node.scaling.x = k * len; }
+      node.position.y = -(lo.y - r.getAbsolutePosition().y) * k; node.position.x = x;
+      for (const m of res.meshes) { m.metadata = { proxy: r }; m.isPickable = true; m.receiveShadows = true; window.addShadow?.(m); }
+      return node;
+    }).catch(e => { console.warn('[scenery] model', name, e); return null; });
+  }
+  // fences: one 2 m section (two posts) per two cells of a straight run, aligned to it; an odd end gets a section scaled to one cell
+  let fenceQueued = false;
+  function scheduleFences() { if (fenceQueued) return; fenceQueued = true; setTimeout(() => { fenceQueued = false; try { rebuildFences(); } catch (e) { console.warn('[scenery] fences', e); } }, 0); }
+  function rebuildFences() {
+    const fences = (state.props || []).filter(m => !m.isDisposed?.() && meta(m)?.type === 'fence');
+    const runs = new Map();
+    for (const f of fences) {
+      for (const n of f._fenceVis || []) n.dispose(false, false); f._fenceVis = [];
+      const p = f.getAbsolutePosition?.() || f.position, alongX = Math.abs(Math.sin(f.rotation?.y || 0)) < .5;
+      const key = (alongX ? 'x' : 'z') + ':' + Math.round(alongX ? p.z : p.x);
+      if (!runs.has(key)) runs.set(key, []); runs.get(key).push({ f, a: Math.round(alongX ? p.x : p.z), alongX });
+    }
+    for (const list of runs.values()) {
+      list.sort((u, v) => u.a - v.a);
+      for (let i = 0; i < list.length; i++) {
+        const c = list[i], nx = list[i + 1], pair = nx && nx.a === c.a + 1;
+        // the root's own frame: +x along the fence when ry is 0; a pair's section sits between the two cells
+        const sign = (c.alongX ? Math.cos(c.f.rotation?.y || 0) : -Math.sin(c.f.rotation?.y || 0)) >= 0 ? 1 : -1;   // local +x is world (cos ry, 0, -sin ry)
+        envModel(c.f, 'fence_section', 1.04, pair ? { x: .5 * sign } : { len: .5 }).then(n => { if (n) (c.f._fenceVis ||= []).push(n); });
+        if (pair) i++;
+      }
+    }
+  }
+  function lanternVisual(sc, r, L) {
+    const iron = mat('lantern_iron', C3(.06, .06, .065), { rough: .55, metallic: .6 });
+    const glow = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
+    const p = r.getAbsolutePosition(), cx = Math.round(p.x), cz = Math.round(p.z), key = (a, b) => a + ',' + b;
+    const mode = window.tablefolkTerrain?.mode?.(), rooms = window.tablefolkRoofs?.findRooms?.();
+    const inRoom = !!rooms?.rooms?.some(room => room.cells.has(key(cx, cz)));
+    const indoor = mode === 'rock' || mode === 'street' || inRoom;
+    const walls = new Set((state.blocks || []).filter(b => !b.isDisposed?.() && meta(b)?.type === 'wall').map(b => key(Math.round(b.position.x), Math.round(b.position.z))));
+    const parts = [], bulbs = [];
+    const box = (name, w, h, d, x, y, z, m, rz = 0) => { const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, sc); b.position.set(x, y, z); b.rotation.z = rz; b.material = m; b.parent = r; parts.push(b); return b; };
+    const cage = (x, y, z) => { const c = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .28, diameterTop: .12, diameterBottom: .18, tessellation: 6 }, sc); c.position.set(x, y, z); c.material = iron; c.parent = r; parts.push(c);
+      const cap = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .09, diameterTop: 0, diameterBottom: .22, tessellation: 6 }, sc); cap.position.set(x, y + .18, z); cap.material = iron; cap.parent = r; parts.push(cap);
+      const bulb = BABYLON.MeshBuilder.CreateSphere('lantern_bulb', { diameter: .13, segments: 7 }, sc); bulb.position.set(x, y, z); bulb.material = glow; bulb.parent = r; bulbs.push(bulb); L.position.set(x, y, z); };
+    if (!indoor) {
+      const wood = window.tablefolkWalls?.timber?.() || mat('darkwood', C3(.115, .072, .042), { rough: .92 });
+      box('lantern_post', .14, 2.2, .14, 0, 1.1, 0, wood); box('lantern_post', .24, .12, .24, 0, .06, 0, wood);
+      box('lantern_arm', .5, .045, .045, .25, 2.0, 0, iron); box('lantern_arm', .32, .035, .035, .14, 1.88, 0, iron, .65);
+      cage(.45, 1.76, 0);
+    } else {
+      // the nearest wall face: the lantern goes on it (the root's frame may be turned: work in world offsets)
+      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => walls.has(key(cx + dx, cz + dz)));
+      const toLocal = (wx, wz) => { const ry = r.rotation?.y || 0, c = Math.cos(ry), s2 = Math.sin(ry); return [wx * c - wz * s2, wx * s2 + wz * c]; };
+      if (dir) {
+        // a sconce: an iron plate on the wall face (the wall's face is .16 from its cell centre), a bracket, a hanging cage
+        const face = 1 - .17, [px, pz] = toLocal(dir[0] * face, dir[1] * face), [ax, az] = toLocal(dir[0] * (face - .16), dir[1] * (face - .16)), [lx, lz] = toLocal(dir[0] * (face - .3), dir[1] * (face - .3));
+        const plate = box('lantern_arm', .06, .26, .06, px, 1.75, pz, iron); plate.scaling.set(1, 1, 1);
+        box('lantern_arm', .045, .045, .045, ax, 1.92, az, iron); box('lantern_arm', .045, .3, .045, (px + lx) / 2, 1.92, (pz + lz) / 2, iron);
+        cage(lx, 1.62, lz);
+      } else {
+        // away from the walls: a short iron stand
+        box('lantern_post', .06, 1.3, .06, 0, .65, 0, iron); box('lantern_post', .34, .04, .34, 0, .02, 0, iron);
+        cage(0, 1.45, 0);
+      }
+      // indoors the light reaches a little further: rooms lit by their lamps feel warm, not dark wood
+      L.range = Math.max(L.range, 8); L.intensity = Math.max(L.intensity, 3);
+    }
+    const one = window.mergeUnder?.(r, parts, 'lantern_post') || null;
+    own(r, one ? [one] : parts); own(r, bulbs, { shadow: false });
   }
   function hexColor(v, fallback) { try { return v ? BABYLON.Color3.FromHexString(String(v)) : fallback; } catch { return fallback; } }
 
@@ -290,19 +373,14 @@
       return r;
     },
     lantern(sc, x, z, opts) {
-      const r = rootAt('lantern', x, z, opts), wood = mat('darkwood', C3(.115, .072, .042), { rough: .92 });
-      const post = BABYLON.MeshBuilder.CreateBox('lantern_post', { width: .07, height: 1.3, depth: .07 }, sc); post.position.y = .65; post.material = wood;
-      const arm = BABYLON.MeshBuilder.CreateBox('lantern_arm', { width: .36, height: .05, depth: .05 }, sc); arm.position.set(.16, 1.26, 0); arm.material = wood;
-      const cage = BABYLON.MeshBuilder.CreateCylinder('lantern_cage', { height: .26, diameterTop: .12, diameterBottom: .16, tessellation: 6 }, sc);
-      cage.position.set(.32, 1.1, 0); cage.material = mat('lantern_metal', C3(.14, .13, .12), { rough: .42, metallic: .55 });
-      const bulb = BABYLON.MeshBuilder.CreateSphere('lantern_bulb', { diameter: .11, segments: 7 }, sc);
-      bulb.position.set(.32, 1.1, 0); bulb.material = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
-      post.parent = arm.parent = r;   // (their positions are the lantern's own)
-      const pole = window.mergeUnder?.(r, [post, arm], 'lantern_post') || post;   // post and arm: one draw call
-      own(r, pole === post ? [post, arm, cage] : [pole, cage]); own(r, [bulb], { shadow: false });
+      // outdoors: a dark timber post with an iron bracket and a caged lantern (2.2 m). Indoors and
+      // underground (pass 3): an iron sconce on the nearest wall face, or a short iron stand away from
+      // the walls. Decided a moment after placing, once the walls stand.
+      const r = rootAt('lantern', x, z, opts);
       finish(r, 'lantern', { material: 'wood' }, opts);
       addLampPool(sc, r, { warm: true });
-      pointLight(r, 'lantern_light', { y: 1.1, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 1.35, range: +opts.range || 6 });
+      const L = pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
+      setTimeout(() => { if (!r.isDisposed?.()) lanternVisual(sc, r, L); }, 250);
       return r;
     },
     light(sc, x, z, opts) {
@@ -312,26 +390,16 @@
       return r;
     },
     fence(sc, x, z, opts) {
-      const r = rootAt('fence', x, z, opts), wood = mat('fence_wood', C3(.36, .25, .15), { rough: .9 }), parts = [];
-      for (const px of [-.42, 0, .42]) {
-        const p = BABYLON.MeshBuilder.CreateBox('fence_post', { width: .09, height: .66, depth: .09 }, sc);
-        p.position.set(px, .33, 0); p.material = wood; parts.push(p);
-      }
-      for (const y of [.24, .46]) {
-        const rail = BABYLON.MeshBuilder.CreateBox('fence_rail', { width: 1, height: .07, depth: .05 }, sc);
-        rail.position.set(0, y, 0); rail.material = wood; parts.push(rail);
-      }
-      own(r, parts);
-      return finish(r, 'fence', { health: 1, material: 'wood', flammable: true }, opts);
+      // pass 2: the env fence_section model, paired over runs (scheduleFences)
+      const r = rootAt('fence', x, z, opts);
+      const out = finish(r, 'fence', { health: 1, material: 'wood', flammable: true }, opts);
+      scheduleFences(); r.onDisposeObservable?.add(() => scheduleFences());
+      return out;
     },
     signpost(sc, x, z, opts) {
-      const r = rootAt('signpost', x, z, opts), wood = mat('sign_wood', C3(.40, .28, .17), { rough: .9 }), parts = [];
-      const post = BABYLON.MeshBuilder.CreateBox('signpost_post', { width: .11, height: 1.0, depth: .11 }, sc); post.position.y = .5; post.material = wood; parts.push(post);
-      for (const [y, dir] of [[.8, 1], [.56, -1]]) {
-        const a = BABYLON.MeshBuilder.CreateBox('signpost_arm', { width: .62, height: .2, depth: .045 }, sc);
-        a.position.set(dir * .3, y, dir * .05); a.rotation.y = dir * .16; a.material = wood; parts.push(a);
-      }
-      own(r, parts);
+      // pass 2: the env signpost model (2 m)
+      const r = rootAt('signpost', x, z, opts);
+      envModel(r, 'signpost', 2.0);
       return finish(r, 'signpost', { health: 2, material: 'wood', flammable: true }, opts);
     },
     crystal_ball(sc, x, z, opts) {

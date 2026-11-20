@@ -24,7 +24,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "seed": 7,                       // layout randomness: same JSON + seed = same map
   "base": "plain",                 // plain (default) | island | clearing | dungeon
   "size": [23, 17],                // board cells [cols, rows], odd, 5-63
-  "lighting": "bright",            // bright | night | dim (night at half ambient)
+  "lighting": "bright",            // bright (morning) | dim (dusk) | night (moonlit)
   "dark": false,                   // fog of war + carried torches
   "walls": "tabletop",             // tabletop | stone | modern | block
   "wallHeight": 2,                 // wall height multiplier (default 1; use 2 with doors)
@@ -65,9 +65,11 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `title`, `subtitle`, `intro` | banner title, banner text for open scenarios, the intro card | |
 | `seed` | layout randomness (map lines, generated maps) | |
 | `base`, `size`, `floor`, `paint`, `campfire` | the board | [board.md](board.md) |
-| `lighting` | `bright`, `night`, `dim` | [board.md](board.md) |
+| `lighting` | `bright` (10:00), `dim` (19:00), `night` (23:00, moonlit) | [board.md](board.md) |
 | `dark` | fog of war; default true for generated dungeons | [board.md](board.md) |
-| `surroundings` | beyond the board's edge: `forest` (thick woods), `fields` (open ground, scattered trees) or `none`; default: forest for a generated forest, fields for a generated village or farm, none otherwise | [board.md](board.md) |
+| `surroundings` | trees beyond the board's edge: `forest` (thick woods), `fields` (open ground, scattered trees) or `none`; default: forest for a generated forest, fields for every other outdoor board | [board.md](board.md) |
+| `shells` | `false`: walled rooms keep code-built roofs instead of the building models over them | [board.md](board.md) |
+| `outside` | what lies past the board: `land` (hills), `rock` (dungeons), `street` (a lone building), `sea` (islands), `none`; default by the kind of world | [board.md](board.md) |
 | `walls`, `wallHeight` | wall style and height | [board.md](board.md) |
 | `roofs` | `true` / `false` overrides the automatic thatched roofs | [board.md](board.md) |
 | `pathfinding`, `earshot`, `safety` | walking, hearing, crisis banner | [board.md](board.md), [characters.md](characters.md) |
@@ -171,9 +173,13 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   Quaternius bodies stay as `adventurer_classic`, `adventurer_woman_classic`,
   `woodsman_classic`, `huntress_classic`, `peasant_woman_classic`,
   `villager_classic`, `witch_classic`. Also `hooded king farmer wizard peasant`
-  (Quaternius Universal rig, built by `tools/build-figures.sh`); the older
-  chibi KayKit `woman rogue knight mage ranger barbarian`; the clay
-  `critter` (the default).
+  (Quaternius Universal rig, built by `tools/build-figures.sh`). The old chibi
+  KayKit names point at the newer bodies (2026-11-20): `knight` is the guard,
+  `mage` the wizard, `rogue` the wanderer, `ranger` the huntress,
+  `barbarian` the swordsman, `woman` the village woman; the chibi ones stay as
+  `knight_classic mage_classic rogue_classic ranger_classic barbarian_classic
+  woman_classic`. The clay `critter` is the default for a character with no
+  `model` (and the blank sandbox world's first character).
 - **Monsters**: `skeleton skeleton_warrior zombie goblin kobold orc troll
   skeleton_farmer rat spider wolf bat ghost slime demon giant dragon`.
   `orc goblin skeleton skeleton_warrior troll skeleton_farmer` are the

@@ -1,46 +1,155 @@
 # Rendering (Babylon.js)
 
 Babylon.js 9.30 on WebGPU (WebGL2 with `?webgl=1`), Havok physics, loaded
-unversioned from cdn.babylonjs.com by `app/preflight.js`. The look is a
-"painted clay diorama": PBR with a clear-coat "plastic" finish and detail
-normal maps (`app/look.js` is the single source of truth for materials and
-post-processing).
+unversioned from cdn.babylonjs.com by `app/preflight.js`. The look (since
+2026-11-20) is weathered, muted, semi-realistic painterly fantasy: matte PBR
+with each model's own maps, one sun or moon with soft shadows, ground that
+blends, land running on to a hazy horizon. `app/look.js` has the materials
+and post-processing, `app/sky.js` the light, sky and time of day,
+`app/terrain.js` the ground and what lies beyond the board, `app/walls.js`
+the walls, `app/roofs.js` the roofs.
 
-## Board and floors
+## Materials (look.js)
 
-- `rebuildBoard()` (`app/app.js`) draws a sculpted grass tile model for every
-  cell (`grass_v7_orm`, 1k textures; a medium version above 900 cells), with
-  per-cell quarter turns so it doesn't repeat. Light quality and boards past
-  2500 cells use the baked tile (`BAKED_TILE`, `loadBakedTile`): a box per
-  cell wearing the sculpted tile seen from above, its colour, occlusion/
-  roughness and surface normals baked into `assets/textures/tile_top_*`
-  (`tools/bake-tile-top.mjs`; normal map level 1.35, a darkened rim standing
-  in for the gap between sculpted tiles). Its material is the sculpted
-  tile's (clay look and all) with the baked maps in place, so grass/plain
-  cells, tints and the paint-overlay skipping work as for the model.
-  Columns stand only below cells on an edge (of the board or a hole): the
-  hidden ones were shaded under the tiles, 3.4 ms of a 9 ms GPU frame.
-  `rebuildBoardSupport()` builds the physics ground and the pick plane.
-- Painted floors are real geometry with relief (bevelled planks, tiles,
-  carpet, lava), built by `boxBatch()` (merged positions, uvs, uv2, colours)
-  with `bevelNormalTexture` on UV2 for rounded edges. Water flows one way;
-  lava is animated with a crust and lights its surroundings.
-- Nothing is flat: every surface has a normal map (generated from the texture
-  by Sobel when it has none).
-- Carpet is a woven rug, `buildRug()` (2026-11-07): a 3 cm slab per cell
-  (sides only where the rug ends) whose top samples an atlas painted per
-  edge mask (`drawRugCell`: 4 edge bits plus 4 inner-corner bits, Chebyshev
-  distance so the frame turns concave corners; 256 px per variant with an
-  8 px gutter). Field colour = the carpet colour or the paint tint (default
-  royal blue); the band picks crimson or navy against it. The weave is a
-  128 px basket-weave normal on UV2 (world-tiled, 3 per cell), finish
-  roughness .46 + clear coat .42 + light sheen. One mesh, material and atlas
-  per colour; the material and atlas go with the mesh.
-- `floorLiftAt (and `standOnFeet` in app.js: one full CPU skinning picks each mesh's lowest vertices, later samples skin only those, figures on different frames; `contactShadow` puts a soft dark patch under every figure, since light quality has no shadow maps: a figure is raised by whatever its idle clip dips below its feet) (and `floorCollider`, a static Havok mesh shape on each floor mesh so physics props rest on its top)(x,z)` is the height of the solid floor on a cell (planks .048,
-  tiles .034, slab .045, rug .03): characters (`setCharacterLogicalPosition`,
-  the walk in `animate`) and catalogue props stand on it, so feet no longer
-  sink into rugs and planks.
+`TABLEFOLK_LOOK.matte(m)` is the finish of everything (the old
+`plasticFinish`, `toyFinish`, `applyClayLook` call it): the material's own
+base colour, normal, metallic-roughness and AO maps; plain roughness raised
+to .55 at least (metals, by a metallic map or a metal name, .3); a roughness
+map clamped in the shader by a material plugin (`TfMatte`: a regex injection
+after `reflectivityOut.roughness`), since glTF's factor can only lower it; no
+clear coat, no clay detail normal; environment intensity at most .55;
+metallic 0 unless a map or the name says metal (glTF's default
+metallicFactor 1 made props chrome). The startup pass in `main()` runs it on
+every material (water and sea keep their sheen). Tone mapping: neutral,
+exposure set by the hour (sky.js), contrast 1.06, no colour curves (the teal
+shadow grade is gone). Medium/high: bloom threshold .9 weight .14, a light
+neutral vignette, FXAA, mild sharpen; SSAO (strength 1.6) only at high.
 
+## Light, sky and time of day (sky.js)
+
+- Two global lights, never added or removed (that recompiles every
+  material): `sun`, a DirectionalLight that is the sun by day and the moon by
+  night, and `sky_fill`, a HemisphericLight. The old point "key" light with
+  its cubemap shadow, the teal rim and the cool fill are gone. Local lights
+  (lamps, fires, spells, lava) are unchanged and budgeted as before.
+- One ShadowGenerator on the sun (PCF; 2048 and QUALITY_MEDIUM at medium,
+  HIGH at high; 1024, QUALITY_LOW, refreshed every second frame at light),
+  a fixed frustum (`shadowFrustumSize`) fitted each frame around the camera's
+  target (1.05 x the camera radius, 10-70 m; 14 m in first person), its
+  centre snapped to whole shadow texels in the light's frame so it doesn't
+  shimmer while the camera glides; `shadowMinZ` 1, `shadowMaxZ` 240, the
+  light 120 m back. `transparencyShadow` so alpha-tested leaves cast
+  through their cut-outs. `?sunshadow=0|1` overrides; the Graphics pane's
+  "sun and moon shadows" (old key `keyShadowEnabled`) switches it. The
+  contact-shadow discs under figures stay at every quality.
+- `setTimeOfDay(hours)` interpolates keyframes (00, 04:36, 05:42, 07, 10, 15,
+  16:36, 17:30 golden, 18:36, 19:24 dusk, 20:24): sun colour and intensity
+  (3.8 at midday), moon intensity (.6-.75), sky top and horizon colours,
+  hemi sky/ground colours and intensity (.74 by day), environment intensity,
+  exposure (1.3 by day: sunlit plaster near-white cream, a shadowed cobble
+  mid-grey), cloud colour, star alpha. The sun rises in the east (-x), is
+  highest in the SOUTH (+z, the default follow camera's side, which looks
+  north: faces toward the camera are lit and shadows fall away to the side
+  and back; pass 1 had it in the north and the scene came out backlit and
+  murky) and sets in the west: morning from the south-east, evening from the
+  south-west. Between 20:24 and 04:36 the moon (fixed, high in the
+  south-west, cool blue) takes the same light. The haze is the horizon colour
+  leaned a little blue (aerial perspective); dusk is blue-violet. `setLighting(mode)`: bright 10:00, dim
+  19:00, night 23:00. Published as `tablefolk.setTimeOfDay` (installWorldAPI)
+  and `tablefolkLook.setTimeOfDay`; clock.js's quarter-hour hook calls it.
+- `setWorld({ underground, fogNear, fogFar, sky })` (terrain.js sets it by
+  the world's outside): underground worlds get no sun (intensity 0, still
+  there), a cool fill (.32, blue-grey) so unlit explored stone is dim but
+  legible, exposure 1.25, black fog and clear colour, no sky.
+- Fog is linear, from `radius + fogNear` to `radius + fogNear + fogFar` (the
+  camera's distance to its target; land 30/200, street 8/32, underground
+  6/26), recomputed each frame, so the board is
+  clear at any zoom; its colour is the horizon's (the clear colour too).
+- Sky: a 1000 m back-faced sphere (`sky_dome`, infinite distance, no fog)
+  wearing a 512 x 256 DynamicTexture repainted when the hour's colours change
+  (gradient, horizon band = fog colour, ~420 stars at night); `sky_clouds`, a
+  900 m sheet at 110 m with a tiling fbm cloud texture drifting (vertex alpha
+  fades it toward the horizon); `sky_sun`, an additive billboard disc in the
+  light's direction (smaller and pale as the moon). Off in the tabletop view.
+- House windows (walls.js) glow by the hour: `tablefolkWalls.setNight(k)`.
+
+## Board and floors (terrain.js, 2026-11-20)
+
+- `rebuildBoard()` (app.js) only keeps the logic's cells (`state.boardCells`,
+  sea cells excluded) and calls `tablefolkTerrain.rebuild()`. The old sculpted
+  tiles, baked tiles and edge columns are gone.
+- Meshes: `board_terrain` over the board and an 8-cell margin, vertices every
+  half cell, y 0 on every walkable cell; a vertex whose every touching cell is
+  sea dips to -.75. `board_terrain_far`, a 3 m grid (4 m at light) out to
+  170 m with the inner rectangle skipped (its vertices there at -.04):
+  hills (fbm, height only from 4 m outside the board, rising over 40 m) in
+  land mode, the sea floor where the sea is, flat in street/rock mode (and
+  short). `sea` (900 m, y -.22, dark, roughness .14, alpha .88) when there is
+  any sea; `state.seaLevel` is its height (falls).
+- Material: one PBRMaterial with the `TfTerrain` plugin (WGSL for WebGPU and
+  GLSL for the WebGL fallback). Each cell's layer: paint (grass ->
+  grass_meadow, stone -> cobblestone or flagstone underground, flagstone,
+  dirt -> dirt_path, sand, wood/oak/carpet -> wood_planks_worn, tile ->
+  flagstone, concrete/lava -> stone_floor_rough, water -> mud, sea -> sand),
+  else the default: grass_meadow (forest_floor for a generated forest),
+  wood_planks_worn for unpainted cells inside rooms (roofs.js findRooms),
+  flagstone underground. Outside the board: the commonest natural layer on
+  the board's rim (land), cobblestone (street), sand next to rim sea cells.
+  Layers are ordered by use; past the limit (4 light, 8 medium/high) a layer
+  maps to the nearest kept one by mean colour.
+- Textures: two `RawTexture2DArray`s built from the env WebPs (decoded with
+  `createImageBitmap` + OffscreenCanvas, mipmapped): colour.rgb + roughness
+  in alpha; normal.rg + AO in b + a height (luminance) in a. 1k at light and
+  medium, 2k at high (memory: 8 layers x 2 arrays at 1k is ~85 MB with
+  mips, at 2k ~340 MB). Samplers: these two and two control maps.
+- Control maps: two RGBA8 `RawTexture`s (layers 0-3, 4-7) at 8 texels a
+  cell over board + margin, each layer's 0/1 mask blurred twice with a box
+  of radius .5 cell (wide) and .14 cell (tight); per texel the result mixes
+  toward tight as the amount of built ground (cobbles, flagstones, planks)
+  nearby rises, so natural ground blends softly and built edges stay crisp;
+  normalised. Clamped: past the margin the edge texels carry on.
+- Shader (`CUSTOM_FRAGMENT_UPDATE_ALPHA`): world xz is the UV; the control
+  lookup is wobbled by two octaves of value noise (amplitude .32 cell) so
+  edges wander and never follow the grid; each layer with weight > .003 is
+  sampled with `textureSampleGrad` at its real tile size (`tileMeters`)
+  plus a per-layer offset (gradients from outside the branch: WGSL
+  uniformity), weighted pow(w, 1.6) x (.15 + height) (stones poke through
+  grass); colour to linear (pow 2.2), a low-frequency macro variation
+  (.16); the normal (OpenGL +Y: T = +x, B = cross(N, T)) replaces `normalW`;
+  roughness and AO (medium/high) go in through a regex replacement of
+  `var roughness: f32=reflectivityOut.roughness;` (also `aoOut`). Grid
+  overlay: lines at half-integers inside the board when `tfParams.x` is 1
+  (Graphics pane "show grid", `tablefolkTerrain.setGrid`, on in the tabletop
+  view). Never call `dpdx`/`fwidth` inside a branch (a WGSL error that only
+  showed with the shadow map off).
+- Before the textures arrive (and if the plugin fails) vertex colours carry
+  the layers' mean colours.
+- Floors: wood, oak, tile and concrete are flat textures in the terrain now
+  (no plank geometry, `floorLiftAt` 0); the rug (`buildRug`) still stands
+  3 cm up. Water and lava stay overlays (`rebuildPaint`): water is dark
+  (.05,.09,.10), roughness .12, alpha .8, over mud, so its shore blends.
+- Variation (pass 2): natural layers (`tfKind` 1) get patches of drier,
+  yellower and of lusher grass at 6-15 m (`tfPat` noise); dirt_path (`tfKind`
+  2) a lighter worn centre and darker edges by its control weight; on land
+  boards the far ground outside the board gets a rotated field patchwork
+  (26 x 17 m cells, three crop tints, soft darker seams, from 12 m out).
+  JS has the same noise (`patchAt`) so the tufts' instance colours follow
+  the patches.
+- Local lights: the terrain and the dungeon rock (`board_terrain`,
+  `board_rock`) take the local lights nearest the camera target (scenery.js
+  budget); before pass 2 floors got only the glow decals, so torch pools on
+  the ground were faint.
+- Ground cover (medium/high): `env-nature/cover` grass_tufts (4 meshes),
+  flowers (3), pebbles (5) as thin instances, deterministic per board seed,
+  on grass and forest-floor cells (open grass one tuft on about a third of the
+  cells, edges .6 + 1.5 per neighbouring path/wall/floor, kept .45 cell off a
+  path's side, none in rooms, on paths, floors or doorways), pebbles only by
+  paths and objects; instance colours (tufts lightened, tinted by the grass
+  patches); capped at 3500 (light: pebbles only, 500). Seen from above, open
+  tufts read as dark specks: hence the thin spread. They don't cast shadows.
+- `rebuildBoardSupport()` builds the physics ground and the pick plane as
+  before.
+- Terrain modes and the outside: see "The edge of the world" below.
 ## Instances and lights
 
 - Repeated things use thin instances (`thinInstanceSetBuffer('matrix' |
@@ -71,7 +180,7 @@ post-processing).
   clamps the `maxSimultaneousLights` setter of StandardMaterial and
   PBRMaterial, `window.TABLEFOLK_MAX_LIGHTS`; every light is computed for
   every pixel, and 8 -> 4 saved 5.4 ms of the Oracle's 9 ms GPU frame). There
-  are 4 global lights; local lights (`scenery.js` `trackLight`; at light
+  are 2 global lights (sky.js: sun, sky_fill; 4 before 2026-11-20); local lights (`scenery.js` `trackLight`; at light
   quality also the crystal lamps' `lamp_light`) are restricted with
   `includedOnlyMeshes`, each mesh getting the nearest that fit under the cap
   (refreshed every second, assigned only when a light's list changed:
@@ -79,16 +188,54 @@ post-processing).
   once took the first 8 lights in scene order and lava's light vanished: that
   is why the nearest-4 rule exists. Hidden meshes keep their nearby lights.
 
-### Surroundings (`app/surroundings.js`, 2026-11-14)
+### Start-up (look pass 3)
 
-Outdoor boards sit in a 280 m ground plane (just under the board's top, the
-grass texture tiled) and a band of trees beyond the edge: each tree model is
-loaded once, its meshes baked to model space (feet at 0, height 1) and drawn
-as thin instances (`thinInstanceSetBuffer`), so ~1000 trees cost one draw
-per mesh of each model. The fog thickens (0.03 for a forest) so the band
-fades out. Seeded by the scenario's seed; half the trees at light quality.
-Not pickable, no physics, not in any prompt. `scenario.js` calls `start(scn)`
-after each world (and sub-world) is built and `clear()` on exit.
+Measured with `startup.mjs`-style timing (scene ready, world active =
+scenario and player avatar, dressed = mesh count steady 3 s; hearthvale,
+light, this machine): control maps at 4 texels a cell (8 cost ~470 ms of
+main thread a build), terrain rebuilds coalesced (120 ms) and skipped when
+size, mode, paint, walls and grid are unchanged, ground texture arrays
+decoded once after `tablefolk-scenario-started` (vertex mean colours until
+then), roofs one a frame, the post-start wall rebuild skipped when every
+wall's look is unchanged, surroundings trees loaded in parallel, static
+props as hardware instances (`loadModelInstance`). `window.__tfMarks`
+holds the summed ms and counts of terrain control/arrays/build/cover, walls,
+roofs and surroundings. Most of what is left is Babylon's shader
+preprocessing, as on main.
+
+### The edge of the world (terrain.js, surroundings.js)
+
+`tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |
+street | none), else: rock for dark worlds, the dungeon base and generated
+dungeons/caves/crypts/castles/keeps/mines; sea when more than 60% of the
+board's rim is sea; street when the walls make rooms and under a quarter of
+the ground is outside them (a world that is all one building); else land.
+
+- land: the margin and the far mesh carry the rim's ground into hills and
+  haze (fog near 10, far 150 m); sea cells on the rim carry on outward as
+  sea (a coast). surroundings.js puts trees on the hills for every land
+  board: `"surroundings"` forest | fields | none, default forest for a
+  generated forest, else fields. Trees are the env-nature `.med` models at
+  real size (8-15 m), each model's meshes baked and drawn as thin
+  instances, standing at `tablefolkTerrain.heightAt`; forest: a 3.2 m
+  lattice from 3.5 m out to 60 m, thickening; fields: a 5 m lattice to 95 m,
+  lone trees and clumps (a sine pattern), a tree line at 55-75% of the
+  depth; half at light. Not pickable, no physics, no shadows.
+- rock: `board_rock`, solid rock at wall-top height over every cell outside
+  the rooms (roofs.js `findRooms().outside`, minus painted floors) and the
+  outer half of every wall cell facing it (half-cell quads; corners by the
+  diagonal rule), 10 cells past the board, with vertical faces where it
+  meets floor; stone_wall_rubble darkened, world UVs, single-sided, never
+  cut by the cutaway. Underground light (sky.js), black fog. In a dark world
+  the unexplored squares are rock too (darkness.js `known`): the rock is
+  rebuilt (throttled 350 ms, `refreshRock`) as the player explores, and
+  darkness.js draws no fog boxes in rock worlds. No sea plane in rock worlds
+  (the dungeon generator's "sea" squares are under the rock, dark stone).
+- street: cobblestone past the walls, fog at 3-29 m, the sky stays.
+- sea: sand under shallow water at the edge, the sea floor falling to
+  -2.6 m, open water to the horizon.
+- Walking off the board where `tablefolkTerrain.waterAt` is false stops the
+  walk at the edge (animate in app.js); into water it is still a fall.
 
 ## Glows and magic
 
@@ -118,23 +265,46 @@ after each world (and sub-world) is built and `clear()` on exit.
 
 ## Walls and doors
 
-- Styles: `tabletop` (joined stone-block sections), `stone` (dry-stone: flat
-  slab stones in a world-aligned sequence, so each stone belongs to the cell
-  containing its midpoint; isotropic grain; tight joints; capstones),
-  `modern`, `block`.
+- Styles: `stone` and `tabletop` (the default) are drawn by walls.js;
+  `modern` (painted panels) and `block` (cubes) keep app.js's builders.
+- walls.js (2026-11-20): every wall cell is one wall object for the logic;
+  the picture is a continuous run .32 thick through the cell centres (arms to
+  each wall neighbour, a post where runs meet), boxes with world-space UVs in
+  metres (faces projected on their dominant axis; the u axis turned so
+  opposite faces aren't mirrored) and the env textures scaled to their real
+  size, so courses run across cells and corners. Looks: `rubble`
+  (stone_wall_rubble, a stone_blocks_large cap .11 tall and .08 wider),
+  `blocks` underground (stone_blocks_large), `house` for walls next to a room
+  roofs.js will roof (`tablefolkRoofs.planned()`): a rubble plinth .42 high,
+  plaster_aged above, timber_dark sill, top plate, posts at corners and at
+  every even cell edge, one brace per even cell, and a window every 3 cells on
+  straight outside runs longer than 3 (a dark pane that glows warm at
+  dusk/night, a timber frame, mullion and transom; visual only). Cracked:
+  broken uneven tops, no cap; burned: dark vertex colour. Materials: colour,
+  OpenGL normal (`invertNormalMapX` true, `invertNormalMapY` false), the
+  roughness map as the metallic texture's green (`useMetallnessFromMetallicTextureBlue`
+  false, or the grey map made walls metallic), AO above light. 1k textures
+  (2k at high).
 - `wallH() = WALL_H * state.wallHeightScale`; doors are `max(.55, min(1.45,
-  wallH() - .3))` tall, a wooden leaf with the wall carried over the top
-  (stone walls stop at door frames; the mortar core is shortened at open
-  ends). A door swings open as anyone approaches; locked ones stay shut.
+  wallH() - .3))` tall. Over a door the wall carries on (plaster and top plate,
+  or stone and cap). Frames: timber jambs and lintel (house) or cut stone,
+  a timber threshold. The leaf is app.js `buildDoorLeaf` with the plank parts
+  in wood_planks_dark (`useVertexColors` off) and the iron straps and rings
+  as before. A door swings open as anyone approaches; locked ones stay shut.
+- Walls are rebuilt again 650 ms after a scenario starts (the rooms and the
+  outside are known then).
 - `app/cutaway.js`: with the follow camera, walls between the camera and the
   player are cut per pixel in the walls' own materials (a material plugin
   discards fragments above a stub height in the cut squares); geometry is
-  never changed (an older vertex clamp bent long walls into slopes). Cut
-  squares get a stone lid. The free camera uses a second mode (`half()`,
-  uniform `tfCut.z` = 2): every wall fragment above half the wall height is
-  discarded, with no lids (square lids looked like dark slabs over the thin
-  stone walls); the fog boxes' plugin (`attach(mat, true)`) ignores that
-  mode. `suspend(true)` returns the mode, `suspend(mode)` restores it.
+  never changed. Every mesh in `state.wallVisuals` is cut, so walls.js's
+  meshes need nothing more. walls.js materials are not back-face culled, and
+  the plugin draws a back face seen through a cut as a flat dark section
+  (`tfCutArea.w` 1; the fog boxes' instance 0), so a cut wall reads solid
+  rather than hollow with timber "teeth". Cut squares get a stone lid. The free camera uses
+  a second mode (`half()`, uniform `tfCut.z` = 2): every wall fragment above
+  half the wall height is discarded, with no lids; the fog boxes' plugin
+  (`attach(mat, true)`) ignores that mode. `suspend(true)` returns the mode,
+  `suspend(mode)` restores it.
 
 ## Darkness
 
@@ -152,15 +322,39 @@ boxes. Carried torches: a torch mesh at the hand's position kept upright
 `app/roofs.js`: rooms are found by flood-filling the board from its edge over
 everything that is not a wall or door (a one-square gap between two walls
 counts as a doorway); a room that fills its rectangle gets a gable roof built
-in a local frame: courses of thatch (each a box tipped a little steeper), a
+in a local frame: courses of roofing (each a box tipped a little steeper), a
 rolled eave and ridge, timber bargeboards, double-faced plaster gables, a tie
-beam and king post, and on some a chimney. Pieces are merged per material
-with `BABYLON.Mesh.MergeMeshes` after computing world matrices top-down.
-One shared thatch DynamicTexture (drawn transposed, because a box top's u
-runs down the slope) and a Sobel normal map; a cloned DynamicTexture never
-became ready, so slabs scale their UVs instead. Fade rule: 0 when the player
-is inside (or roofs are lifted by `tablefolkRoofs.toggle()` in tests), .22
-when the follow camera's ray hits it, else 1; never in the free camera.
+beam and king post, and on some a chimney. Roofing by house (seeded): thatch
+for rooms of 16 cells or fewer (and some others), else clay_roof_tiles or
+slate_roof; the env textures (turned a quarter so the courses run along the
+ridge, `wAng`), plaster_aged gables (UVs given to the triangles),
+timber_dark, rubble chimneys. Materials are shared by every roof of a kind,
+so the fade is per roof through each mesh's `visibility` (and roofs are
+disposed without their materials). Pieces are merged per material with
+`BABYLON.Mesh.MergeMeshes`; one roof a frame, nearest the player first (all
+at once took ~2.5 s of one frame in a big village).
+
+Building shells (look pass 3): homes and workplaces stay walk-in rooms
+(jobs.js needs their beds and stations on the same map), but outside a room
+gets the matching env building model as its exterior instead of a code roof
+(`planShell`, `buildShell`): chosen by the room's role from `state.places`
+(tavern/inn: inn, smithy: blacksmith, stable/barn, guardhouse: barracks,
+mill, homes and shops: house, fantasy, stone or tall house; a home or
+farmhouse too big for those: inn, mill house, barracks), seeded, the last
+choice avoided; turned so its +z front faces the room's door side; scaled
+non-uniformly to the room's outer size when within 0.75-1.25 on both axes
+(else the code roof). A shell is a roof entry: it fades with the same rule
+(gone while the player is in the room or its doorway, also in first person;
+see-through when the follow camera's ray to the player crosses its bounding
+box), and while it stands the characters inside are hidden (`g._shellHidden`,
+kept apart from the fog of war's `_fogHidden`). Visual only: walls, door,
+sight and paths are the room's; the room's code walls sit inside the model's
+walls. `"shells": false` (scenario or `generate`) keeps code roofs.
+`tablefolkRoofs.shells()` lists them. `planned()` lists the rooms that get (or will
+get) a roof (walls.js), `findRooms()` the rooms and the outside squares
+(terrain.js). Fade rule: 0 when the player is inside (or roofs are lifted by
+`tablefolkRoofs.toggle()` in tests), .22 when the follow camera's ray hits
+it, else 1; never in the free camera.
 
 ## Characters
 
@@ -173,10 +367,8 @@ when the follow camera's ray hits it, else 1; never in the free camera.
   skeletons are disposed. The `_Head` mesh is gone after the first frame.
 
 - Finish: every person (`createFigure`, `createPerson`) gets `toyFinish()`,
-  the toy-plastic look of the tiles and props: metallic 0, baked
-  roughness/metalness maps ignored (AO kept), roughness .4, clear coat .6
-  (rough .12), environment 1. The environment reflection carries the gloss
-  on light quality, which has no post effects.
+  now look.js `matte()`: the model's own maps, roughness at least .55 (metal
+  .3), no clear coat (2026-11-20; it was a glossy toy plastic).
 - Bodies are in `FIGURES` (`app/app.js`): KayKit chibi people with the 8
   KayKit animation packs, Quaternius models with their own clips mapped to
   the game's names (`FIG_CLIPS`, `figClipName`), Universal-rig figures, Meshy
@@ -258,6 +450,53 @@ emissive and slightly grey paper (bloom washed them out). Floor notes sit at
 y .075 (they were buried) and turn to read from the south.
 
 ## Light quality (`?gfx=light`, Graphics pane)
+
+Since 2026-11-20 (the new look): light has the sun's shadow map (1024,
+QUALITY_LOW, every second frame), 1k terrain textures with at most 4 layers
+and constant roughness, walls and roofs with colour and normal maps only,
+the `.med` trees and `.1k` env models, pebbles but no grass or flowers, no
+post-process pipeline, SSAO or glow, `adaptToDeviceRatio` off, at most 6
+lights per material. Medium: shadow every second frame, 1k terrain with
+roughness and AO (8 layers), 1k env models, ground cover, bloom; high: 2k
+everything, SSAO, the shadow every frame.
+
+Measured 2026-11-20 (RTX 2060, 1920x1080, headless Chrome, `profile.mjs`
+QUICK with 40 s to settle; WebGPU timestamps read 0 on this driver, so the
+GPU figure is the median submit-to-done latency, `lat`; memory is the Chrome
+GPU process in a fresh Chrome after 35 s; the GPU is shared with another
+job's model, so expect +-1-2 ms noise):
+
+| scene | tier | CPU render ms before / after | lat ms before / after | draw calls before / after | GPU MiB before / after |
+|---|---|---|---|---|---|
+| the Oracle | light | 5.8 / 4.6 | 4.3 / 3.9 | 72 / 164 | 304 / 525-602 |
+| the Oracle | medium | 5.8 / 6.9 | 3.8 / 4.9 | 154 / 274 | - |
+| market village | light | 6.7 / 7.4 | 3.2 / 4.9 | 79 / 328 | 815 / 850-863 |
+| market village | medium | 8.7 / 10.6 | 4.0 / 6.5-10.9 | 172 / 202 | 953 / 1204 |
+
+After pass 2 (same method, 45 s to settle): the Oracle light 4.5 ms CPU,
+3.3 lat, 158 draws, 418-426 MiB; medium 6.8 / 4.6 / 276; market village
+light 6.4 / 3.8 / 251, 858 MiB; medium 9.2 / 5.3 / 358, 1260 MiB.
+
+After pass 3 (props as instances, small things cast no sun shadow): the
+Oracle light 4.1 ms CPU, 3.4 lat, 131 draws; medium 7.2 / 4.8 / 245; market
+village light 6.5 / 3.6 / 149; medium 8.4 / 5.1 / 247. Start-up, warm cache
+(world active / fully dressed, s): hearthvale light main 5.3 / 9.3, now 5.5 /
+10.2; the Oracle 3.8 / 6.6 vs 3.8 / 7.3; goblin-bakery 3.3 / 5.1 vs 4.5 / 6.4.
+
+The extra draw calls are the shadow pass (every caster again), the
+real-model trees (several meshes each), the ground cover kinds and the
+surroundings' tree meshes. Without the shadow map the market village at
+medium drew 200 calls instead of 442 (before the every-second-frame refresh).
+
+Pass 2 (light-tier memory, the Oracle, fresh Chrome, +-50 MiB noise): all
+on 517 MiB; without the surroundings' trees 419; without ground cover,
+without the terrain's texture arrays or without the sun's shadow map, no
+change beyond the noise. So at light quality the surroundings use three
+tree models that share bark and leaf textures and drop their normal and
+roughness maps, the terrain arrays are 512 px, walls and roofs have colour
+and normal maps only, and wall materials are made on first use.
+
+Before 2026-11-20:
 
 Measured on the haunted tavern (2026-10-31): the test Chrome's GPU process
 281 MiB at light, 620 at medium. Light: the simple voxel island and sea, no

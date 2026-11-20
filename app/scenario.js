@@ -998,6 +998,8 @@
       remembers: s.remembers === false ? false : null,   // mind.js: characters remember the player between visits (this browser)
       memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
       surroundings: ['forest', 'fields', 'none'].includes(s.surroundings) ? s.surroundings : null,   // surroundings.js: beyond the board's edge
+      outside: ['land', 'sea', 'rock', 'street', 'none'].includes(s.outside) ? s.outside : null,
+      shells: s.shells === false ? false : null,   // roofs.js: building models over homes and workplaces (false: code-built roofs)   // terrain.js: what the ground beyond the board is (default by world kind)
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: s.brain === 'none' ? 'none' : typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
@@ -1093,6 +1095,7 @@
     // The base's content and the grid become ordinary objects, paint and
     // positions for the build; the link and restart keep the compact form.
     const scn = expandBuildings(expandGrid(expandBase(base)));
+    w.state.envScn = scn;   // terrain.js and sky.js read the world's kind while it is built
     // Layers, later wins per cell: the base's sea, then the grid, then "paint".
     scn.paint = [...(scn.basePaint || []), ...scn.paint];
     stopChecker();

@@ -1,4 +1,7 @@
-/* tablefolk.world - shared "painted clay diorama" look.
+/* tablefolk.world - the shared materials and post-processing: matte,
+ * weathered, painterly-realistic since 2026-11-20 (a glossy "painted clay
+ * diorama" before; the notes below are about those older assets). sky.js has
+ * the light, the sky and the time of day.
  *
  * SINGLE SOURCE OF TRUTH for materials + post-processing, so that app.js and
  * app/tilepreview.html cannot drift apart (this codebase already got burned by
@@ -27,15 +30,13 @@
 
   const DEFAULTS = {
     detailNormalUrl: (window.tablefolkPacks?.base || './assets/') + 'textures/detail_clay_n.png',
-    rough: 0.24,        // deliberately glossy global finish
-    detail: 0.11,       // locked subtle clay tooth; >0.3 reads as crusty sand
-    detailScale: 5,     // detail map UV tiling per unit tile
-    envIntensity: 0.85
+    minRough: 0.55,     // matte: nothing is glossier than this (metals: METAL_MIN)
+    envIntensity: 0.55  // moderate image-based light; the sky fill and sun do the rest
   };
+  const METAL_MIN = 0.3, METAL_RE = /metal|iron|steel|gold|silver|brass|bronze|copper|blade|sword|axe|armou?r|chain|nail|coin/i;
 
   let _detailTex = null;
   let _detailUrl = DEFAULTS.detailNormalUrl;
-
   function detailNormal(scene) {
     if (!_detailTex || _detailTex.getScene() !== scene) {
       _detailTex = new BABYLON.Texture(_detailUrl, scene, false, false);
@@ -44,44 +45,81 @@
     return _detailTex;
   }
 
-  function applyClayLook(m, scene, opts) {
-    if (!m) return m;
+  // Roughness floor for materials whose roughness comes from a texture (the
+  // factor can only lower it): a plugin clamps it in the shader, right after
+  // the reflectivity block, so a glossy map can't make plastic.
+  let MattePlugin = null;
+  function matteClass() {
+    if (MattePlugin) return MattePlugin;
+    const WGSL = BABYLON.ShaderLanguage?.WGSL;
+    MattePlugin = class extends BABYLON.MaterialPluginBase {
+      constructor(mat, min) { super(mat, 'TfMatte', 250, { TFMATTE: false }); this.min = min; this._enable(true); }
+      getClassName() { return 'TfMattePlugin'; }
+      isCompatible() { return true; }
+      prepareDefines(d) { d.TFMATTE = true; }
+      getUniforms(lang) { const ubo = [{ name: 'tfMatte', size: 1, type: 'float' }]; return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFMATTE\nuniform float tfMatte;\n#endif\n' }; }
+      bindForSubMesh(ubo) { ubo.updateFloat('tfMatte', this.min); }
+      getCustomCode(type, lang) {
+        if (type !== 'fragment') return null;
+        if (lang === WGSL) return { '!var roughness: f32=reflectivityOut\\.roughness;': 'var roughness: f32=max(reflectivityOut.roughness,uniforms.tfMatte);microSurface=1.0-roughness;' };
+        return { '!float roughness=reflectivityOut\\.roughness;': 'float roughness=max(reflectivityOut.roughness,tfMatte);microSurface=1.0-roughness;' };
+      }
+    };
+    return MattePlugin;
+  }
+
+  // The finish of everything (2026-11-20): matte, weathered, each model's own
+  // PBR maps. No clear coat, no forced gloss, no clay detail normal. Plain
+  // (untextured) roughness is raised to minRough; a roughness map is clamped
+  // in the shader. Metallic only where a metallic map says so or the
+  // material is named as metal (glTF's default metallicFactor 1 without a
+  // map made props chrome); metals keep down to METAL_MIN.
+  function matte(m, opts) {
+    if (!m || m._tfMatte) return m;
     const o = Object.assign({}, DEFAULTS, opts || {});
     if (m instanceof BABYLON.PBRMaterial) {
-      m.metallic = 0;
-      m.useMetallnessFromMetallicTextureBlue = false;
-      // The requested global wet/glazed finish overrides baked ORM roughness.
-      m.useRoughnessFromMetallicTextureGreen = false;
-      m.useRoughnessFromMetallicTextureAlpha = false;
-      m.roughness = o.rough;
-      m.environmentIntensity = o.envIntensity;
-      m.specularIntensity = 0.5;
-      if (o.detail > 0) {
-        const t = detailNormal(scene);
-        m.detailMap.texture = t;
-        m.detailMap.texture.uScale = o.detailScale;
-        m.detailMap.texture.vScale = o.detailScale;
-        m.detailMap.isEnabled = true;
-        m.detailMap.bumpLevel = o.detail;
-        m.detailMap.diffuseBlendLevel = 0;
-        m.detailMap.roughnessBlendLevel = 0;
-      }
+      m._tfMatte = true;
+      const metal = !!m.metallicTexture || METAL_RE.test(m.name || '');
+      if (!metal) m.metallic = 0;
+      const min = metal ? METAL_MIN : o.minRough;
+      try { m.clearCoat.isEnabled = false; } catch {}
+      try { if (m.detailMap) { m.detailMap.isEnabled = false; m.detailMap.texture = null; } } catch {}
+      if (m.roughness == null) m.roughness = 1;
+      const fromMap = m.metallicTexture && (m.useRoughnessFromMetallicTextureGreen || m.useRoughnessFromMetallicTextureAlpha);
+      if (!fromMap) m.roughness = Math.max(m.roughness, min);
+      else if (!m._tfMattePlugin) { try { m._tfMattePlugin = new (matteClass())(m, min); } catch (e) { console.warn('[look] matte plugin', e); } }
+      m.environmentIntensity = Math.min(m.environmentIntensity ?? 1, o.envIntensity);
+      m.enableSpecularAntiAliasing = true;
     } else if (m instanceof BABYLON.StandardMaterial) {
-      // StandardMaterial ignores the IBL for diffuse so it can never fully
-      // match a PBR asset. At minimum kill the plastic highlight.
-      m.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-      m.specularPower = 128;
+      m._tfMatte = true;
+      m.specularColor = new BABYLON.Color3(0.06, 0.06, 0.06);
+      m.specularPower = 16;
     }
     return m;
   }
-
+  // glTF files that use the same image files (the env-nature trees share
+  // their bark and leaf atlases) each decode their own copy: point every
+  // material at one texture per image URL and drop the duplicates.
+  const _shared = new Map();
+  const SLOTS = ['albedoTexture', 'bumpTexture', 'metallicTexture', 'ambientTexture', 'emissiveTexture', 'opacityTexture'];
+  function shareTextures(materials) {
+    for (const m of materials || []) for (const k of SLOTS) {
+      const t = m && m[k]; const url = t && t.url; if (!url || /^(data|blob):/.test(url)) continue;
+      const key = url + '|' + t.coordinatesIndex + '|' + t.uScale + '|' + t.vScale;
+      const have = _shared.get(key);
+      if (have && have !== t && !have.isDisposed?.() && have.getScene?.() === t.getScene?.()) { m[k] = have; try { t.dispose(); } catch {} }
+      else if (!have || have.isDisposed?.()) _shared.set(key, t);
+    }
+  }
+  // old names: every caller now gets the matte finish
+  function applyClayLook(m, scene, opts) { return matte(m, opts); }
   function applyClayLookToMeshes(meshes, scene, opts) {
     const seen = new Set();
     for (const mesh of meshes || []) {
       const m = mesh && mesh.material;
       if (!m || seen.has(m.uniqueId)) continue;
       seen.add(m.uniqueId);
-      applyClayLook(m, scene, opts);
+      if (m.subMaterials) for (const sm of m.subMaterials) matte(sm, opts); else matte(m, opts);
     }
   }
 
@@ -89,8 +127,8 @@
   function applyTonemap(scene, o) {
     o = o || {};
     const ip = scene.imageProcessingConfiguration;
-    ip.exposure = o.exposure !== undefined ? o.exposure : 1.28;
-    ip.contrast = o.contrast !== undefined ? o.contrast : 1.10;
+    ip.exposure = o.exposure !== undefined ? o.exposure : 1.0;
+    ip.contrast = o.contrast !== undefined ? o.contrast : 1.06;
     const mode = o.tonemap || 'neutral';
     if (mode === 'none') {
       ip.toneMappingEnabled = false;
@@ -101,14 +139,11 @@
         ? N
         : BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
     }
-    if (o.grade === false) { ip.colorCurvesEnabled = false; return; }
+    if (o.grade !== 'warm') { ip.colorCurvesEnabled = false; return; }
     try {
       const cc = new BABYLON.ColorCurves();
-      cc.shadowsHue = 195; cc.shadowsDensity = 26;
-      cc.shadowsSaturation = -6; cc.shadowsExposure = 5;
-      cc.midtonesSaturation = 4;
-      cc.highlightsHue = 40; cc.highlightsDensity = 16; cc.highlightsSaturation = -4;
-      cc.globalSaturation = 6;
+      // a faint warm grade only (the teal shadow grade is gone)
+      cc.highlightsHue = 40; cc.highlightsDensity = 8; cc.globalSaturation = -4;
       ip.colorCurves = cc;
       ip.colorCurvesEnabled = true;
     } catch (e) { console.warn('color curves unavailable', e); }
@@ -138,7 +173,10 @@
   window.TABLEFOLK_LOOK = {
     DEFAULTS,
     setDetailNormalUrl(u) { _detailUrl = u; _detailTex = null; },
+    METAL_RE,
     detailNormal,
+    matte,
+    shareTextures,
     applyClayLook,
     applyClayLookToMeshes,
     applyTonemap,
