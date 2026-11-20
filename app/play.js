@@ -436,13 +436,15 @@
   // cells a turn) when it can see the player within 8 cells.
   // Whom a monster goes after: the player, or with the scenario's
   // "monsters": "everyone" (or the agent's "hunts": "everyone") also the
-  // characters, the nearest it can see within 8 cells (survival worlds).
+  // characters, the nearest it can see within 8 cells (survival worlds);
+  // the default while the world lives (2026-11-20), "monsters": "player" not.
   function preyFor(c) {
     const pl = me(), a = c.logicalPos || c.root.position, cfg = getBrainConfig(c.id);
     // hostile toward someone in particular (mind.js tempers): only them
     const grudge = hostileTarget(c); if (grudge) return grudge;
     if (!isHostile(c)) return null;
-    const all = (cfg.hunts || state.monsters) === 'everyone';
+    // a living world (live.js on): everyone, unless the scenario says "monsters": "player"
+    const all = (cfg.hunts || state.monsters || (window.tablefolkLive?.on ? 'everyone' : 'player')) === 'everyone';
     const cand = [pl, ...(all ? state.characters.filter(o => o !== c && !isHostile(o) && !isAnimal(o)) : [])]
       .filter(o => o && !o.defeated && !(o !== pl && getBrainConfig(o.id).defeated));
     let best = null, bd = 1e9;

@@ -54,14 +54,22 @@ player's `"player": {"hp": 20}` (default 20).
   fights with the same routine and still talks: when spoken to, and one line
   as the fight starts (words only on those turns: say, whisper, emote).
 - In a living world ([living.md](living.md)) monsters come for the player
-  when near and in sight, else wander. A fighter with prey in sight acts
-  every 1.5-2.5 s whatever the pace.
+  and the characters when near and in sight, else wander
+  (`"monsters": "player"`: only the player, as before 2026-11-20). A fighter
+  with prey in sight acts every 1.5-2.5 s whatever the pace.
+- **Threats** (`"threats"`, [living.md](living.md#threats-threats)): raiders on
+  the clock. Guards and hunters go to them, the others hide at home; raiders
+  fight to the end, or leave at dawn or when half of them are down.
 - **Pushed too far**: a character insulted again and again (tempers,
   [characters.md](characters.md)) that is brave or a fighter becomes hostile
   toward that one only: one line, then the same routine against them, a
-  blow every 1.5-2.5 s in a living world. It stops when they are down, out
-  of sight for a minute, or have apologised or paid. A guard called for help
-  does the same after one warning. `"tempers": false` turns this off.
+  blow every 1.5-2.5 s in a living world. It is a quarrel, not a fight to
+  the death: it stops when the other is down to a third of their health,
+  gives in ("I yield", "I give up", "mercy"), runs off (out of sight for 15
+  s), apologises or pays; the fighter says its piece ("That's enough. Get out
+  of here.") and will not serve them. A guard called for help does the same
+  after one warning. Monsters, raiders and scenario `"hostile"` characters
+  still fight to the end. `"tempers": false` turns this off.
 - Allow `attack` only for characters who should fight, and say in the
   personality when they do ("If insulted twice, attack(player)."); the
   tempers above work without it.

@@ -23,6 +23,7 @@
  *
  *   window.tablefolkDirector.tick(c)     live.js, after c's turn
  *   window.tablefolkDirector.now(text?)  make something happen now (tests, dev)
+ *   window.tablefolkDirector.narrate(t)  the narrator's line alone (threats.js)
  * Loaded after live.js; uses app.js globals.
  */
 (function () {
@@ -183,5 +184,5 @@
     const c = list[Math.floor(Math.random() * list.length)];
     return happen(c, text ? { text } : pick(c));
   }
-  window.tablefolkDirector = { tick, now, happen };
+  window.tablefolkDirector = { tick, now, happen, narrate };
 })();

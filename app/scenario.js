@@ -944,10 +944,16 @@
       voices: Array.isArray(s.voices) ? s.voices.filter(v => v && typeof v === 'object' && /^[A-Za-z0-9_-]{1,32}$/.test(String(v.id || '')) && typeof v.sample === 'string' && /^data:audio\//.test(v.sample)).slice(0, 32) : [],
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // mind.js: news passed between characters, reflection, how much the game helps the characters; play.js: who monsters go after
-      gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: s.monsters === 'everyone' ? 'everyone' : 'player',
+      gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null, monsters: ['everyone', 'player'].includes(s.monsters) ? s.monsters : null,   // unset: everyone in a living world, the player otherwise (play.js preyFor)
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
       // mind.js tempers: insults anger characters and push them to refuse, order out, call for help or fight ("tempers": false: off); how quickly ("temper": short | normal | long, agents may override)
       tempers: s.tempers !== false, temper: ['short', 'normal', 'long'].includes(s.temper) ? s.temper : null,
+      // clock.js: the time of day ("time": "08:00", "dayMinutes": 12 real minutes a day, 0 frozen; "clock": false: none)
+      time: typeof s.time === 'string' && /^\d{1,2}:\d{2}$/.test(s.time) ? s.time : null, dayMinutes: Number.isFinite(+s.dayMinutes) && s.dayMinutes !== null && s.dayMinutes !== '' ? Math.max(0, Math.min(240, +s.dayMinutes)) : null, clock: s.clock === false ? false : null,
+      // threats.js: raids, rats, bandits and package kinds on the clock; mind.js: "harsh": starving drains health
+      threats: Array.isArray(s.threats) ? s.threats.filter(t => t && typeof t === 'object' && typeof t.kind === 'string').slice(0, 12).map(t => ({ ...t, kind: String(t.kind) })) : [], harsh: s.harsh === true,
+      // jobs.js: the world's prices (item: gold), over the jobs' own
+      prices: s.prices && typeof s.prices === 'object' && !Array.isArray(s.prices) ? Object.fromEntries(Object.entries(s.prices).filter(([, v]) => Number.isFinite(+v)).map(([k, v]) => [String(k).toLowerCase(), Math.max(0, +v)])) : {},
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // subworlds: other maps (a building's inside, a dungeon) the player walks into through a link at a square
       subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},
@@ -1043,7 +1049,11 @@
       if (r.status === 'rejected') { console.error(r.reason); window.tablefolkToast?.('asset pack failed: ' + r.reason.message, { type: 'error' }); }
     }
     // Packages (packages.js): their items, skills, roles and workflows.
+    // (what the last scenario's packages brought goes first: they must not leak into this one)
+    if (!opts.sub) window.tablefolkPackages?.reset?.();
     const packageWarnings = window.tablefolkPackages ? await window.tablefolkPackages.loadAll(base.packages) : [];
+    // jobs.js: the built-in jobs and any the agents name by reference
+    if (!opts.sub && window.tablefolkJobs) packageWarnings.push(...await window.tablefolkJobs.load(base).catch(e => [e.message]));
     const parentAgents = opts.restore ? base.agents : null;
     // the world's own voices (a subworld keeps its parent's unless it brings its own)
     if (!opts.sub || base.voices.length) try { window.tablefolkTTS?.setScenarioVoices?.(base.voices); } catch (e) { console.warn('[voices]', e); }
@@ -1068,7 +1078,7 @@
     window.tablefolkStory?.reset(scn.flags, scn.facts, scn.triggers);   // story.js
     w.state.onlySpokenTo = scn.onlySpokenTo ?? null; w.state.simple = scn.simple ?? null; w.state.systemPrompt = scn.systemPrompt || '';
     window.tablefolkBooks?.load(scn.books, scn.agents);
-    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || 'player'; w.state.tempers = scn.tempers !== false; w.state.temper = scn.temper || null; w.state.ladderFight = null;   // workflows.js   // generated maps' rooms and buildings (senses.js)
+    w.state.lore = scn.lore || []; w.state.food = scn.food || []; w.state.needs = scn.needs !== false; w.state.mind = scn.mind !== false; w.state.gossip = scn.gossip !== false; w.state.reflect = scn.reflect !== false; w.state.reflexes = scn.reflexes !== false; w.state.plans = scn.plans !== false; w.state.autoThink = scn.autoThink !== false; w.state.glances = scn.glances !== false; w.state.expect = scn.expect || null; w.state.monsters = scn.monsters || null; w.state.harsh = !!scn.harsh; w.state.tempers = scn.tempers !== false; w.state.temper = scn.temper || null; w.state.ladderFight = null;   // workflows.js   // generated maps' rooms and buildings (senses.js)
     w.setCampfire?.(scn.campfire);
     w.state.globalHistory = [];
     w.setAllowed(scn.allowed);
