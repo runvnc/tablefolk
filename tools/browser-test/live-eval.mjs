@@ -105,9 +105,10 @@ console.log('open', url);
 await page.goto(url);
 for (;;) {
   const s = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.(), consent: !document.getElementById('modelConsent')?.hidden, st: document.getElementById('brainStatus')?.textContent, n: window.TABLEFOLK_STATE?.characters?.length, key: window.tablefolkBrainInfo?.()?.key })).catch(() => ({}));
-  if (s.consent) { console.log('model download prompt showing: not approving it; stopping'); process.exit(2); }
+  if (s.consent && process.env.APPROVE_DOWNLOAD === '1') { await page.evaluate(() => document.getElementById('approveModelDownload')?.click()); await page.waitForTimeout(2000); continue; }   // (a rented test machine: tools/cloud-gpu)
+  if (s.consent) { console.log('model download prompt showing: not approving it; stopping (APPROVE_DOWNLOAD=1 to allow)'); process.exit(2); }
   if (s.ready && s.n) { console.log(`ready in ${ts()} s: ${s.st} (${s.key})`); break; }
-  if (ts() > 240) { console.log('never ready', JSON.stringify(s)); process.exit(3); }
+  if (ts() > (+process.env.READY_TIMEOUT || 240)) { console.log('never ready', JSON.stringify(s)); process.exit(3); }
   await page.waitForTimeout(1000);
 }
 // hooks: prompts, agent turns, spoken lines, the history with its results
