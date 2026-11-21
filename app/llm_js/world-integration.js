@@ -1,6 +1,6 @@
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261115d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261121a';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261115d';
+import { installDevConsole } from './dev-console.js?v=20261121a';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';

@@ -558,6 +558,11 @@ async function sendTurn(conversation, promptText, opts, onToken) {
     throw err;
   }
 
+  // Out of graphics memory, the engine does not fail: its buffers are invalid
+  // and every token is id 0, NUL characters (Raon-1 nano beside another page's
+  // model on a 6 GB card, 2026-11-21). Say so instead of "speaking" them.
+  if (/^\0+$/.test(fullText.trim())) throw new Error('the model wrote only NUL characters: the graphics card is probably out of memory');
+  fullText = fullText.replace(/\0/g, '');
   console.log('[litert-worker] RAW LiteRT OUTPUT:', fullText);
   const { text, thinking } = splitThinking(fullText);
   const allThinking = [channelText.trim(), thinking].filter(Boolean).join('\n');
