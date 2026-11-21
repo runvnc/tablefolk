@@ -545,3 +545,38 @@ hide" from a raid (the route home never worked): they now stay put and
 sleep where they are. The first full run stalled with 100 s model calls
 (the test Chrome's GPU state after many reloads, with the rendering job's
 Chrome on the same card): a fresh Chrome per run fixed it.
+
+## Integration checks after the merges (2026-11-21)
+
+No-model suites on the merged code: `sections-test` 37/37 (marker names
+are now `link_<kind>_<material>`), `package-test` 59/59, `libs/script`
+35/35, `libs.mjs check` ok, `check-api-doc` 135 names found. `uses-test`
+ran through (GPU out-of-memory noise from another job's model on the same
+card). `willow-lane-test` and `live-pending-test` need EmbeddingGemma or
+Gemma: with another job's 3-4 GB model on the 6 GB card they failed or
+hung (menu matching by meaning got no embeddings); rerun them on a free
+card.
+
+`run-evals.sh` (E2B, RUNS=2, the card free): 33/36: shop-role-chaos 8/8,
+shop-chaos 7/8 (haggle to 45 2/2 now that `sell(x) N` and `use(sell(...))`
+parse), feelings-chaos 4/4, smithy 4/4, roles 6/8 (quest giver 0/2: old_tom
+never named the hollow or the den: "Could you give_quest(find missing
+sheep)?" inside a say line), companion 4/4. shop-chaos twice more: 6/8
+(potion 1/2: `give(healing potion) 8`, left unparsed on purpose; haggle 1/2:
+sold at 50 after agreeing to 45) and 8/8.
+
+Hearthvale's day with a trip to the Wolfwood at 12:00 for 1.5 game hours
+(`live-eval --day --day-minutes=8 --label=sections` beside `sections-day.mjs
+--at=12 --hours=1.5`): while away 0 model calls and 0 lines from the
+village; the catch-up for 109 game minutes moved 7 workers to their places,
+put the night-watch guard to bed, regrew 3 things, fed nobody; job cycles
+farmer 6, baker 2, innkeeper 4, smith 3, woodcutter 4, guard 14 (places),
+hunter 2, child 9 (last hearthvale day: 7, 4, 7, 7, 6, 4, 3, 8); 27 model
+calls (1.1 a game hour, was 1.5); evening model lines 2.3 a game hour (was
+4.0); 6 sales; three slept on the floor at home (counted as sleep); five
+ended the day hungry (.59-.69), all having just woken at 05:35 with the
+day ending at 06:41 (the catch-up had set their hunger as if they ate at
+midday, so they got hungry in the night). A control day without the trip
+could not be run cleanly (the other job's model on the card: the brain took
+110-190 s to load and the world stalled).
+
