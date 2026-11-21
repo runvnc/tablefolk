@@ -85,6 +85,12 @@ whole microphone path: `CHROME_EXTRA="--use-fake-ui-for-media-stream
 --use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>"`
 for `launch-chrome.sh`, then click `#micBtn` twice.
 
+Reply parsing (no browser): `node tools/browser-test/reply-parse-test.mjs` checks
+`app/llm_js/reply-clean.js`: a stray quote after a command's bracket
+(`say("...")". walk(tam)`, Raon-1 nano) and code-style endings split into
+clean command lines; spoken words are counted in any script (a Korean line
+counted 0 words and was turned into an emote, for Raon and E2B alike).
+
 Scripted (no model): `uses-test.mjs` drives every kind of `use`, `put`, `take`, `close` and the player's E, with shots in `results/uses`.
 
 

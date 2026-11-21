@@ -1,3 +1,4 @@
+import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
 import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261121d';
 import { localClient } from '../../libs/brain/engines/openai.js';
 import { installDevConsole } from './dev-console.js?v=20261121d';
@@ -1194,7 +1195,8 @@ async function main() {
         return '\n' + name + '(' + args.map(a => /^-?\d+(\.\d+)?$/.test(a) ? a : JSON.stringify(a)).join(', ') + ')\n';
       }).replace(/<\/?tool_call>/g, '');
       // a command line ended like code, say("...");, is the command (E2B copied it from its own history: 'unknown command')
-      line = String(line || '').replace(/\)[ \t]*[;.][ \t]*$/gm, ')');   // (and say("..."). at chaos 50: the sword sale's first line was lost)
+      // (and say("..."). at chaos 50: the sword sale's first line was lost; say("...")" with a stray quote: Raon-1 nano) reply-clean.js
+      line = cleanReply(line);
       if (simple) line = simpleReply(world, g, line);
       const planLines = (typeof window.splitPlanLines==='function' ? window.splitPlanLines(line) : String(line || '').split('\n').map(l => l.trim()).filter(Boolean));
       // A line that isn't shaped like a command, name(...), is speech: small
@@ -1286,7 +1288,7 @@ async function main() {
       // A line under four words ("Hush." "it is, wren") is not spoken unless it
       // answers a yes/no question: the character emotes instead.
       if (!simple && !chatTestMode && !askedYesNo) for (const c of planCmds) {
-        if ((c.kind !== 'say' && c.kind !== 'whisper') || String(c.text || '').split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).length >= 4) continue;
+        if ((c.kind !== 'say' && c.kind !== 'whisper') || wordCount(c.text) >= 4) continue;   // (any script: a Korean line counted 0 words and became an emote)
         const t = String(c.text || '').trim();
         c.kind = 'emote'; c.emote = /^(hmph|humph|hm+|ugh|bah|pfft|tch)\b/i.test(t) ? 'huff' : /^(hush|shh+|quiet)\b/i.test(t) ? 'shush' : /^(no|nope|never|nah)\b/i.test(t) ? 'shrug' : /^(hello|hi|hey|greetings|good (day|morning|evening|night)|well met)\b/i.test(t) ? 'wave' : /\?$/.test(t) ? 'frown' : /!$/.test(t) ? 'scowl' : 'nod'; delete c.text;
       }
