@@ -152,6 +152,7 @@
   function diagRow() {
     const r = profile(null), pr = probe.result();
     const what = { rails: 'the game runs their day; the model talks', guided: 'they pick each next activity and plan their day; the game carries it out', free: 'they act on their own (do, plan, talk); the game carries out each activity' }[r.level] + (r.preset === 'assisted' || r.label !== r.preset ? '; ' + PF().DOMAINS.filter(d => r.domains[d] === 'code').join(', ') + ' in code' : '');
+    if (pr?.garbled) return ['Characters decide', 'rails', 'the model\'s answers came back garbled on this graphics card: its results are wrong here', 'bad', 'capability check: garbled output; try another model, browser or graphics driver'];
     return ['Characters decide', r.label, what, probe.running ? 'busy' : 'ok', r.why + (pr ? ` · check: ${pr.score}/${pr.of} (${Object.entries(pr.tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ') || 'all passed'}), ${pr.tokS} tok/s, ${pr.seconds} s` : '')];
   }
 
@@ -226,7 +227,11 @@
         try { const r = await window.tablefolkLLM.chat.completions.create({ messages: SPEED.msgs, max_tokens: SPEED.max, temperature: 0, agentId: 'probe' }); so = clean(r?.choices?.[0]?.message?.content); } catch {}
         const sec = Math.max(.05, (performance.now() - s0) / 1000), tokS = +(so.length / 4.2 / sec).toFixed(1);
         const score = Object.values(tasks).filter(t => t.ok).length;
-        const res = { v: PROBE_V, brain: brainKey(), card: probeKey().split(':').slice(3).join(':'), score, of: TASKS.length, tokS, seconds: +((performance.now() - t0) / 1000).toFixed(1), tasks, at: new Date().toISOString() };
+        // garbled answers ("!!!!!!", every task): the graphics card computes wrong results with this
+        // engine (an RTX 4070 host did, for LiteRT and Bonsai alike, 2026-11-21); nothing to fix in the game
+        const garbled = Object.values(tasks).filter(t => /^(.)\1{4,}/.test(t.out) || !/[\p{L}\p{N}]/u.test(t.out)).length >= Math.ceil(TASKS.length * .7);
+        if (garbled) window.tablefolkDiag?.note('brain', `the model's answers are garbled on this graphics card (${clip(Object.values(tasks)[0]?.out || '', 30)}): its results are wrong here; try another model, browser or driver`);
+        const res = { v: PROBE_V, garbled, brain: brainKey(), card: probeKey().split(':').slice(3).join(':'), score, of: TASKS.length, tokS, seconds: +((performance.now() - t0) / 1000).toFixed(1), tasks, at: new Date().toISOString() };
         try { localStorage.setItem(probeKey(), JSON.stringify(res)); } catch {}
         const lv = levelFrom(score, tokS), doms = domainsFrom(tasks);
         window.tablefolkDiag?.note('brain', `capability check: ${score}/${TASKS.length}, ${tokS} tokens/s in ${res.seconds} s: ${lv}${Object.keys(doms).length && lv !== 'rails' ? ' (' + Object.keys(doms).join(' and ') + ' in code)' : ''}` + (Object.entries(tasks).some(([, t]) => !t.ok) ? ` (missed: ${Object.entries(tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ')})` : ''));
