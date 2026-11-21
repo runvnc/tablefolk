@@ -112,6 +112,21 @@ const MODEL_CONFIG = {
     vram: '~1.6 GB',
     lib: '0.19.0-nightly.20261024',   // 0.19.0 stable made it speak random tokens and <s><s><s> (2026-10-30); this nightly works
   },
+  // KRAFTON's Raon-1 nano (3.2B dense, 1.6B of it a per-layer embedding
+  // table; gated delta-rule linear attention + MLA; Korean and English;
+  // Apache-2.0): their own 4-bit bundle, 1.82 GB, built for a 4,096-token
+  // context and answering without thinking. Not mirrored on R2 (Hugging Face).
+  // maxTokens: the engine's window (the bundle's own; 8192 is the default);
+  // charBudget: system + history + the new prompt + room for the answer, in
+  // characters (prefaceMessages), so a turn fits that window.
+  'raon1-nano-litert': {
+    label: 'Raon-1 nano (LiteRT-LM)',
+    modelUrl: 'https://huggingface.co/KRAFTON/Raon-1-nano-litert-lm/resolve/main/model.litertlm',
+    fallbackUrl: 'https://huggingface.co/KRAFTON/Raon-1-nano-litert-lm/resolve/main/model.litertlm',
+    vram: '~2 GB',
+    maxTokens: 4096,
+    charBudget: 10500,
+  },
   'bonsai-8b-litert': {
     label: 'Ternary Bonsai 8B (LiteRT-LM)',
     modelUrl: 'https://huggingface.co/litert-community/Ternary-Bonsai-8B/resolve/main/bonsai-8b-int2pc-32k-crashfix.litertlm',   // not mirrored on R2 yet
@@ -379,12 +394,19 @@ function clearConversations(agentId = null) {
 // failed. History is kept to a budget in characters (about 3 to a token),
 // leaving room for the new prompt and the answer.
 const CHAR_BUDGET = 19000;
+// a model with a smaller window has its own (MODEL_CONFIG charBudget)
+const charBudget = () => MODEL_CONFIG[currentModel]?.charBudget || CHAR_BUDGET;
+// how often history had to be cut to fit (debugLastPrompt reports it)
+const budgetStats = { prefaces: 0, trimmed: 0, dropped: 0, slim: 0, overflow: 0 };
 const sizeOf = list => list.reduce((n, m) => n + String(m.content || '').length, 0);
 function prefaceMessages(system, messages, reserve = 0) {
   const hist = messages.slice(-MAX_HISTORY_MESSAGES).filter(m => m.role === 'user' || m.role === 'assistant')
     .map(m => ({ role: m.role, content: String(m.content || '') }));
-  while (hist.length && String(system || '').length + sizeOf(hist) + reserve > CHAR_BUDGET) hist.shift();
+  const before = hist.length;
+  while (hist.length && String(system || '').length + sizeOf(hist) + reserve > charBudget()) hist.shift();
   while (hist.length && hist[0].role !== 'user') hist.shift();
+  budgetStats.prefaces++;
+  if (hist.length < before) { budgetStats.trimmed++; budgetStats.dropped += before - hist.length; }
   return [...(system ? [{ role: 'system', content: system }] : []), ...hist];
 }
 
@@ -398,7 +420,7 @@ function prefaceMessages(system, messages, reserve = 0) {
 // temperature and top-p 0.95, top-k 64; other models keep the bundle's.
 const samplerFor = s => (s?.recommended || engineVision) ? { sessionConfig: { samplerParams: { type: 2, p: s?.top_p ?? .95, k: Math.min(64, s?.top_k ?? 64), temperature: Number.isFinite(+s?.temperature) ? Math.max(.05, +s.temperature) : .5 } } } : {};
 async function liveConversation(key, agentId, system, historyOverride = null, sampling, reserve = 0, slim = false) {
-  if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride && !slim && live.chars + reserve < CHAR_BUDGET) {
+  if (live && live.key === key && live.turns < MAX_TURNS_PER_CONVERSATION && !historyOverride && !slim && live.chars + reserve < charBudget()) {
     live.turns += 1; live.chars += reserve;
     return live.conv;
   }
@@ -474,6 +496,7 @@ async function generateText(messages, opts, onToken) {
     console.warn('[litert-worker] generation failed, retrying on a rebuilt conversation', err);
     await dropLive();
     // too long even so: once more with no history at all
+    if (/too long/i.test(err?.message || '')) { budgetStats.overflow++; budgetStats.slim++; }
     return await runTurn(systemContent, chatMessages, promptText, /too long/i.test(err?.message || '') ? { ...opts, _slim: true } : opts, onToken, thinking);
   }
 }
@@ -508,7 +531,7 @@ let lastSent = null;
 // bare string into a list of parts, which they can't add to a string.
 const userMessage = text => MODEL_CONFIG[currentModel]?.plainContent ? { role: 'user', content: text } : text;
 async function sendTurn(conversation, promptText, opts, onToken) {
-  lastSent = { agentId: opts.agentId || 'default', thinking: !!opts.extra_body?.enable_thinking, promptText, at: Date.now() };
+  lastSent = { agentId: opts.agentId || 'default', thinking: !!opts.extra_body?.enable_thinking, promptText, at: Date.now(), model: currentModel, charBudget: charBudget(), budget: { ...budgetStats } };
   let fullText = '', channelText = '';
   console.log('[litert-worker] SENDING PROMPT TO LiteRT conversation', {
     agentId: opts.agentId || 'default', streaming: !!onToken, thinking: !!opts.extra_body?.enable_thinking, promptText,
@@ -638,13 +661,14 @@ async function handle(e, post, tag) {
         // (@litertjs/wasm-utils' createWasmLib) checks for a pre-existing
         // self.Module and honors self.Module.locateFile when set - so we
         // seed it ourselves, matching the CDN version pinned above.
-        const ver = cfg.lib || LIB;
+        // e.data.lib: a test can name another library build (tools/browser-test/litert-model-test.html)
+        const ver = e.data.lib || cfg.lib || LIB;
         // one library per worker: a model on another version needs a fresh
         // worker (model-loader-litert.js starts one when it sees this)
         if (libVersion && libVersion !== ver) throw new Error('RESTART_WORKER: ' + modelKey + ' needs LiteRT-LM ' + ver);
         const { Engine, Backend } = await libFor(ver); libVersion = ver;
         self.Module = { locateFile: (path) => `https://cdn.jsdelivr.net/npm/@litert-lm/core@${ver}/wasm/` + path };
-        engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: 8192 },
+        engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: cfg.maxTokens || 8192 },
           ...(cfg.vision ? { visionBackend: Backend.GPU, maxVisionTokensPerImage: 256 } : {}) });
         engineVision = !!cfg.vision;
         // Warm up before saying "ready": the first generation sets up the

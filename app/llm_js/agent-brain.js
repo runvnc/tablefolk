@@ -43,6 +43,10 @@ const SUPPORTED_MODELS = {
   // and 32-bit kernels where the GPU lacks shader-f16; hidden while evaluated
   'lfm3-1.7b-webgpu': { label: 'LFM3 1.7B (WebGPU kernels, smaller)', engine: 'lfm3', size: '~1.1 GB', hidden: true },
   'minicpm5-2b-litert': { label: 'MiniCPM5 2B (LiteRT-LM, smaller)', engine: 'litert-lm', size: '~1.6 GB', hidden: true },
+  // KRAFTON's Raon-1 nano (3.2B, 1.5B effective; Korean and English; Apache-2.0):
+  // their 4-bit LiteRT-LM bundle from Hugging Face, a 4,096-token window
+  // (litert-worker.js keeps its prompts to a smaller budget); hidden while evaluated
+  'raon1-nano-litert': { label: 'Raon-1 nano (LiteRT-LM; Korean and English)', engine: 'litert-lm', size: '~1.8 GB', hidden: true },
   // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's
   // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
@@ -104,6 +108,7 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   if (opts.topK != null) body.top_k = opts.topK;
   if (opts.minP != null) body.min_p = opts.minP;
   if (samplingFor(fresh.model)?.repetition_penalty) body.repetition_penalty = opts.repetitionPenalty;
+  if (samplingFor(fresh.model)?.presence_penalty != null) body.presence_penalty = samplingFor(fresh.model).presence_penalty;   // Raon-1
   // The models in libs/brain/sampling.js think by default in their chat templates (LFM3:
   // enable_thinking defaults to true, and all of max_tokens went into
   // reasoning_content, leaving no answer); llama.cpp and vLLM take the switch.

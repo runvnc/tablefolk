@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LiteRT model test</title>
+<!-- One LiteRT-LM model in the game's own worker (libs/brain/engines/litert-worker.js),
+     without the game: load it (from this origin's OPFS cache, else its download),
+     then chat. Used to try a bundle on another library build before it goes into the game.
+       /tools/browser-test/litert-model-test.html?model=raon1-nano-litert[&lib=0.20.0-nightly.20261118]
+     In the page (eval.mjs): await window.load()  -> { ms, ... }
+                             await window.chat([{role:'system',content:'...'},{role:'user',content:'...'}], {temperature:.1})
+                               -> { text, ms, firstMs, chars }
+     A download asks nothing here: open it only for a model you mean to fetch. -->
+<pre id="log">loading...</pre>
+<script>
+const q = new URLSearchParams(location.search);
+const model = q.get('model') || 'gemma4-e2b-litert', lib = q.get('lib') || undefined;
+const w = new Worker('/libs/brain/engines/litert-worker.js');
+const log = t => { document.getElementById('log').textContent += '\n' + t; console.log(t); };
+let next = 1; const pending = new Map();
+w.onmessage = e => { const p = pending.get(e.data.id); if (!p) return;
+  if (e.data.type === 'progress') { const d = e.data.data; window.lastProgress = typeof d === 'string' ? d : d?.text; return; }
+  if (e.data.type === 'token') { p.onToken?.(e.data.text); return; }
+  pending.delete(e.data.id); e.data.type === 'error' ? p.reject(new Error(e.data.message)) : p.resolve(e.data.data); };
+w.onerror = e => log('worker error: ' + e.message);
+const call = (type, payload = {}, onToken) => new Promise((resolve, reject) => { const id = next++; pending.set(id, { resolve, reject, onToken }); w.postMessage({ id, type, ...payload }); });
+window.load = async () => { const t0 = performance.now(); const r = await call('load', { modelKey: model, mirror: false, lib }); const ms = Math.round(performance.now() - t0); log(`loaded ${model} (lib ${lib || 'default'}) in ${ms} ms`); return { ms, ...r }; };
+window.chat = async (messages, opts = {}) => {
+  const t0 = performance.now(); let firstMs = null;
+  const r = await call('generate', { messages, streaming: true, opts: { agentId: opts.agentId || 'test', recommended: true, temperature: .1, top_p: .95, top_k: 64, ...opts } },
+    t => { if (firstMs == null && t) firstMs = Math.round(performance.now() - t0); });
+  const ms = Math.round(performance.now() - t0);
+  log(`${ms} ms: ${r.text}`);
+  return { text: r.text, ms, firstMs, chars: r.text.length };
+};
+window.lastPrompt = () => call('debugLastPrompt');
+window.clear = () => call('clearConversations');
+log(`model ${model}, lib ${lib || 'default'}`);
+</script>

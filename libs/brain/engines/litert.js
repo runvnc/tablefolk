@@ -22,6 +22,7 @@ const MODEL_CONFIG = {
   'bonsai-1.7b-litert': { label: 'Ternary Bonsai 1.7B (LiteRT-LM)' },
   'bonsai-8b-litert': { label: 'Ternary Bonsai 8B (LiteRT-LM)' },
   'minicpm5-2b-litert': { label: 'MiniCPM5 2B (LiteRT-LM, int4)' },
+  'raon1-nano-litert': { label: 'Raon-1 nano (LiteRT-LM)' },
 };
 
 let worker = null, shared = false;

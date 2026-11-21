@@ -11,6 +11,10 @@ const RECOMMENDED = [
   // openbmb/MiniCPM5-2B card: temperature 1.0, top_p 0.95, min_p 0 (llama.cpp's
   // default min_p 0.05 led to repetition); repetition_penalty 1.05 if it repeats
   { match: /minicpm[-_ ]?5/i, temperature: 1.0, top_p: 0.95, min_p: 0, repetition_penalty: 1.05 },
+  // KRAFTON/Raon-1-nano card, chat and instructions: temperature 0.1,
+  // presence_penalty 1.5 (agentic/code: 1.0 and 0). LiteRT-LM's web sampler has
+  // no presence penalty; an endpoint is sent it.
+  { match: /raon/i, temperature: 0.1, presence_penalty: 1.5 },
   // LiquidAI/LFM3-1.7B card, "General (chat, tool use, agents, coding)";
   // generation_config.json (1.0 is only for maths)
   { match: /lfm[-_ ]?3/i, temperature: 0.1, top_k: 50, repetition_penalty: 1.1 },
