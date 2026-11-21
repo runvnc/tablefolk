@@ -1063,6 +1063,16 @@ bartowski/AtomicChat quant without them; per-dispatch cost in ggml-webgpu
 as a big F32 tensor: prompt reading off the flash-attention path, and the
 3.8 GB WebGPU compute buffer at ub 2048); a way to turn its thinking off.
 
+**LookAtMyQuant** (github.com/ShinMegamiBoson/lookatmyquant, noted
+2026-11-21, not tried): trellis-coded builds of Inkling 2 Mini at 5.38 GB
+(1.63 bits/weight) and 8.87 GB (2.69), self-reported better than Unsloth's
+9.14 GB Q2 on GSM8K and HumanEval, decoded on the fly (about 6 GB of
+memory for the small one, 75 tokens/s on an M5 Max). Its only runtime is
+MLX with custom Metal kernels on Apple silicon; no GGUF, ONNX or WebGPU
+path. Running it in a browser would mean writing WebGPU kernels for the
+model and the trellis decode, as `bonsai2.js` does for Bonsai 2: a project,
+worth it only if the thinking and the per-token cost are solved first.
+
 ## Autonomy: rails, guided, free (2026-11-21)
 
 `app/agency.js` (minds.md, "autonomy"). Measured on vast.ai, one RTX 3090
