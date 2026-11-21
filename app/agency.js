@@ -199,7 +199,9 @@
     const out = {};
     // (not activity: that is the main loop, and the score's preset already decides it; the 9B failed the sums
     // and the bundle haggle, tagged activity, and went back to rails)
-    for (const d of ['plan', 'talk', 'danger', 'needs', 'temper']) { const its = TASKS.filter(t => t.dom === d && tasks?.[t.id]); if (its.length && its.filter(t => !tasks[t.id].ok).length / its.length >= .5) out[d] = 'code'; }
+    // (nor plan: Bonsai 2 9B failed the plan item, a format test, and with plans in code its villagers
+    // talked all day and made nothing: judge coherence 2.6 against 3.6 with its own plans)
+    for (const d of ['talk', 'danger', 'needs', 'temper']) { const its = TASKS.filter(t => t.dom === d && tasks?.[t.id]); if (its.length && its.filter(t => !tasks[t.id].ok).length / its.length >= .5) out[d] = 'code'; }
     return out;
   }
   function probeKey() {
