@@ -69,6 +69,11 @@ with sight are in the picker but not yet run on a card big enough for them.
 
 ## Next, by payoff
 
+0. **Autonomy** (2026-11-21, `app/agency.js`): rails / guided / free per
+   brain, scenario or character, with a capability check. Next: tune the
+   free prompt per model family, let free characters travel between
+   sections, and feed the judge's notes back into the menus.
+
 1. **A Tablefolk fine-tune of E4B**: a big model plays thousands of turns,
    and a LoRA learns the command format, the card and staying in character.
    This is the largest raw gain. It is a training job, so ask first.

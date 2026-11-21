@@ -486,6 +486,40 @@ Measured: testing.md, "A whole day".
   suggest carrying a stocked barrel; jobs.js `goDo` sets `g._useTarget`
   so uses.js `find` uses the thing it walked to.
 
+## Built (2026-11-21): autonomy, off the rails for strong brains
+
+`app/agency.js` (its header is the reference). `level(g)`: agent `autonomy` >
+scenario `autonomy` (state.autonomy) > Settings (`tablefolk.autonomy`,
+`?autonomy=`) > auto: the probe's level, else tier (basic rails, capable
+guided, ambitious free; measured speed under 15 chars/s drops one).
+Simple-mode brains are always rails. Hooks, each a no-op on rails:
+jobs.js `tick` hands over after danger, rules (grace mode: run after the
+condition held 30 game min) and threats (`A.threat`, undefined = the rails
+path meanwhile); `eventPick` -> `A.eventPick`; `remark` off; jobs.js
+`kit` exposes the helpers (steps, eat, bedtime, chores, fightRaiders,
+hideHome...). mind.js: `ladder` sets `a.furious` and an event instead of
+acting; `refuses(g, who, byCode)` holds only for code-run deals;
+`startFight` (ladderFight, beaten), `mayFight` (app.js commandsFor adds
+attack), an `attack(name)` listener; `planDay` off where agency plans.
+world-integration.js: `muted` only by the floor rule above rails; `do`/`plan`
+extracted from prose; tablefolkLLM passes `thinking`; runAs events carry
+`source`; history x2. chatter.js: only DEALS kinds above rails. app.js:
+`systemLines` (how the world works) and `promptLines` (time, do() menu,
+intent) only above rails. skills.js: a package command's `allowed(g)`.
+
+Guided: `options()` builds the menu (keys stable: `step:i`, `talk:id`,
+`eat`, `sleep`...); `planDay` (thinking on Bonsai 2 / 12B / endpoints, 384
+tokens), `planNext` followed for two boundaries then `pickNext`; a failed
+plan step sets `replan`. Decisions run without holding up the live loop
+(`later`). Free: `freeDecide` opens a turn (`openTurn`, `g._intent`) when the
+budget gap allows (median turn seconds x free characters x .75, at least
+8 s); `do()` queues `ag.next`; with no do(), `codeFill` (routine, eat, sleep,
+evening, rest; 25 game min). Safety nets in `safety()`.
+
+Measuring: live-eval `--autonomy=`; `interest-report.mjs`; `judge.mjs`
+(OpenRouter, ledger in work/openrouter-spend.json). Results: brains.md,
+"Autonomy".
+
 ## Order of work
 
 1. Headless runner and evals, and a baseline score.

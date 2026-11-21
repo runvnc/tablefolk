@@ -48,7 +48,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "brain": "none",                         // optional: no language model (characters.md)
   "lore": [], "needs": true, "mind": true, "food": [],
   "tempers": true, "temper": "normal",   // insults anger characters (false: off); short | normal | long for everyone (characters.md)
-  "gossip": true, "reflect": true, "reflexes": true, "expect": null, "monsters": null, "remembers": true, "plans": true, "glances": true, "autoThink": true,   // characters.md
+  "gossip": true, "reflect": true, "reflexes": true, "expect": null, "autonomy": null, "monsters": null, "remembers": true, "plans": true, "glances": true, "autoThink": true,   // characters.md
   "live": false, "pace": "calm", "director": 5, "events": [],
   "time": "08:00", "dayMinutes": 12, "clock": true,   // the time of day (living.md)
   "talk": false,                   // true: a talk-only scene (the world builder adds no jobs, threats or living-world rules)
@@ -135,6 +135,7 @@ Without `at` the player starts at the south of the board.
   "secret": "Took the mayor's lamp.",               // kept from the player unless it trusts them a lot (characters.md)
   "agenda": "become the next mayor",               // what it is quietly after, on its card each turn
   "expect": "capable",             // basic | capable | ambitious: how much the game helps it (characters.md); else by brain
+  "autonomy": "free",              // rails | guided | free: how much it decides for itself (living.md); else the world's, the player's, the brain's
   "reflexes": false,               // no game-made moves for it in danger or hunger
   "hunts": "everyone",             // a monster that goes after characters too, not only the player
   "temperament": "brave",          // brave | timid | calm (how it takes being hurt or insulted); else guessed

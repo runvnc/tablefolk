@@ -101,6 +101,7 @@ supported part (other members are internal and may change).
 | `tablefolkClock.now()`, `.set(min, day)`, `.isNight()` | the time of day |
 | `tablefolkThreats.now(kind)`, `.active()`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats |
 | `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
+| `tablefolkAgency.level(g)`, `.why(g)`, `.setting()`, `.setSetting(v)`, `.options(g, state, job)`, `.stats()`, `.probe.run()`, `.probe.result()` | autonomy: `rails`, `guided` or `free` for a character and why; the player's setting (`auto` or a level); the activities it could start now; plans and results; the capability check (living.md, "How much characters decide") |
 | `tablefolkUses.register(kind, def)`, `.stockOf(thing)` | kinds of use; what a thing has left |
 | `tablefolkChatter.say(g, kind, slots, { to })`, `.add(pools)` | a templated line from a pool (living.md, "Spoken life"); add pools |
 | `tablefolkTalk.speak(g, text, { to, answer })` | a line as the character's own, told to those in earshot; `answer`: the one it is said to answers it |
@@ -132,7 +133,10 @@ All on `window`, as `CustomEvent`s; read `e.detail`.
 | `tablefolk-flag` | `{ name, value, was }` | a world flag changed |
 | `tablefolk-menu` | `{ menu, item, agentId, how, text }` | a menu choice was taken |
 | `tablefolk-workflow` | `{ agentId, name, ended, vars }` | a workflow ended |
-| `tablefolk-model-call` | `{ agentId, kind }` | the language model was asked something (`reply`, `pick`, `cause`, `remark`...) |
+| `tablefolk-model-call` | `{ agentId, kind }` | the language model was asked something (`reply`, `pick`, `cause`, `remark`; above rails `choose`, `plan`, `reaction`, `raidpick`, `free`, `talk`, `react`...) |
+| `tablefolk-activity` | `{ agentId, phase, key, kind, label, by, routine, outcome, reason, why, minutes }` | above rails: an activity started or ended (`by`: `model`, `plan`, `code`, `safety`, `fallback`; `outcome`: `done`, `failed`, `interrupted`) |
+| `tablefolk-plan` | `{ agentId, items, why, revised, reason, notes }` | above rails: a day plan written or revised (with the reason), or notes rewritten with `plan(...)` |
+| `tablefolk-agency` | `{ agentId, what, kind, detail }` | above rails: a pick and its answer, a nonsense answer, a safety net, a loop set aside, the turn budget |
 | `tablefolk-thinking` | `{ agentId, thinking }` | the model started or stopped thinking |
 | `tablefolk-load` | `{ key, label, state, ... }` | a download's progress (speech input) |
 

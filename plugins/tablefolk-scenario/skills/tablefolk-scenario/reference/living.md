@@ -166,6 +166,56 @@ hungry. Starving (`.8`) for a third of a day it is **weak**: it walks
 slowly and cannot work. It does not die of it unless the world is
 `"harsh": true` (then it loses health).
 
+## How much characters decide (`autonomy`)
+
+The day above is **on rails**: code runs it and the model talks. That suits
+small brains (Gemma 4 E2B). With a stronger brain characters can decide for
+themselves. `"autonomy"` on a character or the scenario (`rails`, `guided`,
+`free`), else the player's choice in Settings ("How much do characters decide
+for themselves?"), else **Auto**: a short capability check the first time a
+brain runs on this device (eight small tasks and its speed, about 20-60 s,
+kept in the browser) picks the level; a slow machine gets a lower one.
+Settings' "Running now" says which level runs and why.
+
+- **On rails**: as above.
+- **Guided**: each time an activity ends, the character picks what to do
+  next from what the world offers right now: its work (each step with what
+  it needs and makes: "bake bread (needs 2 wheat: you have 0, the stores
+  have some; makes 2 bread)"), eating, bed, people near and what it feels
+  about them (talk, have it out, give food to someone hungry), someone out
+  of materials it could help, the evening at the tavern, what it is quietly
+  after (`agenda`), its goal, package commands that fit, a place it has not
+  been today, or "something else (say what)". In the morning it writes a
+  plan for the day (up to five of those) and follows it, asking itself
+  again every few steps; when a step fails it re-plans, knowing why. Code
+  carries each activity out and tells it how it went next time ("How your
+  last activities went: bake bread: failed (out of wheat)").
+- **Free**: the character's own turns are the main loop. It sees its whole
+  situation and the activities as commands, `do(bake bread, why)` (one
+  command runs the whole thing: walking, fetching, making), keeps notes with
+  `plan("...")` (goals, next steps, who owes it what, what it hides), talks
+  to whom it likes, gives, sells, quarrels, or walks off to another place.
+  Turns are shared out by the brain's speed, so a world of eight stays
+  responsive; in between, code keeps it at its usual work.
+
+Above rails characters speak on their own initiative: no topics chosen by the
+game, no remarks or evening openers, and templated lines only for deals code
+carries out (a sale and thanks, food asked for and shared, materials
+brought); the floor rule still holds (one conversation at a time nearby).
+Raids are a choice with the consequences stated (fight with what it holds,
+fetch a weapon, call the guard, run home, hide, shout a warning, talk bandits
+out of it); the game's own answer runs until it has chosen. Some things stay
+in code at every level: walking and the steps of a task, honest results,
+one fight between characters at a time and never to the death, and safety
+nets (starving for two game hours it eats; two hours past its bedtime it
+goes to bed; an activity that failed three times running is left for an
+hour; a job's command rule runs when its condition has held half an hour and
+the character has not run it).
+
+What it costs: guided asks the model about once per activity (a few seconds
+on a capable machine); free asks for whole turns. Measured: maintainer skill,
+brains.md, "Autonomy".
+
 ## What the player does
 
 The village notices the player. Helping drive off a raid, buying from

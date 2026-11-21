@@ -369,6 +369,14 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Monsters that hunt everyone**: `"monsters": "everyone"` (or a monster's
   `"hunts": "everyone"`) sends monsters after the nearest character they
   can see, not only the player: villages under attack, survival worlds.
+- **How much it decides for itself** (`"autonomy"`: `rails`, `guided`
+  or `free`, on the character or the scenario; else the player's
+  Settings, else by the brain): see [living.md](living.md#how-much-characters-decide-autonomy).
+  Above rails tempers are advice: at the top of the ladder it is told it is
+  furious and chooses (fight, order out, call for help, walk away, let it
+  go; or `attack(name)` itself), within the same limits (one fight between
+  characters at a time, never to the death); refusing to deal with someone
+  is its own choice.
 - `"mind": false` turns the whole mind off.
 
 Each turn's prompt ends with "Stay yourself: ..." and one sentence of the
