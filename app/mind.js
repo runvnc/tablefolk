@@ -263,7 +263,8 @@
     if (TIERS.includes(set)) return set;
     const k = String(window.tablefolkBrainInfo?.()?.key || '');
     if (/endpoint|12b|26b|27b|31b|9b/i.test(k)) return 'ambitious';
-    if (/e4b/i.test(k)) return 'capable';
+    // Raon-1 nano: 36/36 on the evals, haggles and refuses lowballs like E4B (brains.md)
+    if (/e4b|raon/i.test(k)) return 'capable';
     return 'basic';
   }
 

@@ -10,6 +10,8 @@ skill (internals); `git log` has every commit.
 
 - **No more local helpers**: the scripts that installed and started llama.cpp's server and the Breeze TTS server on the player's computer are gone, with the "find helpers on this computer" buttons, the Breeze server option in the Voice pane (a saved choice of it falls back to the default voice), the game server's Breeze auto-start and the endpoint presets for servers on your own machine. Tablefolk runs in the browser; a player who already has an AI server or an OpenRouter key still pastes its address or key in the endpoint panel or the world builder, and Breeze TTS 2 still runs in the browser.
 
+- **Raon-1 nano in the model menu**: KRAFTON's 3B model, Korean and English, runs in the browser (about 1.8 GB; needs an 8 GB+ graphics card). In the tests it beat Gemma 4 E2B (all 36 character tests, and it sells in Korean) with turns 3-4 times slower. Its larger GGUF versions also load in the browser through a llama.cpp build of KRAFTON's own, but are still far too slow to play.
+
 ## 2026-11-20
 
 - **Look pass 4 (second part)**: in a newly generated village each building's room is sized to the building it wears, and a few barrels, crates, sacks and flowers stand by the doors; hedgerows line the fields past the edge; lamps in houses and taverns light the room warmer and wider at night. Characters' replies like `sell(potion) 8` and `use(sell(...))` are understood.

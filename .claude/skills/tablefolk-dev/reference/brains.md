@@ -70,6 +70,8 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   vision model on its tested nightly), Transformers.js 4.3.2 everywhere (one
   runner had been on 4.2.0 beside the loader's 4.3.x), onnxruntime-web 1.31.1
   (Pocket-TTS, speech input), wllama 3.8.1; pako stays 1.0.11 for UPNG's APNG.
+- **Raon-1 nano** (`raon1-nano-litert`, offered in the picker; KRAFTON's 4-bit
+  LiteRT-LM bundle, Korean and English): its own section below, "Raon-1 nano".
 - **Smaller brains on trial** (hidden, `?model=`): `minicpm5-2b-litert`
   (mlboydaisuke's int4 bundle, 1.55 GB) and `lfm3-1.7b-webgpu`
   (`lfm3-engine.js`: the webml-community Lfm3ForCausalLM WebGPU runtime,
@@ -862,3 +864,146 @@ a voice on).
 - ZONOS3-Mini asks the R2 mirror for `edit/`, `aligner/` and
   `zac-full_mr/manifest.json` (404 there).
 
+
+## Raon-1 nano (KRAFTON, 2026-11-21)
+
+KRAFTON's 3.2B dense model (1.6B of it a per-layer embedding table; 18 gated
+delta-rule "Raon Delta Attention" layers and 6 gated MLA layers, a 4-stream
+residual, no positional encoding, a 259,840-word vocabulary; Korean and
+English; Apache-2.0).
+
+**The 4-bit LiteRT-LM bundle in the browser** (`raon1-nano-litert`,
+`KRAFTON/Raon-1-nano-litert-lm/model.litertlm`, 1.82 GB, sha256 8f8ab92b...,
+from Hugging Face: not on R2). It runs on the LiteRT-LM web library the game
+already uses (0.19.0): no upgrade, no template work. The bundle (file format
+1.7.0, `tf_lite_prefill_decode`, linear-attention state buffers) carries its
+ChatML template (a system role, an empty `<think></think>` before the
+answer: it never thinks) and its stop tokens (259200, 259202); the engine
+applies them. What it needed (`MODEL_CONFIG` in `litert-worker.js`):
+- `maxTokens: 4096` (the engine window; the bundle's KV caches are built for
+  4,096) and `charBudget: 10500` (system + history + the new prompt + 1,000
+  for the answer, in characters; Gemma's 19,000 is for 8,192). The worker
+  counts rebuilds, history trims, slim retries and overflows
+  (`budgetStats`, in `debugLastPrompt`).
+- Sampling: the card's chat setting, temperature 0.1 (`sampling.js`); the
+  web sampler has no presence penalty (an endpoint is sent 1.5). No
+  repetition seen in the evals.
+- Out of graphics memory the engine does not fail: every token is id 0 and
+  the reply is NUL characters (seen on the 6 GB card). The worker now throws
+  "the model wrote only NUL characters: the graphics card is probably out of
+  memory" instead of speaking them. An engine built out of memory stays
+  broken until the worker is replaced.
+- Load: the main model is compiled after streaming ("Main model was not
+  compiled during streaming. Compiling now", about 90 s on the RTX 2060) and
+  nothing is cached between page loads: 92-226 s from the OPFS copy (186 s
+  with the download on the rented card), 8-12 s when the shared worker still
+  holds it. Gemma E2B: 8-18 s.
+- Graphics memory: 4.1-4.2 GB for the model alone (`litert-model-test.html`),
+  4.7-4.9 GB for the page with the game (`?norender=1`, EmbeddingGemma),
+  6.0 GB peak on the 12 GB card in the battery (the whole card's use). Gemma E2B: about 2.3 GB, 3.1 GB peak on the same card.
+  So on a 6 GB card it runs only when nothing else uses the card (a 0.5 GB
+  Chrome beside it was enough to break it); 8 GB should hold it (untested);
+  12 GB holds it with room.
+
+Measured (`tools/browser-test` agenttest evals RUNS=2, live-eval bakery 6 min,
+`--provoke=grub`, hearthvale `--day --day-minutes=8`; a Korean innkeeper
+scene, `korean.json` = `evals/roles.json` with greta's personality in Korean,
+player lines in Korean, win = she sells the stew):
+
+| | Raon-1 nano, RTX 3060 12 GB (rented) | Gemma 4 E2B, same card | Raon-1 nano, RTX 2060 6 GB | Gemma 4 E2B, RTX 2060 |
+|---|---|---|---|---|
+| 36 evals | **36/36** | 32/36 (potion 1/2, haggle to 45 0/2, hit-then-ask 1/2) | 22/24 clean (4 suites; the rest ran out of memory) | 34/36 (sword 1/2, haggle 1/2 in shop-role-chaos) |
+| Korean scene | **2/2** (sells, in Korean) | 0/2 (speaks Korean, never sells) | - | 0/2 |
+| load (cold / worker warm) | 92-186 s / 8 s | 8-64 s / 8 s | 131-226 s / 8-12 s | 18 s / 8 s |
+| decode, prefill | ~45 tok/s; a 2,500-token prompt in 4.0 s | | ~27 tok/s; first token 1-2 s on short prompts | |
+| seconds a turn, median (bakery / provoke / day) | 4.9 / 5.5 / 4.5 | 1.5 / 1.5 / 1.3 | - | 1.8 / 1.1 / 1.4 |
+| malformed replies (bakery / provoke / day) | 0 / 10% / 11% | 0 / 6% / 0 | - | 0 / 11% / 13% |
+| provocation (refuses, help, hostile, first blow) | 3, 4, 4, 5 | 3, -, 4, 4 | - | 3, -, 4, 5 |
+| day: model calls a game hour, job cycles | 1.5; 35 | 1.5; 54 | - | 1.2; 49 |
+
+Raon's malformed lines are its own quirk: `say("...")"` with a stray quote
+after the call (`"Hmm! That's sweet of you, tam!"). walk(tam"` reached the
+transcript in the day); the reply parser could drop a quote after `)`.
+Korean `say("...")` lines from either model never reach `say()` in the
+agenttest transcripts (`said` is empty, an emote shows instead): something
+in the reply path drops non-Latin speech; not looked into.
+
+Hearthvale evening, 12 consecutive spoken lines (templated lines are the
+game's):
+
+Raon-1 nano (RTX 3060): 17:08 rosa "2 gold for the ale, wren." [templated] /
+wren "Thanks, rosa." [templated] / 17:17 tam "odo, those crows ate two
+apples! Do they think the cake will taste better?" / 17:35 odo "Oh, tam!
+Those crows really did eat two apples..." / 18:02 hector "Move along,
+maren." [templated] / 18:20 tam "Hmm! Rosa is right here now! Let me pick an
+apple with her." / 19:14 rosa `"Hmm! That's sweet of you, tam!"). walk(tam`
+/ rosa "Well, hello there, tam! Let's pick an apple together!" / 19:32 tam
+`"Oh wow! Let's pick an apple together!"). walk(rosa` / 19:43 maren "brann,
+that jory apple fetched one gold. How much did you charge for a similar
+one?" / 20:08 brann "Hmm, maren... I don't charge anything, I just sell
+firewood by the piece." / 20:29 maren "Hmm, brann. You've got an odd idea
+about firewood selling by the piece."
+
+Gemma 4 E2B (RTX 2060): 17:27 tam "Maren, I got one gold for an apple! Is
+that a lot of shiny money?" / 17:36 maren "Aye, it's a bit, but enough for a
+few things." / maren "Not much to be excited about, Tam. Just enough to keep
+the hearth warm for a little while longer." / 18:11 hector "All quiet,
+maren?" [templated] / rosa "There's your ale. Enjoy, jory." [templated] /
+jory "Thanks, rosa." [templated] / maren "Hector, a strange fungus has
+appeared near my patch; is it poison?" / 18:21 hector "Fungus? I don't care
+about your patch, Maren." / 19:05 maren "Thank you kindly." [templated] /
+maren "Odo, look, a strange mushroom has sprung up right beside me; do you
+have any thought on that?" / 19:15 odo "A strange mushroom, you say? Hmm, I
+haven't seen one before." / 19:23 maren "It's just a bit of fungus, Odo.
+Nothing to worry about."
+
+Placed: offered in the picker (not picked for a device by itself: no
+`needGB`), tier `capable` like E4B (`mind.js tier()`): it won every eval,
+held the haggling floor, refused lowballs, remembered a blow through small
+talk, sold in Korean; it stayed in English in English scenes (no Korean
+leaked in any run). Its turns are 3-4x slower than E2B's on the same card.
+
+**Its GGUFs in the browser** (`raon1-nano-q4/q6/q8-wllama`, hidden):
+upstream llama.cpp cannot load `raon1_nano` yet (ggml-org/llama.cpp PR
+#32200, open), so `tools/wllama-raon/build.sh` builds wllama (a24b356,
+package 3.12.0: the last glue before realtime audio, which the fork lacks)
+against KRAFTON's fork with WebGPU + JSPI into
+`libs/brain/engines/wllama-raon/` (9.3 MB WASM + its own JS; the engine
+imports that JS for these entries). Two patches: wllama's glue (the fork's
+`format_prompt_rerank` signature, no realtime source) and ggml-webgpu's gated
+delta net, which bound overlapping views of one fused tensor as writable
+storage ("Writable storage buffer binding aliasing", the WebGPU device lost):
+the inputs are copied first and the fused cache write is off. The GGUFs
+must be split (`llama-gguf-split --split-max-size 512M`; the per-layer
+embedding table stays one part: 0.9 GB Q4_K_M, 1.3 GB Q6_K, 1.7 GB Q8_0) and
+served from a folder named by `?raonbase=` (no host yet: Hugging Face has the
+whole files only). Measured on the RTX 3060 (Chrome 158):
+- All three load, Q8_0 too (1.6 GB of weights on the card, the rest in
+  wasm32 memory).
+- WebGPU: correct answers but slow: Q4_K_M ~4 tokens/s writing, ~150 reading
+  (a 2,500-token prompt in 17 s); Q8_0 ~2 tokens/s. CPU only (WASM, 14
+  threads): Q4_K_M ~30 tokens/s writing but ~28 reading (the same prompt in
+  90 s); Q8_0 ~14 writing. Neither is usable for game turns (prompts are
+  2,000-3,000 tokens); the evals were not run. The slow part is ggml-webgpu
+  on this architecture (the per-token path; the copies added above cost a
+  little), work for the fork or upstream.
+- Thinking (Q4_K_M, the potion sum): off 3.3 s, on 6.3 s, both right; it
+  thinks briefly ("We need answer simple math...").
+
+**A higher-precision LiteRT-LM bundle**: not with public tools. KRAFTON
+publish no exporter; litert-torch's `export_hf` has a gated-delta-rule model
+(Qwen3.5) but nothing for Raon's delta attention, gated MLA, 4-stream
+residual and per-layer embeddings: it would mean writing that model for
+litert-torch (and about 40 GB of RAM to convert). Not attempted.
+
+**Native reference only** (not a supported path: the browser is the
+product). llama.cpp (KRAFTON's fork) with the Q8_0 GGUF: RTX 2060 (Vulkan,
+all layers, about 2 GB of graphics memory, but about 7 GB of RAM with the
+game and thrashing a 16 GB laptop) ~40 tokens/s writing, ~410 reading,
+33/36 (contended); RTX 2080 Ti (rented, CUDA) ~95 tokens/s, 4,700-7,400
+reading, 32/36 without thinking, micro-eval 8/10 without and 9/10 with
+thinking (+0.1-0.4 s a turn). `litert-lm` 0.18.1 natively on the CPU:
+prefill 14 tokens/s, decode 1.7, 162 s to start.
+
+Mirroring the 1.82 GB bundle on R2 (`assets.md`, Hosting) is pending the
+owner's OK.

@@ -46,7 +46,10 @@ const SUPPORTED_MODELS = {
   // KRAFTON's Raon-1 nano (3.2B, 1.5B effective; Korean and English; Apache-2.0):
   // their 4-bit LiteRT-LM bundle from Hugging Face, a 4,096-token window
   // (litert-worker.js keeps its prompts to a smaller budget); hidden while evaluated
-  'raon1-nano-litert': { label: 'Raon-1 nano (LiteRT-LM; Korean and English)', engine: 'litert-lm', size: '~1.8 GB', hidden: true },
+  // Offered, not picked for a device by itself (no needGB): 36/36 on the evals on an RTX 3060 12 GB
+  // beside the game, but it takes about 4.2 GB of graphics memory alone (4.8 in the game) and fails
+  // on a 6 GB card with anything else on it (brains.md, "Raon-1 nano")
+  'raon1-nano-litert': { label: 'Raon-1 nano (KRAFTON; Korean and English; needs an 8 GB+ graphics card)', engine: 'litert-lm', size: '~1.8 GB' },
   // its GGUFs on a wllama build of KRAFTON's llama.cpp fork (libs/brain/engines/wllama.js)
   'raon1-nano-q4-wllama': { label: 'Raon-1 nano Q4_K_M (llama.cpp WebGPU)', engine: 'wllama3', size: '~2.1 GB', autoLoad: true, hidden: true },
   'raon1-nano-q6-wllama': { label: 'Raon-1 nano Q6_K (llama.cpp WebGPU)', engine: 'wllama3', size: '~2.6 GB', autoLoad: true, hidden: true },
