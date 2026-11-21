@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-21
+
+- **No more local helpers**: the scripts that installed and started llama.cpp's server and the Breeze TTS server on the player's computer are gone, with the "find helpers on this computer" buttons, the Breeze server option in the Voice pane (a saved choice of it falls back to the default voice), the game server's Breeze auto-start and the endpoint presets for servers on your own machine. Tablefolk runs in the browser; a player who already has an AI server or an OpenRouter key still pastes its address or key in the endpoint panel or the world builder, and Breeze TTS 2 still runs in the browser.
+
 ## 2026-11-20
 
 - **Look pass 4 (second part)**: in a newly generated village each building's room is sized to the building it wears, and a few barrels, crates, sacks and flowers stand by the doors; hedgerows line the fields past the edge; lamps in houses and taverns light the room warmer and wider at night. Characters' replies like `sell(potion) 8` and `use(sell(...))` are understood.

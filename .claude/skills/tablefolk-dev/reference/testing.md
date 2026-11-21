@@ -24,11 +24,11 @@ node close.mjs                                         # always close it: it hol
   back to SwiftShader. `--mute-audio` keeps game sounds off the speakers.
   Visible mode floats and sizes the window with `hyprctl` under Hyprland
   (tiling ignores `--window-size`).
-- **Voices off in model evals**: a test profile that remembers the Breeze
-  voice makes the test server start `breeze-server` (2+ GB of the card);
-  beside Gemma E4B on a 6 GB card the model then answers nothing (seen
-  2026-11-15). `survival-test.mjs` and `mind-check.mjs` set
-  `tablefolkTtsEnabled=0` before the page loads; `pgrep -fa breeze-server`.
+- **Voices off in model evals**: a voice that takes graphics memory (Breeze
+  or ZONOS3-Mini in the browser) beside Gemma E4B on a 6 GB card can leave
+  the model answering nothing (seen 2026-11-15 with the native Breeze
+  server, removed since). `survival-test.mjs` and `mind-check.mjs` set
+  `tablefolkTtsEnabled=0` before the page loads.
 - **A fresh test Chrome per model**: after E4B ran in a test Chrome,
   switching that Chrome to E2B (`?model=`) gave empty answers after ~50 s a
   turn (2026-11-15; Breeze had also run beside it). Close and relaunch
@@ -297,7 +297,7 @@ checks; load `http://localhost:8001/willow-lane` in the test Chrome first,
 with EmbeddingGemma on). A world with a model: `haggle-workflow` on :8000
 (Gemma cached), chat 20 then 45 gold: Mog counters, then sells at 45. Turn
 voices off in the test profile (`tablefolkTtsEnabled` 0): a Breeze server
-started for the page beside the test Chrome filled the 6 GB card and the
+(the native one, removed 2026-11-21) started for the page beside the test Chrome filled the 6 GB card and the
 LiteRT worker hung (2026-11-13); after that the shared worker needs a Chrome
 restart.
 

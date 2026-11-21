@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261115a" />
+  <link rel="stylesheet" href="style.css?v=20261121a" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -331,9 +331,6 @@
       <div class="custom-grid">
         <label>Engine <select id="ttsEngine" title="which speech model runs (the server's admin page sets the default)"><option value="">server default</option></select></label>
         <label id="ttsLanguageBox">Language <select id="ttsLanguage"><option value="english_2026-04">English</option><option value="german">German</option><option value="italian">Italian</option><option value="portuguese">Portuguese</option><option value="spanish">Spanish</option></select></label>
-        <label id="breezeUrlBox" title="Breeze TTS 2 runs in breeze-server on your computer (tools/breeze-server.sh). Blank: through this Tablefolk server; or the server's own address when it was started with --cors">Breeze server <input id="breezeUrl" type="text" placeholder="/api/tts/breeze (via this server)" spellcheck="false" /></label>
-        <small id="breezeStatus" class="tts-note"></small>
-        <div class="helpers-row"><button type="button" class="find-helpers" title="Looks for breeze-server (port 8137) and llama.cpp (port 8080) on this computer. The browser may ask to allow local network access.">find helpers on this computer</button> <small class="helpers-status tts-note"></small></div>
         <label>Volume <input id="ttsVolume" type="range" min="0" max="1" step=".05" value=".85" /></label>
         <label>Buffering <input id="ttsBufferMs" type="range" min="150" max="1500" step="50" value="350" title="Lower = speech starts sooner but stutters more easily under load. Higher = more delay before speech starts, but far more resistant to glitches." /></label>
       </div>
@@ -342,11 +339,11 @@
       <div id="ttsTelemetry">backend: WASM CPU · waiting for speech metrics</div>
       <div class="section-subtitle">Speech input (the 🎤 button)</div>
       <label><select id="speechMode" onchange="tablefolkSpeech&&tablefolkSpeech.setMode(this.value)">
-        <option value="auto">Automatic: on a phone the browser's own; else Underdog Bark in this browser (asks before its download), else this server's Gemma, else llama.cpp with a model that hears, else the browser's</option>
+        <option value="auto">Automatic: on a phone the browser's own; else Underdog Bark in this browser (asks before its download), else this server's Gemma, else your own AI server when its model hears, else the browser's</option>
         <option value="bark">In this browser: Underdog Bark 3.0 (private; on the graphics card when it has room, else the processor)</option>
         <option value="bark-cpu">In this browser, on the processor: Underdog Bark 3.0 int8 (0.9 GB, no graphics memory, about 1 s a sentence)</option>
-        <option value="gemma">This server's Gemma 4 audio input (bun server/server.js --litert)</option>
-        <option value="llama">llama.cpp on this computer with a model that hears (LFM3-Omni-2B: tools/llama-server.sh --omni)</option>
+        <option value="gemma">This Tablefolk server's Gemma 4 audio input (when its operator set one up)</option>
+        <option value="llama">Your own AI server (the endpoint brain's address), when its model takes audio</option>
         <option value="browser">The browser's own recognition (Chrome on the device when it can, about 300 MB once; else its makers' servers)</option>
       </select></label>
       <div class="section-subtitle">Custom voice sample</div>
@@ -409,26 +406,21 @@
       </div>
       <div class="section-subtitle">Brain options</div>
       <details id="llmEndpointBox" class="llm-endpoint">
-        <summary>OpenAI-compatible endpoint (for the "endpoint" brain)</summary>
+        <summary>Your own AI server or OpenRouter key (the "endpoint" brain)</summary>
         <label>Preset <select id="llmPreset"><option value="">(choose one to fill the fields)</option>
           <option value="/api/llm/v1|">This server's default</option>
           <option value="https://openrouter.ai/api/v1|google/gemma-4-26b-a4b-it">Gemma 4 26B: OpenRouter with your own key</option>
           <option value="https://openrouter.ai/api/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter with your own key</option>
-          <option value="http://localhost:11434/v1|hf.co/ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF">Nemotron 3.5 Bolt E4B: Ollama on this machine</option>
-          <option value="http://localhost:8080/v1|nemotron-3.5-bolt-e4b">Nemotron 3.5 Bolt E4B: llama.cpp server on this machine (llama-server -hf ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF)</option>
           <option value="/api/llm/v1|prism-ml/ternary-bonsai-2-27b">Bonsai 2 27B: OpenRouter through this server</option>
-          <option value="http://127.0.0.1:8080/v1|LFM3-1.7B">LFM3 1.7B: llama.cpp on this computer (tools/llama-server.sh)</option>
-          <option value="http://localhost:8080/v1|ternary-bonsai-2-4b">Bonsai 2 4B: llama.cpp server on this machine (prism-ml/Ternary-Bonsai-2-4B-gguf)</option>
         </select></label>
-        <div class="helpers-row"><button type="button" class="find-helpers" title="Looks for llama.cpp (port 8080) and breeze-server (port 8137) on this computer. The browser may ask to allow local network access.">find helpers on this computer</button> <small class="helpers-status"></small></div>
         <label>Base URL <input id="llmBaseURL" type="text" placeholder="/api/llm/v1 (this server's default)" spellcheck="false" /></label>
         <label>API key <input id="llmApiKey" type="password" placeholder="blank: the server's key / none" autocomplete="off" /></label>
         <label>Model <input id="llmModel" type="text" list="llmModelList" placeholder="blank: the server's default" spellcheck="false" /></label>
         <label>Server's models <select id="llmModelPick"><option value="">(not listed yet)</option></select> <button id="llmModelRefresh" type="button" title="ask the server which models it has (GET /models)">↻</button></label>
         <datalist id="llmModelList"></datalist>
         <div id="llmModelStatus" class="llm-endpoint-note"></div>
-        <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model with image input: gemma4-e2b-mm on litert-lm serve, Gemma 4 / GPT on OpenRouter; slower)</label>
-        <div class="llm-endpoint-note">Any OpenAI-compatible server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, <code>litert-lm serve</code>, llama.cpp, Ollama (a server on your own computer must allow this page's requests: CORS). The key stays in this browser; an OpenRouter preset uses the key you signed in with on the world builder.</div>
+        <label class="spawn-mode-toggle"><input id="agentVision" type="checkbox" /> vision: send each character a picture of what it sees (needs a model that takes images; slower)</label>
+        <div class="llm-endpoint-note">Have your own AI server or an OpenRouter key? Paste it here. Any OpenAI-compatible address works (it ends in <code>/v1</code>, e.g. <code>http://localhost:8080/v1</code>, and must allow this page's requests: CORS). The key stays in this browser; the OpenRouter presets use the key you signed in with on the world builder.</div>
       </details>
       <label class="spawn-mode-toggle"><input id="chatTestMode" type="checkbox" /> chat test mode (bare conversation, no perception)</label>
       <label class="spawn-mode-toggle"><input id="antiEcho" type="checkbox" /> anti-echo instructions (off by default - small models can confuse negative prompts)</label>
@@ -483,8 +475,8 @@
     </div>
   </div>
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
-  <script src="browser-check.js?v=20261115a"></script>
+  <script src="browser-check.js?v=20261121a"></script>
   <script src="diagnostics.js?v=20261115c"></script>
-  <script src="preflight.js?v=20261121i"></script>
+  <script src="preflight.js?v=20261121j"></script>
 </body>
 </html>

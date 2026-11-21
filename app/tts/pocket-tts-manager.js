@@ -27,7 +27,6 @@
   const ENGINES={
     'pocket-18m':{label:'Pocket-TTS small (18M, ~40 MB, English)',worker:'/libs/voice/pocket18-worker.js',languages:false},
     'pocket-100m':{label:'Pocket-TTS (100M, ~120 MB, 5 languages)',worker:'/libs/voice/pocket-worker.js',languages:true},
-    // Breeze TTS 2 in breeze-server on this computer (breeze-client.js): not a worker, the same messages
     // Breeze TTS 2 compiled for the browser (tools/breeze-web/): WebGPU, the 2.46 GB model downloaded
     // once into OPFS; library voices cloned from sample + transcript (cloneByText); shows its download
     // ZONOS3-Mini (Zyphra, Apache-2.0) in this browser: its own WebGPU engine (libs/voice/zonos-web/), ~1 GB
@@ -35,10 +34,10 @@
     // precomputed in assets/voices/zonos-embeddings.json); the first choice when the card has room
     'zonos-web':{stream:true,label:'ZONOS3-Mini in this browser (natural, 43 languages; ~1 GB download once; WebGPU, about 1.5 GB of graphics memory)',worker:'/libs/voice/zonos-web-worker.js',languages:true,cloneBySample:true,progress:true},
     'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'/libs/voice/breeze-web-worker.js',languages:false,cloneByText:true,progress:true},
-    'breeze':{label:'Breeze TTS 2 (3B, runs in breeze-server on this computer; ~3 GB of graphics memory)',client:true,languages:false},
   };
-  // Breeze (breeze-server on this computer, or in the browser) is never picked by itself: only when
-  // the player chooses it in the Voice pane (the Tablefolk server then starts breeze-server on demand).
+  // Breeze in the browser is never picked by itself: only when the player chooses it in the Voice pane.
+  // (The engine 'breeze', a breeze-server on the player's computer, was removed on 2026-11-21: a saved
+  // choice of it falls back to the default, chooseEngine.)
   // Each engine's measured speed on this machine (seconds of speech per second
   // of work, smoothed), kept across visits: it sizes the buffer before a line
   // starts (an engine slower than speech would stutter) and rules Breeze out.
@@ -104,15 +103,15 @@
   // line starts (8 WASM threads; measured 2026-11-13 on an RTX 4070). localStorage
   // tablefolkBreezeTeCpu '1' / '0' forces it.
   function breezeTeCpu(){ const f=localStorage.getItem('tablefolkBreezeTeCpu'); if(f==='1'||f==='0') return f==='1'; const free=window.tablefolkDevice?.freeGB; return free!=null && free<3.5; }
-  // The engine and why: this browser's choice (the voice pane), Breeze running
-  // on this computer, Breeze in this browser when it was downloaded before and
-  // fits, else the site's default (admin page), else the small Pocket-TTS.
+  // The engine and why: this browser's choice (the voice pane), ZONOS3-Mini in
+  // this browser when it was downloaded before and fits, else the site's
+  // default (admin page), else the small Pocket-TTS.
   async function chooseEngine(){
     const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine]) return {id:mine,why:'chosen in the voice settings'};
+    if(mine==='breeze'){ try{ localStorage.removeItem('tablefolkTtsEngine'); localStorage.removeItem('tablefolkBreezeUrl'); }catch{} }   // the removed breeze-server engine: back to the default
     const noZ=await zonosWhyNot();
     if(!noZ && localStorage.getItem(ZONOS_READY)==='1') return {id:'zonos-web',why:'the best voice this graphics card holds (downloaded before)'};
-    // Breeze (on this computer or in the browser) only when chosen in the Voice pane: never by itself
-    // (2026-11-15: an installed breeze-server was started and picked on a visit before ZONOS3-Mini was downloaded)
+    // Breeze in the browser only when chosen in the Voice pane: never by itself
     const def=await serverDefault(), id=ENGINES[def]&&!/^breeze/.test(def)?def:'pocket-18m';
     return {id,why:(!noZ?'ZONOS3-Mini would fit here: not downloaded yet':'ZONOS3-Mini can\'t run here: '+noZ)+'; this is '+(id===def?'the site\'s default voice':'the default voice')};
   }
@@ -128,7 +127,7 @@
     engineLabel(){ const e=ENGINES[this.engine]; return e?e.label.replace(/ \(.*/,''):''; }
     // ---- the better voice: Breeze TTS 2 in this browser, offered when it fits
     // the better voice this card can take and has not got yet: ZONOS3-Mini, else Breeze in the browser
-    offerable(){ if(this.upgrade||this.engine==='zonos-web') return null; if(this.zonosWhy==='') return localStorage.getItem(ZONOS_READY)==='1'?null:'zonos-web'; if(this.breezeWebWhy==='' && localStorage.getItem(BREEZE_WEB_READY)!=='1' && this.engine!=='breeze-web' && this.engine!=='breeze') return 'breeze-web'; return null; }
+    offerable(){ if(this.upgrade||this.engine==='zonos-web') return null; if(this.zonosWhy==='') return localStorage.getItem(ZONOS_READY)==='1'?null:'zonos-web'; if(this.breezeWebWhy==='' && localStorage.getItem(BREEZE_WEB_READY)!=='1' && this.engine!=='breeze-web') return 'breeze-web'; return null; }
     canOfferBreeze(){ return !!this.offerable(); }
     offerLabel(){ const id=this.offerable(); return id==='zonos-web'?'ZONOS3-Mini (1 GB, runs on this graphics card)':id==='breeze-web'?'Breeze TTS 2 (2.5 GB, runs on this graphics card)':''; }
     // once the characters' model is ready (no contest for the graphics card), at most twice per browser
@@ -223,8 +222,8 @@
     // Switch engines: the running one is dropped and the new one loads now.
     async setEngine(id){ return this.switchEngine(id,true); }
     async switchEngine(id,persist=true){ if(!ENGINES[id])return; if(persist) localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); this.warmed=false; try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} if(engine==='breeze-web'){ for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100)); } this.pendingLoad=new Promise((resolve,reject)=>{ const worker=E.client?new window.TablefolkBreezeWorker():new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:engine==='zonos-web'?zonosLanguage():settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1',teCpu:breezeTeCpu()}}); }); return this.pendingLoad; }
-    async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(READY_KEY[this.engine])localStorage.setItem(READY_KEY[this.engine],'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.client||ENGINES[this.engine]?.cloneByText||ENGINES[this.engine]?.cloneBySample?'':' (CPU)'}`,'ready');resolve?.(); if(!this.offerChecked){ this.offerChecked=true; this.maybeOfferBreeze().catch(()=>{}); } await this.restoreCustomVoices();} }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} if(engine==='breeze-web'){ for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100)); } this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:engine==='zonos-web'?zonosLanguage():settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1',teCpu:breezeTeCpu()}}); }); return this.pendingLoad; }
+    async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(READY_KEY[this.engine])localStorage.setItem(READY_KEY[this.engine],'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.cloneByText||ENGINES[this.engine]?.cloneBySample?'':' (CPU)'}`,'ready');resolve?.(); if(!this.offerChecked){ this.offerChecked=true; this.maybeOfferBreeze().catch(()=>{}); } await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry
       if(m.type==='audio_chunk_meta'){this.receivedSamples++;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(m.metrics?.chunkRtfx)||0;if(!this.telemetry.audioArrivalMs&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;}
@@ -362,8 +361,6 @@
     // A voice from the designed library (assets/voices/): fetched, cloned like an
     // uploaded sample (kept for this page only), used as custom:pack-<id>.
     async ensurePack(id){
-      // an engine outside the browser (Breeze) clones library voices itself, by name
-      if(ENGINES[this.engine]?.client) return id;
       // ZONOS3-Mini: a speaker embedding (192 numbers) from the sample alone; the library's are
       // precomputed (assets/voices/zonos-embeddings.json, tools/browser-test/zonos-embeddings.mjs)
       if(ENGINES[this.engine]?.cloneBySample){

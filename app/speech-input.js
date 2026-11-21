@@ -13,24 +13,24 @@
  * The Voice pane's "Speech input" picks one. Automatic (the default) on a
  * phone or tablet: the browser's recognition (when it has one). Elsewhere:
  * Underdog Bark 3.0 in this browser (libs/hear, @tablefolk/hear; asked once before its download,
- * nothing leaves the machine), else the server's Gemma, else a llama.cpp model
- * with audio input on this computer (LFM3-Omni-2B: tools/llama-server.sh
- * --omni; found through the endpoint settings or the helper finder), else the
+ * nothing leaves the machine), else the server's Gemma, else the player's own
+ * AI server when its model takes audio (the endpoint brain's address, asked
+ * through llama.cpp's GET /props), else the
  * browser's: Chrome's on-device recognition when it has it (its language pack,
  * about 300 MB, installed on the first 🎤 click), else its cloud one.
  * Bark runs fp16 on the graphics card (1.3 GB download, about 1.2 GB of
  * graphics memory, 0.4 s a sentence) when the card has shader-f16 and 1.5 GB
- * left beside the chat model (and Breeze, when it speaks), else int8 on the
+ * left beside the chat model (and the voice, when it speaks), else int8 on the
  * processor (0.9 GB, no graphics memory, about 1.2 s a sentence). Measured with
  * tools/browser-test/asr-test.mjs (2026-11-01): 1.3% WER on LibriSpeech,
  * against 4.0% for Gemma 4 E2B's audio input at ten times the time.
  * The button names the recogniser in use (Bark GPU, Bark CPU, Chrome
- * on-device, Chrome cloud, Gemma (server), the llama.cpp model) and its
+ * on-device, Chrome cloud, Gemma (server), the own server's model) and its
  * tooltip the last transcription's time; a fallback also says so in a toast.
  */
 (function () {
   let mode = null; // 'bark' | 'gemma' | 'llama' | 'browser' | null
-  let llama = null;   // { base, model } of a llama.cpp server whose model hears (GET /props: modalities.audio)
+  let llama = null;   // { base, model } of the player's own server whose model hears (llama.cpp's GET /props: modalities.audio)
   const $ = id => document.getElementById(id);
 
   const pick = () => { try { return localStorage.getItem('tablefolk.speech') || 'auto'; } catch { return 'auto'; } };
@@ -53,11 +53,10 @@
     return (window.SpeechRecognition || window.webkitSpeechRecognition) ? 'browser' : null;
   }
 
-  // the endpoint brain's server (when it is not this server's proxy), and llama.cpp's
-  // usual port once the helper finder has run (probing 127.0.0.1 unasked makes Chrome ask)
+  // the endpoint brain's server, when the player set one (not this server's proxy)
   async function findLlama() {
     let saved = {}; try { saved = JSON.parse(localStorage.getItem('tablefolk_llm_endpoint') || '{}') || {}; } catch {}
-    const bases = [saved.baseURL && !/^\/api\//.test(saved.baseURL) ? saved.baseURL : null, localStorage.getItem('tablefolkHelpers') === '1' ? 'http://127.0.0.1:8080/v1' : null].filter(Boolean);
+    const bases = [saved.baseURL && !/^\/api\//.test(saved.baseURL) ? saved.baseURL : null].filter(Boolean);
     for (const b of bases) {
       const base = b.replace(/\/+$/, '');
       try {
@@ -71,7 +70,7 @@
     const u8 = new Uint8Array(wav); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
     const r = await fetch(llama.base + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: llama.model || undefined, temperature: 0, max_tokens: 400,
       messages: [{ role: 'system', content: 'Perform ASR in English.' }, { role: 'user', content: [{ type: 'input_audio', input_audio: { data: btoa(bin), format: 'wav' } }] }] }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || 'llama.cpp transcription failed');
+    const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || 'transcription on your server failed');
     return d.choices?.[0]?.message?.content || '';
   }
 
@@ -92,7 +91,7 @@
   }
   const setState = (st, title) => { const b = button(); if (!b) return; b.dataset.state = st; b.disabled = st === 'loading'; if (title) b.title = title; };
   // Which recogniser is in use, on the button itself (every mode, not only
-  // dev): Bark GPU / Bark CPU, Chrome on-device / Chrome cloud, Gemma, llama.cpp.
+  // dev): Bark GPU / Bark CPU, Chrome on-device / Chrome cloud, Gemma, the own server's model.
   let engine = '', lastNote = '';
   function showEngine(name, note) {
     if (name != null) engine = name; if (note != null) lastNote = note;
@@ -104,7 +103,7 @@
   async function guessEngine(m) {
     if (m === 'bark') { const p = await barkPlan(); return 'Bark ' + (p.variant === 'q8' ? 'CPU' : 'GPU'); }
     if (m === 'gemma') return 'Gemma (server)';
-    if (m === 'llama') return (llama?.model || 'llama.cpp').replace(/\.gguf$/i, '').replace(/-GGUF$/i, '').slice(0, 18);
+    if (m === 'llama') return (llama?.model || 'own server').replace(/\.gguf$/i, '').replace(/-GGUF$/i, '').slice(0, 18);
     if (m === 'browser') {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       let a = null; try { a = await SR?.available?.({ langs: [navigator.language || 'en-US'], processLocally: true }); } catch {}
@@ -306,7 +305,7 @@
     try {
       if (mode === 'gemma' || mode === 'bark' || mode === 'llama') await startRecording();
       else if (mode === 'browser') await startBrowser();
-      else window.tablefolkToast?.('no speech input: run the Tablefolk server with litert-lm serve, or use Chrome', { type: 'error' });
+      else window.tablefolkToast?.('no speech input in this browser: try Chrome', { type: 'error' });
     } catch (e) { window.tablefolkToast?.('microphone: ' + e.message, { type: 'error' }); setState('idle'); }
   }
 
@@ -321,7 +320,7 @@
     setState('idle'); showEngine();
   }
   const init = () => { const sel = $('speechMode'); if (sel) sel.value = pick(); button(); setState('idle'); detect().then(async m => { mode = m; const e = await guessEngine(m); showEngine(e);
-    const why = { bark: barkOk() === '1' ? 'in this browser (downloaded before or approved): ' + barkWhy : 'in this browser; asks before its download on the first 🎤 click', gemma: 'this server\'s Gemma', llama: 'a llama.cpp model with audio on this computer', browser: pick() === 'auto' && phone() ? 'the browser\'s own (a phone or tablet)' : barkOk() === '0' ? 'the browser\'s own (Underdog Bark was declined)' : 'the browser\'s own' }[m] || 'none available';
+    const why = { bark: barkOk() === '1' ? 'in this browser (downloaded before or approved): ' + barkWhy : 'in this browser; asks before its download on the first 🎤 click', gemma: 'this server\'s Gemma', llama: 'your own AI server\'s model, which takes audio', browser: pick() === 'auto' && phone() ? 'the browser\'s own (a phone or tablet)' : barkOk() === '0' ? 'the browser\'s own (Underdog Bark was declined)' : 'the browser\'s own' }[m] || 'none available';
     window.tablefolkDiag?.note('speech', `${e}: ${why}`); preload(); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   function state() {

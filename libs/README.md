@@ -119,7 +119,7 @@ The code is MIT, like the rest of the repository. The models are not ours:
 | Pocket-TTS | CC-BY-4.0 (Kyutai) |
 | Underdog Bark 3.0 | CC-BY-4.0 |
 | Strands Decider | Apache-2.0 |
-| **Breeze TTS 2** | **research and non-commercial only** (BreezeBlue) |
+| **Breeze TTS 2** (in the browser; no server version since 2026-11-21) | **research and non-commercial only** (BreezeBlue) |
 | tiny-sd (painting) | CreativeML Open RAIL-M (use restrictions apply) |
 | Chitra Tiny (painting) | Apache-2.0 |
 | TAESD (painting decoder) | MIT |

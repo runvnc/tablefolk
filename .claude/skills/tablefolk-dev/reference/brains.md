@@ -135,8 +135,8 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     (`tools/convert-litertlm.sh`, needs about 40 GB of RAM: not done on the
     maintainer's 15 GB laptop). The picker entry `nemotron-bolt-e4b-litert`
     is `hidden` until the converted file is on R2; then un-hide it and hide
-    the Gemma E4B. Until then it runs through an endpoint (llama.cpp or
-    Ollama on the GGUF; the Brain options have presets).
+    the Gemma E4B. Until then a player who already serves the GGUF can use
+    it through the endpoint brain (no preset: 2026-11-21).
 - **Endpoint** (`libs/brain/engines/openai.js`): any OpenAI-compatible server; by
   default this server's `/api/llm/v1` proxy (keys stay on the server).
   Picking it in the top bar opens `#endpointPop` with the Brain options'
@@ -186,9 +186,10 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   forward). Steering a character (14 situations, direction and command, 0.9
   s for both natively): direction 10/14 (three misses were "move one step to
   the person" against "stay"), command 11/14; every answer at confidence 0.5+
-  was right (6/6, 8/8), every miss below it. Worth it as a local helper
-  (llama-server) for fast, confident choices with Gemma for the unsure ones;
-  in the browser too slow beside the current matcher (menus.js, 50-150 ms).
+  was right (6/6, 8/8), every miss below it. Natively it would suit fast,
+  confident choices with Gemma for the unsure ones, but a native helper is
+  not this project (CLAUDE.md); in the browser too slow beside the current
+  matcher (menus.js, 50-150 ms).
 - **Qwen2.5 0.5B** (`qwen2.5-0.5b`, engine `wllama3`, 2026-11-06):
   `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, the 491 MB Q4_K_M, the newest official 0.5B
   (Qwen3 starts at 0.6B, Qwen3.5 at 0.8B). Every layer on the GPU: about 50 tok/s,
@@ -455,69 +456,28 @@ that folder (`packages.js askTrust`, one rule for both).
   default voice. Chosen by itself when downloaded before
   (`tablefolkZonosWebReady`) and 2 GB are left beside the chat model, else
   offered (toast, twice at most; `upgradeTo('zonos-web')` downloads it
-  while the current voice talks). Breeze is never chosen by itself
-  (2026-11-15: an installed breeze-server was started and picked on a visit
-  before ZONOS3-Mini was downloaded): without ZONOS3-Mini, the site's
-  default (Pocket-TTS).
-- **Breeze TTS 2** (engine `breeze`, `app/tts/breeze-client.js`): BreezeBlue's
-  3B model (English and Mandarin; weights research/non-commercial only) has
-  no browser build (2026-10-30: no ONNX, WebGPU or Transformers.js port;
-  the Qwen3-TTS browser ports don't clone), so it runs in `breeze-server`
-  (HoppouAI/Breeze-TTS-2.cpp, Vulkan, Apache-2.0) on the player's machine:
-  `tools/breeze-server.sh [port] [--download-only]` downloads the v0.1.3
-  binary and the 2.46 GB `q4_k-dd2` GGUF into `~/.cache/tablefolk-breeze`
-  (from the R2 mirror `breeze-tts-2/`, about 2 minutes; else Hugging Face and
-  GitHub) and starts it on 8137 with `--cors` (about 3 GB of graphics
-  memory). The page reaches it
-  through `/api/tts/breeze/` (server.js `breezeProxy`, `BREEZE_URL`; owner
-  only, or visitors when the admin opens the local model to them), so Chrome
-  never asks for local network access; the Voice pane's "Breeze server"
-  field can name the server itself instead. The client stands in for a
-  speech worker (same messages; `TablefolkBreezeWorker`), streams the
-  server's 24 kHz s16le PCM into the PCM worklet (a `reset` first, or the
-  worklet keeps the last line's end and the next never finishes), retries
-  `409 busy`, and aborts on stop. Library voices are saved on the server once
-  as `tf_<id>_<mood|main>_<v>` from the sample (decoded to a 24 kHz WAV) and
-  its transcript (`text` / `mood_text` in `voices.json`, written by
-  `elevenlabs-moods.py` without the [tags]); built-in and recorded voices
-  get a designed voice from their description. Started on demand
-  (2026-11-01): `/api/tts/breeze/status` says whether Breeze is installed in
-  `~/.cache/tablefolk-breeze` (model and a binary; `vramGB` 2.1 for the
-  te-cpu build, else 3) and running; `/start` runs `tools/breeze-server.sh`
-  (`.ps1` on Windows) when BREEZE_URL is on this machine, waits for
-  `/health` (about 35 s warming up on the RTX 2060), logs to
-  `server.log` there, stops it after `BREEZE_IDLE_MIN` (30) minutes without
-  speech and with the server; `--no-breeze` or `BREEZE_AUTOSTART=0` turns
-  it off. Choosing Breeze in the Voice pane starts it the same way; it is
-  never chosen by itself (only in the Voice pane). Every engine's speed (`generation_metrics` rtfx, smoothed,
-  `localStorage.tablefolkTtsRtfx`) also sizes the audio held before a line
+  while the current voice talks). Breeze is never chosen by itself:
+  without ZONOS3-Mini, the site's default (Pocket-TTS).
+- **Breeze TTS 2 natively** (engine `breeze`, `app/tts/breeze-client.js`,
+  a `breeze-server` on the player's machine reached through server.js's
+  `/api/tts/breeze/` and started on demand by it, `tools/breeze-server.sh`):
+  removed 2026-11-21 with the other local helpers (CLAUDE.md, "Back ends:
+  connect, never install"). Breeze runs only in the browser now
+  (`breeze-web`, below). A saved `tablefolkTtsEngine` of `breeze` falls
+  back to the default voice (`chooseEngine` clears it and
+  `tablefolkBreezeUrl`; the Voice pane's engine menu shows the default).
+  Every engine's speed (`generation_metrics` rtfx, smoothed,
+  `localStorage.tablefolkTtsRtfx`) sizes the audio held before a line
   plays (`holdFor`: (1 - r/1.1) of the line's estimated length at 14
   characters a second, at most 8 s), so a slow engine waits instead of
-  stuttering. Breeze's own log on the RTX 2060 beside Gemma E2B and the
-  game: 0.35-0.9x real time over 32 lines (1.0-1.4x measured alone), so it
-  tries Breeze once and goes back to Pocket-TTS. Tested against a mock
-  server (registration, streaming, three lines in a row, stop) and against
-  the real model on the RTX 2060 (native Vulkan has fp16, so no shader-f16
-  problem there; 2026-10-30): about 3 GB of graphics memory, 1.37x realtime
-  for a 10 s designed line; in the game path (proxy, `breeze` engine) first
-  audio about 0.5 s for a saved voice and 1.3-1.7 s the first time a voice is
-  cloned, 1.0-1.4x realtime; Gemini 4 Argon rated the dwarf (anger) and
-  innkeeper clones 10/10 "same speaker" against their samples.
-  Memory, by part (q4_k-dd2): the T5Gemma2 text encoder 903 MiB (a 262k-word
-  table), backbone 759, codec 377 (float32 convolutions), depth decoder 225,
-  audio embeddings 68; float32 KV caches and vocoder scratch add about 0.8
-  GB. Breeze and Gemma E2B together ran the 6 GB card out of memory, and
-  ggml-vulkan then kept going on failed allocations: scrambled speech with
-  the real line faint in it ("ErrorOutOfDeviceMemory" in the server log).
-  `tools/breeze-server/build.sh` builds v0.1.5 with `te-cpu.patch`:
-  BREEZE_TE_CPU=1 (the script's default) loads the `te.*` tensors into a CPU
-  buffer (twins in their own context; the originals point at them, so the
-  GPU allocation skips them) and runs the encoder graph on ggml's CPU
-  backend (BREEZE_TE_THREADS, default half the cores). Measured on the RTX
-  2060: peak 3005 to 2149 MiB above idle, first audio 0.42 to 0.86 s (the
-  encoder takes 0.5 s on 6 threads), Gemini 4 Argon heard the same speaker
-  (9-10/10) and the exact words in both. Its Vulkan build needs the SPIR-V
-  headers (fetched into ~/.cache/tablefolk-build when missing).
+  stuttering. From the native measurements (RTX 2060, 2026-10-30), still
+  true of the model: memory by part (q4_k-dd2) is the T5Gemma2 text encoder
+  903 MiB (a 262k-word table), backbone 759, codec 377 (float32
+  convolutions), depth decoder 225, audio embeddings 68; float32 KV caches
+  and vocoder scratch add about 0.8 GB. `te-cpu.patch` (now in
+  `tools/breeze-web/`, applied by its `build.sh`) puts the text encoder on
+  the CPU backend: natively peak 3005 to 2149 MiB, first audio 0.42 to
+  0.86 s, the same speaker and words (Gemini 4 Argon, 9-10/10).
 - **Breeze TTS 2 in the browser** (engine `breeze-web`,
   `libs/voice/breeze-web-worker.js`, `libs/voice/breeze-web/breeze.{mjs,wasm}`):
   Breeze-TTS-2.cpp compiled to WebAssembly with ggml's WebGPU backend
@@ -553,8 +513,7 @@ that folder (`packages.js askTrust`, one rule for both).
   once a batch and uses mat-vec workgroups of 64: 0.70x to 1.0-1.1x alone. The picture is the other
   half: default graphics at 60 fps left it under 0.38x, so app.js caps the frame rate while
   `breeze-web` speaks (`tablefolkSpeakFps`, Graphics pane, default 15). The README has the
-  profile and what did not help. Native `breeze-server` holds 2.3 GB of the card while idle, enough to
-  run the browser build or Qwen out of memory.
+  profile and what did not help.
   Cloned voices were broken in the browser until 2026-11-07: ggml's `sum_rows` lost rows past 65,535 workgroups, which any reference clip over about 32 frames reaches. The patch fixes it; the README here tells how, and `trace-clone.hpp` is the tool for the next such bug. The manager now resamples references with `OfflineAudioContext` (cache keys gained `:24k`), and library voices load native codes from `assets/voices/breeze-codes/` (`tools/breeze-web/build-voice-codes.mjs`; rerun it when a sample changes). `rtfx` from the worker now leaves out the wait before audio (`overallRtfx` keeps it), stored as `breeze-web-2`, because `holdFor` read the wait as slowness.
   Traps found: pointers above 2 GB come back negative in JS (use `>>> 2`),
   exported HEAP views go stale when memory grows (take fresh views of
@@ -800,7 +759,7 @@ Ideas, next:
   slower turns).
 - **CPU offload of Bonsai:** impossible in the browser (the engine is
   WebGPU-only; wllama lacks Prism's PTQ1_0). Possible natively with Prism's
-  llama.cpp fork, as a local helper.
+  llama.cpp fork, but a native back end is not this project (CLAUDE.md).
 
 ## Bonsai 2 on 12 GB cards, with the new minds (2026-11-15)
 
@@ -809,7 +768,7 @@ the `vastai/linux-desktop:cuda-12.9-ubuntu24.04-2026-02-05` image. The
 image's Chrome 144 cannot compile Bonsai's kernels ("'subgroupBallot' must
 only be called from uniform control flow"): install the current Chrome
 (157 worked). The box clones the public repo and serves it on its own :8000
-(`BREEZE_AUTOSTART=0`); only its CDP port is tunnelled back
+; only its CDP port is tunnelled back
 (`ssh -L 9231:localhost:9223`), and the test scripts take `CDP_PORT`. A
 fresh Chrome per model: a 27B still on the card made the 9B fail with
 invalid buffers.

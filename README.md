@@ -68,7 +68,7 @@ input about 1 GB.
 | characters (online) | any model on OpenRouter or your own server | their servers | the provider's terms |
 | meaning (menus, memory) | EmbeddingGemma | browser | Apache-2.0 |
 | voices (default) | Pocket-TTS (Kyutai), small and standard | browser (CPU) | CC-BY-4.0 |
-| voices (optional, better) | Breeze TTS 2 | browser (WebGPU) or a local server | **BreezeBlue research and non-commercial licence** |
+| voices (optional, better) | Breeze TTS 2 | browser (WebGPU) | **BreezeBlue research and non-commercial licence** |
 | speech input | Underdog Bark 3.0 (Parakeet TDT) | browser (WebGPU or CPU) | CC-BY-4.0 |
 | speech input (phones) | the browser's own recognition | the browser | – |
 | painting (artist characters) | tiny-sd 512 px, with the TAESD decoder | browser (WebGPU) | CreativeML Open RAIL-M (use restrictions); TAESD MIT |

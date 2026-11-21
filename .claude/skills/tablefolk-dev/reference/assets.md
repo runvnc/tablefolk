@@ -376,11 +376,12 @@ SHA-256 and put one by one with `wrangler r2 object put` (four at a time).
 A new export goes under a new revision prefix.
 Breeze TTS 2 is under `breeze-tts-2/`: HoppouAI's `breeze-tts-2-q4_k-dd2.gguf`
 in 37 parts with a `parts.json` (size, part size, part names, SHA-256), the
-breeze-server v0.1.3 Linux and Windows builds, `LICENSE-model.txt`
+breeze-server v0.1.3 Linux and Windows builds (unused since the local
+helpers went, 2026-11-21), `LICENSE-model.txt`
 (BreezeBlue's research and non-commercial licence: redistribution only for
 that, with the licence and a NOTICE), `NOTICE.txt` (its required wording and
 "Derived from Breeze TTS 2...") and the runtime's Apache licence;
-`tools/breeze-server.sh` reads that layout.
+`libs/voice/breeze-web-worker.js` reads the parts.
 The maintainer's line was about 1 MB/s each way on 2026-10-25: a 1.2 GB file
 takes half an hour. Everything else is served from the repo. `?assets=<url>`
 or `window.TABLEFOLK_ASSETS` points the app at another asset host.

@@ -1,6 +1,6 @@
 // Encode every library voice natively, into assets/voices/breeze-codes/<name>.bin, so Breeze in the
 // browser needn't: its encoder's codes differ from native's (README.md here) and take time on the card.
-//   start a native breeze-server on 8137 with a voices dir, then:
+//   (maintainer tool) build HoppouAI/Breeze-TTS-2.cpp natively, start its breeze-server on 8137 with a voices dir, then:
 //   node tools/breeze-web/build-voice-codes.mjs <its voices dir>
 // A .bin is the codes as little-endian int16, 16 per frame, read by pocket-tts-manager.js.
 import fs from 'fs'; import os from 'os'; import path from 'path'; import { execFileSync } from 'child_process';

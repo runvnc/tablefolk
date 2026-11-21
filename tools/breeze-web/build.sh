@@ -28,9 +28,9 @@ git -C third_party/ggml checkout -q "$GGML_REV"
 git -C third_party/ggml apply "$HERE/ggml-webgpu-fast.patch"
 # breeze-trace.patch: the hook trace-clone.hpp uses to see every operation
 git apply "$HERE/breeze-trace.patch"
-# te-cpu.patch (from the native build): the 0.9 GB text encoder on the CPU backend
+# te-cpu.patch (written for the native build, kept here): the 0.9 GB text encoder on the CPU backend
 # when tf_set_te_cpu(1) is called before tf_init: ~1 GB less graphics memory
-git apply "$ROOT/tools/breeze-server/te-cpu.patch" || git apply --3way "$ROOT/tools/breeze-server/te-cpu.patch"
+git apply "$HERE/te-cpu.patch" || git apply --3way "$HERE/te-cpu.patch"
 grep -q convtr1d_stream src/codec_decoder.cpp || { echo "expected Breeze with the matmul vocoder (v0.1.6 work, 87b4366 or later)"; exit 1; }
 emcmake cmake -S . -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DBREEZE_VULKAN=OFF -DGGML_WEBGPU=ON -DGGML_WEBGPU_JSPI=ON -DGGML_OPENMP=OFF -DGGML_NATIVE=OFF \

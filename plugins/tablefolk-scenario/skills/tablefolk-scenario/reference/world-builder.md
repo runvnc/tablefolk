@@ -70,20 +70,18 @@ double-height.
   `tools/browser-test/worldgen-test.html?prompt=...` runs it on its own.
 - *your own key*: your OpenRouter account (the **Sign in with OpenRouter**
   button makes a key for this site and brings you back; or paste one from
-  openrouter.ai/keys) or any OpenAI-compatible server, a local one too
-  (llama.cpp's `llama-server`, Ollama, LM Studio, vLLM). Your browser calls
+  openrouter.ai/keys), or the address of an AI server you already run (any
+  OpenAI-compatible one; the address ends in `/v1`). Your browser calls
   it directly and the key is kept only in this browser; the server only
   hands out the same prompt its own model would get and checks the answer.
-  A server on your own computer must allow the page's requests (CORS):
-  `llama-server` does already, Ollama needs `OLLAMA_ORIGINS=*`, LM Studio
-  has an "Enable CORS" switch; the browser may ask to reach the local
-  network. Type any model the provider has (presets for OpenRouter); a
+  A server on your own computer must allow the page's requests (CORS); the
+  browser may ask to reach the local network. Type any model the provider has (presets for OpenRouter); a
   reasoning model like DeepSeek V4.1 Flash writes the best worlds. Tick
   "also for the characters when I play" to have the game's characters use
   the same key (with Gemma 4 26B, quick and cheap). The game's Brain options
   have OpenRouter presets that use this key too.
-- *on this server*: the local model server (`litert-lm serve`, Gemma 4 E4B;
-  ~22 s on an RTX 2060).
+- *on this server*: a local model the server's operator runs beside it
+  (`litert-lm serve`, Gemma 4 E4B; ~22 s on an RTX 2060), when there is one.
 - *cloud*: the generator endpoint (OpenRouter by default, model
   `deepseek/deepseek-v4.1-flash-1017`; `gpt-6-luna` on OpenAI takes 6-14 s).
   Replies may run to 17000 tokens for models that think at length.

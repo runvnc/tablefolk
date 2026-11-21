@@ -152,7 +152,7 @@
   function runs(r) {
     return [
       ['3D world and characters (Gemma)', r.needs.world, ''],
-      ['Voices in the browser (Breeze)', r.needs.breezeWeb, 'the voices on the CPU (Pocket-TTS) or a Breeze server still work'],
+      ['Voices in the browser (Breeze)', r.needs.breezeWeb, 'the voices on the CPU (Pocket-TTS) still work'],
       ['Qwen models on the GPU', r.needs.wllamaGpu, 'they run on the CPU, slower'],
       ['Speech input on the GPU', r.needs.barkGpu, 'it runs on the CPU, slower'],
     ];

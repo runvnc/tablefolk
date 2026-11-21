@@ -336,7 +336,7 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <div id="ownCustom" class="ownrow" hidden>
       <label class="field grow"><span class="lbl">Server address</span><input id="ownURL" placeholder="http://localhost:8080/v1" spellcheck="false"></label>
       <label class="field"><span class="lbl">Key (if it needs one)</span><input type="password" id="ownKeyC" autocomplete="off" spellcheck="false"></label>
-      <p class="muted wide">Any OpenAI-compatible server works, a local one too, as long as it lets this page call it (CORS): llama.cpp's <code>llama-server</code> does already; Ollama needs <code>OLLAMA_ORIGINS=*</code>; LM Studio: turn on “Enable CORS” in its server settings. Your browser may ask to reach your local network.</p>
+      <p class="muted wide">Have your own AI server? Paste its OpenAI-compatible address (it ends in <code>/v1</code>). It must allow this page's requests (CORS); your browser may ask to reach your local network.</p>
     </div>
     <div class="ownrow">
       <label class="field grow"><span class="lbl">Model</span><input id="ownModel" list="ownModels" spellcheck="false" placeholder="deepseek/deepseek-v4.1-flash-1017"><datalist id="ownModels"></datalist></label>

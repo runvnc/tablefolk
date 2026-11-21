@@ -160,8 +160,6 @@ code { color:#ffe0a0; }
 #ttsTelemetry { font:600 10px/1.45 ui-monospace,monospace; color:#b9d8c5; overflow-wrap:anywhere; margin:-2px 3px 8px; }
 #customVoiceName, #customVoiceFile { box-sizing:border-box; width:100%; margin-bottom:7px; border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(0,0,0,.28); border-radius:10px; padding:7px; font-size:11px; }
 .tts-note { display:block; color:#aebead; font:9px/1.35 ui-monospace,monospace; }
-.helpers-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
-.helpers-row .helpers-status { display:inline; color:#aebead; font:9px/1.35 ui-monospace,monospace; }
 
 /* ---- confirm dialog (confirm-dialog.js) ---- */
 .confirm-overlay { position:fixed; z-index:1100; display:flex; align-items:center; justify-content:center; padding:14px; border-radius:20px; background:rgba(8,12,10,.55); backdrop-filter:blur(6px) saturate(.9); animation:confirm-fade .16s ease-out both; }
@@ -647,12 +645,10 @@ body.user-mode #playerHp { font-size:11px; }
   #chatDock, body.user-mode #chatDock { left:8px; right:8px; width:auto; bottom:8px; }
   .chat-send-row > .mic-btn .mic-engine { display:none; }
 }
-/* Voice pane: one column, long engine names and the helpers button stay inside the panel */
+/* Voice pane: one column: long engine names stay inside the panel */
 #pane-voice .custom-grid { grid-template-columns:minmax(0,1fr); }
 #pane-voice .custom-grid > * { min-width:0; }
 #pane-voice select, #pane-voice input[type="text"] { width:100%; min-width:0; max-width:100%; box-sizing:border-box; text-overflow:ellipsis; }
-#pane-voice .helpers-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-#pane-voice .helpers-row button { white-space:normal; }
 #pane-voice input[type="text"] { border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(0,0,0,.28); border-radius:10px; padding:6px 8px; font-size:11px; }
 @media (max-width:520px) { #sidePanel { max-width:calc(100vw - 70px); } }
 

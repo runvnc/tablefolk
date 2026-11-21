@@ -8,7 +8,7 @@ Nothing here is cancelled by a later batch; a later batch only changes priority.
 
 1. Does llmsizer know DGX Spark, RTX Spark, Apple M6? (DGX Spark yes; the others added by name in `hardware.js`)
 2. The endpoint brain: list the server's models in a picker. (done)
-3. Breeze TTS 2 (smallest model, voice cloning) as an option, enabled when memory allows; keep Pocket-TTS here. (done as a local-server engine, the user's choice: no browser build exists; tested against a mock server)
+3. Breeze TTS 2 (smallest model, voice cloning) as an option, enabled when memory allows; keep Pocket-TTS here. (done as a local-server engine, the user's choice: no browser build exists; tested against a mock server. The local-server engine was dropped 2026-11-21: installing back ends negates the browser's convenience; Breeze runs in the browser now)
 
 ## Characters, cameras and brains batch (2026-10-30)
 
@@ -36,7 +36,7 @@ the LiteRT-LM Bonsai bundles don't run in the web engine: hidden; the bigger
 Bonsai run through an endpoint); 11 (the speech model is on R2); 9 not
 finished: Nemotron 3.5 Bolt E4B has no .litertlm and the converter
 (`tools/convert-litertlm.sh`, untested) needs a machine with about 40 GB of RAM,
-so for now it is an endpoint preset (Ollama / llama.cpp on the GGUF) and a
+so for now it is an endpoint preset (Ollama / llama.cpp on the GGUF; the preset was dropped 2026-11-21: no model recommendations for back ends) and a
 hidden picker entry that waits for the converted file on R2.
 Ask first (see CLAUDE.md): paid fal.ai calls, model downloads, R2 uploads.
 

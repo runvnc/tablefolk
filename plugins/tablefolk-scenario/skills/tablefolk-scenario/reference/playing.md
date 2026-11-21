@@ -72,10 +72,11 @@ by itself after the characters' model on later visits; while it loads the 🎤
 is greyed out and shows its progress, so a press never waits on it. It runs on the graphics
 card when there is room beside the characters' model, else on the processor
 (about a second a sentence). The button names the recogniser it is using
-(Bark GPU, Bark CPU, Chrome on-device, Chrome cloud, Gemma, or the llama.cpp
-model), and its tooltip how long the last one took. The Voice pane's "Speech input" can pick the
-processor, the server's Gemma (`litert-lm serve`), llama.cpp with a model
-that hears (`tools/llama-server.sh --omni`), or the browser's own
+(Bark GPU, Bark CPU, Chrome on-device, Chrome cloud, Gemma, or your own
+server's model), and its tooltip how long the last one took. The Voice pane's "Speech input" can pick the
+processor, the Tablefolk server's Gemma (when its operator set one up), your
+own AI server when you use one for the characters and its model takes audio,
+or the browser's own
 recognition: Chrome's on-device one when it has it (it installs a language
 pack of about 300 MB on the first click), else its makers' servers. When the
 player declines Bark's download, Automatic takes the next of these that
@@ -164,7 +165,7 @@ before.
 | Bonsai 2 27B | Prism ML's ternary 27B (~5.9 GB), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
 | Qwen1.5 0.5B | the older 0.5B chat model (Q4_0 GGUF, ~395 MB, on wllama) people laugh at: "10 + 10 = 11", "The Earth has 46,942 moons". Simple mode by default; The Oracle runs on it. If the graphics card is too full it loads on the CPU, about 3x slower |
 | Qwen2.5 0.5B | Alibaba's smallest chat model (Q4_K_M GGUF, ~490 MB, on wllama), about 50 tokens a second: gets facts wrong with confidence. Simple mode by default (see "Very small brains" in [characters.md](characters.md)) |
-| OpenAI-compatible endpoint | any server: this Tablefolk server's proxy (default), OpenRouter, OpenAI, `litert-lm serve`, llama.cpp (`tools/llama-server.sh`, `.ps1` on Windows, `.command` on a Mac: LFM3-1.7B on http://127.0.0.1:8080/v1, about 1.3 GB of graphics memory; `--omni` (`-Omni` on Windows) runs LFM3-Omni-2B instead, which also hears, so the 🎤 button can use it), Ollama. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
+| OpenAI-compatible endpoint | for a player who already has an AI server or an OpenRouter key: paste its address (an OpenAI-compatible one ends in `/v1`, e.g. `http://localhost:8080/v1`; a server on your own computer must allow this page's requests, CORS) or the key. Blank uses this Tablefolk server's proxy. Picking it opens a panel under the top bar (base URL, API key, model, presets; the ⚙ endpoint button reopens it), which lists the server's models (`GET /models`) in a picker and as suggestions while typing; "done" starts it. Vision sends pictures |
 
 Hidden test engines (MiniCPM, Transformers.js) are listed in
 `app/llm_js/agent-brain.js`. One model runs for all characters, in one shared
@@ -191,24 +192,13 @@ with 8 GB of memory or more are offered it too; iPhones and smaller phones
 keep Pocket-TTS.
 Pocket-TTS small (18M
 parameters, about 40 MB, English) and the 100M one (about 120 MB, five
-languages), and **Breeze TTS 2** (3B, much more natural and acted; it runs
-outside the browser in `breeze-server` on your own computer, about 3 GB of
-graphics memory: install it once with `tools/breeze-server.sh` (Windows:
-`tools/breeze-server.ps1`; no Mac build yet); after that the Tablefolk
-server starts it by itself when it is wanted and stops it after half an
-hour of quiet. It is used only when you pick it under Engine, never by
-itself. Its weights are for non-commercial use). **Breeze TTS 2 in this
-browser** is the same model with no server: a 2.5 GB download once (asked
+languages), and **Breeze TTS 2 in this browser** (3B, much more natural
+and acted; used only when you pick it under Engine, never by itself; its
+weights are for non-commercial use): a 2.5 GB download once (asked
 first), on the graphics card through WebGPU (it needs JSPI (see "Browsers") and the `shader-f16`
 feature, which Chrome on Linux with NVIDIA hides unless it is started with
 `--enable-dawn-features=vulkan_enable_f16_on_nvidia`; without either the option is greyed
-out and says which is missing, and the worker checks both before the download; about 0.6x realtime on an RTX 2060, so best on bigger cards). **Find helpers on this computer** (a button in the Voice pane and in the
-endpoint panel) looks for breeze-server (port 8137) and llama.cpp (port 8080)
-on the player's own machine, which works from tablefolk.world too: the
-browser asks once to allow local network access. Breeze found is used
-directly when this server cannot reach it; llama.cpp found offers itself as
-the brain (the LFM3 preset). After the first time it looks again quietly
-on each visit. Voices are placed in space. The slider beside the speaker
+out and says which is missing, and the worker checks both before the download; about 0.6x realtime on an RTX 2060, so best on bigger cards). Voices are placed in space. The slider beside the speaker
 button in the top bar (and the Voice pane) sets their volume. The Voice pane
 can clone a voice from a sample.
 
@@ -218,8 +208,7 @@ The Graphics pane sets quality, shadows, the sea and "smart memory" (the
 embedding model). Light is the default; every quality uses the simple sea and
 sky (the detailed ocean and island only come with `?island=1`). The 🔊/🔇
 button at the top turns speech on and off; its tooltip names the voice in
-use. The voice is the one picked in the Voice pane, else Breeze running on
-this computer, else **Breeze TTS 2 in the browser** when it was downloaded
+use. The voice is the one picked in the Voice pane, else **Breeze TTS 2 in the browser** when it was downloaded
 and the graphics card has room beside the characters' model (3.5 GB), else
 the site's default (Pocket-TTS). When Breeze would fit but isn't downloaded,
 the game offers it once (twice at most) after the characters' model is

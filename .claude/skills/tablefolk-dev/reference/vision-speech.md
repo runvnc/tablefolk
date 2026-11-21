@@ -116,8 +116,9 @@ built.
    change): for players who don't speak English.
 4. **LFM3-Omni-2B / LFM3-Audio-2B** (Liquid AI, late October 2026; LFM Open
    License): audio in, text or speech out, 18 languages, streaming
-   "LiveASR". Built as the helper choice (`tools/llama-server.sh --omni`;
-   the page finds it by `GET /props` `modalities.audio`): 1.6% on
+   "LiveASR". Was built as a local-helper choice (`tools/llama-server.sh
+   --omni`, removed 2026-11-21; the page still uses a player's own server
+   when the endpoint brain's `GET /props` says `modalities.audio`): 1.6% on
    LibriSpeech at 0.7 s, nearly as good as Bark, and the same model can be the
    characters' brain (micro-eval 7/10 against LFM3-1.7B's 9/10: it doesn't
    haggle). Not in the browser.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Tablefolk server (Bun).
 //
-//   bun server/server.js [port] [--litert] [--no-breeze] [--world-loading] [--byo-model]
+//   bun server/server.js [port] [--litert] [--world-loading] [--byo-model]
 //
 // Serves the project's static files (the app at /app/), and:
 //   /api/llm/v1/...     OpenAI-compatible proxy for the characters' "endpoint"
@@ -20,13 +20,10 @@
 //   /admin              the admin page (password set on first start;
 //                       delete .admin/password.json or pass --reset-admin to reset)
 //   /api/voices         voice genders and descriptions (set on /admin)
-//   /api/tts/breeze/... Breeze TTS 2's breeze-server on this machine (BREEZE_URL):
-//                       health, voices, streamed speech, for the owner only;
-//                       /status and /start: started on demand when installed
 // See server/config.js for the settings.
 import { join, normalize, extname } from 'node:path';
-import { existsSync, statSync, readdirSync, openSync } from 'node:fs';
-import { config, ROOT, LITERT_URL, SPEECH_MODEL, BREEZE_URL } from './config.js';
+import { existsSync, statSync } from 'node:fs';
+import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
 import { handleWorld, handleGenerate, handleRevise, handleCritique, handleFinish, handleWorldgenMessages, worldgenOptions } from './generate.js';
 import { guestMay } from './settings.js';
 import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
@@ -34,7 +31,6 @@ import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps
 const args = process.argv.slice(2);
 const port = +(args.find(a => /^\d+$/.test(a)) || config.port);
 if (args.includes('--litert')) config.startLitert = true;
-if (args.includes('--no-breeze')) config.noBreeze = true;
 if (args.includes('--world-loading')) config.worldView = 'loading';
 if (args.includes('--byo-model')) config.byoModel = true;
 config.port = port;
@@ -127,76 +123,6 @@ async function proxy(req, url, prefix, ep, ip = '', which = 'cloud', local = fal
   }
 }
 
-// Breeze TTS 2 (breeze-server) on this machine, for the page's "Breeze" speech
-// engine (app/tts/breeze-client.js). Through here the page needs no CORS from
-// breeze-server and never asks the browser for local network access. Its GPU
-// is the owner's: visitors only when the admin page opens this machine's local model to them.
-async function breezeProxy(req, url, local) {
-  const sub = url.pathname.slice('/api/tts/breeze'.length);
-  if (!['/health', '/v1/voices', '/v1/audio/speech', '/status', '/start'].includes(sub)) return Response.json({ error: 'not proxied' }, { status: 404 });
-  if (!local && !isAdmin(req) && !config.guestBrain?.local) return Response.json({ error: 'this server\'s Breeze voice is not open to visitors' }, { status: 403 });
-  if (sub === '/status') return Response.json({ ...breezeInstall(), running: await breezeUp(), autostart: breezeAuto() });
-  if (sub === '/start') return Response.json({ ...breezeInstall(), running: await startBreeze(), autostart: breezeAuto() });
-  breezeUsed = Date.now();
-  try {
-    const up = await fetch(BREEZE_URL + sub, {
-      method: req.method, headers: req.headers.get('content-type') ? { 'Content-Type': req.headers.get('content-type') } : {},
-      body: req.method === 'POST' ? await req.arrayBuffer() : undefined, signal: sub === '/health' ? AbortSignal.timeout(1500) : undefined,
-    });
-    const h = { 'Content-Type': up.headers.get('content-type') || 'application/octet-stream', 'Cache-Control': 'no-store' };
-    for (const k of ['x-sample-rate', 'x-sample-format']) if (up.headers.get(k)) h[k] = up.headers.get(k);
-    return new Response(up.body, { status: up.status, headers: h });
-  } catch (e) {
-    return Response.json({ error: `breeze-server at ${BREEZE_URL} unreachable: ${e.message}` }, { status: 502 });
-  }
-}
-
-// Starting breeze-server on demand: when the page picks Breeze (it fits
-// beside the chat model, or the player chose it) and nothing answers at
-// BREEZE_URL, this server runs tools/breeze-server.sh, provided Breeze is
-// installed (~/.cache/tablefolk-breeze: the model and a breeze-server binary,
-// put there by that script) and BREEZE_URL is on this machine. It is stopped
-// after BREEZE_IDLE_MIN minutes (default 30) without speech, and with this
-// server. --no-breeze (or BREEZE_AUTOSTART=0) turns it off.
-const BREEZE_DIR = join(process.env.HOME || process.env.USERPROFILE || '.', '.cache', 'tablefolk-breeze');
-let breezeProc = null, breezeStarting = null, breezeUsed = 0;
-const breezeAuto = () => !config.noBreeze && process.env.BREEZE_AUTOSTART !== '0' && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(BREEZE_URL);
-function breezeInstall() {
-  const model = existsSync(join(BREEZE_DIR, 'breeze-tts-2-q4_k-dd2.gguf'));
-  const build = existsSync(join(BREEZE_DIR, 'build', 'breeze-server'));
-  let bin = build;
-  if (!bin) try { bin = readdirSync(BREEZE_DIR, { recursive: true }).some(f => /(^|[\/])breeze-server(\.exe)?$/.test(String(f)) && !String(f).startsWith('mirror')); } catch {}
-  // graphics memory: the local build runs the text encoder on the processor
-  return { installed: model && !!bin, vramGB: build ? 2.1 : 3 };
-}
-async function breezeUp() {
-  try { const r = await fetch(BREEZE_URL + '/health', { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; }
-}
-async function startBreeze() {
-  if (await breezeUp()) return true;
-  if (!breezeAuto() || !breezeInstall().installed) return false;
-  if (breezeStarting) return breezeStarting;
-  return breezeStarting = (async () => {
-    try {
-      if (!breezeProc) {
-        const port = new URL(BREEZE_URL).port || '8137', win = process.platform === 'win32';
-        const cmd = win ? ['powershell', '-ExecutionPolicy', 'Bypass', '-File', join(ROOT, 'tools', 'breeze-server.ps1'), port] : ['bash', join(ROOT, 'tools', 'breeze-server.sh'), port];
-        const log = openSync(join(BREEZE_DIR, 'server.log'), 'a');
-        breezeProc = Bun.spawn(cmd, { stdout: log, stderr: log, stdin: 'ignore' });
-        console.log(`started breeze-server on ${BREEZE_URL} (pid ${breezeProc.pid}; log ${join(BREEZE_DIR, 'server.log')})`);
-        breezeProc.exited.then(code => { console.log(`breeze-server exited (${code})`); breezeProc = null; });
-      }
-      breezeUsed = Date.now();
-      for (let i = 0; i < 120 && breezeProc; i++) { if (await breezeUp()) return true; await Bun.sleep(500); }
-      return await breezeUp();
-    } finally { breezeStarting = null; }
-  })();
-}
-setInterval(() => {
-  const idle = Number(process.env.BREEZE_IDLE_MIN || 30) * 60000;
-  if (breezeProc && Date.now() - breezeUsed > idle) { console.log('breeze-server idle: stopping it'); try { breezeProc.kill(); } catch {} }
-}, 60000).unref?.();
-
 // Speech to text with Gemma 4's own audio input (litert-lm serve and a model
 // with an audio encoder). The page posts 16 kHz mono WAV.
 let speechChecked = null;
@@ -261,7 +187,6 @@ const server = Bun.serve({
     const p = url.pathname;
     // / is the landing page (index.html), served as a static file below
     if (p.startsWith('/api/llm/v1/')) return proxy(req, url, '/api/llm/v1', config.characters, ip, 'cloud', local);
-    if (p.startsWith('/api/tts/breeze/')) return breezeProxy(req, url, local);
     if (p.startsWith('/api/local/v1/')) return proxy(req, url, '/api/local/v1', { baseURL: LITERT_URL, model: 'gemma4-e4b,gpu' }, ip, 'local', local);
     if (p === '/api/generate') return handleGenerate(req, url);
     if (p === '/api/worldgen/options') return Response.json(await worldgenOptions(req), { headers: { 'Cache-Control': 'no-store' } });
@@ -294,9 +219,9 @@ if (config.startLitert) {
   litert = Bun.spawn(['litert-lm', 'serve', '--port', port], { stdout: 'inherit', stderr: 'inherit' });
   console.log(`started litert-lm serve on ${LITERT_URL}`);
 }
-// helpers this server started go with it
-const stopHelpers = () => { for (const p of [litert, breezeProc]) try { p?.kill(); } catch {} process.exit(0); };
-process.on('SIGINT', stopHelpers); process.on('SIGTERM', stopHelpers);
+// litert-lm serve, when this server started it, goes with it
+const stopLitert = () => { try { litert?.kill(); } catch {} process.exit(0); };
+process.on('SIGINT', stopLitert); process.on('SIGTERM', stopLitert);
 
 console.log(`Serving tablefolk.world on http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${server.port}/app/`);
 console.log(`  characters' endpoint brain -> ${config.characters.baseURL} (${config.characters.model})${config.characters.apiKey ? '' : ' [no key]'}`);

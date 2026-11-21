@@ -77,7 +77,7 @@ with sight are in the picker but not yet run on a card big enough for them.
 3. **Plans tied to the day/night clock** (plans exist now, but not by time
    of day).
 4. **Best-of-N with a chooser**: 2-3 candidate actions, picked by the
-   Decider (as a local helper: 0.5 s natively, 6-8 s in the browser) or by a
+   Decider (6-8 s in the browser; native helpers are not this project) or by a
    scoring pass.
 5. **A stable prompt prefix** to cut LiteRT rebuilds: measure the cache reuse
    first.
