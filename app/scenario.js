@@ -1654,6 +1654,7 @@
   function watchPads() {
     if (transition || !active) return;
     edgeFirstPerson();
+    if (edgeClick()) return;
     const c = playerCell(); if (!c || c === lastCell) return;
     lastCell = c;
     const l = world.links.find(l => l.at && !l.edge && l.at.join(',') === c);
@@ -1662,6 +1663,19 @@
     const [x, z] = c.split(',').map(Number), Wd = W().WORLD;
     const e = world.links.find(l => l.edge && ((l.edge === 'east' && x === -(Wd.halfW - 1)) || (l.edge === 'west' && x === Wd.halfW - 1) || (l.edge === 'north' && z === -(Wd.halfH - 1)) || (l.edge === 'south' && z === Wd.halfH - 1)));
     if (e && rimHint !== world.id + e.edge) { rimHint = world.id + e.edge; toast(`${e.edge[0].toUpperCase() + e.edge.slice(1)}: ${e.name ? 'the way to ' + e.name : 'a way on'}. Keep walking ${e.edge} to go.`); }
+  }
+  // A click on a rim square (or past it) where an edge leads on: once the player
+  // has walked there and stopped, one more step, off the board (a click-walk
+  // ended on the last square and nothing happened).
+  function edgeClick() {
+    const st = W().state, ct = st.clickTarget, av = W().getPlayerAvatar?.(); if (!ct || !av || av.turnMove || performance.now() - ct.at > 60000) return false;
+    const Wd = W().WORLD, bx = Wd.halfW - 1, bz = Wd.halfH - 1, cx = Math.max(-bx, Math.min(bx, ct.x)), cz = Math.max(-bz, Math.min(bz, ct.z));
+    const edge = ct.x <= -bx ? 'east' : ct.x >= bx ? 'west' : ct.z <= -bz ? 'north' : ct.z >= bz ? 'south' : null;
+    if (!edge) { st.clickTarget = null; return false; }
+    const l = world.links.find(k => k.edge === edge); if (!l) { st.clickTarget = null; return false; }
+    if (playerCell() !== cx + ',' + cz) return false;
+    st.clickTarget = null; const [dx, dz] = EDGE_DIR[edge];
+    setCharacterFacing(av, new BABYLON.Vector3(dx, 0, dz)); travel(l); return true;
   }
   // walking off the board where an edge leads on: app.js playerStep stops at the rim, so it is wrapped
   function edgeOff(dir) {

@@ -1,15 +1,21 @@
 /* sections.js -- the look and the upkeep of a world in sections (scenario.js
  * keeps the sections themselves: links, travel, saved states, the journey).
  *
- *   marker(link)       a link's look on its square, by "kind": stairs_down (steps
- *                      going down into the dark, a stone rim), stairs_up (steps
- *                      rising to a dark opening), cave (a dark mouth in a rock
- *                      mound), gate (two posts and a lintel), trapdoor (a hatch
- *                      with an iron ring); each with its destination's name on a
- *                      small floating label. A door keeps scenario.js's glowing disc.
- *   edgeMarker(e)      an edge that leads on: a faint band along the rim and an
- *                      arrow with the name where the road leaves (terrain.js draws
- *                      the road past the board, surroundings.js keeps trees off it)
+ *   marker(link)       a link's look on its square, by "kind" (real geometry, look
+ *                      pass 4): stairs_down (a stairwell cut into the floor:
+ *                      terrain.js leaves the square open, six steps go down into
+ *                      the dark between stone sides), stairs_up (six steps
+ *                      against the wall to a dark opening in a stone frame),
+ *                      cave (a dark mouth under an arch of piled rock), gate (a
+ *                      timber gateway on stone footings, its leaves open),
+ *                      trapdoor (a plank hatch in a frame, iron straps, a ring);
+ *                      each with its destination's name on a small floating label.
+ *                      A door keeps scenario.js's glowing disc.
+ *   edgeMarker(e)      an edge that leads on: the road leaves between two
+ *                      waymarker stones, a signpost names where it goes, and a
+ *                      faint arrow shows on the ground while the player is within
+ *                      3 squares (terrain.js draws the road past the board,
+ *                      surroundings.js keeps trees off it)
  *   clearMarkers()
  *   catchUp({ minutes, agents, places })
  *                      a section coming back after game time passed, in code (no
@@ -84,55 +90,123 @@
     return m;
   }
   const ARROW = { stairs_down: '↓ ', stairs_up: '↑ ', trapdoor: '↓ ', cave: '', gate: '', door: '' };
+  // boxes merged per material under a root (one draw call per material a marker)
+  function builder(root, kind) {
+    const sc = state.scene, parts = new Map();
+    const box = (name, w, h, d, px, py, pz, m, opts = {}) => {
+      const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, sc); b.position.set(px, py, pz);
+      if (opts.ry) b.rotation.y = opts.ry; if (opts.rx) b.rotation.x = opts.rx; if (opts.rz) b.rotation.z = opts.rz;
+      if (opts.col) { const n = b.getTotalVertices(), c = new Float32Array(n * 4); for (let i = 0; i < n; i++) c.set([...opts.col, 1], i * 4); b.setVerticesData(BABYLON.VertexBuffer.ColorKind, c); }
+      b.parent = root; (parts.get(m) || parts.set(m, []).get(m)).push(b); return b;
+    };
+    const done = () => { for (const [m, list] of parts) { for (const b of list) { if (!b.getVerticesData(BABYLON.VertexBuffer.ColorKind)) { const n = b.getTotalVertices(), c = new Float32Array(n * 4).fill(1); b.setVerticesData(BABYLON.VertexBuffer.ColorKind, c); } }
+      // merged in world space (MergeMeshes bakes each part's world matrix): not parented, disposed with the root
+      root.computeWorldMatrix(true); for (const b of list) b.computeWorldMatrix(true);
+      const one = BABYLON.Mesh.MergeMeshes(list, true, true, undefined, false, false);
+      if (!one) continue; one.name = 'link_' + kind + '_' + (m.name || 'part'); root.onDisposeObservable.add(() => { try { one.dispose(); } catch {} }); one.material = m; one.isPickable = false; one.receiveShadows = true; one.useVertexColors = true; one.hasVertexAlpha = false; } };
+    return { box, done };
+  }
+  // a square of ground the terrain leaves open (a stairwell): terrain.js holes
+  const holes = new Map();
+  function hole(key, x0, z0, x1, z1) { holes.set(key, [x0, z0, x1, z1]); window.tablefolkTerrain?.setHoles?.([...holes.values()]); }
+  // Each kind is real geometry (look pass 4): a stairwell cut into the floor with six
+  // steps going down into the dark between stone sides; stairs up against a wall to a
+  // dark opening; a cave mouth as a dark rock arch; a gate as a timber gateway on
+  // stone footings; a trapdoor as a plank hatch with an iron ring.
   function marker(l) {
     const sc = state.scene; if (!sc || !l.at) return false;
     const [x, z] = l.at, root = new BABYLON.TransformNode('link_marker', sc);
     root.position.set(x, top(), z);
     const [fx, fz] = l.kind === 'stairs_down' || l.kind === 'stairs_up' ? facingOf(l) : [0, -1];
     root.rotation.y = Math.atan2(fx, fz);   // local +z runs the way the stair goes
-    const box = (name, w, h, d, px, py, pz, m) => { const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, sc); b.position.set(px, py, pz); b.material = m; b.parent = root; b.isPickable = false; b.receiveShadows = true; return b; };
+    const B = builder(root, l.kind), box = B.box, S = stone(), Wd = wood(), Ir = iron(), K = black();
     if (l.kind === 'stairs_down') {
-      const p = BABYLON.MeshBuilder.CreateGround('link_stairs_down', { width: .86, height: .92 }, sc); p.parent = root; p.position.y = .012; p.material = stairsDownTex(sc); p.isPickable = false;
-      p.rotation.y = Math.PI;   // the light end toward the player coming in (local -z)
-      box('link_rim', .1, .1, 1, -.48, .05, 0, stone()); box('link_rim', .1, .1, 1, .48, .05, 0, stone()); box('link_rim', 1.06, .1, .1, 0, .05, .5, stone());
+      // the opening: .9 x .96; six steps from the near end (local -z) down to -1.0, darker as they go
+      const W0 = .86, D = .96, n = 6, rise = .17, run = D / n;
+      hole('l' + x + ',' + z, x - .47, z - .5, x + .47, z + .5);
+      // the hole is axis-aligned; the steps turn with the stair (a square opening fits either way)
+      for (let i = 0; i < n; i++) { const k = Math.pow(.62, i + 1); box('link_step', W0, rise, run + .02, 0, -rise * (i + .5), -D / 2 + run * (i + .5), S, { col: [k, k * .97, k * .93] }); }
+      // under the steps and the far end: dark
+      box('link_dark', W0, .04, D, 0, -rise * n - .02, 0, K);
+      box('link_dark', W0, rise * n, .04, 0, -rise * n / 2, D / 2 + .01, K);
+      // stone sides (the cut's walls), lit near the top
+      for (const sx of [-1, 1]) { box('link_side', .06, .5, D, sx * (W0 / 2 + .03), -.25, 0, S, { col: [.55, .53, .5] }); box('link_side', .06, rise * n - .5, D, sx * (W0 / 2 + .03), -.5 - (rise * n - .5) / 2, 0, K); }
+      // a kerb of dressed stone round the opening, lower on the near side
+      box('link_kerb', 1.06, .08, .09, 0, .04, D / 2 + .045, S); for (const sx of [-1, 1]) box('link_kerb', .09, .08, D + .18, sx * .5, .04, 0, S);
+      box('link_kerb', 1.06, .03, .09, 0, .015, -D / 2 - .045, S);
     } else if (l.kind === 'stairs_up') {
-      for (let i = 0; i < 5; i++) box('link_step', .86, .2 * (i + 1), .19, 0, .1 * (i + 1), -.38 + i * .19, stone());
-      const d = BABYLON.MeshBuilder.CreatePlane('link_dark', { width: .74, height: 1.25 }, sc); d.parent = root; d.position.set(0, 1 + .62, .47); d.material = black(); d.isPickable = false;
-      box('link_post', .1, 2.4, .12, -.43, 1.2, .47, stone()); box('link_post', .1, 2.4, .12, .43, 1.2, .47, stone()); box('link_lintel', .96, .14, .14, 0, 2.38, .47, stone());
+      // six steps rising against the wall (local +z) to a dark opening in a stone frame
+      const n = 6, rise = .2, run = .16;
+      for (let i = 0; i < n; i++) box('link_step', .86, rise * (i + 1), run, 0, rise * (i + 1) / 2, -.45 + run * (i + .5), S, { col: [.85 - i * .05, .83 - i * .05, .8 - i * .05] });
+      for (const sx of [-1, 1]) box('link_cheek', .08, rise * n, n * run, sx * .47, rise * n / 2, -.45 + n * run / 2, S, { col: [.7, .68, .65] });
+      box('link_dark', .74, 1.3, .06, 0, rise * n + .62, .47, K);
+      for (const sx of [-1, 1]) box('link_post', .12, rise * n + 1.35, .16, sx * .43, (rise * n + 1.35) / 2, .47, S);
+      box('link_lintel', 1.0, .16, .18, 0, rise * n + 1.36, .47, S);
     } else if (l.kind === 'cave') {
-      const r = BABYLON.MeshBuilder.CreateSphere('link_cave_rock', { diameter: 1.9, segments: 7 }, sc); r.parent = root; r.scaling.set(1, .75, .7); r.position.set(0, .15, .55); r.material = stone(); r.isPickable = false;
-      const d = BABYLON.MeshBuilder.CreateDisc('link_cave_mouth', { radius: .46, tessellation: 18 }, sc); d.parent = root; d.scaling.set(1, 1.4, 1); d.position.set(0, .5, .04); d.rotation.y = Math.PI; d.material = black(); d.isPickable = false;
+      // a rock arch: piled boulders round a dark mouth set back into the mound
+      const R = (i, a, b) => { const v = Math.sin(x * 12.9 + z * 78.2 + i * 37.7) * 43758.5; return a + (v - Math.floor(v)) * (b - a); };
+      const arch = [[-.62, .25, .55, .7], [-.6, .75, .45, .55], [-.42, 1.15, .5, .45], [0, 1.32, .7, .4], [.42, 1.15, .5, .45], [.6, .75, .45, .55], [.62, .25, .55, .7]];
+      arch.forEach(([ax, ay, w, h], i) => { const k = R(i, .5, .72); box('link_cave_rock', w, h, R(i + 9, .55, .8), ax, ay, .25, S, { col: [k, k * .97, k * .92], ry: R(i + 3, -.3, .3), rz: R(i + 5, -.25, .25) }); });
+      box('link_cave_rock', 1.9, .6, 1.1, 0, 1.55, .75, S, { col: [.42, .41, .39], rz: .05 });
+      box('link_cave_mouth', .78, 1.15, .05, 0, .58, .52, K);
+      box('link_cave_mouth', .78, .04, .5, 0, .02, .28, K);
     } else if (l.kind === 'gate') {
-      box('link_post', .16, 1.9, .16, -.5, .95, 0, wood()); box('link_post', .16, 1.9, .16, .5, .95, 0, wood()); box('link_lintel', 1.25, .14, .18, 0, 1.92, 0, wood());
-      for (let i = -2; i <= 2; i++) box('link_bar', .035, 1.5, .035, i * .17, .8, .02, iron());
-      box('link_bar', .82, .05, .04, 0, 1.45, .02, iron()); box('link_bar', .82, .05, .04, 0, .3, .02, iron());
+      // a timber gateway on stone footings, a little roof, the way through dark-shaded
+      for (const sx of [-1, 1]) { box('link_footing', .34, .4, .34, sx * .6, .2, 0, S); box('link_post', .2, 2.0, .2, sx * .6, 1.4, 0, Wd); box('link_brace', .08, .55, .08, sx * .44, 2.0, 0, Wd, { rz: sx * .75 }); }
+      box('link_lintel', 1.6, .18, .24, 0, 2.38, 0, Wd);
+      box('link_roof', 1.9, .06, .5, 0, 2.62, -.1, Wd, { rx: .35, col: [.6, .55, .5] }); box('link_roof', 1.9, .06, .5, 0, 2.62, .1, Wd, { rx: -.35, col: [.6, .55, .5] });
+      for (let i = -1; i <= 1; i += 2) { box('link_leaf', .5, 1.6, .06, i * .26, .95, .12, Wd, { ry: i * .9, col: [.75, .7, .65] }); box('link_band', .5, .06, .07, i * .26, 1.4, .12, Ir, { ry: i * .9 }); box('link_band', .5, .06, .07, i * .26, .5, .12, Ir, { ry: i * .9 }); }
     } else if (l.kind === 'trapdoor') {
-      box('link_hatch', .8, .05, .8, 0, .03, 0, wood());
-      for (let i = -1; i <= 1; i++) box('link_band', .82, .055, .06, 0, .035, i * .3, iron());
-      const ring = BABYLON.MeshBuilder.CreateTorus('link_ring', { diameter: .16, thickness: .025, tessellation: 16 }, sc); ring.parent = root; ring.position.set(0, .07, -.25); ring.material = iron(); ring.isPickable = false;
+      // planks in a timber frame, two iron straps, a ring
+      box('link_frame', .92, .05, .08, 0, .025, -.42, Wd, { col: [.6, .55, .5] }); box('link_frame', .92, .05, .08, 0, .025, .42, Wd, { col: [.6, .55, .5] });
+      for (const sx of [-1, 1]) box('link_frame', .08, .05, .92, sx * .42, .025, 0, Wd, { col: [.6, .55, .5] });
+      for (let i = 0; i < 5; i++) box('link_plank', .15, .04, .78, -.32 + i * .16, .03, 0, Wd, { col: [.95 - (i % 2) * .1, .9 - (i % 2) * .1, .85 - (i % 2) * .1] });
+      for (const sz of [-.22, .22]) box('link_band', .8, .015, .07, 0, .055, sz, Ir);
+      const ring = BABYLON.MeshBuilder.CreateTorus('link_ring', { diameter: .16, thickness: .025, tessellation: 16 }, sc); ring.parent = root; ring.position.set(0, .07, -.3); ring.material = Ir; ring.isPickable = false;
     } else { root.dispose(); return false; }
-    // a faint glow on the square: this is a way somewhere
-    const g = BABYLON.MeshBuilder.CreateDisc('link_glow', { radius: .5, tessellation: 32 }, sc); g.rotation.x = Math.PI / 2; g.position.set(x, top() + .04, z); g.material = glow(); g.isPickable = false;
-    markers.push(root, g);
-    const lb = label((ARROW[l.kind] || '') + (l.name || ''), x, z, l.kind === 'stairs_up' || l.kind === 'gate' ? 2.75 : 1.6);
+    B.done();
+    markers.push(root);
+    const lb = label((ARROW[l.kind] || '') + (l.name || ''), x, z, l.kind === 'stairs_up' ? 2.95 : l.kind === 'gate' ? 3.0 : l.kind === 'cave' ? 2.3 : 1.4);
     if (lb) markers.push(lb);
     return true;
   }
+  // An edge that leads on: the road runs off the board between two waymarker
+  // stones, a signpost names where it goes; a faint arrow on the ground only
+  // while the player is within 3 squares of the road's last square.
+  let arrows = [], arrowObs = null;
+  function signTex(text) {
+    const sc = state.scene, t = new BABYLON.DynamicTexture('link_sign_tex', { width: 512, height: 128 }, sc, true), c = t.getContext();
+    c.fillStyle = '#5a4026'; c.fillRect(0, 0, 512, 128);
+    for (let i = 0; i < 6; i++) { c.fillStyle = `rgba(0,0,0,${.08 + (i % 2) * .06})`; c.fillRect(0, i * 22, 512, 2); }
+    c.font = '700 64px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(20,12,4,.55)'; c.fillText(text, 258, 68); c.fillStyle = '#f1dfb5'; c.fillText(text, 256, 64);
+    t.update(); return t;
+  }
   function edgeMarker(e) {
     const sc = state.scene; if (!sc || window.TABLEFOLK_TABLETOP) return;
-    const Wd = W().WORLD, bx = Wd.halfW - 1, bz = Wd.halfH - 1, ew = e.edge === 'east' || e.edge === 'west';
-    const len = ew ? Wd.rows : Wd.cols, band = BABYLON.MeshBuilder.CreateGround('link_edge_band', { width: ew ? .5 : len, height: ew ? len : .5 }, sc);
-    const off = .25;
-    band.position.set(e.edge === 'east' ? -bx - off : e.edge === 'west' ? bx + off : 0, top() + .03, e.edge === 'north' ? -bz - off : e.edge === 'south' ? bz + off : 0);
-    band.material = glow(); band.isPickable = false; markers.push(band);
-    const [rx, rz] = e.road || [0, 0], d = { east: [-1, 0], west: [1, 0], north: [0, -1], south: [0, 1] }[e.edge];
-    // an arrow on the ground at the road, pointing off the board
+    const [rx, rz] = e.road || [0, 0], d = { east: [-1, 0], west: [1, 0], north: [0, -1], south: [0, 1] }[e.edge] || [0, 1];
+    const root = new BABYLON.TransformNode('link_edge', sc);
+    root.position.set(rx + d[0] * .5, top(), rz + d[1] * .5); root.rotation.y = Math.atan2(d[0], d[1]);   // local +z: off the board
+    const B = builder(root, 'edge'), box = B.box, S = stone(), Wd = wood();
+    // two waymarker stones either side of the road, a little worn and leaning
+    for (const sx of [-1, 1]) { box('link_waystone', .32, .7, .26, sx * 1.35, .3, 0, S, { rz: sx * .06, ry: sx * .2, col: [.78, .76, .72] }); box('link_waystone', .36, .08, .3, sx * 1.35, .66, 0, S, { col: [.62, .6, .57] }); }
+    // the signpost: a post beside the road and an arm pointing on
+    box('link_signpost', .12, 2.1, .12, 1.85, 1.05, -.2, Wd);
+    B.done();
+    const arm = BABYLON.MeshBuilder.CreatePlane('link_sign', { width: 1.25, height: .3, sideOrientation: BABYLON.Mesh.DOUBLESIDE }, sc);
+    const sm = new BABYLON.StandardMaterial('link_sign_mat', sc), tex = signTex(e.name || e.edge); sm.diffuseTexture = tex; sm.specularColor = C3(0, 0, 0); sm.emissiveColor = C3(.18, .16, .14);
+    arm.material = sm; arm.parent = root; arm.position.set(1.85 - .45, 1.75, -.2); arm.rotation.y = -Math.PI / 2; arm.isPickable = false;
+    arm.onDisposeObservable.add(() => { try { tex.dispose(); sm.dispose(); } catch {} });
+    markers.push(root);
+    // the arrow: only near
     const a = BABYLON.MeshBuilder.CreateDisc('link_edge_arrow', { radius: .38, tessellation: 3 }, sc);
     a.rotation.x = Math.PI / 2; a.rotation.y = Math.atan2(d[0], d[1]) - Math.PI / 2; a.position.set(rx + d[0] * .15, top() + .05, rz + d[1] * .15);
-    a.material = glow(); a.isPickable = false; markers.push(a);
-    const lb = label('→ ' + (e.name || e.edge), rx + d[0] * .4, rz + d[1] * .4, 1.7); if (lb) markers.push(lb);
+    a.material = glow(); a.isPickable = false; a.setEnabled(false); markers.push(a); arrows.push({ a, x: rx, z: rz });
+    if (!arrowObs) arrowObs = sc.onBeforeRenderObservable.add(() => {
+      const p = state.playerAvatar?.logicalPos || state.playerAvatar?.root?.position;
+      for (const r of arrows) if (!r.a.isDisposed()) { const on = !!p && Math.hypot(p.x - r.x, p.z - r.z) <= 3; if (r.a.isEnabled() !== on) r.a.setEnabled(on); }
+    });
   }
-  function clearMarkers() { for (const m of markers) try { m.dispose(false, false); } catch {} markers = []; }
+  function clearMarkers() { for (const m of markers) try { m.dispose(false, false); } catch {} markers = []; arrows = []; if (arrowObs) { try { state.scene?.onBeforeRenderObservable.remove(arrowObs); } catch {} arrowObs = null; } holes.clear(); window.tablefolkTerrain?.setHoles?.([]); }
 
   // ---------------------------------------------------------------- time passed elsewhere
   const inHours = (h, w) => Array.isArray(w) && (w[0] <= w[1] ? h >= w[0] && h < w[1] : h >= w[0] || h < w[1]);

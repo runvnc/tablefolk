@@ -728,9 +728,9 @@
   // Things someone walks up to and uses (beds, stations, stores): each keeps a
   // free side reachable from the way in. (A row of beds against a wall walled
   // the inner ones in: villagers stood all night, 2026-11-20.)
-  // (beds, anvils, cauldrons, workbenches, chests, barrels, crates; a table or a
-  // bookcase may stand closed in)
-  const USE_GLYPHS = new Set(['Z', 'a', 'o', 'w', '&', 'h', 'm', 'B', 'C', ']', '|']);
+  // (beds, anvils, cauldrons, workbenches, chests, barrels, crates, benches,
+  // stools and chairs: the evening's seats; a table or a bookcase may stand closed in)
+  const USE_GLYPHS = new Set(['Z', 'a', 'o', 'w', '&', 'h', 'm', 'B', 'C', ']', '|', 'n', 's', 'z']);
   function safeCell(gen, p, occupied, blocked) {
     const W = gen.size[0], H = gen.size[1], x0 = Math.floor((W - 1) / 2), z0 = Math.floor((H - 1) / 2);
     const rc = (x, z) => [z + z0, x0 - x], g = gen.grid;

@@ -244,28 +244,26 @@
   }
 
   // ---- outdoors: a soft mist over the unexplored ground ----
-  // Two sheets (low over the ground, higher through trunks and walls) whose
-  // alpha is a blurred mask of the unexplored squares: tall things show
-  // through faintly as silhouettes; the explored ground is clear.
+  // One unlit sheet a little above the ground, grey-blue and translucent, so
+  // what lies under it reads darker and drained of colour (never white in
+  // daylight: it is unlit, and darker than the lit ground), whose alpha is a
+  // mask of the unexplored squares blurred over about two squares; past the
+  // board it thins out over six squares, so it never ends in a rectangle.
+  // (Pass 4: two lit sheets whitened the board by day and showed their edges.)
   let mist = null;
   function drawMist() {
-    const sc = state.scene, b = board(), PX = 8, M = 3, Wc = b.cols + 2 * M, Hc = b.rows + 2 * M;
+    const sc = state.scene, b = board(), PX = 8, M = 6, Wc = b.cols + 2 * M, Hc = b.rows + 2 * M;
     if (!mist || mist.w !== Wc || mist.h !== Hc) {
       clearMist();
       const tex = new BABYLON.DynamicTexture('board_mist_tex', { width: Wc * PX, height: Hc * PX }, sc, false);
       tex.hasAlpha = true; tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-      const mk = (name, y, alpha, col) => {
-        const m = BABYLON.MeshBuilder.CreateGround(name, { width: Wc, height: Hc, subdivisions: 1 }, sc);
-        m.position.set(0, (state.terrainTopY ?? 0) + y, 0);   // the board is centred on 0, 0
-        const mat = new BABYLON.StandardMaterial(name + '_mat', sc);
-        mat.diffuseColor = col; mat.emissiveColor = col.scale(.42); mat.specularColor = BABYLON.Color3.Black();
-        mat.opacityTexture = tex; mat.diffuseTexture = null; mat.alpha = alpha; mat.disableDepthWrite = true; mat.backFaceCulling = false;
-        m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.renderingGroupId = 0;
-        return m;
-      };
-      // a ground plane's u runs with +x, v with -z (top row of the canvas is +z)
-      // dim and grey, not white: the ground under it reads darker and drained of colour
-      mist = { tex, w: Wc, h: Hc, M, PX, low: mk('board_mist_low', .12, .68, new BABYLON.Color3(.36, .39, .42)), high: mk('board_mist_high', 1.4, .22, new BABYLON.Color3(.55, .58, .62)) };
+      const m = BABYLON.MeshBuilder.CreateGround('board_mist_low', { width: Wc, height: Hc, subdivisions: 1 }, sc);
+      m.position.set(0, (state.terrainTopY ?? 0) + .09, 0);   // the board is centred on 0, 0
+      const mat = new BABYLON.StandardMaterial('board_mist_low_mat', sc), col = new BABYLON.Color3(.13, .155, .19);
+      mat.diffuseColor = BABYLON.Color3.Black(); mat.emissiveColor = col; mat.specularColor = BABYLON.Color3.Black(); mat.disableLighting = true;
+      mat.opacityTexture = tex; mat.alpha = .62; mat.disableDepthWrite = true; mat.backFaceCulling = false; mat.fogEnabled = true;
+      m.material = mat; m.isPickable = false; m.alwaysSelectAsActiveMesh = true;
+      mist = { tex, w: Wc, h: Hc, M, PX, low: m, high: null };
     }
     const ctx = mist.tex.getContext(), W2 = mist.w * PX, H2 = mist.h * PX;
     const can = mist.can ||= document.createElement('canvas'); can.width = W2; can.height = H2;
@@ -273,17 +271,17 @@
     for (let i = -M; i < b.cols + M; i++) for (let j = -M; j < b.rows + M; j++) {
       const x = Math.round(b.x0 + i), z = Math.round(b.z0 + j);
       if (explored.has(x + ',' + z)) continue;
-      // thinning out past the board's edge (no hard rim where the sheet ends)
-      const out = Math.max(0, -i, i - (b.cols - 1), -j, j - (b.rows - 1));
-      c2.fillStyle = `rgba(255,255,255,${out ? Math.max(0, 1 - out / (M + .5)) : 1})`;
+      // thinning out past the board's edge (smoothly: no rim where the sheet ends)
+      const out = Math.max(0, -i, i - (b.cols - 1), -j, j - (b.rows - 1)), k = out ? Math.max(0, 1 - out / (M - 1)) : 1;
+      c2.fillStyle = `rgba(255,255,255,${(k * k * (3 - 2 * k)).toFixed(3)})`;
       // a ground's u runs from -x (0) to +x, its v from -z (0) to +z, and the canvas's top row is v 1
       c2.fillRect(Math.round((i + M) * PX), Math.round((b.rows - 1 - j + M) * PX), PX, PX);
     }
-    ctx.clearRect(0, 0, W2, H2); ctx.filter = 'blur(' + (PX * 1.1) + 'px)'; ctx.drawImage(can, 0, 0); ctx.filter = 'none';
+    ctx.clearRect(0, 0, W2, H2); ctx.filter = 'blur(' + (PX * 1.6) + 'px)'; ctx.drawImage(can, 0, 0); ctx.filter = 'none';
     mist.tex.update();
-    for (const m of [mist.low, mist.high]) m.setEnabled(!state.firstPerson || m === mist.low);
+    mist.low.setEnabled(true);
   }
-  function clearMist() { if (!mist) return; for (const m of [mist.low, mist.high]) try { m.dispose(false, true); } catch {} try { mist.tex.dispose(); } catch {} mist = null; }
+  function clearMist() { if (!mist) return; for (const m of [mist.low, mist.high]) try { m?.dispose(false, true); } catch {} try { mist.tex.dispose(); } catch {} mist = null; }
 
   // ---- carried torches ----
   let torchMats = null;

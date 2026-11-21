@@ -59,7 +59,8 @@
     const glass = new BABYLON.PBRMaterial('wall_window', state.scene);
     glass.albedoColor = new BABYLON.Color3(.05, .05, .06); glass.metallic = 0; glass.roughness = .35; glass.environmentIntensity = .6; glass.maxSimultaneousLights = 8; glass._tfMatte = true;
     // made on first use: a world with only rubble walls loads no plaster or timber textures
-    const lazy = { rubble: () => pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]), blocks: () => pbr('blocks', 'stone_blocks_large', [.74, .77, .84]),
+    // blocks (dungeons): grey under torchlight (the warmer tint read olive), damp and moss low down (dampPlugin)
+    const lazy = { rubble: () => pbr('rubble', 'stone_wall_rubble', [.92, .9, .86]), blocks: () => damp(pbr('blocks', 'stone_blocks_large', [.7, .74, .82])),
       cap: () => pbr('cap', 'stone_blocks_large', [.82, .8, .77]), plaster: () => pbr('plaster', 'plaster_aged', [.95, .92, .86], { bump: .7 }),
       timber: () => pbr('timber', 'timber_dark', [1, 1, 1]), door: () => pbr('door', 'wood_planks_dark', [1.15, 1.1, 1.05]) };
     const made = {};
@@ -69,8 +70,44 @@
     setNight(night);
     return mats;
   }
+  // Damp and moss low on dungeon walls: the albedo darkens and greens toward the
+  // floor (under ~.7 m), in patches (value noise in world space); cheap, no texture.
+  let Damp = null;
+  function damp(m) {
+    try {
+      const WGSL = BABYLON.ShaderLanguage?.WGSL;
+      Damp ||= class extends BABYLON.MaterialPluginBase {
+        constructor(mat) { super(mat, 'TfDamp', 210, { TFDAMP: false }); this._enable(true); }
+        getClassName() { return 'TfDampPlugin'; }
+        isCompatible() { return true; }
+        prepareDefines(d) { d.TFDAMP = true; }
+        getUniforms() { return { ubo: [] }; }
+        getCustomCode(type, lang) {
+          if (type !== 'fragment') return null;
+          if (lang === WGSL) return { CUSTOM_FRAGMENT_UPDATE_ALPHA: `
+{ let dp = fragmentInputs.vPositionW; let dq = floor(dp.xz * 1.7 + vec2f(dp.y * .9, 0.0)); let df = fract(dp.xz * 1.7 + vec2f(dp.y * .9, 0.0));
+  let dh = fract(sin(dot(dq, vec2f(127.1, 311.7))) * 43758.5453); let dh2 = fract(sin(dot(dq + vec2f(1.0, 0.0), vec2f(127.1, 311.7))) * 43758.5453);
+  let dn = mix(dh, dh2, smoothstep(0.0, 1.0, df.x));
+  let low = 1.0 - smoothstep(0.05, 0.75, dp.y);
+  let k = clamp(low * (0.35 + dn * 0.9), 0.0, 1.0);
+  surfaceAlbedo = mix(surfaceAlbedo, surfaceAlbedo * vec3f(0.55, 0.66, 0.48), k * 0.75); }
+` };
+          return { CUSTOM_FRAGMENT_UPDATE_ALPHA: `
+{ vec3 dp = vPositionW; vec2 dq = floor(dp.xz * 1.7 + vec2(dp.y * .9, 0.0)); vec2 df = fract(dp.xz * 1.7 + vec2(dp.y * .9, 0.0));
+  float dh = fract(sin(dot(dq, vec2(127.1, 311.7))) * 43758.5453); float dh2 = fract(sin(dot(dq + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
+  float dn = mix(dh, dh2, smoothstep(0.0, 1.0, df.x));
+  float low = 1.0 - smoothstep(0.05, 0.75, dp.y);
+  float k = clamp(low * (0.35 + dn * 0.9), 0.0, 1.0);
+  surfaceAlbedo = mix(surfaceAlbedo, surfaceAlbedo * vec3(0.55, 0.66, 0.48), k * 0.75); }
+` };
+        }
+      };
+      new Damp(m);
+    } catch (e) { console.warn('[walls] damp', e); }
+    return m;
+  }
   function setNight(k) {
-    night = k;
+    night = k; window.TABLEFOLK_NIGHT = k;   // roofs.js: shells' windows glow by it
     if (mats?.glass) mats.glass.emissiveColor = new BABYLON.Color3(1, .62, .3).scale(k * 1.6);
   }
 

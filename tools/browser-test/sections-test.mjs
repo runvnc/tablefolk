@@ -68,7 +68,7 @@ try {
   await ev(() => { localStorage.removeItem('tablefolkJourney'); localStorage.setItem('tablefolkTtsEnabled', '0'); });
   await open(`${BASE}/app/?art=1&scenario=${FIX}`);
   check('starts on the top map', await ev(() => window.tablefolkScenario.section === '' && window.tablefolkScenario.active.scn.title === 'Crossroads'));
-  check('markers for stairs, gate, cave, trapdoor and the edge', await ev(() => ['link_stairs_down', 'link_post', 'link_cave_rock', 'link_hatch', 'link_edge_band', 'link_edge_arrow'].every(n => window.tablefolk.state.scene.meshes.some(m => m.name === n && !m.isDisposed()))));
+  check('markers for stairs, gate, cave, trapdoor and the edge', await ev(() => ['link_stairs_down_', 'link_gate_', 'link_cave_', 'link_trapdoor_', 'link_edge_', 'link_edge_arrow'].every(n => window.tablefolk.state.scene.meshes.some(m => m.name.startsWith(n) && !m.isDisposed()))));
   const clock0 = await ev(() => ({ ...window.tablefolk.state.clock }));
 
   // ---- stairs down, a follower comes along ----
@@ -76,7 +76,7 @@ try {
   await ev(() => __s.onto(0, -3, [0, -2]));
   check('stairs down into the cellar', await ev(() => __s.waitSection('cellar')));
   check('the companion came along', await ev(() => __s.agents().includes('mara') && __s.agents().includes('rat1')), await ev(() => __s.agents()));
-  check('the stairs up back is there', await ev(() => window.tablefolk.state.scene.meshes.some(m => m.name === 'link_step' && !m.isDisposed())));
+  check('the stairs up back is there', await ev(() => window.tablefolk.state.scene.meshes.some(m => m.name.startsWith('link_stairs_up_') && !m.isDisposed())));
   await shot('cellar');
   // change things here: take the key from the chest, move the barrel, defeat the rat, set a flag
   await ev(async () => {

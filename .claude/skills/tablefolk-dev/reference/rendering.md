@@ -354,15 +354,28 @@ the canvas `filter`), redrawn only when the explored set grows; grey, lit
 `ITEM_CATALOG`) in what is still hidden are disabled (`_fogHidden`).
 `save()`/`restore()` carry the explored squares and revealed room squares.
 
-Link markers (sections.js): code-built, not saved, `link_*` meshes:
-stairs down (a ground quad with a painted 6-step gradient from stone to
-black, a stone rim of three boxes), stairs up (five stacked boxes, a black
-plane in a stone frame), cave (a squashed sphere of stone, a black disc),
-gate (posts, lintel, iron bars), trapdoor (planks, bands, a ring), each with
-a faint glow disc and a billboard label (DynamicTexture). Materials are env
-textures (`stone_blocks_large`, `wood_planks_dark`) made matte by
-`TABLEFOLK_LOOK.matte`. Edge links: a glow band on the rim and an arrow
-disc where the road leaves.
+Link markers (sections.js, look pass 4): code-built boxes merged per
+material into `link_<kind>_<material>` meshes (one draw call a material),
+not saved: stairs down is a real stairwell (terrain.js `setHoles`: up to four
+squares where the terrain's fragments are discarded, `tfHole0-3` in the
+TfTerrain plugin; six steps going down to -1 m, darker step by step through
+vertex colours, stone sides, a black floor and back, a kerb), stairs up (six
+steps and cheeks against the wall, a black opening in a stone frame), cave
+(seven tilted boulders as an arch over a black mouth, a lintel rock), gate
+(stone footings, timber posts, braces, a small roof, open leaves with iron
+bands), trapdoor (a frame, planks, two straps, a ring); a billboard label
+names the destination. No glow disc. Edge links: two waymarker stones either
+side of the road where it leaves, a signpost whose arm names the place
+(DynamicTexture), and a faint ground arrow shown only while the player is
+within 3 squares. A click-walk to a rim square by an edge (or past the board,
+clamped to the rim) travels when the player arrives (scenario.js
+`edgeClick`, `state.clickTarget`).
+
+Outdoor mist (pass 4): one unlit sheet (`board_mist_low`, y .09, colour
+(.13,.155,.19), alpha .62) over the board and six squares round it; its
+opacity mask (8 px a square) is the unexplored squares blurred by about two
+squares, fading smoothly to nothing past the rim (no rectangle). Unlit and
+darker than lit ground, so it never whitens a sunny board.
 
 `app/darkness.js`: fog of war as thin-instance boxes (black for unseen,
 dim for remembered, a flat lid at floor level where there is neither floor
@@ -372,6 +385,18 @@ boxes. Carried torches: a torch mesh at the hand's position kept upright
 (parenting it to the hand bone pointed the flame at the floor), a
 `PointLight` tracked by scenery, a lamp pool, and a dimmed particle flame
 (bloom blew it out).
+
+Cutaway, pass 4: terrain.js's rock over the outer half of wall cells is its
+own mesh (`board_rock_wall`, a double-sided clone of the rock material with
+the cutaway plugin), so it is cut with the walls; left whole it stood as a
+row of "teeth" above cut walls. Wall lamps (scenery.js `lanternVisual`
+sconces, listed in `window.tablefolkSconces`) on cut walls are hidden, their
+light kept (cutaway.js `sconces`).
+
+Dungeon walls (pass 4): the `blocks` tint is (.7,.74,.82) and lanterns light
+(1,.8,.58) (the old (1,.72,.34) turned grey stone olive); the `TfDamp`
+plugin darkens and greens the albedo low on the walls (under ~.75 m) in
+value-noise patches.
 
 ## Roofs
 
@@ -406,7 +431,17 @@ box), and while it stands the characters inside are hidden (`g._shellHidden`,
 kept apart from the fog of war's `_fogHidden`). Visual only: walls, door,
 sight and paths are the room's; the room's code walls sit inside the model's
 walls. `"shells": false` (scenario or `generate`) keeps code roofs.
-`tablefolkRoofs.shells()` lists them. `planned()` lists the rooms that get (or will
+`tablefolkRoofs.shells()` lists them. Pass 4: a house room's walls,
+door frame and door leaf are drawn per room (walls.js `roomMeshes(room)`)
+and disabled while its shell stands opaque (the models' walls are inset from
+their footprints and the code walls poked through); the shell slides along
+its front, widened up to 1.25 x, or mirrored, so the model's door (`DOOR_X`,
+read off each model's front view) is over the room's door (`doorFit`); dark,
+cool texels on upright faces of the building models (shells and props) glow
+warm with `TABLEFOLK_NIGHT` (walls.js `setNight`; roofs.js `windowGlow`, a
+material plugin adding to `finalColor` before fog), since the models have no
+emissive mask. Speech bubbles, badges and the 💬 chip of a character whose
+root is disabled (indoors under a shell, in the fog) are hidden. `planned()` lists the rooms that get (or will
 get) a roof (walls.js), `findRooms()` the rooms and the outside squares
 (terrain.js). Fade rule: 0 when the player is inside (or roofs are lifted by
 `tablefolkRoofs.toggle()` in tests), .22 when the follow camera's ray hits

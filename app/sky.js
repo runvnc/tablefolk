@@ -34,15 +34,16 @@
   // keyframes: hour, sun colour, sun intensity, moon intensity, sky top, horizon, hemi sky, hemi ground, hemi intensity, environment, exposure, clouds, stars
   const K = (h, sunC, sunI, moonI, top, hor, hs, hg, hi, env, exp, cl, stars) => ({ h, sunC: hex(sunC), sunI, moonI, top: hex(top), hor: hex(hor), hs: hex(hs), hg: hex(hg), hi, env, exp, cl: hex(cl), stars });
   const KEYS = [
+    // pass 4: a warmer sun and less sky fill by day (more contrast), a deeper golden 17:30
     // pass 2 (2026-11-20): brighter, clearer days; blue-warm haze; golden 17:30; blue-violet dusk; moonlit blue night
     K(0, '#ffffff', 0, .75, '#0b1430', '#25345c', '#6a82c0', '#1a1c26', .55, .18, 1.3, '#2c3656', 1),
     K(4.6, '#ffffff', 0, .7, '#0e1834', '#2c3a62', '#6a82c0', '#1a1c26', .52, .18, 1.3, '#303a5a', .9),
     K(5.7, '#ffa47a', .8, .1, '#4a6094', '#e6b49c', '#a0a4c0', '#4a4038', .5, .3, 1.15, '#e0a898', .25),
     K(7, '#ffe2c0', 3.2, 0, '#5a8ad0', '#d6dfe8', '#b4c4de', '#5a5040', .66, .5, 1.28, '#f6eee6', 0),
-    K(10, '#fff0d2', 3.8, 0, '#4a82d0', '#d2e0ee', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
-    K(15, '#ffeed0', 3.8, 0, '#4a82d0', '#d4e0ec', '#bccce6', '#5e5444', .74, .55, 1.3, '#ffffff', 0),
-    K(16.6, '#ffe0b4', 3.4, 0, '#5684cc', '#e2dccc', '#c0c4d4', '#5e5040', .68, .5, 1.26, '#fff0e0', 0),
-    K(17.5, '#ffb468', 3.0, 0, '#6a88c0', '#f4c48c', '#d0bcb0', '#5a4434', .6, .45, 1.24, '#ffd2a0', 0),
+    K(10, '#ffe6bc', 4.1, 0, '#4a82d0', '#d8e0e6', '#b8c6dc', '#6a5a44', .6, .5, 1.3, '#ffffff', 0),
+    K(15, '#ffe8c4', 4.0, 0, '#4a82d0', '#d8e0e8', '#b8c6dc', '#6a5a44', .62, .5, 1.3, '#ffffff', 0),
+    K(16.6, '#ffd49c', 3.6, 0, '#5684cc', '#e8d8c0', '#c0c0cc', '#64503a', .6, .46, 1.26, '#fff0e0', 0),
+    K(17.5, '#ffa450', 3.6, 0, '#6a88c0', '#f8c07c', '#d4b8a0', '#5e442e', .5, .4, 1.26, '#ffcc90', 0),
     K(18.6, '#ff8a52', 1.2, 0, '#46508a', '#e09a78', '#a69cb8', '#3a3036', .5, .32, 1.2, '#d89a88', .1),
     K(19.4, '#ff6a48', .15, .1, '#262e66', '#7a6496', '#7a7cb8', '#262434', .5, .26, 1.3, '#6a5a86', .35),
     K(20.4, '#ffffff', 0, .6, '#101a3c', '#2c3c66', '#6a80bc', '#1c1e28', .52, .2, 1.3, '#323c5e', .8),

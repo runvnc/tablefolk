@@ -1865,6 +1865,8 @@ function loadModelInstance(scene,dir,name,prepare){
       state.sharedAssetMats ||= new Set();
       for(const m of c.materials) state.sharedAssetMats.add(m);
       try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
+      // the env buildings' windows glow at night (roofs.js windowGlow), as props and as shells
+      if(/^(house|fantasy_house|tall_house|stone_house|inn|blacksmith|barracks|stable|barn|mill_house|sawmill)(\.1k)?\.glb$/.test(name) && /props\/env\//.test(dir)) for(const m of c.materials) window.tablefolkRoofs?.windowGlow?.(m);
       try{ LOOK()?.shareTextures?.(c.materials); }catch{}
       try{ const n=mergeContainerLooks(c); if(n && window.TABLEFOLK_DEV) console.log('[merge]',name,'-'+n,'draw calls'); }catch(e){ console.warn('[merge] failed',name,e); }
       return c;
@@ -5821,7 +5823,7 @@ function updateSpeechHistory(project,stack){
   else if(HIST.who) HIST.leaveAt=0;
   for(const g of state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters){
     const c=g._chip, recent=g._lastLineAt && now-g._lastLineAt<45000, talking=stack.has(g.root) && HIST.who!==g;
-    const show=g._lines?.length && (recent || HIST.hoverWho===g) && !talking && HIST.who!==g && !(g===state.playerAvatar && state.firstPerson);
+    const show=g._lines?.length && (recent || HIST.hoverWho===g) && !talking && HIST.who!==g && !(g===state.playerAvatar && state.firstPerson) && g.root?.isEnabled?.()!==false;
     if(!show){ if(c) c.hidden=true; continue; }
     const p=project(g.root,1.0); if(p.z<0 || p.z>1){ if(c) c.hidden=true; continue; }
     const el=chipFor(g); el.hidden=false; el.style.left=p.x+'px'; el.style.top=(p.y-34)+'px';
@@ -5854,12 +5856,13 @@ function updateBubbles(dt){
   for(const b of [...state.bubbles].sort((a,c)=>(a.thought?1:0)-(c.thought?1:0))){
     const p=project(b.node,1.0), up=stack.get(b.node)||0;
     // the history card lists these lines too, in their place
-    const inCard=HIST.who?.root===b.node && !b.thought; b.div.style.visibility=inCard?'hidden':''; if(inCard) continue;
+    // in the card, or its speaker hidden (indoors under a building shell, in the fog of war): not shown
+    const inCard=HIST.who?.root===b.node && !b.thought, gone=b.node?.isEnabled && !b.node.isEnabled(); b.div.style.visibility=inCard||gone?'hidden':''; if(inCard||gone) continue;
     b.div.style.left=p.x+'px'; b.div.style.top=(p.y-42-up)+'px';
     stack.set(b.node,up+b.div.offsetHeight+6);
   }
   updateSpeechHistory(project,stack);
-  for(const b of [...state.badges]){ b.ttl-=dt; const node=b.node.root||b.node; const p=project(node,.8); b.div.style.left=p.x+'px'; b.div.style.top=(p.y+b.vy*(1-b.ttl))+'px'; b.div.style.opacity=Math.max(0,b.ttl); if(b.ttl<=0){ b.div.remove(); state.badges=state.badges.filter(x=>x!==b); } }
+  for(const b of [...state.badges]){ b.ttl-=dt; const node=b.node.root||b.node; const p=project(node,.8); b.div.style.visibility=node.isEnabled && !node.isEnabled()?'hidden':''; b.div.style.left=p.x+'px'; b.div.style.top=(p.y+b.vy*(1-b.ttl))+'px'; b.div.style.opacity=Math.max(0,b.ttl); if(b.ttl<=0){ b.div.remove(); state.badges=state.badges.filter(x=>x!==b); } }
 }
 function updateCompassHUD(){
   if(!state.camera||!state.scene||!state.engine||!compassHud) return;
@@ -6311,7 +6314,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
           const av=state.playerAvatar, owner=pick.pickedMesh?.metadata?.ownerId;
           if(av && !e.altKey && !owner && !av.turnMove && !av.falling){
             if(state.npcBusy || av.defeated) return;
-            walk(av,{type:'coord',x:tx,z:tz}); state.followAvatar=true;
+            // past the board's edge (the road running off it): to the rim square on the way
+            const bx=WORLD.halfW-1, bz=WORLD.halfH-1;
+            walk(av,{type:'coord',x:Math.max(-bx,Math.min(bx,tx)),z:Math.max(-bz,Math.min(bz,tz))}); state.followAvatar=true;
+            state.clickTarget={x:tx,z:tz,at:performance.now()};   // scenario.js: a click on the rim by an edge way out goes on
             if(av.turnMove) window.tablefolkPlay?.acted('move');
             return;
           }

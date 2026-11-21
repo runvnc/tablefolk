@@ -50,7 +50,7 @@
   const RES = 4, MARGIN = 8, FAR = 170;   // control map texels a cell (8 cost ~470 ms of main thread a build on a 45 x 35 board)
   const NATURAL = new Set(['grass_meadow', 'grass_dry', 'forest_floor', 'dirt_path', 'mud', 'sand', 'gravel', 'farmland', 'snow']);
   let manifest = null, manifestP = null;
-  const T = { mesh: null, far: null, rock: null, sea: null, mat: null, rockMat: null, seaMat: null, arrays: null, arraysKey: '', ctrl: [], layers: [], mode: 'land', grid: false, cover: [], coverKey: '', sig: '' };
+  const T = { mesh: null, far: null, rock: null, sea: null, mat: null, rockMat: null, seaMat: null, arrays: null, arraysKey: '', ctrl: [], layers: [], mode: 'land', grid: false, cover: [], coverKey: '', sig: '', holes: [] };
 
   function loadManifest() {
     manifestP ||= fetch(ENV() + 'manifest.json').then(r => r.json()).then(m => { manifest = Object.fromEntries(m.materials.map(x => [x.name, x])); return manifest; }).catch(e => { console.warn('[terrain] manifest', e); manifest = {}; return manifest; });
@@ -199,18 +199,25 @@ float tfNoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (
       prepareDefines(d) { d.TFTERRAIN = true; }
       getSamplers(s) { s.push('tfCtrl0Sampler', 'tfCtrl1Sampler', 'tfAlbSampler', 'tfNrmSampler'); }
       getUniforms(lang) {
-        const ubo = ['tfCtrl', 'tfTile0', 'tfTile1', 'tfParams', 'tfFlags', 'tfKind0', 'tfKind1', 'tfExtra'].map(name => ({ name, size: 4, type: 'vec4' }));
-        return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfCtrl;uniform vec4 tfTile0;uniform vec4 tfTile1;uniform vec4 tfParams;uniform vec4 tfFlags;uniform vec4 tfKind0;uniform vec4 tfKind1;uniform vec4 tfExtra;\n' };
+        const ubo = ['tfCtrl', 'tfTile0', 'tfTile1', 'tfParams', 'tfFlags', 'tfKind0', 'tfKind1', 'tfExtra', 'tfHole0', 'tfHole1', 'tfHole2', 'tfHole3'].map(name => ({ name, size: 4, type: 'vec4' }));
+        return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfCtrl;uniform vec4 tfTile0;uniform vec4 tfTile1;uniform vec4 tfParams;uniform vec4 tfFlags;uniform vec4 tfKind0;uniform vec4 tfKind1;uniform vec4 tfExtra;uniform vec4 tfHole0;uniform vec4 tfHole1;uniform vec4 tfHole2;uniform vec4 tfHole3;\n' };
       }
       bindForSubMesh(ubo) {
         const u = this.u;
         ubo.updateFloat4('tfCtrl', ...u.ctrl); ubo.updateFloat4('tfTile0', ...u.t0); ubo.updateFloat4('tfTile1', ...u.t1);
         ubo.updateFloat4('tfParams', T.grid ? 1 : 0, u.p[1], u.p[2], u.p[3]); ubo.updateFloat4('tfFlags', ...u.f); ubo.updateFloat4('tfKind0', ...(u.k0 || [1, 1, 1, 1])); ubo.updateFloat4('tfKind1', ...(u.k1 || [1, 1, 1, 1])); ubo.updateFloat4('tfExtra', ...(u.x || [0, 0, 0, 0]));
+        // stairwells (sections.js): up to four squares of ground left open (x0, z0, x1, z1)
+        for (let i = 0; i < 4; i++) ubo.updateFloat4('tfHole' + i, ...(T.holes[i] || [1e5, 1e5, 1e5, 1e5]));
         for (const k of ['tfCtrl0Sampler', 'tfCtrl1Sampler', 'tfAlbSampler', 'tfNrmSampler']) if (this.tex[k]) ubo.setTexture(k, this.tex[k]);
       }
       getCustomCode(type, lang) {
         if (type !== 'fragment') return null;
         if (lang === WGSL) return {
+          CUSTOM_FRAGMENT_MAIN_BEGIN: `
+{ let hp = fragmentInputs.vPositionW.xz;
+  if ((hp.x > uniforms.tfHole0.x && hp.x < uniforms.tfHole0.z && hp.y > uniforms.tfHole0.y && hp.y < uniforms.tfHole0.w) || (hp.x > uniforms.tfHole1.x && hp.x < uniforms.tfHole1.z && hp.y > uniforms.tfHole1.y && hp.y < uniforms.tfHole1.w)
+   || (hp.x > uniforms.tfHole2.x && hp.x < uniforms.tfHole2.z && hp.y > uniforms.tfHole2.y && hp.y < uniforms.tfHole2.w) || (hp.x > uniforms.tfHole3.x && hp.x < uniforms.tfHole3.z && hp.y > uniforms.tfHole3.y && hp.y < uniforms.tfHole3.w)) { discard; } }
+`,
           CUSTOM_FRAGMENT_DEFINITIONS: `
 var tfCtrl0SamplerSampler: sampler; var tfCtrl0Sampler: texture_2d<f32>;
 var tfCtrl1SamplerSampler: sampler; var tfCtrl1Sampler: texture_2d<f32>;
@@ -272,6 +279,11 @@ var tfRough: f32 = uniforms.tfFlags.y; var tfAO: f32 = 1.0;
           '!var roughness: f32=reflectivityOut\\.roughness;': 'var roughness: f32=tfRough;microSurface=1.0-roughness;aoOut.ambientOcclusionColor=aoOut.ambientOcclusionColor*tfAO;',
         };
         return {
+          CUSTOM_FRAGMENT_MAIN_BEGIN: `
+{ vec2 hp = vPositionW.xz;
+  if ((hp.x > tfHole0.x && hp.x < tfHole0.z && hp.y > tfHole0.y && hp.y < tfHole0.w) || (hp.x > tfHole1.x && hp.x < tfHole1.z && hp.y > tfHole1.y && hp.y < tfHole1.w)
+   || (hp.x > tfHole2.x && hp.x < tfHole2.z && hp.y > tfHole2.y && hp.y < tfHole2.w) || (hp.x > tfHole3.x && hp.x < tfHole3.z && hp.y > tfHole3.y && hp.y < tfHole3.w)) discard; }
+`,
           CUSTOM_FRAGMENT_DEFINITIONS: `
 uniform sampler2D tfCtrl0Sampler; uniform sampler2D tfCtrl1Sampler;
 uniform highp sampler2DArray tfAlbSampler; uniform highp sampler2DArray tfNrmSampler;
@@ -663,5 +675,5 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
   // darkness.js: the explored area grew; the rock over unexplored rooms follows (throttled)
   let rockTimer = null;
   function refreshRock() { if (T.mode !== 'rock' || rockTimer) return; rockTimer = setTimeout(() => { rockTimer = null; try { const old = T.rock; T.rock = buildRock(); old?.dispose(); state.boardMeshes = [T.mesh, T.far, T.rock, T.sea].filter(Boolean); } catch (e) { console.warn('[terrain] rock', e); } }, 350); }
-  window.tablefolkTerrain = { rebuild, refreshRock, mode: () => T.mode, heightAt, waterAt, isRock: (x, z) => T.mode === 'rock' && !!T.rockCells?.has(Math.round(x) + ',' + Math.round(z)), setGrid, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
+  window.tablefolkTerrain = { rebuild, refreshRock, mode: () => T.mode, heightAt, waterAt, isRock: (x, z) => T.mode === 'rock' && !!T.rockCells?.has(Math.round(x) + ',' + Math.round(z)), setGrid, setHoles: h => { T.holes = (h || []).slice(0, 4); }, layerAt: (x, z) => cellLayers(T.mode).at(Math.round(x), Math.round(z)), get layers() { return T.layers; }, get state() { return T; } };
 })();

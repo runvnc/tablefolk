@@ -382,7 +382,8 @@
       const r = rootAt('lantern', x, z, opts);
       finish(r, 'lantern', { material: 'wood' }, opts);
       addLampPool(sc, r, { warm: true });
-      const L = pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .72, .34)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
+      // a warm but not orange light (pass 4: (1, .72, .34) turned grey dungeon stone olive)
+      const L = pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .8, .58)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
       setTimeout(() => { if (!r.isDisposed?.()) lanternVisual(sc, r, L); }, 250);
       return r;
     },

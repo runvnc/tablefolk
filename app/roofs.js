@@ -257,6 +257,9 @@
   // "shells": false in a scenario turns them off.
   const SHELL_FOOT = { house: [4.69, 4.99], fantasy_house: [5.44, 5.01], tall_house: [3.68, 6.01], stone_house: [3.82, 5.52], inn: [6.71, 8], blacksmith: [6.94, 6.01],
     barracks: [7.52, 4.94], stable: [7.05, 4.62], barn: [6.51, 9], mill_house: [4.7, 5] };
+  // where each model's front door is, along its front (model x, metres; read off its front
+  // view, look pass 4; also "door_x" in the env manifest): the shell slides to line it up
+  const DOOR_X = { house: 1.0, fantasy_house: .45, tall_house: 0, stone_house: 0, inn: 0, barracks: .5, mill_house: -.85, blacksmith: 0, stable: 0, barn: 0 };
   const SHELL_ROLE = { tavern: ['inn', 'fantasy_house'], inn: ['inn', 'fantasy_house'], smithy: ['blacksmith', 'stone_house'], forge: ['blacksmith'], stable: ['stable', 'barn'], barn: ['barn', 'stable'],
     guardhouse: ['barracks', 'stone_house'], barracks: ['barracks'], mill: ['mill_house'], temple: ['stone_house', 'tall_house'], library: ['tall_house', 'stone_house'],
     shop: ['fantasy_house', 'house', 'tall_house'], bakery: ['house', 'fantasy_house'], alchemist: ['tall_house', 'house'] };
@@ -293,23 +296,78 @@
     if (!fits.length) return null;
     const pool = fits.length > 1 ? fits.filter(f => f.m !== lastShell) : fits, pick = pool[Math.floor(hsh * pool.length) % pool.length];
     lastShell = pick.m;
-    return { ...pick, side, cx: (room.x0 + room.x1) / 2, cz: (room.z0 + room.z1) / 2 };
+    return { ...pick, side, cx: (room.x0 + room.x1) / 2, cz: (room.z0 + room.z1) / 2, ...doorFit(room, D, side, pick, across) };
+  }
+  // the model's door over the room's: slide the shell along its front and widen it to still
+  // cover the room (at most 1.25 x the model), mirrored when that is nearer; else centred
+  function doorFit(room, D, side, pick, across) {
+    const dx0 = DOOR_X[pick.m] ?? 0, foot = SHELL_FOOT[pick.m][0], cx = (room.x0 + room.x1) / 2, cz = (room.z0 + room.z1) / 2;
+    let door = null;
+    for (const k of D) { const [x, z] = k.split(',').map(Number); if ((side === 's' && z === room.z1 + 1 || side === 'n' && z === room.z0 - 1) && x >= room.x0 && x <= room.x1 || (side === 'e' && x === room.x0 - 1 || side === 'w' && x === room.x1 + 1) && z >= room.z0 && z <= room.z1) { door = [x, z]; break; } }
+    if (!door) return {};
+    // local +x of the turned model in world terms: (cos ry, -sin ry)
+    const ry = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 }[side], ux = Math.cos(ry), uz = -Math.sin(ry);
+    const off = (door[0] - cx) * ux + (door[1] - cz) * uz;
+    const tryIt = mir => { const sx = (across + 2 * Math.abs(off - mir * dx0 * pick.sx)) / foot; return sx <= 1.25 ? { slide: off - mir * dx0 * (sx), sxDoor: sx, mirror: mir < 0 } : null; };
+    const a = tryIt(1), b = dx0 ? tryIt(-1) : null;
+    const best = a && b ? (a.sxDoor <= b.sxDoor ? a : b) : a || b;
+    return best ? { slide: best.slide, sx: best.sxDoor, mirror: best.mirror } : {};
+  }
+  // Windows that glow warm at dusk and night: the models have no emissive mask, so
+  // their dark, cool texels on upright faces (glass) light up with the night
+  // (walls.js setNight -> TABLEFOLK_NIGHT); timber (dark but warm), roofs and
+  // bright walls stay as they are.
+  let Glow = null;
+  function windowGlow(m) {
+    if (!m || m._tfGlow || !(m instanceof BABYLON.PBRMaterial)) return;
+    try {
+      const WGSL = BABYLON.ShaderLanguage?.WGSL;
+      Glow ||= class extends BABYLON.MaterialPluginBase {
+        constructor(mat) { super(mat, 'TfWinGlow', 220, { TFWINGLOW: false }); this._enable(true); }
+        getClassName() { return 'TfWinGlowPlugin'; }
+        isCompatible() { return true; }
+        prepareDefines(d) { d.TFWINGLOW = true; }
+        getUniforms(lang) { const ubo = [{ name: 'tfNight', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfNight;\n' }; }
+        bindForSubMesh(ubo) { ubo.updateFloat4('tfNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); }
+        getCustomCode(type, lang) {
+          if (type !== 'fragment') return null;
+          if (lang === WGSL) return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+if (uniforms.tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
+  let a = surfaceAlbedo; let l = dot(a, vec3f(0.3, 0.59, 0.11));
+  let g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
+  finalColor = vec4f(finalColor.rgb + vec3f(1.0, 0.58, 0.24) * g * uniforms.tfNight.x * 2.2, finalColor.a);
+}
+` };
+          return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
+  vec3 a = surfaceAlbedo; float l = dot(a, vec3(0.3, 0.59, 0.11));
+  float g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
+  finalColor.rgb += vec3(1.0, 0.58, 0.24) * g * tfNight.x * 2.2;
+}
+` };
+        }
+      };
+      new Glow(m); m._tfGlow = true;
+    } catch (e) { console.warn('[roofs] window glow', e); }
   }
   function buildShell(room, plan, sc) {
     const RY = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 };
     const root = new BABYLON.TransformNode('roof_shell_' + plan.m, sc), node = new BABYLON.TransformNode('roof_shell_model', sc);
     node.parent = root; root.position.set(plan.cx, state.terrainTopY ?? 0, plan.cz); root.rotation.y = RY[plan.side];
-    node.scaling.set(plan.sx, Math.sqrt(plan.sx * plan.sz), plan.sz);
+    node.scaling.set(plan.sx * (plan.mirror ? -1 : 1), Math.sqrt(plan.sx * plan.sz), plan.sz);
+    node.position.x = plan.slide || 0;   // the model's door over the room's (doorFit)
     const entry = { room, root, parts: [], mats: [], alpha: 1, target: 1, shell: plan.m, box: null };
     const file = plan.m + (window.TABLEFOLK_GFX?.quality === 'high' ? '.glb' : '.1k.glb');
-    loadModelInstance(sc, ENVM(), file, c => { for (const m of c.materials) window.TABLEFOLK_LOOK?.matte?.(m); }).then(res => {
+    loadModelInstance(sc, ENVM(), file, c => { for (const m of c.materials) { window.TABLEFOLK_LOOK?.matte?.(m); windowGlow(m); } }).then(res => {
       if (root.isDisposed()) { for (const m of res.meshes) m.dispose(); return; }
       for (const n of res.rootNodes) n.parent = node;
       // the model's footprint is centred on its origin, feet at 0
       root.computeWorldMatrix(true);
       let lo = new BABYLON.Vector3(1e9, 1e9, 1e9), hi = lo.scale(-1);
       for (const m of res.meshes) { if (!(m.getTotalVertices?.() > 0)) continue; m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox; lo = BABYLON.Vector3.Minimize(lo, b.minimumWorld); hi = BABYLON.Vector3.Maximize(hi, b.maximumWorld);
-        m.isPickable = false; m.receiveShadows = true; m.metadata = { roof: true }; window.addShadow?.(m); entry.parts.push(m); }
+        m.isPickable = false; m.receiveShadows = true; m.metadata = { roof: true }; window.addShadow?.(m); entry.parts.push(m);
+        // (the container may have been loaded first for a building prop, without this prepare)
+        windowGlow(m.material); }
       node.position.y = (state.terrainTopY ?? 0) - lo.y;
       entry.box = { lo, hi: hi.add(new BABYLON.Vector3(0, -lo.y, 0)) };
     }).catch(e => console.warn('[roofs] shell', plan.m, e));
@@ -400,5 +458,5 @@
   }
   // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
   function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
-  window.tablefolkRoofs = { rebuild, toggle, shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
+  window.tablefolkRoofs = { windowGlow, rebuild, toggle, shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
 })();
