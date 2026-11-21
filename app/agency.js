@@ -717,14 +717,19 @@
   // ---------------------------------------------------------------- the safety nets
   function safety(g, s, j) {
     const A = ag(s), k = X(), m = M()?.mindOf?.(g) || {}, h = hour(), t = gm(), cur = A.act?.key;
-    if ((m.hunger || 0) >= .8) { A.starve ??= t; if (t - A.starve >= 120 && cur !== 'eat' && !((A.safeEat || 0) > t)) { A.safeEat = t + 60; return { key: 'eat', kind: 'eat', cmd: 'eat', label: 'get something to eat (starving)', doing: 'getting something to eat', run: runEat, why: 'starving for two hours' }; } } else A.starve = null;
-    const sh = k.sleepHours(j); if (k.inHours(h, sh) && cur !== 'sleep') { const into = ((h - sh[0]) + 24) % 24; if (into >= 2 && into < 8 && !((A.safeSleep || 0) > t)) { A.safeSleep = t + 180; return { key: 'sleep', kind: 'sleep', cmd: 'sleep', label: 'go to bed (long past bedtime)', doing: 'going to bed', run: runSleep, why: 'two hours past its bedtime' }; } }
+    if ((m.hunger || 0) >= .8) { A.starve ??= t; if (t - A.starve >= 120 && cur !== 'eat' && !((A.safeEat || 0) > t) && domain(g, 'needs') !== 'code') { A.safeEat = t + 60; return { key: 'eat', kind: 'eat', cmd: 'eat', label: 'get something to eat (starving)', doing: 'getting something to eat', run: runEat, why: 'starving for two hours' }; } } else A.starve = null;
+    const sh = k.sleepHours(j); if (k.inHours(h, sh) && cur !== 'sleep' && cur !== 'eat' && domain(g, 'needs') !== 'code') { const into = ((h - sh[0]) + 24) % 24; if (into >= 2 && into < 8 && !((A.safeSleep || 0) > t)) { A.safeSleep = t + 180; return { key: 'sleep', kind: 'sleep', cmd: 'sleep', label: 'go to bed (long past bedtime)', doing: 'going to bed', run: runSleep, why: 'two hours past its bedtime' }; } }
     return null;
   }
 
   function needsByCode(g, s, j) {
     const A = ag(s), k = X(), t = gm(), m = M()?.mindOf?.(g) || {};
     const byCode = kind => domain(g, 'needs') === 'code' || (A.needCode?.[kind] || 0) > t;
+    // in order: starving, it eats, at night too; a meal under way is not cut off by bedtime, nor sleep by
+    // ordinary hunger (brann went to bed hungry, then bed and the starving net took turns all night: 9B, assisted)
+    const hunger = m.hunger || 0, cur = A.act?.kind;
+    if (byCode('eat') && hunger >= .8) return cur === 'eat' ? null : { key: 'eat', kind: 'eat', cmd: 'eat', label: 'get something to eat (starving)', doing: 'getting something to eat', run: runEat, why: 'starving' };
+    if (cur === 'eat' && hunger >= .3) return null;
     if (byCode('sleep') && k.inHours(hour(), k.sleepHours(j)) && !raidOn()) return { key: 'sleep', kind: 'sleep', cmd: 'sleep', label: 'go to bed (its bedtime)', doing: 'going to bed', run: runSleep, why: 'bedtime' };
     if (byCode('eat') && (m.hunger || 0) >= .55 && !k.inHours(hour(), k.sleepHours(j))) return { key: 'eat', kind: 'eat', cmd: 'eat', label: 'get something to eat (hungry)', doing: 'getting something to eat', run: runEat, why: 'hungry' };
     return null;
