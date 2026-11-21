@@ -696,7 +696,8 @@ async function main() {
   // calls that overlapped (agency.js turns and picks, reflection, a reply) left one that never
   // returned and the living world stalled (Gemma 4 12B and Bonsai 2 27B on an RTX 3090, 2026-11-21)
   { const decide = manager.decide.bind(manager); let chain = Promise.resolve();
-    manager.decide = agent => { const p = chain.then(() => decide(agent)); chain = p.catch(() => {}); return p; }; }
+    // (window.tablefolkDecideSecs: the model's own seconds per call, without the wait: agency.js budgets turns by it)
+    manager.decide = agent => { const p = chain.then(() => { const t0 = performance.now(); return decide(agent).finally(() => { const a = window.tablefolkDecideSecs ||= []; a.push((performance.now() - t0) / 1000); if (a.length > 30) a.shift(); }); }); chain = p.catch(() => {}); return p; }; }
   installDevConsole(() => manager);
   // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.

@@ -548,7 +548,8 @@
   const THINK_BUDGET = 384;
   const turnSecs = [];
   function noteTurn(sec) { if (sec > .2 && sec < 120) { turnSecs.push(sec); if (turnSecs.length > 20) turnSecs.shift(); } }
-  const medianTurn = () => { if (!turnSecs.length) return null; const a = turnSecs.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
+  // the model's own seconds a call (world-integration.js, without the wait in its queue), else whole turns
+  const medianTurn = () => { const src = (window.tablefolkDecideSecs || []).filter(x => x > .3); const b = src.length >= 3 ? src : turnSecs; if (!b.length) return null; const a = b.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
   // an open turn (world-integration.js runAgentTurn) with what it set out to do (g._intent: promptLines)
   function openTurn(g, kind, intent) {
     const s = g._job || {}; s.turnBusy = true;
@@ -646,7 +647,7 @@
   // ---------------------------------------------------------------- free: open turns as the main loop
   const freeChars = () => state.characters.filter(c => !c.defeated && c._job && J()?.handles?.(c) && level(c) === 'free' && c.pose?.mode !== 'lie').length;
   // seconds between one character's open turns: the brain shared by everyone free, kept below ~75% busy
-  function budgetGap() { const sec = medianTurn() ?? 6; return Math.max(8, sec * Math.max(1, freeChars()) * .75); }
+  function budgetGap() { const sec = medianTurn() ?? 6; return Math.min(60, Math.max(8, sec * Math.max(1, freeChars()) * .75)); }
   function codeFill(g, s, j) {
     const opts = options(g, s, j), k = X(), h = hour();
     const o = opts.find(x => x.key === 'eat' && (M()?.mindOf?.(g)?.hunger || 0) >= .6) || (k.inHours(h, k.sleepHours(j)) && opts.find(x => x.key === 'sleep')) || (k.inHours(h, j.hours || [7, 17]) && opts.find(x => x.key === 'routine')) || opts.find(x => x.key === 'evening') || opts.find(x => x.key === 'rest');
