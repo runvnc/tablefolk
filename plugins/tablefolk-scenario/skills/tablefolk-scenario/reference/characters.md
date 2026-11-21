@@ -369,8 +369,9 @@ You like: barnaby (gave you ale). You dislike: grub (attacked you).
 - **Monsters that hunt everyone**: `"monsters": "everyone"` (or a monster's
   `"hunts": "everyone"`) sends monsters after the nearest character they
   can see, not only the player: villages under attack, survival worlds.
-- **How much it decides for itself** (`"autonomy"`: `rails`, `guided`
-  or `free`, on the character or the scenario; else the player's
+- **How much it decides for itself** (`"autonomy"`: `rails`, `assisted`,
+  `guided` or `free`, or an object such as `{"preset": "guided", "danger":
+  "code"}`, on the character or the scenario; else the player's
   Settings, else by the brain): see [living.md](living.md#how-much-characters-decide-autonomy).
   Above rails tempers are advice: at the top of the ladder it is told it is
   furious and chooses (fight, order out, call for help, walk away, let it

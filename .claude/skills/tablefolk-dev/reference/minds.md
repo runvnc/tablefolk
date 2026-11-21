@@ -516,6 +516,24 @@ budget gap allows (median turn seconds x free characters x .75, at least
 8 s); `do()` queues `ag.next`; with no do(), `codeFill` (routine, eat, sleep,
 evening, rest; 25 game min). Safety nets in `safety()`.
 
+Profiles (2026-11-21, later): `app/autonomy-profile.js` (pure; Node test
+`tools/browser-test/profile-test.mjs`, 20 checks) turns presets (rails,
+assisted, guided, free) and objects into six domains. agency.js `resolve`
+feeds it [character, world, setting, Auto's value]; Auto's value is the
+check's preset plus `{domain: 'code'}` for every domain whose items it
+failed (half or more; v3 tags each item, `domainsFrom`). `level(g)`: rails
+when activity is code, free for the free preset, else guided (assisted runs
+the guided loop). `domain(g, d)` gates: talk (menu talk options, the
+floor-only mute in world-integration.js, chatter.js deals, jobs.js
+remarks), plan (planDay), danger (jobs.js A.threat and the danger turn, else
+the rails path), needs (`needsByCode`: eat at hunger .55 awake, bed in the
+sleep hours, not in a raid), temper (mind.js `temperByModel`: the advisory
+ladder, refuses, mayFight). `A.needCode[kind]`: two failed eat or sleep
+activities hand that need to code for 180 game minutes. `shortMenu`: below
+the check's comfortable band (score share < .7) picks, plans and free menus
+keep 7 options ranked needs > plan's next > work > help > talk > evening.
+A world with `"brain": "none"`, no engine or `?art=1` is always rails.
+
 Measuring: live-eval `--autonomy=`; `interest-report.mjs`; `judge.mjs`
 (OpenRouter, ledger in work/openrouter-spend.json). Results: brains.md,
 "Autonomy".

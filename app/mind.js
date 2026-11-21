@@ -626,7 +626,7 @@
     // above rails (agency.js guided, free): the top of the ladder is advice, not an act; the
     // model is told it is furious and chooses (agency.js eventPick offers fight, order out,
     // call for help, walk away, let it go; or attack(name) in a turn of its own)
-    if (aboveRails(g)) {
+    if (temperByModel(g)) {
       a.furious = true;
       const cfg = getBrainConfig(g.id), name = nameOfKey(key);
       setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] You are furious with ${name} (${a.why || 'they keep at you'}). What you do about it is up to you.`]).slice(-5) });
@@ -652,6 +652,8 @@
     void other;
   }
   const aboveRails = g => { const l = window.tablefolkAgency?.level?.(g); return !!l && l !== 'rails'; };
+  // tempers by the model (agency.js profile: guided, assisted, free) or by the ladder in code
+  const temperByModel = g => window.tablefolkAgency?.domain?.(g, 'temper') === 'model';
   // a quarrel the character chose (agency.js): the hard limits hold: one fight between
   // characters at a time, none with someone already beaten down to a third; it ends
   // there (standDown, endQuarrel). '' when it started, else why not.
@@ -669,11 +671,11 @@
     return '';
   }
   // may it strike someone it is angry with? (app.js commandsFor adds attack): above rails, at level 3+
-  function mayFight(g) { return aboveRails(g) && tempersOn() && Object.values(mindOf(g).angryAt || {}).some(a => a.v >= .7); }
+  function mayFight(g) { return temperByModel(g) && tempersOn() && Object.values(mindOf(g).angryAt || {}).some(a => a.v >= .7); }
   function calmDown(g, key, why) { calm(g, key, .4, why || `You let it go with ${nameOfKey(key)}`); const a = mindOf(g).angryAt?.[key]; if (a) a.furious = false; }
   // its own attack(name) on someone it is furious with starts the quarrel (non-lethal, one at a time)
   window.addEventListener('tablefolk-agent-turn', e => {
-    const g = state.characters.find(c => c.id === e.detail?.agentId); if (!g || !aboveRails(g)) return;
+    const g = state.characters.find(c => c.id === e.detail?.agentId); if (!g || !temperByModel(g)) return;
     const t = String(e.detail?.line || '').match(/\battack\(\s*"?([^")]+)"?\s*\)/i); if (!t) return;
     const key = keyOf(t[1].trim()), a = mindOf(g).angryAt?.[key];
     if (a && a.v >= .7 && !getBrainConfig(g.id).hostileTo?.[key]) { const no = startFight(g, key); if (no) console.info('[mind]', g.id, 'no fight with', key + ':', no); }
@@ -757,13 +759,13 @@
   }
   // will it deal with them? (app.js sell, give, give_quest; trade)
   // (above rails the model decides whom it serves: only the deals code runs for it keep the refusal)
-  function refuses(g, who, byCode = false) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn() && (byCode || !aboveRails(g)); }
+  function refuses(g, who, byCode = false) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn() && (byCode || !temperByModel(g)); }
   function temperLines(g) {
     const m = mindOf(g), out = [];
     for (const [key, a] of Object.entries(m.angryAt || {})) {
       const name = nameOfKey(key), lv = Math.min(a.level || 0, Math.max(angerLevel(a.v), a.hostile || a.orderedOut ? 4 : 0));
       if (lv >= 4 && a.hostile) out.push(`You are fighting ${name}: they pushed you too far. They can stop it by apologising.`);
-      else if (aboveRails(g) && lv >= 3) out.push(`You are furious with ${name} (${a.why || 'they keep at you'}). What you do about it is up to you: refuse to deal with them, order them out, call for help, walk away, or fight them with attack(${name}) (not to the death).`);
+      else if (temperByModel(g) && lv >= 3) out.push(`You are furious with ${name} (${a.why || 'they keep at you'}). What you do about it is up to you: refuse to deal with them, order them out, call for help, walk away, or fight them with attack(${name}) (not to the death).`);
       else if (lv >= 4 && a.orderedOut) out.push(`Order ${name} out of here. If they insult or hit you again, call for help.`);
       else if (lv >= 4 && a.backAway != null) out.push(`${name} frightens you: keep away from them; you called for help.`);
       else if (lv >= 3) out.push(`You will not serve or help ${name} until they apologise.`);

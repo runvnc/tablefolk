@@ -178,6 +178,11 @@ kept in the browser) picks the level; a slow machine gets a lower one.
 Settings' "Running now" says which level runs and why.
 
 - **On rails**: as above.
+- **Assisted**: the character chooses what to do, plans its day and starts
+  its own conversations (as guided), but the game keeps it fed, in bed at
+  night and safe in a raid (as on rails: indoors unless its job fights or
+  defends). For brains that plan well but handle emergencies and their own
+  needs badly.
 - **Guided**: each time an activity ends, the character picks what to do
   next from what the world offers right now: its work (each step with what
   it needs and makes: "bake bread (needs 2 wheat: you have 0, the stores
@@ -211,6 +216,22 @@ nets (starving for two game hours it eats; two hours past its bedtime it
 goes to bed; an activity that failed three times running is left for an
 hour; a job's command rule runs when its condition has held half an hour and
 the character has not run it).
+
+Under the presets is a profile: six decisions, each made by `code` or the
+`model`: `activity` (what to do next), `plan` (the day's plan), `talk`
+(starting conversations), `danger` (raids and monsters: shelter, fight,
+flee), `needs` (when to eat and sleep) and `temper` (what it does when
+provoked). Rails is all code; assisted has danger and needs in code;
+guided and free are all model (free with open turns). `"autonomy"` may be
+an object that changes some of them: `{"preset": "guided", "danger":
+"code"}` (domains it does not name come from the preset; with no
+`"preset"`, from the player's setting or the brain's). On Auto the
+capability check marks each decision it failed for code, so a brain may come
+out as "guided (danger and needs in code)"; Settings and Running now say so.
+A need a character keeps failing to meet (two failed tries to eat, or to get
+to bed) is handled by the game for three game hours, then handed back.
+Brains below the check's comfortable band see a short menu (needs, their
+plan and work first, then a few others).
 
 What it costs: guided asks the model about once per activity (a few seconds
 on a capable machine); free asks for whole turns. Measured: maintainer skill,

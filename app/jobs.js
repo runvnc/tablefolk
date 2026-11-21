@@ -390,7 +390,7 @@
   // a remark while working: one line, the activity in the prompt
   async function remark(g, s) {
     // (above rails the model speaks on its own initiative: no code-chosen remarks)
-    if (window.tablefolkAgency?.level?.(g) && window.tablefolkAgency.level(g) !== 'rails') return false;
+    if (window.tablefolkAgency?.domain?.(g, 'talk') === 'model') return false;
     if (!brainOk() || gm() - s.lastRemark < 180 || Math.random() > .3 || window.tablefolkLive?.quiet?.() === false || window.tablefolkTalk?.mayStart?.(g.id) === false) return false;
     const near = nearPeople(g); if (!near.length) return false;
     s.lastRemark = gm();
@@ -1317,7 +1317,7 @@
     // in danger and no fighter: the game's reflexes (or the model) as before
     const foes = M()?.foes?.(g, 4) || [];
     // above rails: its own turn on the danger, without holding up everyone else's (agency.js)
-    if (foes.length && !fighter(g, j) && window.tablefolkAgency?.level?.(g) !== 'rails' && window.tablefolkAgency?.danger) return window.tablefolkAgency.danger(g, S(g), j, foes);
+    if (foes.length && !fighter(g, j) && window.tablefolkAgency?.domain?.(g, 'danger') === 'model' && window.tablefolkAgency?.level?.(g) !== 'rails' && window.tablefolkAgency?.danger) return window.tablefolkAgency.danger(g, S(g), j, foes);
     if (foes.length && !fighter(g, j)) {
       // a package or skill command that fits (signal the militia, a spell): offered first
       const offs = offerOpts(g);
@@ -1335,7 +1335,8 @@
     // model is offered them and code runs one only when its condition has held half a game hour
     const rr = await rules(g, s, j, lvl !== 'rails'); if (rr) { s.busyWith = s.doing || 'its job\u2019s orders'; return rr; }
     const asleep0 = inHours(h, sleepHours(j));
-    let th = lvl !== 'rails' ? await A.threat(g, s, j, asleep0) : undefined;
+    // (danger by the model: a choice with its consequences; danger in code (rails, assisted): the reflexes below)
+    let th = lvl !== 'rails' && A.domain?.(g, 'danger') === 'model' ? await A.threat(g, s, j, asleep0) : undefined;
     if (th === undefined) th = await threatened(g, s, j, asleep0);
     if (th) { s.busyWith = s.doing || 'the raid'; return th; }
     s.busyWith = '';

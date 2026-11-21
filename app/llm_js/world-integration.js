@@ -1084,7 +1084,7 @@ async function main() {
       const fromPlayer = (cfg.pendingChat || []).some(l => pnLow && String(l).toLowerCase().startsWith(pnLow + ' says'));
       const crowded = !fromPlayer && !!window.tablefolkMind && world.state?.mind !== false && (busyNear(g.id) || isTalkedOut(g.id)) && !(cfg.pendingChat || []).some(l => activeConvos().some(c => (c.a === g.id || c.b === g.id) && String(l).startsWith((c.a === g.id ? c.b : c.a) + ' says')));
       // (above rails, agency.js guided and free: it may speak on its own initiative; only the floor rule holds)
-      const railsTalk = (window.tablefolkAgency?.level?.(g) || 'rails') === 'rails';
+      const railsTalk = (window.tablefolkAgency?.domain?.(g, 'talk') || 'code') !== 'model';
       const muted = crowded || (railsTalk && !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g));
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }

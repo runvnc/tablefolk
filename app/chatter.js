@@ -94,7 +94,7 @@
     if (!mindful(g) || state.mind === false) return false;
     if (W().getBrainConfig(g.id)?.enabled === false) return false;
     // above rails (agency.js guided, free) the model speaks for itself: only the words of a deal code carries out
-    const lvl = window.tablefolkAgency?.level?.(g); if (lvl && lvl !== 'rails' && !DEALS.has(kind)) return false;
+    if (window.tablefolkAgency?.domain?.(g, 'talk') === 'model' && !DEALS.has(kind)) return false;
     if (g.pose?.mode === 'lie' && kind !== 'intruder') return false;
     const now = performance.now(), c = g._chatter ||= { at: -1e9, last: '', byKind: {} };
     if (!force && now - c.at < (URGENT.has(kind) ? URGENT_GAP : GAP)) return false;

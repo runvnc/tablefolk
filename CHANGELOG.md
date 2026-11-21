@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-21
 
+- **Assisted, and autonomy by decision**: a new choice, Assisted: characters choose what to do, plan and talk, while the game keeps them fed, in bed at night and safe in a raid. Underneath, each of six decisions (activity, plan, talk, danger, needs, temper) is made by the game or the model; a world or character can set them one by one (`{"preset": "guided", "danger": "code"}`), and Auto keeps in code what the brain failed in its capability check. A character that keeps failing to eat or get to bed is helped by the game for a while; smaller brains see shorter menus.
+
 - **Raon-1 nano downloads from our mirror**: its 1.8 GB model now comes from the same fast mirror as Gemma 4 E2B on tablefolk.world, with Hugging Face as the fallback.
 
 - **Characters can decide for themselves**: a new setting, "How much do characters decide for themselves?" (Settings): Auto, On rails, Guided, Free; also `"autonomy"` on a world or a character. Guided characters choose each next activity from what the world offers and plan their day; free ones act on their own turns with `do(...)` and keep notes with `plan(...)`. Raids and tempers become choices; they speak on their own initiative. Auto picks the level from a short capability check of the brain on this device.

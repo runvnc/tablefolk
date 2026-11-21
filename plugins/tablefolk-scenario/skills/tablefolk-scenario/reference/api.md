@@ -101,7 +101,8 @@ supported part (other members are internal and may change).
 | `tablefolkClock.now()`, `.set(min, day)`, `.isNight()` | the time of day |
 | `tablefolkThreats.now(kind)`, `.active()`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats |
 | `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
-| `tablefolkAgency.level(g)`, `.why(g)`, `.setting()`, `.setSetting(v)`, `.options(g, state, job)`, `.stats()`, `.probe.run()`, `.probe.result()` | autonomy: `rails`, `guided` or `free` for a character and why; the player's setting (`auto` or a level); the activities it could start now; plans and results; the capability check (living.md, "How much characters decide") |
+| `tablefolkProfile.normalize(v)`, `.resolve(sources)`, `.describe(p)`, `.PRESETS`, `.DOMAINS` | autonomy profiles: a preset or an object to a profile of six domains, `code` or `model` |
+| `tablefolkAgency.profile(g)`, `.domain(g, name)`, `.level(g)`, `.why(g)`, `.setting()`, `.setSetting(v)`, `.options(g, state, job)`, `.stats()`, `.probe.run()`, `.probe.result()` | autonomy: `rails`, `guided` or `free` for a character and why; the player's setting (`auto` or a level); the activities it could start now; plans and results; the capability check (living.md, "How much characters decide") |
 | `tablefolkUses.register(kind, def)`, `.stockOf(thing)` | kinds of use; what a thing has left |
 | `tablefolkChatter.say(g, kind, slots, { to })`, `.add(pools)` | a templated line from a pool (living.md, "Spoken life"); add pools |
 | `tablefolkTalk.speak(g, text, { to, answer })` | a line as the character's own, told to those in earshot; `answer`: the one it is said to answers it |

@@ -1008,8 +1008,9 @@
       lore: Array.isArray(s.lore) ? s.lore.map(String).slice(0, 64) : [], needs: s.needs !== false, mind: s.mind !== false,
       // mind.js: news passed between characters, reflection, how much the game helps the characters; play.js: who monsters go after
       gossip: s.gossip !== false, reflect: s.reflect !== false, reflexes: s.reflexes !== false, plans: s.plans !== false, autoThink: s.autoThink !== false, glances: s.glances !== false, expect: ['basic', 'capable', 'ambitious'].includes(s.expect) ? s.expect : null,
-      // agency.js: how much the characters decide for themselves (rails | guided | free; unset: the player's setting, else the brain's)
-      autonomy: ['rails', 'guided', 'free'].includes(s.autonomy) ? s.autonomy : null, monsters: ['everyone', 'player'].includes(s.monsters) ? s.monsters : null,   // unset: everyone in a living world, the player otherwise (play.js preyFor)
+      // agency.js: how much the characters decide for themselves: a preset (rails | assisted | guided | free) or
+      // { "preset": "guided", "danger": "code" } (autonomy-profile.js; unset: the player's setting, else the brain's)
+      autonomy: window.tablefolkProfile?.normalize?.(s.autonomy) ?? null, monsters: ['everyone', 'player'].includes(s.monsters) ? s.monsters : null,   // unset: everyone in a living world, the player otherwise (play.js preyFor)
       // live.js: start with everyone acting on their own; director.js: things that happen now and then
       // mind.js tempers: insults anger characters and push them to refuse, order out, call for help or fight ("tempers": false: off); how quickly ("temper": short | normal | long, agents may override)
       // "talk": true: a talk-only scene (the world builder leaves out jobs, threats and the living-world rules)
@@ -1216,7 +1217,7 @@
         // mind.js: a fresh mind each run; who it is beyond the personality
         mind: null, backstory: a.backstory ? String(a.backstory) : '', knows: Array.isArray(a.knows) ? a.knows.map(String) : [],
         // mind.js: what it hides and what it is quietly after; how much the game helps it (expect)
-        secret: a.secret ? String(a.secret).slice(0, 300) : '', agenda: a.agenda ? String(a.agenda).slice(0, 300) : '', readsBooks: a.readsBooks === true || a.readsBooks === 'true', expect: ['basic', 'capable', 'ambitious'].includes(a.expect) ? a.expect : '', autonomy: ['rails', 'guided', 'free'].includes(a.autonomy) ? a.autonomy : '', ...(a.reflexes === false ? { reflexes: false } : {}), hunts: a.hunts === 'everyone' ? 'everyone' : '',
+        secret: a.secret ? String(a.secret).slice(0, 300) : '', agenda: a.agenda ? String(a.agenda).slice(0, 300) : '', readsBooks: a.readsBooks === true || a.readsBooks === 'true', expect: ['basic', 'capable', 'ambitious'].includes(a.expect) ? a.expect : '', autonomy: window.tablefolkProfile?.normalize?.(a.autonomy) ?? '', ...(a.reflexes === false ? { reflexes: false } : {}), hunts: a.hunts === 'everyone' ? 'everyone' : '',
         temperament: withRole(a).temperament || '', temper: ['short', 'normal', 'long'].includes(a.temper) ? a.temper : '', hostileTo: null, role: a.role || '', prices: a.prices && typeof a.prices === 'object' ? a.prices : null,
         // Its own commands, else the scenario's "allowed" list.
         allowed: Array.isArray(a.allowed) ? a.allowed.map(String) : null,
