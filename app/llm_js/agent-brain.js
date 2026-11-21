@@ -47,6 +47,10 @@ const SUPPORTED_MODELS = {
   // their 4-bit LiteRT-LM bundle from Hugging Face, a 4,096-token window
   // (litert-worker.js keeps its prompts to a smaller budget); hidden while evaluated
   'raon1-nano-litert': { label: 'Raon-1 nano (LiteRT-LM; Korean and English)', engine: 'litert-lm', size: '~1.8 GB', hidden: true },
+  // its GGUFs on a wllama build of KRAFTON's llama.cpp fork (libs/brain/engines/wllama.js)
+  'raon1-nano-q4-wllama': { label: 'Raon-1 nano Q4_K_M (llama.cpp WebGPU)', engine: 'wllama3', size: '~2.1 GB', autoLoad: true, hidden: true },
+  'raon1-nano-q6-wllama': { label: 'Raon-1 nano Q6_K (llama.cpp WebGPU)', engine: 'wllama3', size: '~2.6 GB', autoLoad: true, hidden: true },
+  'raon1-nano-q8-wllama': { label: 'Raon-1 nano Q8_0 (llama.cpp WebGPU)', engine: 'wllama3', size: '~3.4 GB', autoLoad: true, hidden: true },
   // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's
   // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
@@ -114,6 +118,9 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   // reasoning_content, leaving no answer); llama.cpp and vLLM take the switch.
   // Not sent to others: strict APIs refuse unknown fields.
   if (samplingFor(fresh.model) && !opts.enableThinking) body.chat_template_kwargs = { enable_thinking: false };
+  // OpenRouter's reasoning models (prism-ml/ternary-bonsai-2-27b) reason by default and spent a
+  // 50-token budget on it, answering nothing: reasoning off unless this turn asks to think
+  if (!opts.enableThinking && /\//.test(fresh.model || '')) body.reasoning = { enabled: false };
   if (opts.dryRun) return '';
   // token counts in the last chunk (llama.cpp, vLLM, OpenRouter)
   if (samplingFor(fresh.model)) body.stream_options = { include_usage: true };

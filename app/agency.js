@@ -444,7 +444,7 @@
   async function runEat(g, s, j, a) {
     const m = M()?.mindOf?.(g) || {};
     if ((m.hunger || 0) < .3) return { done: true, text: 'ate' };
-    if (gm() - a.startMin > 90) return { fail: 'could not get food in time' + (s.hungerWhy ? ': ' + s.hungerWhy : '') };
+    if (gm() - a.startMin > 180) return { fail: 'could not get food in time' + (s.hungerWhy ? ': ' + s.hungerWhy : '') };
     const r = await X().eat(g, s); if (!r) return { fail: s.hungerWhy || 'no food to be had' };
     return { busy: true, ms: r.ms || 2500 };
   }
@@ -730,6 +730,8 @@
     if (!raiders.length) { A.raid = null; return undefined; }
     const gr = raiders[0]._threat?.group || raiders[0];
     const near = raiders.slice().sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
+    // raiders that frighten nobody (crows at the stores) are only a fighter's business, as on rails
+    if (!raiders.some(r => T().scares?.(r)) && !X().fighter(g, j)) return undefined;
     // asleep with them far off: as on rails (stays in, sleeps)
     if (asleep && g.pose?.mode === 'lie' && dist(posOf(near), posOf(g)) > 8) return undefined;
     if (!A.raid || A.raid.group !== gr) A.raid = { group: gr, choice: null, asking: false, asked: 0 };
@@ -765,10 +767,10 @@
     emit('tablefolk-activity', { agentId: g.id, phase: 'start', key: 'raid:' + ch.opt.key, kind: 'raid', label: ch.opt.label, by: 'model', why: ch.why, routine: false });
     return { ...ch.opt, words: ch.why };
   }
-  const shout = (g, words) => { const w = String(words || '').replace(/^["“']+|["”']+$/g, '').trim(); return w.length >= 4 && !/^(i |because|to |so |it )/i.test(w) ? X().runLine(g, `say(${JSON.stringify(w.slice(0, 140))})`) : null; };
+  const shout = (g, words, gr) => { if (gr) { gr.agencyShouts = (gr.agencyShouts || 0) + 1; if (gr.agencyShouts > 2) return null; } const w = String(words || '').replace(/^["“']+|["”']+$/g, '').trim(); return w.length >= 4 && !/^(i |because|to |so |it )/i.test(w) ? X().runLine(g, `say(${JSON.stringify(w.slice(0, 140))})`) : null; };
   async function runRaid(g, s, j, R, raiders, asleep) {
     const k = X(), ch = R.choice;
-    if (ch.words && !R.shouted) { R.shouted = true; await shout(g, ch.words); }
+    if (ch.words && !R.shouted) { R.shouted = true; await shout(g, ch.words, R.group); }
     if (ch.key === 'fight') return k.fightRaiders(g, s, j, raiders);
     if (ch.key === 'fetch') {
       if (cfgOf(g).wielding) { R.choice = { ...ch, key: 'fight' }; return k.fightRaiders(g, s, j, raiders); }
