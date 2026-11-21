@@ -4,8 +4,9 @@
 # step (chrome-restart.sh), results in tools/browser-test/results. Steps as in autonomy-queue.sh;
 # TAG adds a card tag to the labels. Writes <log dir>/q.done at the end.
 L=$1; shift; mkdir -p "$L"; cd /root/tablefolk/tools/browser-test
-command -v node >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq nodejs npm >/dev/null 2>&1; }
-[ -d node_modules/playwright-core ] || npm install -q playwright-core >/dev/null 2>&1
+command -v npm >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq nodejs npm >/dev/null 2>&1; }
+[ -d node_modules/playwright-core ] || npm install playwright-core >/dev/null 2>&1
+[ -d node_modules/playwright-core ] || { echo "no playwright-core" >> "$L/queue.log"; exit 1; }
 export CDP_PORT=9223 APPROVE_DOWNLOAD=1 READY_TIMEOUT=900 PROBE_TIMEOUT=1200
 fresh() { bash /root/tablefolk/tools/cloud-gpu/chrome-restart.sh > /dev/null 2>&1; sleep 3; }
 run() { echo "== $(date +%T) $*" >> "$L/queue.log"; }
