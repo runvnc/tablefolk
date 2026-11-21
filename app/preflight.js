@@ -58,7 +58,7 @@
     ['combat.js?v=20261120b'],
     ['spells.js?v=20261115c'],
     ['reactions.js?v=20261115b'],
-    ['terrain.js?v=20261120f'],
+    ['terrain.js?v=20261121b'],
     ['surroundings.js?v=20261121a'],
     ['walls.js?v=20261121a'],
     ['darkness.js?v=20261120d'],

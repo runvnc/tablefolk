@@ -444,6 +444,7 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
     const D = window.tablefolkDark, hid = (x, z) => !!(D?.on && !D.known(x, z));
     const isSolid = (x, z) => { const k = x + ',' + z; if (wallSet.has(k)) return false; if (Math.abs(x) > bx || Math.abs(z) > bz) return true; if (!R.outside?.has(k)) return false; const p = paintAt(x, z)?.mat; return !p || p === 'sea'; };
     const isRock = (x, z) => isSolid(x, z) || (!wallSet.has(x + ',' + z) && hid(x, z));
+    const nearHid = (x, z) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dz]) => !wallSet.has((x + dx) + ',' + (z + dz)) && hid(x + dx, z + dz));
     T.rockCells = new Set(); for (let z = -bz; z <= bz; z++) for (let x = -bx; x <= bx; x++) if (isSolid(x, z)) T.rockCells.add(x + ',' + z);
     const isWall = (x, z) => wallSet.has(x + ',' + z) && !doorAt(x, z);
     const doorAt = (x, z) => (state.blocks || []).some(b => !b.isDisposed?.() && meta(b)?.type === 'door' && Math.round(b.position.x) === x && Math.round(b.position.z) === z);
@@ -456,7 +457,9 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       if (!rock && !wall) continue;
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
         if (rock || isRock(x + sx, z) || isRock(x, z + sz) || (isRock(x + sx, z + sz) && isWall(x + sx, z) && isWall(x, z + sz))) {
-          const k = qk(2 * x + (sx > 0 ? 1 : 0), 2 * z + (sz > 0 ? 1 : 0)); q.add(k); if (!rock) qw.add(k);
+          // (only a wall the player knows: an unexplored room's walls stay under whole rock)
+          // (a wall beside an unexplored square counts as unexplored: in "rooms" reveal its cell is "known")
+          const k = qk(2 * x + (sx > 0 ? 1 : 0), 2 * z + (sz > 0 ? 1 : 0)); q.add(k); if (!rock && !nearHid(x, z)) qw.add(k);
         }
       }
     }
