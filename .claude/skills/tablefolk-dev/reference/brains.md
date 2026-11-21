@@ -1074,6 +1074,15 @@ eight characters. Pleasant guided wants a model answering a pick in under
 faster card), or a longer day (`dayMinutes`); free wants that with fewer
 characters. Settings' Auto chooses guided for both 12B and 27B (below).
 
+**Gemma 4 E4B at guided** (the same day, after the fixes) is the run where
+guided works: 98% of 100 activities model-chosen, 16 self-started
+interactions across 8 pairs (one gift), 14 day plans and 7 revisions with
+their reasons, 27 surprises, 4% wasted; 6 of 8 ate, 5 of 7 slept at night,
+two ended hungry (brann, wren), 3 sales between characters (rails on the
+12B: 17), raid 83% indoors; 123 model calls (5.1 a game hour). Judge:
+coherence 4.0, personality 4.0, purposefulness 4.38, surprise 2.88. A
+smaller, faster brain makes more decisions in the same day than the 12B.
+
 The capability check (`probe.mjs`), RTX 3090: v1's eight items were passed
 alike (E2B 6/8 at 60 tokens/s, E4B 7/8 at 37, Bonsai 2 9B 6/8 at 81, Bonsai
 2 27B 6/8 at 28): it could not tell the brains apart, so v2 has harder
