@@ -692,6 +692,11 @@ async function main() {
   // Let the console's llm()/genmap() piggyback on this manager when it's
   // already sitting on the model they want, instead of loading a redundant
   // second copy of the same multi-GB weights.
+  // One model call at a time, in order: the in-page engines keep one conversation cache, and
+  // calls that overlapped (agency.js turns and picks, reflection, a reply) left one that never
+  // returned and the living world stalled (Gemma 4 12B and Bonsai 2 27B on an RTX 3090, 2026-11-21)
+  { const decide = manager.decide.bind(manager); let chain = Promise.resolve();
+    manager.decide = agent => { const p = chain.then(() => decide(agent)); chain = p.catch(() => {}); return p; }; }
   installDevConsole(() => manager);
   // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.

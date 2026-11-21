@@ -97,7 +97,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261121h', 'module'],
+    ['llm_js/world-integration.js?v=20261121i', 'module'],
   ];
 
   function browserSummary() {
