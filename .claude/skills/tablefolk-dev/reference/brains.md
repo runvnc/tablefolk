@@ -1219,3 +1219,46 @@ Bonsai 2 9B makes the most happen (twice the interactions, many more
 surprises) but less coherently (judge 3.1-3.4), and its villagers stood
 outside in the raid. Raon-1 nano works at guided but wastes more turns and
 reads flattest; the check's rails is right for it.
+
+### Autonomy by domain: assisted, and Auto's profile (2026-11-21, evening)
+
+The capability check v3 (10 items, each tagged with the decision it tests;
+two new: shelter in a raid, eat when faint). Auto takes the preset from the
+score and keeps in code the talk, danger, needs or temper domains whose items
+it failed (never activity or plan: see below). Bonsai 2 9B: 5/10 (RTX 4090,
+145 tokens/s; RTX 4070, 76) -> **assisted (temper in code)**; Bonsai 2 27B on
+the 4070: 6/10, 26 tokens/s -> guided (danger in code).
+
+Bonsai 2 9B, hearthvale's day, RTX 4090 (each run once):
+
+| | guided | assisted | Auto, plans in code (dropped) | Auto: assisted (temper in code), RTX 4070 12 GB |
+|---|---|---|---|---|
+| model-chosen activities | 93% | 93% | 93% | 85% |
+| self-started interactions (pairs) | 27 (14) | 24 (13) | 34 (7) | 21 (8) |
+| plans / revised | 16 / 9 | 15 / 13 | 0 | 15 / 5 |
+| surprises | 86 | 83 | 157 | 37 |
+| wasted | 4% | 5% | 6% | 2% |
+| ate / slept / hungry at the end | 8 / 7 / 1 | 8 / 7 / 0 | 8 / 7 / 0 | 8 / 7 / 0 |
+| made / sales between characters | 11 / 9 | 9 / 4 | 0 / 1 | 11 / 9 |
+| indoors during the night wolves | 64% | 79% | 90% | 96% |
+| judge (coherence / personality / purpose / surprise) | 3.5 / 3.88 / 4.13 / 3.0 | 3.63 / 4.0 / 4.13 / 3.0 | 2.63 / 3.13 / 3.5 / 2.63 | 3.88 / 4.13 / 4.5 / 3.25 |
+
+So danger and needs in code bring the raid and meals back without costing the
+9B its liveliness; but its plans must stay its own: with plans in code (an
+Auto rule since dropped: the plan item is a format test) its villagers talked
+all day and made nothing. A first Auto run also showed code-run needs
+fighting each other at night (bed cut off a meal, then bed and the starving
+net took turns): fixed (starving eats first; a meal is not cut off by bed).
+
+**12 GB, RTX 4070** (driver 580.82, Chrome 158, light graphics): Bonsai 2
+27B at guided fits (peak 11.1 of 12.3 GB) and stays coherent (judge 4.13 /
+4.13 / 4.63 / 3.25), but is too slow for eight characters in a 12-minute day:
+picks 2.5-4.5 s, turns 9-16 s, 66 model calls (136 on a 4090), 5 of 8 ate,
+two hungry at the end, 2 sales. Bonsai 2 9B on Auto on the same card: peak
+5.3 GB, the working village in the table above. A first RTX 4070 host gave
+garbled answers ("!!!!" and mixed scripts) for Bonsai and LiteRT alike: a
+faulty card or host; the check now reports garbled answers in Running now.
+
+Picks, now: **12 GB**: Bonsai 2 9B, Auto (assisted, temper in code); the 27B
+at guided only for fewer characters or a longer day. **16 GB**: Bonsai 2 27B
+at guided (the 4080 run above). **24 GB**: Bonsai 2 27B at guided, or free.
