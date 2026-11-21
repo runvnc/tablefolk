@@ -74,9 +74,9 @@ const raon = (quant, parts, gb) => ({
 });
 
 const MODEL_CONFIG = {
-  'raon1-nano-q4-wllama': raon('Q4_K_M', 4, 1.94),
+  'raon1-nano-q4-wllama': raon('Q4_K_M', 5, 1.94),
   'raon1-nano-q6-wllama': raon('Q6_K', 5, 2.46),
-  'raon1-nano-q8-wllama': raon('Q8_0', 7, 3.16),
+  'raon1-nano-q8-wllama': raon('Q8_0', 6, 3.16),
   'minicpm5-1b-wgpu': {
     label: 'MiniCPM5-1B (WebGPU, GGUF)',
     file: 'MiniCPM5-1B-Q4_K_M.gguf',

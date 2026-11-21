@@ -1,0 +1,36 @@
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+index 77fbb4f..730fbb3 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -3465,7 +3465,8 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+             return ggml_webgpu_ssm_scan(ctx, src0, src1, src2, node->src[3], node->src[4], node->src[5], node->src[6],
+                                         node);
+         case GGML_OP_GATED_DELTA_NET:
+-            if (ggml_webgpu_can_fuse_gdn_cache(cgraph, node_idx, num_encoded_ops)) {
++            // tablefolk: the fused cache write binds the state twice as writable storage, which WebGPU refuses (aliasing)
++            if (false && ggml_webgpu_can_fuse_gdn_cache(cgraph, node_idx, num_encoded_ops)) {
+                 ggml_tensor * dst_fuse = cgraph->nodes[node_idx + num_encoded_ops - 1]->src[1];
+                 return ggml_webgpu_gated_delta_net(ctx, src0, src1, src2, node->src[3], node->src[4], node->src[5],
+                                                    node, dst_fuse);
+diff --git a/src/models/delta-net-base.cpp b/src/models/delta-net-base.cpp
+index 2e15777..2a8cfef 100644
+--- a/src/models/delta-net-base.cpp
++++ b/src/models/delta-net-base.cpp
+@@ -396,6 +396,8 @@ std::pair<ggml_tensor *, ggml_tensor *> llm_build_delta_net_base::build_delta_ne
+     GGML_ASSERT(s->ne[0] == S_v && s->ne[1] == S_v && s->ne[2] == H_v      && s->ne[3] == n_seqs);
+ 
+     // K=1: output carries the final state only. state s is 4D [S_v, S_v, H_v, n_seqs].
++    // tablefolk: inputs as their own copies: views of one fused tensor overlap, and WebGPU refuses two overlapping writable bindings
++    q = ggml_cont(ctx0, q); k = ggml_cont(ctx0, k); v = ggml_cont(ctx0, v); g = ggml_cont(ctx0, g); b = ggml_cont(ctx0, b); s = ggml_cont(ctx0, s);
+     ggml_tensor * result = ggml_gated_delta_net(ctx0, q, k, v, g, b, s, /*K=*/1);
+     if (n_tokens == 1) {
+         res->add_fused_node({LLM_FUSED_OP_GDN_AR, result, il});
+@@ -561,6 +563,8 @@ ggml_tensor * llm_build_delta_net_base::build_recurrent_attn(
+     const int64_t K = cparams.n_rs_seq + 1;
+ 
+     // state s is 4D [S_v, S_v, H_v, n_seqs]; K snapshot slots are written into the output.
++    // tablefolk: inputs as their own copies: views of one fused tensor overlap, and WebGPU refuses two overlapping writable bindings
++    q = ggml_cont(ctx0, q); k = ggml_cont(ctx0, k); v = ggml_cont(ctx0, v); g = ggml_cont(ctx0, g); b = ggml_cont(ctx0, b); s = ggml_cont(ctx0, s);
+     ggml_tensor * gdn_out = ggml_gated_delta_net(ctx0, q, k, v, g, b, s, K);
+     if (n_seq_tokens > 1) {
+         res->add_fused_node({LLM_FUSED_OP_GDN_CH, gdn_out, il});

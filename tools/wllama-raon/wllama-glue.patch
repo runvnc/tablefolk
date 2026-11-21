@@ -1,0 +1,25 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 337c054..d901b7f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -109,7 +109,6 @@ set(LLAMA_SERVER_SRC llama.cpp/tools/server/server-context.cpp
+     llama.cpp/tools/server/server-decision.cpp
+     llama.cpp/tools/server/server-schema.cpp
+     llama.cpp/tools/server/server-stream.cpp
+-    llama.cpp/tools/server/server-realtime.cpp
+ )
+ 
+ set(WLLAMA_SRC ${LLAMA_COMMON_SRC} ${LLAMA_SERVER_SRC}
+diff --git a/cpp/wllama-context.h b/cpp/wllama-context.h
+index 58c9c2f..7bd398e 100644
+--- a/cpp/wllama-context.h
++++ b/cpp/wllama-context.h
+@@ -839,7 +839,7 @@ struct wllama_context
+ 
+     auto rd = std::make_unique<server_response_reader>(ctx_server.get_response_reader());
+ 
+-    auto tokens = format_prompt_rerank(model, vocab, nullptr, query, document, {}, {}, mtmd_helper_init_opt_default());
++    auto tokens = format_prompt_rerank(model, vocab, nullptr, query, document, mtmd_helper_init_opt_default());
+     server_task task = server_task(SERVER_TASK_TYPE_RERANK);
+     task.id = rd->get_new_id();
+     task.index = 0;
