@@ -1007,3 +1007,86 @@ prefill 14 tokens/s, decode 1.7, 162 s to start.
 
 Mirroring the 1.82 GB bundle on R2 (`assets.md`, Hosting) is pending the
 owner's OK.
+
+## Autonomy: rails, guided, free (2026-11-21)
+
+`app/agency.js` (minds.md, "autonomy"). Measured on vast.ai, one RTX 3090
+24 GB (driver 595, Chrome 158, real WebGPU: NVIDIA Ampere), hearthvale's
+whole day (`live-eval --day --day-minutes=12 --autonomy=<level>`) and the
+goblin bakery (6 min), the player idle, no voices. Runs are not seeded (the
+game has no RNG seed): one run each, read them as direction.
+
+**Bonsai 2 27B stalled on this card at every level** (rails too: 14 model
+calls in the whole day, five characters hungry at the end; a call never
+returned; loading once stuck at "preparing"). Not seen on the 4070, 3060 and
+4060 Ti before; untried why (driver 595 or Chrome 158). The comparison ran
+on **Gemma 4 12B** (LiteRT-LM).
+
+Three things the first runs found, fixed (they matter beyond autonomy):
+model calls that overlapped (an agency turn, a pick, a reflection, a reply)
+left one that never returned: world-integration.js now queues every call
+(`manager.decide` serialised, given up after 2 minutes, own seconds in
+`tablefolkDecideSecs`); live.js waited for every reply turn, so a 12B's
+10-30 s answers froze the whole village: above rails a turn runs on its own;
+free turns re-read a doubled history and thought on every turn near a
+monster: the usual history and no auto-thinking above rails.
+
+hearthvale, Gemma 4 12B, one game day (guided and free after those fixes;
+free still stalled at 12:00, see below):
+
+| | rails | guided | free |
+|---|---|---|---|
+| activities chosen by the model | 5% (13 of 253) | 98% (47 of 48) | 64% |
+| self-started lines to someone (pairs) | 0 (0) | 17 (5) | 1 (1) |
+| code-prompted lines (evening topics, remarks, causes) / templated | 11 / 32 | 2 / 4 | 0 / 2 |
+| day plans / revised with a reason / steps done | - | 8 / 3 / 23 | notes 9 |
+| surprises (off-routine, a reason, done) | 0 | 14 | 1 |
+| replies picking up what was said or a remembered fact | 21% | 33% | 0 of 4 |
+| wasted (failed, nonsense, loops, empty) | 12% | 3% | 0 |
+| model calls / game hour; model seconds / game hour (with queueing) | 1.7; 5.5 | 2.4; 62 | 0.6; 39 |
+| meals (people who ate) | 8 of 8 but tam | 4 of 8 | 0 |
+| slept at night (of 7; the guard watches) | 7 | 0 (the world stopped at 21:00) | 1 |
+| stores in chests: start / end | 18 / 85 | 18 / 16 | 18 / 20 |
+| sales between characters | 17 | 2 | 0 |
+| raid (crows by day, wolves at night) | 4 came, 2 down; 73% indoors | 4, 1 down; 99% indoors; nobody hurt | 4, 1 down; 90% |
+
+The judge (`judge.mjs`, deepseek-v4.1-flash, 1-5, mean of the characters):
+
+| | coherence | personality | purposefulness | surprise |
+|---|---|---|---|---|
+| hearthvale rails | 4.25 | 4.00 | 4.13 | 2.88 |
+| hearthvale guided | 4.13 | 4.38 | 4.63 | 3.38 |
+| hearthvale free (stalled) | 4.17 | 3.67 | 4.33 | 2.83 |
+| bakery rails | 3.67 | 4.33 | 4.00 | 3.67 |
+| bakery guided | 4.00 | 5.00 | 4.67 | 4.00 |
+| bakery free | 4.00 | 4.50 | 5.00 | 3.50 |
+
+What it means: guided on a 12B gives characters their own errands and
+words (odo lectures maren about the wheat, jory re-plans around food and
+firewood, tam hunts for honey cake, hector chooses to fight the crows), and
+the judge sees it; but the village stops working, because each pick and
+turn costs 2-30 s on this card and the day is 12 real minutes: work cycles
+fell from ~10 to ~1 a character, sales 17 to 2, and from 21:00 a model call
+that never came back (before the two-minute give-up) stopped the world.
+Free is not usable on a 12B here: 26-70 s a turn, 8-21 turns in a day for
+eight characters. Pleasant guided wants a model answering a pick in under
+~1 s and a turn in under ~5 s (Bonsai 2 9B's 107 tokens/s class, or a
+faster card), or a longer day (`dayMinutes`); free wants that with fewer
+characters. Settings' Auto chooses guided for both 12B and 27B (below).
+
+The capability check (`probe.mjs`), RTX 3090: v1's eight items were passed
+alike (E2B 6/8 at 60 tokens/s, E4B 7/8 at 37, Bonsai 2 9B 6/8 at 81, Bonsai
+2 27B 6/8 at 28): it could not tell the brains apart, so v2 has harder
+items (a locked chest, sums, a fact moved twice, a false belief, a bundle
+under the floor price). v2 (thresholds: free 7+ and 15+ tokens/s, guided
+5+ and 6+ tokens/s): Gemma 4 E2B 4/8 -> rails; Gemma 4 E4B 6/8, 34
+tokens/s -> guided; Bonsai 2 9B 5/8, 80 tokens/s -> guided; Gemma 4 12B
+6/8, 29 tokens/s -> guided (all missed the bundle under the floor price,
+most the fact moved twice). Each check takes 7-12 s once the brain is loaded
+(E2B 124 s: it ran beside the evals). Bonsai 2 27B was not re-run on v2 (v1:
+6/8, 28 tokens/s). So Auto puts no in-browser brain on free today; free is
+for a character or world that asks for it, or a faster brain.
+
+E2B on rails after all of this (`run-evals.sh`, RUNS=2, the RTX 3090):
+33/36 (shop-chaos potion 1/2, haggle to 45 0/2), the same band as before
+(33-36).

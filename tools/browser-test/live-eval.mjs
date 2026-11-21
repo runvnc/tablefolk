@@ -213,7 +213,7 @@ const minds = {}; for (const id of agents) minds[id] = await mindOf(id);
 const elapsed = cap.t;   // seconds since the hooks went in
 
 // ---- scoring ----
-const KNOWN = new Set('say whisper walk face look emote give sell eat carry drop throw dig build remember feel note use take put close goal give_quest attack wield inventory touch push pull repair panic workflow spell fireball lightning spawn breathe_fire sit sleep rest'.split(' '));
+const KNOWN = new Set('say whisper walk face look emote give sell eat carry drop throw dig build remember feel note use take put close goal give_quest attack wield inventory touch push pull repair panic workflow spell fireball lightning spawn breathe_fire sit sleep rest do plan drink signal'.split(' '));
 const CMD = /^\s*([A-Za-z_][\w.-]*)\s*\(([\s\S]*)\)\s*$/;
 const parse = raw => String(raw).split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(CMD); return m ? { c: m[1].toLowerCase(), a: m[2] } : { c: '(plain)', a: l }; });
 const sayText = a => String(a).trim().replace(/^[A-Za-z][\w ]{0,20},\s*(?=["“])/, '').replace(/^["“']+|["”']+$/g, '');
