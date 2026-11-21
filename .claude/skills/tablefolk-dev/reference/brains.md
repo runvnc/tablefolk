@@ -1100,3 +1100,58 @@ for a character or world that asks for it, or a faster brain.
 E2B on rails after all of this (`run-evals.sh`, RUNS=2, the RTX 3090):
 33/36 (shop-chaos potion 1/2, haggle to 45 0/2), the same band as before
 (33-36).
+
+### Bonsai 2 27B's stall, and guided on 40-series cards (2026-11-21, later)
+
+**The 27B stall did not reproduce elsewhere.** The same tests on an RTX
+4090 (driver 595.91, Chrome 158), an RTX 4080 16 GB (580.173) and a second
+RTX 3090 (575.64): the 27B loads (31-202 s), answers every prompt length up
+to the 8192 window (a longer one fails cleanly with ContextOverflowError,
+`tools/browser-test/llm-sweep.mjs`), and takes overlapping calls without
+trouble even with the game's queue off (`?llmqueue=0`: bonsai2.js queues its
+own). On the second 3090, the rails day that had stalled ran a working
+village (everyone ate and slept, 36 calls), at 2-27 s a call. So the
+stall belonged to the first 3090 host (driver 595.71.05): calls of 59-70 s,
+then one that never returned, and once a load stuck at "preparing" with the
+GPU idle in a fresh Chrome. The 3090s are also slow for the 27B: prompts read
+2.3x slower than on the 4090 (a ~7k-token prompt 34 s vs 15 s; 28 tokens/s
+written vs 53). The game now gives up a call after 2 minutes and never
+waits on one turn above rails, so a host like that slows the world instead
+of stopping it (not re-tested on that host).
+
+Guided on hearthvale's day (12 real minutes), each run once; the 12B row is
+from the RTX 3090 above, the others after all the fixes:
+
+| | E4B, 3090 | Raon-1 nano, 4090 | Bonsai 2 9B, 4090 | Bonsai 2 9B, 4080 16 GB | Bonsai 2 27B, 4090 | Bonsai 2 27B, 4080 16 GB |
+|---|---|---|---|---|---|---|
+| model-chosen activities | 98% | 97% | 94% | 87% | 98% | 86% |
+| self-started interactions (pairs) | 16 (8) | 13 (8) | 33 (12) | 23 (9) | 16 (8) | 12 (8) |
+| plans / revised | 14 / 7 | 16 / 19 | 16 / 17 | 9 / 11 | 14 / 5 | 8 / 11 |
+| surprises | 27 | 23 | 106 | 68 | 31 | 18 |
+| reply depth | 18% | 31% | 52% | 62% | 41% | 43% |
+| wasted | 4% | 14% (49 failed activities, 10 loops) | 6% | 8% | 6% | 2% |
+| safety nets | 2 | 4 | 15 | 28 | 2 | 13 |
+| ate / slept at night / hungry at the end | 6 / 5 / 2 | 8 / 7 / 0 | 8 / 7 / 0 | 7 / 7 / 1 | 8 / 6 / 0 | 8 / 7 / 0 |
+| sales between characters | 3 | 14 | 3 | 15 | 4 | 2 |
+| others indoors during the raid | 83% | 92% | 34% | (no raid came) | 92% | 88% |
+| model calls a game hour | 5.1 | 8.3 | 13.1 | 9.3 | 5.7 | 4.1 |
+| judge: coherence / personality / purpose / surprise | 4.0 / 4.0 / 4.38 / 2.88 | 3.5 / 2.88 / 3.63 / 2.38 | 3.13 / 3.25 / 3.38 / 2.5 (the 4080 run's transcript) | | 4.0 / 4.25 / 4.5 / 3.25 | 4.0 / 3.88 / 4.25 / 3.0 |
+
+Also: Raon-1 nano on rails (4090), the baseline: everyone ate and slept, 44
+calls, 0 self-started interactions, judge 4.13 / 3.5 / 4.38 / 2.63. Bonsai 2
+27B at **free** (4090): everyone ate and slept, 25 self-started lines (8
+pairs), 12 notes rewritten with plan(), 10 sales, 63% model-chosen (code
+fills between its turns), 8% wasted, 117 calls; judge 4.0 / 4.25 / **4.75**
+/ 3.13. Peak graphics memory with the 27B and the game: 11.1 GB (4090), 11.0
+GB of 16 (4080).
+
+The capability check v2 on the 4090: Bonsai 2 27B 5/8 at 53 tokens/s
+(missed the sums, the danger choice, the bundle under its floor) -> guided;
+Raon-1 nano 4/8 at 58 -> rails.
+
+Reading: Bonsai 2 27B gives the most coherent, purposeful characters with a
+working village, at guided on 16 GB and 24 GB cards and at free on a 4090.
+Bonsai 2 9B makes the most happen (twice the interactions, many more
+surprises) but less coherently (judge 3.1-3.4), and its villagers stood
+outside in the raid. Raon-1 nano works at guided but wastes more turns and
+reads flattest; the check's rails is right for it.
