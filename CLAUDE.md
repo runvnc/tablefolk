@@ -45,13 +45,17 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - **The browser is the product.** Models that run in the browser, with no
   install, are what Tablefolk is for. Try hard to get a promising model
   running in the browser on a 12 GB or 16 GB machine before anything else.
-- **Back-end servers are not this project.** Tablefolk accepts llama-server
-  and any OpenAI-compatible endpoint, and that is all: no scripts that
-  install or run a back end for a model, no recommending models for back
-  ends, no evals or docs built around "run this server". Someone who can set
-  up their own back end does not need us to. Do not add to the local-helper
-  tooling (`tools/llama-server.*`, `docs/LOCAL-HELPERS-PLAN.md`); ask before
-  removing what exists.
+- **Back ends: connect, never install.** Supported and wanted: E2B and E4B
+  in the browser first; and, as a secondary use, a player who ALREADY has a
+  local AI server (llama-server, anything OpenAI-compatible) or an
+  OpenRouter key (theirs, or one we provide) pasting a URL or key to use a
+  stronger model for characters or world building. That must stay painless.
+  Not this project: scripts, installers or instructions for setting up a
+  back end, recommending models for back ends, or presenting a back end as
+  the way to get the "full" experience. Making someone install llama-server
+  negates the browser's convenience (at that point they would want a native
+  game). The local-helper tooling was removed on 2026-11-21 (llama-server
+  and Breeze scripts, `docs/LOCAL-HELPERS-PLAN.md`): do not bring it back.
 - **Not on rails for strong models.** Running nearly every character action
   in code suits the smallest models (Gemma 4 E2B) and is the fallback, not
   the goal. With the strongest model that runs in the browser on the
@@ -93,9 +97,6 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
   (done 2026-11-12; assets.md, Hosting). Hidden models still load from HF.
 - Walk-in buildings: checked in first person 2026-10-31 (roof kept as the
   ceiling); the watch tower, bell tower and windmill remain closed models.
-- Local helpers: `docs/LOCAL-HELPERS-PLAN.md` (Breeze PR
-  HoppouAI/Breeze-TTS-2.cpp#17 open; Windows scripts untested; R2 mirror
-  of LFM3 waits for the user).
 - Light dynamic props (chairs, stools, crates) can be flung across the map
   when a walker's path goes through their cell (an ANIMATED collider pushing
   them; seen 2026-11-01 in `uses-test.mjs`). Chests, anvils and cauldrons are
