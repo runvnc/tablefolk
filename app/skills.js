@@ -130,6 +130,8 @@
   const pkgLine = (name, c) => { const h = String(c.help || ''); const usage = c.usage || name + '()'; const line = h.startsWith(name + '(') ? h : `${usage}${h ? ' - ' + h : ''}`; return line + (c.example && !line.startsWith(c.example) ? ` e.g. ${c.example}` : ''); };
   function pkgAllowed(g, name) {
     const c = PKG[name]; if (!c || !g) return false;
+    // a command with its own test (agency.js do and plan: characters above rails only)
+    if (typeof c.allowed === 'function') { try { return !isPlayer(g) && !!c.allowed(g); } catch { return false; } }
     if (isPlayer(g)) return true;
     const listed = () => commandsFor(g).has(name) || [].concat(window.tablefolkJobs?.jobOf?.(g)?.commands || []).map(c => window.tablefolkRoles?.cmdName?.(c) ?? c).includes(name);
     if (c.allowedBy === 'listed') return listed();

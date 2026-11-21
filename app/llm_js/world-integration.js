@@ -609,7 +609,8 @@ function buildAgentMessages(world, g, cfg) {
   // goal) is in the state card (mind.js), so a small model isn't asked to
   // dig it out of a long history.
   // a big brain (mind.js tier "ambitious": 9B and up, online models) keeps twice as much
-  const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
+  // (and a character that decides for itself, agency.js guided or free)
+  const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' || (window.tablefolkAgency?.level?.(g) || 'rails') !== 'rails' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
   // The window moves 8 messages at a time, not one: a window sliding every
   // turn changed the prompt right after the system message, so the engine's
   // cached prefix (LiteRT, Bonsai) was lost each turn and the whole prompt
@@ -695,7 +696,8 @@ async function main() {
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.
   window.tablefolkLLM = localClient({
     // temperature 0 means greedy (the model's recommended sampling otherwise wins)
-    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, greedy: opts.temperature === 0, onToken: onToken ? t => onToken(t) : null }),
+    // (thinking: true asks a model that reasons to think first: agency.js plans and emergencies, a small budget)
+    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, greedy: opts.temperature === 0, enableThinking: !!opts.thinking, onToken: onToken ? t => onToken(t) : null }),
   }, { model: 'active-brain' });
   let running = false;
   let stepIndex = 0;
@@ -1069,7 +1071,9 @@ async function main() {
       const pnLow = (world.playerName?.() || document.getElementById('chatName')?.value || '').trim().toLowerCase();
       const fromPlayer = (cfg.pendingChat || []).some(l => pnLow && String(l).toLowerCase().startsWith(pnLow + ' says'));
       const crowded = !fromPlayer && !!window.tablefolkMind && world.state?.mind !== false && (busyNear(g.id) || isTalkedOut(g.id)) && !(cfg.pendingChat || []).some(l => activeConvos().some(c => (c.a === g.id || c.b === g.id) && String(l).startsWith((c.a === g.id ? c.b : c.a) + ' says')));
-      const muted = crowded || (!told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g));
+      // (above rails, agency.js guided and free: it may speak on its own initiative; only the floor rule holds)
+      const railsTalk = (window.tablefolkAgency?.level?.(g) || 'rails') === 'rails';
+      const muted = crowded || (railsTalk && !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g));
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
       const budgetQuiet = !spokenTo && cfg.quietTurns > 0, quiet = budgetQuiet || (muted && !chatTestMode);
@@ -1217,7 +1221,7 @@ async function main() {
       // sell(healing potion, 8)'): the commands are pulled out and run, and
       // only the quoted words are spoken when there are quotes (the rest is
       // narration). The history keeps the cleaned lines.
-      const others = allowedCmds().map(c => c === 'spell.fireball' ? 'fireball' : c === 'spell.lightning' ? 'lightning' : c).filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
+      const others = [...allowedCmds(), ...(window.tablefolkAgency?.commandsFor?.(g) || [])].map(c => c === 'spell.fireball' ? 'fireball' : c === 'spell.lightning' ? 'lightning' : c).filter(c => c !== 'say' && c !== 'whisper' && /^\w+$/.test(c));
       const embedded = others.length ? new RegExp('\\b(' + others.join('|') + ')\\(([^()]*)\\)', 'gi') : null;
       const histParts = [];
       const planCmds = planLines.flatMap(l => {
@@ -1583,7 +1587,7 @@ async function main() {
     while (!world.isTurnReady()) await sleep(100);
     await world.stepAgentTurn(g.id, cmd, source);
     while (!world.isTurnReady()) await sleep(100);
-    try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line, source } })); } catch {}
     return true;
   };
   // Run a character's workflow until it waits (for speech, for turns) or ends:

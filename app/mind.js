@@ -316,6 +316,7 @@
   let planning = false;
   async function planDay(g) {
     const m = mindOf(g), cfg = getBrainConfig(g.id);
+    if (aboveRails(g) && window.tablefolkJobs?.handles?.(g)) return;   // agency.js plans the day itself
     if (planning || reflecting || state.plans === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated || cfg.goal || cfg.quest) return;
     planning = true; m.lastPlanned = m.turn;
     try {
@@ -621,6 +622,16 @@
     const m = mindOf(g), a = m.angryAt[key], lv = angerLevel(a.v), was = a.level || 0;
     a.level = Math.max(was, lv);
     if (lv < 4 || was >= 4) return;
+    // above rails (agency.js guided, free): the top of the ladder is advice, not an act; the
+    // model is told it is furious and chooses (agency.js eventPick offers fight, order out,
+    // call for help, walk away, let it go; or attack(name) in a turn of its own)
+    if (aboveRails(g)) {
+      a.furious = true;
+      const cfg = getBrainConfig(g.id), name = nameOfKey(key);
+      setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] You are furious with ${name} (${a.why || 'they keep at you'}). What you do about it is up to you.`]).slice(-5) });
+      addMemory(g, `You were furious with ${name}.`, 2.5);
+      return;
+    }
     const cfg = getBrainConfig(g.id), t = temperament(cfg), name = nameOfKey(key), other = charOf(key);
     // already beaten down to a third of their health: not another fight, only the door
     if (fighterish(g) && beaten(key)) { a.orderedOut = true; a.level = 3; setBrainConfig(g.id, { pendingChat: (cfg.pendingChat || []).concat([`[event] ${name} is hurt and still insulting you. Tell them to get out; you will not fight them again.`]).slice(-5) }); return; }
@@ -639,6 +650,33 @@
     }
     void other;
   }
+  const aboveRails = g => { const l = window.tablefolkAgency?.level?.(g); return !!l && l !== 'rails'; };
+  // a quarrel the character chose (agency.js): the hard limits hold: one fight between
+  // characters at a time, none with someone already beaten down to a third; it ends
+  // there (standDown, endQuarrel). '' when it started, else why not.
+  function startFight(g, key) {
+    if (!tempersOn()) return 'tempers are off in this world';
+    const name = nameOfKey(key), o = charOf(key);
+    if (!o || o.defeated) return `${name} is not here`;
+    if (beaten(key)) return `${name} is already beaten down`;
+    if (key !== 'player' && state.ladderFight && !(state.ladderFight.a === g.id || state.ladderFight.b === g.id)) return 'another fight is going on';
+    if (key !== 'player') state.ladderFight = { a: g.id, b: key };
+    const m = mindOf(g); m.angryAt ||= {}; const a = m.angryAt[key] ||= { v: .85, level: 4, n: 0 };
+    a.hostile = true; a.furious = false;
+    setBrainConfig(g.id, { hostileTo: { ...(getBrainConfig(g.id).hostileTo || {}), [key]: Date.now() } });
+    addMemory(g, `You went for ${name}.`, 3);
+    return '';
+  }
+  // may it strike someone it is angry with? (app.js commandsFor adds attack): above rails, at level 3+
+  function mayFight(g) { return aboveRails(g) && tempersOn() && Object.values(mindOf(g).angryAt || {}).some(a => a.v >= .7); }
+  function calmDown(g, key, why) { calm(g, key, .4, why || `You let it go with ${nameOfKey(key)}`); const a = mindOf(g).angryAt?.[key]; if (a) a.furious = false; }
+  // its own attack(name) on someone it is furious with starts the quarrel (non-lethal, one at a time)
+  window.addEventListener('tablefolk-agent-turn', e => {
+    const g = state.characters.find(c => c.id === e.detail?.agentId); if (!g || !aboveRails(g)) return;
+    const t = String(e.detail?.line || '').match(/\battack\(\s*"?([^")]+)"?\s*\)/i); if (!t) return;
+    const key = keyOf(t[1].trim()), a = mindOf(g).angryAt?.[key];
+    if (a && a.v >= .7 && !getBrainConfig(g.id).hostileTo?.[key]) { const no = startFight(g, key); if (no) console.info('[mind]', g.id, 'no fight with', key + ':', no); }
+  });
   // a guard, a soldier, anyone who fights (role, commands, or a monster with a mind)
   function isProtector(c) {
     if (!c || c.defeated || getBrainConfig(c.id).defeated || window.tablefolkPlay?.isAnimal?.(c)) return false;
@@ -717,12 +755,14 @@
     try { window.tablefolkJobs?.addNews?.(g.id, how === 'ran' ? `${name} ran from ${g.id}` : `${g.id} beat ${name} in a quarrel`, 'quarrel'); } catch {}
   }
   // will it deal with them? (app.js sell, give, give_quest; trade)
-  function refuses(g, who) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn(); }
+  // (above rails the model decides whom it serves: only the deals code runs for it keep the refusal)
+  function refuses(g, who, byCode = false) { const a = mindOf(g).angryAt?.[keyOf(who)]; return !!a && angerLevel(a.v) >= 3 && tempersOn() && (byCode || !aboveRails(g)); }
   function temperLines(g) {
     const m = mindOf(g), out = [];
     for (const [key, a] of Object.entries(m.angryAt || {})) {
       const name = nameOfKey(key), lv = Math.min(a.level || 0, Math.max(angerLevel(a.v), a.hostile || a.orderedOut ? 4 : 0));
       if (lv >= 4 && a.hostile) out.push(`You are fighting ${name}: they pushed you too far. They can stop it by apologising.`);
+      else if (aboveRails(g) && lv >= 3) out.push(`You are furious with ${name} (${a.why || 'they keep at you'}). What you do about it is up to you: refuse to deal with them, order them out, call for help, walk away, or fight them with attack(${name}) (not to the death).`);
       else if (lv >= 4 && a.orderedOut) out.push(`Order ${name} out of here. If they insult or hit you again, call for help.`);
       else if (lv >= 4 && a.backAway != null) out.push(`${name} frightens you: keep away from them; you called for help.`);
       else if (lv >= 3) out.push(`You will not serve or help ${name} until they apologise.`);
@@ -978,10 +1018,12 @@
     const w = want(g), urgent = /^(stay safe|get your wounds|get away|tell .* attacked|let .* stand for)/.test(w);
     if (w && (urgent || !cfg.goal)) out.push('You want: ' + w + '.');
     if (cfg.goal) { const n = m.turn - m.goalTurn; out.push(`Current goal: ${cfg.goal}` + (n >= 6 ? ` (${n} turns on it: what is the next step?)` : '')); }
-    const mem = recall(g, { basic: 3, capable: 4, ambitious: 6 }[tier(g)]); if (mem.length) out.push('You remember: ' + mem.join(' | '));
+    const mem = recall(g, aboveRails(g) ? 6 : { basic: 3, capable: 4, ambitious: 6 }[tier(g)]); if (mem.length) out.push('You remember: ' + mem.join(' | '));
     const kn = facts(g); if (kn.length) out.push('You know: ' + kn.join(' | '));
     const rc = !danger.length && recipeLine(g); if (rc) out.push(rc);
     const gl = !danger.length && gossipLine(g); if (gl) out.push(gl);
+    // agency.js (guided, free): its notes, the day's plan, how its last activities went
+    out.push(...(window.tablefolkAgency?.cardLines?.(g) || []));
     out.push(...danger);
     return out;
   }
@@ -1077,5 +1119,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { insult, isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { startFight, mayFight, calmDown, fleeSpot, bestWeapon, insult, isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

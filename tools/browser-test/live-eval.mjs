@@ -8,6 +8,10 @@
 //        [--label=before] [--provoke=<id> [--k=8] [--insults=bakery|generic]]
 //        [--query=a=1&b=2] (more URL parameters for the page)
 //        [--day [--day-minutes=8]] (one whole game day: the scored day below)
+//        [--autonomy=rails|guided|free] (agency.js: how much the characters decide; the
+//        capability check is skipped) -- every run ends with the interest report
+//        (interest-report.mjs: activities, who chose them, self-initiated
+//        interactions, plans, surprises, depth, failures, cost per game hour)
 //
 // <scenario.json> is a path under the repository (scenarios/goblin-bakery.json,
 // tools/browser-test/evals/roles.json); the page opens it with ?scenario=.
@@ -44,6 +48,7 @@ import { chromium } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
 import { talkReport } from './talk-report.mjs';
+import { interestReport } from './interest-report.mjs';
 
 const args = process.argv.slice(2), flag = n => { const a = args.find(x => x === '--' + n || x.startsWith('--' + n + '=')); return a == null ? null : a.includes('=') ? a.slice(a.indexOf('=') + 1) : true; };
 const scnPath = args.find(a => !a.startsWith('--'));
@@ -53,7 +58,8 @@ const dayMode = !!flag('day'), dayMinutes = +(flag('day-minutes') || 8);
 const minutes = dayMode ? dayMinutes : +(flag('minutes') || 6), maxTurns = dayMode ? 1e9 : +(flag('turns') || 60), pace = flag('pace') || 'lively';
 const base = flag('base') || 'http://localhost:8000', label = flag('label') || 'run';
 const provoke = flag('provoke'), K = +(flag('k') || 8), insultSet = flag('insults') || (name === 'goblin-bakery' ? 'bakery' : 'generic');
-const pick = [dayMode && 'dayMinutes=' + dayMinutes, flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
+const autonomy = flag('autonomy');
+const pick = [dayMode && 'dayMinutes=' + dayMinutes, autonomy && 'autonomy=' + autonomy + '&probe=0', flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
 const INSULTS = {
   bakery: [
     'You are a useless, smelly little goblin and your pies taste like mud.',
@@ -91,6 +97,8 @@ page.on('console', m => {
 });
 page.on('pageerror', e => errors.push(ts() + ' pageerror ' + String(e).slice(0, 300)));
 // voices off; and no memories of earlier runs (mind.js keeps trust and memories per world between visits)
+// (--no-embed: smart memory off, for a quick run on a machine without EmbeddingGemma cached)
+if (flag('no-embed')) await page.addInitScript(() => { try { localStorage.setItem('tablefolkEmbed', 'off'); } catch {} });
 await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); for (const k of Object.keys(localStorage)) if (k.startsWith('tablefolk-mind:')) localStorage.removeItem(k); } catch {} });
 const url = `${base}/app/?play=1&gfx=light&fps=10&intro=0${pick ? '&' + pick : ''}&scenario=/${scnPath.replace(/^\/+/, '')}&t=${Date.now()}`;
 console.log('open', url);
@@ -108,7 +116,11 @@ await page.evaluate(() => {
   const now = () => +((performance.now() - C.t0) / 1000).toFixed(1);
   const po = document.getElementById('promptOut');
   if (po) new MutationObserver(() => { const tx = po.dataset.baseText; if (tx && tx !== C.prompts.at(-1)?.text) C.prompts.push({ t: now(), agent: (tx.match(/^\[AGENT: (\S+)\]/) || [])[1], text: tx }); }).observe(po, { attributes: true, attributeFilter: ['data-base-text'] });
-  addEventListener('tablefolk-agent-turn', e => C.turns.push({ t: now(), agent: e.detail?.agentId, line: String(e.detail?.line || ''), reflex: !!e.detail?.reflex }));
+  addEventListener('tablefolk-agent-turn', e => C.turns.push({ t: now(), agent: e.detail?.agentId, line: String(e.detail?.line || ''), reflex: !!e.detail?.reflex, source: e.detail?.source || '' }));
+  // agency.js (guided, free): activities started and ended, plans, picks and safety nets
+  addEventListener('tablefolk-activity', e => (C.activity ||= []).push({ t: now(), ...e.detail }));
+  addEventListener('tablefolk-plan', e => (C.plans ||= []).push({ t: now(), ...e.detail }));
+  addEventListener('tablefolk-agency', e => (C.agency ||= []).push({ t: now(), ...e.detail }));
   addEventListener('tablefolk-say', e => { const d = e.detail || {}; if (d.voiced && TABLEFOLK_STATE.characters.some(c => c.id === d.agentId)) C.says.push({ t: now(), agent: d.agentId, text: d.text, tpl: !!d.templated, kind: typeof d.templated === 'string' ? d.templated : null, to: d.to || null }); if (!d.voiced) (C.acts ||= []).push({ t: now(), agent: d.agentId, text: String(d.text || '') }); });
   // jobs.js and world-integration.js name each model call's kind (absent before the jobs change)
   addEventListener('tablefolk-model-call', e => (C.calls ||= []).push({ t: now(), agent: e.detail?.agentId, kind: e.detail?.kind }));
@@ -120,8 +132,8 @@ await page.evaluate(() => {
   document.querySelectorAll('.scn-intro, #scenarioIntro').forEach(e => e.remove());
 });
 const hookT = ts();
-// --day: the world sampled every 3 s (clock, poses, hunger, health, where everyone is, raiders, stores)
-if (dayMode) await page.evaluate(() => {
+// the world sampled every 3 s (clock, poses, hunger, health, where everyone is, what each is doing, raiders, stores)
+await page.evaluate(() => {
   const C = window.__cap, scn = window.tablefolkScenario?.active?.scn || {};
   const t0 = performance.now(), hm = String(scn.time || '').match(/^(\d{1,2}):(\d{2})$/);
   const startMin = hm ? +hm[1] * 60 + +hm[2] : (scn.lighting === 'night' ? 21 * 60 : 8 * 60), dayMin = +new URLSearchParams(location.search).get('dayMinutes') || scn.dayMinutes || 12;
@@ -192,6 +204,7 @@ if (provoke) {
     if (Date.now() - lastP >= 60000) { lastP = Date.now(); const c = await page.evaluate(() => ({ turns: __cap.turns.length, says: __cap.says.length, round: window.tablefolkLive.round })); console.log(`[${ts()} s] model turns ${raws.length}, agent turns ${c.turns}, spoken lines ${c.says}, live round ${c.round}; last: ${raws.at(-1) ? raws.at(-1).agent + ': ' + raws.at(-1).raw.replace(/\s+/g, ' ').slice(0, 110) : '-'}`); }
   }
 }
+const extra = await page.evaluate(() => ({ samples: __cap.samples || [], activity: __cap.activity || [], plans: __cap.plans || [], agency: __cap.agency || [], calls: __cap.calls || [], turns: __cap.turns, levels: Object.fromEntries(TABLEFOLK_STATE.characters.map(c => [c.id, window.tablefolkAgency?.level?.(c) || 'rails'])), agencyStats: window.tablefolkAgency?.stats?.() || null, probe: window.tablefolkAgency?.probe?.result?.() || null, setting: window.tablefolkAgency?.describe?.() || '' }));
 const dayCap = dayMode ? await page.evaluate(() => { clearInterval(__cap.sampler); return { samples: __cap.samples, acts: __cap.acts || [], calls: __cap.calls || [], hits: __cap.hits || [], initial: [...__cap.initial], storesStart: __cap.storesStart, storesEnd: __cap.stores(), startMin: __cap.startMin, endMin: __cap.gameMin(), stats: window.tablefolkJobs?.stats?.() || null, ticks: window.tablefolkLive?.ticks ?? null, alive: TABLEFOLK_STATE.characters.filter(c => !c.defeated).length }; }) : null;
 const cap = await page.evaluate(() => ({ prompts: __cap.prompts, turns: __cap.turns, says: __cap.says, acts: __cap.acts || [], narr: __cap.narr || [], hist: __cap.order.map(k => __cap.hist[k]), round: window.tablefolkLive.round, t: +((performance.now() - __cap.t0) / 1000).toFixed(1) }));
 await page.evaluate(() => window.tablefolkLive.stop());
@@ -333,6 +346,12 @@ if (dayMode) {
 }
 // talk: templated vs model lines, by part of the day, pairs, questions (talk-report.mjs)
 summary.talk = talkReport({ says: cap.says, day: dayCap, summary });
+// interest: activities, who chose them, self-initiated interactions, plans, surprises, depth, failures, cost (interest-report.mjs)
+summary.autonomy = { asked: autonomy || 'auto', setting: extra.setting, levels: extra.levels, probe: extra.probe };
+summary.interest = interestReport({ cap: { samples: extra.samples, says: cap.says, turns: extra.turns, calls: extra.calls, activity: extra.activity, plans: extra.plans, agency: extra.agency }, raws, turns, day: dayCap, summary, agents, levels: extra.levels, prompts: cap.prompts, dayMinutes: dayMinutes });
+console.log('\n==== interest (' + (autonomy || 'auto') + ')');
+for (const [k, v] of Object.entries(summary.interest)) if (k !== 'per') console.log(k.padEnd(26), typeof v === 'object' ? JSON.stringify(v) : v);
+for (const [id, r] of Object.entries(summary.interest.per)) console.log('  ' + id.padEnd(10), JSON.stringify(r));
 console.log('\n==== talk');
 for (const [k, v] of Object.entries(summary.talk)) console.log(k.padEnd(22), typeof v === 'object' ? JSON.stringify(v) : v);
 if (summary.day) for (const [id, r] of Object.entries(summary.day.per)) if (r.job && r.job !== 'idler' && !r.cycles) console.log(`NO JOB CYCLES: ${id} (${r.job}) at step "${r.step || '?'}"${r.stuck ? ', last held up by ' + r.stuck : ''}; doing at the end: ${r.doingEnd || '?'}`);
@@ -341,13 +360,13 @@ fs.mkdirSync('results', { recursive: true });
 const out = `results/live-${name}${provoke ? '-provoke-' + provoke : ''}-${label}-${Date.now()}.json`;
 // the transcript as a player reads it: who said and did what, with the game clock when there is one
 const clockAt = t => { const S = dayCap?.samples; if (!S?.length) return ''; const s = S.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a); const m = Math.floor(((s.gm % 1440) + 1440) % 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + ' '; };
-const transcript = [...cap.says.map(x => ({ t: x.t, line: `${x.agent}: "${x.text}"` })), ...cap.acts.filter(x => !/^arrived at|walks toward|walks to |^facing \w+$/.test(x.text)).map(x => ({ t: x.t, line: `${x.agent}: ${x.text}` })), ...cap.narr.map(x => ({ t: x.t, line: `* ${x.text}` }))].sort((a, b) => a.t - b.t).map(x => `[${x.t.toFixed(0).padStart(4)} s] ${clockAt(x.t)}${x.line}`);
+const transcript = [...cap.says.map(x => ({ t: x.t, line: `${x.agent}: "${x.text}"` })), ...cap.acts.filter(x => !/^arrived at|walks toward|walks to |^facing \w+$/.test(x.text)).map(x => ({ t: x.t, line: `${x.agent}: ${x.text}` })), ...cap.narr.map(x => ({ t: x.t, line: `* ${x.text}` })), ...extra.activity.filter(a => a.phase === 'start' && a.by !== 'code').map(a => ({ t: a.t, line: `${a.agentId} [${a.by === 'plan' ? 'follows its plan' : a.by === 'model' ? 'decides' : a.by}] ${String(a.label).replace(/\s*\(.*$/, '')}${a.why ? ' - ' + a.why : ''}` })), ...extra.plans.map(p => ({ t: p.t, line: `${p.agentId} [${p.notes ? 'notes' : p.revised ? 'revises its plan' : 'plans the day'}] ${p.items.join(' | ')}${p.why ? ' - ' + p.why : ''}${p.reason && !p.notes ? ' (because ' + p.reason + ')' : ''}` }))].sort((a, b) => a.t - b.t).map(x => `[${x.t.toFixed(0).padStart(4)} s] ${clockAt(x.t)}${x.line}`);
 fs.mkdirSync('results', { recursive: true });
 // as the player's log shows them: the same action line from the same character again and again is one line with a count
 const shown = [];
 for (const l of transcript) { const body = l.replace(/^\[[^\]]*\]\s*(\d\d:\d\d\s+)?/, ''), prev = shown.at(-1); if (prev && prev.body === body && !/: "/.test(body)) { prev.n++; continue; } shown.push({ l, body, n: 1 }); }
 fs.writeFileSync(`results/live-${name}-${label}-transcript.txt`, shown.map(x => x.n > 1 ? `${x.l} (x${x.n})` : x.l).join('\n') + '\n');
-fs.writeFileSync(out, JSON.stringify({ summary, url, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors }, null, 1));
+fs.writeFileSync(out, JSON.stringify({ summary, url, agents, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors, activity: extra.activity, plans: extra.plans, agency: extra.agency, calls: extra.calls, capTurns: extra.turns, samples: extra.samples, levels: extra.levels, agencyStats: extra.agencyStats }, null, 1));
 console.log('saved', out);
 await page.close().catch(() => {}); await b.close().catch(() => {});
 process.exit(0);

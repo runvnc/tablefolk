@@ -18,6 +18,9 @@
  * voiced like any line, kept in the speaker's own history as say("...") and
  * told to those in earshot as heard (no answer asked, no model call). They
  * hold no conversational floor (tablefolk-say carries templated: true).
+ * Above rails (agency.js guided and free autonomy) only the deal kinds are
+ * said (sale, thanks, ask_food, share_food, refuse_food, help): the rest is
+ * the model's to say or not.
  *
  *   window.tablefolkChatter = { say(g, kind, slots, { to, force }), add(pools, from), reset(), pools, voiceOf, greetTick }
  * Loaded after jobs.js; uses app.js globals (state, getBrainConfig).
@@ -27,6 +30,8 @@
   const PKG = [];             // [{ from, pools }] from packages (reset with the scenario)
   const GAP = 20000, URGENT_GAP = 6000;
   const URGENT = new Set(['raid', 'raid_fighter', 'intruder', 'allclear']);
+  // transactions code carries out (a sale, thanks, food asked for and shared or refused, materials brought)
+  const DEALS = new Set(['sale', 'thanks', 'ask_food', 'share_food', 'refuse_food', 'help']);
   // kinds a whole village says at once (bedtime): one of them every so often, from anyone
   const KIND_GAP = { bed: 15000, wake: 15000, allclear: 30000, raid: 4000 }, kindAt = {};
   const W = () => window.tablefolk, P = () => window.tablefolkPlay, M = () => window.tablefolkMind;
@@ -88,6 +93,8 @@
   function say(g, kind, slots = {}, { to = null, force = false } = {}) {
     if (!mindful(g) || state.mind === false) return false;
     if (W().getBrainConfig(g.id)?.enabled === false) return false;
+    // above rails (agency.js guided, free) the model speaks for itself: only the words of a deal code carries out
+    const lvl = window.tablefolkAgency?.level?.(g); if (lvl && lvl !== 'rails' && !DEALS.has(kind)) return false;
     if (g.pose?.mode === 'lie' && kind !== 'intruder') return false;
     const now = performance.now(), c = g._chatter ||= { at: -1e9, last: '', byKind: {} };
     if (!force && now - c.at < (URGENT.has(kind) ? URGENT_GAP : GAP)) return false;

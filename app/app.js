@@ -3384,7 +3384,7 @@ function allowedFor(g){ const own=g?.id!=null && state.brainConfigs.get(g.id)?.a
 // What it may run: its list, plus the mind commands (mind.js) for characters.
 // Dragons breathe fire whatever the scenario allows (spells.js breathe_fire)
 const DRAGON_BODIES=new Set(['red_dragon','dragon','wyrmling']);
-function commandsFor(g){ let s=allowedFor(g); if(g && DRAGON_BODIES.has(g.charModel) && !s.has('spell.firebreath')) s=new Set([...s,'spell.firebreath']); /* mind.js tempers: pushed too far, it may strike the one it fights */ if(g && g!==state.playerAvatar && state.brainConfigs.get(g.id)?.hostileTo && !s.has('attack')) s=new Set([...s,'attack']); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
+function commandsFor(g){ let s=allowedFor(g); if(g && DRAGON_BODIES.has(g.charModel) && !s.has('spell.firebreath')) s=new Set([...s,'spell.firebreath']); /* mind.js tempers: pushed too far, it may strike the one it fights */ if(g && g!==state.playerAvatar && (state.brainConfigs.get(g.id)?.hostileTo || window.tablefolkMind?.mayFight?.(g)) && !s.has('attack')) s=new Set([...s,'attack']); if(!g || g===state.playerAvatar) return s; const role=[...(window.tablefolkRoles?.commands(g)||[]),...(window.tablefolkSkills?.allowedBy(g)||[])]; const mind=(state.mind===false || !window.tablefolkMind)?[]:MIND_COMMANDS; return (role.length||mind.length)?new Set([...s,...role,...mind]):s; }
 function canRun(kind,spell,g=null){ if(kind==='skill') return true; /* skills.js checks the character has it */ const key=kind==='spell'?'spell.'+spell:kind; return commandsFor(g).has(key); }
 // A command a character may not run, or one that makes no sense: the player
 // hears it; a model-run character's goes only into its own history (its next
@@ -4657,6 +4657,9 @@ function buildAgentPrompt(g, cfg) {
     // reasoning models (LFM3 1.7B) otherwise spend hundreds of tokens per turn
     ...(getBrainConfig(g.id).thinking === true ? ['Keep your thinking short: a few sentences on what is happening and what you will do, then stop. Do not overthink; this is one small turn. Your reply after thinking is commands only, as above.'] : []),
     'Talk like a real person: one or two short sentences at a time.',
+    // agency.js (guided, free autonomy): how the world works and that it decides for itself;
+    // nothing for characters on rails (the small brains' prompt stays as it was)
+    ...(window.tablefolkAgency?.systemLines?.(g) || []),
     '',
     `Character: ${g.id}`,
     ...(style ? [`Style: ${style}`] : []),
@@ -4693,6 +4696,8 @@ function buildAgentPrompt(g, cfg) {
     // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
     ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
+    // agency.js (guided, free): the time, the activities it may start with do(...), what it set out to do this turn
+    ...(window.tablefolkAgency?.promptLines?.(g) || []),
     // a turn the game chose to think on (mind.js thinkNow): at the end, so the
     // cached prefix stays the same whether it thinks or not
     ...(cfg.thinking !== true && window.tablefolkMind?.thinkNow?.(g) ? ['This turn matters: think it through briefly (a few sentences), then stop. Your reply after thinking is commands only, as above.'] : []),
