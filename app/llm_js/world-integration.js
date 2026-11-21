@@ -698,7 +698,10 @@ async function main() {
   // returned and the living world stalled (Gemma 4 12B and Bonsai 2 27B on an RTX 3090, 2026-11-21)
   { const decide = manager.decide.bind(manager); let chain = Promise.resolve();
     // (window.tablefolkDecideSecs: the model's own seconds per call, without the wait: agency.js budgets turns by it)
-    manager.decide = agent => { const p = chain.then(() => { const t0 = performance.now(); return decide(agent).finally(() => { const a = window.tablefolkDecideSecs ||= []; a.push((performance.now() - t0) / 1000); if (a.length > 30) a.shift(); }); }); chain = p.catch(() => {}); return p; }; }
+    // (a call that never comes back, Gemma 4 12B on LiteRT with an above-rails prompt, is given up after
+    // two minutes: the caller gets an error and the world goes on instead of stopping for good)
+    const GIVE_UP = 120000;
+    manager.decide = agent => { const p = chain.then(() => { const t0 = performance.now(); return Promise.race([decide(agent), new Promise((_, no) => setTimeout(() => no(new Error('the model did not answer in 2 minutes')), GIVE_UP))]).finally(() => { const a = window.tablefolkDecideSecs ||= []; a.push((performance.now() - t0) / 1000); if (a.length > 30) a.shift(); }); }); chain = p.catch(() => {}); return p; }; }
   installDevConsole(() => manager);
   // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.
