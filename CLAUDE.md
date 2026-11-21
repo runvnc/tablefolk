@@ -45,8 +45,13 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - **The browser is the product.** Models that run in the browser, with no
   install, are what Tablefolk is for. Try hard to get a promising model
   running in the browser on a 12 GB or 16 GB machine before anything else.
-- **Back ends: connect, never install.** Supported and wanted: E2B and E4B
-  in the browser first; and, as a secondary use, a player who ALREADY has a
+- **Getting past E2B/E4B in the browser is a main goal.** E2B and E4B stay
+  supported as the floor, but the aim is the strongest model that can run in
+  the browser (Bonsai 2, Raon-1 nano, Gemma 4 12B, whatever comes next) and
+  characters that use it to the full (see "Not on rails" below). Keep
+  looking for, adding and measuring stronger in-browser models.
+- **Back ends: connect, never install.** In-browser models come first; as a
+  secondary use, a player who ALREADY has a
   local AI server (llama-server, anything OpenAI-compatible) or an
   OpenRouter key (theirs, or one we provide) pasting a URL or key to use a
   stronger model for characters or world building. That must stay painless.
