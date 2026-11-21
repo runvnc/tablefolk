@@ -73,7 +73,7 @@
     ['packages.js?v=20261120i'],
     ['embed.js?v=20261115c'],
     ['books.js?v=20261115f'],
-    ['mind.js?v=20261121a'],
+    ['mind.js?v=20261121b'],
     ['uses.js?v=20261120h'],
     ['roles.js?v=20261120c'],
     ['play.js?v=20261120e'],

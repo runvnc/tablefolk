@@ -262,12 +262,6 @@
     const cfg = g ? getBrainConfig(g.id) : {}, set = cfg.expect || state.expect;
     if (TIERS.includes(set)) return set;
     const k = String(window.tablefolkBrainInfo?.()?.key || '');
-    // a small model behind an endpoint (Raon-1 nano on llama-server) is still small
-    if (k === 'endpoint') {
-      let em = new URLSearchParams(location.search).get('llmModel');
-      try { em ||= JSON.parse(localStorage.getItem('tablefolk_llm_endpoint') || '{}')?.model; } catch {}
-      if (/raon[-_ ]?1[-_ ]?nano/i.test(em || '')) return 'basic';
-    }
     if (/endpoint|12b|26b|27b|31b|9b/i.test(k)) return 'ambitious';
     if (/e4b/i.test(k)) return 'capable';
     return 'basic';
