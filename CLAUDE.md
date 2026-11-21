@@ -40,6 +40,29 @@ and everything users see: `plugins/tablefolk-scenario/skills/tablefolk-scenario/
 - Record the user's request batches in `docs/REQUESTS.md` when asked; log
   changes in `CHANGELOG.md`, never in the README.
 
+## What this project is, and is not (2026-11-21, from the owner)
+
+- **The browser is the product.** Models that run in the browser, with no
+  install, are what Tablefolk is for. Try hard to get a promising model
+  running in the browser on a 12 GB or 16 GB machine before anything else.
+- **Back-end servers are not this project.** Tablefolk accepts llama-server
+  and any OpenAI-compatible endpoint, and that is all: no scripts that
+  install or run a back end for a model, no recommending models for back
+  ends, no evals or docs built around "run this server". Someone who can set
+  up their own back end does not need us to. Do not add to the local-helper
+  tooling (`tools/llama-server.*`, `docs/LOCAL-HELPERS-PLAN.md`); ask before
+  removing what exists.
+- **Not on rails for strong models.** Running nearly every character action
+  in code suits the smallest models (Gemma 4 E2B) and is the fallback, not
+  the goal. With the strongest model that runs in the browser on the
+  player's machine (Bonsai 2, Raon-1 nano, Gemma 4 E4B/12B, whatever comes),
+  characters should decide and act for themselves as far as the model can
+  carry it: an autonomy level per brain, scenario or character.
+- **Do not design to the maintainer's old laptop** (RTX 2060, 6 GB, 16 GB
+  RAM). Develop and measure for capable consumer hardware; rent a GPU
+  (vast.ai, key in `.env`) to test what the laptop cannot run, and keep the
+  laptop's own load light: the owner works on it.
+
 ## Public site (2026-11-09)
 
 - tablefolk.world is a Cloudflare Worker with static files (`cloud/`):
