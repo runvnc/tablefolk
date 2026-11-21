@@ -873,8 +873,9 @@ residual, no positional encoding, a 259,840-word vocabulary; Korean and
 English; Apache-2.0).
 
 **The 4-bit LiteRT-LM bundle in the browser** (`raon1-nano-litert`,
-`KRAFTON/Raon-1-nano-litert-lm/model.litertlm`, 1.82 GB, sha256 8f8ab92b...,
-from Hugging Face: not on R2). It runs on the LiteRT-LM web library the game
+`KRAFTON/Raon-1-nano-litert-lm/model.litertlm`, 1.82 GB, sha256 8f8ab92b...;
+mirrored on R2 since 2026-11-21 at the pinned revision 54312d3, Hugging Face as
+the fallback: assets.md, Hosting). It runs on the LiteRT-LM web library the game
 already uses (0.19.0): no upgrade, no template work. The bundle (file format
 1.7.0, `tf_lite_prefill_decode`, linear-attention state buffers) carries its
 ChatML template (a system role, an empty `<think></think>` before the

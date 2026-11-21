@@ -115,14 +115,16 @@ const MODEL_CONFIG = {
   // KRAFTON's Raon-1 nano (3.2B dense, 1.6B of it a per-layer embedding
   // table; gated delta-rule linear attention + MLA; Korean and English;
   // Apache-2.0): their own 4-bit bundle, 1.82 GB, built for a 4,096-token
-  // context and answering without thinking. Not mirrored on R2 (Hugging Face).
+  // context and answering without thinking. Mirrored on R2 (same bytes, sha256
+  // 8f8ab92b..., copied by tools/r2-copy 2026-11-21) at the pinned Hugging Face
+  // revision; Hugging Face is the fallback.
   // maxTokens: the engine's window (the bundle's own; 8192 is the default);
   // charBudget: system + history + the new prompt + room for the answer, in
   // characters (prefaceMessages), so a turn fits that window.
   'raon1-nano-litert': {
     label: 'Raon-1 nano (LiteRT-LM)',
-    modelUrl: 'https://huggingface.co/KRAFTON/Raon-1-nano-litert-lm/resolve/main/model.litertlm',
-    fallbackUrl: 'https://huggingface.co/KRAFTON/Raon-1-nano-litert-lm/resolve/main/model.litertlm',
+    modelUrl: 'https://geebr-models.mindroot.io/litert/hf/KRAFTON/Raon-1-nano-litert-lm/resolve/54312d339f6ed417257a166055fcb130a6dbf80e/model.litertlm',
+    fallbackUrl: 'https://huggingface.co/KRAFTON/Raon-1-nano-litert-lm/resolve/54312d339f6ed417257a166055fcb130a6dbf80e/model.litertlm',
     vram: '~2 GB',
     maxTokens: 4096,
     charBudget: 10500,

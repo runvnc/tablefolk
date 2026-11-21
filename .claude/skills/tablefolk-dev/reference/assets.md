@@ -344,7 +344,13 @@ from the four hostnames. The speech model is under `underdog-bark-3.0/`
 Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader
 trying R2 first and Hugging Face as the fallback: `qwen1_5-0_5b-chat-q4_0.gguf`
 (the Oracle's Qwen1.5), `gemma-4-E2B-it.litertlm` (Gemma E2B with sight) and
-`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B). Pocket-TTS's models
+`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B), and Raon-1
+nano's 4-bit LiteRT-LM bundle (2026-11-21, `tools/r2-copy/`, 1.82 GB in 78 s,
+sha256 8f8ab92b...) at
+`litert/hf/KRAFTON/Raon-1-nano-litert-lm/resolve/54312d339f6ed417257a166055fcb130a6dbf80e/model.litertlm`
+(Hugging Face's layout at the pinned revision; `litert-worker.js` falls back to
+that revision on Hugging Face; the OPFS copy is keyed by the model's name, so
+one cached from Hugging Face stays in use). Pocket-TTS's models
 too, under `pocket-tts/web/` (KevinAHM/pocket-tts-web: `onnx/<language>/`
 for the five languages, `sentencepiece.js`, its README and licences) and
 `pocket-tts/18m/` (maxime/pocket-tts-18m-onnx, `english_18m_refl_2026-10/`);

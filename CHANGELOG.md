@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-21
 
+- **Raon-1 nano downloads from our mirror**: its 1.8 GB model now comes from the same fast mirror as Gemma 4 E2B on tablefolk.world, with Hugging Face as the fallback.
+
 - **Characters can decide for themselves**: a new setting, "How much do characters decide for themselves?" (Settings): Auto, On rails, Guided, Free; also `"autonomy"` on a world or a character. Guided characters choose each next activity from what the world offers and plan their day; free ones act on their own turns with `do(...)` and keep notes with `plan(...)`. Raids and tempers become choices; they speak on their own initiative. Auto picks the level from a short capability check of the brain on this device.
 
 - **No more local helpers**: the scripts that installed and started llama.cpp's server and the Breeze TTS server on the player's computer are gone, with the "find helpers on this computer" buttons, the Breeze server option in the Voice pane (a saved choice of it falls back to the default voice), the game server's Breeze auto-start and the endpoint presets for servers on your own machine. Tablefolk runs in the browser; a player who already has an AI server or an OpenRouter key still pastes its address or key in the endpoint panel or the world builder, and Breeze TTS 2 still runs in the browser.
