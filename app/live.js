@@ -136,7 +136,8 @@
   // the next one due: someone with something to answer first (after a short
   // pause), then whoever's time has come
   function due() {
-    const now = performance.now(), all = state.characters.filter(alive);
+    // (a character whose turn runs on its own, above rails, waits for it: agency.js)
+    const now = performance.now(), all = state.characters.filter(alive).filter(c => !c._turnRunning);
     for (const c of all) if (!nextAt.has(c)) schedule(c, true);
     const quietOk = now - lastSpeechAt >= P0().quiet * 1000 * tempo();
     // even an answer waits a little after the last line (a third of the quiet gap)
@@ -176,7 +177,7 @@
       const hostile = P()?.isHostile?.(c), mind = !hostile || P()?.talksToo?.(c), why = reason(c);
       const pendBefore = JSON.stringify(getBrainConfig(c.id).pendingChat || []);
       const J = window.tablefolkJobs, jobbed = !hostile && !P()?.isAnimal?.(c) && !!J?.handles?.(c);
-      let next = null;
+      let next = null, asyncTurn = false;
       try {
         if (hostile && !mind) await monsterTurn(c);
         else if (P()?.isAnimal?.(c)) await animalTurn(c);
@@ -189,15 +190,22 @@
         else if (!why && Math.random() < P0().idle) await idle(c);
         else {
           if (hostile || P()?.hostileTarget?.(c)) await monsterTurn(c);
-          status(`${c.id} is thinking…`);
-          await w.runAgentTurn(c);
+          // above rails (agency.js guided, free) its turn runs without holding up everyone else's:
+          // a 12B's 10-30 s answers froze the whole village while it waited (RTX 3090, 2026-11-21)
+          if (jobbed && (window.tablefolkAgency?.level?.(c) || 'rails') !== 'rails') {
+            asyncTurn = true; c._turnRunning = true;
+            w.runAgentTurn(c).catch(e => console.warn('[live]', c.id, e)).finally(() => { c._turnRunning = false; });
+          } else {
+            status(`${c.id} is thinking…`);
+            await w.runAgentTurn(c);
+          }
         }
       } catch (e) { console.warn('[live]', c.id, e); }
       // A turn that did not take in what was waiting for it (a monster, an
       // animal, a skipped turn) must not leave it "pending" for good: due()
       // serves pending characters first, and nobody else got a turn.
       { const cfg = getBrainConfig(c.id), now = JSON.stringify(cfg.pendingChat || []);
-        if (now !== '[]' && now === pendBefore) { cfg.pendingChat = []; console.info('[live] cleared what', c.id, 'never took in'); } }
+        if (!asyncTurn && now !== '[]' && now === pendBefore) { cfg.pendingChat = []; console.info('[live] cleared what', c.id, 'never took in'); } }
       status('');
       schedule(c, false, next);
       try { window.tablefolkDirector?.tick?.(c); } catch (e) { console.warn('[director]', e); }

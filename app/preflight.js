@@ -76,7 +76,7 @@
     ['roles.js?v=20261120c'],
     ['play.js?v=20261120e'],
     ['animals.js?v=20261114c'],
-    ['live.js?v=20261120g'],
+    ['live.js?v=20261121a'],
     ['director.js?v=20261120c'],
     ['clock.js?v=20261120c'],
     ['jobs.js?v=20261121b'],
