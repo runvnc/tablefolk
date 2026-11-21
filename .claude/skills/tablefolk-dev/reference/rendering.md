@@ -581,6 +581,19 @@ village light 6.5 / 3.6 / 149; medium 8.4 / 5.1 / 247. Start-up, warm cache
 (world active / fully dressed, s): hearthvale light main 5.3 / 9.3, now 5.5 /
 10.2; the Oracle 3.8 / 6.6 vs 3.8 / 7.3; goblin-bakery 3.3 / 5.1 vs 4.5 / 6.4.
 
+After pass 4 (2026-11-21, `profile.mjs` QUICK, SETTLE=40 s, 1920x1080,
+the machine busy with another job: +-1-2 ms): the Oracle light 3.8 ms CPU,
+gpu 4.6, lat 1.7, 131 draws; medium 6.5 / 5.7 / 2.6 / 245; market village
+light 5.0 / 4.8 / 2.7 / 119; medium 10.9 / 5.5 / 6.6 / 208 (8.4 in pass 3:
+the hedgerows' instances and noise). GPU process memory at light, fresh
+Chrome, 35 s: the Oracle 426 MiB, market village 866-891, hearthvale 1181.
+Hearthvale without the surroundings, the ground cover or the terrain's
+texture arrays: no change beyond 10 MiB. Its textures add up to ~330 MB, half
+of it the characters' own (each Meshy body one 2048 texture, 21 MB with
+mips; the Quaternius peasant 59 MB); 1.9 M vertices. The cheapest big
+saving left: 1k copies of the character bodies for light (as
+`critter_rigged.1k.glb`), not done.
+
 The extra draw calls are the shadow pass (every caster again), the
 real-model trees (several meshes each), the ground cover kinds and the
 surroundings' tree meshes. Without the shadow map the market village at
