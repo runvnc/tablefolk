@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-21
 
+- **Inkling 2 Mini tried in the browser, not yet**: Thinking Machines' new 26B model ran in Chrome on a rented RTX 4090 with good answers, but it needs 19 GB of graphics memory, writes only 7-8 tokens a second and always thinks first, so a turn takes 15-60 s. Not offered; the trial build is in `tools/wllama-inkling/`.
+
 - **Assisted, and autonomy by decision**: a new choice, Assisted: characters choose what to do, plan and talk, while the game keeps them fed, in bed at night and safe in a raid. Underneath, each of six decisions (activity, plan, talk, danger, needs, temper) is made by the game or the model; a world or character can set them one by one (`{"preset": "guided", "danger": "code"}`), and Auto keeps in code what the brain failed in its capability check. A character that keeps failing to eat or get to bed is helped by the game for a while; smaller brains see shorter menus.
 
 - **Raon-1 nano downloads from our mirror**: its 1.8 GB model now comes from the same fast mirror as Gemma 4 E2B on tablefolk.world, with Hugging Face as the fallback.

@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Inkling wllama test</title></head>
+<body><pre id="log"></pre>
+<script type="module">
+// Trial page (brains.md, "Inkling 2 Mini"): served from the wllama checkout
+// (MULTITHREAD=1 node scripts/http_server.js), the GGUF beside it as m.gguf.
+// ?ub=2048&fa=1&ctx=8192&effort=0&n=64. Results go to the console as "INK {...}".
+import { Wllama } from '/esm/index.js';
+const q = new URLSearchParams(location.search);
+const out = (o) => { const s = 'INK ' + JSON.stringify(o); console.log(s); document.getElementById('log').textContent += s + '\n'; };
+const names = ['rosa', 'tam', 'odo', 'maren', 'hector', 'brann', 'jory', 'wren'];
+const lines = [];
+const p2 = (n) => String(n).padStart(2, '0');
+for (let i = 0; i < 70; i++) {
+  lines.push(`[${p2(8 + Math.floor(i / 6))}:${p2((i * 7) % 60)}] ${names[i % 8]} walks to the well near the bakery, looks at the apples in the cart, ` +
+    `and says to ${names[(i + 3) % 8]}: "The harvest is thin this year; bread costs ${2 + i % 4} gold now."`);
+}
+const system = 'You are Greta, the innkeeper of Hearthvale. You are warm but drive a hard bargain. Stew costs 5 gold; never sell under 4. ' +
+  'Answer with one action: say("..."), give(item, name), walk(place) or wait(). Keep it under 30 words.\n\nWhat happened today:\n' + lines.join('\n');
+const SHORT = q.get('short') === '1';
+const users = SHORT ? ['Player: What is 2+3? Answer with say("...").'] : ["Player (wren): Greta, I'd like a bowl of stew. Will you take 3 gold?",
+  'Player (wren): Fine. What about 4 gold, and you tell me the news?',
+  'Player (tam): Greta! Did you see the crows in the orchard?'];
+try {
+  const w = new Wllama({ default: '/src/wasm/wllama.wasm' });
+  const t0 = performance.now();
+  let lastPct = -10;
+  await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
+    n_ctx: +(q.get('ctx') || 8192), n_batch: +(q.get('ub') || 2048), n_ubatch: +(q.get('ub') || 2048),
+    flash_attn: q.get('fa') === '0' ? false : true, n_gpu_layers: 999,
+    progressCallback: ({ loaded, total }) => { const p = Math.floor(100 * loaded / total); if (p >= lastPct + 10) { lastPct = p; out({ dl: p, s: ((performance.now() - t0) / 1000).toFixed(1) }); } },
+  });
+  out({ loaded_s: ((performance.now() - t0) / 1000).toFixed(1) });
+  if (q.get('raw') === '1') { // plain completion: is the output sane at all?
+    const t = performance.now();
+    const r = await w.createCompletion({ prompt: 'The capital of France is Paris. The capital of Germany is', max_tokens: 6, temperature: 0 });
+    out({ raw_s: ((performance.now() - t) / 1000).toFixed(2), text: r.choices?.[0]?.text, timings: r.timings });
+  }
+  const eff = q.get('effort') ?? '0';
+  for (const u of users) {
+    const t = performance.now();
+    let raw = '', tm = {}; const chunks = [];
+    try { await w.createChatCompletion({
+      messages: [{ role: 'system', content: SHORT ? 'You are Greta, an innkeeper.' : system }, { role: 'user', content: u }],
+      stream: true, onData: (c) => { const d = c.choices?.[0]?.delta || {}; raw += (d.reasoning_content || '') + (d.content || ''); if (chunks.length < 3) chunks.push(JSON.stringify(c).slice(0, 300)); if (c.timings) tm = c.timings; },
+      max_tokens: +(q.get('n') || 64), temperature: 0.2, cache_prompt: true,
+      chat_template_kwargs: { reasoning_effort: isNaN(+eff) ? eff : +eff },
+    }); } catch (e) { out({ call_error: String(e).slice(0, 200) }); }
+    out({ wall_s: ((performance.now() - t) / 1000).toFixed(2), prompt_n: tm.prompt_n, cache_n: tm.cache_n,
+      prompt_tps: tm.prompt_per_second?.toFixed(1), gen_n: tm.predicted_n, gen_tps: tm.predicted_per_second?.toFixed(1),
+      text: raw.slice(0, 400), chunks });
+  }
+  out({ done: true });
+} catch (e) { out({ error: String(e?.stack || e) }); }
+</script></body></html>

@@ -1009,6 +1009,60 @@ prefill 14 tokens/s, decode 1.7, 162 s to start.
 Mirroring the 1.82 GB bundle on R2 (`assets.md`, Hosting) is pending the
 owner's OK.
 
+## Inkling 2 Mini (Thinking Machines, trial 2026-11-21): not yet
+
+26.4B looped MoE (128 experts, 8 active; layers 6-17 run 3 times a token, so
+~12,000 graph nodes a token), Apache-2.0, released 2026-11-20. Upstream
+llama.cpp runs it since 690b87d (#32704). A go/no-go trial on a rented
+RTX 4090 24 GB (vast.ai, driver 595, Chrome 158, the linux-desktop image),
+~1 hour, ~$0.55. Not in the picker; nothing wired in.
+
+Built: `tools/wllama-inkling/build.sh` (wllama fa1019a, whose llama.cpp
+submodule predates the model, moved to llama.cpp master afe77e18f; one glue
+fix, `wllama-glue.patch`: `parse_questions` gained an argument). wllama master
+streams GPU weights through 1 MB buffers, so a GGUF past 4 GB loads whole (no
+splitting, no memory64) when every layer is on the GPU; Chrome keeps a copy in
+OPFS. `inkling-test.html` + `run-chrome.sh` (in the same folder) run a
+3,425-token innkeeper prompt and two follow-ups with the same prefix; results
+are console lines `INK {...}`. A fresh Chrome profile per run: after a killed
+run the old profile returned no WebGPU adapter.
+
+| 4090 24 GB | load | GPU memory | read (2,500-3,425 tokens) | write | prefix reused | output |
+|---|---|---|---|---|---|---|
+| UD-Q2_K_XL (Unsloth `Mainline_Support`, 9.1 GB), native Vulkan | | 10.0 GB (8k context) | 503-560 tok/s with `-ub 2048 -fa on`; 142 with the server's defaults | 23-28 | yes (3,396 of 3,425 cached; a follow-up in 0.5 s) | good |
+| UD-Q2_K_XL, native WebGPU (Dawn 94c3c9c) | | | pp512 146 | 1.7-2.0 | | **garbage** ("!!!!") |
+| UD-Q2_K_XL, Chrome (wllama) | 70 s | 12.7 GB | 7.8 (short prompt) | 0.7 | | **garbage** |
+| IQ4_NL (ggml-org, 17.6 GB), native Vulkan | | | 537 | 26.8 | | good |
+| IQ4_NL, native WebGPU | | | 481 (ub 2048), 445 (ub 512) | 11.1 | | good |
+| IQ4_NL, Chrome (wllama, ub 512, 8k context) | 117 s (69 s of it copying 17.6 GB to OPFS) | 19.1 GB | 232 (3,425 tokens in 14.8 s) | 7-8 | yes (a follow-up's 24 new tokens in 1.7 s) | good |
+
+Why the Unsloth quant fails on WebGPU: its experts are NVFP4, MXFP4, Q2_0
+and IQ1_S (with F32 per-expert scales); ggml-webgpu leaves 1.3 GB of them on
+the CPU (42 graph splits) and returns token 0 every step. ggml-org's IQ4_NL
+(IQ4_NL experts, Q8_0 elsewhere) runs entirely on the GPU (1 split) and is
+correct.
+
+What blocks it:
+- **Writing speed**: 7-8 tokens/s in Chrome on a 4090 (11 natively on
+  WebGPU, 27 on Vulkan): the per-token graph is ~12,000 nodes, and WebGPU
+  pays per dispatch. Weaker cards will be slower.
+- **It always thinks**: `reasoning_effort` (a chat template variable,
+  `chat_template_kwargs`, `none` = 0.0) still gave 100-450 tokens of
+  reasoning before a one-line answer (natively: 6-20 s a turn on the 4090
+  via Vulkan). At 8 tokens/s that is 15-60 s a turn. Answers were good
+  ("Stew is 5 gold, and I won't go below 4"). Cutting the thinking off (an
+  empty think block in the template) was not tried.
+- **Memory**: the only correct quant on WebGPU is 17.6 GB (19 GB on the
+  card): no 16 GB card. A 9-12 GB quant in WebGPU-supported types (K-quants,
+  IQ2/IQ3, IQ4_NL; not NVFP4/MXFP4/Q2_0) would fit 16 GB beside the game but
+  was not tested; writing speed would not improve much (overhead-bound).
+
+Watch: ggml-webgpu support for NVFP4 / MXFP4 / Q2_0 (MUL_MAT_ID) or a
+bartowski/AtomicChat quant without them; per-dispatch cost in ggml-webgpu
+(fusing, fewer submits); llama.cpp #32707 (the relative-position bias built
+as a big F32 tensor: prompt reading off the flash-attention path, and the
+3.8 GB WebGPU compute buffer at ub 2048); a way to turn its thinking off.
+
 ## Autonomy: rails, guided, free (2026-11-21)
 
 `app/agency.js` (minds.md, "autonomy"). Measured on vast.ai, one RTX 3090

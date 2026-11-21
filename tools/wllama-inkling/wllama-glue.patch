@@ -1,0 +1,13 @@
+diff --git a/cpp/wllama-context.h b/cpp/wllama-context.h
+index 401a884..b6e01d1 100644
+--- a/cpp/wllama-context.h
++++ b/cpp/wllama-context.h
+@@ -1260,7 +1260,7 @@ struct wllama_context
+ 
+     json body = json::parse(req.data_json.value);
+     decision_request dreq;
+-    dreq.questions = decision.parse_questions(body);
++    dreq.questions = decision.parse_questions(body, false);
+ 
+     std::vector<raw_buffer> files;
+     const json state = decision.parse_state(body, files);
