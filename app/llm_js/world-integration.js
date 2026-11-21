@@ -1165,7 +1165,8 @@ async function main() {
           // of it went into reasoning and no answer came).
           enableThinking: thinking,
           // a turn the game chose to think on (mind.js thinkNow) gets less room
-          maxTokens: thinking ? (cfg.thinking === true ? 4096 : 1536) : simple ? 70 : undefined,
+          // (above rails, agency.js, a small budget: a 27B at 28 tokens/s spent ~55 s on each danger turn)
+          maxTokens: thinking ? (cfg.thinking === true ? 4096 : (window.tablefolkAgency?.level?.(g) || 'rails') !== 'rails' ? 512 : 1536) : simple ? 70 : undefined,
           chaos: cfg.chaos ?? 1,   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
         });
         // thought and never answered (out of room): answer at once without thinking

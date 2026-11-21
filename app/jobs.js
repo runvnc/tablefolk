@@ -1316,6 +1316,8 @@
     const h = K()?.hour() ?? 10, m = M()?.mindOf?.(g);
     // in danger and no fighter: the game's reflexes (or the model) as before
     const foes = M()?.foes?.(g, 4) || [];
+    // above rails: its own turn on the danger, without holding up everyone else's (agency.js)
+    if (foes.length && !fighter(g, j) && window.tablefolkAgency?.level?.(g) !== 'rails' && window.tablefolkAgency?.danger) return window.tablefolkAgency.danger(g, S(g), j, foes);
     if (foes.length && !fighter(g, j)) {
       // a package or skill command that fits (signal the militia, a spell): offered first
       const offs = offerOpts(g);

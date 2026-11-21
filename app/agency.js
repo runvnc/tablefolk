@@ -558,7 +558,8 @@
     return (async () => {
       while (g._intent && performance.now() - t0 < 30000) await new Promise(r => setTimeout(r, 200));
       g._intent = intent; g._callKind = kind;
-      try { await W().runAgentTurn(g); } catch (e) { console.warn('[agency] turn', g.id, e); }
+      // (a turn that never comes back, an engine stuck on the card, frees the character after two minutes)
+      try { await Promise.race([W().runAgentTurn(g), new Promise(r => setTimeout(r, 120000))]); } catch (e) { console.warn('[agency] turn', g.id, e); }
       finally { g._callKind = null; g._intent = null; s.turnBusy = false; removeEventListener('tablefolk-agent-turn', onTurn); }
       const sec = (performance.now() - t0) / 1000; noteTurn(sec);
       return { spoke: (g._lastLineAt || 0) > said0, line, sec };
@@ -724,6 +725,11 @@
     return o.run();
   }
 
+  // a monster close by (jobs.js tick): its own turn (the card's DANGER line and choices), not awaited
+  function danger(g, s, j, foes) {
+    if (!s.turnBusy) openTurn(g, 'danger', { kind: 'react', why: `Danger: ${foes.map(f => f.id).slice(0, 3).join(', ')} close by.` });
+    return { ms: 1800 };
+  }
   // ---------------------------------------------------------------- raids: a choice with the consequences stated
   async function threat(g, s, j, asleep) {
     const raiders = T()?.active?.() || [];
@@ -827,5 +833,5 @@
     return out;
   }
 
-  window.tablefolkAgency = { level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, stats, note, LEVELS, get turnSeconds() { return medianTurn(); } };
+  window.tablefolkAgency = { level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, danger, stats, note, LEVELS, get turnSeconds() { return medianTurn(); } };
 })();

@@ -79,10 +79,10 @@
     ['live.js?v=20261120g'],
     ['director.js?v=20261120c'],
     ['clock.js?v=20261120c'],
-    ['jobs.js?v=20261121a'],
+    ['jobs.js?v=20261121b'],
     ['threats.js?v=20261120j'],
     ['chatter.js?v=20261121a'],
-    ['agency.js?v=20261121c'],
+    ['agency.js?v=20261121d'],
     ['speech-input.js?v=20261121a'],
     ['worldgen-own.js?v=20261115a'],
     ['online-brain.js?v=20261112b'],
@@ -97,7 +97,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261121g', 'module'],
+    ['llm_js/world-integration.js?v=20261121h', 'module'],
   ];
 
   function browserSummary() {
