@@ -611,7 +611,8 @@ function buildAgentMessages(world, g, cfg) {
   // dig it out of a long history.
   // a big brain (mind.js tier "ambitious": 9B and up, online models) keeps twice as much
   // (and a character that decides for itself, agency.js guided or free)
-  const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' || (window.tablefolkAgency?.level?.(g) || 'rails') !== 'rails' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
+  // (not above rails: free turns are many, and on a 12B every turn re-read a doubled history: 30-60 s a call on an RTX 3090)
+  const keep = window.tablefolkMind?.tier?.(g) === 'ambitious' && (window.tablefolkAgency?.level?.(g) || 'rails') === 'rails' ? HISTORY_KEEP * 2 : HISTORY_KEEP;
   // The window moves 8 messages at a time, not one: a window sliding every
   // turn changed the prompt right after the system message, so the engine's
   // cached prefix (LiteRT, Bonsai) was lost each turn and the whole prompt

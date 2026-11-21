@@ -1045,6 +1045,8 @@
   // this off.
   function thinkNow(g) {
     if (state.autoThink === false || tier(g) !== 'ambitious') return false;
+    // above rails the character's own turns are the main loop: thinking is kept for its plans and emergencies (agency.js)
+    if (aboveRails(g) && window.tablefolkJobs?.handles?.(g)) return false;
     const key = String(window.tablefolkBrainInfo?.()?.key || '');
     if (!/bonsai2|12b|endpoint/i.test(key)) return false;   // models that think well
     if (dangerLines(g).length) return true;
