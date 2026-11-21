@@ -13,8 +13,8 @@ run() { echo "== $(date +%T) $*" >> "$L/queue.log"; }
 for s in "$@"; do
   case $s in
     probe-*) m=${s#probe-}; fresh; run probe $m; timeout 1500 node probe.mjs --model=$m > "$L/probe-$m.log" 2>&1 ;;
-    day-*) lv=${s##*-}; r=${s#*-}; m=${r%-*}; fresh; run day $m $lv; timeout 2400 node live-eval.mjs scenarios/hearthvale.json --day --day-minutes=12 --model=$m --autonomy=$lv --label=$m-$lv > "$L/day-$m-$lv.log" 2>&1 ;;
-    bakery-*) lv=${s##*-}; r=${s#*-}; m=${r%-*}; fresh; run bakery $m $lv; timeout 1500 node live-eval.mjs scenarios/goblin-bakery.json --minutes=6 --model=$m --autonomy=$lv --label=$m-$lv > "$L/bakery-$m-$lv.log" 2>&1 ;;
+    day-*) lv=${s##*-}; r=${s#*-}; m=${r%-*}; fresh; run day $m $lv; timeout 2400 node live-eval.mjs scenarios/hearthvale.json --day --day-minutes=12 --model=$m $([ "$lv" = auto ] || echo --autonomy=$lv) --label=$m-$lv${TAG:+-$TAG} > "$L/day-$m-$lv.log" 2>&1 ;;
+    bakery-*) lv=${s##*-}; r=${s#*-}; m=${r%-*}; fresh; run bakery $m $lv; timeout 1500 node live-eval.mjs scenarios/goblin-bakery.json --minutes=6 --model=$m --autonomy=$lv --label=$m-$lv${TAG:+-$TAG} > "$L/bakery-$m-$lv.log" 2>&1 ;;
     evals-*) m=${s#evals-}; fresh; run evals $m; EVAL_ARGS="--model=$m" RUNS=2 timeout 2400 bash run-evals.sh > "$L/evals-$m.log" 2>&1 ;;
   esac
 done

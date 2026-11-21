@@ -196,7 +196,9 @@
   // a domain whose items it failed (half or more) stays in code
   function domainsFrom(tasks) {
     const out = {};
-    for (const d of ['activity', 'plan', 'talk', 'danger', 'needs', 'temper']) { const its = TASKS.filter(t => t.dom === d && tasks?.[t.id]); if (its.length && its.filter(t => !tasks[t.id].ok).length / its.length >= .5) out[d] = 'code'; }
+    // (not activity: that is the main loop, and the score's preset already decides it; the 9B failed the sums
+    // and the bundle haggle, tagged activity, and went back to rails)
+    for (const d of ['plan', 'talk', 'danger', 'needs', 'temper']) { const its = TASKS.filter(t => t.dom === d && tasks?.[t.id]); if (its.length && its.filter(t => !tasks[t.id].ok).length / its.length >= .5) out[d] = 'code'; }
     return out;
   }
   function probeKey() {
