@@ -16,6 +16,8 @@ import { getCurrentModel } from './wllama.js';
 // out of command syntax.
 function buildPrompt(messages, think, template) {
   // Qwen: plain ChatML (its template adds nothing else when a system message is there)
+  // Raon-1 nano: ChatML, and its template's empty think block unless thinking
+  if (template === 'raon') return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n' + (think ? '<think>\n' : '<think></think>\n\n');
   if (template === 'chatml') return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n';
   let p = '<s>';
   for (const msg of messages) {
@@ -44,7 +46,7 @@ export function createWllama3Engine(wllamaInstance) {
             : null;
 
           const prompt = buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
-          const stopToken = wllamaInstance.tablefolkTemplate === 'chatml' ? '<|im_end|>' : MINICPM_END;
+          const stopToken = /^(chatml|raon)$/.test(wllamaInstance.tablefolkTemplate) ? '<|im_end|>' : MINICPM_END;
           const t0 = performance.now();
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
             'prompt chars:', prompt.length, 'maxTokens:', maxTokens, 'sampling:', { temperature, top_p: config.top_p, top_k: config.top_k, repeat: config.repetition_penalty },

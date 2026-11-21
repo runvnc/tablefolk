@@ -53,7 +53,30 @@ async function pickModelUrl(cfg) {
   return urls[urls.length - 1];
 }
 
+// KRAFTON's Raon-1 nano GGUFs need KRAFTON's llama.cpp fork (upstream cannot
+// load the raon1_nano architecture yet): a wllama 3.8.1 WASM built against it
+// (WebGPU + JSPI, as wllama's own build; brains.md, "Raon-1 nano"). Its files:
+// ?raonwasm=<url of wllama.wasm> and ?raonbase=<folder of the split GGUF parts>.
+const q = () => new URLSearchParams(globalThis.location?.search || '');
+const RAON_WASM = () => q().get('raonwasm') || new URL('./wllama-raon/wllama.wasm', import.meta.url).href;
+const RAON_JS = () => q().get('raonjs') || new URL('./wllama-raon/index.js', import.meta.url).href;   // the wllama JS built with that WASM (its glue changed after 3.8.1)
+const RAON_BASE = () => q().get('raonbase') || 'https://huggingface.co/KRAFTON/Raon-1-nano-gguf/resolve/main/';
+const raon = (quant, parts, gb) => ({
+  label: `Raon-1 nano ${quant} (llama.cpp WebGPU)`,
+  get base() { return RAON_BASE() + quant + '/'; },
+  file: `raon-1-nano-${quant}-00001-of-${String(parts).padStart(5, '0')}.gguf`,
+  size: gb * 1024 ** 3,
+  gpuLayers: 99,
+  template: 'raon',
+  ctx: 8192,
+  get wasm() { return RAON_WASM(); },
+  get js() { return RAON_JS(); },
+});
+
 const MODEL_CONFIG = {
+  'raon1-nano-q4-wllama': raon('Q4_K_M', 4, 1.94),
+  'raon1-nano-q6-wllama': raon('Q6_K', 5, 2.46),
+  'raon1-nano-q8-wllama': raon('Q8_0', 7, 3.16),
   'minicpm5-1b-wgpu': {
     label: 'MiniCPM5-1B (WebGPU, GGUF)',
     file: 'MiniCPM5-1B-Q4_K_M.gguf',
@@ -185,9 +208,10 @@ export async function loadModel(modelKey, onProgress) {
   try {
     const modelUrl = await pickModelUrl(cfg);
     const loadAt = async layers => {
-    wllama = new Wllama(WLLAMA3_WASM, { allowOffline: false });
+    const W = cfg.js ? (await import(cfg.js)).Wllama : Wllama;
+    wllama = new W(cfg.wasm ? { default: cfg.wasm } : WLLAMA3_WASM, { allowOffline: false });
     await wllama.loadModelFromUrl(modelUrl, {
-      n_ctx: 4096,
+      n_ctx: cfg.ctx || 4096,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
       // pthreads do not always coexist (WebGPU objects cannot be shared across
