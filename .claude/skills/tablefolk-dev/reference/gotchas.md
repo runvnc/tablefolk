@@ -40,7 +40,10 @@ in the code.
   yourself" line goes above the feelings and memories. Re-run the evals after
   any prompt change.
 - They answer in prose: plain text is spoken, embedded commands are pulled
-  out, `say(Name, "...")` is fixed.
+  out, `say(Name, "...")` is fixed. In a haggle E2B writes `sell(potion) 8`
+  (read as `sell(potion, 8)`; a number after any other command is dropped,
+  after `give()` left alone: a price or a gift, nobody can tell) and
+  `use(sell(...))` (the inner command runs): app.js `parseLLMCommandLine`.
 - They repeat and echo: repeat and echo guards, a talk budget, at most two
   lines a turn.
 - Unknown emotes made characters dance: unknown ones now read as a frown.

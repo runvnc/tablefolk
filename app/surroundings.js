@@ -94,6 +94,20 @@
       if (rnd() > p * (lite ? .5 : 1)) continue;
       put(px, pz);
     }
+    // fields (medium and high): hedgerows of low, wide oak along the field edges past the board,
+    // with gaps for gates (look pass 4: the open land read as one green lawn)
+    if (kind !== 'forest' && !lite && loaded.oak_tree_b) {
+      const hedge = lists.oak_tree_b, reach = 70, dx = 24, dz = 18;
+      const row = (fixed, alongX, from, to) => { let gap = 0; for (let a = from; a <= to; a += 2.4) {
+        if (gap > 0) { gap--; continue; } if (rnd() < .035) { gap = 2; continue; }
+        const x = alongX ? a : fixed + (rnd() - .5) * .6, z = alongX ? fixed + (rnd() - .5) * .6 : a;
+        if (Math.max(Math.abs(x) - hw, Math.abs(z) - hh) < 9 || onRoad(x, z) || (T && H(x, z) < -.3)) continue;
+        const k = .2 + rnd() * .07;
+        hedge.push(BABYLON.Matrix.Scaling(k * 1.6, k * .9, k * 1.6).multiply(BABYLON.Matrix.RotationY(rnd() * 6.283)).multiply(BABYLON.Matrix.Translation(x, H(x, z) - .15, z)));
+      } };
+      for (let x = hw + 12; x < hw + reach; x += dx) { row(x, false, -hh - reach, hh + reach); row(-x, false, -hh - reach, hh + reach); }
+      for (let z = hh + 10; z < hh + reach; z += dz) { row(z, true, -hw - reach, hw + reach); row(-z, true, -hw - reach, hw + reach); }
+    }
     let n = 0;
     for (const [t, list] of Object.entries(lists)) {
       const src = loaded[t]; if (!src || !list.length) continue;

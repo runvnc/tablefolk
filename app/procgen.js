@@ -270,15 +270,27 @@
     const kinds = [...new Set([...want, ...['tavern', 'smithy', 'shop', 'temple', 'alchemist', 'guardhouse', 'library', 'stable'].slice(0, Math.max(3, Math.round(wanted * .6)))])];
     while (kinds.length < wanted) kinds.push('house');
     const places = [];
+    // the building model each walk-in building will wear (roofs.js shells): its room is
+    // sized from the model's footprint, so the shell fits it (look pass 4: shells narrower
+    // than their rooms let the code walls stick out)
+    let lastShell = null;
+    const SHELL_OF = { house: ['house', 'fantasy_house', 'stone_house', 'tall_house'], tavern: ['inn'], smithy: ['blacksmith'], guardhouse: ['barracks'], stable: ['stable'],
+      temple: ['stone_house', 'tall_house'], library: ['tall_house', 'stone_house'], shop: ['fantasy_house', 'house'], alchemist: ['tall_house', 'house'] };
     for (const k of kinds) {
       const spec = BUILDING_FURNISH[k];
+      // (only for worlds without hand-placed things: an extra draw changes the whole layout, and
+      // a showcase's own x/z objects would land in other rooms)
+      const pool = (SHELL_OF[k] || []).filter(m => m !== lastShell), shell = !opts.fitShells || opts.shells === false || !pool.length ? null : pool[Math.floor(R.next() * pool.length)];
+      const foot = shell && MODEL_FOOT[shell];
       let done = false;
       for (let tries = 0; tries < 240 && !done; tries++) {
-        // outer size, walls included; later tries shrink it to fit
+        // outer size, walls included (from the model: across x deep, rounded, at least 5); later tries shrink it to fit
         const shrink = tries < 120 ? 0 : tries < 180 ? 1 : 2;
-        const w = Math.max(5, spec.size[0] - shrink + (shrink ? 0 : R.int(0, 1))), h = Math.max(5, spec.size[1] - shrink + (shrink ? 0 : R.int(0, 1)));
+        const across = foot ? Math.max(5, Math.round(foot[0]) - shrink) : Math.max(5, spec.size[0] - shrink + (shrink ? 0 : R.int(0, 1)));
+        const deep = foot ? Math.max(5, Math.round(foot[1]) - shrink) : Math.max(5, spec.size[1] - shrink + (shrink ? 0 : R.int(0, 1)));
         // Front onto one of the four road sides.
         const side = R.pick(['n', 's', 'e', 'w']);
+        const w = !foot || side === 'n' || side === 's' ? across : deep, h = !foot || side === 'n' || side === 's' ? deep : across;
         let r0, c0, door;
         if (side === 'n') { r0 = midR - 1 - h; c0 = R.int(1, W - 1 - w); door = [r0 + h - 1, c0 + Math.floor(w / 2)]; }
         else if (side === 's') { r0 = midR + 3; c0 = R.int(1, W - 1 - w); door = [r0, c0 + Math.floor(w / 2)]; }
@@ -295,7 +307,8 @@
         const inner = { r0: r0 + 1, c0: c0 + 1, r1: r1 - 1, c1: c1 - 1 };
         furnish(g, R, inner, spec, [door]);
         mark(r0 - 1, c0 - 1, r1 + 1, c1 + 1);
-        places.push({ kind: k, ...inner, door });
+        places.push({ kind: k, ...inner, door, ...(shell ? { shell } : {}) });
+        if (shell) lastShell = shell;
         done = true;
       }
     }
@@ -341,7 +354,22 @@
     named.push({ id: 'square', kind: 'square', ...sq, center: at(midR, midC) });
     if (pond) named.push({ id: 'pond', kind: 'pond', r0: pond[0], c0: pond[1], r1: pond[0] + 2, c1: pond[1] + 3, center: at(pond[0] + 1, pond[1] + 2), outdoor: true });
     if (garden) named.push({ id: 'garden', kind: 'garden', r0: garden[0] + 1, c0: garden[1] + 1, r1: garden[0] + 2, c1: garden[1] + 3, center: at(garden[0] + 1, garden[1] + 2) });
-    const objects = [...named.filter(p => !['square', 'pond', 'garden'].includes(p.kind)).map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.5, intensity: 1.6, range: 4.5, color: '#ffd29a' })), ...extraObjs];
+    // a little clutter by the doors (barrels, crates, sacks, flowers), on grass beside the door's
+    // path, for worlds without hand-placed things (fitShells); its own random stream
+    const clutter = [];
+    if (opts.fitShells) {
+      const R2 = rng((opts.seed | 0) + 4049), kinds = ['barrel', 'crate', 'sacks', 'flower_patch', 'flower_patch', 'barrel'];
+      for (const p of places) {
+        if (!p.door || R2.next() > .7) continue;
+        const [dr0, dc0] = p.door, out = dr0 < p.r0 ? [-1, 0] : dr0 > p.r1 ? [1, 0] : dc0 < p.c0 ? [0, -1] : [0, 1];
+        for (const s2 of [1, -1]) {
+          const r = dr0 + out[0] + (out[0] ? 0 : s2), c = dc0 + out[1] + (out[1] ? 0 : s2);
+          if (g[r]?.[c] !== ',' || R2.next() > .6) continue;
+          const [x, z] = at(r, c); clutter.push({ type: kinds[Math.floor(R2.next() * kinds.length)], x, z, ry: +(R2.next() * 6.28).toFixed(2) });
+        }
+      }
+    }
+    const objects = [...named.filter(p => !['square', 'pond', 'garden'].includes(p.kind)).map(p => ({ type: 'light', x: p.center[0], z: p.center[1], y: 1.5, intensity: 1.6, range: 4.5, color: '#ffd29a' })), ...extraObjs, ...clutter];
     return finish({ kind: 'village', W, H, g, places: named, objects, start: named.find(p => p.kind === 'square'), lighting: 'bright' });
   }
 
@@ -828,7 +856,8 @@
     const make = KINDS[kindName] || dungeon, outdoor = make === village || make === forest || make === farm;
     const style = opts.style || STYLE_OF[kindName] || '';
     // a castle is lit (its rooms are lived in); other dungeons and caves are dark
-    const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? (!outdoor && style !== 'castle'), style };
+    const placedByHand = (scn.objects || []).some(o => o && Number.isFinite(+o.x) && o.x !== '' && o.type !== 'light') || (scn.agents || []).some(a => Array.isArray(a.at));
+    const genOpts = { ...opts, want, seed: opts.seed ?? scn.seed ?? 1, size: opts.size || scn.size, dark: scn.dark ?? (!outdoor && style !== 'castle'), style, fitShells: opts.fitShells ?? !placedByHand };
     let gen = make(genOpts);
     if (make === village && opts.extras !== false) gen = villageExtras(gen, genOpts);
     const warnings = [], used = new Set(), occupied = new Set(), placed = {}, blocked = new Set();
@@ -892,7 +921,7 @@
     return {
       scenario: { ...scn, grid: scn.grid?.length ? scn.grid : gen.grid, legend: { ...gen.legend, ...(scn.legend || {}) }, size: scn.size || gen.size,
         objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, dark: scn.dark ?? gen.dark, walls: scn.walls ?? (make === forest || make === cave ? 'stone' : 'stone'), wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
-      places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
+      places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, ...(p.shell ? { shell: p.shell } : {}), who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
       warnings,
     };
   }

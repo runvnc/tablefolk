@@ -3426,6 +3426,13 @@ function splitPlanLines(text){
 function parseLLMCommandLine(line){
   line=String(line||'').trim();
   if(!line) return null;
+  // two shapes a small model writes in a haggle (shop-chaos evals): a number after the
+  // command, "sell(healing potion) 8" (a price: sell(healing potion, 8); after any other
+  // command it is dropped; after give() it is left alone: a price or a gift, nobody can
+  // tell), and a command inside use(): use(sell(...))
+  { const t=line.match(/^([A-Za-z_]+)\(([^()]*)\)\s+(\d+)\s*(?:gold|coins?)?\.?$/i), n=t&&t[1].toLowerCase();
+    if(t && n!=='give') line=n==='sell' && !/,\s*\d/.test(t[2]) ? `${t[1]}(${t[2]}, ${t[3]})` : `${t[1]}(${t[2]})`; }
+  { const u=line.match(/^use\(\s*((?:sell|give|eat|drink|take|put|wield|attack|walk|emote|close)\([^()]*\))\s*\)$/i); if(u) line=u[1]; }
   const m=line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\(([^]*)\)$/);
   if(!m) return parseCommand(line);
   const name=m[1].toLowerCase();

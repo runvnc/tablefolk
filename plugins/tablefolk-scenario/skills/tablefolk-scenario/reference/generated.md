@@ -130,6 +130,10 @@ generated the first time the player goes in ([things.md](things.md#sections-worl
   doorway, and every bed, station and store keeps a free side reachable
   from the door. An object given `x`/`z` on a square the map already
   furnished is moved to a free cell of the same place.
+- In a generated village with nothing placed by hand (no `x`/`z` on objects,
+  no `at` on characters), each walk-in building's room is sized to the
+  building model it wears from outside, and a few barrels, crates, sacks or
+  flowers stand by some doors.
 - An agent with neither `at` nor `in` is matched by words in its id, style
   and personality: goblins and monsters to the lair, rulers and sorcerers to
   the throne room, guards to barracks, priests to the shrine or temple,

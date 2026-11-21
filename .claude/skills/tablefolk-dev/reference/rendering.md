@@ -248,7 +248,9 @@ the ground is outside them (a world that is all one building); else land.
   instances, standing at `tablefolkTerrain.heightAt`; forest: a 3.2 m
   lattice from 3.5 m out to 60 m, thickening; fields: a 5 m lattice to 95 m,
   lone trees and clumps (a sine pattern), a tree line at 55-75% of the
-  depth; half at light. Not pickable, no physics, no shadows.
+  depth; half at light. Fields at medium/high (pass 4) also get hedgerows:
+  `oak_tree_b` squashed low and wide (k .2-.27) every 2.4 m along lines
+  every 24 m (x) and 18 m (z) from 9 m out to 70 m, with gaps for gates. Not pickable, no physics, no shadows.
 - rock: `board_rock`, solid rock at wall-top height over every cell outside
   the rooms (roofs.js `findRooms().outside`, minus painted floors) and the
   outer half of every wall cell facing it (half-cell quads; corners by the
@@ -440,7 +442,12 @@ read off each model's front view) is over the room's door (`doorFit`); dark,
 cool texels on upright faces of the building models (shells and props) glow
 warm with `TABLEFOLK_NIGHT` (walls.js `setNight`; roofs.js `windowGlow`, a
 material plugin adding to `finalColor` before fog), since the models have no
-emissive mask. Speech bubbles, badges and the 💬 chip of a character whose
+emissive mask. In a generated village with no hand-placed things (no object
+x/z, no agent `at`: procgen `fitShells`), each walk-in building's room is
+sized from the model it will wear (`SHELL_OF`, the manifest footprint
+rounded, at least 5 squares) and the place carries `shell`, which
+`planShell` uses first; a showcase keeps its old layout (an extra random
+draw would move its rooms from under its own objects). Speech bubbles, badges and the 💬 chip of a character whose
 root is disabled (indoors under a shell, in the fog) are hidden. `planned()` lists the rooms that get (or will
 get) a roof (walls.js), `findRooms()` the rooms and the outside squares
 (terrain.js). Fade rule: 0 when the player is inside (or roofs are lifted by

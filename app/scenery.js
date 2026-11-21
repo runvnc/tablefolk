@@ -183,7 +183,7 @@
       }
     }
   }
-  function lanternVisual(sc, r, L) {
+  function lanternVisual(sc, r, L, opts = {}) {
     const iron = mat('lantern_iron', C3(.06, .06, .065), { rough: .55, metallic: .6 });
     const glow = mat('lantern_glow', C3(.06, .05, .02), { emissive: C3(1.9, 1.15, .42), rough: .3 });
     const p = r.getAbsolutePosition(), cx = Math.round(p.x), cz = Math.round(p.z), key = (a, b) => a + ',' + b;
@@ -216,8 +216,10 @@
         box('lantern_post', .06, 1.3, .06, 0, .65, 0, iron); box('lantern_post', .34, .04, .34, 0, .02, 0, iron);
         cage(0, 1.45, 0);
       }
-      // indoors the light reaches a little further: rooms lit by their lamps feel warm, not dark wood
+      // indoors the light reaches a little further: rooms lit by their lamps feel warm, not dark wood;
+      // in a house or tavern (not underground: grey stone there) warmer and wider, a cosy room at night
       L.range = Math.max(L.range, 8); L.intensity = Math.max(L.intensity, 3);
+      if (inRoom && mode !== 'rock' && !opts.color) { L.diffuse = C3(1, .7, .42); L.range = Math.max(L.range, 10); L.intensity = Math.max(L.intensity, 3.6); }
     }
     const one = window.mergeUnder?.(r, parts, 'lantern_post') || null;
     own(r, one ? [one] : parts); own(r, bulbs, { shadow: false });
@@ -384,7 +386,7 @@
       addLampPool(sc, r, { warm: true });
       // a warm but not orange light (pass 4: (1, .72, .34) turned grey dungeon stone olive)
       const L = pointLight(r, 'lantern_light', { y: 1.75, color: hexColor(opts.color, C3(1, .8, .58)), intensity: +opts.intensity || 2.4, range: +opts.range || 7 });
-      setTimeout(() => { if (!r.isDisposed?.()) lanternVisual(sc, r, L); }, 250);
+      setTimeout(() => { if (!r.isDisposed?.()) lanternVisual(sc, r, L, opts); }, 250);
       return r;
     },
     light(sc, x, z, opts) {
