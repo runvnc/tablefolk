@@ -5004,7 +5004,7 @@ const FIGURES={
   troll:{dir:'meshy',h:2.15,v:'20261101a'}, skeleton_farmer:{dir:'meshy',h:1.32,v:'20261101a'}, orc:{dir:'meshy',file:'orc_warrior',h:1.5,v:'20261101a'}, orc_classic:{file:'orc',h:1.45},
   demon:{dir:'meshy',h:1.85,v:'20261115a'}, demon_classic:{file:'demon',h:1.55}, giant:{dir:'meshy',h:2.2,v:'20261115a'}, giant_classic:{file:'giant',h:2.1}, rat:{h:.32}, spider:{h:.5}, wolf:{dir:'animals',h:.78,v:'20261114b'}, bear:{dir:'animals',h:1.15,v:'20261121a'}, red_dragon:{dir:'animals',h:3.65,v:'20261119a'},   // Quaternius Animated Animal Pack (2026-11-13); the old wolf file's skinning was broken in Babylon
   // animals (Quaternius Animated Animal and Farm Animal packs, CC0): not hostile, no brain unless "talks": true (play.js ANIMALS)
-  cow:{dir:'animals',h:1.3,v:'20261114b'}, bull:{dir:'animals',h:1.35,v:'20261122a'}, horse:{dir:'animals',h:1.6,v:'20261122a'}, white_horse:{dir:'animals',h:1.6,v:'20261122a'}, donkey:{dir:'animals',h:1.15,v:'20261122a'}, deer:{dir:'animals',h:1.25,v:'20261114b'}, stag:{dir:'animals',h:1.55,v:'20261122a'}, fox:{dir:'animals',h:0.5,v:'20261114a'}, dog:{dir:'animals',h:0.6,v:'20261122a'}, husky:{dir:'animals',h:0.65,v:'20261122a'}, alpaca:{dir:'animals',h:1.5,v:'20261114a'}, pig:{dir:'animals',h:0.65,v:'20261122a'}, sheep:{dir:'animals',h:0.75,v:'20261114a'},
+  cow:{dir:'animals',h:1.3,v:'20261114b'}, bull:{dir:'animals',h:1.35,v:'20261122a'}, horse:{dir:'animals',h:1.6,v:'20261122a',big:false}, white_horse:{dir:'animals',h:1.6,v:'20261122a',big:false}, donkey:{dir:'animals',h:1.15,v:'20261122a'}, deer:{dir:'animals',h:1.25,v:'20261114b'}, stag:{dir:'animals',h:1.55,v:'20261122a',big:false}, fox:{dir:'animals',h:0.5,v:'20261114a'}, dog:{dir:'animals',h:0.6,v:'20261122a'}, husky:{dir:'animals',h:0.65,v:'20261122a'}, alpaca:{dir:'animals',h:1.5,v:'20261114a'}, pig:{dir:'animals',h:0.65,v:'20261122a'}, sheep:{dir:'animals',h:0.75,v:'20261114a'},
   // more monsters (Quaternius Ultimate Monsters and Animated Enemies, CC0)
   wyrmling:{h:1.0,v:'20261114a'}, imp:{dir:'meshy',h:.85,v:'20261115a'}, imp_classic:{file:'imp',h:0.9,v:'20261114a'}, mushroom_warrior:{h:1.0,v:'20261114a'}, bunny:{h:0.8,v:'20261114a'}, snake:{h:0.45,v:'20261114a'}, wasp:{h:0.6,v:'20261114a',lift:.45}, frog:{h:0.35,v:'20261114a'},
   bat:{h:.45,lift:.75}, dragon:{h:1.3,lift:.35}, ghost:{h:1.1,lift:.25}, slime:{h:.5},
@@ -5138,9 +5138,11 @@ async function createFigure(id,pos,model,label){
   const bb=root.getHierarchyBoundingVectors(true,m=>m.isEnabled() && (m.getTotalVertices?.()||0)>0);
   const k=F.h/Math.max(.05,bb.max.y-bb.min.y); root.scaling.setAll(k);
   // big ones block all the squares under them (bigBodyAt): half length and
-  // width and the centre's offset, in the body's own frame (it faces -z here)
+  // width and the centre's offset, in the body's own frame (it faces -z here).
+  // big:false keeps a body to one square like a person: the rebuilt horses and stag are
+  // .9-.95 half long since 2026-11-22 (true to their skeletons) and keep their old behaviour.
   const ex=(bb.max.x-bb.min.x)*k/2, ez=(bb.max.z-bb.min.z)*k/2;
-  const footHalf=F.footprint ? [F.footprint[0]/2,F.footprint[1]/2,0,0] : Math.max(ex,ez)>.8 ? [ex*.85,ez*.85,((bb.max.x+bb.min.x)/2-root.position.x)*k,((bb.max.z+bb.min.z)/2-root.position.z)*k] : null;
+  const footHalf=F.footprint ? [F.footprint[0]/2,F.footprint[1]/2,0,0] : F.big!==false && Math.max(ex,ez)>.8 ? [ex*.85,ez*.85,((bb.max.x+bb.min.x)/2-root.position.x)*k,((bb.max.z+bb.min.z)/2-root.position.z)*k] : null;
   importedRoot.position.y=(-(bb.min.y-root.position.y)+(F.lift||0)/k);
   const wide=Math.max(.4,Math.min(1.1,F.h*.55));
   const collider=BABYLON.MeshBuilder.CreateBox(id+'_collider',{width:wide,height:Math.max(.4,Math.min(1.4,F.h)),depth:wide},sc);

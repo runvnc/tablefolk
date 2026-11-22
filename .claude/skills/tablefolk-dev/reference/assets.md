@@ -317,6 +317,19 @@ body: the first runs had counted the importer's bone-display Icosphere (fixed
 2026-11-19), which stretched each mesh a metre below the feet and, for the
 narrow ones, to 1.9 m wide; at the same `h` they are now truer to their
 skeletons, a little longer and narrower than before.
+Checked 2026-11-22 (bind-pose skinned boxes, joint world x inverse bind x
+position, old file vs new; lineup `work/closeup/shots/animals_lineup.png`):
+the old meshes were squashed, not the new ones stretched: their height
+carried about a metre (in the rig's units) of the Icosphere below the feet
+(horse 5.81 vs 4.82, dog 4.10 vs 3.10) and the narrow ones a 1.90 width, so
+scaled to the same `h` they came out short-bodied and leggy (horse length /
+height .98, dog .96; now 1.18 and 1.28, as the animals are). Kept: the
+heights (`h` unchanged), so they are 18-33% longer (horse 1.56 -> 1.88 m,
+stag 1.44 -> 1.79, bull 1.97 -> 2.37, dog .58 -> .77, pig 1.14 -> 1.39).
+Blocking: a body whose half length passes .8 blocks every square under it
+(`footHalf`); horse, white_horse and stag (.94, .94, .90) now would, so their
+FIGURES entries carry `big: false` and stay one-square bodies as before; the
+bull blocked before (.98) and still does (1.19).
 Meshy characters, Quaternius, KayKit, village/farm/nature packs and the
 `gen/` props are not torn (the packs' many parts are authored pieces).
 
