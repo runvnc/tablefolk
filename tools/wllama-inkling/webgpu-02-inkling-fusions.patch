@@ -1327,7 +1327,7 @@ index cc7f660..87c2960 100644
              outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
          }
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
-index 95040c4..9f6a5f0 100644
+index 95040c4..a06b341 100644
 --- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 @@ -192,7 +192,8 @@ struct webgpu_capabilities {
@@ -1367,17 +1367,52 @@ index 95040c4..9f6a5f0 100644
      wgpu::Buffer             set_rows_dev_error_buf;
      wgpu::Buffer             set_rows_host_error_buf;
      wgpu::CommandEncoder     active_command_encoder;
-@@ -604,6 +618,9 @@ static int ggml_webgpu_env_int(const char * name, int def) {
+@@ -604,6 +618,12 @@ static int ggml_webgpu_env_int(const char * name, int def) {
  #ifndef GGML_WEBGPU_PARAM_BATCH_WRITE
  #    define GGML_WEBGPU_PARAM_BATCH_WRITE 1
  #endif
++#ifndef GGML_WEBGPU_MMID_VEC_MAX_TOKENS
++#    define GGML_WEBGPU_MMID_VEC_MAX_TOKENS 64
++#endif
 +#ifndef GGML_WEBGPU_MMVQ
 +#    define GGML_WEBGPU_MMVQ 1
 +#endif
  #ifndef GGML_WEBGPU_SUBMIT_BATCH
  #    define GGML_WEBGPU_SUBMIT_BATCH WEBGPU_DEFAULT_COMMAND_SUBMIT_BATCH_SIZE
  #endif
-@@ -3762,6 +3779,93 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
+@@ -2042,6 +2062,9 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
+         (uint32_t) (src1->nb[1] / ggml_type_size(src1->type)),
+         (uint32_t) (src0->nb[2] / ggml_type_size(src0->type)),
+         (uint32_t) (src1->nb[2] / ggml_type_size(src1->type)),
++        (uint32_t) dst->ne[2],                                       // tokens
++        (uint32_t) (src2->nb[1] / ggml_type_size(src2->type)),       // ids stride per token
++        (uint32_t) (dst->nb[2] / ggml_type_size(dst->type)),         // dst stride per token
+     };
+ 
+     std::vector<wgpu::BindGroupEntry> entries = {
+@@ -2062,7 +2085,7 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
+ 
+     const uint32_t max_wg_per_dim = ctx->global_ctx->capabilities.limits.maxComputeWorkgroupsPerDimension;
+     uint32_t       output_groups  = CEIL_DIV(dst->ne[0], decisions->outputs_per_wg);
+-    uint32_t       total_wg       = output_groups * param_n_expert_used;
++    uint32_t       total_wg       = output_groups * param_n_expert_used * (uint32_t) dst->ne[2];
+     compute_2d_workgroups(total_wg, max_wg_per_dim, wg_x, wg_y);
+ 
+     return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
+@@ -2086,8 +2109,10 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id(webgpu_context & ctx,
+                                                 ggml_tensor *    src1,
+                                                 ggml_tensor *    src2,
+                                                 ggml_tensor *    dst) {
+-    // we can use mat-vec fast path
+-    if (dst->ne[2] == 1) {
++    // the mat-vec path, one token after the other: for a few tokens it beats the tiled kernel by far (that one
++    // runs every expert's tiles; a 41-token batch of Inkling's MoE took 8.7 ms a layer tiled)
++    static const int vec_max_tokens = ggml_webgpu_env_int("GGML_WEBGPU_MMID_VEC_MAX_TOKENS", GGML_WEBGPU_MMID_VEC_MAX_TOKENS);
++    if (dst->ne[2] <= vec_max_tokens && dst->ne[3] == 1 && src1->ne[3] == 1 && src2->ne[2] == 1) {
+         return ggml_webgpu_mul_mat_id_vec(ctx, src0, src1, src2, dst);
+     }
+ 
+@@ -3762,6 +3787,93 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
      return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
  }
  
@@ -1471,7 +1506,7 @@ index 95040c4..9f6a5f0 100644
  // Returns the encoded command, or std::nullopt if the operation is a no-op
  static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
                                                             ggml_cgraph *  cgraph,
-@@ -3778,6 +3882,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+@@ -3778,6 +3890,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
      }
      WEBGPU_LOG_DEBUG("ggml_webgpu_encode(" << node << ", " << ggml_op_name(node->op) << ")");
  
@@ -1488,7 +1523,7 @@ index 95040c4..9f6a5f0 100644
      ggml_tensor * src0 = node->src[0];
      ggml_tensor * src1 = node->src[1];
      ggml_tensor * src2 = node->src[2];
-@@ -4009,6 +4123,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+@@ -4009,6 +4131,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
          }
          GGML_LOG_INFO("ggml_webgpu ops in a %d-node graph: %s\n", cgraph->n_nodes, line.c_str());
      }
@@ -1524,7 +1559,7 @@ index 95040c4..9f6a5f0 100644
      if (st.have_last) {
          st.gap_ms += std::chrono::duration<double, std::milli>(t_start - st.last_end).count();
      }
-@@ -4888,7 +5031,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
+@@ -4888,7 +5039,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
          ctx->webgpu_global_ctx->adapter.HasFeature(wgpu::FeatureName::Subgroups);
      // for dot4I8packed
      ctx->webgpu_global_ctx->capabilities.supports_dot_product = ctx->webgpu_global_ctx->instance.HasWGSLLanguageFeature(
@@ -1534,7 +1569,7 @@ index 95040c4..9f6a5f0 100644
  
      bool valid_subgroup_matrix_config = false;
  #if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
-@@ -5005,6 +5149,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+@@ -5005,6 +5157,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
      webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
      webgpu_ctx->param_batch_write =
          ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
@@ -1627,11 +1662,58 @@ index 0000000..90a5dce
 +        default: {}
 +    }
 +}
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_decls.tmpl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_decls.tmpl
+index 3e331b7..b75e97d 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_decls.tmpl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_decls.tmpl
+@@ -681,12 +681,13 @@ fn create_iq_gw4(dl: f32, qs_u32: u32, shift_phase: u32) -> vec4<f16> {
+ #endif
+ 
+ #if defined(INIT_SRC0_SHMEM_IQ2_XXS)
++#include "iq2xxs_ws.tmpl"
+ fn create_iq_gw4(ig: u32, grid_phase: u32) -> vec4<f32> {
+     return vec4<f32>(
+-            f32(get_byte(iq2xxs_grid[(ig + grid_phase + 0u) / 4u], (ig + grid_phase + 0u) % 4u)),
+-            f32(get_byte(iq2xxs_grid[(ig + grid_phase + 1u) / 4u], (ig + grid_phase + 1u) % 4u)),
+-            f32(get_byte(iq2xxs_grid[(ig + grid_phase + 2u) / 4u], (ig + grid_phase + 2u) % 4u)),
+-            f32(get_byte(iq2xxs_grid[(ig + grid_phase + 3u) / 4u], (ig + grid_phase + 3u) % 4u)),
++            f32(get_byte(iq2xxs_grid_ws[(ig + grid_phase + 0u) / 4u], (ig + grid_phase + 0u) % 4u)),
++            f32(get_byte(iq2xxs_grid_ws[(ig + grid_phase + 1u) / 4u], (ig + grid_phase + 1u) % 4u)),
++            f32(get_byte(iq2xxs_grid_ws[(ig + grid_phase + 2u) / 4u], (ig + grid_phase + 2u) % 4u)),
++            f32(get_byte(iq2xxs_grid_ws[(ig + grid_phase + 3u) / 4u], (ig + grid_phase + 3u) % 4u)),
+         );
+ }
+ #endif
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
+index 732b8b8..7b572f0 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
+@@ -87,6 +87,10 @@ fn main(@builtin(workgroup_id) wg_id: vec3<u32>,
+         @builtin(num_workgroups) num_wg: vec3<u32>) {
+ 
+     let thread_id = local_id.x;
++#ifdef INIT_SRC0_SHMEM_IQ2_XXS
++    for (var i = thread_id; i < 68u; i += TOTAL_WORKGROUP_SIZE) { fill_iq2xxs_ws(i); }
++    workgroupBarrier();
++#endif
+     let local_m = get_local_m(thread_id);
+     let local_n = get_local_n(thread_id);
+ 
 diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
-index e87cc6b..6450308 100644
+index e87cc6b..57dafee 100644
 --- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
 +++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
-@@ -58,6 +58,10 @@ fn main(
+@@ -24,6 +24,9 @@ struct MulMatIdVecParams {
+     stride_11: u32,
+     stride_02: u32,
+     stride_12: u32,
++    n_tokens: u32,
++    ids_stride: u32,
++    dst_stride2: u32,
+ };
+ 
+ @group(0) @binding(0) var<storage, read_write> src0: array<SRC0_TYPE>; // [cols, rows, n_expert]
+@@ -58,16 +61,22 @@ fn main(
  ) {
  
      let thread_id = local_id.x;
@@ -1642,6 +1724,62 @@ index e87cc6b..6450308 100644
  
      let output_groups: u32 = (params.m + OUTPUTS_PER_WG - 1u) / OUTPUTS_PER_WG;
      let wg_linear = wg_id.y * num_wg.x + wg_id.x;
+ 
+-    if (wg_linear >= output_groups * params.n_expert_used) {
++    let per_token = output_groups * params.n_expert_used;
++    if (wg_linear >= per_token * params.n_tokens) {
+         return;
+     }
+ 
+-    let slot       = wg_linear / output_groups;
+-    let own_expert = ids[params.offset_ids + slot];
++    let token      = wg_linear / per_token;
++    let slot       = (wg_linear % per_token) / output_groups;
++    let own_expert = ids[params.offset_ids + token * params.ids_stride + slot];
+     let row_base   = (wg_linear % output_groups) * OUTPUTS_PER_WG;
+ 
+     // a skipped slot (id -1) keeps the zero accumulator, so the reduction below writes zeros
+@@ -75,8 +84,8 @@ fn main(
+     let skipped = i32(own_expert) == -1;
+ 
+     let src0_batch_offset = params.offset_src0 + select(own_expert, 0u, skipped) * params.stride_02;
+-    let src1_idx_base     = params.offset_src1 + (slot % params.b_ne1) * params.stride_11;
+-    let dst_idx_base      = params.offset_dst + slot * params.m + row_base;
++    let src1_idx_base     = params.offset_src1 + token * params.stride_12 + (slot % params.b_ne1) * params.stride_11;
++    let dst_idx_base      = params.offset_dst + token * params.dst_stride2 + slot * params.m + row_base;
+ 
+     var acc: array<array<f32, OUTPUTS_PER_WG>, NUM_COLS>;
+     if (!skipped) {
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_reg_tile.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_reg_tile.wgsl
+index 0e17fae..087dba3 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_reg_tile.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_reg_tile.wgsl
+@@ -71,6 +71,10 @@ fn main(@builtin(workgroup_id) wg_id: vec3<u32>,
+         @builtin(num_workgroups) num_wg: vec3<u32>) {
+ 
+     let thread_id = local_id.x;
++#ifdef INIT_SRC0_SHMEM_IQ2_XXS
++    for (var i = thread_id; i < 68u; i += TOTAL_WORKGROUP_SIZE) { fill_iq2xxs_ws(i); }
++    workgroupBarrier();
++#endif
+     let local_m = get_local_m(thread_id);
+     let local_n = get_local_n(thread_id);
+ 
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_subgroup_matrix.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_subgroup_matrix.wgsl
+index 35998a9..80932a2 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_subgroup_matrix.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_subgroup_matrix.wgsl
+@@ -88,6 +88,10 @@ fn main(@builtin(workgroup_id) wg_id: vec3<u32>,
+         @builtin(num_workgroups) num_wg: vec3<u32>) {
+ 
+     let thread_id = local_id.x;
++#ifdef INIT_SRC0_SHMEM_IQ2_XXS
++    for (var i = thread_id; i < 68u; i += TOTAL_WORKGROUP_SIZE) { fill_iq2xxs_ws(i); }
++    workgroupBarrier();
++#endif
+     let subgroup_m = subgroup_id % SUBGROUP_M;
+     let subgroup_n = subgroup_id / SUBGROUP_M;
+ 
 diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl
 index 1781a6c..0316e8d 100644
 --- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl
