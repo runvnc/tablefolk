@@ -655,6 +655,24 @@ lights per material. Medium: shadow every second frame, 1k terrain with
 roughness and AO (8 layers), 1k env models, ground cover, bloom; high: 2k
 everything, SSAO, the shadow every frame.
 
+Close up (2026-11-22): the building models (house ... mill_house: app.js
+`ENV_BUILDINGS`) load their 2048 files at medium as well as high
+(roofs.js `envFull`, `?env2k=0` for the old 1k): at 85-140 texels a metre
+their 1k copies were mush at walking distance (`work/closeup/shots/game/
+med_vs_high.jpg`). Cost: +50 MB of texture memory (three maps, mipmapped)
+for each distinct building model in view, ~+250 MB in hearthvale (5
+models), ~+300 MB in a generated village (6); props stay 1k below high.
+`tablefolkGfxGB()` counts `scene.textures` only, which misses the env
+models' textures (their containers are instanced, not added to the scene).
+Their material plugin (roofs.js `windowGlow`, TfWinGlow) also lays a fine
+grain over them, medium and high only: plaster_aged's 1k normal and colour,
+triplanar in world space at a .45 m tile, fading in from 14 m to full at
+4 m, normal 1.2, albedo .6 (`tablefolkRoofs.detail`, live; less on dark
+texels), sampled outside branches (WGSL uniformity); 2 shared 1k textures
+(~11 MB), 6 samples a building fragment; off with
+`window.TABLEFOLK_ENV_DETAIL = 0` (`detail_strength.jpg`: at .55/.3 it did
+not show).
+
 Measured 2026-11-20 (RTX 2060, 1920x1080, headless Chrome, `profile.mjs`
 QUICK with 40 s to settle; WebGPU timestamps read 0 on this driver, so the
 GPU figure is the median submit-to-done latency, `lat`; memory is the Chrome

@@ -1870,15 +1870,20 @@ function ensureDoorAnimator(){
 // and shares its geometry, materials and textures: twenty trees cost one set
 // of textures, not twenty. Shared materials are never disposed with an object.
 const modelContainers=new Map();
+// the env models' version (assets/models/props/env, rebuilt in place): bump it with them so browsers refetch
+const ENV_MODELS_V='20261122b';
+// the env building models: their windows glow (roofs.js windowGlow), and medium loads their 2048 files (roofs.js envFull)
+const ENV_BUILDINGS=/^(house|fantasy_house|tall_house|stone_house|inn|blacksmith|barracks|stable|barn|mill_house|sawmill)$/;
 function loadModelInstance(scene,dir,name,prepare){
   const url=dir+name;
   if(!modelContainers.has(url)){
-    const p=BABYLON.SceneLoader.LoadAssetContainerAsync(dir,name,scene).then(c=>{
+    const q=/props\/env\//.test(dir) && !name.includes('?') ? '?v='+ENV_MODELS_V : '';
+    const p=BABYLON.SceneLoader.LoadAssetContainerAsync(dir,name+q,scene).then(c=>{
       state.sharedAssetMats ||= new Set();
       for(const m of c.materials) state.sharedAssetMats.add(m);
       try{ prepare?.(c); }catch(e){ console.warn('model prepare failed',name,e); }
       // the env buildings' windows glow at night (roofs.js windowGlow), as props and as shells
-      if(/^(house|fantasy_house|tall_house|stone_house|inn|blacksmith|barracks|stable|barn|mill_house|sawmill)(\.1k)?\.glb$/.test(name) && /props\/env\//.test(dir)) for(const m of c.materials) window.tablefolkRoofs?.windowGlow?.(m);
+      if(ENV_BUILDINGS.test(name.replace(/(\.1k)?\.glb$/,'')) && /props\/env\//.test(dir)) for(const m of c.materials) window.tablefolkRoofs?.windowGlow?.(m);
       try{ LOOK()?.shareTextures?.(c.materials); }catch{}
       try{ const n=mergeContainerLooks(c); if(n && window.TABLEFOLK_DEV) console.log('[merge]',name,'-'+n,'draw calls'); }catch(e){ console.warn('[merge] failed',name,e); }
       return c;
@@ -3036,7 +3041,7 @@ function makeCatalogItem(scene,type,x,z,opts={}){
   let proxy=null, url=file;
   // a variant by the square it stands on (the same tree stays the same tree); the light copy at light quality
   if(base.variantUrls?.length){ const all=[file,...base.variantUrls], h=((Math.round(x)*73856093)^(Math.round(z)*19349663))>>>0; url=all[h%all.length]; }
-  if(base.tier && (base.tier==='med' ? window.TABLEFOLK_GFX?.lite : window.TABLEFOLK_GFX?.quality!=='high')) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
+  if(base.tier && (base.tier==='med' ? window.TABLEFOLK_GFX?.lite : !(window.tablefolkRoofs?.envFull?.() && ENV_BUILDINGS.test(type)) && window.TABLEFOLK_GFX?.quality!=='high')) url=base.tier==='med' ? url.replace(/\.gltf$/,'.med.gltf') : url.replace(/\.glb$/,'.1k.glb');
   const p=importPropAsset(scene,url,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2,onProxy:m=>{ proxy=m; }});
   p.catch(e=>console.warn('catalog item failed',type,e));
   if(type==='torch' && proxy) addLampPool(scene,proxy,{warm:true,y:-base.h/2+.025});

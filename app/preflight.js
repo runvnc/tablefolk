@@ -52,7 +52,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261122a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261122h'],
+    ['app.js?v=20261122l'],
     ['bodies.js?v=20261120c'],
     ['scenery.js?v=20261121a'],
     ['combat.js?v=20261120b'],
@@ -63,7 +63,7 @@
     ['walls.js?v=20261122d'],
     ['darkness.js?v=20261122a'],
 
-    ['roofs.js?v=20261122d'],
+    ['roofs.js?v=20261122g'],
     ['cutaway.js?v=20261122c'],
     ['head-window.js?v=20261101f'],
     ['locks.js?v=20261024a'],

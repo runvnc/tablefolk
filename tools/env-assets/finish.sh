@@ -8,11 +8,13 @@
 #  Then run check.py <name> (the torn-mesh gate) before committing.
 # ENV_WORK defaults to work/env (git-ignored: the raw files are large). SAMPLES (render) defaults to 12.
 # Needs blender on PATH, and ~/.cache/tablefolk-gltf with @gltf-transform/core, extensions, functions,
-# meshoptimizer and sharp installed (npm i there); decomp.mjs is copied there.
+# meshoptimizer and sharp installed (npm i there); decomp.mjs is copied there. A model with "presimplify" also needs
+# ~/.cache/tablefolk-meshopt with meshoptimizer 1.x and @gltf-transform/core + extensions (simplify.mjs is copied there).
 set -e
 T="$(cd "$(dirname "$0")" && pwd)"; R="$(cd "$T/../.." && pwd)"
 W="${ENV_WORK:-$R/work/env}"; A="$R/assets/models/props/env"
-G="${GLTF_DIR:-$HOME/.cache/tablefolk-gltf}"
+G="${GLTF_DIR:-$HOME/.cache/tablefolk-gltf}"; MO="${MESHOPT_DIR:-$HOME/.cache/tablefolk-meshopt}"
+[ -f "$MO/simplify.mjs" ] && cmp -s "$T/simplify.mjs" "$MO/simplify.mjs" || { mkdir -p "$MO"; cp "$T/simplify.mjs" "$MO/"; }
 mkdir -p "$W/proc" "$W/renders" "$A"; cmp -s "$T/decomp.mjs" "$G/env-decomp.mjs" || cp "$T/decomp.mjs" "$G/env-decomp.mjs"
 for n in "$@"; do
   read -r raw opts dx < <(python3 - "$T/options.json" "$n" <<'PY'
@@ -23,7 +25,16 @@ print(m.get('raw', 'raw/%s.glb' % sys.argv[2]), json.dumps(o, separators=(',', '
 PY
 )
   echo "== $n $opts"
-  nice blender -b --factory-startup -P "$T/proc.py" -- "$W/$raw" "$W/proc/$n.glb" "$opts" 2>&1 | grep -E "STATS|CREAM" > "$W/proc/$n.stats"
+  src="$W/$raw"
+  # presimplify (tris): meshoptimizer 1.x, permissive, before Blender (the bed: Blender's collapse stops at its
+  # 3-face cloth edges); proc.py then rebakes from the raw (hp_src)
+  pre=$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('presimplify', ''))" "$opts")
+  if [ -n "$pre" ]; then
+    (cd "$MO" && node simplify.mjs "$src" "$W/proc/$n.pre.glb" "$pre" 0.05 0) | tail -1
+    opts=$(python3 -c "import json,sys; o=json.loads(sys.argv[1]); o['hp_src']=sys.argv[2]; print(json.dumps(o,separators=(',',':')))" "$opts" "$src")
+    src="$W/proc/$n.pre.glb"
+  fi
+  nice blender -b --factory-startup -P "$T/proc.py" -- "$src" "$W/proc/$n.glb" "$opts" 2>&1 | grep -E "STATS|CREAM|BAKE|DELIGHT" > "$W/proc/$n.stats"
   cut -c1-300 "$W/proc/$n.stats"
   nice "$R/tools/compress-glb.sh" --max 2048 "$W/proc/$n.glb" "$A/$n.glb" >/dev/null 2>&1
   nice "$R/tools/compress-glb.sh" "$W/proc/$n.glb" "$A/$n.1k.glb" >/dev/null 2>&1

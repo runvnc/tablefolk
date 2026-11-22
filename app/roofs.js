@@ -325,18 +325,42 @@
   // their dark, cool texels on upright faces (glass) light up with the night
   // (walls.js setNight -> TABLEFOLK_NIGHT); timber (dark but warm), roofs and
   // bright walls stay as they are.
+  // Close-up detail (2026-11-22): the building models' own textures hold 85-140 texels a metre
+  // (one 2048 atlas over a whole house; 1k at light and medium), soft at walking distance. A
+  // fine tiling grain (plaster_aged's normal and colour, 1k, one copy for all) is laid over them
+  // triplanar in world space, fading in from 14 m to full at 4 m: normals perturbed and albedo
+  // varied a little, less on dark texels (timber, windows). Medium and high only; off with
+  // window.TABLEFOLK_ENV_DETAIL = 0 (before/after shots).
+  const DETAIL = { tile: .45, normal: 1.2, albedo: .6, near: 4, far: 14 };
+  let detailTex = null;
+  function detailTextures(sc) {
+    if (detailTex && detailTex.n.getScene() === sc && !detailTex.n.isDisposed?.()) return detailTex;
+    const t = (kind, srgb) => { const x = new BABYLON.Texture(ENV() + 'plaster_aged_' + kind + '_1k.webp', sc, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE); x.gammaSpace = srgb; x.wrapU = x.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE; x.anisotropicFilteringLevel = 8; return x; };
+    return (detailTex = { n: t('normal', false), c: t('color', true) });
+  }
+  // the building models' 2048 files at medium too (2026-11-22): their 1k copies are mush at walking
+  // distance (85-140 texels a metre at 2048); ?env2k=0 keeps medium on the 1k files (memory tests)
+  const ENV2K = new URLSearchParams(location.search).get('env2k') !== '0';
+  const envFull = () => window.TABLEFOLK_GFX?.quality === 'high' || (ENV2K && !window.TABLEFOLK_GFX?.lite);
+  const detailOn = () => !window.TABLEFOLK_GFX?.lite && window.TABLEFOLK_ENV_DETAIL !== 0;
   let Glow = null;
   function windowGlow(m) {
     if (!m || m._tfGlow || !(m instanceof BABYLON.PBRMaterial)) return;
     try {
       const WGSL = BABYLON.ShaderLanguage?.WGSL;
       Glow ||= class extends BABYLON.MaterialPluginBase {
-        constructor(mat) { super(mat, 'TfWinGlow', 220, { TFWINGLOW: false }); this._enable(true); }
+        constructor(mat) { super(mat, 'TfWinGlow', 220, { TFWINGLOW: false }); this._enable(true); this.det = detailTextures(mat.getScene()); }
         getClassName() { return 'TfWinGlowPlugin'; }
         isCompatible() { return true; }
         prepareDefines(d) { d.TFWINGLOW = true; }
-        getUniforms(lang) { const ubo = [{ name: 'tfNight', size: 4, type: 'vec4' }, { name: 'tfHole', size: 4, type: 'vec4' }, { name: 'tfHoleB', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfNight;\nuniform vec4 tfHole;\nuniform vec4 tfHoleB;\n' }; }
-        bindForSubMesh(ubo) { ubo.updateFloat4('tfNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); ubo.updateFloat4('tfHole', hole.x, hole.z, hole.alongX, hole.k); ubo.updateFloat4('tfHoleB', HOLE_W, HOLE_D, hole.yTop, 0); }
+        getSamplers(s) { s.push('tfDetNSampler', 'tfDetCSampler'); }
+        getUniforms(lang) { const ubo = [{ name: 'tfNight', size: 4, type: 'vec4' }, { name: 'tfHole', size: 4, type: 'vec4' }, { name: 'tfHoleB', size: 4, type: 'vec4' }, { name: 'tfDet', size: 4, type: 'vec4' }, { name: 'tfEye', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfNight;\nuniform vec4 tfHole;\nuniform vec4 tfHoleB;\nuniform vec4 tfDet;\nuniform vec4 tfEye;\n' }; }
+        bindForSubMesh(ubo) {
+          ubo.updateFloat4('tfNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); ubo.updateFloat4('tfHole', hole.x, hole.z, hole.alongX, hole.k); ubo.updateFloat4('tfHoleB', HOLE_W, HOLE_D, hole.yTop, 0);
+          const on = detailOn(), e = state.scene?.activeCamera?.globalPosition;
+          ubo.updateFloat4('tfDet', on ? DETAIL.normal : 0, on ? DETAIL.albedo : 0, 1 / DETAIL.tile, DETAIL.near); ubo.updateFloat4('tfEye', e?.x || 0, e?.y || 0, e?.z || 0, DETAIL.far);
+          ubo.setTexture('tfDetNSampler', this.det.n); ubo.setTexture('tfDetCSampler', this.det.c);
+        }
         getCustomCode(type, lang) {
           if (type !== 'fragment') return null;
           // the doorway being approached (doorway(), below): the shell dithered away around it
@@ -355,14 +379,44 @@ if (tfHole.w > 0.002) {
   if (ha < tfHoleB.x && hd < tfHoleB.y && vPositionW.y < tfHoleB.z && tfHole.w > hn) discard;
 }
 `;
-          if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: holeW, CUSTOM_FRAGMENT_BEFORE_FOG: `
+          // the close-up grain (DETAIL): sampled outside any branch (WGSL uniformity), weights by the normal
+          const detW = `
+{
+  let dp = fragmentInputs.vPositionW * uniforms.tfDet.z;
+  let dk = (1.0 - smoothstep(uniforms.tfDet.w, uniforms.tfEye.w, distance(fragmentInputs.vPositionW, uniforms.tfEye.xyz)));
+  var dw = pow(abs(normalW), vec3f(4.0)); dw = dw / max(dw.x + dw.y + dw.z, 1e-4);
+  let nx = textureSample(tfDetNSampler, tfDetNSamplerSampler, dp.zy).xy * 2.0 - vec2f(1.0);
+  let ny = textureSample(tfDetNSampler, tfDetNSamplerSampler, dp.xz).xy * 2.0 - vec2f(1.0);
+  let nz = textureSample(tfDetNSampler, tfDetNSamplerSampler, dp.xy).xy * 2.0 - vec2f(1.0);
+  let lw = vec3f(0.3, 0.59, 0.11);
+  let cl = dw.x * dot(textureSample(tfDetCSampler, tfDetCSamplerSampler, dp.zy).rgb, lw) + dw.y * dot(textureSample(tfDetCSampler, tfDetCSamplerSampler, dp.xz).rgb, lw) + dw.z * dot(textureSample(tfDetCSampler, tfDetCSamplerSampler, dp.xy).rgb, lw);
+  let la = dot(surfaceAlbedo, lw); let lit = smoothstep(0.02, 0.12, la);
+  let dn = dw.x * vec3f(0.0, nx.y, nx.x) + dw.y * vec3f(ny.x, 0.0, ny.y) + dw.z * vec3f(nz.x, nz.y, 0.0);
+  normalW = normalize(normalW + dn * uniforms.tfDet.x * dk * (0.4 + 0.6 * lit));
+  surfaceAlbedo = surfaceAlbedo * mix(1.0, clamp(cl / 0.55, 0.6, 1.4), uniforms.tfDet.y * dk * lit);
+}
+`, detG = `
+{
+  vec3 dp = vPositionW * tfDet.z;
+  float dk = 1.0 - smoothstep(tfDet.w, tfEye.w, distance(vPositionW, tfEye.xyz));
+  vec3 dw = pow(abs(normalW), vec3(4.0)); dw /= max(dw.x + dw.y + dw.z, 1e-4);
+  vec2 nx = texture(tfDetNSampler, dp.zy).xy * 2.0 - 1.0, ny = texture(tfDetNSampler, dp.xz).xy * 2.0 - 1.0, nz = texture(tfDetNSampler, dp.xy).xy * 2.0 - 1.0;
+  vec3 lw = vec3(0.3, 0.59, 0.11);
+  float cl = dw.x * dot(texture(tfDetCSampler, dp.zy).rgb, lw) + dw.y * dot(texture(tfDetCSampler, dp.xz).rgb, lw) + dw.z * dot(texture(tfDetCSampler, dp.xy).rgb, lw);
+  float lit = smoothstep(0.02, 0.12, dot(surfaceAlbedo, lw));
+  vec3 dn = dw.x * vec3(0.0, nx.y, nx.x) + dw.y * vec3(ny.x, 0.0, ny.y) + dw.z * vec3(nz.x, nz.y, 0.0);
+  normalW = normalize(normalW + dn * tfDet.x * dk * (0.4 + 0.6 * lit));
+  surfaceAlbedo *= mix(1.0, clamp(cl / 0.55, 0.6, 1.4), tfDet.y * dk * lit);
+}
+`;
+          if (lang === WGSL) return { CUSTOM_FRAGMENT_DEFINITIONS: 'var tfDetNSamplerSampler: sampler; var tfDetNSampler: texture_2d<f32>; var tfDetCSamplerSampler: sampler; var tfDetCSampler: texture_2d<f32>;\n', CUSTOM_FRAGMENT_MAIN_BEGIN: holeW, CUSTOM_FRAGMENT_UPDATE_ALPHA: detW, CUSTOM_FRAGMENT_BEFORE_FOG: `
 if (uniforms.tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   let a = surfaceAlbedo; let l = dot(a, vec3f(0.3, 0.59, 0.11));
   let g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
   finalColor = vec4f(finalColor.rgb + vec3f(1.0, 0.58, 0.24) * g * uniforms.tfNight.x * 2.2, finalColor.a);
 }
 ` };
-          return { CUSTOM_FRAGMENT_MAIN_BEGIN: holeG, CUSTOM_FRAGMENT_BEFORE_FOG: `
+          return { CUSTOM_FRAGMENT_DEFINITIONS: 'uniform sampler2D tfDetNSampler; uniform sampler2D tfDetCSampler;\n', CUSTOM_FRAGMENT_MAIN_BEGIN: holeG, CUSTOM_FRAGMENT_UPDATE_ALPHA: detG, CUSTOM_FRAGMENT_BEFORE_FOG: `
 if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   vec3 a = surfaceAlbedo; float l = dot(a, vec3(0.3, 0.59, 0.11));
   float g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
@@ -381,7 +435,7 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     node.scaling.set(plan.sx * (plan.mirror ? -1 : 1), Math.sqrt(plan.sx * plan.sz), plan.sz);
     node.position.x = plan.slide || 0;   // the model's door over the room's (doorFit)
     const entry = { room, root, parts: [], mats: [], alpha: 1, target: 1, shell: plan.m, box: null };
-    const file = plan.m + (window.TABLEFOLK_GFX?.quality === 'high' ? '.glb' : '.1k.glb');
+    const file = plan.m + (envFull() ? '.glb' : '.1k.glb');
     loadModelInstance(sc, ENVM(), file, c => { for (const m of c.materials) { window.TABLEFOLK_LOOK?.matte?.(m); windowGlow(m); } }).then(res => {
       if (root.isDisposed()) { for (const m of res.meshes) m.dispose(); return; }
       for (const n of res.rootNodes) n.parent = node;
@@ -540,5 +594,5 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   }
   // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
   function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
-  window.tablefolkRoofs = { windowGlow, rebuild, toggle, doorway: () => ({ k: hole.k, x: hole.x, z: hole.z, room: hole.r?.room || null }), shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha, target: r.target, walls: (window.tablefolkWalls?.roomMeshes?.(r.room) || []).filter(m => m.isEnabled()).length })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
+  window.tablefolkRoofs = { detail: DETAIL, envFull, windowGlow, rebuild, toggle, doorway: () => ({ k: hole.k, x: hole.x, z: hole.z, room: hole.r?.room || null }), shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha, target: r.target, walls: (window.tablefolkWalls?.roomMeshes?.(r.room) || []).filter(m => m.isEnabled()).length })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
 })();

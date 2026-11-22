@@ -333,6 +333,51 @@ bull blocked before (.98) and still does (1.19).
 Meshy characters, Quaternius, KayKit, village/farm/nature packs and the
 `gen/` props are not torn (the packs' many parts are authored pieces).
 
+Second pass, 2026-11-22 (close up: soft textures, faceted beams, baked
+lighting, the bed). Measured first: the shipped textures are the raws' own
+2048 maps (no more detail exists), AVIF q75 keeps ~91% of the base colour's
+fine detail (Laplacian energy; q85 95% for +0.5 MB a model: not worth it),
+and the buildings get 85-140 texels a metre (props 275-1650), so up close
+they are soft at 2048 and mush at the 1k files that medium and light load.
+Changes, in proc.py (every model, all pass check.py):
+- **Normal bake** (`bake`, default on): the welded, cleaned, scaled model
+  before decimation is kept as a high-poly copy (its winding made consistent
+  first: Meshy's raws are inconsistent in patches, which baked as normals
+  pointing into the surface) and Cycles bakes its shading (surface plus its
+  normal map) into a new tangent-space normal map for the decimated mesh
+  (cage .004 x size, ray .01 x size; ~5 s on the CPU); TANGENT exported so
+  Babylon shades with the same MikkTSpace frame. Removes the diagonal
+  shading wedges on posts and walls (`work/closeup/shots/cur/bs_crops3.jpg`).
+- **40k triangles for buildings** (was 30k): a flat wall bent by the
+  collapse showed as a wedge even with baked normals.
+- **De-light** (`delight`, default .6; `delight.py`): per colour cluster
+  (k-means, 6) the low-frequency luminance is evened toward the cluster's
+  median (normalized convolution within the cluster, so timber never darkens
+  the plaster beside it in the atlas), gain clamped .6-1.6. Baked highlights
+  and dark blotches on plaster and stone are toned down; at night the
+  baked-in light no longer shows (`bs_delight.jpg`).
+- **The bed** (`presimplify`, `rebake`): its cloth has 2,761 three-face
+  edges, where Blender's collapse stops (33k) and which it had turned into a
+  trough without legs or pillow; seam-keeping meshoptimizer stops at 58k
+  (49k UV islands), `split_nm` tore the frame. Now finish.sh simplifies the
+  raw with meshoptimizer 1.x in permissive mode (`simplify.mjs`, in
+  `~/.cache/tablefolk-meshopt`) to ~9k, and proc.py gives it new UVs (Smart
+  UV Project) and bakes base colour, roughness and normal from the raw
+  (`hp_src`): 8,882 triangles, 3.6 -> 1.8 MB, legs and pillow back
+  (`bed_rb_cmp.jpg`).
+- Faces doubled by the weld are deleted (`dedup`; none found in these raws).
+Sizes: 64 -> 71 MB for all 50 files (tangents, the bigger buildings); the
+same three textures a model, so texture memory is unchanged.
+The blacksmith's roof "slivers": the thin ragged tile ends along its eaves
+are in the raw itself (raw and decimated look alike from below,
+`bs_eaves.jpg`); the pipeline neither adds nor removes them.
+Medium quality now loads the buildings' 2048 files (rendering.md, Light
+quality): their 1k copies were the main softness.
+In the game (roofs.js): the building models' material plugin also lays a
+fine tiling grain over them up close (see rendering.md, Roofs); env model
+URLs carry `ENV_MODELS_V` (app.js `loadModelInstance`): bump it when the
+files are rebuilt.
+
 Faults to watch for: soft cast shadows and ground or grass discs under the
 object (ask for none, reject inputs that keep them), hollow things filled in
 (a well's shaft), plaster whiter than the scenes, spiky roof-ridge noise,
