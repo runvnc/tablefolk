@@ -1,9 +1,9 @@
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
 new file mode 100644
-index 0000000..72d21bc
+index 0000000..742604e
 --- /dev/null
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
-@@ -0,0 +1,1071 @@
+@@ -0,0 +1,1089 @@
 +// Fused kernels for chains of small ops (Inkling 2 glue: row L2 clips, loop controllers, short convolutions with their
 +// state store, depth mixes, SiTU, the MoE expert sum). At batch size 1 each graph node is one dispatch, and the cost
 +// of a dispatch (encoding, the barrier after it, a mostly idle GPU) dwarfs its arithmetic: Inkling 2 Mini runs ~8,250
@@ -44,6 +44,8 @@ index 0000000..72d21bc
 +    const ggml_tensor * slot[WF_MAX_SLOTS] = {};      // tensors by kernel slot
 +    std::vector<uint32_t> p;                          // kernel parameters after the slot words
 +    uint32_t            wg_x = 1, wg_y = 1;
++    int                 variant = 0;                  // a specialization of the kernel (0: none)
++    std::string         consts;                       // WGSL consts prepended for the variant
 +};
 +
 +static bool wf_is_noop(const ggml_tensor * t) {
@@ -231,6 +233,14 @@ index 0000000..72d21bc
 +    let w = ldw(pu(2u*k), a >> 2u);
 +    return f32(bitcast<i32>(w << (24u - 8u*(a & 3u))) >> 24u);
 +}
++fn ldu(k: u32, byte: u32) -> u32 {   // a u32 at any byte offset
++    let a = pu(2u*k + 1u) + byte;
++    let g = pu(2u*k);
++    let lo = ldw(g, a >> 2u);
++    let sh = (a & 3u)*8u;
++    if (sh == 0u) { return lo; }
++    return (lo >> sh) | (ldw(g, (a >> 2u) + 1u) << (32u - sh));
++}
 +fn tanh_s(x: f32) -> f32 { return tanh(clamp(x, -15.0, 15.0)); }
 +fn sigmoid_s(x: f32) -> f32 { return 1.0 / (1.0 + exp(-clamp(x, -80.0, 80.0))); }
 +fn wid_lin(wid: vec3<u32>, nwg: vec3<u32>) -> u32 { return wid.x + wid.y * nwg.x; }
@@ -282,7 +292,14 @@ index 0000000..72d21bc
 +            let blk = row + b*34u;
 +            let d = ldh(k, blk);
 +            var t = 0.0;
-+            for (var j = 0u; j < 32u; j++) { t += ldi8(k, blk + 2u + j) * ldf(0u, ht + (b*32u + j)*4u); }
++            for (var j4 = 0u; j4 < 8u; j4++) {
++                let w = ldu(k, blk + 2u + 4u*j4);
++                let hb = ht + (b*32u + 4u*j4)*4u;
++                t += f32(bitcast<i32>(w << 24u) >> 24u) * ldf(0u, hb)
++                   + f32(bitcast<i32>(w << 16u) >> 24u) * ldf(0u, hb + 4u)
++                   + f32(bitcast<i32>(w << 8u) >> 24u) * ldf(0u, hb + 8u)
++                   + f32(bitcast<i32>(w) >> 24u) * ldf(0u, hb + 12u);
++            }
 +            s += d*t;
 +        }
 +    }
@@ -430,10 +447,13 @@ index 0000000..72d21bc
 +
 +// MIX: slots st0 q1 dst2; p (from 6): n L Q T st_nb1 st_nb2 q_nb1 d_nb1 d_nb2 eps sm_scale nchunk
 +//   per token: z_l = rms_norm(st_l), w_q = softmax_l(sm_scale*<z_l, q_q>), y_q = sum_l w_ql z_l
-+//   workgroups of 128 per (output chunk of 128, token); each recomputes the (small) scores; L <= 16, Q <= 4
++//   workgroups of 128 per (output chunk of 128, token), each recomputes the (small) scores. The kernel is
++//   specialized on L (states) and Q (queries) so that the per-thread sums stay in registers: ML and MQ are
++//   prepended as consts.
 +static const char * wf_wgsl_mix = R"(
-+var<workgroup> part: array<f32, 2048>;   // 16 sums x 128 threads
-+var<workgroup> wsh: array<f32, 80>;
++var<workgroup> rs: array<f32, 128>;
++var<workgroup> rd: array<vec4<f32>, 128>;
++var<workgroup> wsh: array<vec4<f32>, ML>;
 +@compute @workgroup_size(128)
 +fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
 +    let nch = pu(17u);
@@ -441,55 +461,51 @@ index 0000000..72d21bc
 +    let t = lin / nch;
 +    let chunk = lin % nch;
 +    let n = pu(6u);
-+    let L = pu(7u);
-+    let Q = pu(8u);
 +    if (t >= pu(9u)) { return; }
 +    let tid = lid.x;
-+    var v: array<f32, 80>;   // 0..15 sum of squares per state, 16 + q*16 + l dots
-+    for (var k = 0u; k < 80u; k++) { v[k] = 0.0; }
++    var ss: array<f32, ML>;
++    var dq: array<vec4<f32>, ML>;
++    for (var l = 0u; l < ML; l++) { ss[l] = 0.0; dq[l] = vec4<f32>(0.0); }
 +    for (var c = tid; c < n; c += 128u) {
-+        var qv: array<f32, 4>;
-+        for (var q = 0u; q < Q; q++) { qv[q] = ldf(1u, q*pu(12u) + c*4u); }
-+        for (var l = 0u; l < L; l++) {
++        var qv = vec4<f32>(0.0);
++        for (var q = 0u; q < MQ; q++) { qv[q] = ldf(1u, q*pu(12u) + c*4u); }
++        for (var l = 0u; l < ML; l++) {
 +            let x = ldf(0u, t*pu(11u) + l*pu(10u) + c*4u);
-+            v[l] += x*x;
-+            for (var q = 0u; q < Q; q++) { v[16u + q*16u + l] += x * qv[q]; }
++            ss[l] += x*x;
++            dq[l] += x * qv;
 +        }
 +    }
-+    for (var bt = 0u; bt < 5u; bt++) {
-+        for (var j = 0u; j < 16u; j++) { part[j*128u + tid] = v[bt*16u + j]; }
++    // reduce each state's sums across the workgroup, then turn them into weight x norm scale per query
++    for (var l = 0u; l < ML; l++) {
++        rs[tid] = ss[l];
++        rd[tid] = dq[l];
 +        workgroupBarrier();
-+        if (tid < 16u) {
-+            var s = 0.0;
-+            for (var j = 0u; j < 128u; j++) { s += part[tid*128u + j]; }
-+            wsh[bt*16u + tid] = s;
++        for (var o = 64u; o > 0u; o >>= 1u) {
++            if (tid < o) { rs[tid] += rs[tid + o]; rd[tid] += rd[tid + o]; }
++            workgroupBarrier();
 +        }
++        if (tid == 0u) {
++            let r = inverseSqrt(rs[0]/f32(n) + pf(15u));
++            wsh[l] = vec4<f32>(rd[0] * (r * pf(16u)));   // scores
++            rs[0] = r;
++        }
++        workgroupBarrier();
++        if (tid == 0u) { ss[l] = rs[0]; }   // thread 0 keeps the norm scales
 +        workgroupBarrier();
 +    }
-+    if (tid < Q) {
-+        let q = tid;
-+        var mx = -3.4e38;
-+        for (var l = 0u; l < L; l++) {
-+            let rs = inverseSqrt(wsh[l]/f32(n) + pf(15u));
-+            let sc = wsh[16u + q*16u + l]*rs*pf(16u);
-+            wsh[16u + q*16u + l] = sc;
-+            mx = max(mx, sc);
-+        }
-+        var den = 0.0;
-+        for (var l = 0u; l < L; l++) { den += exp(wsh[16u + q*16u + l] - mx); }
-+        for (var l = 0u; l < L; l++) {
-+            let rs = inverseSqrt(wsh[l]/f32(n) + pf(15u));
-+            wsh[16u + q*16u + l] = exp(wsh[16u + q*16u + l] - mx) / den * rs;   // weight times the norm scale
-+        }
++    if (tid == 0u) {
++        var mx = vec4<f32>(-3.4e38);
++        for (var l = 0u; l < ML; l++) { mx = max(mx, wsh[l]); }
++        var den = vec4<f32>(0.0);
++        for (var l = 0u; l < ML; l++) { den += exp(wsh[l] - mx); }
++        for (var l = 0u; l < ML; l++) { wsh[l] = exp(wsh[l] - mx) / den * ss[l]; }
 +    }
 +    workgroupBarrier();
 +    let c = chunk*128u + tid;
 +    if (c < n) {
-+        for (var q = 0u; q < Q; q++) {
-+            var y = 0.0;
-+            for (var l = 0u; l < L; l++) { y += wsh[16u + q*16u + l] * ldf(0u, t*pu(11u) + l*pu(10u) + c*4u); }
-+            stf(2u, t*pu(14u) + q*pu(13u) + c*4u, y);
-+        }
++        var y = vec4<f32>(0.0);
++        for (var l = 0u; l < ML; l++) { y += wsh[l] * ldf(0u, t*pu(11u) + l*pu(10u) + c*4u); }
++        for (var q = 0u; q < MQ; q++) { stf(2u, t*pu(14u) + q*pu(13u) + c*4u, y[q]); }
 +    }
 +}
 +)";
@@ -1048,6 +1064,8 @@ index 0000000..72d21bc
 +                  (uint32_t) st->nb[1],  (uint32_t) st->nb[2],  (uint32_t) q->nb[1],  (uint32_t) dst->nb[1],
 +                  (uint32_t) dst->nb[2], wf_f(ggml_get_op_params_f32(N[0], 0)), wf_f(sm_scale), (uint32_t) CEIL_DIV(n, 128) };
 +    c.wg_x    = (uint32_t) (CEIL_DIV(n, 128) * T);
++    c.variant = (int) (L * 8 + Q);
++    c.consts  = "const ML: u32 = " + std::to_string(L) + "u;\nconst MQ: u32 = " + std::to_string(Q) + "u;\n";
 +    return true;
 +}
 +
@@ -1075,8 +1093,46 @@ index 0000000..72d21bc
 +            return false;
 +    }
 +}
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp
+index cc7f660..87c2960 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp
+@@ -56,6 +56,9 @@
+ #define WEBGPU_MUL_MAT_VEC_FLOAT_OUTPUTS_PER_WG    4
+ #define WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG 4
+ #define WEBGPU_MUL_MAT_VEC_K_Q_OUTPUTS_PER_WG      4
++#ifndef WEBGPU_MUL_MAT_VEC_IQ2XXS_OUTPUTS_PER_WG
++#    define WEBGPU_MUL_MAT_VEC_IQ2XXS_OUTPUTS_PER_WG 8
++#endif
+ 
+ // default size for reg-tile matrix multiplication
+ #define WEBGPU_MUL_MAT_WG_SIZE 256
+@@ -2314,6 +2317,11 @@ class ggml_webgpu_shader_lib {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
+         } else if (key.src0_type >= GGML_TYPE_Q2_K) {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_K_Q_OUTPUTS_PER_WG;
++            if (key.src0_type == GGML_TYPE_IQ2_XXS) {
++                // the IQ2_XXS tables are filled into workgroup memory once per workgroup: more rows per workgroup
++                const char * r = getenv("GGML_WEBGPU_IQ2XXS_ROWS");
++                outputs_per_wg = r ? (uint32_t) atoi(r) : WEBGPU_MUL_MAT_VEC_IQ2XXS_OUTPUTS_PER_WG;
++            }
+         } else if (key.src0_type >= GGML_TYPE_Q4_0) {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
+         }
+@@ -2779,6 +2787,11 @@ class ggml_webgpu_shader_lib {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
+         } else if (key.src0_type >= GGML_TYPE_Q2_K) {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_K_Q_OUTPUTS_PER_WG;
++            if (key.src0_type == GGML_TYPE_IQ2_XXS) {
++                // the IQ2_XXS tables are filled into workgroup memory once per workgroup: more rows per workgroup
++                const char * r = getenv("GGML_WEBGPU_IQ2XXS_ROWS");
++                outputs_per_wg = r ? (uint32_t) atoi(r) : WEBGPU_MUL_MAT_VEC_IQ2XXS_OUTPUTS_PER_WG;
++            }
+         } else if (key.src0_type >= GGML_TYPE_Q4_0) {
+             outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
+         }
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
-index 95040c4..e118a0d 100644
+index 95040c4..9ab9329 100644
 --- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 @@ -192,7 +192,8 @@ struct webgpu_capabilities {
@@ -1116,7 +1172,17 @@ index 95040c4..e118a0d 100644
      wgpu::Buffer             set_rows_dev_error_buf;
      wgpu::Buffer             set_rows_host_error_buf;
      wgpu::CommandEncoder     active_command_encoder;
-@@ -3762,6 +3776,91 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
+@@ -604,6 +618,9 @@ static int ggml_webgpu_env_int(const char * name, int def) {
+ #ifndef GGML_WEBGPU_PARAM_BATCH_WRITE
+ #    define GGML_WEBGPU_PARAM_BATCH_WRITE 1
+ #endif
++#ifndef GGML_WEBGPU_MMVQ
++#    define GGML_WEBGPU_MMVQ 1
++#endif
+ #ifndef GGML_WEBGPU_SUBMIT_BATCH
+ #    define GGML_WEBGPU_SUBMIT_BATCH WEBGPU_DEFAULT_COMMAND_SUBMIT_BATCH_SIZE
+ #endif
+@@ -3762,6 +3779,92 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
      return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
  }
  
@@ -1191,12 +1257,13 @@ index 95040c4..e118a0d 100644
 +        }
 +    }
 +
-+    auto it = ctx->fuse_pipelines.find((int) c.type);
++    const int key = (int) c.type + WF_COUNT * c.variant;
++    auto      it  = ctx->fuse_pipelines.find(key);
 +    if (it == ctx->fuse_pipelines.end()) {
-+        std::string code = std::string(wf_wgsl_prelude) + kernels[c.type];
++        std::string code = c.consts + wf_wgsl_prelude + kernels[c.type];
 +        std::string name = std::string("fused_") + wf_names[c.type];
-+        it = ctx->fuse_pipelines.emplace((int) c.type, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
-+                                                                                   name.c_str())).first;
++        it = ctx->fuse_pipelines.emplace(key, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
++                                                                          name.c_str())).first;
 +    }
 +    uint32_t wg_x, wg_y;
 +    compute_2d_workgroups(std::max(1u, c.wg_x), lim.maxComputeWorkgroupsPerDimension, wg_x, wg_y);
@@ -1208,7 +1275,7 @@ index 95040c4..e118a0d 100644
  // Returns the encoded command, or std::nullopt if the operation is a no-op
  static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
                                                             ggml_cgraph *  cgraph,
-@@ -3778,6 +3877,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+@@ -3778,6 +3881,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
      }
      WEBGPU_LOG_DEBUG("ggml_webgpu_encode(" << node << ", " << ggml_op_name(node->op) << ")");
  
@@ -1225,7 +1292,7 @@ index 95040c4..e118a0d 100644
      ggml_tensor * src0 = node->src[0];
      ggml_tensor * src1 = node->src[1];
      ggml_tensor * src2 = node->src[2];
-@@ -4009,6 +4118,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+@@ -4009,6 +4122,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
          }
          GGML_LOG_INFO("ggml_webgpu ops in a %d-node graph: %s\n", cgraph->n_nodes, line.c_str());
      }
@@ -1261,7 +1328,17 @@ index 95040c4..e118a0d 100644
      if (st.have_last) {
          st.gap_ms += std::chrono::duration<double, std::milli>(t_start - st.last_end).count();
      }
-@@ -5005,6 +5143,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+@@ -4888,7 +5030,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
+         ctx->webgpu_global_ctx->adapter.HasFeature(wgpu::FeatureName::Subgroups);
+     // for dot4I8packed
+     ctx->webgpu_global_ctx->capabilities.supports_dot_product = ctx->webgpu_global_ctx->instance.HasWGSLLanguageFeature(
+-        wgpu::WGSLLanguageFeatureName::Packed4x8IntegerDotProduct);
++        wgpu::WGSLLanguageFeatureName::Packed4x8IntegerDotProduct) &&
++        ggml_webgpu_env_int("GGML_WEBGPU_MMVQ", GGML_WEBGPU_MMVQ) != 0;
+ 
+     bool valid_subgroup_matrix_config = false;
+ #if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
+@@ -5005,6 +5148,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
      webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
      webgpu_ctx->param_batch_write =
          ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
@@ -1270,3 +1347,142 @@ index 95040c4..e118a0d 100644
      webgpu_ctx->param_arena.init(
          webgpu_ctx->global_ctx->device, WEBGPU_PARAMS_BUF_SIZE_BYTES,
          webgpu_ctx->global_ctx->command_submit_batch_size + WEBGPU_NUM_PARAM_SLOT_SAFETY_MARGIN,
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/iq2xxs_ws.tmpl b/ggml/src/ggml-webgpu/wgsl-shaders/iq2xxs_ws.tmpl
+new file mode 100644
+index 0000000..90a5dce
+--- /dev/null
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/iq2xxs_ws.tmpl
+@@ -0,0 +1,78 @@
++// IQ2_XXS tables in workgroup memory for the mat-vec kernels: a module-scope const array indexed at run time is
++// copied into every invocation (2 KB of private memory per thread), which made the IQ2_XXS MUL_MAT_ID vec kernel
++// ~20x slower than its memory traffic. Generated from common_decls.tmpl; filled by fill_iq2xxs_ws, 8 words per thread.
++var<workgroup> iq2xxs_grid_ws: array<u32, 512>;
++var<workgroup> ksigns_iq2xs_ws: array<u32, 32>;
++fn fill_iq2xxs_ws(tid: u32) {
++    switch (tid) {
++        case 0u: { iq2xxs_grid_ws[0] = 0x08080808u; iq2xxs_grid_ws[1] = 0x08080808u; iq2xxs_grid_ws[2] = 0x0808082bu; iq2xxs_grid_ws[3] = 0x08080808u; iq2xxs_grid_ws[4] = 0x08081919u; iq2xxs_grid_ws[5] = 0x08080808u; iq2xxs_grid_ws[6] = 0x08082b08u; iq2xxs_grid_ws[7] = 0x08080808u; }
++        case 1u: { iq2xxs_grid_ws[8] = 0x08082b2bu; iq2xxs_grid_ws[9] = 0x08080808u; iq2xxs_grid_ws[10] = 0x08190819u; iq2xxs_grid_ws[11] = 0x08080808u; iq2xxs_grid_ws[12] = 0x08191908u; iq2xxs_grid_ws[13] = 0x08080808u; iq2xxs_grid_ws[14] = 0x082b0808u; iq2xxs_grid_ws[15] = 0x08080808u; }
++        case 2u: { iq2xxs_grid_ws[16] = 0x082b082bu; iq2xxs_grid_ws[17] = 0x08080808u; iq2xxs_grid_ws[18] = 0x082b2b08u; iq2xxs_grid_ws[19] = 0x08080808u; iq2xxs_grid_ws[20] = 0x082b2b2bu; iq2xxs_grid_ws[21] = 0x08080808u; iq2xxs_grid_ws[22] = 0x19080819u; iq2xxs_grid_ws[23] = 0x08080808u; }
++        case 3u: { iq2xxs_grid_ws[24] = 0x19081908u; iq2xxs_grid_ws[25] = 0x08080808u; iq2xxs_grid_ws[26] = 0x19190808u; iq2xxs_grid_ws[27] = 0x08080808u; iq2xxs_grid_ws[28] = 0x19192b08u; iq2xxs_grid_ws[29] = 0x08080808u; iq2xxs_grid_ws[30] = 0x192b0819u; iq2xxs_grid_ws[31] = 0x08080808u; }
++        case 4u: { iq2xxs_grid_ws[32] = 0x192b1908u; iq2xxs_grid_ws[33] = 0x08080808u; iq2xxs_grid_ws[34] = 0x2b080808u; iq2xxs_grid_ws[35] = 0x08080808u; iq2xxs_grid_ws[36] = 0x2b08082bu; iq2xxs_grid_ws[37] = 0x08080808u; iq2xxs_grid_ws[38] = 0x2b082b2bu; iq2xxs_grid_ws[39] = 0x08080808u; }
++        case 5u: { iq2xxs_grid_ws[40] = 0x2b2b082bu; iq2xxs_grid_ws[41] = 0x08080808u; iq2xxs_grid_ws[42] = 0x08080819u; iq2xxs_grid_ws[43] = 0x08080819u; iq2xxs_grid_ws[44] = 0x08081908u; iq2xxs_grid_ws[45] = 0x08080819u; iq2xxs_grid_ws[46] = 0x08190808u; iq2xxs_grid_ws[47] = 0x08080819u; }
++        case 6u: { iq2xxs_grid_ws[48] = 0x08191919u; iq2xxs_grid_ws[49] = 0x08080819u; iq2xxs_grid_ws[50] = 0x19080808u; iq2xxs_grid_ws[51] = 0x08080819u; iq2xxs_grid_ws[52] = 0x2b081908u; iq2xxs_grid_ws[53] = 0x08080819u; iq2xxs_grid_ws[54] = 0x2b192b08u; iq2xxs_grid_ws[55] = 0x08080819u; }
++        case 7u: { iq2xxs_grid_ws[56] = 0x08080808u; iq2xxs_grid_ws[57] = 0x0808082bu; iq2xxs_grid_ws[58] = 0x0808082bu; iq2xxs_grid_ws[59] = 0x0808082bu; iq2xxs_grid_ws[60] = 0x082b082bu; iq2xxs_grid_ws[61] = 0x0808082bu; iq2xxs_grid_ws[62] = 0x2b08082bu; iq2xxs_grid_ws[63] = 0x0808082bu; }
++        case 8u: { iq2xxs_grid_ws[64] = 0x08080819u; iq2xxs_grid_ws[65] = 0x08081908u; iq2xxs_grid_ws[66] = 0x08081908u; iq2xxs_grid_ws[67] = 0x08081908u; iq2xxs_grid_ws[68] = 0x08190808u; iq2xxs_grid_ws[69] = 0x08081908u; iq2xxs_grid_ws[70] = 0x082b0819u; iq2xxs_grid_ws[71] = 0x08081908u; }
++        case 9u: { iq2xxs_grid_ws[72] = 0x082b1908u; iq2xxs_grid_ws[73] = 0x08081908u; iq2xxs_grid_ws[74] = 0x19080808u; iq2xxs_grid_ws[75] = 0x08081908u; iq2xxs_grid_ws[76] = 0x1908082bu; iq2xxs_grid_ws[77] = 0x08081908u; iq2xxs_grid_ws[78] = 0x19082b08u; iq2xxs_grid_ws[79] = 0x08081908u; }
++        case 10u: { iq2xxs_grid_ws[80] = 0x192b0808u; iq2xxs_grid_ws[81] = 0x08081908u; iq2xxs_grid_ws[82] = 0x2b080819u; iq2xxs_grid_ws[83] = 0x08081908u; iq2xxs_grid_ws[84] = 0x2b081908u; iq2xxs_grid_ws[85] = 0x08081908u; iq2xxs_grid_ws[86] = 0x2b190808u; iq2xxs_grid_ws[87] = 0x08081908u; }
++        case 11u: { iq2xxs_grid_ws[88] = 0x2b2b1908u; iq2xxs_grid_ws[89] = 0x08081908u; iq2xxs_grid_ws[90] = 0x08080808u; iq2xxs_grid_ws[91] = 0x08081919u; iq2xxs_grid_ws[92] = 0x0808082bu; iq2xxs_grid_ws[93] = 0x08081919u; iq2xxs_grid_ws[94] = 0x08082b08u; iq2xxs_grid_ws[95] = 0x08081919u; }
++        case 12u: { iq2xxs_grid_ws[96] = 0x082b0808u; iq2xxs_grid_ws[97] = 0x08081919u; iq2xxs_grid_ws[98] = 0x1908192bu; iq2xxs_grid_ws[99] = 0x08081919u; iq2xxs_grid_ws[100] = 0x192b2b19u; iq2xxs_grid_ws[101] = 0x08081919u; iq2xxs_grid_ws[102] = 0x2b080808u; iq2xxs_grid_ws[103] = 0x08081919u; }
++        case 13u: { iq2xxs_grid_ws[104] = 0x2b190819u; iq2xxs_grid_ws[105] = 0x08081919u; iq2xxs_grid_ws[106] = 0x08082b19u; iq2xxs_grid_ws[107] = 0x0808192bu; iq2xxs_grid_ws[108] = 0x08190808u; iq2xxs_grid_ws[109] = 0x0808192bu; iq2xxs_grid_ws[110] = 0x19080808u; iq2xxs_grid_ws[111] = 0x0808192bu; }
++        case 14u: { iq2xxs_grid_ws[112] = 0x2b081908u; iq2xxs_grid_ws[113] = 0x0808192bu; iq2xxs_grid_ws[114] = 0x2b2b1908u; iq2xxs_grid_ws[115] = 0x0808192bu; iq2xxs_grid_ws[116] = 0x08080808u; iq2xxs_grid_ws[117] = 0x08082b08u; iq2xxs_grid_ws[118] = 0x08081919u; iq2xxs_grid_ws[119] = 0x08082b08u; }
++        case 15u: { iq2xxs_grid_ws[120] = 0x08082b08u; iq2xxs_grid_ws[121] = 0x08082b08u; iq2xxs_grid_ws[122] = 0x08191908u; iq2xxs_grid_ws[123] = 0x08082b08u; iq2xxs_grid_ws[124] = 0x082b2b08u; iq2xxs_grid_ws[125] = 0x08082b08u; iq2xxs_grid_ws[126] = 0x19080819u; iq2xxs_grid_ws[127] = 0x08082b08u; }
++        case 16u: { iq2xxs_grid_ws[128] = 0x19081908u; iq2xxs_grid_ws[129] = 0x08082b08u; iq2xxs_grid_ws[130] = 0x19190808u; iq2xxs_grid_ws[131] = 0x08082b08u; iq2xxs_grid_ws[132] = 0x1919082bu; iq2xxs_grid_ws[133] = 0x08082b08u; iq2xxs_grid_ws[134] = 0x2b082b08u; iq2xxs_grid_ws[135] = 0x08082b08u; }
++        case 17u: { iq2xxs_grid_ws[136] = 0x08081908u; iq2xxs_grid_ws[137] = 0x08082b19u; iq2xxs_grid_ws[138] = 0x19080808u; iq2xxs_grid_ws[139] = 0x08082b19u; iq2xxs_grid_ws[140] = 0x0808082bu; iq2xxs_grid_ws[141] = 0x08082b2bu; iq2xxs_grid_ws[142] = 0x08191908u; iq2xxs_grid_ws[143] = 0x08082b2bu; }
++        case 18u: { iq2xxs_grid_ws[144] = 0x08080819u; iq2xxs_grid_ws[145] = 0x08190808u; iq2xxs_grid_ws[146] = 0x08081908u; iq2xxs_grid_ws[147] = 0x08190808u; iq2xxs_grid_ws[148] = 0x08190808u; iq2xxs_grid_ws[149] = 0x08190808u; iq2xxs_grid_ws[150] = 0x082b0819u; iq2xxs_grid_ws[151] = 0x08190808u; }
++        case 19u: { iq2xxs_grid_ws[152] = 0x19080808u; iq2xxs_grid_ws[153] = 0x08190808u; iq2xxs_grid_ws[154] = 0x192b0808u; iq2xxs_grid_ws[155] = 0x08190808u; iq2xxs_grid_ws[156] = 0x2b081908u; iq2xxs_grid_ws[157] = 0x08190808u; iq2xxs_grid_ws[158] = 0x2b190808u; iq2xxs_grid_ws[159] = 0x08190808u; }
++        case 20u: { iq2xxs_grid_ws[160] = 0x2b191919u; iq2xxs_grid_ws[161] = 0x08190808u; iq2xxs_grid_ws[162] = 0x08080808u; iq2xxs_grid_ws[163] = 0x08190819u; iq2xxs_grid_ws[164] = 0x08082b08u; iq2xxs_grid_ws[165] = 0x08190819u; iq2xxs_grid_ws[166] = 0x082b0808u; iq2xxs_grid_ws[167] = 0x08190819u; }
++        case 21u: { iq2xxs_grid_ws[168] = 0x19190808u; iq2xxs_grid_ws[169] = 0x08190819u; iq2xxs_grid_ws[170] = 0x19192b2bu; iq2xxs_grid_ws[171] = 0x08190819u; iq2xxs_grid_ws[172] = 0x2b080808u; iq2xxs_grid_ws[173] = 0x08190819u; iq2xxs_grid_ws[174] = 0x082b1908u; iq2xxs_grid_ws[175] = 0x0819082bu; }
++        case 22u: { iq2xxs_grid_ws[176] = 0x19081919u; iq2xxs_grid_ws[177] = 0x0819082bu; iq2xxs_grid_ws[178] = 0x08080808u; iq2xxs_grid_ws[179] = 0x08191908u; iq2xxs_grid_ws[180] = 0x08082b08u; iq2xxs_grid_ws[181] = 0x08191908u; iq2xxs_grid_ws[182] = 0x082b0808u; iq2xxs_grid_ws[183] = 0x08191908u; }
++        case 23u: { iq2xxs_grid_ws[184] = 0x082b1919u; iq2xxs_grid_ws[185] = 0x08191908u; iq2xxs_grid_ws[186] = 0x19082b19u; iq2xxs_grid_ws[187] = 0x08191908u; iq2xxs_grid_ws[188] = 0x2b080808u; iq2xxs_grid_ws[189] = 0x08191908u; iq2xxs_grid_ws[190] = 0x08192b08u; iq2xxs_grid_ws[191] = 0x08191919u; }
++        case 24u: { iq2xxs_grid_ws[192] = 0x192b082bu; iq2xxs_grid_ws[193] = 0x08191919u; iq2xxs_grid_ws[194] = 0x08080808u; iq2xxs_grid_ws[195] = 0x0819192bu; iq2xxs_grid_ws[196] = 0x0819192bu; iq2xxs_grid_ws[197] = 0x0819192bu; iq2xxs_grid_ws[198] = 0x08080819u; iq2xxs_grid_ws[199] = 0x08192b08u; }
++        case 25u: { iq2xxs_grid_ws[200] = 0x08081908u; iq2xxs_grid_ws[201] = 0x08192b08u; iq2xxs_grid_ws[202] = 0x08190808u; iq2xxs_grid_ws[203] = 0x08192b08u; iq2xxs_grid_ws[204] = 0x19080808u; iq2xxs_grid_ws[205] = 0x08192b08u; iq2xxs_grid_ws[206] = 0x2b080819u; iq2xxs_grid_ws[207] = 0x08192b08u; }
++        case 26u: { iq2xxs_grid_ws[208] = 0x08080808u; iq2xxs_grid_ws[209] = 0x08192b19u; iq2xxs_grid_ws[210] = 0x08081919u; iq2xxs_grid_ws[211] = 0x08192b19u; iq2xxs_grid_ws[212] = 0x2b2b0808u; iq2xxs_grid_ws[213] = 0x08192b19u; iq2xxs_grid_ws[214] = 0x19190819u; iq2xxs_grid_ws[215] = 0x08192b2bu; }
++        case 27u: { iq2xxs_grid_ws[216] = 0x08080808u; iq2xxs_grid_ws[217] = 0x082b0808u; iq2xxs_grid_ws[218] = 0x0808082bu; iq2xxs_grid_ws[219] = 0x082b0808u; iq2xxs_grid_ws[220] = 0x08082b2bu; iq2xxs_grid_ws[221] = 0x082b0808u; iq2xxs_grid_ws[222] = 0x19081908u; iq2xxs_grid_ws[223] = 0x082b0808u; }
++        case 28u: { iq2xxs_grid_ws[224] = 0x192b0819u; iq2xxs_grid_ws[225] = 0x082b0808u; iq2xxs_grid_ws[226] = 0x2b080808u; iq2xxs_grid_ws[227] = 0x082b0808u; iq2xxs_grid_ws[228] = 0x2b08082bu; iq2xxs_grid_ws[229] = 0x082b0808u; iq2xxs_grid_ws[230] = 0x082b2b19u; iq2xxs_grid_ws[231] = 0x082b0819u; }
++        case 29u: { iq2xxs_grid_ws[232] = 0x19082b08u; iq2xxs_grid_ws[233] = 0x082b0819u; iq2xxs_grid_ws[234] = 0x08080808u; iq2xxs_grid_ws[235] = 0x082b082bu; iq2xxs_grid_ws[236] = 0x0808082bu; iq2xxs_grid_ws[237] = 0x082b082bu; iq2xxs_grid_ws[238] = 0x08080819u; iq2xxs_grid_ws[239] = 0x082b1908u; }
++        case 30u: { iq2xxs_grid_ws[240] = 0x08081908u; iq2xxs_grid_ws[241] = 0x082b1908u; iq2xxs_grid_ws[242] = 0x08190808u; iq2xxs_grid_ws[243] = 0x082b1908u; iq2xxs_grid_ws[244] = 0x19080808u; iq2xxs_grid_ws[245] = 0x082b1908u; iq2xxs_grid_ws[246] = 0x1919192bu; iq2xxs_grid_ws[247] = 0x082b1908u; }
++        case 31u: { iq2xxs_grid_ws[248] = 0x08080808u; iq2xxs_grid_ws[249] = 0x082b1919u; iq2xxs_grid_ws[250] = 0x19080819u; iq2xxs_grid_ws[251] = 0x082b1919u; iq2xxs_grid_ws[252] = 0x192b1908u; iq2xxs_grid_ws[253] = 0x082b1919u; iq2xxs_grid_ws[254] = 0x2b190808u; iq2xxs_grid_ws[255] = 0x082b192bu; }
++        case 32u: { iq2xxs_grid_ws[256] = 0x08082b08u; iq2xxs_grid_ws[257] = 0x082b2b08u; iq2xxs_grid_ws[258] = 0x082b0808u; iq2xxs_grid_ws[259] = 0x082b2b08u; iq2xxs_grid_ws[260] = 0x2b191908u; iq2xxs_grid_ws[261] = 0x082b2b08u; iq2xxs_grid_ws[262] = 0x19081908u; iq2xxs_grid_ws[263] = 0x082b2b2bu; }
++        case 33u: { iq2xxs_grid_ws[264] = 0x08080819u; iq2xxs_grid_ws[265] = 0x19080808u; iq2xxs_grid_ws[266] = 0x08081908u; iq2xxs_grid_ws[267] = 0x19080808u; iq2xxs_grid_ws[268] = 0x08190808u; iq2xxs_grid_ws[269] = 0x19080808u; iq2xxs_grid_ws[270] = 0x08192b08u; iq2xxs_grid_ws[271] = 0x19080808u; }
++        case 34u: { iq2xxs_grid_ws[272] = 0x082b0819u; iq2xxs_grid_ws[273] = 0x19080808u; iq2xxs_grid_ws[274] = 0x082b1908u; iq2xxs_grid_ws[275] = 0x19080808u; iq2xxs_grid_ws[276] = 0x19080808u; iq2xxs_grid_ws[277] = 0x19080808u; iq2xxs_grid_ws[278] = 0x19082b08u; iq2xxs_grid_ws[279] = 0x19080808u; }
++        case 35u: { iq2xxs_grid_ws[280] = 0x1919192bu; iq2xxs_grid_ws[281] = 0x19080808u; iq2xxs_grid_ws[282] = 0x192b0808u; iq2xxs_grid_ws[283] = 0x19080808u; iq2xxs_grid_ws[284] = 0x2b080819u; iq2xxs_grid_ws[285] = 0x19080808u; iq2xxs_grid_ws[286] = 0x2b081908u; iq2xxs_grid_ws[287] = 0x19080808u; }
++        case 36u: { iq2xxs_grid_ws[288] = 0x2b190808u; iq2xxs_grid_ws[289] = 0x19080808u; iq2xxs_grid_ws[290] = 0x08080808u; iq2xxs_grid_ws[291] = 0x19080819u; iq2xxs_grid_ws[292] = 0x082b0808u; iq2xxs_grid_ws[293] = 0x19080819u; iq2xxs_grid_ws[294] = 0x192b0819u; iq2xxs_grid_ws[295] = 0x19080819u; }
++        case 37u: { iq2xxs_grid_ws[296] = 0x2b080808u; iq2xxs_grid_ws[297] = 0x19080819u; iq2xxs_grid_ws[298] = 0x2b081919u; iq2xxs_grid_ws[299] = 0x19080819u; iq2xxs_grid_ws[300] = 0x08080819u; iq2xxs_grid_ws[301] = 0x1908082bu; iq2xxs_grid_ws[302] = 0x08190808u; iq2xxs_grid_ws[303] = 0x1908082bu; }
++        case 38u: { iq2xxs_grid_ws[304] = 0x19082b08u; iq2xxs_grid_ws[305] = 0x1908082bu; iq2xxs_grid_ws[306] = 0x1919192bu; iq2xxs_grid_ws[307] = 0x1908082bu; iq2xxs_grid_ws[308] = 0x192b2b08u; iq2xxs_grid_ws[309] = 0x1908082bu; iq2xxs_grid_ws[310] = 0x08080808u; iq2xxs_grid_ws[311] = 0x19081908u; }
++        case 39u: { iq2xxs_grid_ws[312] = 0x08082b08u; iq2xxs_grid_ws[313] = 0x19081908u; iq2xxs_grid_ws[314] = 0x082b0808u; iq2xxs_grid_ws[315] = 0x19081908u; iq2xxs_grid_ws[316] = 0x2b080808u; iq2xxs_grid_ws[317] = 0x19081908u; iq2xxs_grid_ws[318] = 0x2b192b19u; iq2xxs_grid_ws[319] = 0x19081908u; }
++        case 40u: { iq2xxs_grid_ws[320] = 0x0819082bu; iq2xxs_grid_ws[321] = 0x19081919u; iq2xxs_grid_ws[322] = 0x082b1908u; iq2xxs_grid_ws[323] = 0x19081919u; iq2xxs_grid_ws[324] = 0x08080808u; iq2xxs_grid_ws[325] = 0x1908192bu; iq2xxs_grid_ws[326] = 0x08080819u; iq2xxs_grid_ws[327] = 0x19082b08u; }
++        case 41u: { iq2xxs_grid_ws[328] = 0x08081908u; iq2xxs_grid_ws[329] = 0x19082b08u; iq2xxs_grid_ws[330] = 0x08190808u; iq2xxs_grid_ws[331] = 0x19082b08u; iq2xxs_grid_ws[332] = 0x19080808u; iq2xxs_grid_ws[333] = 0x19082b08u; iq2xxs_grid_ws[334] = 0x19081919u; iq2xxs_grid_ws[335] = 0x19082b08u; }
++        case 42u: { iq2xxs_grid_ws[336] = 0x08080808u; iq2xxs_grid_ws[337] = 0x19082b19u; iq2xxs_grid_ws[338] = 0x19192b08u; iq2xxs_grid_ws[339] = 0x19082b19u; iq2xxs_grid_ws[340] = 0x192b0819u; iq2xxs_grid_ws[341] = 0x19082b19u; iq2xxs_grid_ws[342] = 0x2b08082bu; iq2xxs_grid_ws[343] = 0x19082b19u; }
++        case 43u: { iq2xxs_grid_ws[344] = 0x19081919u; iq2xxs_grid_ws[345] = 0x19082b2bu; iq2xxs_grid_ws[346] = 0x2b190808u; iq2xxs_grid_ws[347] = 0x19082b2bu; iq2xxs_grid_ws[348] = 0x08080808u; iq2xxs_grid_ws[349] = 0x19190808u; iq2xxs_grid_ws[350] = 0x08082b08u; iq2xxs_grid_ws[351] = 0x19190808u; }
++        case 44u: { iq2xxs_grid_ws[352] = 0x08190819u; iq2xxs_grid_ws[353] = 0x19190808u; iq2xxs_grid_ws[354] = 0x08192b19u; iq2xxs_grid_ws[355] = 0x19190808u; iq2xxs_grid_ws[356] = 0x082b0808u; iq2xxs_grid_ws[357] = 0x19190808u; iq2xxs_grid_ws[358] = 0x2b080808u; iq2xxs_grid_ws[359] = 0x19190808u; }
++        case 45u: { iq2xxs_grid_ws[360] = 0x2b082b08u; iq2xxs_grid_ws[361] = 0x19190808u; iq2xxs_grid_ws[362] = 0x08081908u; iq2xxs_grid_ws[363] = 0x19190819u; iq2xxs_grid_ws[364] = 0x1908082bu; iq2xxs_grid_ws[365] = 0x19190819u; iq2xxs_grid_ws[366] = 0x2b2b1908u; iq2xxs_grid_ws[367] = 0x19190819u; }
++        case 46u: { iq2xxs_grid_ws[368] = 0x2b190819u; iq2xxs_grid_ws[369] = 0x1919082bu; iq2xxs_grid_ws[370] = 0x2b190808u; iq2xxs_grid_ws[371] = 0x19191908u; iq2xxs_grid_ws[372] = 0x2b19082bu; iq2xxs_grid_ws[373] = 0x19191908u; iq2xxs_grid_ws[374] = 0x08082b2bu; iq2xxs_grid_ws[375] = 0x19191919u; }
++        case 47u: { iq2xxs_grid_ws[376] = 0x08080819u; iq2xxs_grid_ws[377] = 0x1919192bu; iq2xxs_grid_ws[378] = 0x19191908u; iq2xxs_grid_ws[379] = 0x1919192bu; iq2xxs_grid_ws[380] = 0x08080808u; iq2xxs_grid_ws[381] = 0x19192b08u; iq2xxs_grid_ws[382] = 0x08190819u; iq2xxs_grid_ws[383] = 0x19192b08u; }
++        case 48u: { iq2xxs_grid_ws[384] = 0x08192b19u; iq2xxs_grid_ws[385] = 0x19192b08u; iq2xxs_grid_ws[386] = 0x192b1908u; iq2xxs_grid_ws[387] = 0x19192b08u; iq2xxs_grid_ws[388] = 0x19080808u; iq2xxs_grid_ws[389] = 0x19192b19u; iq2xxs_grid_ws[390] = 0x08082b08u; iq2xxs_grid_ws[391] = 0x19192b2bu; }
++        case 49u: { iq2xxs_grid_ws[392] = 0x08081908u; iq2xxs_grid_ws[393] = 0x192b0808u; iq2xxs_grid_ws[394] = 0x08190808u; iq2xxs_grid_ws[395] = 0x192b0808u; iq2xxs_grid_ws[396] = 0x19080808u; iq2xxs_grid_ws[397] = 0x192b0808u; iq2xxs_grid_ws[398] = 0x192b2b08u; iq2xxs_grid_ws[399] = 0x192b0808u; }
++        case 50u: { iq2xxs_grid_ws[400] = 0x08080808u; iq2xxs_grid_ws[401] = 0x192b0819u; iq2xxs_grid_ws[402] = 0x19191919u; iq2xxs_grid_ws[403] = 0x192b0819u; iq2xxs_grid_ws[404] = 0x08192b08u; iq2xxs_grid_ws[405] = 0x192b082bu; iq2xxs_grid_ws[406] = 0x192b0808u; iq2xxs_grid_ws[407] = 0x192b082bu; }
++        case 51u: { iq2xxs_grid_ws[408] = 0x08080808u; iq2xxs_grid_ws[409] = 0x192b1908u; iq2xxs_grid_ws[410] = 0x08081919u; iq2xxs_grid_ws[411] = 0x192b1908u; iq2xxs_grid_ws[412] = 0x08190808u; iq2xxs_grid_ws[413] = 0x192b1919u; iq2xxs_grid_ws[414] = 0x0819082bu; iq2xxs_grid_ws[415] = 0x192b1919u; }
++        case 52u: { iq2xxs_grid_ws[416] = 0x2b081908u; iq2xxs_grid_ws[417] = 0x192b1919u; iq2xxs_grid_ws[418] = 0x1908082bu; iq2xxs_grid_ws[419] = 0x192b2b08u; iq2xxs_grid_ws[420] = 0x08080808u; iq2xxs_grid_ws[421] = 0x2b080808u; iq2xxs_grid_ws[422] = 0x0808082bu; iq2xxs_grid_ws[423] = 0x2b080808u; }
++        case 53u: { iq2xxs_grid_ws[424] = 0x08082b2bu; iq2xxs_grid_ws[425] = 0x2b080808u; iq2xxs_grid_ws[426] = 0x19080819u; iq2xxs_grid_ws[427] = 0x2b080808u; iq2xxs_grid_ws[428] = 0x2b08082bu; iq2xxs_grid_ws[429] = 0x2b080808u; iq2xxs_grid_ws[430] = 0x08081908u; iq2xxs_grid_ws[431] = 0x2b080819u; }
++        case 54u: { iq2xxs_grid_ws[432] = 0x08192b08u; iq2xxs_grid_ws[433] = 0x2b080819u; iq2xxs_grid_ws[434] = 0x19080808u; iq2xxs_grid_ws[435] = 0x2b080819u; iq2xxs_grid_ws[436] = 0x08190819u; iq2xxs_grid_ws[437] = 0x2b08082bu; iq2xxs_grid_ws[438] = 0x08080819u; iq2xxs_grid_ws[439] = 0x2b081908u; }
++        case 55u: { iq2xxs_grid_ws[440] = 0x08081908u; iq2xxs_grid_ws[441] = 0x2b081908u; iq2xxs_grid_ws[442] = 0x08190808u; iq2xxs_grid_ws[443] = 0x2b081908u; iq2xxs_grid_ws[444] = 0x08191919u; iq2xxs_grid_ws[445] = 0x2b081908u; iq2xxs_grid_ws[446] = 0x19080808u; iq2xxs_grid_ws[447] = 0x2b081908u; }
++        case 56u: { iq2xxs_grid_ws[448] = 0x192b0808u; iq2xxs_grid_ws[449] = 0x2b081908u; iq2xxs_grid_ws[450] = 0x08080808u; iq2xxs_grid_ws[451] = 0x2b081919u; iq2xxs_grid_ws[452] = 0x1908192bu; iq2xxs_grid_ws[453] = 0x2b081919u; iq2xxs_grid_ws[454] = 0x2b191908u; iq2xxs_grid_ws[455] = 0x2b081919u; }
++        case 57u: { iq2xxs_grid_ws[456] = 0x08082b19u; iq2xxs_grid_ws[457] = 0x2b08192bu; iq2xxs_grid_ws[458] = 0x19080808u; iq2xxs_grid_ws[459] = 0x2b08192bu; iq2xxs_grid_ws[460] = 0x192b0808u; iq2xxs_grid_ws[461] = 0x2b08192bu; iq2xxs_grid_ws[462] = 0x0808082bu; iq2xxs_grid_ws[463] = 0x2b082b08u; }
++        case 58u: { iq2xxs_grid_ws[464] = 0x08081908u; iq2xxs_grid_ws[465] = 0x2b082b19u; iq2xxs_grid_ws[466] = 0x08190819u; iq2xxs_grid_ws[467] = 0x2b082b2bu; iq2xxs_grid_ws[468] = 0x08081908u; iq2xxs_grid_ws[469] = 0x2b190808u; iq2xxs_grid_ws[470] = 0x08190808u; iq2xxs_grid_ws[471] = 0x2b190808u; }
++        case 59u: { iq2xxs_grid_ws[472] = 0x082b1908u; iq2xxs_grid_ws[473] = 0x2b190808u; iq2xxs_grid_ws[474] = 0x19080808u; iq2xxs_grid_ws[475] = 0x2b190808u; iq2xxs_grid_ws[476] = 0x2b2b0819u; iq2xxs_grid_ws[477] = 0x2b190808u; iq2xxs_grid_ws[478] = 0x0819192bu; iq2xxs_grid_ws[479] = 0x2b190819u; }
++        case 60u: { iq2xxs_grid_ws[480] = 0x2b080808u; iq2xxs_grid_ws[481] = 0x2b190819u; iq2xxs_grid_ws[482] = 0x19081919u; iq2xxs_grid_ws[483] = 0x2b19082bu; iq2xxs_grid_ws[484] = 0x08080808u; iq2xxs_grid_ws[485] = 0x2b191908u; iq2xxs_grid_ws[486] = 0x082b082bu; iq2xxs_grid_ws[487] = 0x2b191908u; }
++        case 61u: { iq2xxs_grid_ws[488] = 0x19081908u; iq2xxs_grid_ws[489] = 0x2b191908u; iq2xxs_grid_ws[490] = 0x19190819u; iq2xxs_grid_ws[491] = 0x2b191919u; iq2xxs_grid_ws[492] = 0x2b080819u; iq2xxs_grid_ws[493] = 0x2b192b08u; iq2xxs_grid_ws[494] = 0x082b0808u; iq2xxs_grid_ws[495] = 0x2b192b19u; }
++        case 62u: { iq2xxs_grid_ws[496] = 0x0808082bu; iq2xxs_grid_ws[497] = 0x2b2b0808u; iq2xxs_grid_ws[498] = 0x19190808u; iq2xxs_grid_ws[499] = 0x2b2b0808u; iq2xxs_grid_ws[500] = 0x2b081919u; iq2xxs_grid_ws[501] = 0x2b2b0808u; iq2xxs_grid_ws[502] = 0x08082b19u; iq2xxs_grid_ws[503] = 0x2b2b0819u; }
++        case 63u: { iq2xxs_grid_ws[504] = 0x08080808u; iq2xxs_grid_ws[505] = 0x2b2b082bu; iq2xxs_grid_ws[506] = 0x08192b08u; iq2xxs_grid_ws[507] = 0x2b2b1908u; iq2xxs_grid_ws[508] = 0x19190808u; iq2xxs_grid_ws[509] = 0x2b2b2b08u; iq2xxs_grid_ws[510] = 0x08081908u; iq2xxs_grid_ws[511] = 0x2b2b2b19u; }
++        case 64u: { ksigns_iq2xs_ws[0] = 0x03828100u; ksigns_iq2xs_ws[1] = 0x87060584u; ksigns_iq2xs_ws[2] = 0x8b0a0988u; ksigns_iq2xs_ws[3] = 0x0f8e8d0cu; ksigns_iq2xs_ws[4] = 0x93121190u; ksigns_iq2xs_ws[5] = 0x17969514u; ksigns_iq2xs_ws[6] = 0x1b9a9918u; ksigns_iq2xs_ws[7] = 0x9f1e1d9cu; }
++        case 65u: { ksigns_iq2xs_ws[8] = 0xa32221a0u; ksigns_iq2xs_ws[9] = 0x27a6a524u; ksigns_iq2xs_ws[10] = 0x2baaa928u; ksigns_iq2xs_ws[11] = 0xaf2e2dacu; ksigns_iq2xs_ws[12] = 0x33b2b130u; ksigns_iq2xs_ws[13] = 0xb73635b4u; ksigns_iq2xs_ws[14] = 0xbb3a39b8u; ksigns_iq2xs_ws[15] = 0x3fbebd3cu; }
++        case 66u: { ksigns_iq2xs_ws[16] = 0xc34241c0u; ksigns_iq2xs_ws[17] = 0x47c6c544u; ksigns_iq2xs_ws[18] = 0x4bcac948u; ksigns_iq2xs_ws[19] = 0xcf4e4dccu; ksigns_iq2xs_ws[20] = 0x53d2d150u; ksigns_iq2xs_ws[21] = 0xd75655d4u; ksigns_iq2xs_ws[22] = 0xdb5a59d8u; ksigns_iq2xs_ws[23] = 0x5fdedd5cu; }
++        case 67u: { ksigns_iq2xs_ws[24] = 0x63e2e160u; ksigns_iq2xs_ws[25] = 0xe76665e4u; ksigns_iq2xs_ws[26] = 0xeb6a69e8u; ksigns_iq2xs_ws[27] = 0x6feeed6cu; ksigns_iq2xs_ws[28] = 0xf37271f0u; ksigns_iq2xs_ws[29] = 0x77f6f574u; ksigns_iq2xs_ws[30] = 0x7bfaf978u; ksigns_iq2xs_ws[31] = 0xff7e7dfcu; }
++        default: {}
++    }
++}
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
+index e87cc6b..6450308 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id_vec.wgsl
+@@ -58,6 +58,10 @@ fn main(
+ ) {
+ 
+     let thread_id = local_id.x;
++#ifdef MUL_ACC_IQ2_XXS
++    fill_iq2xxs_ws(thread_id);
++    workgroupBarrier();
++#endif
+ 
+     let output_groups: u32 = (params.m + OUTPUTS_PER_WG - 1u) / OUTPUTS_PER_WG;
+     let wg_linear = wg_id.y * num_wg.x + wg_id.x;
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl
+index 1781a6c..0316e8d 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec.wgsl
+@@ -77,6 +77,10 @@ fn main(
+ #endif
+ ) {
+     let thread_id = local_id.x;
++#ifdef MUL_ACC_IQ2_XXS
++    fill_iq2xxs_ws(thread_id);
++    workgroupBarrier();
++#endif
+ 
+     let total_batches = params.bs02 * params.broadcast2 * params.bs03 * params.broadcast3;
+     let wg_linear = wg_id.y * num_wg.x + wg_id.x;
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec_acc.tmpl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec_acc.tmpl
+index 2c116aa..1ad969d 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec_acc.tmpl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_vec_acc.tmpl
+@@ -1075,6 +1075,7 @@ fn accumulate_vec_dot(thread_id: u32, row_base: u32, src0_batch_offset: u32, src
+ #endif
+ 
+ #ifdef MUL_ACC_IQ2_XXS
++#include "iq2xxs_ws.tmpl"
+ #define BLOCK_SIZE 256
+ #define BLOCK_SIZE_BYTES 66
+ #define THREADS_PER_BLOCK 16
+@@ -1116,9 +1117,9 @@ fn accumulate_vec_dot(thread_id: u32, row_base: u32, src0_batch_offset: u32, src
+                         let l = slot0 + ll;
+                         let grid_idx = (aux_lo >> (8u * l)) & 0xFFu;
+                         let signs_idx = (aux_hi >> (7u * l)) & 0x7Fu;
+-                        let signs = (ksigns_iq2xs[signs_idx / 4u] >> ((signs_idx % 4u) * 8u)) & 0xFFu;
+-                        let gw_lo = iq2xxs_grid[grid_idx * 2u];
+-                        let gw_hi = iq2xxs_grid[grid_idx * 2u + 1u];
++                        let signs = (ksigns_iq2xs_ws[signs_idx / 4u] >> ((signs_idx % 4u) * 8u)) & 0xFFu;
++                        let gw_lo = iq2xxs_grid_ws[grid_idx * 2u];
++                        let gw_hi = iq2xxs_grid_ws[grid_idx * 2u + 1u];
+                         for (var j = 0u; j < 8u; j++) {
+                             let gw = select(gw_hi, gw_lo, j < 4u);
+                             let b = f32((gw >> ((j & 3u) * 8u)) & 0xFFu);
