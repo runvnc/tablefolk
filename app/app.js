@@ -686,7 +686,11 @@ function freezeStaticScenery(){
   }
   return n;
 }
-addEventListener('tablefolk-scenario-started',()=>{ for(const ms of [1000,4000]) setTimeout(()=>{ try{ freezeStaticScenery(); }catch(e){ console.warn('[freeze]',e); } },ms); });
+// Under the loading cover it is the cover's last step before the reveal
+// (loading.js finish: walls and roofs are rebuilt by then, nothing in view
+// hitches); without a cover (?cover=0, a world started in view) on timers.
+window.tablefolkLoading?.finish('freeze',()=>{ try{ freezeStaticScenery(); }catch(e){ console.warn('[freeze]',e); } });
+addEventListener('tablefolk-scenario-started',()=>{ if(window.tablefolkLoading?.coverUp) return; for(const ms of [1000,4000]) setTimeout(()=>{ try{ freezeStaticScenery(); }catch(e){ console.warn('[freeze]',e); } },ms); });
 // Meshes of one material merged into one child of `node`, their transforms
 // relative to it baked into the vertices (a door's iron leaf and its rings, a
 // lantern's post and arm): one draw call where there were several, and still

@@ -741,6 +741,10 @@ body.user-mode #playerHp { font-size:11px; }
 #loadCover .lc-bar { position:relative; height:4px; margin:26px auto 12px; width:min(320px,100%); border-radius:99px; background:rgba(255,220,160,.12); overflow:hidden; }
 #loadCover .lc-bar i { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:inherit; background:linear-gradient(90deg,#b8894a,#ffd98a); box-shadow:0 0 8px rgba(255,217,138,.45); transition:width .3s cubic-bezier(.22,.8,.3,1); }
 #loadCover .lc-step { margin:0; min-height:1.4em; color:#9d917d; font-size:13px; }
+#loadCover.waking .lc-bar i { animation:lcWake 1.6s ease-in-out infinite; }
+#loadCover.waking .lc-step { color:#cbbfa9; }
+@keyframes lcWake { 50% { opacity:.45; } }
+@media (prefers-reduced-motion: reduce) { #loadCover.waking .lc-bar i { animation:none; } }
 #loadCover.short .lc-kicker, #loadCover.short .lc-sub { display:none; }
 #loadCover.short .lc-title { font-size:clamp(20px,4.5vw,26px); color:#efe3c8; }
 #loadCover.short { background:#0b0a09; }

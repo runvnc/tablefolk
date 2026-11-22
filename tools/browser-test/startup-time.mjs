@@ -5,7 +5,10 @@
 // fully dressed (scene mesh count steady 3 s after the world is active, and no
 // dressing work pending in window.__tfMarks). With --art the page gets ?art=1
 // (no model). Prints one JSON line; window.__tfMarks (ms summed per part) and
-// the loading stages (window.tablefolkLoading.log) are included. Never
+// the loading stages (window.tablefolkLoading.log) are included. `gap`: the
+// longest pause between drawn frames (`frame`, a held or frozen picture) and
+// between animation frames (`raf`, the main thread) in the 20 s after the
+// reveal, in ms, with when (`frameAt`, `rafAt`, s); the run waits for them. Never
 // approves a model download.
 //
 //   node startup-time.mjs <scenario name> [--art] [--base=http://localhost:8000]
@@ -46,6 +49,22 @@ await page.addInitScript(() => {
   addEventListener('tablefolk-scenario-started', () => at('started'));
   addEventListener('tablefolk-world-ready', () => at('reveal'));
   window.__tfAt = at;
+  // the longest gap between drawn frames (TABLEFOLK_FRAMES steps) and between
+  // animation frames (the main thread) in the first 20 s after the reveal
+  const G = T.gap = { frame: 0, frameAt: null, raf: 0, rafAt: null };
+  let lastF = -1, lastFT = 0, lastR = 0;
+  const tick = () => {
+    const t = performance.now(), sec = +((t - T.t0) / 1000).toFixed(2);
+    if (T.reveal != null && sec <= T.reveal + 20) {
+      const f = window.TABLEFOLK_FRAMES || 0;
+      if (lastR) { const d = t - lastR; if (d > G.raf) { G.raf = Math.round(d); G.rafAt = sec; } }
+      if (f !== lastF) { if (lastF >= 0) { const d = t - lastFT; if (d > G.frame) { G.frame = Math.round(d); G.frameAt = sec; } } lastF = f; lastFT = t; }
+      else if (lastF >= 0 && t - lastFT > G.frame) { G.frame = Math.round(t - lastFT); G.frameAt = sec; }
+    }
+    if (T.reveal != null && sec >= T.reveal + 20) G.done = true;
+    lastR = t; requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
   // main-thread long tasks per second (VERBOSE prints them)
   T.lt = {}; try { new PerformanceObserver(l => { for (const e of l.getEntries()) { const k = Math.floor((e.startTime - T.t0) / 1000); T.lt[k] = Math.round((T.lt[k] || 0) + e.duration); } }).observe({ type: 'longtask', buffered: true }); } catch {}
 });
@@ -95,8 +114,9 @@ for (;;) {
   }
   const doneBrain = art || (T.brain != null && T.firstTurn != null);
   const doneReveal = T.reveal != null || !s.hasLoading || t > 60;
+  const doneGap = !s.hasLoading || (T.reveal != null && (T.gap?.done || t > T.reveal + 25));
   if (r.dressed != null && doneReveal) sampling = false;
-  if (r.dressed != null && doneBrain && doneReveal) { Object.assign(r, T, { t0: undefined, lt: undefined }); r.marks = s.marks; break; }
+  if (r.dressed != null && doneBrain && doneReveal && doneGap) { Object.assign(r, T, { t0: undefined, lt: undefined }); r.marks = s.marks; break; }
   if (t > limit) { Object.assign(r, T, { t0: undefined, lt: undefined }); r.timeout = true; r.status = status; r.marks = s.marks; break; }
   await new Promise(res => setTimeout(res, 200));
 }

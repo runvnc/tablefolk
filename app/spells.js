@@ -35,9 +35,10 @@
  * sound effects (sfx.js enabled).
  *
  *   window.tablefolkSpells = { cast(g, spell, target), spawn(g, thing, n),
- *     fireballVfx(from, to), resolveThing(name), prewarm() (run 1.5 s after
- *     each world starts: draws every glow and particle kind once, invisibly, so
- *     the first spell doesn't stall on GPU pipelines), sound, audio: { source,
+ *     fireballVfx(from, to), resolveThing(name), prewarm() (once, under the
+ *     loading cover before the first reveal, or 1.5 s after a world starts
+ *     without one: draws every glow and particle kind once, invisibly, so
+ *     the first spell doesn't stall on GPU pipelines; returns a promise), sound, audio: { source,
  *     noise, tone } (the 3D sound helpers, also used by reactions.js's cries) }
  * The caster's arms: reactions.js gesture() plays and holds the cast clip.
  *
@@ -843,7 +844,8 @@
   // kinds of particle system are drawn for a few frames just in front of the
   // camera, all of them black or clear (nothing shows), then dropped.
   function prewarm() {
-    const s = sc(), cam = s?.activeCamera; if (!s || !cam || prewarm.done) return; prewarm.done = true;
+    const s = sc(), cam = s?.activeCamera; if (!s || !cam) return; if (prewarm.done) return prewarm.p; prewarm.done = true;
+    let finished; prewarm.p = new Promise(r => { finished = r; });
     const at = cam.globalPosition.add(cam.getForwardRay(1).direction.scale(1.5)), made = [];
     try {
       for (const k of ['flare', 'fire', 'smoke', 'ring', 'scorch']) T[k]();
@@ -865,7 +867,7 @@
     const obs = s.onAfterRenderObservable.add(() => {
       if (meshes.every(m => m.isReady(true)) && systems.every(p => p.isReady() && p.getActiveCount() > 0)) drawn++;
       if (drawn < 3 && performance.now() - t0 < 10000) return;
-      s.onAfterRenderObservable.remove(obs); prewarm.drawn = drawn >= 3;
+      s.onAfterRenderObservable.remove(obs); prewarm.drawn = drawn >= 3; finished();
       // the particle systems stay, stopped (disposing one let its compiled
       // effect go, and the first spell compiled it again)
       for (const x of made) try { if (x.getActiveCount) { x.stop(); x.emitRate = 0; } else x.dispose(); } catch {}
@@ -874,7 +876,10 @@
   // once a world is up and drawing (rendering is held while a scenario loads,
   // and nothing drawn then warms anything); a page without one: a while after
   // the scene is ready
-  window.addEventListener('tablefolk-scenario-started', () => setTimeout(prewarm, 1500));
+  // Under the loading cover: its last step before the reveal (loading.js finish;
+  // drawn under the cover, nothing in view hitches), else 1.5 s after a world starts.
+  window.tablefolkLoading?.finish('spells', prewarm);
+  window.addEventListener('tablefolk-scenario-started', () => { if (!window.tablefolkLoading?.coverUp) setTimeout(prewarm, 1500); });
   const fallback = () => setTimeout(prewarm, 8000);
   if (window.TABLEFOLK_SCENE_READY) fallback(); else window.addEventListener('tablefolk-scene-ready', fallback, { once: true });
 

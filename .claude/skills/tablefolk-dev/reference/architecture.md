@@ -111,10 +111,15 @@ is one event, `tablefolk-world-ready` ({ms, timedOut, pending, stages}), and
 | `roofs` | roofs.js, on `tablefolk-scenario-started` | the last roof or shell (one a frame) |
 | `travel` | scenario.js `curtain(true)` (a section) | `curtain(false)` |
 
-With nothing pending for 300 ms it settles: `scene.whenReadyAsync()` (every
-material and texture ready; at most 8 s) and four frames drawn under the
-cover (shaders compiled), then it fades out. 45 s after it went up it lifts
-anyway and notes in the "This device" pane what was still pending. While it
+With nothing pending for 300 ms it settles: the finishing steps
+(`tablefolkLoading.finish(name, fn)`, each at most 10 s: app.js `freeze`,
+`freezeStaticScenery`; spells.js `spells`, the spells' shader prewarm; both
+ran on timers after the reveal before 2026-11-22 and could hitch the first
+seconds in view; without a cover they still do), `scene.whenReadyAsync()`
+(every material and texture ready; at most 8 s) and four frames drawn under
+the cover (shaders compiled), then it fades out, or, the first time, wakes
+the characters first (below). 45 s after it went up it lifts anyway and notes
+in the "This device" pane what was still pending. While it
 is up the render loop draws at most 15 frames a second and
 `tablefolkDressGate` never waits for the model. A link's world is not
 preceded by the saved one any more (app.js skips `loadWorldState` and the
@@ -132,9 +137,19 @@ that asked for a turn has released, or 90 s):
    stages above); `pickForDevice` (the device probe, cached) and the brain
    manager's set-up, which read but do not load anything.
 2. `brain` (world-integration.js): the model's weights onto the card and its
-   warm-up (`tablefolkHoldRender` holds the picture during the warm-up, as
-   before). A model not yet downloaded asks first; the question waits while
-   the cover is up. Until the brain is ready characters run on code (rails).
+   warm-up (`tablefolkHoldRender` holds the picture during the warm-up).
+   A model already in the browser's cache (not an endpoint, not `?art=1`)
+   calls `tablefolkLoading.holdCover('brain', {step, capMs: 30000})` before
+   its turn: its turn comes as soon as the first world is built (the
+   `waking` entry in `.log`), and the cover stays up, "Waking the
+   characters…" with the full bar pulsing, until `release('brain')` (after
+   the ready status, so the picture's hold is off) or 30 s, after which the
+   world shows and the model finishes in view (noted in "This device"). The
+   45 s safety timeout covers the build only; the hold has its own cap.
+   `tablefolk-world-ready` fires at the lift, after the hold. A model not yet
+   downloaded asks first and starts after the reveal; the question waits
+   while the cover is up. Until the brain is ready characters run on code
+   (rails).
 3. `voice` (tts-ui.js auto-load, `tablefolkTTS.prepare`).
 4. `speech` (speech-input.js: Underdog Bark's preload, which also waits for
    the brain's status as before).

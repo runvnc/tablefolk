@@ -897,6 +897,7 @@ async function main() {
     cached = await hasActiveModelCached(manager);
     setCacheStatus(cached ? 'model cached' : 'not cached');
   } catch {}
+  const keyAtCheck = manager.getModelKey();
 
   const modelLabel = manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.label || manager.getModelKey();
   const loadBtn = el('loadBrains');
@@ -935,19 +936,26 @@ async function main() {
     // is built and shown (loading.js start-up queue, first in line): started beside the
     // world's own build both were slower, and the picture hitched (jank.mjs).
     const L = window.tablefolkLoading;
+    // A model already in the browser's cache sets up under the loading cover, right after
+    // the world is built (its warm-up holds the picture for seconds: better hidden than
+    // frozen in view); at most 30 s, then the world shows and it finishes in view. A
+    // download (asked first), an endpoint and ?art=1 start after the reveal as before.
+    const eng = getActiveEngine(manager);
+    if (L && cached && eng !== 'openai' && eng !== 'none' && manager.getModelKey() === keyAtCheck) L.holdCover('brain', { step: 'Waking the characters', capMs: 30000 });
     if (L) await L.turn('brain');
     else for (let i = 0; i < 60 && !(window.tablefolkScenario?.active && window.TABLEFOLK_STATE?.playerAvatar); i++) await new Promise(r => setTimeout(r, 100));
     setStatus('auto-loading ' + liveLabel + '...');
     console.log(cached ? '[character] loading cached model...' : '[character] starting approved download...', liveLabel);
     if (!await loadModelOnce(manager)) { window.tablefolkLoading?.release('brain'); return; }
     console.log('[character] auto-load completed, enabling buttons...');
-    window.tablefolkLoading?.release('brain');
     el('startBrains').disabled = false;
     el('stepBrains').disabled = false;
     el('loadBrains').disabled = true;
     world.state.nextAgentId = world.getAgents()[0]?.id || null;
     appendLog('local brain auto-loaded: ' + modelLabel);
     setStatus(modelLabel + ' ready', 'ready');
+    // (after the ready status: the picture's hold is off before the cover lifts)
+    window.tablefolkLoading?.release('brain');
   } catch (err) {
     window.tablefolkLoading?.release('brain');
     console.error('[character] auto-load FAILED:', err);

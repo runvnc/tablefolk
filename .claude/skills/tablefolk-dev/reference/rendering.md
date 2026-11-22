@@ -252,6 +252,32 @@ in every run, and the mesh count never changed after the reveal. The world
 is complete and in view about 12-15 s sooner with a model; the first reply
 comes at about the same time (31.9 s before, 31.1 s after, averages of two).
 
+The model's set-up then froze the picture in view (`tablefolkHoldRender`
+during the warm-up): an 11.6 s gap between drawn frames after the reveal.
+Since 2026-11-22 (later) a model already cached sets up under the cover
+("Waking the characters…", loading.js `holdCover`, cap 30 s), and the
+static-scenery freeze and the spells' shader prewarm are the cover's last
+steps (`finish`) instead of timers after the reveal. `startup-time.mjs` now
+records `gap`: the longest pause between drawn frames (`frame`) and
+animation frames (`raf`) in the 20 s after the reveal. hearthvale, light,
+Gemma 4 E2B, 800x500, load average 11-14 (other agents' Chromes running):
+
+| | world built (settle end) | reveal | brain ready | first turn | longest frame gap after reveal |
+|---|---|---|---|---|---|
+| before (1 run) | 20.4 | 21.1 | 36.5 | 43.2 | 11 585 ms (the warm-up) |
+| after (2 runs) | 26.2, 25.7 | 45.2, 47.9 | 45.4, 47.9 | 47.6, 52.3 | 655, 390 ms (main thread, the first calls) |
+| after, `?art=1` (2 runs) | 29.7, - | 30.9, 22.6 | - | - | 3 341 (GPU shared with another agent's run), 141 ms |
+
+The hold ("waking" in `.log`) took 18.2 and 21.3 s here, the model's
+set-up from its cache (it was 15.3 s in view before, with the picture
+held). The world shows about 20 s later and the first reply comes about as
+soon as before (the model starts on a built world, not after the reveal
+plus 600 ms), with no frozen picture. The two finishing steps take
+under 10 ms (freeze) and 0-2.2 s (the prewarm, often already done by its
+8 s fallback under the cover). The voice was off in these runs (the test
+turns it off) and speech input showed no gap; they still start after the
+reveal.
+
 ### The edge of the world (terrain.js, surroundings.js)
 
 `tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |

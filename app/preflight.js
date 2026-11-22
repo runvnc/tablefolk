@@ -41,7 +41,7 @@
     ['https://cdn.babylonjs.com/babylon.js'],
     ['https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js'],
     ['https://cdn.babylonjs.com/havok/HavokPhysics_umd.js'],
-    ['loading.js?v=20261122c'],
+    ['loading.js?v=20261122e'],
     ['world-file.js?v=20261115b'],
     ['tts/voice-sample.js?v=20261115b'],
     ['tts/pocket-tts-manager.js?v=20261122b'],
@@ -52,11 +52,11 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261122a'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261122g'],
+    ['app.js?v=20261122h'],
     ['bodies.js?v=20261120c'],
     ['scenery.js?v=20261121a'],
     ['combat.js?v=20261120b'],
-    ['spells.js?v=20261115c'],
+    ['spells.js?v=20261122b'],
     ['reactions.js?v=20261115b'],
     ['terrain.js?v=20261122a'],
     ['surroundings.js?v=20261122b'],
@@ -99,7 +99,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261122a', 'module'],
+    ['llm_js/world-integration.js?v=20261122c', 'module'],
   ];
 
   function browserSummary() {
