@@ -1136,7 +1136,7 @@ load. Weak GPUs with lots of RAM: no (the CPU path in the browser writes 0.6
 tok/s). What would unblock it: elementwise fusion in ggml-webgpu for this
 graph (or a custom engine), and sending `llama-webgpu.patch` upstream.
 
-### Inkling 2 Mini in the game, by URL (2026-11-22, in progress)
+### Inkling 2 Mini in the game, by URL (2026-11-22)
 
 Ability measured with the endpoint brain, natively: a rented RTX 4070 Ti
 Super 16 GB (vast.ai, driver 595.91, Chrome 158 on the box), upstream
@@ -1170,6 +1170,53 @@ answer.
   done of any free day (job cycles: rosa 5, tam 4, maren 3, brann 3). Judge
   3.88 / 3.5 / 4.38 / 2.63: below its own guided day and below Bonsai 2 27B
   at free on the 4090 (4.0 / 4.25 / 4.75 / 3.13).
+- 36 evals (RUNS=2): **35/36** (haggle to 45 1/2). E2B 32-35, Raon-1 nano
+  36, Spark-X2.6-4B 31.
+- (The capability check is cached in the profile per brain name and card:
+  repeats under the same name return the stored result. 8/10 came out the
+  same in three separate runs.)
+
+Beside the baselines (hearthvale's day, 12 minutes; Inkling's turns at native
+CUDA speed, not Chrome's 5-9 s):
+
+| | check v3 | evals | guided judge (c / p / u / s) | free judge | free: ate / hungry, calls |
+|---|---|---|---|---|---|
+| Inkling 2 Mini AD-IQ2_M, endpoint | **8/10** | 35/36 | 4.0 / 3.88 / **4.63** / 3.0 | 3.88 / 3.5 / 4.38 / 2.63 | 6 / 2, 186 |
+| Bonsai 2 27B, Chrome 4090 | 5/8 (v2); 6/10 (4070) | - | 4.0 / 4.25 / 4.5 / 3.25 | 4.0 / 4.25 / 4.75 / 3.13 | 8 / 1, 118 |
+| Bonsai 2 27B, Chrome 4080 S | - | - | 4.0 / 3.88 / 4.38 / 3.38 | 3.88 / 3.75 / 4.5 / 2.75; 3.5 / 3.75 / 4.38 / 2.75 | 6 / 3, 77; 6 / 2, 95 |
+| Gemma 4 E4B, Chrome 3090 | 6/8 (v2) | - | 4.0 / 4.0 / 4.38 / 2.88 | - | - |
+| SenseNova-Loop-9B, endpoint | 7/10 | - | 3.5 / 3.88 / 4.13 / 2.88 | - | - |
+
+**Smaller quants** (same box and proxy; check v3 repeated under fresh names,
+evals RUNS=2; KLD from the publishers' cards; card memory = llama-server
+alone at 16k context):
+
+| file | size | KLD | on the card | check v3 | evals | guided day |
+|---|---|---|---|---|---|---|
+| AtomicChat AD-IQ2_M | 8.67 GB | 0.130 | 10.9 GB | 8/10 (3 runs) | 35/36 | judge 4.0 / 3.88 / 4.63 / 3.0 |
+| Unsloth UD-IQ2_XXS (`Mainline_Support/`) | 8.49 GB | 0.073 | 10.7 GB | 7/10 (2 runs; missed plan, mind, danger) | 35/36 | - |
+| drofn 8GB-64K | 6.62 GB | 0.130 | 8.9 GB | 6/10 (2 runs; missed plan, mind, danger, haggle) | 33/36 (haggle 0/2, horseshoe 1/2) | 98% model-chosen, 20 self-started (13 pairs), 15 plans / 8 revised, 55 surprises, depth 0.42, wasted 4%, 8 ate / 7 slept / 1 hungry, 17 sales, 78% indoors, 282 calls, 2.5 s a turn; judge 3.88 / 3.75 / 4.25 / 2.75 |
+
+Unsloth's top-level `UD-*` files are the draft PR's layout and fail to load
+on master (`blk.24.attn_q.weight not found`); the `Mainline_Support/`
+copies (`.gguf_file`) load. drofn's 64K file (2 GB smaller, would fit a 12 GB
+card beside the game) costs two check items, 2 evals and about 0.3 on the
+judge's scale: a guided-class brain still, but no longer the best one.
+
+**Verdict**: Inkling 2 Mini is the most capable brain measured for this
+game: guided without doubt (8/10, one item from free; 35/36; the best
+purposefulness score at guided), and at free it keeps a working village with
+the most job cycles of any free day, though the judge reads it flatter than
+its guided day (personality 3.5, depth 0.17) and below Bonsai 2 27B's free
+day on a 4090. So: capable of guided, borderline for free (as the 27B is);
+its free days are not better than its guided ones. Worth the engine work only
+if it gets fast in Chrome: today's 6-7 tokens a second (5-9 s a turn) would
+put it in the 27B-on-16-GB band, where free already loses to guided.
+Proposed, not made: (1) if Inkling is wired in, add `The user` (and
+`<|message_`) to its stop strings: 1-2% of no-think answers continue into
+reasoning after the command, costing a full max_tokens turn; (2) the
+AD-IQ2_M or Unsloth UD-IQ2_XXS (mainline) files, not drofn's, unless 12 GB
+cards matter more than two check items.
 
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
