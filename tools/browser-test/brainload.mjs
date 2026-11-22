@@ -18,7 +18,10 @@ page.on('console', m => {
   const t = m.text();
   const r = t.match(/RAW OUTPUT at .*elapsed ms: (\d+)/);
   if (r) turns.push(+r[1]);
+  const k = t.match(/llama\.cpp timings: prompt_n= (\d+) prompt_ms= (\d+) PREFILL= ([\d.]+).*predicted_n= (\d+) DECODE= ([\d.]+)/);
+  if (k) reads.push({ n: +k[1], ms: +k[2], gen: +k[4], tps: +k[5] });
 });
+const reads = [];
 const t0 = Date.now();
 await page.goto(`${base}/app/?${q}&t=${t0}`);
 let consentAt = null, readyAt = null;
@@ -35,7 +38,11 @@ for (;;) {
 }
 const play = +flag('play', 180);
 await page.waitForTimeout(play * 1000);
+const med = a => { const v = a.filter(x => Number.isFinite(x)).sort((x, y) => x - y); return v.length ? v[Math.floor(v.length / 2)] : null; };
 const sorted = [...turns].sort((a, b) => a - b), pct = p => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] : null;
 console.log(JSON.stringify({ model: flag('model'), downloaded: !!consentAt, ready_s: ((readyAt - t0) / 1000).toFixed(1), turns: turns.length,
-  turn_median_s: pct(0.5) && (pct(0.5) / 1000).toFixed(2), turn_p90_s: pct(0.9) && (pct(0.9) / 1000).toFixed(2) }));
+  turn_median_s: pct(0.5) && (pct(0.5) / 1000).toFixed(2), turn_p90_s: pct(0.9) && (pct(0.9) / 1000).toFixed(2),
+  // tokens read and written a call, its reading and writing speed (llama.cpp's timings), medians
+  read_n_median: med(reads.map(x => x.n)), read_ms_median: med(reads.map(x => x.ms)), written_median: med(reads.map(x => x.gen)),
+  write_tps_median: med(reads.map(x => x.tps)) }));
 await page.close(); await b.close(); process.exit(0);

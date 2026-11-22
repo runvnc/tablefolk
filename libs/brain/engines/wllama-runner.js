@@ -76,7 +76,7 @@ export function createWllama3Engine(wllamaInstance) {
           const stops = stopsFor(wllamaInstance.tablefolkTemplate);
           const t0 = performance.now();
           // hybrid models: read the shared prefix on its own when it changed, so a cache checkpoint sits at its end
-          if (wllamaInstance.tablefolkPrime) {
+          if (wllamaInstance.tablefolkPrime && new URLSearchParams(globalThis.location?.search || '').get('wprime') !== '0') {
             const end = primeEnd(prompt, wllamaInstance.tablefolkTemplate);
             const prefix = end > 0 ? prompt.slice(0, end) : null;
             if (prefix && prefix !== wllamaInstance.tablefolkPrimed) {
