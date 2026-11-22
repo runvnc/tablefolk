@@ -26,7 +26,7 @@ const users = ["Player (wren): Greta, I'd like a bowl of stew. Will you take 3 g
 const stats = (t, r) => { const tm = r.timings || {}; return { wall_s: ((performance.now() - t) / 1000).toFixed(2), read: tm.prompt_n, reused: tm.cache_n,
   read_tps: tm.prompt_per_second?.toFixed(1), written: tm.predicted_n, write_tps: tm.predicted_per_second?.toFixed(1), text: (r.choices?.[0]?.text || '').slice(0, 300) }; };
 try {
-  const w = new Wllama({ default: '/src/wasm/wllama.wasm' });
+  const w = new Wllama({ default: '/src/wasm/' + (q.get('wasm') || 'wllama') + '.wasm' });
   const t0 = performance.now(); let lastPct = -10;
   await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
     n_ctx: +(q.get('ctx') || 8192), n_batch: +(q.get('ub') || 512), n_ubatch: +(q.get('ub') || 512),

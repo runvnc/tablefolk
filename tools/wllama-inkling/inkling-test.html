@@ -22,7 +22,7 @@ const users = SHORT ? ['Player: What is 2+3? Answer with say("...").'] : ["Playe
   'Player (wren): Fine. What about 4 gold, and you tell me the news?',
   'Player (tam): Greta! Did you see the crows in the orchard?'];
 try {
-  const w = new Wllama({ default: '/src/wasm/wllama.wasm' });
+  const w = new Wllama({ default: '/src/wasm/' + (q.get('wasm') || 'wllama') + '.wasm' });
   const t0 = performance.now();
   let lastPct = -10;
   await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
