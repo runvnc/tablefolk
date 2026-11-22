@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
-# The faster Inkling / SenseNova WebGPU build (brains.md, "Inkling 2 Mini", 2026-11-22 speed work), on a rented box:
-# wllama 4.0.0 with its llama.cpp replaced by ggml-org/llama.cpp 5bacb7c (5 commits past wllama's pin) plus
-#   llama-webgpu.patch                MUL_MAT_ID f32 accumulation + Q2_0 (the earlier fix)
-#   webgpu-01-dispatch-cache.patch    per-token counters (GGML_WEBGPU_STATS), cached bind groups, one parameter
-#                                     WriteBuffer per submit, no repeated SetPipeline
-#   webgpu-02-inkling-fusions.patch   fused Inkling glue kernels (when present)
-# Also a native Dawn build (llama-completion, llama-bench, test-backend-ops) for quick checks: nrun.sh.
-#   build-fast.sh [native|wasm NAME "CXXFLAGS"]...
-#   e.g. build-fast.sh native wasm fast "" wasm stats "-DGGML_WEBGPU_STATS=16"
+# The fast WebGPU build for Inkling 2 Mini and SenseNova-Loop-9B (brains.md, "Faster in Chrome", 2026-11-22), on a
+# rented box. One llama.cpp tree runs both models:
+#   ggml-org/llama.cpp 5bacb7c (master 2026-11-22, 5 commits past wllama 4.0.0's pin)
+#   + PR #32588 merged (blueswhen sensenova-loop, head 0ba8e4a: SenseNova Loop, the exact powered Sinkhorn)
+#   + llama-webgpu.patch                  MUL_MAT_ID f32 accumulation + Q2_0 (the earlier Inkling fix)
+#   + webgpu-01-dispatch-cache.patch      per-token counters (GGML_WEBGPU_STATS), cached bind groups, one parameter
+#                                         WriteBuffer per submit, no repeated SetPipeline
+#   + webgpu-02-inkling-fusions.patch     fused kernels (ggml-webgpu-fuse.hpp: Inkling's glue chains + a generic
+#                                         element-wise run fusion), IQ2_XXS tables in workgroup memory, MUL_MAT_ID
+#                                         mat-vec path for batches up to 64 tokens, GGML_WEBGPU_MMVQ switch
+#   + ../sensenova/llama-webgpu.patch     F32 x F32 router matmuls on the GPU
+# and wllama 4.0.0 with its llama.cpp replaced by that tree. Also a native Dawn build for quick checks
+# (nrun.sh, mrun.sh, kld.sh, prof.sh with a -DGGML_WEBGPU_GPU_PROFILE build).
+#   build-fast.sh [native] [wasm NAME "CXXFLAGS"]...
+#   e.g. build-fast.sh native wasm fast "-DGGML_WEBGPU_MMVQ=0" wasm stats "-DGGML_WEBGPU_STATS=16 -DGGML_WEBGPU_MMVQ=0"
 # Switches (env natively, -D in the browser): GGML_WEBGPU_STATS=N (print every N graphs), GGML_WEBGPU_BIND_GROUP_CACHE=0,
-# GGML_WEBGPU_PARAM_BATCH_WRITE=0 (the old per-dispatch path), GGML_WEBGPU_SUBMIT_BATCH, GGML_WEBGPU_FUSE=0.
+# GGML_WEBGPU_PARAM_BATCH_WRITE=0 (the old per-dispatch path), GGML_WEBGPU_SUBMIT_BATCH, GGML_WEBGPU_FUSE=0,
+# GGML_WEBGPU_FUSE_MASK=bits (wf_type), GGML_WEBGPU_MMVQ=0 (no q8 activation pre-pass: fewer dispatches),
+# GGML_WEBGPU_MMID_VEC_MAX_TOKENS (64), GGML_WEBGPU_IQ2XXS_ROWS (8); GGML_WEBGPU_DUMP=file writes a big graph's nodes.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd /root
-[ -d lc ] || { git clone -q --filter=blob:none https://github.com/ggml-org/llama.cpp lc && git -C lc checkout -q "${LLAMA_REF:-5bacb7c}";
-  for p in llama-webgpu.patch webgpu-01-dispatch-cache.patch webgpu-02-inkling-fusions.patch; do [ -f "$HERE/$p" ] && git -C lc apply "$HERE/$p"; done; }
+if [ ! -d lc ]; then
+  git clone -q --filter=blob:none https://github.com/ggml-org/llama.cpp lc
+  git -C lc checkout -q "${LLAMA_REF:-5bacb7c}"
+  git -C lc fetch -q origin pull/32588/head:pr32588
+  git -C lc -c user.name=x -c user.email=x@x merge -q --no-edit pr32588
+  for p in "$HERE/llama-webgpu.patch" "$HERE/webgpu-01-dispatch-cache.patch" "$HERE/webgpu-02-inkling-fusions.patch" \
+           "$HERE/../sensenova/llama-webgpu.patch"; do git -C lc apply "$p"; done
+fi
 [ -d dawn ] || { curl -sL -o dawn.tgz https://github.com/google/dawn/releases/download/v20260908.214631/Dawn-94c3c9cc0d5fb2e85aebb370fa8d37b71aa34655-ubuntu-latest-Release.tar.gz && mkdir -p dawn && tar -xzf dawn.tgz -C dawn --strip-components=1; }
 mkdir -p wl
 [ -d wl/emsdk ] || (cd wl && git clone -q https://github.com/emscripten-core/emsdk.git && cd emsdk && ./emsdk install 4.0.20 >/dev/null && ./emsdk activate 4.0.20 >/dev/null)
@@ -22,8 +36,8 @@ mkdir -p wl
 while [ $# -gt 0 ]; do
   case "$1" in
     native)
-      (cd lc && cmake -B bw -DGGML_WEBGPU=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_HTML=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DDawn_DIR=/root/dawn/lib64/cmake/Dawn >/dev/null &&
-        cmake --build bw -j"$(nproc)" --target llama-bench llama-completion test-backend-ops >/dev/null)
+      (cd lc && cmake -B bw -DGGML_WEBGPU=ON -DLLAMA_CURL=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DDawn_DIR=/root/dawn/lib64/cmake/Dawn >/dev/null &&
+        cmake --build bw -j"$(nproc)" --target llama-completion llama-perplexity llama-bench >/dev/null)
       shift ;;
     wasm)
       N=$2; F=$3; shift 3
@@ -35,7 +49,9 @@ while [ $# -gt 0 ]; do
        emmake make wllama -j"$(nproc)" 2>&1 | grep -E " error" | head -20 || true
        export PATH="$(dirname "$EMSDK_NODE"):$PATH"
        cd .. && mkdir -p src/wasm && node scripts/pack_wasm.js build-$N/wllama.wasm src/wasm/$N.wasm
-       [ -f esm/index.js ] || { npm ci --silent && npm run build:glue >/dev/null && npm run build:worker >/dev/null && npx tsup src/index.ts --format esm --clean >/dev/null; }
+       # the JS checks the wasm's llama.cpp version: rebuild it against this tree
+       [ -f esm/index.js ] || npm ci --silent
+       npm run build:glue >/dev/null && npm run build:worker >/dev/null && npx tsup src/index.ts --format esm --clean >/dev/null
        cp "$HERE/inkling-test.html" "$HERE/../sensenova/sensenova-test.html" .) ;;
     *) echo "unknown step $1"; exit 1 ;;
   esac

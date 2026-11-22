@@ -1136,6 +1136,75 @@ load. Weak GPUs with lots of RAM: no (the CPU path in the browser writes 0.6
 tok/s). What would unblock it: elementwise fusion in ggml-webgpu for this
 graph (or a custom engine), and sending `llama-webgpu.patch` upstream.
 
+### Faster in Chrome: ggml-webgpu dispatch caching and fused kernels (2026-11-22)
+
+Inkling's token is ~8,250 GPU dispatches of tiny kernels (11,826 graph nodes).
+The cost was per dispatch, on both sides: the wasm side encoding each one
+(a new BindGroup, a separate `queue.WriteBuffer` for its parameters, every
+token) and the GPU side running thousands of barrier-separated little kernels.
+Work in `tools/wllama-inkling/` (`build-fast.sh`, patches split by step, all
+on llama.cpp 5bacb7c + PR #32588 + wllama 4.0.0; nothing upstream did any of
+this as of 2026-11-22, searched):
+
+- `webgpu-01-dispatch-cache.patch`: per-token counters (`GGML_WEBGPU_STATS=N`:
+  dispatches, bind groups made/cached, writes, submits, encode/submit/readback/
+  wait ms, the op mix of a big graph), bind groups cached by (pipeline,
+  buffers, offsets, sizes) (cleared when a buffer is freed), one parameter
+  WriteBuffer per submit batch, no repeated SetPipeline.
+- `webgpu-02-inkling-fusions.patch` (`ggml-webgpu-fuse.hpp`): backend-side
+  matchers on the stock graph (no new ops, stock GGUFs; ideas from
+  nahcmon/inkling-fast-llama.cpp and realugbun's inkling2-speed CUDA
+  fusions), each chain one WGSL kernel: row L2 clip, loop controller in
+  (cont+rms+rms+concat) and out (two q8_0 rank-64 matvecs + tanh gates), short
+  conv with its state store and residuals, SiTU, MoE routing (sigmoid, top-k,
+  weights) and the weighted expert sum, the depth mix (rms, scores, softmax,
+  weighted sum; specialized per state/query count), the relative-position
+  bias + mask; plus a generic one: any run of same-shape element-wise nodes
+  becomes one generated kernel (strides baked in, offsets as parameters).
+  Tensors are bound per wgpu buffer over their merged range, so aliasing
+  never needs overlapping bindings. `GGML_WEBGPU_FUSE=0` /
+  `GGML_WEBGPU_FUSE_MASK` turn them off.
+- Same patch, not fusion: the IQ2_XXS mat-vec kernels indexed a 512-word
+  `const` table at run time, which Tint copies into every invocation (2 KB of
+  private memory per thread): the expert gate/up matmul took 15 ms of each
+  token. The table now lives in workgroup memory (generated
+  `iq2xxs_ws.tmpl`): 3x faster kernel. MUL_MAT_ID uses the mat-vec path for
+  batches up to 64 tokens (the tiled kernel ran 8.7 ms a layer for a 41-token
+  turn prompt). `GGML_WEBGPU_MMVQ=0` drops the q8 activation pre-pass
+  (~500 dispatches; used for the browser build).
+
+Measured on a rented RTX 4080 16 GB (i9-13900K, Chrome 158, AD-IQ2_M, 8k
+context, ub 512, thinking off, prefix primed; `inkling-test.html`, `crun.sh`):
+
+| Chrome, per token | dispatches | encode (wasm) | GPU wait | writing tok/s | a turn |
+|---|---|---|---|---|---|
+| wllama 4.0.0 + master as shipped | 8,251 (8,251 new bind groups, 8,251 writes) | 61.5 ms | 2-6 ms | 12.9-13.8 | 3.9-5.1 s |
+| + bind-group cache, batched writes | 8,251 (0 new, 129 writes) | 21.5 ms | ~25 ms | 15.8-16.9 | 3.0-3.5 s |
+| + first 8 fusions | 4,045 | 15.6 ms | 32 ms | 17.4-18.9 | 3.3 s |
+| + IQ2_XXS table fix, specialized mix | 3,551 | 14.2 ms | 21 ms | 24.2-24.7 | 2.7-3.0 s |
+| **all (the shipped build)** | **3,123** | 15.0 ms | 19.6 ms | **22.9-25.2** | **1.7-2.6 s** |
+
+(wllama 4.0.0 alone doubled the old 6-7 tok/s: it wraps the queue waits.)
+The 24-31 new prompt tokens of a turn now read at 26-32 tok/s (was 17-22);
+the 3,396-token first prompt 26 s, load 20 s, 10.5 GB peak. Native Dawn on the
+same card: 20.5 -> 36.2 tok/s. Correctness: same greedy text as unfused
+WebGPU and the CPU on the test prompts; llama-perplexity KL divergence against
+the CPU (2 x 512 tokens, `kld.sh`): unfused WebGPU 0.0033 / 97.6% same top
+token, all fusions 0.0030 / 97.6%.
+
+What a token costs now (Chrome): ~15 ms encoding 3,100 dispatches in wasm
+(~5 us each, JS calls into Dawn), ~20 ms more until the GPU is done, ~4 ms
+graph build + sampling. Left: the remaining dispatches (mix concats, q8_0
+attention matvecs, the controller's down projection) and a recorded replay
+of the whole token (the graph is the same every token). Speculative decoding:
+wllama 4.0.0 passes `spec_type` / a draft model through, but both models are
+hybrids whose recurrent state needs rollback for rejected drafts (open PR
+#31669); not tried. Several characters per step (n_seqs batching): not tried.
+
+Shipped (not wired into the picker): `libs/brain/engines/wllama-fast/`
+(`wllama.wasm` + its `index.js`, wllama 4.0.0 API), built with
+`-DGGML_WEBGPU_MMVQ=0`; runs Inkling and SenseNova.
+
 ### Inkling 2 Mini in the game, by URL (2026-11-22)
 
 Ability measured with the endpoint brain, natively: a rented RTX 4070 Ti
@@ -1313,6 +1382,22 @@ Build: `tools/sensenova/build-native.sh` (CUDA + Dawn WebGPU from the fork;
 the linux-desktop image needs `libcublas-dev-12-9`, and `cuda-nvml-dev-12-9`
 for the PR branch), `build-wllama.sh` (wllama fa1019a against the fork, the
 Inkling glue patch not needed), `brun.sh` (one Chrome run on the box).
+
+### Faster in Chrome (2026-11-22)
+
+On llama.cpp master + PR #32588 (its exact powered Sinkhorn: 14,145 nodes) with
+`tools/sensenova/llama-webgpu.patch` (routers on the GPU: one graph split) and
+the Inkling work above (`tools/wllama-inkling/build-fast.sh`, the same
+binary): the generic element-wise run fusion turns the Sinkhorn's ~80 tiny
+nodes per route into one kernel each; 10,939 -> 2,821 dispatches a token.
+Native Dawn (RTX 4080) 24.2 -> 35.8 tok/s with the same greedy text. **Chrome
+158, AD-Q4_K_M, 8k context, thinking off, prefix primed: 21-26 tok/s
+writing, turns 2.0-2.5 s** (was 1.0-1.2 tok/s and 20-34 s with the fork's 20
+iterations), 6.4 GB peak, first prompt (3,327 tokens) 34 s, load 16 s; answers
+in character ("Three gold? My stew costs five, and no less than four."). KL
+divergence against the CPU (2 x 512 tokens): unfused WebGPU 0.084 / 95.7%
+same top token, fused 0.081 / 95.5% (the gap to the CPU predates the fusions;
+not chased).
 
 ## Spark-X2.6-4B (SparkLLM / XHToken, 2026-11-22): the benchmarks don't carry over to the game
 

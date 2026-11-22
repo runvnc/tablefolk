@@ -2,7 +2,7 @@
 # crun.sh PAGE "<query>" [cap s] [TAG]: one headless Chrome run on the box; prints tagged lines, stats, peak GPU MiB
 PAGE=$1; Q="$2"; CAP="${3:-600}"; TAG="${4:-INK}"; W=${WL:-/root/wl/wllama}
 export PATH=$(ls -d /root/wl/emsdk/node/*/bin | head -1):$PATH
-[ -f /root/wsrv.pid ] && kill "$(cat /root/wsrv.pid)" 2>/dev/null
+[ -f /root/wsrv.pid ] && kill "$(cat /root/wsrv.pid)" 2>/dev/null; fuser -k 8080/tcp 2>/dev/null
 [ -f /root/chrome.pid ] && kill "$(cat /root/chrome.pid)" 2>/dev/null; sleep 1; killall -q chrome; sleep 1
 PROFILE=/root/cr-$(date +%s)
 (cd "$W" && MULTITHREAD=1 setsid nohup node scripts/http_server.js > /root/wsrv.log 2>&1 < /dev/null & echo $! > /root/wsrv.pid)
@@ -24,4 +24,4 @@ grep -o "$TAG .*" /root/chrome.log | grep -v '"dl"' | sed 's/", source: .*//' | 
 grep -o 'graph: nodes = [0-9]*, splits = [0-9]*' /root/chrome.log | sort | uniq -c | head -3
 grep -o 'ggml_webgpu stats:.*' /root/chrome.log | sed 's/\\n.*//; s/", source.*//' | tail -${STATS:-4} | cut -c1-420
 grep -iE 'lost|out of memory|Uncaught' /root/chrome.log | head -3 | cut -c1-200
-kill "$(cat /root/chrome.pid)" "$(cat /root/wsrv.pid)" 2>/dev/null; sleep 1; killall -q chrome; rm -rf /root/cr-*
+kill "$(cat /root/chrome.pid)" "$(cat /root/wsrv.pid)" 2>/dev/null; fuser -k 8080/tcp 2>/dev/null; sleep 1; killall -q chrome; rm -rf /root/cr-*
