@@ -1,0 +1,30 @@
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/model_index.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/model_index.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/scheduler/scheduler_config.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/scheduler/scheduler_config.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/transformer/config.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/transformer/config.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/transformer/diffusion_pytorch_model.safetensors
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/transformer/diffusion_pytorch_model.safetensors
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/vae/config.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/vae/config.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/vae/diffusion_pytorch_model.safetensors
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/vae/diffusion_pytorch_model.safetensors
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/visual_eature_extractor/preprocessor_config.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/visual_eature_extractor/preprocessor_config.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/visual_encoder/config.json
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/visual_encoder/config.json
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Geometry-1300m/visual_encoder/diffusion_pytorch_model.safetensors
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Geometry-1300m/visual_encoder/diffusion_pytorch_model.safetensors
+https://huggingface.co/stepfun-ai/Step1X-3D/resolve/main/Step1X-3D-Texture/step1x-3d-ig2v.safetensors
+  dir=/root/w/stepfun-ai/Step1X-3D
+  out=Step1X-3D-Texture/step1x-3d-ig2v.safetensors

@@ -1,0 +1,60 @@
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/shape_dec_next_dc_f16c32_fp16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/shape_dec_next_dc_f16c32_fp16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/shape_dec_next_dc_f16c32_fp16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/shape_dec_next_dc_f16c32_fp16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16_mv.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16_mv.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16_mv.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16_mv.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16_mv.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_512_bf16_mv.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16_mv.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_512_bf16_mv.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16_mv.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16_mv.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16_mv.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16_mv.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_dec_conv3d_16l8_fp16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_dec_conv3d_16l8_fp16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_dec_conv3d_16l8_fp16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_dec_conv3d_16l8_fp16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_flow_img_dit_1_3B_64_bf16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_flow_img_dit_1_3B_64_bf16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_flow_img_dit_1_3B_64_bf16_mv.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_flow_img_dit_1_3B_64_bf16_mv.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_flow_img_dit_1_3B_64_bf16_mv.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_flow_img_dit_1_3B_64_bf16_mv.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/tex_dec_next_dc_f16c32_fp16.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/tex_dec_next_dc_f16c32_fp16.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/tex_dec_next_dc_f16c32_fp16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/tex_dec_next_dc_f16c32_fp16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/pipeline.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=pipeline.json
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/pipeline_mv.json
+  dir=/root/w/TencentARC/Pixal3D
+  out=pipeline_mv.json

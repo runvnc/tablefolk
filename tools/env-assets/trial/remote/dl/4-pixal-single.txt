@@ -1,0 +1,12 @@
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors
+https://huggingface.co/TencentARC/Pixal3D/resolve/main/ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors
+  dir=/root/w/TencentARC/Pixal3D
+  out=ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors

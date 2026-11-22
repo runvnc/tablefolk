@@ -413,8 +413,9 @@ tier, decompressed, check.py `--pair`), and were rendered at fixed cameras
 `tools/env-assets/trial/` (fal client with a ledger and spending cap, lock
 wrapper, processing, renders, sheets); scratch, the call table (`calls.md`)
 and the sheets (`shots/inn_side_by_side.jpg`,
-`shots/blacksmith_side_by_side.jpg`) in `work/img3d-trial/` (not in git).
-$1.99 of fal in all (19 calls).
+`shots/blacksmith_side_by_side.jpg`; with Pixal3D and Step1X-3D:
+`shots/*_side_by_side_2.jpg`) in `work/img3d-trial/` (not in git).
+$1.99 of fal in all (19 calls), plus $2.03 of vast.ai (below).
 
 - **On fal (2026-11-22)**: TRELLIS.2 (`fal-ai/trellis-2`, MIT: $0.25 /
   0.30 / 0.35 at 512 / 1024 / 1536), its retexture endpoint
@@ -468,16 +469,86 @@ $1.99 of fal in all (19 calls).
   shapes; a textured run ($0.48) was not worth the budget. Its licence
   excludes the EU, UK and South Korea anyway.
 
+**Self-hosted on vast.ai, same day: Pixal3D and Step1X-3D.** One RTX 6000
+Ada 48 GB (pytorch/pytorch:2.6.0-cuda12.4-cudnn9-devel; Step1X-3D needs
+~27 GB, Pixal3D's 1536 mode more than 24 GB). Install and run scripts in
+`tools/env-assets/trial/remote/` (setup-pixal3d.sh, setup-step1x.sh,
+pixal_run.py, pixal_single.py, s1x_run.py; logs in
+`work/img3d-trial/vastlogs/`). Lessons from the setup:
+- **Pick a host by its network and per-GB prices, not only $/h.** The first
+  box (a 48 GB 4090 in Japan) had broken IPv6 (fix:
+  `precedence ::ffff:0:0/96 100` in /etc/gai.conf), GitHub refusals and Hugging
+  Face at 0-5 MB/s, and was given up after 18 min. The second pulled ~75 GB
+  of weights at 60+ MB/s (aria2c, 8 connections a file: `remote/dl/`), but billed downloads per GB: **the trial cost $2.03 of
+  vast credit against a $1.00 budget** (GPU $0.85, storage $0.16,
+  downloads $1.01). Filter on `inet_down_cost` and `storage_cost`, and
+  fetch only the checkpoints a run uses.
+- Pixal3D: TRELLIS.2's setup.sh steps without flash-attn
+  (`ATTN_BACKEND=sdpa`), NATTEN 0.21 built for sm_89, `einops` added; its
+  configs name the gated, non-commercial `briaai/RMBG-2.0` as background
+  remover: point `pipeline*.json` at `ZhengPeng7/BiRefNet` (our inputs carry
+  alpha anyway). Full-VRAM mode at 1536 ran out of memory in CuMesh's GLB
+  extraction even alone on 48 GB: use `--low_vram` (models offloaded), ~3.5
+  min a run at 12 steps. Its weights: 46 GB (single and multi-view sets).
+- Step1X-3D (own env, torch 2.5.1): its requirements' git+ lines need
+  `--no-build-isolation`; `mosaicml-streaming` is imported at load;
+  setuptools < 70 (`pkg_resources`). SDXL base is fetched at runtime: its
+  fp16 files under the plain names in a local folder, patched into
+  `step1x_3d_texture_synthesis_pipeline.py`.
+- Running both at once on 48 GB ran out of memory: one at a time.
+
+- **Pixal3D multi-view** (its distinctive route): views need camera-to-world
+  poses and are used uncropped, so each concept's pose was estimated by
+  fitting the Meshy mesh's silhouette over a grid of azimuth, elevation and
+  FOV (`trial/pose_fit.py`, `pose_score.py`: IoU 0.95 / 0.92 for the inn's
+  front / back, 0.90 / 0.90 for the blacksmith's; front az 45, back az
+  210-220, el 5-10) and the concept reframed to match. Set mvA = the two
+  real concepts; set mvB = the two concepts plus two renders of the Meshy
+  mesh (az 135 and 315) at exact poses. Frame 0 is not Pixal3D's canonical
+  front, so the result comes back in that camera's frame (`pixal_run.py`
+  turns it back; still needed yaw -90 for the inn, 180 for the blacksmith).
+  1536 cascade, 12 steps (25 steps ran out of memory alongside Step1X-3D),
+  seeds 1-2. **The best open result**: mvA inn seed 1 from the front is close
+  to the concept and to Meshy (crisp porch, door, dormers; an even warm roof
+  without TRELLIS.2's blotches; cream plaster; brown timber), and the
+  blacksmith's seed 1 has a modelled forge with its fire pit. But it is
+  unreliable: where the two concepts disagree (the chimney's place) it builds
+  both (two chimneys and a doubled gable on the inn's back); inn seed 2 came
+  out warped and dark, blacksmith seed 2 leans; adding the Meshy renders
+  (mvB) fixed the inn's back but wrecked the blacksmith (a pagoda-like roof:
+  Meshy moved its chimney relative to the concept). Up close its texture is
+  softer than Meshy's and the eaves wave. Open edges 600-1,600 (inn) and
+  900-1,300 (blacksmith), 1-6 pieces; finals 2.7-3.9 MB.
+- **Pixal3D single image** (inn, cut-out front, MoGe camera, 1536, 12
+  steps): a clean, crisp front close to Meshy's, but a dark back (the unseen
+  side), slightly tilted, smeared tiles up close; 193 open edges, one piece.
+- **Step1X-3D** (geometry 1300m: 50 steps, octree 512, up to 400k faces,
+  seeds 1-3; then its texture model, which cuts the mesh to 50k faces and
+  paints from SDXL multi-views): watertight, 0 open edges, ~1 MB finals. It
+  modelled the forge and fire, but its shapes are soft and lumpy (melted
+  shingles, lumpy dormers), the inn 25% taller than the concept, porches
+  copied onto the back, and the texture changes between sides (front walls
+  dark blue-grey, back beige). Below Meshy on every seed.
+- **Step1X-3D texture on Meshy's shapes**: the inn's is a fair, even
+  orange-and-cream, about equal to Meshy's own; the blacksmith's has a
+  smeared forge interior and a roof that is light grey in front and slate
+  at the back. Not better than Meshy's texture.
+
 **Verdict: keep Meshy 7.1.** None of the open options beat it on both shape
-and texture: TRELLIS.2's shape is competitive but its texture is not, and
-TRELLIS.2 retexturing does not improve Meshy's texture. Worth keeping in
-mind: TRELLIS.2 for an object whose shape Meshy gets wrong (it modelled the
-forge interior Meshy left empty), then retextured or painted. Not tested:
-Pixal3D and Step1X-3D (self-hosting on a rented GPU: Pixal3D's setup is
-above, ~$0.50-1 of a 4090 for a fair trial of both buildings with seeds;
-Step1X-3D similar), Hunyuan3D 2.1, a third TRELLIS.2 seed, other TRELLIS.2
-guidance and remesh settings (`remesh_project`, shape guidance), TRELLIS.2
-retexturing the blacksmith, and textured Hunyuan3D.
+and texture across seeds: TRELLIS.2's shape is competitive but its texture
+is not; Pixal3D multi-view comes closest (its best seeds rival Meshy from the
+front), but it is unreliable from seed to seed, builds both versions where
+the two concept views disagree, is softer up close, and needs a rented
+48 GB GPU and ~46 GB of weights; Step1X-3D, SAM 3D and Hunyuan3D 2.0 are
+below; retexturing Meshy's shape with TRELLIS.2 or Step1X-3D does not improve
+its texture. Worth trying later: Pixal3D with consistent posed views (two
+concept views made to agree, or several views of one generated turnaround),
+and TRELLIS.2 or Pixal3D for an object whose shape Meshy gets wrong (the
+forge interior). Not tested: Hunyuan3D 2.1 (not on fal), Pixal3D at 25
+steps, single-image Pixal3D on the blacksmith or with more seeds, a third
+TRELLIS.2 seed and its other settings (`remesh_project`, shape guidance),
+the Step1X-3D label model (symmetry and sharp-edge controls; 8.8 GB more),
+textured Hunyuan3D.
 
 ### Procedural trees, plants and the environment texture set (2026-11-20)
 
