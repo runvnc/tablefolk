@@ -403,7 +403,8 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     for (const r of roofs) { if (r.shell) for (const m of window.tablefolkWalls?.roomMeshes?.(r.room) || []) if (!m.isDisposed?.()) m.setEnabled(true); r.root.dispose(false, false); }
     roofs = [];
   }
-  function rebuild() { const t0 = performance.now(); try { rebuild0(); } finally { window.tfMark?.('roofs.rebuild', t0); } }
+  // (a promise: settled when the last roof of this build is up, or the build was replaced)
+  function rebuild() { const t0 = performance.now(); try { return rebuild0(); } finally { window.tfMark?.('roofs.rebuild', t0); } }
   function rebuild0() {
     clear(); sig = '';
     enabled = wanted();
@@ -418,11 +419,13 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     const todo = rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); })
       .sort((a, b) => Math.hypot((a.x0 + a.x1) / 2 - p.x, (a.z0 + a.z1) / 2 - p.z) - Math.hypot((b.x0 + b.x1) / 2 - p.x, (b.z0 + b.z1) / 2 - p.z));
     const D = doors(), useShells = shellsWanted(); lastShell = null;
-    const step = () => { if (my !== buildToken || !todo.length) return; const room = todo.shift(); try { const plan = useShells && planShell(room, D); roofs.push(plan ? buildShell(room, plan, state.scene) : build(room, state.scene)); } catch (e) { console.warn('[roofs]', e); } next(); };
+    let finished; const all = new Promise(r => { finished = r; });
+    const step = () => { if (my !== buildToken || !todo.length) return finished(); const room = todo.shift(); try { const plan = useShells && planShell(room, D); roofs.push(plan ? buildShell(room, plan, state.scene) : build(room, state.scene)); } catch (e) { console.warn('[roofs]', e); } next(); };
     // the rest wait while the model loads or answers (app.js tablefolkDressGate)
     const next = () => { if (window.TABLEFOLK_MODEL_BUSY || window.TABLEFOLK_PAUSE_RENDER) window.tablefolkDressGate().then(() => requestAnimationFrame(step)); else requestAnimationFrame(step); };
     step();
     sig = signature(W);
+    return all;
   }
   const signature = W => W.size + '|' + [...W].slice(0, 400).join(';').length;
 
@@ -522,7 +525,8 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     lifted = !lifted;
   }
   // a new world: build after its walls; walls built or dug later: again
-  addEventListener('tablefolk-scenario-started', () => { lifted = false; setTimeout(rebuild, 600); });
+  // (the loading cover waits for the last roof, loading.js)
+  addEventListener('tablefolk-scenario-started', () => { lifted = false; const done = window.tablefolkLoading?.begin('roofs'); setTimeout(() => { let p; try { p = rebuild(); } catch {} Promise.resolve(p).finally(() => done?.()); }, 600); });
   setInterval(() => { if (!enabled || !state.scene) return; const s = signature(walls()); if (sig && s !== sig) rebuild(); }, 2500);
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });

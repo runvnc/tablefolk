@@ -343,6 +343,7 @@
   let lastSig = '';
   const looksSig = (dark, houses) => (dark ? 'u' : 'o') + [...houses.walls].sort().join(';').length + ':' + houses.walls.size + ':' + wallH();
   // the world finished building (rooms, the outside known): draw the walls again if their looks changed
-  addEventListener('tablefolk-scenario-started', () => setTimeout(() => { try { const dark = underground(); if (looksSig(dark, dark ? { walls: new Set() } : houseCells()) !== lastSig) scheduleWallRebuild(); } catch {} }, 650));
+  // (the loading cover waits for it, loading.js: the rebuild is a microtask after this)
+  addEventListener('tablefolk-scenario-started', () => { const done = window.tablefolkLoading?.begin('walls'); setTimeout(() => { try { const dark = underground(); if (looksSig(dark, dark ? { walls: new Set() } : houseCells()) !== lastSig) scheduleWallRebuild(); } catch {} setTimeout(() => done?.(), 0); }, 650); });
   window.tablefolkWalls = { build, setNight, timber: () => materials().timber, roomMeshes: r => roomMeshes.get(roomKey(r)) || [] };
 })();

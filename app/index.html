@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261122a" />
+  <link rel="stylesheet" href="style.css?v=20261122b" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -30,6 +30,15 @@
     </section>
   </main>
   <canvas id="renderCanvas"></canvas>
+  <div id="loadCover" role="status" aria-live="polite">
+    <div class="lc-card">
+      <p class="lc-kicker">tablefolk.world</p>
+      <h1 class="lc-title">Tablefolk</h1>
+      <p class="lc-sub" hidden></p>
+      <div class="lc-bar" role="progressbar" aria-label="building the world" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+      <p class="lc-step">Setting up the 3D view…</p>
+    </div>
+  </div>
 
   <header id="topBar">
     <div class="brand">tablefolk.world</div>
@@ -484,6 +493,6 @@
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261121a"></script>
   <script src="diagnostics.js?v=20261121a"></script>
-  <script src="preflight.js?v=20261122j"></script>
+  <script src="preflight.js?v=20261122l"></script>
 </body>
 </html>

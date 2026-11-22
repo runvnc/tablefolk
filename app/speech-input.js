@@ -315,6 +315,7 @@
   async function preload() {
     if (mode !== 'bark' || barkOk() !== '1' || barkIsReady) return;
     setState('loading', 'the speech model loads after the characters\' model…');
+    await window.tablefolkLoading?.turn('speech');   // after the world is shown, the model and the voice (loading.js)
     for (let i = 0; i < 240 && !/ready|fail|error|skipped/i.test($('brainStatus')?.textContent || ''); i++) await new Promise(r => setTimeout(r, 500));
     try { await barkLoad(); } catch (e) { window.tablefolkDiag?.note('speech', 'Underdog Bark failed: ' + e.message); }
     setState('idle'); showEngine();

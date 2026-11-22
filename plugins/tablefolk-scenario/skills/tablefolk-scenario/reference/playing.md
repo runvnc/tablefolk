@@ -25,6 +25,19 @@ one short toast after the world has loaded, once per browser version, with a
 "details" button to that section; start-up is never held up. Scripts and
 tests read the same values from `window.tablefolkBrowser`.
 
+## Opening a world
+
+A loading screen with the world's title (and `subtitle`), a progress bar and
+the current step ("Planting the trees around", "Dressing the characters")
+covers the page until the world is completely built: ground, walls, roofs,
+trees, things and the characters' own bodies. Nothing half-built shows. Then
+the world appears (with its intro card, if it has one), and only then does
+the characters' model load, with the small status under the top bar: walk and
+look around meanwhile; characters keep to their routines until it is ready.
+Going to another section shows the same screen with the destination's name;
+the model stays loaded. After 45 s the world shows anyway, and Settings → This
+device says what was still loading.
+
 ## First visit
 
 The first time a character speaks, the page asks before downloading the

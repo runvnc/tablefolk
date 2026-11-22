@@ -126,6 +126,8 @@ window.tablefolkDressGate=async(most=4000)=>{
   dressWaiting++;
   try{
     while(true){
+      // under the loading cover (loading.js) the world comes first: no wait
+      if(window.tablefolkLoading?.coverUp) return;
       const loading=window.TABLEFOLK_MODEL_BUSY && performance.now()-t0<40000, thinking=window.TABLEFOLK_PAUSE_RENDER && performance.now()-t0<most;
       if(!loading && !thinking) return;
       await new Promise(r=>setTimeout(r,150));
@@ -6479,7 +6481,10 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   spawnPickPlane.position.y=.025; spawnPickPlane.isPickable=true; const _spm=new BABYLON.StandardMaterial('spawn_pick_mat',scene); _spm.alpha=0; _spm.disableLighting=true; spawnPickPlane.material=_spm; }
   scene.onPointerObservable.add(pi=>{ if(pi.type!==BABYLON.PointerEventTypes.POINTERPICK || !pi.pickInfo?.hit) return; const m=pi.pickInfo.pickedMesh; const owner=m?.metadata?.ownerId; const g=state.characters.find(x=>owner===x.id || m.name.startsWith(x.id+'_')); if(g){ state.zoomFocus=new BABYLON.Vector3(g.root.position.x,0.6,g.root.position.z); return selectCharacter(g); } const mm=meta(m); const target=logicalTarget(m); if(pi.pickInfo.pickedPoint) state.zoomFocus=new BABYLON.Vector3(pi.pickInfo.pickedPoint.x,0.6,pi.pickInfo.pickedPoint.z); if(mm?.interactive){ state.target=target; const tp=target.getAbsolutePosition?.()||pi.pickInfo.pickedPoint; state.zoomFocus=new BABYLON.Vector3(tp.x,0.6,tp.z); log('target: '+(mm.type||target.name)+' / '+(mm.state||'intact')); updatePerceptionUI(); } });
   setupUI(); installWorldAPI();
-  const restored=await loadWorldState();
+  // A link's world replaces the saved one at once: not restored first (its bodies and
+  // props were a second build under the loading cover), and no stand-in character.
+  const linkedWorld=/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario');
+  const restored=linkedWorld || await loadWorldState();
   if(!restored){
     const g=await createGeneratedCritter(scene,'folk1',new BABYLON.Vector3(0,.06,0));
     setCharacterLogicalPosition(g,new BABYLON.Vector3(0,0,0));
@@ -6504,6 +6509,8 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     if(gpuFramesInFlight>=2) return;
     if(window.TABLEFOLK_PAUSE_RENDER){ const fps=thinkFps(); if(fps<=0) return; if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     if(TABLEFOLK_FPS_CAP && performance.now()-lastFrameAt<1000/TABLEFOLK_FPS_CAP) return;
+    // under the loading cover: 15 frames a second (enough to compile shaders; the rest goes to building)
+    if(window.tablefolkLoading?.coverUp && performance.now()-lastFrameAt<window.tablefolkLoading.frameMs) return;
     // Breeze in the browser shares the GPU with the picture, and must keep up with real
     // time while it speaks: full graphics at 60 fps left it under 0.43x, 15 fps about 1.07x
     // after the first sound (RTX 2060). Graphics pane, localStorage tablefolkSpeakFps; 60 = no cap.

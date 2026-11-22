@@ -90,6 +90,57 @@ files wrap themselves in an IIFE and publish a `window.tablefolkX` object.
 `installWorldAPI()` in `app.js` publishes `window.tablefolk`, the API that
 scenario.js, the tests and packages use.
 
+### The loading cover and the start-up order (loading.js, 2026-11-22)
+
+`#loadCover` (index.html, styled in style.css) is up from the first frame;
+`app/loading.js` (loaded right after Babylon.js) lifts it once the world is
+completely built, so no intermediate stage is ever on screen. "World ready"
+is one event, `tablefolk-world-ready` ({ms, timedOut, pending, stages}), and
+`tablefolkLoading.whenRevealed()`. What it waits for, as named stages
+(`tablefolkLoading.begin(name)` returns `done`; `.log` has their times):
+
+| stage | begun by | ends |
+|---|---|---|
+| `scene` | loading.js | `tablefolk-scene-ready` |
+| `opening` | loading.js, when the URL has `?scenario=` / `#s=` | `TABLEFOLK_LINK_OPENED` (scenario.js) |
+| `world` | scenario.js `playScenarioNow` (also puts the cover up, with the world's `title` and `subtitle`) | the build returns |
+| `bodies`, `props` | every `BABYLON.SceneLoader` `ImportMeshAsync` / `LoadAssetContainerAsync` / `AppendAsync` (wrapped; bodies when the path is a character's) | the file is loaded |
+| `trees` | surroundings.js `start` | the trees stand |
+| `ground` | terrain.js, on `tablefolk-scenario-started` | the rebuild with the texture arrays, and the ground cover |
+| `walls` | walls.js, on `tablefolk-scenario-started` | the 650 ms rebuild |
+| `roofs` | roofs.js, on `tablefolk-scenario-started` | the last roof or shell (one a frame) |
+| `travel` | scenario.js `curtain(true)` (a section) | `curtain(false)` |
+
+With nothing pending for 300 ms it settles: `scene.whenReadyAsync()` (every
+material and texture ready; at most 8 s) and four frames drawn under the
+cover (shaders compiled), then it fades out. 45 s after it went up it lifts
+anyway and notes in the "This device" pane what was still pending. While it
+is up the render loop draws at most 15 frames a second and
+`tablefolkDressGate` never waits for the model. A link's world is not
+preceded by the saved one any more (app.js skips `loadWorldState` and the
+stand-in character when the URL names a scenario). `?cover=0` turns the cover
+off; `?tiles=1` pages never show it.
+
+Sections use the same cover in its short form (`.short`: the destination's
+name only); the model is not touched (`playScenarioNow` with `sub`).
+
+Start-up order (the queue is `tablefolkLoading.turn(job)` / `release(job)`;
+a job starts after the first reveal plus 600 ms, and after every earlier job
+that asked for a turn has released, or 90 s):
+
+1. Before the reveal: the page, Babylon, the scene, the world's build (all
+   stages above); `pickForDevice` (the device probe, cached) and the brain
+   manager's set-up, which read but do not load anything.
+2. `brain` (world-integration.js): the model's weights onto the card and its
+   warm-up (`tablefolkHoldRender` holds the picture during the warm-up, as
+   before). A model not yet downloaded asks first; the question waits while
+   the cover is up. Until the brain is ready characters run on code (rails).
+3. `voice` (tts-ui.js auto-load, `tablefolkTTS.prepare`).
+4. `speech` (speech-input.js: Underdog Bark's preload, which also waits for
+   the brain's status as before).
+5. Later, on their own triggers: the capability check (agency.js, once a
+   brain is ready), the better-voice offer, sight (a character's first look).
+
 ## Files
 
 | file | job |
@@ -123,6 +174,7 @@ scenario.js, the tests and packages use.
 | `play.js` | the player's side: E, loot, inventory pane, giving, the turn round after each player action, fighters |
 | `live.js`, `director.js` | living worlds and pacing; events |
 | `speech-input.js` | the 🎤 button: hold to talk (`press` / `release`; `toggle` stays for scripts); Bark's progress goes out as `tablefolk-load` events |
+| `loading.js` | the loading cover (`#loadCover`) and "world ready": staged builders report into it, it lifts when the world is built; the ordered start-up queue for the brain, voice and speech engines (above, "The loading cover") |
 | `load-status.js` | the download cards under the top bar (`tablefolkLoad.set/clear`): Breeze engines' TTS `status` and `upgrade` events, and `tablefolk-load` events (speech input) |
 | `procgen.js` | dungeon and village generator, walk-in building templates (also imported by the server) |
 | `sections.js` | a world in sections, its look and upkeep: the link markers (stairs, cave, gate, trapdoor, edge band and arrow, labels), `catchUp` (a section coming back after game time passed: stock, meals, needs, where workers stand), the 🗺 map card (`tablefolkSections`); the sections themselves are in scenario.js |
@@ -156,6 +208,7 @@ is silently dropped.
 | event | fired by | used for |
 |---|---|---|
 | `tablefolk-scene-ready` | app.js | start-up |
+| `tablefolk-world-ready` | loading.js ({ms, timedOut, pending, stages}) | the loading cover lifted: the world is built and shown; the start-up queue goes on |
 | `tablefolk-clock` | clock.js, every game quarter hour ({min, day, hour}) | regrowth (uses.js), threats, jobs' daily tallies, package modules |
 | `tablefolk-model-call` | jobs.js, world-integration.js ({agentId, kind}) | live-eval --day counts the model calls by kind |
 | `tablefolk-scenario-started` | scenario.js ({title, live, sub, section}) | live.js, roofs, director, welcome, package modules (`sub`: a section build; `live` is the world's) |

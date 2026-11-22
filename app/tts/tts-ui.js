@@ -25,7 +25,9 @@
       $('ttsStatus').textContent='Pocket-TTS disabled (art review mode)';
     } else if(tts.wasLoaded() || localStorage.getItem('tablefolkTtsEnabled')!=='0'){
       $('ttsStatus').textContent='Auto-loading cached Pocket-TTS…';
-      tts.load().catch(err=>{
+      // after the world is shown and the characters' model has loaded (loading.js start-up queue)
+      const L=window.tablefolkLoading;
+      (L?L.turn('voice'):Promise.resolve()).then(()=>tts.load()).finally(()=>L?.release('voice')).catch(err=>{
         $('ttsStatus').textContent='Pocket-TTS auto-load failed: '+err.message;
         console.error('Pocket-TTS auto-load failed',err);
       });

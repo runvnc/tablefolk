@@ -50,7 +50,8 @@
     return models.get(type);
   }
 
-  async function start(scn) { const t0 = performance.now(); try { await start0(scn); } finally { window.tfMark?.('surroundings(async)', t0); } }
+  // (the loading cover waits for the trees, loading.js)
+  async function start(scn) { const t0 = performance.now(), done = window.tablefolkLoading?.begin('trees'); try { await start0(scn); } finally { done?.(); window.tfMark?.('surroundings(async)', t0); } }
   async function start0(scn) {
     clear();
     const sc = state.scene; if (!sc) return;

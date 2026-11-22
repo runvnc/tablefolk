@@ -181,7 +181,7 @@ function waitForDownloadConsent(modelLabel, modelSize) {
 // asked before the welcome screen came up, and would sit on the intro card).
 // A link's world is still opening too (scenario.js sets the flag): the question came up, then its intro card hid it, then it came back.
 const linkOpening = () => !window.TABLEFOLK_LINK_OPENED && (/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario'));
-const busyScreen = () => linkOpening() || !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
+const busyScreen = () => linkOpening() || !!window.tablefolkLoading?.coverUp || !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
 function askConsent(modelLabel, modelSize) {
   showDownloadConsent(modelLabel, modelSize);
   const notice = el('modelLoadNotice');
@@ -930,25 +930,18 @@ async function main() {
     // Re-read the label HERE rather than reusing the one captured before the
     // consent prompt: the user may have changed the dropdown while it was open.
     const liveLabel = manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.label || manager.getModelKey();
+    setStatus('waiting for the world to be built: ' + liveLabel + ' loads next');
+    // The model's set-up (weights onto the graphics card, warm-up) waits until the world
+    // is built and shown (loading.js start-up queue, first in line): started beside the
+    // world's own build both were slower, and the picture hitched (jank.mjs).
+    const L = window.tablefolkLoading;
+    if (L) await L.turn('brain');
+    else for (let i = 0; i < 60 && !(window.tablefolkScenario?.active && window.TABLEFOLK_STATE?.playerAvatar); i++) await new Promise(r => setTimeout(r, 100));
     setStatus('auto-loading ' + liveLabel + '...');
-    // Let the world draw its first frames first (shaders, shadows, textures:
-    // a second or so of GPU work): started together with the model's setup
-    // they made the picture hitch for another second after it (jank.mjs).
-    // A world that is opening: until it is up and playable and its start-up passes are done
-    // (walls and ground rebuilt with the rooms known: about 1.2 s after it starts); the
-    // dressing that follows (ground textures, cover, trees, shells) waits for the model.
-    // Started in the middle of the world's own start the model took 7 s to set up instead of 4.
-    const t0 = performance.now(); let upAt = null;
-    const opening = () => !!window.tablefolkScenario && (/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario'));
-    while (performance.now() - t0 < 15000) {
-      if (upAt == null && window.tablefolkScenario?.active && window.TABLEFOLK_STATE?.playerAvatar) upAt = performance.now();
-      if (upAt != null ? performance.now() - upAt >= 1200 : !opening() && (window.TABLEFOLK_FRAMES || 0) >= 45) break;
-      if (!opening() && performance.now() - t0 > 6000) break;
-      await new Promise(r => setTimeout(r, 100));
-    }
     console.log(cached ? '[character] loading cached model...' : '[character] starting approved download...', liveLabel);
-    if (!await loadModelOnce(manager)) return;
+    if (!await loadModelOnce(manager)) { window.tablefolkLoading?.release('brain'); return; }
     console.log('[character] auto-load completed, enabling buttons...');
+    window.tablefolkLoading?.release('brain');
     el('startBrains').disabled = false;
     el('stepBrains').disabled = false;
     el('loadBrains').disabled = true;
@@ -956,6 +949,7 @@ async function main() {
     appendLog('local brain auto-loaded: ' + modelLabel);
     setStatus(modelLabel + ' ready', 'ready');
   } catch (err) {
+    window.tablefolkLoading?.release('brain');
     console.error('[character] auto-load FAILED:', err);
     window.tablefolkDiag?.note('brain', 'failed to load: ' + err.message);
     setStatus('Auto-load failed: ' + err.message + ' Open Agent brains to retry.', 'error');

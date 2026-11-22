@@ -62,7 +62,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | field | meaning | chapter |
 |---|---|---|
 | `v` | format version, always `1` | |
-| `title`, `subtitle`, `intro` | banner title, banner text for open scenarios, the intro card | |
+| `title`, `subtitle`, `intro` | banner title, banner text for open scenarios, the intro card; `title` and `subtitle` are also on the loading screen while the world is built (the intro card follows once it is shown) | |
 | `seed` | layout randomness (map lines, generated maps) | |
 | `base`, `size`, `floor`, `paint`, `campfire` | the board | [board.md](board.md) |
 | `lighting` | `bright` (10:00), `dim` (19:00), `night` (23:00, moonlit) | [board.md](board.md) |

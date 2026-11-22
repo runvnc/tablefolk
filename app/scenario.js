@@ -1108,7 +1108,15 @@
   }
   // Hit points for monsters without "hp" (combat.js NATURAL has their damage).
   const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24, red_dragon: 30, wyrmling: 9, imp: 7, mushroom_warrior: 8, bunny: 5, minotaur: 18, lizardman: 9, werewolf: 12, mummy: 9, snake: 4, wasp: 3, frog: 2, bull: 12, stag: 9, horse: 10, white_horse: 10, cow: 9, deer: 6, fox: 4, dog: 5, husky: 5, alpaca: 7, donkey: 8, pig: 6, sheep: 5, ogre: 16, gnoll: 9, lich: 16, vampire: 14, cultist: 7, bandit: 7, bear: 12, zombie_classic: 7, kobold_classic: 5, demon_classic: 14, giant_classic: 18, imp_classic: 7, gargoyle: 12, dark_knight: 14 };
+  // The loading cover (loading.js) is up while a world or a section is built: its title
+  // here, and the build itself is one of the stages it waits for.
   async function playScenarioNow(input, opts = {}) {
+    const L = !opts.testing && window.tablefolkLoading;
+    if (L && !opts.sub) L.show({ title: input?.title || 'Untitled scenario', subtitle: input?.subtitle || '' });
+    const done = L ? L.begin('world') : null;
+    try { return await playScenarioBuild(input, opts); } finally { done?.(); }
+  }
+  async function playScenarioBuild(input, opts = {}) {
     const w = W(); if (!w?.ready) throw new Error('world not ready');
     // opts.sub: a section entered through a link (opts.section: its id; the
     // player, the goal, the clock, the flags and the banner stay the world's);
@@ -1520,7 +1528,16 @@
   }
 
   // ---- travelling ----
+  // The way between sections: the loading cover's short form (loading.js), up until the
+  // section is built; without it (?cover=0) a plain fade.
+  let curtainHold = null;
   function curtain(show, text = '') {
+    const L = window.tablefolkLoading;
+    if (L && !L.off) {
+      if (show) { curtainHold ||= L.begin('travel'); L.show({ short: true, title: text || 'On the way' }); }
+      else { curtainHold?.(); curtainHold = null; }
+      return Promise.resolve();
+    }
     let el = document.getElementById('sectionCurtain');
     if (!el) {
       el = document.createElement('div'); el.id = 'sectionCurtain'; el.setAttribute('aria-live', 'polite');
@@ -1575,7 +1592,7 @@
   async function go(toId, how = {}, opts = {}) {
     const w = W(), fromId = world.id, fromTitle = world.base?.title || '';
     const def = sectionDef(toId); if (!def) throw new Error('no section "' + toId + '"');
-    await curtain(true, opts.text || '');
+    await curtain(true, opts.text || def.title || how.name || titleOf(toId) || '');
     const followers = opts.noSnapshot ? [] : takeFollowers();
     if (!opts.noSnapshot) { journey.states[fromId] = snapshot(fromId, new Set(followers.map(f => f.id))); journey.visited[fromId] = { title: fromTitle, at: clockNow() }; }
     const saved = opts.state || journey.states[toId], av = w.getPlayerAvatar?.(), keep = clone(w.state.player);

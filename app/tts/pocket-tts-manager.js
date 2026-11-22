@@ -243,12 +243,13 @@
     // each character's voice, and for engines that have it a short silent line,
     // so the first real line comes as fast as the rest.
     async prepare(voiceIds=[]){ if(!settings().enabled||window.TABLEFOLK_ART_MODE)return; try{
+      await window.tablefolkLoading?.turn('voice');   // not while the world is built (loading.js)
       await this.load(); await this.ensureAudio(true);
       const ready=[]; for(const id of [...new Set(voiceIds.filter(Boolean).map(String))]){ if(id.startsWith('pack:')){ const v=await this.ensurePack(id.split('@')[0]).catch(e=>{console.warn('[tts] voice',id,e);return null;}); if(v)ready.push(v); } else ready.push(id); }
       if(ENGINES[this.engine]?.warmup && !this.warmed && this.worker){ this.warmed=true; const t0=performance.now(), voice=(ready[0]||'').replace('builtin:','');
         await new Promise(res=>{ this.pending.set('warmup',{resolve:res,reject:res}); this.worker.postMessage({type:'warmup',data:{text:'Well, well. Here we are again, old friend.',voice}}); setTimeout(res,60000); });
         console.log(`[tts] warmed up in ${Math.round(performance.now()-t0)} ms`); }
-    }catch(e){ console.warn('[tts] prepare',e); } }
+    }catch(e){ console.warn('[tts] prepare',e); } finally { window.tablefolkLoading?.release('voice'); } }
     engines(){return Object.entries(ENGINES).map(([id,e])=>({id,label:e.label,languages:e.languages}));}
     // Switch engines: the running one is dropped and the new one loads now.
     async setEngine(id){ pickedNow.add(id); clearFailed(id); return this.switchEngine(id,true); }

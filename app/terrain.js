@@ -577,10 +577,12 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
   // ---- (re)build ----
   let busy = null, again = false;
   let debounce = null, lastKey = '';
+  let rebuildWaiters = [];
   function rebuild() {
     // world construction asks many times in a few hundred ms: build once after the last request
+    // (every caller's promise settles with that build: the loading cover waits on one)
     clearTimeout(debounce);
-    return new Promise(res => { debounce = setTimeout(() => res(rebuildNow()), 120); });
+    return new Promise(res => { rebuildWaiters.push(res); debounce = setTimeout(() => { const w = rebuildWaiters; rebuildWaiters = []; const p = rebuildNow(); for (const r of w) r(p); }, 120); });
   }
   function rebuildNow() {
     if (busy) { again = true; return busy; }
@@ -662,13 +664,14 @@ float tfRough = tfFlags.y; float tfAO = 1.0;
       P.tex = { tfCtrl0Sampler: C.tex[0], tfCtrl1Sampler: C.tex[1], tfAlbSampler: T.arrays.alb, tfNrmSampler: T.arrays.nrm };
     }
     tfMark('terrain.build(async)', tB);
-    const tCv = performance.now(); buildCover(C).then(() => tfMark('terrain.cover(async)', tCv)).catch(e => console.warn('[terrain] cover', e));
+    const tCv = performance.now(); T.coverP = buildCover(C).then(() => tfMark('terrain.cover(async)', tCv)).catch(e => console.warn('[terrain] cover', e));
     window.dispatchEvent(new CustomEvent('tablefolk-terrain', { detail: { mode: T.mode, layers: C.names } }));
   }
   function setGrid(on) { T.grid = !!on; }
   T.grid = !!(GFX().showGrid || window.TABLEFOLK_TABLETOP);
   // the world is finished (walls, rooms, scenario): build once more with all of it
-  addEventListener('tablefolk-scenario-started', () => { T.started = true; lastKey = ''; setTimeout(rebuild, 400); });
+  // (the loading cover waits for it: ground textures and ground cover, loading.js)
+  addEventListener('tablefolk-scenario-started', () => { T.started = true; lastKey = ''; const done = window.tablefolkLoading?.begin('ground'); setTimeout(() => rebuild().then(() => T.coverP).finally(() => done?.()), 400); });
   addEventListener('tablefolk-scenario-exit', () => { T.started = false; });
   // water a walker would fall into: a sea cell, or past the board's edge where the sea is
   function waterAt(x, z) {
