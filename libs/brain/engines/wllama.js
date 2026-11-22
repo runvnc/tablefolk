@@ -255,6 +255,7 @@ export async function loadModel(modelKey, onProgress) {
     wllama = new W(cfg.wasm ? { default: cfg.wasm } : WLLAMA3_WASM, { allowOffline: false });
     await wllama.loadModelFromUrl(modelUrl, {
       ...(cfg.loadOpts || {}),
+      ...(q().get('wpar') ? { n_parallel: +q().get('wpar') } : {}),   // ?wpar=N: llama.cpp server slots (wllama 4 default 4)
       n_ctx: cfg.ctx || 4096,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
