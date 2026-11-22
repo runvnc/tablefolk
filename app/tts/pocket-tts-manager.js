@@ -34,7 +34,29 @@
     // precomputed in assets/voices/zonos-embeddings.json); the first choice when the card has room
     'zonos-web':{stream:true,label:'ZONOS3-Mini in this browser (natural, 43 languages; ~1 GB download once; WebGPU, about 1.5 GB of graphics memory)',worker:'/libs/voice/zonos-web-worker.js',languages:true,cloneBySample:true,progress:true},
     'breeze-web':{warmup:true,stream:true,label:'Breeze TTS 2 in this browser (3B; 2.5 GB download once; WebGPU, about 3 GB of graphics memory)',worker:'/libs/voice/breeze-web-worker.js',languages:false,cloneByText:true,progress:true},
+    // the last resort: the browser's own speechSynthesis (no download, no graphics card; no lip sync, not placed in space)
+    'browser':{label:'the browser\'s own speech (no download)',browser:true,languages:false},
   };
+  // ---- a voice engine that crashes never crashes again (2026-11-22) ----
+  // A crash, a lost graphics device, running out of memory, a load that fails or a
+  // line that never sounds: the engine is marked failed for this session (sessionStorage:
+  // a reload in the same tab keeps it), noted in diagnostics with the reason, and the
+  // next lighter voice takes over with a one-time toast. It is tried again only when the
+  // player picks it in the Voice pane (setEngine).
+  const FAIL_KEY='tablefolkVoiceFailed';
+  const failedMap=()=>{ try{ return JSON.parse(sessionStorage.getItem(FAIL_KEY)||'{}'); }catch{ return {}; } };
+  const failedHere=id=>!!failedMap()[id];
+  function markFailed(id,reason){ const m=failedMap(); m[id]={reason,at:Date.now()}; try{ sessionStorage.setItem(FAIL_KEY,JSON.stringify(m)); }catch{} }
+  function clearFailed(id){ const m=failedMap(); if(!m[id]) return; delete m[id]; try{ sessionStorage.setItem(FAIL_KEY,JSON.stringify(m)); }catch{} }
+  // lighter: the heavy graphics-card voices fall to Pocket-TTS small (on the processor), it to the browser's
+  const LIGHTER={'zonos-web':'pocket-18m','breeze-web':'pocket-18m','pocket-100m':'pocket-18m','pocket-18m':'browser'};
+  function lighterThan(id){ let n=LIGHTER[id]; while(n&&failedHere(n)) n=LIGHTER[n]; return n||null; }
+  // what a crash message means, in words
+  function failWhy(msg){ const m=String(msg||''); return /out of memory|OOM|allocat|silence/i.test(m)?'the graphics card ran out of memory':/device (was )?lost|GPU device/i.test(m)?'the graphics card dropped it (device lost)':/network|fetch|download/i.test(m)?'its download failed':/no WebGPU|adapter/i.test(m)?'no WebGPU here':m.slice(0,140)||'it stopped working'; }
+  // Graphics memory the scene takes beyond what a brain's needGB already allows for (about
+  // half a gigabyte of drawing): graphics-settings.js tablefolkGfxGB (measured textures, or
+  // the quality's floor). A heavy voice is left out when the brain and the graphics leave too little.
+  const gfxExtraGB=()=>{ try{ return Math.max(0,(window.tablefolkGfxGB?.()??0)-.5); }catch{ return 0; } };
   // Breeze in the browser is never picked by itself: only when the player chooses it in the Voice pane.
   // (The engine 'breeze', a breeze-server on the player's computer, was removed on 2026-11-21: a saved
   // choice of it falls back to the default, chooseEngine.)
@@ -63,7 +85,8 @@
     if(B?.mobile ?? /Android|iPhone|iPad|iPod/.test(navigator.userAgent)) return 'a phone or tablet: Pocket-TTS is lighter';
     if(!navigator.gpu) return 'no WebGPU in this browser';
     for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
-    const d=window.tablefolkDevice, free=d?.freeGB;
+    if(failedHere('breeze-web')) return 'it failed here this session ('+failedMap()['breeze-web'].reason+')';
+    const d=window.tablefolkDevice, free=d?.freeGB==null?null:d.freeGB-gfxExtraGB();
     if(free==null||Number.isNaN(free)) return 'the graphics card\'s memory is not known';
     // Breeze wants ~3.5 GB, or ~2.6 with its text encoder on the processor (breezeTeCpu)
     if(free<2.6) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model; Breeze wants 2.6 (3.5 for its fastest start)`;
@@ -84,10 +107,12 @@
     if(mobile && !(navigator.deviceMemory>=8)) return 'a phone with under 8 GB of memory: Pocket-TTS is lighter';
     if(!navigator.gpu) return 'no WebGPU in this browser';
     for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100));
-    const free=mobile?8:window.tablefolkDevice?.freeGB;
-    if(free==null||Number.isNaN(free)) return 'the graphics card\'s memory is not known';
+    if(failedHere('zonos-web')) return 'it failed here this session ('+failedMap()['zonos-web'].reason+')';
+    const free0=mobile?8:window.tablefolkDevice?.freeGB;
+    if(free0==null||Number.isNaN(free0)) return 'the graphics card\'s memory is not known';
+    const gx=mobile?0:gfxExtraGB(), free=free0-gx;
     // measured 2026-11-15 (nvidia-smi): 1.45 GB loaded and speaking, 1.7 with the voice encoder (cloning)
-    if(free<2) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model; ZONOS3-Mini wants 2`;
+    if(free<2) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model${gx>.05?' and the graphics ('+(window.TABLEFOLK_GFX?.quality||'')+' quality, about '+Math.round(gx*10)/10+' GB more)':''}; ZONOS3-Mini wants 2`;
     const failed=+localStorage.getItem('tablefolkZonosFailed')||0; if(Date.now()-failed<864e5) return 'it ran out of graphics memory here in the last day';
     if((speeds()['zonos-web']??1)<.9) return 'measured slower than speech on this machine before';
     return '';
@@ -107,15 +132,21 @@
   // this browser when it was downloaded before and fits, else the site's
   // default (admin page), else the small Pocket-TTS.
   async function chooseEngine(){
-    const mine=localStorage.getItem('tablefolkTtsEngine'); if(ENGINES[mine]) return {id:mine,why:'chosen in the voice settings'};
+    const mine=localStorage.getItem('tablefolkTtsEngine');
+    if(ENGINES[mine]&&failedHere(mine)){ const n=lighterThan(mine); if(n) return {id:n,why:`${nameOf(mine)} failed here this session (${failedMap()[mine].reason}): the next lighter voice`}; }
+    else if(ENGINES[mine]&&pickedNow.has(mine)) return {id:mine,why:'chosen in the voice settings'};
+    // a heavy voice chosen on an earlier visit: only while the graphics card has room for it now
+    else if(mine==='zonos-web'||mine==='breeze-web'){ const no=mine==='zonos-web'?await zonosWhyNot():await breezeWebWhyNot(); if(!no||/slower than speech/.test(no)) return {id:mine,why:'chosen in the voice settings'}; window.tablefolkDiag?.note('voice',`${nameOf(mine)} (chosen before) left out: ${no}`); return {id:'pocket-18m',why:`${nameOf(mine)} is chosen, but ${no}: Pocket-TTS small for now`}; }
+    else if(ENGINES[mine]) return {id:mine,why:'chosen in the voice settings'};
     if(mine==='breeze'){ try{ localStorage.removeItem('tablefolkTtsEngine'); localStorage.removeItem('tablefolkBreezeUrl'); }catch{} }   // the removed breeze-server engine: back to the default
     const noZ=await zonosWhyNot();
     if(!noZ && localStorage.getItem(ZONOS_READY)==='1') return {id:'zonos-web',why:'the best voice this graphics card holds (downloaded before)'};
     // Breeze in the browser only when chosen in the Voice pane: never by itself
-    const def=await serverDefault(), id=ENGINES[def]&&!/^breeze/.test(def)?def:'pocket-18m';
+    const def=await serverDefault(); let id=ENGINES[def]&&!/^breeze/.test(def)&&!failedHere(def)?def:'pocket-18m'; if(failedHere(id)) id=lighterThan(id)||'browser';
     return {id,why:(!noZ?'ZONOS3-Mini would fit here: not downloaded yet':'ZONOS3-Mini can\'t run here: '+noZ)+'; this is '+(id===def?'the site\'s default voice':'the default voice')};
   }
   async function chosenEngine(){ return (await chooseEngine()).id; }
+  const pickedNow=new Set();   // engines the player picked in the Voice pane this session: tried even when tight
   const DB='tablefolk-pocket-tts', STORE='voices';
   const CACHE_MARKER='tablefolkTtsModelCached';
   const settings=()=>({enabled:localStorage.getItem('tablefolkTtsEnabled')!=='0',language:localStorage.getItem('tablefolkTtsLanguage')||'english_2026-04',volume:Number(localStorage.getItem('tablefolkTtsVolume')||.85),bufferMs:clamp(Number(localStorage.getItem('tablefolkTtsBufferMs')||350),150,1500)});
@@ -220,9 +251,24 @@
     }catch(e){ console.warn('[tts] prepare',e); } }
     engines(){return Object.entries(ENGINES).map(([id,e])=>({id,label:e.label,languages:e.languages}));}
     // Switch engines: the running one is dropped and the new one loads now.
-    async setEngine(id){ return this.switchEngine(id,true); }
+    async setEngine(id){ pickedNow.add(id); clearFailed(id); return this.switchEngine(id,true); }
+    // The engine broke (crash, device lost, out of memory, a failed load, lines that never sound):
+    // never again this session unless picked; the next lighter voice now, said once.
+    engineFailed(id,msg){
+      if(!id||failedHere(id)) return;   // handled already (a crash reports itself more than once)
+      const why=failWhy(msg), next=lighterThan(id), name=nameOf(id);
+      markFailed(id,why); pickedNow.delete(id); clearTimeout(this.watchdog);
+      if(id==='zonos-web'&&/memory/.test(why)) localStorage.setItem('tablefolkZonosFailed',String(Date.now()));
+      window.tablefolkDiag?.note('voice',`${name} failed: ${why} (${String(msg||'').slice(0,160)}); ${next?'now '+nameOf(next):'speech off'}`);
+      console.warn('[tts]',name,'failed:',msg);
+      if(next) this.why=`${name} failed here (${why}): the next lighter voice`;
+      if(!this.failToasted?.has(id)){ (this.failToasted||=new Set()).add(id); window.tablefolkToast?.(next?`The voice is now ${nameOf(next)}: ${name} ${why==='it stopped working'?'stopped working':'stopped ('+why+')'}.`:`Speech is off: ${name} stopped (${why}).`,{type:'info',duration:9000}); }
+      if(this.engine===id) queueMicrotask(async()=>{ if(next){ await this.switchEngine(next,false).catch(e=>console.warn('[tts] fallback',e)); this.why=`${name} failed here (${why}): the next lighter voice`; this.pump(); } else { this.unload(); this.status('speech off: '+why,'error'); } });
+    }
     async switchEngine(id,persist=true){ if(!ENGINES[id])return; if(persist) localStorage.setItem('tablefolkTtsEngine',id); if(id===this.engine)return; this.stop(); this.warmed=false; try{this.worker?.terminate();}catch{} this.worker=null; this.ready=false; this.loading=false; this.pendingLoad=null; this.directPort=false; if(this.audioCtx){ try{this.pcmNode?.disconnect();}catch{} try{await this.audioCtx.close();}catch{} this.audioCtx=null; this.pcmNode=null; this.gain=null; this.analyser=null; } return this.load(); }
-    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} if(engine==='breeze-web'){ for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100)); } this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{if(this.worker===worker){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;reject(e);this.status('Pocket-TTS failed: '+e.message,'error');}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:engine==='zonos-web'?zonosLanguage():settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1',teCpu:breezeTeCpu()}}); }); return this.pendingLoad; }
+    async load(){ if(this.ready)return; if(this.loading)return this.pendingLoad; this.loading=true; const pick=await chooseEngine(), engine=this.engine=pick.id, E=ENGINES[engine]; this.why=pick.why; window.tablefolkDiag?.note('voice',E.label.replace(/ \(.*/,'')+': '+pick.why); this.status(this.wasLoaded()?`Auto-loading ${E.label}…`:`Downloading ${E.label}…`,'loading'); if(this.worker){try{this.worker.terminate();}catch{}this.worker=null;} if(engine==='breeze-web'){ for(let i=0;i<60&&!window.tablefolkDevice;i++) await new Promise(r=>setTimeout(r,100)); }
+      if(E.browser){ this.loading=false; if(!globalThis.speechSynthesis){ this.pendingLoad=null; this.status('no speech in this browser','error'); throw new Error('no speechSynthesis in this browser'); } this.ready=true; this.status(E.label+' ready','ready'); return; }
+      this.pendingLoad=new Promise((resolve,reject)=>{ const worker=new Worker(E.worker,{type:'module'}); this.worker=worker; worker.onmessage=e=>this.onMessage(e.data,resolve,reject); worker.onerror=e=>{const mine=this.worker===worker; if(mine){try{worker.terminate();}catch{}this.worker=null;}this.loading=false;this.pendingLoad=null;this.ready=false;reject(e);this.status(E.label.replace(/ \(.*/,'')+' failed: '+(e.message||'the worker crashed'),'error'); if(mine){ if(this.running)this.finishCurrent(false); this.engineFailed(engine,'the voice worker crashed: '+(e.message||'no message')); }}; worker.postMessage({type:'load',data:{mirror:mirrorOk(),language:engine==='zonos-web'?zonosLanguage():settings().language,allowCpu:localStorage.getItem('tablefolkBreezeCpu')==='1',teCpu:breezeTeCpu()}}); }); return this.pendingLoad; }
     async onMessage(m,resolve,reject){ if(m.type==='status'&&ENGINES[this.engine]?.progress) this.status(m.status,m.state||'loading'); if(m.type==='runtime_info')Object.assign(this.telemetry,m.data||{}); if(m.type==='bundle_loaded')this.sampleRate=m.sampleRate||24000; if(m.type==='voices_loaded'||m.type==='loaded'){ if(!this.ready){this.ready=true;this.loading=false;localStorage.setItem(CACHE_MARKER,'1');if(READY_KEY[this.engine])localStorage.setItem(READY_KEY[this.engine],'1');this.status(`${ENGINES[this.engine]?.label||'Pocket-TTS'} ready${ENGINES[this.engine]?.cloneByText||ENGINES[this.engine]?.cloneBySample?'':' (CPU)'}`,'ready');resolve?.(); if(!this.offerChecked){ this.offerChecked=true; this.maybeOfferBreeze().catch(()=>{}); } await this.restoreCustomVoices();} }
       if(m.type==='generation_started'){this.receivedSamples=0;this.pendingAudio=[];this.pendingStreamEnd=false;this.telemetry={...this.telemetry,bufferedMs:0,underruns:0,resumeCount:0,minBufferedMs:null,chunks:0,lastChunkRtfx:0,rtfx:0,firstAudioMs:null,audioArrivalMs:null,playbackStartMs:null};if(!this.directPort)this.pcmNode?.port.postMessage({type:'reset'});}
       // Direct-port path: worker sends audio_chunk_meta (no audio data) for telemetry
@@ -235,7 +281,10 @@
       if(m.type==='voice_encoded'){ const p=this.pending.get('encode'); if(p){this.pending.delete('encode');p.resolve();} }
       if(m.type==='warmed'){ const p=this.pending.get('warmup'); if(p){this.pending.delete('warmup');p.resolve();} }
       // the engine is broken for good (ZONOS3-Mini out of graphics memory): the default voice for now
-      if(m.type==='error'&&m.fatal&&this.engine==='zonos-web'){ localStorage.setItem('tablefolkZonosFailed',String(Date.now())); window.tablefolkDiag?.note('voice','ZONOS3-Mini failed: '+m.error+'; back to the default voice'); queueMicrotask(async()=>{ const def=await serverDefault(); await this.switchEngine(ENGINES[def]&&!/^(zonos|breeze)/.test(def)?def:'pocket-18m',false); }); }
+      if(m.type==='audio_chunk'||m.type==='audio_chunk_meta'||m.type==='stream_ended'){ clearTimeout(this.watchdog); if(m.type!=='stream_ended') this.genErrors=0; }
+      // the engine broke for good (fatal: out of graphics memory, the device lost), a load that failed,
+      // or three lines in a row that failed: the next lighter voice (engineFailed)
+      if(m.type==='error'){ const eng=this.engine; if(m.fatal||!this.ready) queueMicrotask(()=>this.engineFailed(eng,m.error)); else if(++this.genErrors>=3){ this.genErrors=0; queueMicrotask(()=>this.engineFailed(eng,'three lines failed: '+m.error)); } }
       if(m.type==='error'){this.status(m.error,'error'); const p=this.pending.get('encode');if(p){this.pending.delete('encode');p.reject(new Error(m.error));} if(this.running)this.finishCurrent(false); if(!this.ready){try{this.worker?.terminate();}catch{}this.worker=null;this.loading=false;this.pendingLoad=null;} reject?.(new Error(m.error));} }
     // for engines that design a voice from words (Breeze) when there is no sample to clone
     designFor(voice){ const id=String(voice).replace(/^(builtin|custom):/,''), v=(window.TABLEFOLK_VOICES||[]).find(x=>x.id===id)||packVoice(String(voice).split('@')[0]); return v?`A ${v.gender||''} voice: ${v.description||'natural and clear'}. Speak clearly and naturally.`.replace(/\s+/g,' '):'A warm, natural speaking voice. Speak clearly and naturally.'; }
@@ -247,13 +296,19 @@
       if(!best&&v.moods.seductive){ const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsMood==='seductive'||/\b(seduct\w*|flirt\w*|sultry|alluring|temptress|coquett\w*|smouldering|siren)\b/i.test((cfg.personality||'')+' '+(cfg.style||''))) best='seductive'; }
       return best?voice+'@'+best:voice; }catch{ return voice; } }
     speak(agent,text,voiceId,level=1){ const s=settings(); if(!s.enabled||!text?.trim())return; const cfg=window.tablefolk?.getBrainConfig?.(agent.id)||{}; if(cfg.ttsEnabled===false)return; this.queue.push({agent,level:clamp(+level||1,.1,1.5),text:String(text).slice(0,500),voice:this.moodVoice(agent,voiceId||cfg.ttsVoiceId||'builtin:alba'),at:Date.now(),speakAt:performance.now()}); this.pump(); }
-    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load();await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item})); const asked=item.voice; if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const bare=item.voice.replace('builtin:',''); if(this.engine!=='zonos-web'&&ZONOS_BUILTINS[bare]) item.voice='builtin:'+ZONOS_BUILTINS[bare]; const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.pcmNode?.port.postMessage({type:'set-min-buffer',samples:Math.floor(this.audioCtx.sampleRate*holdFor(this.engine,item.text))}); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(asked)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
+    async pump(){ if(this.running||!this.queue.length)return; this.running=true; try{await this.load(); if(ENGINES[this.engine]?.browser) return this.speakBrowser(); await this.ensureAudio(); if(this.audioCtx.state!=='running')throw new Error('Audio is blocked; click the page once, then try again.'); const item=this.queue.shift(); if(!item)return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item}));
+      // a line that never sounds (a hung engine, a lost device it did not report): 30 s, then the next lighter voice
+      clearTimeout(this.watchdog); const eng=this.engine; this.watchdog=setTimeout(()=>{ if(this.current===item&&this.engine===eng){ this.finishCurrent(false); this.engineFailed(eng,'no sound for 30 s after a line was asked for'); } },30000); const asked=item.voice; if(item.voice.startsWith('pack:')) item.voice=await this.ensurePack(item.voice).catch(e=>{console.warn('pack voice',e);return 'builtin:alba';}); const bare=item.voice.replace('builtin:',''); if(this.engine!=='zonos-web'&&ZONOS_BUILTINS[bare]) item.voice='builtin:'+ZONOS_BUILTINS[bare]; const voice=item.voice.startsWith('custom:')?item.voice:item.voice.replace('builtin:',''); this.pcmNode?.port.postMessage({type:'set-min-buffer',samples:Math.floor(this.audioCtx.sampleRate*holdFor(this.engine,item.text))}); this.worker.postMessage({type:'generate',data:{text:item.text,voice,instruction:this.designFor(asked)}}); }catch(e){this.status(e.message,'error');this.finishCurrent(false);} }
+    // the browser's own speech: one line, the volume times how loud it is said (no placing in space)
+    speakBrowser(){ const item=this.queue.shift(); if(!item) return this.finishCurrent(false); this.current=item; this.spatialAgent=item.agent||null; this.dispatchEvent(new CustomEvent('speechstart',{detail:item}));
+      const u=new SpeechSynthesisUtterance(item.text); u.volume=clamp((this.volume??settings().volume)*(item.level??1),0,1); let done=false; const end=ok=>{ if(done) return; done=true; clearTimeout(t); if(this.current===item) this.finishCurrent(ok); };
+      u.onend=()=>end(true); u.onerror=()=>end(false); const t=setTimeout(()=>end(false),Math.max(8000,item.text.length*150)); try{ speechSynthesis.speak(u); }catch(e){ end(false); } }
     // Legacy path only: relay audio chunks from main thread to worklet.
     // With the direct MessagePort, audio flows worker->worklet and this is unused.
     streamChunk(data,metrics={}){if(!this.pcmNode||!data.length)return;if(!this.receivedSamples&&this.current)this.telemetry.audioArrivalMs=performance.now()-this.current.speakAt;this.receivedSamples+=data.length;this.telemetry.chunks++;this.telemetry.lastChunkRtfx=Number(metrics?.chunkRtfx)||0;this.pendingAudio.push(data);this.flushAudio();}
     flushAudio(){if(!this.pcmNode)return;while(this.pendingAudio.length){const chunk=this.pendingAudio.shift();this.pcmNode.port.postMessage({type:'audio',data:chunk},[chunk.buffer]);}if(!this.pendingAudio.length&&this.pendingStreamEnd){this.pendingStreamEnd=false;this.pcmNode.port.postMessage({type:'stream-ended'});}}
     emitTelemetry(){this.dispatchEvent(new CustomEvent('telemetry',{detail:{...this.telemetry}}));}
-    finishCurrent(ok){const item=this.current;if(item)this.dispatchEvent(new CustomEvent('speechend',{detail:{...item,ok}}));this.current=null;this.spatialAgent=null;this.running=false;this.receivedSamples=0;queueMicrotask(()=>this.pump());}
+    finishCurrent(ok){clearTimeout(this.watchdog);const item=this.current;if(item)this.dispatchEvent(new CustomEvent('speechend',{detail:{...item,ok}}));this.current=null;this.spatialAgent=null;this.running=false;this.receivedSamples=0;queueMicrotask(()=>this.pump());}
 
     // ---- spatial audio ----
     // Pan + attenuate by the speaking character's world position relative to the
@@ -342,7 +397,7 @@
           '</span>'+
           '<span>R</span>'+
         '</div>';
-    }    stop(){this.queue=[];try{this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}
+    }    stop(){this.queue=[];try{if(ENGINES[this.engine]?.browser)globalThis.speechSynthesis?.cancel();this.worker?.postMessage({type:'stop'});this.pcmNode?.port.postMessage({type:'reset'});}catch{}this.finishCurrent(false);}
     unload(){this.warmed=false;this.stopSpatialTicker();this.stop();try{this.worker?.terminate();}catch{}this.worker=null;this.ready=false;this.loading=false;this.pendingLoad=null;this.pendingAudio=[];this.pending.clear();try{this.pcmNode?.disconnect();}catch{}this.analyser=null;try{this.gain?.disconnect();}catch{}try{this.audioCtx?.close();}catch{}this.pcmNode=null;this.gain=null;this.audioCtx=null;this.directPort=false;}
     // the language list of the engine running (or about to): [[value,label]], null for Pocket's (the page's own options)
     languageList(engine=this.engine){ return engine==='zonos-web'?ZONOS_LANGUAGES:null; }
@@ -361,6 +416,7 @@
     // A voice from the designed library (assets/voices/): fetched, cloned like an
     // uploaded sample (kept for this page only), used as custom:pack-<id>.
     async ensurePack(id){
+      if(ENGINES[this.engine]?.browser) return 'builtin:alba';   // the browser's speech has its own voices only
       // ZONOS3-Mini: a speaker embedding (192 numbers) from the sample alone; the library's are
       // precomputed (assets/voices/zonos-embeddings.json, tools/browser-test/zonos-embeddings.mjs)
       if(ENGINES[this.engine]?.cloneBySample){

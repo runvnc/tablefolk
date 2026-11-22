@@ -87,6 +87,30 @@
     : (settings.quality !== 'high' && MED[file]) ? MED[file]   // light uses the simplified geometry too
     : HAS_1K.has(file) ? file.replace(/\.glb$/, '.1k.glb') : file;
 
+  // Graphics memory the scene takes, in GB (2026-11-22): the textures it holds (width x
+  // height x bytes a texel, a third more for mipmaps, six faces for a cube), render targets
+  // and shadow maps included, plus ~0.3 GB of buffers and the screen's own; never under the
+  // quality's floor (high draws 4k building textures, SSAO, bloom). The voice picker
+  // (pocket-tts-manager.js) leaves a heavy voice out when the brain and this leave too little.
+  const FLOOR_GB = { light: .45, medium: .8, high: 1.6 };
+  let gfxMeasured = null, gfxAt = 0;
+  window.tablefolkGfxGB = function () {
+    const sc = window.TABLEFOLK_STATE?.scene;
+    if (sc && performance.now() - gfxAt > 5000) {
+      gfxAt = performance.now(); let bytes = 0;
+      try {
+        for (const t of sc.textures || []) {
+          const z = t.getSize?.(); if (!z?.width) continue;
+          const bpp = t.textureType === 1 || t.textureType === 2 ? 16 : 4;   // float / half float targets
+          bytes += z.width * z.height * bpp * (t.isCube ? 6 : 1) * (t.noMipmap ? 1 : 1.33);
+        }
+        const e = sc.getEngine(); bytes += e.getRenderWidth() * e.getRenderHeight() * 4 * 6;   // the frame, depth, post-process targets
+        gfxMeasured = bytes / 2 ** 30 + .3;
+      } catch { gfxMeasured = null; }
+    }
+    return Math.max(FLOOR_GB[settings.quality] || .45, gfxMeasured || 0);
+  };
+
   function applyShadow(gen, enabled, every) {
     if (!gen) return;
     try {
