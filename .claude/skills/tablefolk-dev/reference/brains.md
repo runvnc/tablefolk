@@ -1162,6 +1162,14 @@ answer.
   call). Judge 4.0 / 3.88 / **4.63** / 3.0. 4 of 281 answers wrote the
   command and then reasoning ("carry(pumpkin)The user wants me to act...")
   up to max_tokens: the command still parsed, the turn took 6 s.
+- The same day at **free**: 44% model-chosen (code fills between turns), 21
+  self-started (9 pairs), one gift, 10 notes, 5 surprises, depth 0.17, wasted
+  4%, 2 safety nets, 6 ate / 6 slept, two hungry at the end (hector and wren,
+  out after the night wolf), 13 sales, 99% indoors in the raid, 186 calls
+  (7.7 a game hour), 2.4 s a turn median (2.1-2.7 p10-p90), and the most work
+  done of any free day (job cycles: rosa 5, tam 4, maren 3, brann 3). Judge
+  3.88 / 3.5 / 4.38 / 2.63: below its own guided day and below Bonsai 2 27B
+  at free on the 4090 (4.0 / 4.25 / 4.75 / 3.13).
 
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
@@ -1548,13 +1556,13 @@ the run below is the retry.)
 | model-chosen activities | 85% | 65% (code fills between turns) | 63% |
 | self-started interactions (pairs) | 10 (4) | 16 (3) | 25 (8) |
 | plans / revised; notes (plan()) | 16 / 13 | - ; 12 | - ; 12 |
-| surprises | 16 | 1 | - |
-| reply depth | 0.80 | 0.63 | - |
-| wasted / safety nets | 1% / 14 | 5% / 2 | 8% / - |
+| surprises | 16 | 1 | 6 |
+| reply depth | 0.80 | 0.63 | 0.43 |
+| wasted / safety nets | 1% / 14 | 5% / 2 | 8% / 16 |
 | ate / slept at night / hungry at the end | 8 / 7 / 0 | 6 / 6 / **3** (jory, hector, wren) | 8 / 7 / 1 |
 | sales between characters | 3 | 8 | 10 |
-| others indoors during the raid | 66% | 93% | - |
-| model calls (a game hour) | 101 (4.2) | 77 (3.2) | 117 |
+| others indoors during the raid | 66% | 93% | 90% |
+| model calls (a game hour) | 101 (4.2) | 77 (3.2) | 118 (4.9) |
 | a model turn: median (p10-p90, max) | 10.9 s (7.4-29.7, 35) | **7.4 s** (6.0-8.9, 11.4) | 5.1 s |
 | peak graphics memory, whole card | 11.3 GB | 11.1 GB | 11.1 GB |
 | judge: coherence / personality / purpose / surprise | 4.0 / 3.88 / 4.38 / 3.38 | 3.88 / 3.75 / 4.5 / 2.75 | 4.0 / 4.25 / 4.75 / 3.13 |
