@@ -1154,6 +1154,14 @@ answer.
   the haggle, where it wrote `sell(sword, 40, Ana)` and then its reasoning
   ("The user wants me to reply with...") in the same answer: the thinking
   skip leaks now and then.
+- Hearthvale's day at guided (12 min, the endpoint on the 4070 Ti Super):
+  98% model-chosen, 20 self-started (10 pairs), 16 plans / 11 revised, 54
+  surprises, depth 0.30, wasted 6%, 4 safety nets, 8 ate / 7 slept, one
+  hungry at the end (jory), 10 sales, 54% indoors in the raid, 10.8 calls a
+  game hour (259), 2.5 s a turn median (proxy: 1.3 s median, 2.5 s p90 a
+  call). Judge 4.0 / 3.88 / **4.63** / 3.0. 4 of 281 answers wrote the
+  command and then reasoning ("carry(pumpkin)The user wants me to act...")
+  up to max_tokens: the command still parsed, the turn took 6 s.
 
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
