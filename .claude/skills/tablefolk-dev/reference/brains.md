@@ -1533,3 +1533,28 @@ faulty card or host; the check now reports garbled answers in Running now.
 Picks, now: **12 GB**: Bonsai 2 9B, Auto (assisted, temper in code); the 27B
 at guided only for fewer characters or a longer day. **16 GB**: Bonsai 2 27B
 at guided (the 4080 run above). **24 GB**: Bonsai 2 27B at guided, or free.
+
+### Bonsai 2 27B at free on a 16 GB card (2026-11-22)
+
+Same box, same tools, one after the other: a rented RTX 4080 Super 16 GB
+(vast.ai, driver 610.57, Chrome 158, light graphics), hearthvale's day (12
+real minutes, the player idle), `box-queue.sh` with graphics memory sampled
+every 2 s. The 4090 free run above is the reference. (A first free attempt
+died at start-up with the page closed, during the model's first download;
+the run below is the retry.)
+
+| | guided, 4080 S | free, 4080 S | free, 4090 (above) |
+|---|---|---|---|
+| model-chosen activities | 85% | 65% (code fills between turns) | 63% |
+| self-started interactions (pairs) | 10 (4) | 16 (3) | 25 (8) |
+| plans / revised; notes (plan()) | 16 / 13 | - ; 12 | - ; 12 |
+| surprises | 16 | 1 | - |
+| reply depth | 0.80 | 0.63 | - |
+| wasted / safety nets | 1% / 14 | 5% / 2 | 8% / - |
+| ate / slept at night / hungry at the end | 8 / 7 / 0 | 6 / 6 / **3** (jory, hector, wren) | 8 / 7 / 1 |
+| sales between characters | 3 | 8 | 10 |
+| others indoors during the raid | 66% | 93% | - |
+| model calls (a game hour) | 101 (4.2) | 77 (3.2) | 117 |
+| a model turn: median (p10-p90, max) | 10.9 s (7.4-29.7, 35) | **7.4 s** (6.0-8.9, 11.4) | 5.1 s |
+| peak graphics memory, whole card | 11.3 GB | 11.1 GB | 11.1 GB |
+| judge: coherence / personality / purpose / surprise | 4.0 / 3.88 / 4.38 / 3.38 | 3.88 / 3.75 / 4.5 / 2.75 | 4.0 / 4.25 / 4.75 / 3.13 |
