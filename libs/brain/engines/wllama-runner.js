@@ -106,7 +106,7 @@ export function createWllama3Engine(wllamaInstance) {
               cache_prompt: true,
               // llama.cpp stops at these itself: cancelling a stream from here (the abort below) crashed the
               // wllama 4 build a few turns later (table index out of bounds; brains.md, "Inkling 2 Mini in the game")
-              ...(wllamaInstance.tablefolkPrime ? { stop: stops } : {}),
+              ...(wllamaInstance.tablefolkServerStops ? { stop: stops } : {}),
               abortSignal: aborter.signal,
               max_tokens: maxTokens,
               temperature,
@@ -138,7 +138,7 @@ export function createWllama3Engine(wllamaInstance) {
                     'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
                 }
                 full += piece;
-                if (shouldAbort?.() || (!wllamaInstance.tablefolkPrime && stops.some(st => full.includes(st)))) { aborter.abort(); return; }
+                if (shouldAbort?.() || (!wllamaInstance.tablefolkServerStops && stops.some(st => full.includes(st)))) { aborter.abort(); return; }
                 if (stops.some(st => full.includes(st))) return;   // the server stops by itself (stop above)
                 onToken?.(full, true);
               },
