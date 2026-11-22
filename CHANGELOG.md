@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-22
+
+- **Inkling 2 Mini runs correctly in the browser on a 16 GB card, still slow**: a fix to llama.cpp's WebGPU backend (expert matmuls added up in half precision and overflowed; one quant type was missing) makes the small 8-10 GB versions of Thinking Machines' 26B model answer correctly in Chrome, with 10.5 GB of graphics memory. With thinking turned off and the shared start of the prompt read once, a character's turn takes 5-9 s on 16-24 GB cards (Bonsai 2 27B: 2-4 s), so it is not offered yet. The build and the fix are in `tools/wllama-inkling/`.
+
 ## 2026-11-21
 
 - **Inkling 2 Mini tried in the browser, not yet**: Thinking Machines' new 26B model ran in Chrome on a rented RTX 4090 with good answers, but it needs 19 GB of graphics memory, writes only 7-8 tokens a second and always thinks first, so a turn takes 15-60 s. Not offered; the trial build is in `tools/wllama-inkling/`.

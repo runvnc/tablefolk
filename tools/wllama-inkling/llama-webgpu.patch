@@ -1,0 +1,50 @@
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+index 75527b111..89e0bf729 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -5042,6 +5042,7 @@ static bool ggml_backend_webgpu_device_supports_op(ggml_backend_dev_t dev, const
+                         case GGML_TYPE_F16:
+                         case GGML_TYPE_BF16:
+                         case GGML_TYPE_Q1_0:
++                        case GGML_TYPE_Q2_0:
+                         case GGML_TYPE_Q4_0:
+                         case GGML_TYPE_Q4_1:
+                         case GGML_TYPE_Q5_0:
+diff --git a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
+index a3c25f656..732b8b82a 100644
+--- a/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
++++ b/ggml/src/ggml-webgpu/wgsl-shaders/mul_mat_id.wgsl
+@@ -6,13 +6,13 @@ enable f16;
+ #include "mul_mat_decls.tmpl"
+ 
+ #ifdef VEC
+-fn store_val(acc: array<array<f16, TILE_M>, TILE_N>, tn: u32, tm: u32) -> vec4<f32> {
++fn store_val(acc: array<array<f32, TILE_M>, TILE_N>, tn: u32, tm: u32) -> vec4<f32> {
+     return vec4<f32>(f32(acc[tn][tm]), f32(acc[tn][tm + 1]), f32(acc[tn][tm + 2]), f32(acc[tn][tm + 3]));
+ }
+ #endif
+ 
+ #ifdef SCALAR
+-fn store_val(acc: array<array<f16, TILE_M>, TILE_N>, tn: u32, tm: u32) -> f32 {
++fn store_val(acc: array<array<f32, TILE_M>, TILE_N>, tn: u32, tm: u32) -> f32 {
+     return f32(acc[tn][tm]);
+ }
+ #endif
+@@ -125,7 +125,7 @@ fn main(@builtin(workgroup_id) wg_id: vec3<u32>,
+     let dst2_stride = params.m * params.n_expert_used;
+     let dst1_stride = params.m;
+ 
+-    var acc: array<array<f16, TILE_M>, TILE_N>;
++    var acc: array<array<f32, TILE_M>, TILE_N>;
+ 
+     for (var k_outer = 0u; k_outer < params.k; k_outer += TILE_K) {
+ 
+@@ -151,7 +151,7 @@ fn main(@builtin(workgroup_id) wg_id: vec3<u32>,
+                     let src1_idx = src1_n * TILE_K + k_inner;
+                     let src1_val = shmem[TILE_SRC0_SHMEM + src1_idx];
+                     for (var tm = 0u; tm < TILE_M; tm++) {
+-                        acc[tn][tm] += src0_tile[tm] * src1_val;
++                        acc[tn][tm] += f32(src0_tile[tm]) * f32(src1_val);
+                     }
+                 }
+             }

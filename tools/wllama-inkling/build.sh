@@ -20,6 +20,7 @@ if [ ! -d wllama ]; then
   git clone -q https://github.com/ngxson/wllama.git && git -C wllama checkout -q "${WLLAMA_REF:-fa1019a451}"
   rm -rf wllama/llama.cpp && git clone -q https://github.com/ggml-org/llama.cpp wllama/llama.cpp
   git -C wllama/llama.cpp checkout -q "$REF"
+  git -C wllama/llama.cpp apply "$HERE/llama-webgpu.patch"   # MUL_MAT_ID: f32 accumulation, Q2_0 (brains.md)
   git -C wllama apply "$HERE/wllama-glue.patch"   # parse_questions gained an argument upstream
 fi
 echo "wllama $(git -C wllama rev-parse --short HEAD), llama.cpp $(git -C wllama/llama.cpp log -1 --format='%h %cs')"

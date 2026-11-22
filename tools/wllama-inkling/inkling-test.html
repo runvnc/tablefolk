@@ -27,7 +27,7 @@ try {
   let lastPct = -10;
   await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
     n_ctx: +(q.get('ctx') || 8192), n_batch: +(q.get('ub') || 2048), n_ubatch: +(q.get('ub') || 2048),
-    flash_attn: q.get('fa') === '0' ? false : true, n_gpu_layers: 999,
+    flash_attn: q.get('fa') === '0' ? false : true, n_gpu_layers: +(q.get('ngl') ?? 999), ...(q.get('threads') ? { n_threads: +q.get('threads') } : {}), ...(q.get('rpc') ? { rpc_workers: +q.get('rpc') } : {}),
     progressCallback: ({ loaded, total }) => { const p = Math.floor(100 * loaded / total); if (p >= lastPct + 10) { lastPct = p; out({ dl: p, s: ((performance.now() - t0) / 1000).toFixed(1) }); } },
   });
   out({ loaded_s: ((performance.now() - t0) / 1000).toFixed(1) });
@@ -37,9 +37,28 @@ try {
     out({ raw_s: ((performance.now() - t) / 1000).toFixed(2), text: r.choices?.[0]?.text, timings: r.timings });
   }
   const eff = q.get('effort') ?? '0';
+  if (q.get('prime') === '1') { // read the shared prefix once, so a checkpoint sits at its end (hybrid model: no partial rollback)
+    const t = performance.now();
+    const pre = `<|message_system|><|content_text|>${SHORT ? 'You are Greta, an innkeeper.' : system}<|end_message|><|message_system|><|content_text|>Thinking effort level: 0<|end_message|>`;
+    const r = await w.createCompletion({ prompt: pre, max_tokens: 1, temperature: 0, cache_prompt: true });
+    out({ prime_s: ((performance.now() - t) / 1000).toFixed(2), prompt_n: r.timings?.prompt_n, prompt_tps: r.timings?.prompt_per_second?.toFixed(1) });
+  }
   for (const u of users) {
     const t = performance.now();
     let raw = '', tm = {}; const chunks = [];
+    if (q.get('nothink') === '1') { // thinking cut off: the answer message is opened in the prompt (brains.md)
+      const sys = SHORT ? 'You are Greta, an innkeeper.' : system;
+      const prompt = `<|message_system|><|content_text|>${sys}<|end_message|><|message_system|><|content_text|>Thinking effort level: 0<|end_message|>` +
+        `<|message_user|><|content_text|>${u}<|end_message|><|message_model|><|content_text|>`;
+      try {
+        const r = await w.createCompletion({ prompt, max_tokens: +(q.get('n') || 64), temperature: 0.2, cache_prompt: true,
+          stop: ['<|end_message|>', '<|content_model_end_sampling|>', '<|message_'] });
+        tm = r.timings || {}; raw = r.choices?.[0]?.text || '';
+      } catch (e) { out({ call_error: String(e).slice(0, 200) }); }
+      out({ wall_s: ((performance.now() - t) / 1000).toFixed(2), prompt_n: tm.prompt_n, cache_n: tm.cache_n,
+        prompt_tps: tm.prompt_per_second?.toFixed(1), gen_n: tm.predicted_n, gen_tps: tm.predicted_per_second?.toFixed(1), text: raw.slice(0, 300) });
+      continue;
+    }
     try { await w.createChatCompletion({
       messages: [{ role: 'system', content: SHORT ? 'You are Greta, an innkeeper.' : system }, { role: 'user', content: u }],
       stream: true, onData: (c) => { const d = c.choices?.[0]?.delta || {}; raw += (d.reasoning_content || '') + (d.content || ''); if (chunks.length < 3) chunks.push(JSON.stringify(c).slice(0, 300)); if (c.timings) tm = c.timings; },
