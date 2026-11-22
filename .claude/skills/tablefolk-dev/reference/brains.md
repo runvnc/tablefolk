@@ -1551,18 +1551,28 @@ every 2 s. The 4090 free run above is the reference. (A first free attempt
 died at start-up with the page closed, during the model's first download;
 the run below is the retry.)
 
-| | guided, 4080 S | free, 4080 S | free, 4090 (above) |
-|---|---|---|---|
-| model-chosen activities | 85% | 65% (code fills between turns) | 63% |
-| self-started interactions (pairs) | 10 (4) | 16 (3) | 25 (8) |
-| plans / revised; notes (plan()) | 16 / 13 | - ; 12 | - ; 12 |
-| surprises | 16 | 1 | 6 |
-| reply depth | 0.80 | 0.63 | 0.43 |
-| wasted / safety nets | 1% / 14 | 5% / 2 | 8% / 16 |
-| ate / slept at night / hungry at the end | 8 / 7 / 0 | 6 / 6 / **3** (jory, hector, wren) | 8 / 7 / 1 |
-| sales between characters | 3 | 8 | 10 |
-| others indoors during the raid | 66% | 93% | 90% |
-| model calls (a game hour) | 101 (4.2) | 77 (3.2) | 118 (4.9) |
-| a model turn: median (p10-p90, max) | 10.9 s (7.4-29.7, 35) | **7.4 s** (6.0-8.9, 11.4) | 5.1 s |
-| peak graphics memory, whole card | 11.3 GB | 11.1 GB | 11.1 GB |
-| judge: coherence / personality / purpose / surprise | 4.0 / 3.88 / 4.38 / 3.38 | 3.88 / 3.75 / 4.5 / 2.75 | 4.0 / 4.25 / 4.75 / 3.13 |
+| | guided, 4080 S | free, 4080 S | free, 4080 S, again | free, 4090 (above) |
+|---|---|---|---|---|
+| model-chosen activities | 85% | 65% (code fills between turns) | 60% | 63% |
+| self-started interactions (pairs) | 10 (4) | 16 (3) | 29 (7) | 25 (8) |
+| plans / revised; notes (plan()) | 16 / 13 | - ; 12 | - ; 11 | - ; 12 |
+| surprises | 16 | 1 | 1 | 6 |
+| reply depth | 0.80 | 0.63 | 0.20 | 0.43 |
+| wasted / safety nets | 1% / 14 | 5% / 2 | 7% / 17 | 8% / 16 |
+| ate / slept at night / hungry at the end | 8 / 7 / 0 | 6 / 6 / **3** (jory, hector, wren) | 6 / 6 / 2 (hector, wren) | 8 / 7 / 1 |
+| sales between characters | 3 | 8 | 12 | 10 |
+| others indoors during the raid | 66% | 93% | 69% | 90% |
+| model calls (a game hour) | 101 (4.2) | 77 (3.2) | 95 (4.0) | 118 (4.9) |
+| a model turn: median (p10-p90, max) | 10.9 s (7.4-29.7, 35) | **7.4 s** (6.0-8.9, 11.4) | 7.4 s (6.2-9.0, 12.2) | 5.1 s |
+| peak graphics memory, whole card | 11.3 GB | 11.1 GB | 11.0 GB | 11.1 GB |
+| judge: coherence / personality / purpose / surprise | 4.0 / 3.88 / 4.38 / 3.38 | 3.88 / 3.75 / 4.5 / 2.75 | 3.5 / 3.75 / 4.38 / 2.75 | 4.0 / 4.25 / 4.75 / 3.13 |
+
+Load from the cache 35-38 s (81 s the first time). Free on 16 GB **works but
+is not as good as on a 4090, and not better than guided on the same card**:
+turns are steady (7.4 s median, never over 12.2 s; guided's picks and plans
+make some turns 30-35 s) and the village runs (sales 8-12, nobody starving),
+but at 3-4 calls a game hour against the 4090's 4.9 the characters act less
+often, the fighters of the night raid end hungry in both runs, and the judge
+puts both free days below the guided day on the same card (coherence 3.5-3.88
+vs 4.0, surprise 2.75 vs 3.38) and below the 4090's free day. Playable, as in
+nothing breaks; not the recommended level: guided stays the 16 GB pick.
