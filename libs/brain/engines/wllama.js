@@ -83,7 +83,9 @@ const fast = cfg => ({
   gpuLayers: 99,
   ctx: 8192,
   // what the speed was measured with: 512-token batches, flash attention
-  loadOpts: { n_batch: 512, n_ubatch: 512, flash_attn: true },
+  // few context checkpoints: they are kept in the 4 GB wasm heap (llama.cpp's default of 32 per slot, 4 slots,
+  // crashed Inkling within 2-3 minutes of a village day: std::bad_alloc while restoring one)
+  loadOpts: { n_batch: 512, n_ubatch: 512, flash_attn: true, n_ctx_checkpoints: 3 },
   // hybrid models (recurrent state): the cache rolls back only to checkpoints, so the shared prefix is read
   // once on its own first (a checkpoint at its end) and each turn reads only its own tokens
   prime: true,
@@ -256,6 +258,7 @@ export async function loadModel(modelKey, onProgress) {
     await wllama.loadModelFromUrl(modelUrl, {
       ...(cfg.loadOpts || {}),
       ...(q().get('wpar') ? { n_parallel: +q().get('wpar') } : {}),   // ?wpar=N: llama.cpp server slots (wllama 4 default 4)
+      ...(q().get('wckpt') ? { n_ctx_checkpoints: +q().get('wckpt') } : {}),   // ?wckpt=N: checkpoints a slot
       n_ctx: cfg.ctx || 4096,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and

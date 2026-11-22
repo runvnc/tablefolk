@@ -4249,6 +4249,10 @@ var _Wllama = class _Wllama {
           kv_unified: (_j = params.kv_unified) != null ? _j : true,
           flash_attn: params.flash_attn,
           swa_full: params.swa_full,
+          // tablefolk: pass the checkpoint settings through (llama.cpp keeps up to 32 per slot in host memory:
+          // with a hybrid model that filled the 4 GB wasm heap within minutes)
+          n_ctx_checkpoints: params.n_ctx_checkpoints,
+          checkpoint_min_step: params.checkpoint_min_step,
           chat_template: params.chat_template,
           jinja: params.jinja,
           reasoning: params.reasoning,
