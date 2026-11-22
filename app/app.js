@@ -137,7 +137,14 @@ window.tablefolkDressGate=async(most=4000)=>{
 // Hold rendering for a while (at most 40 s), with a note over the picture:
 // world-integration.js does it while the local model is set up.
 let renderHeldUntil=0, gpuFramesInFlight=0;
+// Off since 2026-11-22: the hold froze the picture for the whole set-up (18 s with
+// E2B on an RTX 2060), while without it the picture keeps going (the model's weights
+// paced in by litert-worker.js) except for one stall of a few seconds in LiteRT's
+// warm-up (rendering.md, "The model's set-up and the picture"). ?renderhold=1 holds
+// as before, for comparisons.
+const renderHoldOff=new URLSearchParams(location.search).get('renderhold')!=='1';
 window.tablefolkHoldRender=(on,text='')=>{
+  if(renderHoldOff) on=false;
   renderHeldUntil=on?performance.now()+40000:0;
   let el=document.getElementById('renderHold');
   if(!el && on){ el=document.createElement('div'); el.id='renderHold'; el.innerHTML='<span class="spin"></span><span class="t"></span>'; document.body.appendChild(el); }
@@ -6539,7 +6546,8 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
     if(window.tablefolkTTS?.running && (window.tablefolkTTS.engine==='breeze-web' || (window.tablefolkTTS.engine==='zonos-web' && localStorage.getItem('tablefolkSpeakFpsZonos')))){ const fps=speakFps(); if(fps<60 && performance.now()-lastFrameAt<1000/fps) return; }
     lastFrameAt=performance.now();
     scene.render(); window.TABLEFOLK_FRAMES=(window.TABLEFOLK_FRAMES||0)+1;
-    const dev=engine._device; if(dev?.queue?.onSubmittedWorkDone){ gpuFramesInFlight++; dev.queue.onSubmittedWorkDone().then(()=>gpuFramesInFlight--,()=>gpuFramesInFlight--); }
+    // (TABLEFOLK_GPU_LAT: the longest submit-to-done of a frame, ms, since a test last reset it)
+    const dev=engine._device; if(dev?.queue?.onSubmittedWorkDone){ gpuFramesInFlight++; const ts=performance.now(); const done=()=>{ gpuFramesInFlight--; const l=performance.now()-ts; if(l>(window.TABLEFOLK_GPU_LAT||0)) window.TABLEFOLK_GPU_LAT=l; }; dev.queue.onSubmittedWorkDone().then(done,done); }
     const recorder=window.tablefolkFrameRecorder;
     if(recorder?.wantsFrame?.()) recorder.captureAfterRender(engine).catch(err=>recorder.fail?.(err));
   });

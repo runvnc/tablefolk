@@ -15,7 +15,12 @@
 // approves a model download.
 //
 //   node startup-time.mjs <scenario name> [--art] [--base=http://localhost:8000]
-//        [--gfx=light|high] [--query=fps=10] [--timeout=150] [--shots=DIR]
+//        [--gfx=light|high] [--query=fps=10] [--timeout=150] [--shots=DIR] [--trace[=FILE]]
+//
+// --trace: per phase of the model's set-up (start, download, weights, setup,
+// warmup, ready; from its status text): seconds, frames drawn (fps), the longest
+// drawn-frame gap, rAF gap (main thread) and GPU frame latency (submit to done),
+// in `phases`; =FILE keeps the raw samples.
 //
 // --shots=DIR: a screenshot every 500 ms until the world is dressed (DIR/NN-t.jpg),
 // with whether the cover was up; `visibleBeforeDressed` counts the samples where
@@ -41,7 +46,44 @@ for (const p of ctx.pages()) if (p !== page) await p.close().catch(() => {});
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: +(process.env.SHOT_W || 800), height: +(process.env.SHOT_H || 500), deviceScaleFactor: 1, mobile: false });
 await page.bringToFront().catch(() => {});
+// a fresh headless Chrome's first tab was sometimes left hidden: no animation
+// frames, so the scene never started (a whole run timed out with only the first
+// status). Focus emulation and an active lifecycle keep it drawing.
+await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+await cdp.send('Page.enable').catch(() => {});
+await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
 await page.goto('about:blank');
+if (flag('trace')) await page.addInitScript(() => { window.__tfTraceOn = true; });
+// --ls=key=value[,key=value]: localStorage entries set before the page loads (e.g. tablefolk_load_pace=4:8)
+if (typeof flag('ls') === 'string') await page.addInitScript(kv => { try { for (const p of kv.split(',')) { const i = p.indexOf('='); localStorage.setItem(p.slice(0, i), p.slice(i + 1)); } } catch {} }, flag('ls'));
+// the model worker's own log lines ([litert-worker] weights, warm-up), with times (`workerLog`)
+const workerLog = [];
+page.on('worker', w => w.on('console', m => { const t = m.text(); if (/litert-worker|warm-up|wllama|bonsai/i.test(t)) workerLog.push([+((Date.now() - t0w) / 1000).toFixed(2), t.slice(0, 160)]); }));
+let t0w = Date.now();
+// --audit: every start of AI work in the page, with its time and caller: workers
+// and shared workers created, GPU devices requested (Babylon's own is marked), model-file and model-host
+// fetches, the origin's private file system and Cache Storage opened. `audit`
+// lists them with `beforeSettle` (before the cover's settle ended): the rule is
+// that nothing AI-related begins before the graphics have settled.
+if (flag('audit')) await page.addInitScript(() => {
+  const A = window.__tfAudit = [], t0 = performance.now();
+  const who = () => (new Error().stack || '').split('\n').slice(2).map(l => l.trim().replace(/^at /, '').replace(/https?:\/\/[^/]+/, '').replace(/\?v=\w+/, '')).filter(l => !/__tfAudit|addInitScript/.test(l)).slice(0, 3).join(' < ');
+  const note = (kind, what) => A.push({ t: +((performance.now() - t0) / 1000).toFixed(2), kind, what: String(what).slice(0, 120), by: who() });
+  const W = window.Worker;
+  window.Worker = function (url, opts) { note('worker', url); return new W(url, opts); };
+  window.Worker.prototype = W.prototype;
+  const SW = window.SharedWorker;
+  if (SW) { window.SharedWorker = function (url, opts) { note('shared-worker', url); return new SW(url, opts); }; window.SharedWorker.prototype = SW.prototype; }
+  const AD = window.GPUAdapter?.prototype;
+  if (AD?.requestDevice) { const rd = AD.requestDevice; AD.requestDevice = function (...a) { note('gpu-device', ''); return rd.apply(this, a); }; }
+  const MODEL = /\.(litertlm|gguf|onnx|safetensors|task|tflite|bin|wasm)(\?|$)|huggingface\.co|geebr-models|hf\.co|jsdelivr\.net\/npm\/@(litert|huggingface|mlc|wllama)/i;
+  const F = window.fetch;
+  window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u?.url || String(u); if (MODEL.test(url)) note('fetch', url); return F.call(this, u, o); };
+  const gd = navigator.storage?.getDirectory?.bind(navigator.storage);
+  if (gd) navigator.storage.getDirectory = () => { note('opfs', 'getDirectory'); return gd(); };
+  const co = caches?.open?.bind(caches);
+  if (co) caches.open = n => { note('cache-storage', n); return co(n); };
+});
 await page.addInitScript(() => {
   try { localStorage.setItem('tablefolkTtsEnabled', '0'); for (const k of Object.keys(localStorage)) if (k.startsWith('tablefolk-mind:') || k.startsWith('tablefolk-journey')) localStorage.removeItem(k); } catch {}
   const T = window.__tfStart = { t0: performance.now() };
@@ -77,14 +119,33 @@ await page.addInitScript(() => {
     lastR = t; requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+  // --trace: every rAF, what changed (drawn frames, the brain's status, the GPU's longest
+  // frame latency), so the node side can attribute pauses to the model's phases
+  T.trace = [];
+  let lastStatus = '', traceF = -1, traceR = 0;
+  const trace = () => {
+    const t = performance.now(), sec = +((t - T.t0) / 1000).toFixed(3);
+    const st = document.getElementById('brainStatus')?.textContent || '', f = window.TABLEFOLK_FRAMES || 0;
+    const lat = Math.round(window.TABLEFOLK_GPU_LAT || 0); window.TABLEFOLK_GPU_LAT = 0;
+    const rgap = traceR ? Math.round(t - traceR) : 0; traceR = t;
+    if (st !== lastStatus || f !== traceF || rgap > 50 || lat > 50) { T.trace.push([sec, f, rgap, lat, st !== lastStatus ? st.slice(0, 70) : undefined]); lastStatus = st; traceF = f; }
+    if (T.trace.length < 60000) requestAnimationFrame(trace);
+  };
+  if (window.__tfTraceOn) requestAnimationFrame(trace);
   // main-thread long tasks per second (VERBOSE prints them)
   T.lt = {}; try { new PerformanceObserver(l => { for (const e of l.getEntries()) { const k = Math.floor((e.startTime - T.t0) / 1000); T.lt[k] = Math.round((T.lt[k] || 0) + e.duration); } }).observe({ type: 'longtask', buffered: true }); } catch {}
 });
 const url = `${base}/app/?${art ? 'art=1' : 'play=1&intro=0'}&gfx=${gfx}${extra ? '&' + extra : ''}&scenario=/scenarios/${name}.json&t=${Date.now()}`;
-const t0 = Date.now();
+// --profile[=FILE]: a CPU profile of the page's main thread from navigation to the reveal:
+// `profile` lists the top functions by self time and the scripts by self time
+// (=FILE keeps the .cpuprofile for Chrome's Performance panel)
+const profiling = !!flag('profile');
+if (profiling) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
+const t0 = Date.now(); t0w = t0;
 if (process.env.VERBOSE) page.on('console', m => { const t = m.text(); if (/\[character\]|\[brain|\[loading|litert|auto-load|tablefolk-world\] (?!RAW|ABOUT|render)/i.test(t)) console.log(((Date.now() - t0) / 1000).toFixed(1), 'console', t.slice(0, 160)); });
 await page.goto(url);
 const r = { name, art, gfx };
+r.visibility = await page.evaluate(() => document.visibilityState).catch(() => null);
 let last = -1, stableSince = 0, status = '', lastChange = 0;
 // screenshots every 500 ms until dressed (and reveal), with the cover's state
 const samples = [];
@@ -117,6 +178,9 @@ for (;;) {
   }).catch(() => ({}));
   const t = (Date.now() - t0) / 1000;
   if (s.consent && !art) { r.error = 'model download prompt: not approved'; break; }
+  // a page that never draws (no scene after 45 s: seen right after another run's Chrome
+  // closed with a model on the card) fails fast instead of waiting out the timeout
+  if (t > 45 && s.T && s.T.ready == null) { r.error = 'page stalled: no scene after 45 s (the GPU may still be busy from the last Chrome)'; break; }
   if (s.st !== status) { status = s.st; if (process.env.VERBOSE) console.log(t.toFixed(1), 'status', status); }
   const T = s.T || {};
   if (s.meshes !== last) { last = s.meshes; lastChange = t; }
@@ -135,6 +199,47 @@ for (;;) {
 }
 sampling = false; await sampler;
 r.stages = await page.evaluate(() => window.tablefolkLoading?.log || null).catch(() => null);
+if (profiling) {
+  const { profile } = await cdp.send('Profiler.stop');
+  if (typeof flag('profile') === 'string') writeFileSync(flag('profile'), JSON.stringify(profile));
+  // self time per node from the samples (until the reveal when there was one)
+  const byId = new Map(profile.nodes.map(n => [n.id, n])), self = new Map();
+  const end = r.reveal != null ? profile.startTime + r.reveal * 1e6 + 2e6 : Infinity;
+  let t = profile.startTime;
+  profile.samples.forEach((id, i) => { t += profile.timeDeltas[i] || 0; if (t > end) return; const d = (profile.timeDeltas[i + 1] || 0) / 1000; self.set(id, (self.get(id) || 0) + d); });
+  const fn = new Map(), file = new Map();
+  for (const [id, ms] of self) {
+    const c = byId.get(id)?.callFrame || {}, u = (c.url || '').replace(/^https?:\/\/[^/]+/, '').replace(/\?.*$/, '') || '(' + (c.functionName || 'native') + ')';
+    const k = (c.functionName || '(anon)') + ' ' + u.split('/').pop() + ':' + (c.lineNumber + 1);
+    fn.set(k, (fn.get(k) || 0) + ms); file.set(u, (file.get(u) || 0) + ms);
+  }
+  const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, ms]) => [k, Math.round(ms)]);
+  r.profile = { functions: top(fn, 30), scripts: top(file, 15) };
+}
+if (workerLog.length) r.workerLog = workerLog;
+if (flag('audit')) {
+  // the reveal follows the settle at once (the stages' own times count from loading.js's load, not navigation)
+  const settled = r.reveal;
+  r.settledAt = settled;
+  r.audit = (await page.evaluate(() => window.__tfAudit || []).catch(() => [])).map(a => ({ ...a, beforeSettle: settled != null && a.t < settled }));
+}
+if (flag('trace')) {
+  // phases of the model's set-up by its status text; per phase: length, frames drawn,
+  // the longest drawn-frame gap, rAF (main thread) gap and GPU frame latency
+  const tr = await page.evaluate(() => window.__tfStart?.trace || []).catch(() => []);
+  const phaseOf = st => /download/i.test(st) ? 'download' : /checking|cache|Loading LiteRT|Model:/i.test(st) ? 'start' : /onto the graphics card/i.test(st) ? 'weights' : /setting up the model|initializ/i.test(st) ? 'setup' : /warming/i.test(st) ? 'warmup' : /ready/i.test(st) ? 'ready' : 'other';
+  const ph = []; let cur = null, lastF = null, lastFT = null;
+  for (const [t, f, rg, lat, st] of tr) {
+    if (st != null) { const name = phaseOf(st); if (!cur || cur.name !== name) { if (cur) cur.end = t; cur = { name, start: t, frames: 0, frameGap: 0, rafGap: 0, gpuLat: 0 }; ph.push(cur); } }
+    if (!cur) continue;
+    if (lastF != null && f !== lastF) { cur.frames += f - lastF; cur.frameGap = Math.max(cur.frameGap, Math.round((t - lastFT) * 1000)); }
+    if (f !== lastF) { lastF = f; lastFT = t; }
+    cur.rafGap = Math.max(cur.rafGap, rg); cur.gpuLat = Math.max(cur.gpuLat, lat);
+  }
+  if (cur) cur.end = tr.at(-1)?.[0];
+  r.phases = ph.filter(p => p.name !== 'other' || p.end - p.start > .5).map(p => ({ ...p, s: +(p.end - p.start).toFixed(2), fps: p.end > p.start ? +(p.frames / (p.end - p.start)).toFixed(1) : 0 }));
+  if (typeof flag('trace') === 'string') writeFileSync(flag('trace'), JSON.stringify(tr));
+}
 if (r.reveal != null && r.dressed != null) r.changedAfterReveal = r.dressed > r.reveal + .3;
 if (shots) {
   // samples showing the world (no cover) after the first frame and before it was fully dressed

@@ -129,8 +129,10 @@ export async function loadModel(modelKey, onProgress) {
     onProgress?.(p);
   };
   const url = local.get('_model_url:' + modelKey) || '', mirror = mirrorAllowed();
+  // pace (measurements): "MB:ms", a pause of ms after every MB of weights streamed in
+  const pace = local.get('_load_pace') || '';
   try {
-    try { await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress }); }
+    try { await call('load', { modelKey, url, mirror, pace }, { onProgress: wrappedProgress }); }
     catch (e) {
       // the worker runs another LiteRT-LM version (the vision model needs the
       // nightly): a fresh dedicated worker for this one
@@ -138,14 +140,14 @@ export async function loadModel(modelKey, onProgress) {
         try { await call('unload'); } catch {}
         try { shared ? worker.close() : worker.terminate(); } catch {}
         worker = null; getWorker(true);
-        await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress });
+        await call('load', { modelKey, url, mirror, pace }, { onProgress: wrappedProgress });
       } else {
       // a shared worker that cannot run it (no WebGPU there, say): once more, dedicated
       if (!shared) throw e;
       console.warn('[model-loader-litert] shared worker failed, using a dedicated one:', e.message);
       try { worker.close(); } catch {}
       worker = null; getWorker(true);
-      await call('load', { modelKey, url, mirror }, { onProgress: wrappedProgress });
+      await call('load', { modelKey, url, mirror, pace }, { onProgress: wrappedProgress });
       }
     }
     currentModel = modelKey;
@@ -171,8 +173,16 @@ export async function clearModelCache(modelKey) {
   return call('clearCache', { modelKey: modelKey || 'gemma4-e2b-litert' });
 }
 
+// Looked up from the page itself (the file's entry and size, nothing read), not
+// through the worker: asking whether to download must not start the engine's
+// worker (a page starting up keeps every AI engine for later).
 export async function hasModelCached(modelKey) {
-  return call('hasCached', { modelKey: modelKey || 'gemma4-e2b-litert' });
+  const key = modelKey || 'gemma4-e2b-litert';
+  try {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle(`litert-${key}.litertlm`)).getFile();
+    return file.size > 0;
+  } catch { return false; }
 }
 
 export function getCacheBackend() {

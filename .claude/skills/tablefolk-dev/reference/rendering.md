@@ -252,32 +252,58 @@ in every run, and the mesh count never changed after the reveal. The world
 is complete and in view about 12-15 s sooner with a model; the first reply
 comes at about the same time (31.9 s before, 31.1 s after, averages of two).
 
-The model's set-up then froze the picture in view (`tablefolkHoldRender`
-during the warm-up): an 11.6 s gap between drawn frames after the reveal.
-Since 2026-11-22 (later) a model already cached sets up under the cover
-("Waking the characters…", loading.js `holdCover`, cap 30 s), and the
-static-scenery freeze and the spells' shader prewarm are the cover's last
-steps (`finish`) instead of timers after the reveal. `startup-time.mjs` now
-records `gap`: the longest pause between drawn frames (`frame`) and
-animation frames (`raf`) in the 20 s after the reveal. hearthvale, light,
-Gemma 4 E2B, 800x500, load average 11-14 (other agents' Chromes running):
+The model's set-up then froze the picture in view: an 11.6 s gap between
+drawn frames after the reveal. Holding the cover for it (`?brainhold=1`,
+loading.js `holdCover`) hid that but showed the world about 25 s later, so
+it is off; the start-up order since 2026-11-22 (architecture.md, "The
+loading cover") is: the download question first (over the cover), the world,
+the reveal, a settled picture (`steady()`), then the AI engines one at a
+time (probe, brain, embed, voice, speech) while the player looks around;
+the characters and the clock wait for the brain.
 
-| | world built (settle end) | reveal | brain ready | first turn | longest frame gap after reveal |
-|---|---|---|---|---|---|
-| before (1 run) | 20.4 | 21.1 | 36.5 | 43.2 | 11 585 ms (the warm-up) |
-| after (2 runs) | 26.2, 25.7 | 45.2, 47.9 | 45.4, 47.9 | 47.6, 52.3 | 655, 390 ms (main thread, the first calls) |
-| after, `?art=1` (2 runs) | 29.7, - | 30.9, 22.6 | - | - | 3 341 (GPU shared with another agent's run), 141 ms |
+### The model's set-up and the picture
 
-The hold ("waking" in `.log`) took 18.2 and 21.3 s here, the model's
-set-up from its cache (it was 15.3 s in view before, with the picture
-held). The world shows about 20 s later and the first reply comes about as
-soon as before (the model starts on a built world, not after the reveal
-plus 600 ms), with no frozen picture. The two finishing steps take
-under 10 ms (freeze) and 0-2.2 s (the prewarm, often already done by its
-8 s fallback under the cover). The voice was off in these runs (the test
-turns it off) and speech input showed no gap; they still start after the
-reveal.
+Why the picture froze although the model runs in a worker: by measurement
+(`startup-time.mjs --trace`: drawn frames, animation frames and each
+frame's GPU submit-to-done latency against the worker's phases; hearthvale,
+Gemma 4 E2B, RTX 2060, other agents' runs on the machine, so +-50%):
 
+- It was our own hold. world-integration.js held rendering
+  (`tablefolkHoldRender`) from "initializing" to "ready", because frames
+  queued behind the model's GPU work once took 1-6.5 s each (jank.mjs,
+  before the two-frames-in-flight back-pressure in app.js). With the hold,
+  nothing was drawn for the whole set-up: 11.8 and 18.4 s.
+- The main thread is never the problem: the longest animation-frame gap
+  during the set-up was 17-434 ms (no hold). It is the GPU: our frames wait
+  behind the worker's GPU work (Chrome's GPU process and the card run both
+  devices' work in turn; WebGPU has no priority between them). Per phase,
+  without the hold: the weights streaming onto the card (5-31 s) drew
+  25-46 frames a second with stalls of 0.3-4.4 s (a frame's GPU latency up
+  to 4.4 s: large uploads); the warm-up (LiteRT's first inference, which
+  builds its compute pipelines: 1.3-5.5 s) is one stall of 0.9-4.4 s.
+- Mitigations measured: pacing the weights' stream (`tablefolk_load_pace`
+  "MB:ms" in localStorage, litert-worker.js: a pause after each MB) gave no
+  clear gain (stalls 3.0-4.2 s at 8:30 and 4:30, 2:30 took the weights
+  from ~6 to 31 s): a single large tensor upload cannot be split from
+  outside, and the run-to-run spread on this machine is larger than the
+  effect; a 10 fps cap during the set-up: 2.5 s worst stall, 4 fps. Off by
+  default. The rest (pipeline creation in the warm-up, how uploads are
+  batched) is inside LiteRT-LM's own code (@litert-lm/core), which takes
+  only the model stream from us.
+- So the hold is off (`?renderhold=1` restores it): the picture keeps
+  moving through the set-up except one stall of a few seconds, the player
+  can look around and walk, and the characters stand still until the brain
+  is ready (live.js). wllama runs in its own worker too and should behave
+  the same (not measured here); bonsai2.js imports its runtime into the
+  page (main thread) and was not measured either.
+
+The world's build, profiled (`--profile`, the main thread from navigation
+to the reveal, `?art=1`): the largest single cost was @tablefolk/device's
+`probeRenderer` (two synchronous WebGL contexts to read the card's name,
+7.9 s of main-thread time while Babylon's own device and uploads were busy),
+now cached for 30 days (RendererName); then Babylon's shader preprocessing
+(`_ScanCode` and its regular expressions, about 1.5 s), texture uploads
+(`updateTexture`, 0.4 s) and roofs.js `findRooms` (0.36 s).
 ### The edge of the world (terrain.js, surroundings.js)
 
 `tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |

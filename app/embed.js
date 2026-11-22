@@ -102,8 +102,10 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ui); else ui();
   window.tablefolkEmbed = api;
-  // Ready before the first turn: it starts loading shortly after the page
-  // opens (it used to wait for a character's first turn and slowed that reply).
+  // Ready before the first turn: it loads in the start-up queue right after the
+  // characters' brain (it used to wait for a character's first turn and slowed
+  // that reply; then it started 1.5 s after the page opened, during the world's
+  // build, which broke the one-thing-at-a-time start: 2026-11-22).
   // Not in a world that needs no recall: "memory": false, or every character
   // in simple mode (The Oracle). It waits for a link's world to open to know.
   async function preload() {
@@ -111,7 +113,10 @@
     const scn = window.tablefolkScenario?.active?.scn, w = window.tablefolk, agents = w?.getAgents?.() || [];
     if (scn?.memory === false) return;
     if (agents.length && w?.isSimpleBrain && agents.every(g => w.isSimpleBrain(g, w.getBrainConfig?.(g.id) || {}))) return;
-    try { start(); } catch {}
+    // in the start-up queue (loading.js): after the world is shown and settled and the
+    // characters' brain has finished, before the voice; one AI engine at a time
+    const L = window.tablefolkLoading;
+    try { if (L) await L.turn('embed'); await Promise.race([start(), new Promise(r => setTimeout(r, 120000))]); } catch {} finally { L?.release('embed'); }
   }
   if (!art && !off()) setTimeout(preload, 1500);
 })();

@@ -1,7 +1,7 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261121d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261122b';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261121d';
+import { installDevConsole } from './dev-console.js?v=20261122b';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -77,10 +77,10 @@ function updateModelNotice(status, state = 'loading') {
   const bar = el('modelProgressBar');
   const consent = el('modelConsent');
   if (consent) consent.hidden = true;
-  if (title) title.textContent = state === 'ready' ? 'Local brain ready'
+  if (title) title.textContent = state === 'ready' ? 'The characters are awake'
     : state === 'error' ? 'Local brain could not load'
-    : progress.phase === 'download' || /download|caching/i.test(text) ? 'Downloading local brain'
-    : 'Preparing local brain';
+    : progress.phase === 'download' || /download|caching/i.test(text) ? 'Downloading the characters\u2019 brain'
+    : 'Waking the characters\u2026';
   if (detail) detail.textContent = text;
 
   if (bar) {
@@ -106,7 +106,7 @@ function setStatus(status, noticeState = null) {
   // 1-6.5 s to appear (tools/browser-test/jank.mjs), a frozen picture. Hold
   // rendering meanwhile (app.js) under a small note: the page stays
   // responsive and the picture comes back at once, with nothing queued.
-  if (/initializ|warming up/i.test(text)) window.tablefolkHoldRender?.(true, 'Waking the characters…');
+  if (/initializ|warming up|onto the graphics card|setting up the model/i.test(text)) window.tablefolkHoldRender?.(true, 'Waking the characters…');
   else if (/ready|fail|error|unavailable/i.test(text)) window.tablefolkHoldRender?.(false);
   if (noticeState) updateModelNotice(status, noticeState);
   else if (/ready/i.test(text)) updateModelNotice(status, 'ready');
@@ -181,7 +181,10 @@ function waitForDownloadConsent(modelLabel, modelSize) {
 // asked before the welcome screen came up, and would sit on the intro card).
 // A link's world is still opening too (scenario.js sets the flag): the question came up, then its intro card hid it, then it came back.
 const linkOpening = () => !window.TABLEFOLK_LINK_OPENED && (/(?:^#|&)s(?:cenario)?=/.test(location.hash) || new URLSearchParams(location.search).has('scenario'));
-const busyScreen = () => linkOpening() || !!window.tablefolkLoading?.coverUp || !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\b(welcome-open|world-loading)\b/.test(document.documentElement.className);
+// Not the loading cover or a link's world opening (since 2026-11-22): the question comes
+// first, over the cover (style.css), so nothing interrupts the world once it is shown;
+// a download that is approved still waits for its turn after the world has settled.
+const busyScreen = () => !!document.querySelector('#scenarioEnd.intro:not([hidden])') || /\bwelcome-open\b/.test(document.documentElement.className);
 function askConsent(modelLabel, modelSize) {
   showDownloadConsent(modelLabel, modelSize);
   const notice = el('modelLoadNotice');
@@ -728,6 +731,8 @@ async function main() {
   const modelSelect = el('modelSelect');
   // The best model this device's graphics card holds (a first visit starts
   // with it; the picker marks it either way).
+  // (from here until the brain is ready or not coming, the characters wait: live.js)
+  window.TABLEFOLK_BRAIN_WAKING = true;
   const device = await manager.pickForDevice().catch(() => null);
   // A world linked with its own "defaultModel" starts on that brain: known
   // here, so the usual model is not loaded first only to be thrown away.
@@ -903,6 +908,12 @@ async function main() {
   const loadBtn = el('loadBrains');
   if (loadBtn) loadBtn.textContent = 'load ' + modelLabel;
   let shouldLoad = cached;
+  // The brain is first in the start-up queue (loading.js): the voice and speech input
+  // wait for it to finish (or be skipped) whatever the order they ask in. Until it is
+  // ready (or not coming) the characters and the clock stand still (live.js).
+  window.tablefolkLoading?.expect('brain');
+  window.TABLEFOLK_BRAIN_WAKING = true;
+  const brainDone = () => { window.TABLEFOLK_BRAIN_WAKING = false; window.tablefolkLoading?.release('brain'); try { window.dispatchEvent(new CustomEvent('tablefolk-brain-settled')); } catch {} };
   if (window.TABLEFOLK_ART_MODE) {
     // Art review mode: never touch the multi-GB model, the renderer is what we
     // are looking at. Buttons stay disabled.
@@ -927,11 +938,12 @@ async function main() {
     }
   }
 
+  if (!shouldLoad) brainDone();
   if (shouldLoad) try {
     // Re-read the label HERE rather than reusing the one captured before the
     // consent prompt: the user may have changed the dropdown while it was open.
     const liveLabel = manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.label || manager.getModelKey();
-    setStatus('waiting for the world to be built: ' + liveLabel + ' loads next');
+    setStatus('waiting for the world to be shown: ' + liveLabel + ' loads next');
     // The model's set-up (weights onto the graphics card, warm-up) waits until the world
     // is built and shown (loading.js start-up queue, first in line): started beside the
     // world's own build both were slower, and the picture hitched (jank.mjs).
@@ -941,12 +953,14 @@ async function main() {
     // frozen in view); at most 30 s, then the world shows and it finishes in view. A
     // download (asked first), an endpoint and ?art=1 start after the reveal as before.
     const eng = getActiveEngine(manager);
-    if (L && cached && eng !== 'openai' && eng !== 'none' && manager.getModelKey() === keyAtCheck) L.holdCover('brain', { step: 'Waking the characters', capMs: 30000 });
+    // (?brainhold=1 only, for comparisons: by default the world shows first, as built, and the
+    // model wakes over it with its own non-blocking notice)
+    if (L && cached && eng !== 'openai' && eng !== 'none' && manager.getModelKey() === keyAtCheck && new URLSearchParams(location.search).get('brainhold') === '1') L.holdCover('brain', { step: 'Waking the characters', capMs: 30000 });
     if (L) await L.turn('brain');
     else for (let i = 0; i < 60 && !(window.tablefolkScenario?.active && window.TABLEFOLK_STATE?.playerAvatar); i++) await new Promise(r => setTimeout(r, 100));
     setStatus('auto-loading ' + liveLabel + '...');
     console.log(cached ? '[character] loading cached model...' : '[character] starting approved download...', liveLabel);
-    if (!await loadModelOnce(manager)) { window.tablefolkLoading?.release('brain'); return; }
+    if (!await loadModelOnce(manager)) { brainDone(); return; }
     console.log('[character] auto-load completed, enabling buttons...');
     el('startBrains').disabled = false;
     el('stepBrains').disabled = false;
@@ -955,9 +969,9 @@ async function main() {
     appendLog('local brain auto-loaded: ' + modelLabel);
     setStatus(modelLabel + ' ready', 'ready');
     // (after the ready status: the picture's hold is off before the cover lifts)
-    window.tablefolkLoading?.release('brain');
+    brainDone();
   } catch (err) {
-    window.tablefolkLoading?.release('brain');
+    brainDone();
     console.error('[character] auto-load FAILED:', err);
     window.tablefolkDiag?.note('brain', 'failed to load: ' + err.message);
     setStatus('Auto-load failed: ' + err.message + ' Open Agent brains to retry.', 'error');

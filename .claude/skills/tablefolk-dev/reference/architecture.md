@@ -117,8 +117,8 @@ With nothing pending for 300 ms it settles: the finishing steps
 ran on timers after the reveal before 2026-11-22 and could hitch the first
 seconds in view; without a cover they still do), `scene.whenReadyAsync()`
 (every material and texture ready; at most 8 s) and four frames drawn under
-the cover (shaders compiled), then it fades out, or, the first time, wakes
-the characters first (below). 45 s after it went up it lifts anyway and notes
+the cover (shaders compiled), then it fades out (with `?brainhold=1`,
+the first time, it wakes the characters first, below). 45 s after it went up it lifts anyway and notes
 in the "This device" pane what was still pending. While it
 is up the render loop draws at most 15 frames a second and
 `tablefolkDressGate` never waits for the model. A link's world is not
@@ -129,40 +129,53 @@ off; `?tiles=1` pages never show it.
 Sections use the same cover in its short form (`.short`: the destination's
 name only); the model is not touched (`playScenarioNow` with `sub`).
 
-Start-up order (the queue is `tablefolkLoading.turn(job)` / `release(job)`;
-a job starts after the first reveal plus 600 ms, and after every earlier job
-that asked for a turn has released, or 90 s):
+Start-up order (2026-11-22, the owner's rule: strictly one thing at a time;
+no AI engine does anything before the graphics are loaded and settled). The
+queue is `tablefolkLoading.turn(job)` / `release(job)` (`skip(job)` when it
+is not coming, `expect(job)` to be waited for before asking): a job starts
+after the first reveal and `steady()` (a second of frames with no gap over
+100 ms, at most 8 s), and after every earlier job in ORDER that is expected
+or has asked has finished (at most 10 minutes):
 
 1. Before the reveal: the page, Babylon, the scene, the world's build (all
-   stages above); `pickForDevice` (the device probe, cached) and the brain
-   manager's set-up, which read but do not load anything.
-2. `brain` (world-integration.js): the model's weights onto the card and its
-   warm-up (`tablefolkHoldRender` holds the picture during the warm-up).
-   A model already in the browser's cache (not an endpoint, not `?art=1`)
-   calls `tablefolkLoading.holdCover('brain', {step, capMs: 30000})` before
-   its turn: its turn comes as soon as the first world is built (the
-   `waking` entry in `.log`), and the cover stays up, "Waking the
-   characters…" with the full bar pulsing, until `release('brain')` (after
-   the ready status, so the picture's hold is off) or 30 s, after which the
-   world shows and the model finishes in view (noted in "This device"). The
-   45 s safety timeout covers the build only; the hold has its own cap.
-   `tablefolk-world-ready` fires at the lift, after the hold. A model not yet
-   downloaded asks first and starts after the reveal; the question waits
-   while the cover is up. Until the brain is ready characters run on code
-   (rails).
-   Nothing lives unseen meanwhile: live.js starts a `"live"` world 1.5 s
-   after `whenRevealed()` (not after `tablefolk-scenario-started`), and the
-   clock, routines (jobs.js), needs (mind.js), greetings (chatter.js) and
-   threats all wait for `tablefolkLive.on`, so the day starts at the
-   scenario's `time` in view. Also after a section's short cover and the
-   cap; `?cover=0` resolves at once (as before). `startup-time.mjs`
-   reports it as `unseen` (the clock at the reveal against the scenario's
-   `time`, who moved).
-3. `voice` (tts-ui.js auto-load, `tablefolkTTS.prepare`).
-4. `speech` (speech-input.js: Underdog Bark's preload, which also waits for
+   stages above). The brain's decision: `pickForDevice` (cached device
+   facts; a first visit picks from the card's name, its GPU measurements
+   deferred to `probe`) and whether the model is in the browser's cache (an
+   OPFS lookup from the page: the file's entry and size, nothing read, no
+   worker). A model that needs a download asks at once, over the cover
+   (`html.cover-up #hud:has(...consent)`): UI only; an approved download
+   still waits for its turn.
+2. `probe` (agent-brain.js): a first visit's @tablefolk/device measurements
+   (bandwidth, memory probe; `deferMeasuring` / `runDeferred`), cached for
+   the next visit. Usually nothing.
+3. `brain` (world-integration.js; expected from its decision): download,
+   the weights onto the card, warm-up, over the world with the non-blocking
+   notice ("Waking the characters…", real progress: the download, then the
+   weights streamed in, then the set-up). The picture is not held
+   (rendering.md, "The model's set-up and the picture"; `?renderhold=1`
+   holds it as before). `?brainhold=1` instead keeps the cover up for a
+   cached model (`holdCover`, cap 30 s; comparisons only).
+   The characters and the clock wait: live.js starts a `"live"` world 1.5 s
+   after `whenRevealed()` and once `TABLEFOLK_BRAIN_WAKING` is false
+   ('tablefolk-brain-settled': ready, failed, declined or not coming; at
+   most 10 minutes), so the day starts at the scenario's `time` with the
+   characters awake. The clock, routines (jobs.js), needs (mind.js),
+   greetings (chatter.js) and threats all follow `tablefolkLive.on`. A
+   section's short cover and `?cover=0` start it as before.
+   `startup-time.mjs` reports `unseen` (the clock at the reveal against the
+   scenario's `time`, who moved).
+4. `embed` (embed.js: EmbeddingGemma for recall; it started 1.5 s after the
+   page opened, during the build, before 2026-11-22).
+5. `voice` (tts-ui.js auto-load, `tablefolkTTS.prepare`).
+6. `speech` (speech-input.js: Underdog Bark's preload, which also waits for
    the brain's status as before).
-5. Later, on their own triggers: the capability check (agency.js, once a
-   brain is ready), the better-voice offer, sight (a character's first look).
+7. Later, on their own triggers: the capability check (agency.js, once a
+   brain is ready: it uses the brain while 4-6 load), the better-voice
+   offer, sight (a character's first look).
+
+`startup-time.mjs --audit` lists every worker, shared worker, GPU device,
+model-host fetch, OPFS and Cache Storage opening with its time and caller,
+and whether it came before the settle.
 
 ## Files
 

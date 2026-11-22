@@ -34,7 +34,9 @@
  * the player's own turn round runs (play.js), and the brains take one
  * decision at a time (world.runAgentTurn).
  * A "live" world starts 1.5 s after the loading cover lifts (loading.js
- * whenRevealed): under the cover the clock and everyone stand still.
+ * whenRevealed) and the characters' brain is ready or not coming
+ * (TABLEFOLK_BRAIN_WAKING, 'tablefolk-brain-settled'): until then the clock and
+ * everyone stand still while the player looks around.
  * Loaded after play.js; uses app.js globals (state, getBrainConfig,
  * cellPassable, occupantAt, findRoute, startTurnPath, playRig).
  */
@@ -254,7 +256,11 @@
     stop(); turns = 0; if (!e.detail?.sub) ticks = 0;
     const g = ++startGen; if (!e.detail?.live) return;
     const go = () => setTimeout(() => { if (g === startGen) start(); }, 1500);
-    const L = window.tablefolkLoading; if (L?.whenRevealed) L.whenRevealed().then(go); else go();
+    // ...and while the characters' brain wakes (world-integration.js: downloading,
+    // loading, warming up) they stand still too: the day starts with them awake
+    // (at most 10 minutes; a brain that fails or is declined lets it start at once)
+    const brain = () => !window.TABLEFOLK_BRAIN_WAKING ? Promise.resolve() : new Promise(r => { const t = setTimeout(r, 600000); addEventListener('tablefolk-brain-settled', () => { clearTimeout(t); r(); }, { once: true }); });
+    const L = window.tablefolkLoading; (L?.whenRevealed ? L.whenRevealed() : Promise.resolve()).then(brain).then(go);
   });
   window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; }, get ticks() { return ticks; },
     // a moment for a line (jobs.js remarks and evening talk wait for it)

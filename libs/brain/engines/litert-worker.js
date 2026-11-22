@@ -675,14 +675,31 @@ async function handle(e, post, tag) {
         if (libVersion && libVersion !== ver) throw new Error('RESTART_WORKER: ' + modelKey + ' needs LiteRT-LM ' + ver);
         const { Engine, Backend } = await libFor(ver); libVersion = ver;
         self.Module = { locateFile: (path) => `https://cdn.jsdelivr.net/npm/@litert-lm/core@${ver}/wasm/` + path };
-        engine = await Engine.create({ model: modelFile.stream(), mainExecutorSettings: { maxNumTokens: cfg.maxTokens || 8192 },
+        // The weights stream in counted: real progress while they go onto the card
+        // ("Loading the model…  n%"), then the engine's own set-up after the last byte.
+        const total = modelFile.size || 0; let read = 0, lastPct = -1, sincePause = 0;
+        // e.data.pace "MB:ms": a pause after every MB streamed (measurements: lets the
+        // page's frames in between the weights' uploads to the card)
+        const [paceMB, paceMs] = String(e.data.pace || '').split(':').map(Number);
+        const tRead = performance.now();
+        const counted = modelFile.stream().pipeThrough(new TransformStream({
+          transform(chunk, ctl) {
+            read += chunk.byteLength; sincePause += chunk.byteLength; ctl.enqueue(chunk);
+            const pct = total ? Math.min(99, Math.floor(read / total * 100)) : null;
+            if (pct !== lastPct) { lastPct = pct; onProgress({ phase: 'weights', percent: pct, text: `Loading the model onto the graphics card… ${pct}%` }); }
+            if (paceMB > 0 && paceMs > 0 && sincePause >= paceMB * 1048576) { sincePause = 0; return new Promise(r => setTimeout(r, paceMs)); }
+          },
+          flush() { onProgress({ phase: 'setup', text: 'Setting up the model on the graphics card…', readMs: Math.round(performance.now() - tRead) }); },
+        }));
+        engine = await Engine.create({ model: counted, mainExecutorSettings: { maxNumTokens: cfg.maxTokens || 8192 },
           ...(cfg.vision ? { visionBackend: Backend.GPU, maxVisionTokensPerImage: 256 } : {}) });
         engineVision = !!cfg.vision;
+        console.log('[litert-worker] engine created in', Math.round(performance.now() - tRead), 'ms after the first byte;', Math.round(total / 1048576), 'MB of weights');
         // Warm up before saying "ready": the first generation sets up the
         // GPU kernels, and that work held up the game's own GPU calls (the
         // page froze for seconds just after "ready"). Here it happens while
         // the page still shows the model loading.
-        onProgress({ phase: 'initialize', percent: 100, text: 'Warming up the local brain...' });
+        onProgress({ phase: 'warmup', text: 'Warming up the local brain...', createMs: Math.round(performance.now() - tRead) });
         try {
           const t0 = performance.now();
           const conv = await engine.createConversation({ preface: { messages: [{ role: 'system', content: 'Answer in one word.' }] } });

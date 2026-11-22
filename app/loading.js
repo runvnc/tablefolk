@@ -33,25 +33,29 @@
  * lifts it anyway and notes in the "This device" pane which stage was still
  * pending.
  *
- * Waking the characters: a job that called `holdCover(job)` before the first
- * reveal (world-integration.js, only for a model already in the browser's
- * cache: no download, no endpoint, not ?art=1) gets its turn as soon as the
- * world is built, and the cover stays up ("Waking the characters…") until it
- * releases, at most `capMs` (30 s; the 45 s safety timeout covers the world's
- * build only). The model's set-up holds the picture for seconds (app.js
- * tablefolkHoldRender), so it happens under the cover instead of in view. On
- * the cap the world is shown and the job finishes in view, as before (noted in
- * the "This device" pane).
+ * Holding the cover for a job: a job that called `holdCover(job)` before the
+ * first reveal gets its turn as soon as the world is built, and the cover stays
+ * up ("Waking the characters…") until it releases, at most `capMs` (30 s; the
+ * 45 s safety timeout covers the world's build only), then the world shows and
+ * the job finishes in view (noted in the "This device" pane). Not used by
+ * default: world-integration.js takes it for the brain only with ?brainhold=1
+ * (comparisons; the world then appeared ~25 s later).
  *
- * Start-up queue: nothing that competes for the graphics card or the main
- * thread starts before the world is shown. A job waits with
- * `await tablefolkLoading.turn(name)`: after the first reveal (and a short
- * pause so the first seconds in view stay smooth), then after every earlier
- * job in ORDER that has also asked for its turn has released (`release(name)`,
- * or 90 s). Jobs: brain (world-integration.js: the model's weights onto the
- * card), voice (tts-ui.js: the voice engine), speech (speech-input.js: the
- * speech recogniser). The capability check (agency.js) and the better-voice
- * offer already wait for a ready brain; sight loads on a character's first look.
+ * Start-up queue, one AI engine at a time: nothing AI-related (a model's
+ * download, cache read, worker, weights, shaders, warm-up) starts before the
+ * world is shown and the picture has settled. A job waits with
+ * `await tablefolkLoading.turn(name)`: after the first reveal and `steady()`
+ * (a second of frames with no gap over 100 ms, at most 8 s), then after every
+ * earlier job in ORDER that is expected (`expect(name)`) or has asked has
+ * finished (`release(name)`, or `skip(name)` when it is not coming; at most
+ * 10 minutes). Jobs: probe (agent-brain.js: a first visit's GPU measurements,
+ * @tablefolk/device runDeferred), brain (world-integration.js: download, weights, warm-up;
+ * expected from its decision, so the others wait even while the download
+ * question is open), embed (embed.js: EmbeddingGemma for recall), voice
+ * (tts-ui.js, pocket-tts-manager.js prepare), speech (speech-input.js). The
+ * capability check (agency.js) and the better-voice offer wait for a ready
+ * brain; sight loads on a character's first look. Only the download question may come before: it is UI, shown
+ * over the cover (world-integration.js).
  *
  * ?cover=0 turns the cover off (start-up as before: the world shows while it
  * builds); hidden render pages (?tiles=1) never show it. While the cover is up
@@ -62,8 +66,8 @@
 (function () {
   const q = new URLSearchParams(location.search);
   const off = q.get('cover') === '0' || q.has('tiles');
-  const SAFETY_MS = 45000, QUIET_MS = 300, SETTLE_MS = 8000, FRAMES = 4, AFTER_REVEAL_MS = 600, FINISH_MS = 10000, HOLD_MS = 30000;
-  const ORDER = ['brain', 'voice', 'speech'];
+  const SAFETY_MS = 45000, QUIET_MS = 300, SETTLE_MS = 8000, FRAMES = 4, STEADY_MS = 1000, STEADY_CAP_MS = 8000, JOB_CAP_MS = 600000, FINISH_MS = 10000, HOLD_MS = 30000;
+  const ORDER = ['probe', 'brain', 'embed', 'voice', 'speech'];
   const el = () => document.getElementById('loadCover');
   const now = () => performance.now();
   const t0 = now();
@@ -227,18 +231,42 @@
     if (!jobs.has(name)) { let r; const p = new Promise(res => { r = res; }); jobs.set(name, { released: p, release: r, claimed: false }); }
     return jobs.get(name);
   }
+  // the picture has settled after the reveal: a second of frames drawn with no gap over
+  // 100 ms (at most 8 s after the reveal); once per page, the first reveal
+  let steadyP = null;
+  function steady() {
+    return steadyP ||= firstReveal.then(() => new Promise(res => {
+      const t0s = now(); let lastF = window.TABLEFOLK_FRAMES || 0, lastFT = now(), since = now();
+      const tick = () => {
+        const t = now(), f = window.TABLEFOLK_FRAMES || 0;
+        if (f !== lastF) { if (t - lastFT > 100) since = t; lastF = f; lastFT = t; }
+        else if (t - lastFT > 100) since = t;
+        if (t - since >= STEADY_MS || t - t0s > STEADY_CAP_MS) {
+          log.push({ name: 'steady', start: +((t0s - t0) / 1000).toFixed(2), end: +((t - t0) / 1000).toFixed(2), ...(t - since < STEADY_MS ? { capped: true } : {}) });
+          return res();
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }));
+  }
   async function turn(name) {
     const me = job(name); me.claimed = true;
     if (off) return;
     // a job holding the cover starts as soon as the world is built, under it
     if (holds.has(name) && !holds.get(name).ended) await Promise.race([built, firstReveal]);
-    else { await firstReveal; await new Promise(r => setTimeout(r, AFTER_REVEAL_MS)); }
+    else await steady();
+    // one at a time, in ORDER: every earlier job that is expected or has asked must
+    // have finished (released or skipped) first
     for (const n of ORDER.slice(0, Math.max(0, ORDER.indexOf(name)))) {
       const j = jobs.get(n);
-      if (j?.claimed) await Promise.race([j.released, new Promise(r => setTimeout(r, 90000))]);
+      if (j?.claimed) await Promise.race([j.released, new Promise(r => setTimeout(r, JOB_CAP_MS))]);
     }
   }
   function release(name) { job(name).release(); holds.get(name)?.end(); }
+  // a job that will ask for its turn (claimed early, so later jobs wait for it), and one that will not
+  function expect(name) { job(name).claimed = true; }
+  const skip = release;
 
   // ---- first load: up from the first frame until the scene and a linked world are built ----
   let openingDone = null;
@@ -254,7 +282,7 @@
   }
 
   window.tablefolkLoading = {
-    begin, track, show, turn, release, finish, holdCover, whenRevealed: () => revealed && !up ? Promise.resolve() : new Promise(r => waiters.push(r)),
+    begin, track, show, turn, release, expect, skip, steady, finish, holdCover, whenRevealed: () => revealed && !up ? Promise.resolve() : new Promise(r => waiters.push(r)),
     firstReveal: () => firstReveal, pending: () => [...stages.values()].map(s => s.name),
     // the render loop's frame time under the cover (app.js): 15 fps; ?coverfps=60 for comparisons
     frameMs: 1000 / Math.max(1, +(q.get('coverfps') || 15)),

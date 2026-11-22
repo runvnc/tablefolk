@@ -564,6 +564,8 @@ html:fullscreen #ttBar { display:none; }
 
 /* world-integration.js: the download question waits for the welcome screen and intro card */
 #modelLoadNotice.ducked { display:none !important; }
+/* the download question comes first, over the loading cover (world-integration.js askConsent) */
+html.cover-up #hud:has(#modelLoadNotice.consent:not(.hidden):not(.ducked)) { z-index:960; }
 /* phones: the top bar keeps the name, the worlds button and the brain's status */
 @media (max-width:700px) {
   #topBar { gap:6px; padding:0 8px; }

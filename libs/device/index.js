@@ -33,11 +33,12 @@
 //   hw.vramOptions, hw.vramAsk           // a card sold with more than one memory size ([8, 16]): told
 //   setCardMemory(hw.gpu, 16)            //   apart by a probe (probeHolds), else ask the player, keep it, reload
 // Kept in localStorage (prefix from @tablefolk/models configure(), 'tablefolk'
-// by default): GpuBandwidth (30 days), BrainSpeed, CardProbe and CardGB:<card name>.
+// by default): GpuBandwidth and RendererName (30 days), BrainSpeed, CardProbe and CardGB:<card name>.
 import { local } from '../models/index.js';
 let tablePromise = null;
 const table = () => tablePromise ||= fetch(new URL('./gpu-memory.json', import.meta.url)).then(r => r.json()).catch(() => ({ vram: {}, aliases: {}, integrated: [] }));
 
+const RENDERER_KEY = 'RendererName';
 function probeRenderer(attrs) {
   try {
     const c = document.createElement('canvas');
@@ -139,6 +140,7 @@ export let lastProbe = null;   // { gb, holds, why, gbs }: the last probe run he
 export async function probeHolds(adapter, gb, sig, bwGBs = null) {
   // a yes is kept; a no is measured again after a day (the card may only have been busy)
   try { const c = local.json(PROBE_KEY); if (c?.sig === sig && c.gb === gb && (c.holds === true || Date.now() - c.at < 864e5)) return c.holds ?? null; } catch {}
+  if (deferring) { deferred.push(() => probeHolds(adapter, gb, sig, bwGBs)); return null; }
   // a no or a can't-tell again after 2 s: a page closed just before (a reload) may still be
   // giving its memory back, its GPU work still running
   let holds = await probeOnce(adapter, gb, bwGBs);
@@ -202,8 +204,17 @@ export function deviceClass(ch, ua = '', touch = 0) {
 // of the card's rated figure: an RTX 2060 measures ~200 of its 336), best of
 // three runs of ten copies. Kept per device and browser for 30 days.
 const BW_KEY = 'GpuBandwidth';
+// A page that must not share the card while it starts (a game building its
+// world) defers the measurements: until runDeferred(), one not cached yet is not
+// made (null: detectHardware goes by the card's name) but kept, and
+// runDeferred() makes them one after another (their results are cached for the
+// next visit). Cached results are used either way.
+let deferring = false; const deferred = [];
+export function deferMeasuring(on = true) { deferring = !!on; }
+export async function runDeferred() { deferring = false; while (deferred.length) { try { await deferred.shift()(); } catch {} } }
 export async function measureBandwidth(adapter, sig, maxMB = 256) {
   try { const c = local.json(BW_KEY); if (c?.sig === sig && Date.now() - c.at < 30 * 864e5 && c.gbs > 0) return c.gbs; } catch {}
+  if (deferring) { deferred.push(() => measureBandwidth(adapter, sig, maxMB)); return null; }
   let dev = null;
   try {
     const size = Math.min(maxMB * 2 ** 20, Math.floor(adapter.limits.maxBufferSize / 2 / 4) * 4);
@@ -257,7 +268,14 @@ let detected = null;
 export function detectHardware() {
   return detected ||= (async () => {
     const t = await table();
-    const seen = [...new Set([probeRenderer({ powerPreference: 'high-performance' }), probeRenderer()].filter(Boolean))];
+    // The renderer's name needs a WebGL context, created synchronously: two of them
+    // blocked a game's start-up for 2-8 s while its own graphics loaded (CPU profile,
+    // 2026-11-22). Kept per browser and adapter for 30 days (RendererName).
+    const ad0 = await navigator.gpu?.requestAdapter?.({ powerPreference: 'high-performance' }).catch(() => null);
+    const fp = [navigator.userAgent, ad0?.info?.vendor, ad0?.info?.architecture, ad0?.info?.device, ad0?.info?.description].join('|');
+    let seen = null;
+    try { const c = local.json(RENDERER_KEY); if (c?.fp === fp && Date.now() - c.at < 30 * 864e5 && Array.isArray(c.seen)) seen = c.seen; } catch {}
+    if (!seen) { seen = [...new Set([probeRenderer({ powerPreference: 'high-performance' }), probeRenderer()].filter(Boolean))]; if (seen.length) local.setJson(RENDERER_KEY, { fp, seen, at: Date.now() }); }
     const parsed = seen.map(parseRenderer);
     const gpu = parsed.find(n => lookupVram(n, t) !== 0) || parsed[0] || null;
     let vram = gpu ? lookupVram(gpu, t) : null;
@@ -271,7 +289,7 @@ export function detectHardware() {
       webgpu: false, f16: false, maxBufferGB: null, vendor: '', bwGBs: null };
     let adapter = null;
     try {
-      adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
+      adapter = ad0 || await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
       if (adapter) {
         hw.webgpu = true; hw.f16 = adapter.features.has('shader-f16');
         hw.maxBufferGB = +(adapter.limits.maxBufferSize / 2 ** 30).toFixed(2);

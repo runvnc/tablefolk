@@ -12,7 +12,13 @@ import { OpenAI, collect } from '../../libs/brain/engines/openai.js';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
 import { loadBonsai2, generateBonsai2 } from '../../libs/brain/engines/bonsai2.js';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
-import { detectHardware, recommendModel, noteBrainSpeed, usableGB } from '../../libs/device/index.js';
+import { detectHardware, recommendModel, noteBrainSpeed, usableGB, deferMeasuring, runDeferred } from '../../libs/device/index.js';
+// A first visit's GPU measurements (bandwidth, memory probe) do not run during the
+// world's build: the model is picked from the card's name (so the download question
+// can come at once), and they run first in the start-up queue (loading.js 'probe',
+// after the world has settled, before the brain), cached for the next visit.
+{ const L = window.tablefolkLoading;
+  if (L?.turn && !L.off) { deferMeasuring(true); (async () => { try { await L.turn('probe'); await runDeferred(); } finally { L.release('probe'); } })(); } }
 import { samplingFor, withChaos } from '../../libs/brain/sampling.js';
 
 // hidden: kept working but not offered in the model picker (MiniCPM retired

@@ -26,6 +26,8 @@ setCardMemory(hw.gpu, 16)  // what the player says theirs has: kept, used from t
 recommendModel(hw, [{ key: 'small', needGB: 3, readGB: 1.3 }, { key: 'big', needGB: 6, readGB: 2.3 }], 'small')
 hw.choiceWhy           // "6 GB usable, 138 GB/s"
 noteBrainSpeed('big', replyChars, seconds)   // a model measured too slow is not picked again
+deferMeasuring()       // GPU measurements not cached yet are skipped (the card's name decides) and kept...
+await runDeferred()    // ...until this makes them, one after another (cached for the next visit)
 ```
 
 It recognises RTX Spark / DGX Spark (NVIDIA on Arm), Apple M-series by tier,
