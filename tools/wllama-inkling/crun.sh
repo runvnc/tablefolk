@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # crun.sh PAGE "<query>" [cap s] [TAG]: one headless Chrome run on the box; prints tagged lines, stats, peak GPU MiB
-PAGE=$1; Q="$2"; CAP="${3:-600}"; TAG="${4:-INK}"; W=/root/wl/wllama
+PAGE=$1; Q="$2"; CAP="${3:-600}"; TAG="${4:-INK}"; W=${WL:-/root/wl/wllama}
 export PATH=$(ls -d /root/wl/emsdk/node/*/bin | head -1):$PATH
 [ -f /root/wsrv.pid ] && kill "$(cat /root/wsrv.pid)" 2>/dev/null
 [ -f /root/chrome.pid ] && kill "$(cat /root/chrome.pid)" 2>/dev/null; sleep 1; killall -q chrome; sleep 1

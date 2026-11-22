@@ -1,9 +1,9 @@
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
 new file mode 100644
-index 0000000..48d418e
+index 0000000..e7b6e37
 --- /dev/null
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
-@@ -0,0 +1,1284 @@
+@@ -0,0 +1,1522 @@
 +// Fused kernels for chains of small ops (Inkling 2 glue: row L2 clips, loop controllers, short convolutions with their
 +// state store, depth mixes, SiTU, the MoE expert sum). At batch size 1 each graph node is one dispatch, and the cost
 +// of a dispatch (encoding, the barrier after it, a mostly idle GPU) dwarfs its arithmetic: Inkling 2 Mini runs ~8,250
@@ -33,12 +33,14 @@ index 0000000..48d418e
 +    WF_MIX,           // RMS_NORM TRANSPOSE CONT REPEAT MUL_MAT SOFT_MAX MUL_MAT             attention over depth
 +    WF_RELBIAS,       // SUB PERMUTE CONT GET_ROWS RESHAPE PERMUTE CONT CPY ADD CPY          rel-position bias + mask
 +    WF_MOE_ROUTE,     // SIGMOID ADD ARGSORT VIEW GET_ROWS SUM_ROWS SCALE DIV SCALE          expert choice and weights
++    WF_EW,            // any run of element-wise ops of one shape: one generated kernel       (e.g. a Sinkhorn)
 +    WF_COUNT
 +};
 +
-+static const char * wf_names[WF_COUNT] = { "clip", "ctrl_out", "norm2cat", "conv", "cat_state", "situ", "moe_sum", "mix", "relbias", "moe_route" };
++static const char * wf_names[WF_COUNT] = { "clip", "ctrl_out", "norm2cat", "conv", "cat_state", "situ", "moe_sum", "mix", "relbias", "moe_route", "ew" };
 +
 +#define WF_MAX_SLOTS 8
++#define WF_MAX_SLOTS_EW 28
 +
 +struct wf_call {
 +    wf_type             type;
@@ -48,6 +50,9 @@ index 0000000..48d418e
 +    uint32_t            wg_x = 1, wg_y = 1;
 +    int                 variant = 0;                  // a specialization of the kernel (0: none)
 +    std::string         consts;                       // WGSL consts prepended for the variant
++    std::string         code;                         // a generated kernel (WF_EW), cached by its text
++    const ggml_tensor * ew_slot[WF_MAX_SLOTS_EW] = {}; // WF_EW: its slots (more than WF_MAX_SLOTS)
++    int                 n_ew = 0;
 +};
 +
 +static bool wf_is_noop(const ggml_tensor * t) {
@@ -247,6 +252,11 @@ index 0000000..48d418e
 +    let sh = (a & 3u)*8u;
 +    if (sh == 0u) { return lo; }
 +    return (lo >> sh) | (ldw(g, (a >> 2u) + 1u) << (32u - sh));
++}
++fn rt_u(x: u32) -> u32 { return x; }
++fn softplus_s(x: f32) -> f32 {
++    let y = exp(-abs(x));
++    return max(x, 0.0) + select(log(1.0 + y), y*(1.0 - 0.5*y), y < 1e-3);
 +}
 +fn tanh_s(x: f32) -> f32 { return tanh(clamp(x, -15.0, 15.0)); }
 +fn sigmoid_s(x: f32) -> f32 { return 1.0 / (1.0 + exp(-clamp(x, -80.0, 80.0))); }
@@ -1288,6 +1298,234 @@ index 0000000..48d418e
 +            return false;
 +    }
 +}
++
++// ---------------------------------------------------------------------------------------------------------------
++// EW: a run of consecutive element-wise nodes of one shape (f32) becomes one generated kernel. Each thread computes
++// one element of every node of the run in registers and stores the nodes that are used after the run. Sources from
++// outside the run may broadcast (ne == 1 on a dimension). Strides are baked into the generated code, buffer offsets
++// come through the slots, so the same run in every layer shares one pipeline.
++
++static bool wf_ew_op(const ggml_tensor * n) {
++    switch (n->op) {
++        case GGML_OP_ADD:
++        case GGML_OP_SUB:
++        case GGML_OP_MUL:
++        case GGML_OP_DIV:
++        case GGML_OP_SCALE:
++        case GGML_OP_SQR:
++        case GGML_OP_SQRT:
++        case GGML_OP_LOG:
++        case GGML_OP_CLAMP:
++            return true;
++        case GGML_OP_UNARY:
++            switch (ggml_get_unary_op(n)) {
++                case GGML_UNARY_OP_ABS:
++                case GGML_UNARY_OP_NEG:
++                case GGML_UNARY_OP_TANH:
++                case GGML_UNARY_OP_RELU:
++                case GGML_UNARY_OP_SIGMOID:
++                case GGML_UNARY_OP_SILU:
++                case GGML_UNARY_OP_EXP:
++                case GGML_UNARY_OP_SOFTPLUS:
++                    return true;
++                default:
++                    return false;
++            }
++        default:
++            return false;
++    }
++}
++
++static std::string wf_lit(float v) {
++    // non-finite values cannot be WGSL constants: route them through a function (evaluated at run time)
++    return std::string(std::isfinite(v) ? "bitcast<f32>(" : "bitcast<f32>(rt_u(") + std::to_string(wf_f(v)) +
++           (std::isfinite(v) ? "u)" : "u))");
++}
++
++static bool wf_match_ew(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    const ggml_tensor * first = cgraph->nodes[i];
++    if (!wf_ew_op(first) || first->type != GGML_TYPE_F32) {
++        return false;
++    }
++    const int64_t    ne[4]   = { first->ne[0], first->ne[1], first->ne[2], first->ne[3] };
++    const int        max_run = 96, max_slots = 28;
++    std::vector<int> run;  // node indices
++    auto in_run = [&](const ggml_tensor * t, int n_run) {
++        for (int a = 0; a < n_run; a++) {
++            if (cgraph->nodes[run[a]] == t) {
++                return true;
++            }
++        }
++        return false;
++    };
++    for (int k = i; k < cgraph->n_nodes && (int) run.size() < max_run; k++) {
++        const ggml_tensor * n = cgraph->nodes[k];
++        if (wf_is_noop(n)) {
++            continue;
++        }
++        if (!wf_ew_op(n) || n->type != GGML_TYPE_F32 || n->ne[0] != ne[0] || n->ne[1] != ne[1] || n->ne[2] != ne[2] ||
++            n->ne[3] != ne[3] || (n->flags & GGML_TENSOR_FLAG_COMPUTE) == 0 || n->nb[0] % 4 || n->nb[1] % 4 ||
++            n->nb[2] % 4 || n->nb[3] % 4) {
++            break;
++        }
++        bool ok = true;
++        for (int s = 0; s < GGML_MAX_SRC && n->src[s]; s++) {
++            const ggml_tensor * t = n->src[s];
++            if (in_run(t, (int) run.size())) {
++                continue;
++            }
++            // an outside source: f32, broadcastable, not a view of a node of the run
++            for (const ggml_tensor * v = t; v; v = v->view_src ? v->view_src : (wf_is_noop(v) ? v->src[0] : nullptr)) {
++                if (v != t && in_run(v, (int) run.size())) {
++                    ok = false;
++                }
++                if (!wf_is_noop(v)) {
++                    break;
++                }
++            }
++            ok &= t->type == GGML_TYPE_F32 && t->nb[0] % 4 == 0 && t->nb[1] % 4 == 0 && t->nb[2] % 4 == 0 && t->nb[3] % 4 == 0;
++            for (int d = 0; d < 4; d++) {
++                ok &= (t->ne[d] == ne[d] || t->ne[d] == 1);
++            }
++        }
++        if (!ok) {
++            break;
++        }
++        run.push_back(k);
++    }
++    // shrink the run until its outputs do not alias its outside sources (or only as the same elements), and it fits
++    std::vector<int>                 outs;
++    std::vector<const ggml_tensor *> ext;
++    int                              n_run = (int) run.size();
++    for (; n_run >= 2; n_run--) {
++        outs.clear();
++        ext.clear();
++        for (int a = 0; a < n_run; a++) {
++            const ggml_tensor * node = cgraph->nodes[run[a]];
++            int                 uses = 0;
++            for (int b = a + 1; b < n_run; b++) {
++                for (int s = 0; s < GGML_MAX_SRC; s++) {
++                    uses += cgraph->nodes[run[b]]->src[s] == node;
++                }
++            }
++            if ((node->flags & GGML_TENSOR_FLAG_OUTPUT) || uses != ggml_node_get_use_count(cgraph, run[a]) || a == n_run - 1) {
++                outs.push_back(a);
++            }
++            for (int s = 0; s < GGML_MAX_SRC && node->src[s]; s++) {
++                const ggml_tensor * t = node->src[s];
++                if (!in_run(t, n_run) && std::find(ext.begin(), ext.end(), t) == ext.end()) {
++                    ext.push_back(t);
++                }
++            }
++        }
++        bool ok = (int) (ext.size() + outs.size()) <= max_slots;
++        for (int o : outs) {
++            const ggml_tensor * on = cgraph->nodes[run[o]];
++            for (const ggml_tensor * e : ext) {
++                ok &= wf_same_or_disjoint(on, e);
++            }
++            for (int o2 : outs) {
++                ok &= o2 == o || !wf_overlap(on, cgraph->nodes[run[o2]]);
++            }
++        }
++        if (ok) {
++            break;
++        }
++    }
++    if (n_run < 2) {
++        return false;
++    }
++
++    // generate the kernel
++    const int   n_slots = (int) (ext.size() + outs.size());
++    const int   pdim    = 2 * n_slots;
++    std::string code    = "@compute @workgroup_size(64)\nfn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) "
++                          "nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {\n";
++    code += "    let e = wid_lin(wid, nwg)*64u + lid.x;\n";
++    code += "    let n0 = pu(" + std::to_string(pdim) + "u); let n1 = pu(" + std::to_string(pdim + 1) + "u); let n2 = pu(" +
++            std::to_string(pdim + 2) + "u); let n3 = pu(" + std::to_string(pdim + 3) + "u);\n";
++    code += "    if (e >= n0*n1*n2*n3) { return; }\n";
++    code += "    let i0 = e % n0; let i1 = (e / n0) % n1; let i2 = (e / (n0*n1)) % n2; let i3 = e / (n0*n1*n2);\n";
++    auto addr = [&](const ggml_tensor * t) {
++        std::string  a;
++        const char * idx[4] = { "i0", "i1", "i2", "i3" };
++        for (int d = 0; d < 4; d++) {
++            if (t->ne[d] == 1 || t->nb[d] == 0) {
++                continue;
++            }
++            a += (a.empty() ? "" : " + ") + std::string(idx[d]) + "*" + std::to_string(t->nb[d]) + "u";
++        }
++        return a.empty() ? std::string("0u") : a;
++    };
++    std::unordered_map<const ggml_tensor *, std::string> name;
++    for (size_t k = 0; k < ext.size(); k++) {
++        name[ext[k]] = "x" + std::to_string(k);
++        code += "    let x" + std::to_string(k) + " = ldf(" + std::to_string(k) + "u, " + addr(ext[k]) + ");\n";
++    }
++    for (int a = 0; a < n_run; a++) {
++        const ggml_tensor * n = cgraph->nodes[run[a]];
++        const std::string   x = name.count(n->src[0]) ? name[n->src[0]] : "";
++        const std::string   y = (n->src[1] && name.count(n->src[1])) ? name[n->src[1]] : "";
++        std::string         ex;
++        const bool          binary = n->op == GGML_OP_ADD || n->op == GGML_OP_SUB || n->op == GGML_OP_MUL || n->op == GGML_OP_DIV;
++        if (x.empty() || (binary && y.empty())) {
++            return false;
++        }
++        switch (n->op) {
++            case GGML_OP_ADD: ex = x + " + " + y; break;
++            case GGML_OP_SUB: ex = x + " - " + y; break;
++            case GGML_OP_MUL: ex = x + " * " + y; break;
++            case GGML_OP_DIV: ex = x + " / " + y; break;
++            case GGML_OP_SCALE:
++                ex = x + "*" + wf_lit(ggml_get_op_params_f32(n, 0)) + " + " + wf_lit(ggml_get_op_params_f32(n, 1));
++                break;
++            case GGML_OP_SQR: ex = x + "*" + x; break;
++            case GGML_OP_SQRT: ex = "sqrt(" + x + ")"; break;
++            case GGML_OP_LOG: ex = "log(" + x + ")"; break;
++            case GGML_OP_CLAMP:
++                ex = "clamp(" + x + ", " + wf_lit(ggml_get_op_params_f32(n, 0)) + ", " + wf_lit(ggml_get_op_params_f32(n, 1)) + ")";
++                break;
++            default:
++                switch (ggml_get_unary_op(n)) {
++                    case GGML_UNARY_OP_ABS: ex = "abs(" + x + ")"; break;
++                    case GGML_UNARY_OP_NEG: ex = "-" + x; break;
++                    case GGML_UNARY_OP_TANH: ex = "tanh_s(" + x + ")"; break;
++                    case GGML_UNARY_OP_RELU: ex = "max(" + x + ", 0.0)"; break;
++                    case GGML_UNARY_OP_SIGMOID: ex = "sigmoid_s(" + x + ")"; break;
++                    case GGML_UNARY_OP_SILU: ex = x + " * sigmoid_s(" + x + ")"; break;
++                    case GGML_UNARY_OP_EXP: ex = "exp(" + x + ")"; break;
++                    case GGML_UNARY_OP_SOFTPLUS: ex = "softplus_s(" + x + ")"; break;
++                    default: return false;
++                }
++        }
++        const std::string v = "v" + std::to_string(a);
++        code += "    let " + v + " = " + ex + ";\n";
++        name[n] = v;
++    }
++    for (size_t k = 0; k < outs.size(); k++) {
++        const ggml_tensor * n = cgraph->nodes[run[outs[k]]];
++        code += "    stf(" + std::to_string(ext.size() + k) + "u, " + addr(n) + ", " + name[n] + ");\n";
++    }
++    code += "}\n";
++
++    c.type    = WF_EW;
++    c.n_nodes = run[n_run - 1] - i + 1;
++    c.code    = code;
++    for (size_t k = 0; k < ext.size(); k++) {
++        c.ew_slot[k] = ext[k];
++    }
++    for (size_t k = 0; k < outs.size(); k++) {
++        c.ew_slot[ext.size() + k] = cgraph->nodes[run[outs[k]]];
++    }
++    c.n_ew = n_slots;
++    c.p    = { (uint32_t) ne[0], (uint32_t) ne[1], (uint32_t) ne[2], (uint32_t) ne[3] };
++    c.wg_x = (uint32_t) CEIL_DIV(ne[0] * ne[1] * ne[2] * ne[3], 64);
++    return true;
++}
++
++static bool wf_match_any(const ggml_cgraph * cgraph, int i, wf_call & c, uint32_t mask) {
++    return wf_match(cgraph, i, c, mask) || (((mask >> WF_EW) & 1u) && wf_match_ew(cgraph, i, c));
++}
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp
 index cc7f660..87c2960 100644
 --- a/ggml/src/ggml-webgpu/ggml-webgpu-shader-lib.hpp
@@ -1327,7 +1565,7 @@ index cc7f660..87c2960 100644
              outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
          }
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
-index 95040c4..a06b341 100644
+index 95040c4..7c8ed54 100644
 --- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 @@ -192,7 +192,8 @@ struct webgpu_capabilities {
@@ -1356,18 +1594,19 @@ index 95040c4..a06b341 100644
          const int  keep      = every;
          const auto keep_last = last_end;
          const bool keep_have = have_last;
-@@ -329,6 +339,10 @@ struct webgpu_context_struct {
+@@ -329,6 +339,11 @@ struct webgpu_context_struct {
      size_t                   param_staging_end   = 0;
      bool                     param_batch_write   = true;
      WGPUComputePipeline      last_pipeline       = nullptr;  // in the active compute pass
 +    // fused chains (ggml-webgpu-fuse.hpp)
 +    uint32_t                                 fuse_mask = 0;
-+    std::unordered_map<int, webgpu_pipeline> fuse_pipelines;
++    std::unordered_map<int, webgpu_pipeline>         fuse_pipelines;
++    std::unordered_map<std::string, webgpu_pipeline> fuse_ew_pipelines;
 +    wgpu::Buffer                             fuse_dummy;
      wgpu::Buffer             set_rows_dev_error_buf;
      wgpu::Buffer             set_rows_host_error_buf;
      wgpu::CommandEncoder     active_command_encoder;
-@@ -604,6 +618,12 @@ static int ggml_webgpu_env_int(const char * name, int def) {
+@@ -604,6 +619,12 @@ static int ggml_webgpu_env_int(const char * name, int def) {
  #ifndef GGML_WEBGPU_PARAM_BATCH_WRITE
  #    define GGML_WEBGPU_PARAM_BATCH_WRITE 1
  #endif
@@ -1380,7 +1619,7 @@ index 95040c4..a06b341 100644
  #ifndef GGML_WEBGPU_SUBMIT_BATCH
  #    define GGML_WEBGPU_SUBMIT_BATCH WEBGPU_DEFAULT_COMMAND_SUBMIT_BATCH_SIZE
  #endif
-@@ -2042,6 +2062,9 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
+@@ -2042,6 +2063,9 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
          (uint32_t) (src1->nb[1] / ggml_type_size(src1->type)),
          (uint32_t) (src0->nb[2] / ggml_type_size(src0->type)),
          (uint32_t) (src1->nb[2] / ggml_type_size(src1->type)),
@@ -1390,7 +1629,7 @@ index 95040c4..a06b341 100644
      };
  
      std::vector<wgpu::BindGroupEntry> entries = {
-@@ -2062,7 +2085,7 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
+@@ -2062,7 +2086,7 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id_vec(webgpu_context & ctx,
  
      const uint32_t max_wg_per_dim = ctx->global_ctx->capabilities.limits.maxComputeWorkgroupsPerDimension;
      uint32_t       output_groups  = CEIL_DIV(dst->ne[0], decisions->outputs_per_wg);
@@ -1399,7 +1638,7 @@ index 95040c4..a06b341 100644
      compute_2d_workgroups(total_wg, max_wg_per_dim, wg_x, wg_y);
  
      return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
-@@ -2086,8 +2109,10 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id(webgpu_context & ctx,
+@@ -2086,8 +2110,10 @@ static webgpu_encoded_op ggml_webgpu_mul_mat_id(webgpu_context & ctx,
                                                  ggml_tensor *    src1,
                                                  ggml_tensor *    src2,
                                                  ggml_tensor *    dst) {
@@ -1412,7 +1651,7 @@ index 95040c4..a06b341 100644
          return ggml_webgpu_mul_mat_id_vec(ctx, src0, src1, src2, dst);
      }
  
-@@ -3762,6 +3787,93 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
+@@ -3762,6 +3788,107 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
      return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
  }
  
@@ -1425,17 +1664,19 @@ index 95040c4..a06b341 100644
 +static std::optional<webgpu_encoded_op> ggml_webgpu_fused(webgpu_context & ctx, const wf_call & c) {
 +    static const char * kernels[WF_COUNT] = { wf_wgsl_clip, wf_wgsl_ctrl_out, wf_wgsl_norm2cat, wf_wgsl_conv,
 +                                              wf_wgsl_conv, wf_wgsl_situ,     wf_wgsl_moe_sum,  wf_wgsl_mix,
-+                                              wf_wgsl_relbias, wf_wgsl_moe_route };
++                                              wf_wgsl_relbias, wf_wgsl_moe_route, nullptr };
 +    const auto & lim   = ctx->global_ctx->capabilities.limits;
 +    const size_t align = lim.minStorageBufferOffsetAlignment;
 +
 +    wgpu::Buffer gb[4];
 +    size_t       glo[4] = {}, ghi[4] = {};
 +    int          ng = 0;
-+    uint32_t     sg[WF_MAX_SLOTS];
++    uint32_t     sg[WF_MAX_SLOTS_EW];
 +    int          n_slots = 0;
-+    for (int k = 0; k < WF_MAX_SLOTS && c.slot[k]; k++) {
-+        const ggml_tensor * t   = c.slot[k];
++    const ggml_tensor * const * slots   = c.type == WF_EW ? c.ew_slot : c.slot;
++    const int                   max_slt = c.type == WF_EW ? c.n_ew : WF_MAX_SLOTS;
++    for (int k = 0; k < max_slt && slots[k]; k++) {
++        const ggml_tensor * t   = slots[k];
 +        wgpu::Buffer        buf = ggml_webgpu_tensor_buf(t);
 +        const size_t        lo = wf_off(t), hi = lo + ggml_nbytes(t);
 +        int                 g = 0;
@@ -1466,7 +1707,7 @@ index 95040c4..a06b341 100644
 +    }
 +    for (int k = 0; k < n_slots; k++) {
 +        params[2 * k]     = sg[k];
-+        params[2 * k + 1] = (uint32_t) (wf_off(c.slot[k]) - glo[sg[k]]);
++        params[2 * k + 1] = (uint32_t) (wf_off(slots[k]) - glo[sg[k]]);
 +    }
 +    params.insert(params.end(), c.p.begin(), c.p.end());
 +    if (params.size() > WEBGPU_PARAMS_BUF_SIZE_BYTES / 4) {
@@ -1488,31 +1729,43 @@ index 95040c4..a06b341 100644
 +        }
 +    }
 +
-+    const int key = (int) c.type + WF_COUNT * c.variant;
-+    auto      it  = ctx->fuse_pipelines.find(key);
-+    if (it == ctx->fuse_pipelines.end()) {
-+        std::string code = c.consts + wf_wgsl_prelude + kernels[c.type];
-+        std::string name = std::string("fused_") + wf_names[c.type];
-+        it = ctx->fuse_pipelines.emplace(key, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
-+                                                                          name.c_str())).first;
++    webgpu_pipeline * pl = nullptr;
++    if (c.type == WF_EW) {
++        auto it = ctx->fuse_ew_pipelines.find(c.code);
++        if (it == ctx->fuse_ew_pipelines.end()) {
++            std::string code = std::string(wf_wgsl_prelude) + c.code;
++            it = ctx->fuse_ew_pipelines.emplace(c.code, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
++                                                                                     "fused_ew")).first;
++        }
++        pl = &it->second;
++    } else {
++        const int key = (int) c.type + WF_COUNT * c.variant;
++        auto      it  = ctx->fuse_pipelines.find(key);
++        if (it == ctx->fuse_pipelines.end()) {
++            std::string code = c.consts + wf_wgsl_prelude + kernels[c.type];
++            std::string name = std::string("fused_") + wf_names[c.type];
++            it = ctx->fuse_pipelines.emplace(key, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
++                                                                              name.c_str())).first;
++        }
++        pl = &it->second;
 +    }
 +    uint32_t wg_x, wg_y;
 +    compute_2d_workgroups(std::max(1u, c.wg_x), lim.maxComputeWorkgroupsPerDimension, wg_x, wg_y);
 +    ctx->global_ctx->stats.fused[c.type]++;
 +    ctx->global_ctx->stats.fused_nodes += c.n_nodes;
-+    return ggml_backend_webgpu_build(ctx, it->second, params, entries, wg_x, wg_y);
++    return ggml_backend_webgpu_build(ctx, *pl, params, entries, wg_x, wg_y);
 +}
 +
  // Returns the encoded command, or std::nullopt if the operation is a no-op
  static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
                                                             ggml_cgraph *  cgraph,
-@@ -3778,6 +3890,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+@@ -3778,6 +3905,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
      }
      WEBGPU_LOG_DEBUG("ggml_webgpu_encode(" << node << ", " << ggml_op_name(node->op) << ")");
  
 +    if (ctx->fuse_mask) {
 +        wf_call fc;
-+        if (wf_match(cgraph, node_idx, fc, ctx->fuse_mask)) {
++        if (wf_match_any(cgraph, node_idx, fc, ctx->fuse_mask)) {
 +            if (auto op = ggml_webgpu_fused(ctx, fc)) {
 +                num_encoded_ops = fc.n_nodes;
 +                return op;
@@ -1523,7 +1776,7 @@ index 95040c4..a06b341 100644
      ggml_tensor * src0 = node->src[0];
      ggml_tensor * src1 = node->src[1];
      ggml_tensor * src2 = node->src[2];
-@@ -4009,6 +4131,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+@@ -4009,6 +4146,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
          }
          GGML_LOG_INFO("ggml_webgpu ops in a %d-node graph: %s\n", cgraph->n_nodes, line.c_str());
      }
@@ -1559,7 +1812,7 @@ index 95040c4..a06b341 100644
      if (st.have_last) {
          st.gap_ms += std::chrono::duration<double, std::milli>(t_start - st.last_end).count();
      }
-@@ -4888,7 +5039,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
+@@ -4888,7 +5054,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
          ctx->webgpu_global_ctx->adapter.HasFeature(wgpu::FeatureName::Subgroups);
      // for dot4I8packed
      ctx->webgpu_global_ctx->capabilities.supports_dot_product = ctx->webgpu_global_ctx->instance.HasWGSLLanguageFeature(
@@ -1569,7 +1822,7 @@ index 95040c4..a06b341 100644
  
      bool valid_subgroup_matrix_config = false;
  #if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
-@@ -5005,6 +5157,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+@@ -5005,6 +5172,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
      webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
      webgpu_ctx->param_batch_write =
          ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
