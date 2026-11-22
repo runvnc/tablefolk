@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-22
 
+- **Farm animals without holes**: the bull, dog, donkey, horse, husky, pig, stag and white horse had cracks and missing patches up close, like the bear before them; all eight are rebuilt from their original models with the seams kept together, on the same skeletons with the same moves. They now fit their skeletons properly too, so at the same height they look a little longer and slimmer than before.
 - **Floors indoors**: a walk-in building's room has its own floor (planks, or its stone or earth) a little above the ground with a threshold at the door, instead of the ground's texture with grass creeping in at the doorway; beds, chests and the like inside a building are hidden while it stands closed (one poked out through the front wall), and barrels and crates by a generated village's doors stand clear of the buildings' steps.
 - **Doors into buildings no longer pop**: walking up to a house's door, the building opens round the doorway before the door swings, showing the room's own door and walls there, and lifts only once you are through; leaving, it closes up the same way.
 - **Trees no longer hide you**: with the follow camera, trees and tall things between the camera and you fade away (treetops fully, trunks to a faint ghost) and come back as the view clears; no extra cost per tree.

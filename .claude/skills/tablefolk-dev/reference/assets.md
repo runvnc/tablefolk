@@ -303,10 +303,20 @@ non-manifold and the collapse stops there; splitting those edges let it
 through but wrecked the frame); `hay` 1.64 m high (decimation pushed strands
 16 cm below the ground: proc.py now clamps at 0). The other generated
 models torn the same way are the Hunyuan3D animals reskinned with
-`reskin-animal.py` (it decimated past 60k faces unwelded; welds now): bull,
-dog, donkey, horse, husky, pig, stag and white_horse still are (25-50k open
-edges each; their raw `hunyuan31.glb` files were deleted, so they need
-regenerating); the bear was rebuilt from its raw (50k open edges to 4).
+`reskin-animal.py` (it decimated past 60k faces unwelded; welds now). All
+nine are rebuilt: the bear from its raw (50k open edges to 4), and on
+2026-11-22 bull, dog, donkey, horse, husky, pig, stag and white_horse (26-47k
+open edges each, 200-3,800 pieces) from raws fetched again from fal: their
+`hunyuan31.glb` files had been deleted, but a finished queue request's result
+stays fetchable (GET `<request url>` from the `hunyuan31.log`, header
+`Authorization: Key $FAL_API_KEY`, gives `model_glb.url`; free, no new run).
+Rebuilt with `reskin-animal.py old.glb hunyuan31.glb out.glb --bones`, they
+pass `check.py --pair` (0-2 open edges, one piece) and keep every bone, rest
+pose and clip of the shipped files exactly. Their boxes now match the rig's
+body: the first runs had counted the importer's bone-display Icosphere (fixed
+2026-11-19), which stretched each mesh a metre below the feet and, for the
+narrow ones, to 1.9 m wide; at the same `h` they are now truer to their
+skeletons, a little longer and narrower than before.
 Meshy characters, Quaternius, KayKit, village/farm/nature packs and the
 `gen/` props are not torn (the packs' many parts are authored pieces).
 
