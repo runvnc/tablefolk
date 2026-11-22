@@ -1,9 +1,9 @@
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
 new file mode 100644
-index 0000000..742604e
+index 0000000..48d418e
 --- /dev/null
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
-@@ -0,0 +1,1089 @@
+@@ -0,0 +1,1284 @@
 +// Fused kernels for chains of small ops (Inkling 2 glue: row L2 clips, loop controllers, short convolutions with their
 +// state store, depth mixes, SiTU, the MoE expert sum). At batch size 1 each graph node is one dispatch, and the cost
 +// of a dispatch (encoding, the barrier after it, a mostly idle GPU) dwarfs its arithmetic: Inkling 2 Mini runs ~8,250
@@ -31,10 +31,12 @@ index 0000000..742604e
 +    WF_SITU,          // SCALE TANH SCALE SIGMOID MUL SCALE TANH SCALE MUL                   SiTU of expert gate/up
 +    WF_MOE_SUM,       // MUL VIEW*E ADD*(E-1)                                                weighted expert sum
 +    WF_MIX,           // RMS_NORM TRANSPOSE CONT REPEAT MUL_MAT SOFT_MAX MUL_MAT             attention over depth
++    WF_RELBIAS,       // SUB PERMUTE CONT GET_ROWS RESHAPE PERMUTE CONT CPY ADD CPY          rel-position bias + mask
++    WF_MOE_ROUTE,     // SIGMOID ADD ARGSORT VIEW GET_ROWS SUM_ROWS SCALE DIV SCALE          expert choice and weights
 +    WF_COUNT
 +};
 +
-+static const char * wf_names[WF_COUNT] = { "clip", "ctrl_out", "norm2cat", "conv", "cat_state", "situ", "moe_sum", "mix" };
++static const char * wf_names[WF_COUNT] = { "clip", "ctrl_out", "norm2cat", "conv", "cat_state", "situ", "moe_sum", "mix", "relbias", "moe_route" };
 +
 +#define WF_MAX_SLOTS 8
 +
@@ -77,6 +79,11 @@ index 0000000..742604e
 +        return true;
 +    }
 +    return wf_off(dst) == wf_off(src) && ggml_are_same_shape(dst, src) && ggml_are_same_stride(dst, src);
++}
++
++static bool wf_permute_is(const ggml_tensor * t, const ggml_tensor * src, int a0, int a1, int a2, int a3) {
++    return t && t->op == GGML_OP_PERMUTE && t->src[0] == src && ggml_get_op_params_i32(t, 0) == a0 &&
++           ggml_get_op_params_i32(t, 1) == a1 && ggml_get_op_params_i32(t, 2) == a2 && ggml_get_op_params_i32(t, 3) == a3;
 +}
 +
 +static bool wf_f32_rows(const ggml_tensor * t) {
@@ -142,7 +149,7 @@ index 0000000..742604e
 +            return false;
 +        }
 +        int uses = 0;
-+        for (int q = k + 1; q <= end; q++) {
++        for (int q = k; q <= end; q++) {  // from k: a CPY lists its own destination as a source
 +            if (!member[q - i]) {
 +                continue;
 +            }
@@ -506,6 +513,75 @@ index 0000000..742604e
 +        var y = vec4<f32>(0.0);
 +        for (var l = 0u; l < ML; l++) { y += wsh[l] * ldf(0u, t*pu(11u) + l*pu(10u) + c*4u); }
 +        for (var q = 0u; q < MQ; q++) { stf(2u, t*pu(14u) + q*pu(13u) + c*4u, y[q]); }
++    }
++}
++)";
++
++// RELBIAS: slots table0 sink1 pos2 mask3 dst4; p (from 10): nkv Tq H S tab_nb1 m_nb1 m_nb3 d_nb1 d_nb2 d_nb3
++//   dst[k,tq,h,s] (f16) = (table[pos[k + nkv*(tq + Tq*s)], h] - sink[h]) + mask[k,tq,0,s]; two elements a thread
++static const char * wf_wgsl_relbias = R"(
++fn rb_val(k: u32, tq: u32, h: u32, s: u32) -> f32 {
++    let nkv = pu(10u);
++    let r = ldw(pu(4u), (pu(5u) + (k + nkv*(tq + pu(11u)*s))*4u) >> 2u);
++    let v = ldf(0u, h*pu(14u) + r*4u) - ldf(1u, h*4u);
++    return v + ldh(3u, s*pu(16u) + tq*pu(15u) + k*2u);
++}
++@compute @workgroup_size(256)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let i = wid_lin(wid, nwg)*256u + lid.x;
++    let nkv = pu(10u);
++    let half = nkv/2u;
++    let Tq = pu(11u);
++    let H = pu(12u);
++    if (i >= half*Tq*H*pu(13u)) { return; }
++    let k = (i % half)*2u;
++    let tq = (i / half) % Tq;
++    let h = (i / (half*Tq)) % H;
++    let s = i / (half*Tq*H);
++    let w = pack2x16float(vec2<f32>(rb_val(k, tq, h, s), rb_val(k + 1u, tq, h, s)));
++    let a = pu(9u) + s*pu(19u) + h*pu(18u) + tq*pu(17u) + k*2u;
++    stw(pu(8u), a >> 2u, w);
++}
++)";
++
++// MOE_ROUTE: slots logits0 bias1 ids2 wts3; p (from 8): E K T l_nb1 ids_nb1 w_nb2 s0 s1 f0 f1
++//   p = sigmoid(logits); ids = the K largest of p + bias (descending, ties to the lower index);
++//   w = p[ids] / (sum(p[ids])*s0 + s1) * f0 + f1; one workgroup per token, E <= 256
++static const char * wf_wgsl_moe_route = R"(
++var<workgroup> pb: array<f32, 256>;
++var<workgroup> pr: array<f32, 256>;
++var<workgroup> sel: array<f32, 64>;
++@compute @workgroup_size(256)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let t = wid_lin(wid, nwg);
++    let E = pu(8u);
++    let K = pu(9u);
++    if (t >= pu(10u)) { return; }
++    let e = lid.x;
++    if (e < E) {
++        let p = sigmoid_s(ldf(0u, t*pu(11u) + e*4u));
++        pr[e] = p;
++        pb[e] = p + ldf(1u, e*4u);
++    }
++    workgroupBarrier();
++    if (e < E) {
++        let v = pb[e];
++        var rank = 0u;
++        for (var j = 0u; j < E; j++) {
++            let u = pb[j];
++            rank += select(0u, 1u, u > v || (u == v && j < e));
++        }
++        if (rank < K) {
++            stw(pu(4u), (pu(5u) + t*pu(12u) + rank*4u) >> 2u, e);
++            sel[rank] = pr[e];
++        }
++    }
++    workgroupBarrier();
++    if (e < K) {
++        var sum = 0.0;
++        for (var j = 0u; j < K; j++) { sum += sel[j]; }
++        let d = sum*pf(14u) + pf(15u);
++        stf(3u, t*pu(13u) + e*4u, (sel[e] / d)*pf(16u) + pf(17u));
 +    }
 +}
 +)";
@@ -1069,6 +1145,121 @@ index 0000000..742604e
 +    return true;
 +}
 +
++static bool wf_match_relbias(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // SUB(table, sink) PERMUTE CONT GET_ROWS(., pos) RESHAPE PERMUTE CONT CPY(mask f16 -> f32) ADD CPY(-> f16)
++    int idx[7];
++    if (!wf_real(cgraph, i, 7, idx, { GGML_OP_SUB, GGML_OP_CONT, GGML_OP_GET_ROWS, GGML_OP_CONT, GGML_OP_CPY, GGML_OP_ADD,
++                                      GGML_OP_CPY })) {
++        return false;
++    }
++    ggml_tensor * N[7];
++    for (int k = 0; k < 7; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    const ggml_tensor * table = N[0]->src[0];
++    const ggml_tensor * sink  = N[0]->src[1];
++    const ggml_tensor * p1    = N[1]->src[0];
++    const ggml_tensor * pos   = N[2]->src[1];
++    const ggml_tensor * p2    = N[3]->src[0];
++    const ggml_tensor * mask  = N[4]->src[0];
++    ggml_tensor *       dst   = N[6];
++    if (!wf_permute_is(p1, N[0], 1, 0, 2, 3) || N[2]->src[0] != N[1] || p2->op != GGML_OP_PERMUTE ||
++        !wf_permute_is(p2, p2->src[0], 2, 0, 1, 3) || p2->src[0]->op != GGML_OP_RESHAPE || p2->src[0]->src[0] != N[2] ||
++        N[5]->src[0] != N[3] || N[5]->src[1] != N[4] || N[6]->src[0] != N[5]) {
++        return false;
++    }
++    const int64_t D = table->ne[0], H = table->ne[1];
++    const int64_t nkv = dst->ne[0], Tq = dst->ne[1], S = dst->ne[3];
++    if (!wf_f32_rows(table) || table->ne[2] != 1 || sink->type != GGML_TYPE_F32 || !ggml_is_contiguous(sink) ||
++        ggml_nelements(sink) != H || pos->type != GGML_TYPE_I32 || !ggml_is_contiguous(pos) ||
++        ggml_nelements(pos) != nkv * Tq * S || mask->type != GGML_TYPE_F16 || mask->nb[0] != 2 || mask->ne[0] != nkv ||
++        mask->ne[1] != Tq || mask->ne[2] != 1 || mask->ne[3] != S || dst->type != GGML_TYPE_F16 || !ggml_is_contiguous(dst) ||
++        dst->ne[2] != H || nkv % 2 != 0 || wf_off(dst) % 4 != 0 || N[4]->type != GGML_TYPE_F32 || D < 1) {
++        return false;
++    }
++    if (wf_overlap(dst, table) || wf_overlap(dst, sink) || wf_overlap(dst, pos) || wf_overlap(dst, mask)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[6], { dst })) {
++        return false;
++    }
++    c.type    = WF_RELBIAS;
++    c.n_nodes = idx[6] - i + 1;
++    c.slot[0] = table;
++    c.slot[1] = sink;
++    c.slot[2] = pos;
++    c.slot[3] = mask;
++    c.slot[4] = dst;
++    c.p       = { (uint32_t) nkv,        (uint32_t) Tq,         (uint32_t) H,          (uint32_t) S,
++                  (uint32_t) table->nb[1], (uint32_t) mask->nb[1], (uint32_t) mask->nb[3], (uint32_t) dst->nb[1],
++                  (uint32_t) dst->nb[2], (uint32_t) dst->nb[3] };
++    c.wg_x    = (uint32_t) CEIL_DIV(nkv / 2 * Tq * H * S, 256);
++    return true;
++}
++
++static bool wf_match_moe_route(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // SIGMOID(logits) ADD(p, bias) ARGSORT(desc) GET_ROWS(p, topk) SUM_ROWS SCALE DIV SCALE
++    int idx[8];
++    if (!wf_real(cgraph, i, 8, idx, { GGML_OP_UNARY, GGML_OP_ADD, GGML_OP_ARGSORT, GGML_OP_GET_ROWS, GGML_OP_SUM_ROWS,
++                                      GGML_OP_SCALE, GGML_OP_DIV, GGML_OP_SCALE })) {
++        return false;
++    }
++    ggml_tensor * N[8];
++    for (int k = 0; k < 8; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    if (ggml_get_unary_op(N[0]) != GGML_UNARY_OP_SIGMOID || ggml_get_op_params_i32(N[2], 0) != GGML_SORT_ORDER_DESC) {
++        return false;
++    }
++    const ggml_tensor * logits = N[0]->src[0];
++    const ggml_tensor * bias   = N[1]->src[1];
++    const ggml_tensor * topk   = N[3]->src[1];
++    ggml_tensor *       ids    = N[2];
++    ggml_tensor *       wts    = N[7];
++    const int64_t       E = logits->ne[0], T = logits->ne[1], K = topk->ne[0];
++    if (N[1]->src[0] != N[0] || N[2]->src[0] != N[1] || wf_base(N[3]->src[0]) != N[0] || topk->op != GGML_OP_VIEW ||
++        topk->view_src != ids || topk->view_offs != 0 || wf_base(N[4]->src[0]) != N[3] || N[5]->src[0] != N[4] ||
++        wf_base(N[6]->src[0]) != N[3] || N[6]->src[1] != N[5] || wf_base(N[7]->src[0]) != N[6]) {
++        return false;
++    }
++    if (!wf_f32_rows(logits) || logits->ne[2] != 1 || E > 256 || K > 64 || K > E || bias->type != GGML_TYPE_F32 ||
++        !ggml_is_contiguous(bias) || ggml_nelements(bias) != E || !ggml_is_contiguous(ids) || ids->ne[1] != T ||
++        wts->type != GGML_TYPE_F32 || !ggml_is_contiguous(wts) || ggml_nelements(wts) != K * T ||
++        wf_overlap(ids, logits) || wf_overlap(wts, logits) || wf_overlap(ids, wts)) {
++        return false;
++    }
++    // the ids are read through the top-k view only (its first K entries are written)
++    if (!wf_window_ok(cgraph, i, idx[7], { ids, wts, topk })) {
++        return false;
++    }
++    for (int k = idx[7] + 1; k < cgraph->n_nodes; k++) {
++        const ggml_tensor * n = cgraph->nodes[k];
++        for (int s = 0; s < GGML_MAX_SRC; s++) {
++            if (n->src[s] == ids) {
++                return false;
++            }
++        }
++    }
++    c.type    = WF_MOE_ROUTE;
++    c.n_nodes = idx[7] - i + 1;
++    c.slot[0] = logits;
++    c.slot[1] = bias;
++    c.slot[2] = ids;
++    c.slot[3] = wts;
++    c.p       = { (uint32_t) E,
++                  (uint32_t) K,
++                  (uint32_t) T,
++                  (uint32_t) logits->nb[1],
++                  (uint32_t) ids->nb[1],
++                  (uint32_t) (K * sizeof(float)),
++                  wf_f(ggml_get_op_params_f32(N[5], 0)),
++                  wf_f(ggml_get_op_params_f32(N[5], 1)),
++                  wf_f(ggml_get_op_params_f32(N[7], 0)),
++                  wf_f(ggml_get_op_params_f32(N[7], 1)) };
++    c.wg_x    = (uint32_t) T;
++    return true;
++}
++
 +static bool wf_match(const ggml_cgraph * cgraph, int i, wf_call & c, uint32_t mask) {
 +    const ggml_tensor * n = cgraph->nodes[i];
 +    auto                on = [&](wf_type t) { return (mask >> t) & 1u; };
@@ -1089,6 +1280,10 @@ index 0000000..742604e
 +            return on(WF_CONV) && wf_match_conv(cgraph, i, c);
 +        case GGML_OP_SCALE:
 +            return on(WF_SITU) && wf_match_situ(cgraph, i, c);
++        case GGML_OP_SUB:
++            return on(WF_RELBIAS) && wf_match_relbias(cgraph, i, c);
++        case GGML_OP_UNARY:
++            return on(WF_MOE_ROUTE) && wf_match_moe_route(cgraph, i, c);
 +        default:
 +            return false;
 +    }
@@ -1132,7 +1327,7 @@ index cc7f660..87c2960 100644
              outputs_per_wg = WEBGPU_MUL_MAT_VEC_LEGACY_Q_OUTPUTS_PER_WG;
          }
 diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
-index 95040c4..9ab9329 100644
+index 95040c4..9f6a5f0 100644
 --- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 +++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
 @@ -192,7 +192,8 @@ struct webgpu_capabilities {
@@ -1182,7 +1377,7 @@ index 95040c4..9ab9329 100644
  #ifndef GGML_WEBGPU_SUBMIT_BATCH
  #    define GGML_WEBGPU_SUBMIT_BATCH WEBGPU_DEFAULT_COMMAND_SUBMIT_BATCH_SIZE
  #endif
-@@ -3762,6 +3779,92 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
+@@ -3762,6 +3779,93 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
      return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
  }
  
@@ -1194,7 +1389,8 @@ index 95040c4..9ab9329 100644
 +
 +static std::optional<webgpu_encoded_op> ggml_webgpu_fused(webgpu_context & ctx, const wf_call & c) {
 +    static const char * kernels[WF_COUNT] = { wf_wgsl_clip, wf_wgsl_ctrl_out, wf_wgsl_norm2cat, wf_wgsl_conv,
-+                                              wf_wgsl_conv, wf_wgsl_situ,     wf_wgsl_moe_sum,  wf_wgsl_mix };
++                                              wf_wgsl_conv, wf_wgsl_situ,     wf_wgsl_moe_sum,  wf_wgsl_mix,
++                                              wf_wgsl_relbias, wf_wgsl_moe_route };
 +    const auto & lim   = ctx->global_ctx->capabilities.limits;
 +    const size_t align = lim.minStorageBufferOffsetAlignment;
 +
@@ -1275,7 +1471,7 @@ index 95040c4..9ab9329 100644
  // Returns the encoded command, or std::nullopt if the operation is a no-op
  static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
                                                             ggml_cgraph *  cgraph,
-@@ -3778,6 +3881,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+@@ -3778,6 +3882,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
      }
      WEBGPU_LOG_DEBUG("ggml_webgpu_encode(" << node << ", " << ggml_op_name(node->op) << ")");
  
@@ -1292,7 +1488,7 @@ index 95040c4..9ab9329 100644
      ggml_tensor * src0 = node->src[0];
      ggml_tensor * src1 = node->src[1];
      ggml_tensor * src2 = node->src[2];
-@@ -4009,6 +4122,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+@@ -4009,6 +4123,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
          }
          GGML_LOG_INFO("ggml_webgpu ops in a %d-node graph: %s\n", cgraph->n_nodes, line.c_str());
      }
@@ -1328,7 +1524,7 @@ index 95040c4..9ab9329 100644
      if (st.have_last) {
          st.gap_ms += std::chrono::duration<double, std::milli>(t_start - st.last_end).count();
      }
-@@ -4888,7 +5030,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
+@@ -4888,7 +5031,8 @@ static void create_webgpu_device(ggml_backend_webgpu_reg_context * ctx) {
          ctx->webgpu_global_ctx->adapter.HasFeature(wgpu::FeatureName::Subgroups);
      // for dot4I8packed
      ctx->webgpu_global_ctx->capabilities.supports_dot_product = ctx->webgpu_global_ctx->instance.HasWGSLLanguageFeature(
@@ -1338,7 +1534,7 @@ index 95040c4..9ab9329 100644
  
      bool valid_subgroup_matrix_config = false;
  #if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
-@@ -5005,6 +5148,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+@@ -5005,6 +5149,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
      webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
      webgpu_ctx->param_batch_write =
          ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
