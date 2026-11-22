@@ -8,12 +8,12 @@ import { chromium } from 'playwright-core';
 const args = process.argv.slice(2), flag = (n, d) => { const a = args.find(x => x.startsWith('--' + n + '=')); return a ? a.split('=').slice(1).join('=') : d; };
 const base = flag('base', 'http://localhost:8000');
 const q = ['play=1', 'intro=0', 'gfx=' + flag('gfx', 'medium'), 'model=' + flag('model'), 'scenario=/' + flag('scenario', 'scenarios/hearthvale.json'),
-  'autonomy=' + flag('autonomy', 'guided')].join('&');
+  'autonomy=' + flag('autonomy', 'guided'), flag('query', '')].filter(Boolean).join('&');   // --query=a=1&b=2: more URL parameters
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close().catch(() => {});
 await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
-const turns = [];
+const turns = [], t0 = Date.now();
 page.on('console', m => {
   const t = m.text();
   const r = t.match(/RAW OUTPUT at .*elapsed ms: (\d+)/);
@@ -21,8 +21,11 @@ page.on('console', m => {
   const k = t.match(/llama\.cpp timings: prompt_n= (\d+) prompt_ms= (\d+) PREFILL= ([\d.]+).*predicted_n= (\d+) DECODE= ([\d.]+)/);
   if (k) reads.push({ n: +k[1], ms: +k[2], gen: +k[4], tps: +k[5] });
 });
-const reads = [];
-const t0 = Date.now();
+const reads = [], errs = [];
+// CONSOLE_LOG=file: every console line (debugging a crash)
+if (process.env.CONSOLE_LOG) { const fs = await import('fs'); page.on('console', m => fs.appendFileSync(process.env.CONSOLE_LOG, `[${((Date.now() - t0) / 1000).toFixed(1)}] ${m.type()}: ${m.text().slice(0, 2000)}\n`)); }
+page.on('pageerror', e => { if (errs.length < 12) errs.push('PAGEERROR ' + String(e).slice(0, 300)); });
+page.on('console', m => { const t = m.text(); if ((m.type() === 'error' || /crash|RuntimeError|abort|exception|Device.*lost/i.test(t)) && errs.length < 12 && !errs.includes(t.slice(0, 300))) errs.push(t.slice(0, 300)); });
 await page.goto(`${base}/app/?${q}&t=${t0}`);
 let consentAt = null, readyAt = null;
 for (;;) {
@@ -44,5 +47,5 @@ console.log(JSON.stringify({ model: flag('model'), downloaded: !!consentAt, read
   turn_median_s: pct(0.5) && (pct(0.5) / 1000).toFixed(2), turn_p90_s: pct(0.9) && (pct(0.9) / 1000).toFixed(2),
   // tokens read and written a call, its reading and writing speed (llama.cpp's timings), medians
   read_n_median: med(reads.map(x => x.n)), read_ms_median: med(reads.map(x => x.ms)), written_median: med(reads.map(x => x.gen)),
-  write_tps_median: med(reads.map(x => x.tps)) }));
+  write_tps_median: med(reads.map(x => x.tps)), errors: errs }));
 await page.close(); await b.close(); process.exit(0);
