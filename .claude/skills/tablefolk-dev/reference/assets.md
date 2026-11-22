@@ -356,6 +356,84 @@ that play a chest's clip get none). procgen.js reserves room for the real
 sizes (closed buildings: inn and barracks 9 x 9 squares, smithy and
 stone/tall/timber houses 7 x 7) and puts walk-in door pads 3 squares out.
 
+### Open image-to-3D against Meshy 7.1, measured (2026-11-22)
+
+Tried on the inn and the blacksmith against the shipped (welded, rebuilt)
+Meshy 7.1 models. Meshy's raws and every candidate went through one frozen
+copy of the shipping pipeline (`work/img3d-trial/pipe/`: proc.py of the
+afternoon of 2026-11-22 with the model's options.json opts: 40k triangles,
+normal map baked from the full model, de-lit base colour; then the 2048
+tier, decompressed, check.py `--pair`), and were rendered at fixed cameras
+(far, back, door at 4.5 m, close on the front-left eave). Scripts in
+`tools/env-assets/trial/` (fal client with a ledger and spending cap, lock
+wrapper, processing, renders, sheets); scratch, the call table (`calls.md`)
+and the sheets (`shots/inn_side_by_side.jpg`,
+`shots/blacksmith_side_by_side.jpg`) in `work/img3d-trial/` (not in git).
+$1.99 of fal in all (19 calls).
+
+- **On fal (2026-11-22)**: TRELLIS.2 (`fal-ai/trellis-2`, MIT: $0.25 /
+  0.30 / 0.35 at 512 / 1024 / 1536), its retexture endpoint
+  (`fal-ai/trellis-2/retexture`, $0.20 at 512, $0.24 at 1024), TRELLIS v1
+  single and multi-image ($0.02), Hunyuan3D **2.0** (`fal-ai/hunyuan3d/v2`
+  and `/multi-view`: $0.16 untextured, $0.48 textured; Tencent community
+  licence, which excludes the EU, UK and South Korea), SAM 3D Objects
+  ($0.02, Meta's SAM licence). **Not on fal**: Pixal3D and Step1X-3D (never
+  listed), Hunyuan3D 2.1 (`fal-ai/hunyuan3d-v21` is deprecated). Nothing
+  newer and open is listed; the newer 3D endpoints (Hunyuan 3.x, Tripo,
+  Rodin, Hi3D, Meshy) are closed.
+- **Input preparation matters**: cut the concept out with BiRefNet
+  (`fal-ai/birefnet/v2`, a fraction of a cent; removes the grey ground and
+  the soft cast shadow) and crop it square with a 10% margin. TRELLIS v1 on
+  the raw concept made black roof planes; on the cut-out it did not.
+- **TRELLIS v1**: blobby, wavy beams, every back side dark. Its GLB leaves
+  `metallicFactor` unset, which glTF reads as 1 (black metal): set it to 0
+  (`trial/matfix.py`) before judging any TRELLIS v1 model. Front + back with
+  multidiffusion invented a second gable; eight views rendered from the Meshy
+  mesh gave Meshy's layout, softer. Not usable.
+- **TRELLIS.2 at 1536** (cut-out front, 25 steps per stage, 2048 texture,
+  seeds 1 and 2): the best open shape. Windows, panelled door, beams and
+  roof lines are as crisp as Meshy's or crisper, and it modelled the forge's
+  interior with its fire. Against it: the texture atlas is hundreds of
+  slivers, so the inn's roof comes out in dark and orange blotches (in both
+  seeds, also undecimated: not our decimation) and the 1k tier will bleed
+  at the seams; timber comes out slate grey instead of brown wood; the
+  blacksmith's roof has torn single-sheet shingles; a grey apron is fused at
+  the inn's base; seed 2 copied the inn's front onto its back. Open edges
+  after welding: inn 2.0-3.2k raw / 1.5-2.4k final, blacksmith 43-45k raw /
+  25k final (Meshy: 421 and 144). Finals 2.6-3.0 MB against Meshy's 2.8 and
+  2.1 MB. They are mostly single-sheet boards and shingles
+  drawn double-sided (the material keeps `doubleSided` through our
+  pipeline), but check.py passes them only because its limit is relative to
+  the raw. Orientation: the inn's front faces +Z as Meshy's does, the
+  blacksmith's needs yaw 180 (TRELLIS v1 differs again: check every model).
+- **TRELLIS.2 retexture of the Meshy shape** (the shipped 30k mesh without
+  UVs, the cut-out front image, 1024, 25 steps): an even, clean texture on
+  Meshy's geometry (the same open edges as Meshy), darker timber and less
+  cream plaster than Meshy's own; about equal, not better.
+- **SAM 3D Objects** (inn only, one seed, $0.02): the surprise. Watertight
+  (0 open edges, one piece), 31k triangles, 1024 texture, a 660 KB final:
+  clean straight roof lines, dormers and porch, and it reads well at game
+  scale. Up close the texture is soft, the gable's beams are painted flat
+  rather than modelled, the plaster is brown, the sign is gone, and the back
+  is a copy of the front. Below Meshy, but cheap enough to try properly (the
+  blacksmith and two more seeds would cost $0.06; out of budget here).
+- **Hunyuan3D 2.0** (untextured, octree 512, 50 steps; 3.0M triangles,
+  pre-decimated to 300k by `trial/predec.py` so proc.py fits the lock): a
+  melted, puffy shape with soft beams and window openings. Worst of the
+  shapes; a textured run ($0.48) was not worth the budget. Its licence
+  excludes the EU, UK and South Korea anyway.
+
+**Verdict: keep Meshy 7.1.** None of the open options beat it on both shape
+and texture: TRELLIS.2's shape is competitive but its texture is not, and
+TRELLIS.2 retexturing does not improve Meshy's texture. Worth keeping in
+mind: TRELLIS.2 for an object whose shape Meshy gets wrong (it modelled the
+forge interior Meshy left empty), then retextured or painted. Not tested:
+Pixal3D and Step1X-3D (self-hosting on a rented GPU: Pixal3D's setup is
+above, ~$0.50-1 of a 4090 for a fair trial of both buildings with seeds;
+Step1X-3D similar), Hunyuan3D 2.1, a third TRELLIS.2 seed, other TRELLIS.2
+guidance and remesh settings (`remesh_project`, shape guidance), TRELLIS.2
+retexturing the blacksmith, and textured Hunyuan3D.
+
 ### Procedural trees, plants and the environment texture set (2026-11-20)
 
 - `assets/models/props/env-nature/` (manifest.json: type, files `<type>.gltf`
