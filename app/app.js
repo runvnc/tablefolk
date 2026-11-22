@@ -3033,7 +3033,8 @@ async function importPropAsset(scene,file,opts={}){
   try{
     // Pack items carry full URLs; the glTF's textures resolve from its folder.
     const abs=/^[a-z]+:/i.test(file), dir=abs?file.slice(0,file.lastIndexOf('/')+1):PROP_ASSET, name=abs?file.slice(dir.length):file;
-    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ if(!(m.needAlphaTesting?.())) m.backFaceCulling=false; LOOK()?.matte(m); } });
+    // tall things (trees, stalls, buildings as props) fade out of the follow camera's way (cutaway.js seeThrough)
+    const result=await loadModelInstance(scene,dir,name,c=>{ for(const m of c.materials){ if(!(m.needAlphaTesting?.())) m.backFaceCulling=false; LOOK()?.matte(m); if((opts.h??1)>=1.4) window.tablefolkCutaway?.seeThrough?.(m); } });
     // Some props (the chest) bring a skeleton and animation clips; free those
     // with the object (disposeWorldObject runs meta.cleanup).
     for(const ag of result.animationGroups||[]) ag.stop();

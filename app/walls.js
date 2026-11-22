@@ -15,14 +15,15 @@
  *            at corners and every 2 cells, a sill and a top plate, braces in
  *            the panels, and a small timber-framed window every 3 cells on
  *            outside runs longer than 3 cells (glowing warm at dusk and night;
- *            only a picture: sight and paths are unchanged)
+ *            only a picture: sight and paths are unchanged); and its own floor,
+ *            a slab 3 cm above the ground in the room's floor texture (floors())
  * Cracked walls lose their cap and get a broken, uneven top; burned ones are
  * dark (vertex colours). Doors: app.js's plank leaf (now wood_planks_dark,
  * iron straps) in a timber frame (house) or a stone one. "modern" and "block"
  * keep their old looks (app.js).
  *
  *   window.tablefolkWalls = { build(cell, top), setNight(k), roomMeshes(room) }   (app.js rebuildWallVisuals;
- *   roomMeshes: a house room's own wall, frame and door meshes, hidden by roofs.js under a shell)
+ *   roomMeshes: a house room's own wall, frame, door and floor meshes, hidden by roofs.js under a shell)
  * Loaded after app.js (uses state, meta, wallH, doorHeight, doorAxisOf,
  * buildDoorLeaf, ensureDoorAnimator, addShadow).
  */
@@ -152,8 +153,9 @@
     return window.tablefolkTerrain?.mode?.() === 'rock' || !!s.dark || s.base === 'dungeon';
   }
   function houseCells() {
-    const out = { walls: new Set(), inside: new Set(), room: new Map() };
+    const out = { walls: new Set(), inside: new Set(), room: new Map(), rooms: [] };
     const R = window.tablefolkRoofs?.planned?.(); if (!R) return out;
+    out.rooms = R;
     for (const r of R) for (const c of r.cells) {
       out.inside.add(c); const [x, z] = c.split(',').map(Number);
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const k = (x + dx) + ',' + (z + dz); out.walls.add(k); if (!out.room.has(k)) out.room.set(k, roomKey(r)); }
@@ -236,11 +238,41 @@
     for (const name of ['rubble', 'blocks', 'cap', 'plaster', 'timber', 'glass']) {
       const m = B0[name].mesh('tt_walls_' + name, () => M[name]); if (m) out.push(m);
     }
+    if (!dark) floors(houses.rooms || [], out);
     for (const [rk, Bq] of perRoom) for (const name of ['rubble', 'cap', 'plaster', 'timber', 'glass']) {
       const m = Bq[name].mesh('tt_walls_' + name + '_room', () => M[name]); if (m) { out.push(m); m.metadata = { ...(m.metadata || {}), room: rk }; (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); }
     }
     state.wallVisuals.push(...out);
     buildDoors(cell, top, houses);
+  }
+  // A house room's own floor (2026-11-22; the owner: "the floor of buildings was merging
+  // into the ground"): the terrain painted the room's floor at the ground's height and
+  // blended grass into it round the doorway. Now a slab FLOOR_UP above the ground over every
+  // room square, out to the walls' centre lines, in the room's floor texture (the terrain
+  // layer it was painted with: planks by default, a smithy's stone, a barn's earth); with
+  // the room's walls (roomMeshes: hidden under a standing shell, shown through its doorway).
+  const FLOOR_UP = .03, FLOOR_TEX = { wood_planks_worn: 2.2, stone_floor_rough: 2.5, flagstone: 2.5, dirt_path: 3, cobblestone: 2.5 };
+  const floorMats = {};
+  function floorMat(env) {
+    const m = floorMats[env]; if (m && !m.isDisposed?.() && m.getScene() === state.scene) return m;
+    TILE[env] ||= FLOOR_TEX[env] || 2.5;
+    const f = pbr('floor_' + env, env, env === 'wood_planks_worn' ? [.95, .88, .8] : [1, 1, 1], { bump: .8 }); f.backFaceCulling = true;
+    return (floorMats[env] = f);
+  }
+  function floors(rooms, out) {
+    for (const r of rooms) {
+      const rk = roomKey(r), byMat = new Map();
+      for (const c of r.cells) {
+        const [x, z] = c.split(',').map(Number);
+        let env = window.tablefolkTerrain?.layerAt?.(x, z); if (!FLOOR_TEX[env]) env = 'wood_planks_worn';
+        const b = byMat.get(env) || byMat.set(env, batch()).get(env);
+        // out to the wall's centre line on a side with no room square (no ground between floor and wall)
+        const e = (dx, dz) => r.cells.has((x + dx) + ',' + (z + dz)) ? .5 : 1;
+        const x0 = x - e(-1, 0), x1 = x + e(1, 0), z0 = z - e(0, -1), z1 = z + e(0, 1), top = state.terrainTopY ?? 0;
+        b.add((x0 + x1) / 2, top + FLOOR_UP / 2 - .01, (z0 + z1) / 2, x1 - x0, FLOOR_UP + .02, z1 - z0, [1, 1, 1]);
+      }
+      for (const [env, b] of byMat) { const m = b.mesh('tt_floor_room', () => floorMat(env)); if (m) { m.metadata = { room: rk }; out.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); } }
+    }
   }
   function runLength(cell, x, z, alongX) {
     const has = (a) => { const k = alongX ? a + ',' + z : x + ',' + a, w = cell.get(k); return w && meta(w).type === 'wall'; };
@@ -289,7 +321,7 @@
       const c = alongX ? x : z;
       for (const e of [-.5 + jw / 2, .5 - jw / 2]) putF(c + e, top + (DH + .12) / 2, jw, DH + .12, T + .06);   // jambs
       putF(c, top + DH + .06, 1, .14, T + .07);                                                             // lintel
-      timber.add(alongX ? x : x, top + .015, alongX ? z : z, alongX ? .9 : T + .1, .03, alongX ? T + .1 : .9, col);   // threshold
+      timber.add(alongX ? x : x, top + (house ? .03 : .015), alongX ? z : z, alongX ? .9 : T + .1, house ? .06 : .03, alongX ? T + .1 : .9, col);   // threshold (a house's a step above its floor)
       // a stone doorstep on the outside of a house door
       if (house) { const side = outsideSide(houses.inside, x, z, alongX); if (side) { const d = T / 2 + .2; alongX ? stone.add(x, top + .06, z + side * d, 1.05, .12, .38, col) : stone.add(x + side * d, top + .06, z, .38, .12, 1.05, col); } }
       const g = buildDoorLeaf(state.scene, x, z, alongX, top, DH); g.door = w;

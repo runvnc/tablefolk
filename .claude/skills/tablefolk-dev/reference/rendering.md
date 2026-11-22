@@ -452,7 +452,49 @@ root is disabled (indoors under a shell, in the fog) are hidden. `planned()` lis
 get) a roof (walls.js), `findRooms()` the rooms and the outside squares
 (terrain.js). Fade rule: 0 when the player is inside (or roofs are lifted by
 `tablefolkRoofs.toggle()` in tests), .22 when the follow camera's ray hits
-it, else 1; never in the free camera.
+it, else 1; never in the free camera. A shell's "inside" is the room's own
+squares only (a code roof also counts its doorway).
+
+Doorways (2026-11-22; the owner: "the wall section disappeared after I opened
+the door"). Before, the room walls and door were disabled under a standing
+shell and enabled the frame the player stepped into the doorway square (in
+`here`), after app.js had already swung the (hidden) leaf open at 1.7 m, so
+the shell's wall vanished late and the door that opened was never seen.
+Now `doorway()` picks the nearest door of a shelled room (`room.doors`:
+[x, z, nx, nz], n out of the room) with the player within `DOOR_NEAR` (3)
+squares outside it, in the doorway, or half a square in; `hole`
+(`TABLEFOLK_DOORWAY`: x, z, alongX, k) eases k to 1 in ~.25 s. The window-glow
+plugin on every building material (`windowGlow`) also takes `tfHole`/`tfHoleB`
+and dithers away shell fragments within `HOLE_W` (1.5) along the wall and
+`HOLE_D` (.95) across it, below the wall tops, by k: a cross-fade to the
+room's walls, frame and leaf, which are enabled while the hole is open or the
+shell's alpha is under .98 (`shellHide(r, hide, open)`), so the leaf that
+swings is the visible one. While the hole is open and the shell stands,
+`TABLEFOLK_ROOM_CLIP` (the room's wall centre lines, the hole) makes the
+walls' cut plugin (cutaway.js, attached to the room meshes' materials by
+`shellHide`) discard the outer half of the room's walls except round the
+doorway, so they never poke through the shell; their inner faces show
+through the door (back faces are discarded there already). The characters
+inside show while the doorway is open, and so do its objects (`shellHide`
+hides the room's objects but lights, `m._shellHidden`, rechecked once a
+second; darkness.js keeps them hidden when the fog reveals them). Leaving is
+the same in reverse; another door closes this hole first.
+
+Room floors (2026-11-22; the owner: "the floor of buildings was merging into
+the ground"): a room's floor was only the terrain's splat layer at y = 0, so
+the outdoor grass (the door square is outdoor ground) blended about a third of
+a square into the room through the doorway, and the floor read as the ground.
+walls.js `floors()` now lays a slab `FLOOR_UP` (3 cm) above the ground over
+every room square, out to the walls' centre lines, per room and per floor
+texture (the terrain layer the room was painted with: wood_planks_worn by
+default, stone_floor_rough, flagstone, dirt_path, cobblestone), with the room's
+`roomMeshes` (hidden under a standing shell, shown through its doorway); a
+house door's threshold is 6 cm. The board is flat under every walkable square
+and ground cover keeps off room and door squares (terrain.js), so a shell's
+base, set on the ground by its lowest point, meets it with no gap; nothing
+pokes through. procgen's door clutter stands two squares out (the rebuilt
+models' steps and porches cover the first). `tablefolkRoofs.doorway()` and `shells()`
+(alpha, target, walls enabled) for tests.
 
 ## Characters
 
@@ -666,6 +708,22 @@ ablations, each against a fresh baseline). Babylon draws everything in one
   costs; the timestamps, not fps, measure it.
 
 ## Cameras and views
+
+- Scenery out of the follow camera's way (2026-11-22, cutaway.js `seeThrough`):
+  a material plugin (`TablefolkSee`) on the materials of props 1.4 m or
+  taller (app.js `importPropAsset`, once per model file) and of the trees past
+  the board (surroundings.js). Uniforms: the camera and the player's chest
+  (`tfSeeCam`, `tfSeeHead`, with the amount and `SEE_R` 2.4 m). A fragment
+  whose distance to the camera-player segment is under R (+ `SEE_NEAR` 1.4
+  toward the camera, so a canopy the camera sits in goes) and before 99% of
+  the way is dithered away (interleaved gradient noise on the frag coord, soft
+  edge from .5 R, fading out between 95 and 99%); below the player's head + .7
+  m only to `SEE_TRUNK` (.72). Per pixel, so thin instances and hardware
+  instances need nothing per copy and no draw calls are added; the shadow pass
+  is untouched. Eases in and out with the follow camera (not first person or
+  the free camera); `TABLEFOLK_NOSEE` turns it off for tests. There is no
+  camera collision: the follow camera can stand in a canopy, which the
+  widened radius clears.
 
 - Window view (`app/head-window.js`, H, Graphics pane): head-coupled
   perspective from the webcam. MediaPipe's FaceDetector (tasks-vision

@@ -245,3 +245,44 @@ goes; read by `openLink`, which resumes when the code matches unless
 - The goal context adds the other sections' saved characters and props at
   an offset of 100000 per section (never near anything here), and a
   `getBrainConfig` that reads saved configs.
+
+## Voice fallback, placed sound effects, activity bubbles (2026-11-22)
+
+- Voices (app/tts/pocket-tts-manager.js): `engineFailed(id, msg)` on a worker
+  crash (`onerror`), a worker `error` that is fatal or comes before `loaded`,
+  three failed lines in a row, or 30 s with no audio after a line was asked
+  for (`watchdog`). It marks the engine in sessionStorage
+  `tablefolkVoiceFailed` (`{id: {reason, at}}`), notes `voice` in diagnostics
+  with the reason (`failWhy`: out of memory, device lost, download, no WebGPU),
+  sets `why` (Running now), toasts once per engine and switches to
+  `lighterThan(id)` (`LIGHTER`: zonos-web/breeze-web/pocket-100m to pocket-18m,
+  pocket-18m to `browser`, the browser's speechSynthesis: `speakBrowser`, no
+  worker, no spatial gain or lip sync). `chooseEngine` skips failed engines and
+  checks a heavy engine chosen on an earlier visit against the budget; one
+  picked this session in the Voice pane (`setEngine`: `pickedNow`, clears its
+  failure) is always tried. Budget: `zonosWhyNot` / `breezeWebWhyNot` take
+  `tablefolkDevice.freeGB` minus `tablefolkGfxGB() - 0.5` (graphics-settings.js:
+  the scene's textures, render targets and screen buffers measured every 5 s,
+  at least .45 / .8 / 1.6 GB at light / medium / high; the 0.5 is what a brain's
+  `needGB` already allows for drawing).
+- Sound effects (app/sfx.js): `play(name, pos)` with a position goes through
+  its own gain and a `PannerNode` (equalpower, inverse, `refDistance` 1.5),
+  the listener set at each sound from the view (at the player's ears, facing
+  the camera's forward; z mirrored like spells.js); silent past `MAX_DIST`
+  (20 m), fading over the last 6 m. Without a position: a UI sound, straight
+  to the master gain. `LEVEL` per effect (doors .07-.08: the Kenney samples are
+  full scale), `measure(name)` renders one offline for peak/RMS, `volume`
+  (Settings `#sfxVolume`, localStorage `tablefolk.sfx.volume`) scales the
+  master; `requested` records each sound's distance.
+- Activity bubbles (app.js before `say`): an unvoiced line of a character other
+  than the player goes through `activityBubble(g, text, kind)`: 'show',
+  'replace' (the shown activity bubble takes the new text) or 'skip' (the line
+  still goes to the log, the Messages pane and `g._lines`). `kind`: 'routine'
+  (uses.js `act`, sitting, lying, getting up, jobs.js waking), 'event'
+  (threats.js thefts), else plain activity. `NOTEWORTHY` (fights, thefts,
+  raids) and lines naming the player always show; `focusedOn` (selected, spoke
+  to or was spoken to by the player in the last 20 s); `nearOnScreen` (within
+  `ACT_NEAR` 6 m and projected inside the viewport); `ACT_GAP` 5 s per
+  character. `emitBadge` follows the same rule for other characters (1.5 s
+  apart). Setting: localStorage `tablefolkActivityBubbles` ('nearby', 'all',
+  'off'; Settings `#activityBubbles`). Bubbles get the class `activity`.

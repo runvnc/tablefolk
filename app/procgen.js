@@ -363,7 +363,8 @@
         if (!p.door || R2.next() > .7) continue;
         const [dr0, dc0] = p.door, out = dr0 < p.r0 ? [-1, 0] : dr0 > p.r1 ? [1, 0] : dc0 < p.c0 ? [0, -1] : [0, 1];
         for (const s2 of [1, -1]) {
-          const r = dr0 + out[0] + (out[0] ? 0 : s2), c = dc0 + out[1] + (out[1] ? 0 : s2);
+          // two squares out, beside the path: the building's steps and porch stand on the first (a barrel sank into the inn's porch)
+          const r = dr0 + out[0] * 2 + (out[0] ? 0 : s2), c = dc0 + out[1] * 2 + (out[1] ? 0 : s2);
           if (g[r]?.[c] !== ',' || R2.next() > .6) continue;
           const [x, z] = at(r, c); clutter.push({ type: kinds[Math.floor(R2.next() * kinds.length)], x, z, ry: +(R2.next() * 6.28).toFixed(2) });
         }

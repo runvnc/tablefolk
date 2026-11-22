@@ -205,7 +205,7 @@
       if (!m || m.isDisposed?.()) continue;
       const mm = meta(m); if (!mm || !(LOOT.test(mm.type || '') || window.tablefolk?.ITEM_CATALOG?.[mm.type])) continue;
       const p = m.getAbsolutePosition?.() || m.position, show = all || uncovered(Math.round(p.x) + ',' + Math.round(p.z));
-      if (!!m._fogHidden === show) { m._fogHidden = !show; m.setEnabled(show); }
+      if (!!m._fogHidden === show) { m._fogHidden = !show; m.setEnabled(show && !m._shellHidden); }
     }
   }
   const LOOT = /chest|coin|gold|crown|necklace|chalice|gem|key|potion|scroll|ring/;

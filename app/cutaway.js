@@ -20,6 +20,8 @@
  *   window.tablefolkCutaway.half()         every wall at half height (free camera)
  *   window.tablefolkCutaway.clear()        walls back to full height
  *   window.tablefolkCutaway.attach(mat)    cut this material too (darkness.js's fog)
+ *   window.tablefolkCutaway.seeThrough(mat) scenery (trees, tall props): fades where it
+ *       stands between the follow camera and the player (see the second part below)
  * Loaded after app.js; uses its globals (state, meta).
  */
 (function () {
@@ -40,17 +42,30 @@
       isCompatible() { return true; }
       prepareDefines(defines) { defines.TFCUT = true; }
       getUniforms(lang) {
-        const ubo = [{ name: 'tfCut', size: 4, type: 'vec4' }, { name: 'tfCutArea', size: 4, type: 'vec4' }];
-        return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFCUT\nuniform vec4 tfCut;\nuniform vec4 tfCutArea;\n#endif\n' };
+        const ubo = [{ name: 'tfCut', size: 4, type: 'vec4' }, { name: 'tfCutArea', size: 4, type: 'vec4' }, { name: 'tfClip', size: 4, type: 'vec4' }, { name: 'tfClipB', size: 4, type: 'vec4' }];
+        return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFCUT\nuniform vec4 tfCut;\nuniform vec4 tfCutArea;\nuniform vec4 tfClip;\nuniform vec4 tfClipB;\n#endif\n' };
       }
       bindForSubMesh(ubo) {
         ubo.updateFloat4('tfCut', cut.x, cut.z, this._fog && cut.on === 2 ? 0 : cut.on, cut.y);
         ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, this._fog ? 0 : 1);
+        // roofs.js: a shelled room whose doorway is open: its walls' outer halves go, but round the doorway
+        const c = !this._fog && window.TABLEFOLK_ROOM_CLIP;
+        ubo.updateFloat4('tfClip', c ? c.x0 : 0, c ? c.z0 : 0, c ? c.x1 : 0, c ? c.z1 : 0);
+        ubo.updateFloat4('tfClipB', c ? c.hx : 0, c ? c.hz : 0, c ? (c.alongX ? -c.w : c.w) : 0, c ? c.d : 0);   // z: the hole's half width, negative when the wall runs along x
       }
       getCustomCode(type, lang) {
         if (type !== 'fragment') return null;
         if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
 #ifdef TFCUT
+if (abs(uniforms.tfClipB.z) > 0.01) {
+  let cq = fragmentInputs.vPositionW.xz; let cb = uniforms.tfClip;
+  let cOut = cq.x > cb.x - 0.75 && cq.x < cb.z + 0.75 && cq.y > cb.y - 0.75 && cq.y < cb.w + 0.75;
+  let cIn = cq.x > cb.x && cq.x < cb.z && cq.y > cb.y && cq.y < cb.w;
+  let ch = cq - uniforms.tfClipB.xy; let cAX = uniforms.tfClipB.z < 0.0;
+  let cw = abs(uniforms.tfClipB.z); let cd = uniforms.tfClipB.w;
+  let cHole = select(abs(ch.y), abs(ch.x), cAX) < cw && select(abs(ch.x), abs(ch.y), cAX) < cd;
+  if (cOut && !cIn && !cHole) { discard; }
+}
 if (uniforms.tfCut.z > 0.5 && fragmentInputs.vPositionW.y > uniforms.tfCut.w) {
   if (uniforms.tfCut.z > 1.5) { discard; }
   let tfc = floor(fragmentInputs.vPositionW.xz + vec2f(0.5)) - uniforms.tfCut.xy;
@@ -72,6 +87,15 @@ if (uniforms.tfCut.z > 0.5 && uniforms.tfCutArea.w > 0.5 && !fragmentInputs.fron
 ` };
         return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
 #ifdef TFCUT
+if (abs(tfClipB.z) > 0.01) {
+  vec2 cq = vPositionW.xz;
+  bool cOut = cq.x > tfClip.x - 0.75 && cq.x < tfClip.z + 0.75 && cq.y > tfClip.y - 0.75 && cq.y < tfClip.w + 0.75;
+  bool cIn = cq.x > tfClip.x && cq.x < tfClip.z && cq.y > tfClip.y && cq.y < tfClip.w;
+  vec2 ch = cq - tfClipB.xy; bool cAX = tfClipB.z < 0.0;
+  float cw = abs(tfClipB.z), cd = tfClipB.w;
+  bool cHole = (cAX ? abs(ch.x) : abs(ch.y)) < cw && (cAX ? abs(ch.y) : abs(ch.x)) < cd;
+  if (cOut && !cIn && !cHole) discard;
+}
 if (tfCut.z > 0.5 && vPositionW.y > tfCut.w) {
   if (tfCut.z > 1.5) discard;
   vec2 tfc = floor(vPositionW.xz + 0.5) - tfCut.xy;
@@ -174,5 +198,91 @@ if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec
     if (on === true) { const was = cut.on; cut.on = 0; return was; }
     cut.on = on === false ? 1 : on; key = ''; return true;
   }
-  window.tablefolkCutaway = { update, half, clear, attach, suspend };
+  // ---- scenery between the follow camera and the player (2026-11-22) ----
+  // Trees, tall props and the trees past the board's edge fade where they stand between
+  // the follow camera and the player: per pixel, in their own materials (a plugin, like
+  // the walls' cut), so instanced and thin-instanced trees need nothing per copy and the
+  // draw calls stay as they are. A fragment within SEE_R of the segment from the camera
+  // to the player's chest is dithered away (soft edge from .5 R to R; the radius widens
+  // by SEE_NEAR toward the camera, so a canopy the camera sits in goes too); above the
+  // player's head fully, lower down (trunks) to SEE_TRUNK, so a trunk stays faintly there.
+  // The amount eases in and out (seeOn) as the follow camera starts or ends; not in
+  // first person or the free camera. Shadows are untouched (the shadow pass has no plugin).
+  const SEE_R = 2.4, SEE_NEAR = 1.4, SEE_TRUNK = .72;
+  const see = { on: 0, want: 0, cam: [0, 0, 0], head: [0, 0, 0] };
+  let SeePlugin = null;
+  function seeClass() {
+    if (SeePlugin) return SeePlugin;
+    const WGSL = BABYLON.ShaderLanguage?.WGSL;
+    SeePlugin = class extends BABYLON.MaterialPluginBase {
+      constructor(mat) { super(mat, 'TablefolkSee', 310, { TFSEE: false }); this._enable(true); }
+      getClassName() { return 'TablefolkSeePlugin'; }
+      isCompatible() { return true; }
+      prepareDefines(d) { d.TFSEE = true; }
+      getUniforms(lang) {
+        const ubo = [{ name: 'tfSeeCam', size: 4, type: 'vec4' }, { name: 'tfSeeHead', size: 4, type: 'vec4' }];
+        return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFSEE\nuniform vec4 tfSeeCam;\nuniform vec4 tfSeeHead;\n#endif\n' };
+      }
+      bindForSubMesh(ubo) { ubo.updateFloat4('tfSeeCam', see.cam[0], see.cam[1], see.cam[2], see.on); ubo.updateFloat4('tfSeeHead', see.head[0], see.head[1], see.head[2], SEE_R); }
+      getCustomCode(type, lang) {
+        if (type !== 'fragment') return null;
+        if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFSEE
+if (uniforms.tfSeeCam.w > 0.01) {
+  let tfA = uniforms.tfSeeCam.xyz; let tfBA = uniforms.tfSeeHead.xyz - tfA; let tfPA = fragmentInputs.vPositionW - tfA;
+  let tfT = clamp(dot(tfPA, tfBA) / max(dot(tfBA, tfBA), 1e-4), 0.0, 1.0);
+  let tfR = uniforms.tfSeeHead.w + (1.0 - tfT) * ${SEE_NEAR.toFixed(2)};
+  let tfD = length(tfPA - tfBA * tfT);
+  if (tfT < 0.99 && tfD < tfR) {
+    var tfK = (1.0 - smoothstep(tfR * 0.5, tfR, tfD)) * uniforms.tfSeeCam.w * (1.0 - smoothstep(0.95, 0.99, tfT));
+    if (fragmentInputs.vPositionW.y < uniforms.tfSeeHead.y + 0.7) { tfK = tfK * ${SEE_TRUNK.toFixed(2)}; }
+    let tfN = fract(52.9829189 * fract(dot(fragmentInputs.position.xy, vec2f(0.06711056, 0.00583715))));
+    if (tfK > tfN) { discard; }
+  }
+}
+#endif
+` };
+        return { CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFSEE
+if (tfSeeCam.w > 0.01) {
+  vec3 tfA = tfSeeCam.xyz, tfBA = tfSeeHead.xyz - tfA, tfPA = vPositionW - tfA;
+  float tfT = clamp(dot(tfPA, tfBA) / max(dot(tfBA, tfBA), 1e-4), 0.0, 1.0);
+  float tfR = tfSeeHead.w + (1.0 - tfT) * ${SEE_NEAR.toFixed(2)};
+  float tfD = length(tfPA - tfBA * tfT);
+  if (tfT < 0.99 && tfD < tfR) {
+    float tfK = (1.0 - smoothstep(tfR * 0.5, tfR, tfD)) * tfSeeCam.w * (1.0 - smoothstep(0.95, 0.99, tfT));
+    if (vPositionW.y < tfSeeHead.y + 0.7) tfK *= ${SEE_TRUNK.toFixed(2)};
+    float tfN = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    if (tfK > tfN) discard;
+  }
+}
+#endif
+` };
+      }
+    };
+    return SeePlugin;
+  }
+  const seen = new WeakSet();
+  // a material of scenery that may stand in the follow camera's way (app.js importPropAsset
+  // for items 1.4 m or taller, surroundings.js's trees); once per material (it compiles anew)
+  function seeThrough(mat) {
+    if (!mat || seen.has(mat) || window.TABLEFOLK_TABLETOP) return;
+    seen.add(mat);
+    if (mat.subMaterials) { for (const m of mat.subMaterials) seeThrough(m); return; }
+    try { new (seeClass())(mat); } catch (e) { console.warn('[cutaway] see plugin', mat.name, e); }
+  }
+  function seeFrame() {
+    const sc = state.scene, cam = sc?.activeCamera, g = state.playerAvatar;
+    see.want = g && cam && !state.firstPerson && state.cameraMode === 'follow' && !window.TABLEFOLK_NOSEE ? 1 : 0;   // TABLEFOLK_NOSEE: off (tests)
+    const dt = Math.min(.1, (sc.getEngine().getDeltaTime() || 16) / 1000);
+    see.on += (see.want - see.on) * Math.min(1, dt * 5); if (Math.abs(see.on - see.want) < .01) see.on = see.want;
+    if (!see.on || !g) return;
+    const c = cam.globalPosition || cam.position, p = g.root.position, top = state.terrainTopY ?? 0;
+    see.cam[0] = c.x; see.cam[1] = c.y; see.cam[2] = c.z;
+    see.head[0] = p.x; see.head[1] = top + (g.height || 1.2) * .7; see.head[2] = p.z;
+  }
+  function seeStart() { state.scene.onBeforeRenderObservable.add(seeFrame); }
+  if (window.TABLEFOLK_SCENE_READY) seeStart(); else addEventListener('tablefolk-scene-ready', seeStart, { once: true });
+
+  window.tablefolkCutaway = { update, half, clear, attach, suspend, seeThrough, get see() { return { on: see.on, cam: see.cam.slice(), head: see.head.slice() }; } };
 })();

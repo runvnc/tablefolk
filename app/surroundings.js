@@ -40,7 +40,7 @@
       const meshes = res.meshes.filter(m => m.getTotalVertices?.() > 0);
       for (const ag of res.animationGroups || []) ag.dispose();
       for (const m of meshes) { m.computeWorldMatrix(true); m.setParent(null); m.bakeCurrentTransformIntoVertices(); m.setEnabled(false); m.isPickable = false;
-        const mt = m.material; if (mt) { window.TABLEFOLK_LOOK?.matte?.(mt); mt.maxSimultaneousLights = 4;
+        const mt = m.material; if (mt) { window.TABLEFOLK_LOOK?.matte?.(mt); window.tablefolkCutaway?.seeThrough?.(mt); mt.maxSimultaneousLights = 4;
           // light quality: distant trees need no normal or roughness maps (~100 MiB of the light tier's memory was the surroundings)
           if (window.TABLEFOLK_GFX?.lite) for (const k of ['bumpTexture', 'metallicTexture']) if (mt[k]) { try { mt[k].dispose(); } catch {} mt[k] = null; } } }
       for (const m of res.meshes) if (!meshes.includes(m)) m.dispose();

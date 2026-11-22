@@ -234,9 +234,18 @@ or a world that is all one building (the roof would be the whole sky).
 
 Outside, a room someone lives or works in wears a real building (a house,
 the inn, the blacksmith, a stable or barn, the barracks, the mill) over its
-walls, chosen by what the room is and fitted to its size; step in (or walk a
-character in) and the building lifts to show the room, and whoever is inside
-is hidden while it stands. It is only a picture: the room's walls and door
+walls, chosen by what the room is and fitted to its size. Walk up to its
+door and, before the door swings open, the building opens round the doorway
+to show the room's own door, frame and walls there (the door you open is the
+one you see, and you can see in); once you are through, the rest of the
+building lifts to show the room, and it closes up again the same way as you
+leave. Whoever and whatever is inside (beds, chests, tables) is hidden while
+it stands closed, so nothing pokes out through its walls. A walk-in room has
+its own floor a few centimetres above the ground (planks, or the floor painted
+in it: a smithy's stone, a barn's earth), with a raised threshold at the door,
+so it never blends into the grass outside. In a generated village the barrels,
+crates and flowers by the doors stand two squares out, clear of a building's
+steps and porch. It is only a picture: the room's walls and door
 are what count. `"shells": false` keeps the plain roofs.
 
 Lanterns outdoors stand on timber posts; indoors and underground they hang

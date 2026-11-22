@@ -89,7 +89,9 @@ camera) starts as a high Diablo-style view behind the player and stays
 centred on you; drag to turn it around you (from any side, tilted within the
 free camera's limits) and it keeps that angle as you walk. Seen from behind,
 walls between it and the player drop to a stub; turned elsewhere, every wall
-stands at half height; a roof in the way turns see-through. C from first
+stands at half height; a roof in the way turns see-through, and trees and
+tall things between the camera and you fade away (the treetops fully, trunks
+to a faint ghost) and come back as the view clears. C from first
 person goes to the free camera. First person (C from the follow camera, or V)
 looks through the avatar's eyes, with walls at full height. A world can start
 in any of them (`"view"`: `overview`, `follow` or `first`); a door into a
@@ -183,8 +185,16 @@ about 1.5 GB, with no special browser flags; on an RTX 2060 beside the
 characters' model it speaks about ten times faster than real time, its first
 sound in under a second). It is the first choice: offered when the graphics
 card has 2 GB left beside the characters' model, and picked by itself once
-downloaded. If it runs out of graphics memory it gives way to the default
-voice for a day. The library's voices are cloned for it ahead of time.
+downloaded, but only when the graphics card has room for it beside the
+characters' model and the graphics (a heavier graphics quality leaves less:
+at high quality on a 6 GB card it is left out, and "Running now" says why).
+If a voice crashes, loses the graphics card or runs out of memory (or its
+lines stop sounding), it is not tried again this session: the next lighter
+voice takes over at once (ZONOS3-Mini or Breeze to Pocket-TTS small, Pocket-TTS
+to the browser's own speech) with a one-time message saying which voice now
+speaks and why, and Settings' "Running now" and "This device" show the
+reason. Picking it again in the Voice pane tries it again. Running out of
+graphics memory also keeps ZONOS3-Mini out for a day. The library's voices are cloned for it ahead of time.
 Its language is in the Voice pane: Automatic (the default) speaks English,
 and tells languages with their own script (Russian, Japanese, Chinese,
 Korean, Arabic, Hindi...) by their letters; pick French, German or any of
@@ -201,7 +211,25 @@ feature, which Chrome on Linux with NVIDIA hides unless it is started with
 `--enable-dawn-features=vulkan_enable_f16_on_nvidia`; without either the option is greyed
 out and says which is missing, and the worker checks both before the download; about 0.6x realtime on an RTX 2060, so best on bigger cards). Voices are placed in space. The slider beside the speaker
 button in the top bar (and the Voice pane) sets their volume. The Voice pane
-can clone a voice from a sample.
+can clone a voice from a sample. "The browser's own speech" is in the Engine
+list too (no download; not placed in space).
+
+**Sound effects** are placed in the world: a door, a blow, coins or a chest
+sound from where they happen, panned by where that is in your view and
+fainter with distance from you (half as loud at 3 m, silent past 20 m), so
+other people's doors across the village are faint or silent. Doors are about
+as loud as a footstep. Settings → "Sound and bubbles" has the effects'
+volume (voices have their own slider).
+
+**Activity bubbles**: besides speech, characters show what they are doing
+("Bram eats the bread") in small, quiet bubbles. By default (Settings →
+"Activity bubbles: nearby") only for the one you talk to or have selected,
+or someone within about 6 m and on screen, at most one every few seconds
+each (a newer one replaces it); routine work you can see in their clips
+(making bread at the oven, sitting, lying down, getting up) shows nothing
+unless it is the one you talk to. A fight, a theft, a raid or anything to or
+about you always shows. "all" shows every one, "off" only those that always
+show. Speech is never hidden, and the Messages pane keeps everything.
 
 ## Graphics
 

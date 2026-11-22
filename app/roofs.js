@@ -16,7 +16,9 @@
  * whose doorway it stands in) fades away (except in first person, where it is
  * the ceiling); with the follow camera, a roof
  * between the camera and the player goes see-through so the player is never
- * lost behind it. The free camera can't peek: roofs stay on. What the
+ * lost behind it. The free camera can't peek: roofs stay on. A building shell
+ * opens round its doorway as the player walks up (before the door swings: doorway())
+ * and lifts only once the player is through. What the
  * characters inside say still shows above the roof (bubbles).
  * With "reveal": "rooms" a room the player has not seen into keeps its roof
  * (darkness.js roomRevealed), even between the camera and the player.
@@ -87,7 +89,8 @@
       r.fill = cells.length / ((r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1));
       // standing in its doorway counts as inside
       r.here = new Set(cells);
-      for (const c of cells) { const [x, z] = c.split(',').map(Number); for (const n of [cellKey(x + 1, z), cellKey(x - 1, z), cellKey(x, z + 1), cellKey(x, z - 1)]) if (D.has(n)) r.here.add(n); }
+      r.doors = [];   // its doorways: [x, z, nx, nz] (n: out of the room)
+      for (const c of cells) { const [x, z] = c.split(',').map(Number); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = cellKey(x + dx, z + dz); if (D.has(n)) { r.here.add(n); if (!r.doors.some(d => d[0] === x + dx && d[1] === z + dz)) r.doors.push([x + dx, z + dz, dx, dz]); } } }
       rooms.push(r);
     }
     return { rooms, outsideShare: ground ? outside / ground : 0, outside: out };
@@ -332,18 +335,34 @@
         getClassName() { return 'TfWinGlowPlugin'; }
         isCompatible() { return true; }
         prepareDefines(d) { d.TFWINGLOW = true; }
-        getUniforms(lang) { const ubo = [{ name: 'tfNight', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfNight;\n' }; }
-        bindForSubMesh(ubo) { ubo.updateFloat4('tfNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); }
+        getUniforms(lang) { const ubo = [{ name: 'tfNight', size: 4, type: 'vec4' }, { name: 'tfHole', size: 4, type: 'vec4' }, { name: 'tfHoleB', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfNight;\nuniform vec4 tfHole;\nuniform vec4 tfHoleB;\n' }; }
+        bindForSubMesh(ubo) { ubo.updateFloat4('tfNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); ubo.updateFloat4('tfHole', hole.x, hole.z, hole.alongX, hole.k); ubo.updateFloat4('tfHoleB', HOLE_W, HOLE_D, hole.yTop, 0); }
         getCustomCode(type, lang) {
           if (type !== 'fragment') return null;
-          if (lang === WGSL) return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+          // the doorway being approached (doorway(), below): the shell dithered away around it
+          const holeW = `
+if (uniforms.tfHole.w > 0.002) {
+  let hp = fragmentInputs.vPositionW.xz - uniforms.tfHole.xy;
+  let ha = select(abs(hp.y), abs(hp.x), uniforms.tfHole.z > 0.5); let hd = select(abs(hp.x), abs(hp.y), uniforms.tfHole.z > 0.5);
+  let hn = fract(52.9829189 * fract(dot(fragmentInputs.position.xy, vec2f(0.06711056, 0.00583715))));
+  if (ha < uniforms.tfHoleB.x && hd < uniforms.tfHoleB.y && fragmentInputs.vPositionW.y < uniforms.tfHoleB.z && uniforms.tfHole.w > hn) { discard; }
+}
+`, holeG = `
+if (tfHole.w > 0.002) {
+  vec2 hp = vPositionW.xz - tfHole.xy;
+  float ha = tfHole.z > 0.5 ? abs(hp.x) : abs(hp.y), hd = tfHole.z > 0.5 ? abs(hp.y) : abs(hp.x);
+  float hn = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  if (ha < tfHoleB.x && hd < tfHoleB.y && vPositionW.y < tfHoleB.z && tfHole.w > hn) discard;
+}
+`;
+          if (lang === WGSL) return { CUSTOM_FRAGMENT_MAIN_BEGIN: holeW, CUSTOM_FRAGMENT_BEFORE_FOG: `
 if (uniforms.tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   let a = surfaceAlbedo; let l = dot(a, vec3f(0.3, 0.59, 0.11));
   let g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
   finalColor = vec4f(finalColor.rgb + vec3f(1.0, 0.58, 0.24) * g * uniforms.tfNight.x * 2.2, finalColor.a);
 }
 ` };
-          return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+          return { CUSTOM_FRAGMENT_MAIN_BEGIN: holeG, CUSTOM_FRAGMENT_BEFORE_FOG: `
 if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   vec3 a = surfaceAlbedo; float l = dot(a, vec3(0.3, 0.59, 0.11));
   float g = (1.0 - smoothstep(0.035, 0.085, l)) * smoothstep(-0.01, 0.02, a.b - a.r * 0.9);
@@ -418,30 +437,84 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
       const head = new BABYLON.Vector3(p.x, (state.terrainTopY ?? 0) + .9, p.z), from = cam.globalPosition || cam.position, dir = head.subtract(from), len = dir.length();
       ray = new BABYLON.Ray(from, dir.normalize(), len);
     }
+    const dw = doorway(p, dt);
     for (const r of roofs) {
-      const inside = myCell && r.room.here.has(myCell);
+      // a shell goes only once you are through its door (in the room); a roof also in its doorway
+      const inside = myCell && (r.shell ? r.room.cells.has(myCell) : r.room.here.has(myCell));
       const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.parts.some(m => ray.intersectsMesh(m, false).hit));
       // in first person the roof overhead stays: it is the ceiling (a shell goes: its walls would hide the room)
       // "reveal": "rooms" (darkness.js): a room not yet seen into keeps its roof on, even in the camera's way
       const hidden = !inside && window.tablefolkDark?.roomRevealed && !window.tablefolkDark.roomRevealed(r.room);
       r.target = lifted || (inside && (!state.firstPerson || r.shell)) ? 0 : blocks && !hidden ? .22 : 1;
-      if (r.shell) shellHide(r, r.target > .5);
       if (Math.abs(r.alpha - r.target) > .005) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7);
         // per roof (the materials are shared between roofs): the meshes' visibility
         for (const m of r.parts) m.visibility = r.alpha > .99 ? 1 : r.alpha;
         r.root.setEnabled(r.alpha > .02);
       }
+      // the room's own walls, door frame and door under a standing shell: hidden, except while its
+      // doorway is open (dw) or the shell is fading (cross-fade, nothing pops)
+      if (r.shell) shellHide(r, r.alpha > .98 && r.target > .5 && !(dw === r && hole.k > .01), dw === r);
     }
+    // the room walls' outer halves are clipped while its shell stands round an open doorway (cutaway.js)
+    const clip = dw && dw.alpha > .02 && hole.k > .01;
+    window.TABLEFOLK_ROOM_CLIP = clip ? { on: 1, x0: dw.room.x0 - 1, z0: dw.room.z0 - 1, x1: dw.room.x1 + 1, z1: dw.room.z1 + 1, hx: hole.x, hz: hole.z, alongX: hole.alongX, w: HOLE_W, d: HOLE_D } : null;
+  }
+  // ---- doorways (2026-11-22) ----
+  // Walking up to a shelled house's door (within DOOR_NEAR squares outside it, or in the
+  // doorway): before the door swings open (app.js opens it within 1.7 m) the shell is dithered
+  // away round that doorway (HOLE_W either side along the wall, HOLE_D deep, up to the wall
+  // tops) over ~.25 s, and the room's own walls, frame and door show there: the door you
+  // open is the one you see. The rest of the shell fades only once you are through (in a room
+  // square). While the hole is open the room walls' outer halves are clipped (cutaway.js,
+  // TABLEFOLK_ROOM_CLIP) so they never poke through the shell elsewhere; their inner faces
+  // still show through the door. Leaving, the same in reverse.
+  const DOOR_NEAR = 3, HOLE_W = 1.5, HOLE_D = .95;
+  const hole = { x: 0, z: 0, alongX: 1, k: 0, yTop: 0, r: null };
+  window.TABLEFOLK_DOORWAY = hole;
+  function doorway(p, dt) {
+    let best = null, bd = 1e9;
+    if (p && !lifted) for (const r of roofs) {
+      if (!r.shell || !r.box || !r.room.doors) continue;
+      for (const [x, z, nx, nz] of r.room.doors) {
+        const rx = p.x - x, rz = p.z - z, out = rx * nx + rz * nz, side = Math.abs(rx * nz - rz * nx);
+        if (out < -.55 || out > DOOR_NEAR || side > 1.4) continue;
+        const d = Math.hypot(rx, rz); if (d < bd) { bd = d; best = { r, x, z, alongX: nz !== 0 ? 1 : 0 }; }
+      }
+    }
+    const want = best ? 1 : 0;
+    if (best && (!hole.r || hole.k < .02 || hole.r === best.r && hole.x === best.x && hole.z === best.z)) { hole.r = best.r; hole.x = best.x; hole.z = best.z; hole.alongX = best.alongX; }
+    else if (best) { hole.k = Math.max(0, hole.k - dt * 8); return hole.r; }   // another door: close this one first
+    hole.k += (want - hole.k) * Math.min(1, dt * 9); if (hole.k < .005 && !want) { hole.k = 0; hole.r = null; } if (hole.k > .995) hole.k = 1;
+    hole.yTop = (state.terrainTopY ?? 0) + wallH() + .06;
+    return hole.k > 0 ? hole.r : null;
   }
   // characters inside a standing shell are indoors: hidden (and shown again when it lifts)
-  function shellHide(r, hide) {
+  function shellHide(r, hide, open = false) {
     // the room's own walls, frames and door go too while the shell stands (walls.js draws them per room)
-    if (r.box) for (const m of window.tablefolkWalls?.roomMeshes?.(r.room) || []) if (!m.isDisposed?.() && m.isEnabled() === hide) m.setEnabled(!hide);
+    if (r.box) for (const m of window.tablefolkWalls?.roomMeshes?.(r.room) || []) {
+      if (m.isDisposed?.()) continue;
+      if (!m._tfClip && m.material) { m._tfClip = true; window.tablefolkCutaway?.attach?.(m.material); }   // the doorway clip lives in the walls' cut plugin
+      if (m.isEnabled() === hide) m.setEnabled(!hide);
+    }
+    // the characters inside: hidden while it stands, seen through an open doorway
+    const hideFolk = hide || (r.alpha > .98 && r.target > .5 && !open);
+    // and the things in it (a bed by the front wall poked out through the model's inset wall),
+    // checked when that changes and once a second (things get carried)
+    const now = performance.now();
+    if (r._objHide !== hideFolk || now - (r._objAt || 0) > 1000) {
+      r._objHide = hideFolk; r._objAt = now;
+      for (const o of window.tablefolk?.getObjects?.() || []) {
+        const m = o.mesh; if (!m || m.isDisposed?.() || o.type === 'light') continue;
+        const inRoom = r.room.cells.has(cellKey(Math.round(o.x), Math.round(o.z)));
+        if (hideFolk && inRoom && !m._shellHidden) { m._shellHidden = r; if (m.isEnabled()) m.setEnabled(false); }
+        else if (m._shellHidden === r && (!hideFolk || !inRoom)) { m._shellHidden = null; if (!m._fogHidden) m.setEnabled(true); }
+      }
+    }
     for (const g of state.characters || []) {
       const q = posOf(g), inRoom = r.room.cells.has(cellKey(Math.round(q.x), Math.round(q.z)));
-      if (hide && inRoom && !g._shellHidden) { g._shellHidden = r; if (!g._fogHidden) g.root.setEnabled(false); }
-      else if (g._shellHidden === r && (!hide || !inRoom)) { g._shellHidden = null; if (!g._fogHidden) g.root.setEnabled(true); }
+      if (hideFolk && inRoom && !g._shellHidden) { g._shellHidden = r; if (!g._fogHidden) g.root.setEnabled(false); }
+      else if (g._shellHidden === r && (!hideFolk || !inRoom)) { g._shellHidden = null; if (!g._fogHidden) g.root.setEnabled(true); }
     }
   }
   function toggle() {
@@ -463,5 +536,5 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   }
   // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
   function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
-  window.tablefolkRoofs = { windowGlow, rebuild, toggle, shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
+  window.tablefolkRoofs = { windowGlow, rebuild, toggle, doorway: () => ({ k: hole.k, x: hole.x, z: hole.z, room: hole.r?.room || null }), shells: () => roofs.filter(r => r.shell).map(r => ({ model: r.shell, room: r.room, alpha: r.alpha, target: r.target, walls: (window.tablefolkWalls?.roomMeshes?.(r.room) || []).filter(m => m.isEnabled()).length })), findRooms: plan, planned, roofed: () => roofs.map(r => r.room), get rooms() { return roofs.map(r => r.room); } };
 })();
