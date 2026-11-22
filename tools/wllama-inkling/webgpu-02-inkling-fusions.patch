@@ -1,0 +1,1272 @@
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
+new file mode 100644
+index 0000000..72d21bc
+--- /dev/null
++++ b/ggml/src/ggml-webgpu/ggml-webgpu-fuse.hpp
+@@ -0,0 +1,1071 @@
++// Fused kernels for chains of small ops (Inkling 2 glue: row L2 clips, loop controllers, short convolutions with their
++// state store, depth mixes, SiTU, the MoE expert sum). At batch size 1 each graph node is one dispatch, and the cost
++// of a dispatch (encoding, the barrier after it, a mostly idle GPU) dwarfs its arithmetic: Inkling 2 Mini runs ~8,250
++// dispatches a token. Each matcher below recognises one chain in the stock llama.cpp graph and runs it as one kernel.
++// The chains and the idea follow the CUDA fusions of github.com/nahcmon/inkling-fast-llama.cpp (MIT) and
++// github.com/realugbun/llama.cpp (branch inkling2-speed); the matchers here are written for the node order of the
++// stock graph and the kernels are WGSL, not bit-exact with the unfused ops (fp32 throughout).
++//
++// Included by ggml-webgpu.cpp after the helpers it uses. GGML_WEBGPU_FUSE=0 (env, or -D) turns it off;
++// GGML_WEBGPU_FUSE_MASK=bits selects fusion types (bit = wf_type).
++//
++// Bindings: every tensor of a fused kernel is addressed through at most 4 storage bindings, one per wgpu buffer the
++// tensors live in, each bound over the merged range of its tensors (so tensors that share a 256-byte window, or
++// alias, never need two overlapping bindings). Tensor slot k has its binding in param 2k and its byte offset from the
++// binding's start in param 2k+1; the kernel's own parameters follow.
++
++#pragma once
++
++enum wf_type {
++    WF_CLIP = 0,      // [MUL] SQR SUM_ROWS SQRT SCALE FILL DIV CLAMP MUL                    row L2 clip
++    WF_CTRL_OUT,      // MUL_MAT(F) TANH MUL SUB MUL_MAT(G) TANH MUL ADD                     loop controller output
++    WF_NORM2CAT,      // [CONT] RMS_NORM [CONT] RMS_NORM CONCAT                              loop controller input
++    WF_CONV,          // [CONCAT VIEW VIEW CPY] SSM_CONV RESHAPE ADD SCALE [ADD]             short conv (+ state store)
++    WF_CAT_STATE,     // CONCAT VIEW VIEW CPY                                                conv input + state store
++    WF_SITU,          // SCALE TANH SCALE SIGMOID MUL SCALE TANH SCALE MUL                   SiTU of expert gate/up
++    WF_MOE_SUM,       // MUL VIEW*E ADD*(E-1)                                                weighted expert sum
++    WF_MIX,           // RMS_NORM TRANSPOSE CONT REPEAT MUL_MAT SOFT_MAX MUL_MAT             attention over depth
++    WF_COUNT
++};
++
++static const char * wf_names[WF_COUNT] = { "clip", "ctrl_out", "norm2cat", "conv", "cat_state", "situ", "moe_sum", "mix" };
++
++#define WF_MAX_SLOTS 8
++
++struct wf_call {
++    wf_type             type;
++    int                 n_nodes = 0;                  // nodes replaced, from the matched one
++    const ggml_tensor * slot[WF_MAX_SLOTS] = {};      // tensors by kernel slot
++    std::vector<uint32_t> p;                          // kernel parameters after the slot words
++    uint32_t            wg_x = 1, wg_y = 1;
++};
++
++static bool wf_is_noop(const ggml_tensor * t) {
++    return ggml_op_is_empty(t->op) || ggml_is_empty(t);
++}
++
++static uint32_t wf_f(float v) {
++    uint32_t u;
++    memcpy(&u, &v, sizeof(u));
++    return u;
++}
++
++// byte range of a tensor (views included) in its buffer
++static size_t wf_off(const ggml_tensor * t) {
++    return ggml_webgpu_tensor_offset(t);
++}
++
++static bool wf_overlap(const ggml_tensor * a, const ggml_tensor * b) {
++    if (!a || !b || a->buffer != b->buffer) {
++        return false;
++    }
++    const size_t a0 = wf_off(a), b0 = wf_off(b);
++    return a0 < b0 + ggml_nbytes(b) && b0 < a0 + ggml_nbytes(a);
++}
++
++// dst may share memory with src only as the very same elements (each thread reads before it writes)
++static bool wf_same_or_disjoint(const ggml_tensor * dst, const ggml_tensor * src) {
++    if (!wf_overlap(dst, src)) {
++        return true;
++    }
++    return wf_off(dst) == wf_off(src) && ggml_are_same_shape(dst, src) && ggml_are_same_stride(dst, src);
++}
++
++static bool wf_f32_rows(const ggml_tensor * t) {
++    return t && t->type == GGML_TYPE_F32 && t->nb[0] == sizeof(float);
++}
++
++// The window [i, end] of the graph that a fusion replaces: its real (computing) nodes are exactly `real`; its no-op
++// nodes are views either of a fused node (then fused too) or of something outside (left alone). Every fused node
++// except the outputs must be used only inside the fusion.
++static bool wf_window_ok(const ggml_cgraph * cgraph, int i, int end, std::initializer_list<const ggml_tensor *> outputs) {
++    auto is_member = [&](const ggml_tensor * t) {
++        for (int k = i; k <= end; k++) {
++            if (cgraph->nodes[k] == t) {
++                return true;
++            }
++        }
++        return false;
++    };
++    std::vector<char> member(end - i + 1, 0);
++    for (int k = i; k <= end; k++) {
++        const ggml_tensor * n = cgraph->nodes[k];
++        if (!wf_is_noop(n)) {
++            member[k - i] = 1;
++            continue;
++        }
++        // a no-op is fused when it views a fused node
++        for (const ggml_tensor * v = n->view_src ? n->view_src : n->src[0]; v; v = v->view_src) {
++            if (is_member(v)) {
++                for (int q = i; q < k; q++) {
++                    if (cgraph->nodes[q] == v && member[q - i]) {
++                        member[k - i] = 1;
++                    }
++                }
++            }
++            if (member[k - i]) {
++                break;
++            }
++        }
++        if (!member[k - i] && n->src[0] && is_member(n->src[0])) {
++            for (int q = i; q < k; q++) {
++                if (cgraph->nodes[q] == n->src[0] && member[q - i]) {
++                    member[k - i] = 1;
++                }
++            }
++        }
++    }
++    for (int k = i; k <= end; k++) {
++        if (!member[k - i]) {
++            continue;
++        }
++        const ggml_tensor * n = cgraph->nodes[k];
++        if (!wf_is_noop(n) && (n->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
++            return false;
++        }
++        bool is_out = false;
++        for (const ggml_tensor * o : outputs) {
++            is_out |= (o == n);
++        }
++        if (is_out) {
++            continue;
++        }
++        if (n->flags & GGML_TENSOR_FLAG_OUTPUT) {
++            return false;
++        }
++        int uses = 0;
++        for (int q = k + 1; q <= end; q++) {
++            if (!member[q - i]) {
++                continue;
++            }
++            for (int s = 0; s < GGML_MAX_SRC; s++) {
++                uses += cgraph->nodes[q]->src[s] == n;
++            }
++        }
++        if (uses != ggml_node_get_use_count(cgraph, k)) {
++            return false;
++        }
++    }
++    return true;
++}
++
++// the next n real nodes from i (no-ops skipped); idx gets their indices, returns false past the graph's end
++static bool wf_real(const ggml_cgraph * cgraph, int i, int n, int * idx, std::initializer_list<ggml_op> ops = {}) {
++    int k = i;
++    auto op = ops.begin();
++    for (int j = 0; j < n; j++) {
++        while (k < cgraph->n_nodes && wf_is_noop(cgraph->nodes[k])) {
++            k++;
++        }
++        if (k >= cgraph->n_nodes) {
++            return false;
++        }
++        if (op != ops.end()) {
++            if (cgraph->nodes[k]->op != *op) {
++                return false;
++            }
++            ++op;
++        }
++        idx[j] = k++;
++    }
++    return true;
++}
++
++// the tensor a no-op chain views, through reshapes etc.
++static const ggml_tensor * wf_base(const ggml_tensor * t) {
++    while (t && wf_is_noop(t) && t->src[0] && (t->op == GGML_OP_RESHAPE || t->op == GGML_OP_VIEW)) {
++        if (t->op == GGML_OP_VIEW && t->view_offs != 0) {
++            break;
++        }
++        if (!ggml_is_contiguous(t) || !ggml_is_contiguous(t->src[0])) {
++            break;
++        }
++        t = t->src[0];
++    }
++    return t;
++}
++
++/* ---------------------------------------------------------------------------------------------------------------- */
++/* WGSL                                                                                                             */
++
++static const char * wf_wgsl_prelude = R"(
++@group(0) @binding(0) var<storage, read_write> b0: array<u32>;
++@group(0) @binding(1) var<storage, read_write> b1: array<u32>;
++@group(0) @binding(2) var<storage, read_write> b2: array<u32>;
++@group(0) @binding(3) var<storage, read_write> b3: array<u32>;
++struct Params { v: array<vec4<u32>, 16>, };
++@group(0) @binding(4) var<uniform> P: Params;
++fn pu(i: u32) -> u32 { return P.v[i >> 2u][i & 3u]; }
++fn pf(i: u32) -> f32 { return bitcast<f32>(pu(i)); }
++fn ldw(g: u32, w: u32) -> u32 {
++    switch g {
++        case 0u: { return b0[w]; }
++        case 1u: { return b1[w]; }
++        case 2u: { return b2[w]; }
++        default: { return b3[w]; }
++    }
++}
++fn stw(g: u32, w: u32, v: u32) {
++    switch g {
++        case 0u: { b0[w] = v; }
++        case 1u: { b1[w] = v; }
++        case 2u: { b2[w] = v; }
++        default: { b3[w] = v; }
++    }
++}
++fn ldf(k: u32, byte: u32) -> f32 { return bitcast<f32>(ldw(pu(2u*k), (pu(2u*k + 1u) + byte) >> 2u)); }
++fn stf(k: u32, byte: u32, v: f32) { stw(pu(2u*k), (pu(2u*k + 1u) + byte) >> 2u, bitcast<u32>(v)); }
++fn ldh(k: u32, byte: u32) -> f32 {
++    let a = pu(2u*k + 1u) + byte;
++    let h = unpack2x16float(ldw(pu(2u*k), a >> 2u));
++    return select(h.x, h.y, (a & 2u) != 0u);
++}
++fn ldi8(k: u32, byte: u32) -> f32 {
++    let a = pu(2u*k + 1u) + byte;
++    let w = ldw(pu(2u*k), a >> 2u);
++    return f32(bitcast<i32>(w << (24u - 8u*(a & 3u))) >> 24u);
++}
++fn tanh_s(x: f32) -> f32 { return tanh(clamp(x, -15.0, 15.0)); }
++fn sigmoid_s(x: f32) -> f32 { return 1.0 / (1.0 + exp(-clamp(x, -80.0, 80.0))); }
++fn wid_lin(wid: vec3<u32>, nwg: vec3<u32>) -> u32 { return wid.x + wid.y * nwg.x; }
++)";
++
++// CLIP: slots x0 w1 dst2; p: ncols nrows ne1 w_ne1 has_w s0 s1 c lo hi w_nb1 (from 6)
++static const char * wf_wgsl_clip = R"(
++var<workgroup> red: array<f32, 128>;
++@compute @workgroup_size(128)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let row = wid_lin(wid, nwg);
++    let ncols = pu(6u);
++    if (row >= pu(7u)) { return; }
++    let has_w = pu(10u) != 0u;
++    let wrow = (row % pu(8u)) % pu(9u);
++    var s = 0.0;
++    for (var c = lid.x; c < ncols; c += 128u) {
++        var a = ldf(0u, (row*ncols + c)*4u);
++        if (has_w) { a = a * ldf(1u, wrow*pu(16u) + c*4u); }
++        s += a*a;
++    }
++    red[lid.x] = s;
++    workgroupBarrier();
++    for (var o = 64u; o > 0u; o >>= 1u) {
++        if (lid.x < o) { red[lid.x] += red[lid.x + o]; }
++        workgroupBarrier();
++    }
++    let norm = sqrt(red[0])*pf(11u) + pf(12u);
++    let factor = clamp(pf(13u) / norm, pf(14u), pf(15u));
++    for (var c = lid.x; c < ncols; c += 128u) {
++        var a = ldf(0u, (row*ncols + c)*4u);
++        if (has_w) { a = a * ldf(1u, wrow*pu(16u) + c*4u); }
++        stf(2u, (row*ncols + c)*4u, a*factor);
++    }
++}
++)";
++
++// CTRL_OUT: slots h0 F1 G2 x3 m4 dst5; p (from 12): n rank T f_nb1 g_nb1 h_nb1 x_nb1 m_nb1 d_nb1 ftype gtype
++//   y = (x - tanh(F h)*x) + tanh(G h)*m;  types: 0 f32, 1 f16, 2 q8_0
++static const char * wf_wgsl_ctrl_out = R"(
++fn wdot(k: u32, wtype: u32, row: u32, ht: u32, rank: u32) -> f32 {
++    var s = 0.0;
++    if (wtype == 0u) {
++        for (var j = 0u; j < rank; j++) { s += ldf(k, row + j*4u) * ldf(0u, ht + j*4u); }
++    } else if (wtype == 1u) {
++        for (var j = 0u; j < rank; j++) { s += ldh(k, row + j*2u) * ldf(0u, ht + j*4u); }
++    } else {
++        for (var b = 0u; b < rank/32u; b++) {
++            let blk = row + b*34u;
++            let d = ldh(k, blk);
++            var t = 0.0;
++            for (var j = 0u; j < 32u; j++) { t += ldi8(k, blk + 2u + j) * ldf(0u, ht + (b*32u + j)*4u); }
++            s += d*t;
++        }
++    }
++    return s;
++}
++@compute @workgroup_size(64)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let i = wid_lin(wid, nwg)*64u + lid.x;
++    let n = pu(12u);
++    if (i >= n*pu(14u)) { return; }
++    let r = i % n;
++    let t = i / n;
++    let ht = t*pu(17u);
++    let f = wdot(1u, pu(21u), r*pu(15u), ht, pu(13u));
++    let g = wdot(2u, pu(22u), r*pu(16u), ht, pu(13u));
++    let x = ldf(3u, t*pu(18u) + r*4u);
++    let m = ldf(4u, t*pu(19u) + r*4u);
++    stf(5u, t*pu(20u) + r*4u, (x - tanh_s(f)*x) + tanh_s(g)*m);
++}
++)";
++
++// NORM2CAT: slots a0 b1 dst2 ca3 cb4; p (from 10): n T a_nb1 b_nb1 d_nb1 ca_nb1 cb_nb1 flags eps_a eps_b
++//   dst[:n] = norm_a ? rms_norm(a) : a, dst[n:] = norm_b ? rms_norm(b) : b; flags: 1 norm a, 2 norm b, 4 write ca=a, 8 cb=b
++static const char * wf_wgsl_norm2cat = R"(
++var<workgroup> ra: array<f32, 128>;
++var<workgroup> rb: array<f32, 128>;
++@compute @workgroup_size(128)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let t = wid_lin(wid, nwg);
++    let n = pu(10u);
++    if (t >= pu(11u)) { return; }
++    let fl = pu(17u);
++    var sa = 0.0;
++    var sb = 0.0;
++    for (var c = lid.x; c < n; c += 128u) {
++        let a = ldf(0u, t*pu(12u) + c*4u);
++        let b = ldf(1u, t*pu(13u) + c*4u);
++        sa += a*a;
++        sb += b*b;
++    }
++    ra[lid.x] = sa;
++    rb[lid.x] = sb;
++    workgroupBarrier();
++    for (var o = 64u; o > 0u; o >>= 1u) {
++        if (lid.x < o) { ra[lid.x] += ra[lid.x + o]; rb[lid.x] += rb[lid.x + o]; }
++        workgroupBarrier();
++    }
++    let qa = select(1.0, inverseSqrt(ra[0]/f32(n) + pf(18u)), (fl & 1u) != 0u);
++    let qb = select(1.0, inverseSqrt(rb[0]/f32(n) + pf(19u)), (fl & 2u) != 0u);
++    for (var c = lid.x; c < n; c += 128u) {
++        let a = ldf(0u, t*pu(12u) + c*4u);
++        let b = ldf(1u, t*pu(13u) + c*4u);
++        stf(2u, t*pu(14u) + c*4u, a*qa);
++        stf(2u, t*pu(14u) + (n + c)*4u, b*qb);
++        if ((fl & 4u) != 0u) { stf(3u, t*pu(15u) + c*4u, a); }
++        if ((fl & 8u) != 0u) { stf(4u, t*pu(16u) + c*4u, b); }
++    }
++}
++)";
++
++// CONV: slots past0 cur1 w2 r3 res4 dst5 cell6 x7; p (from 16):
++//   16 mode (0 full: past/cur -> dst (+cell), 1 conv: x -> dst, 2 cat: past/cur -> x + cell)
++//   17 d  18 C  19 T  20 S  21 past_nb1 22 past_nb2 23 cur_nb0 24 cur_nb1 25 cur_nb2 26 w_nb1
++//   27 cell_nb1 28 x_nb1 29 x_nb2 30 s0 31 s1 32 has_res 33 has_cell
++//   x = [past, cur] along dim 0; y[c,t,s] = (r + sum_k x[t+k,c,s]*w[k,c])*s0 + s1 (+ res); cell[s][c*(d-1)+k] = x[T+k,c,s]
++static const char * wf_wgsl_conv = R"(
++fn x_at(j: u32, c: u32, s: u32) -> f32 {
++    let d1 = pu(17u) - 1u;
++    if (pu(16u) == 1u) { return ldf(7u, s*pu(29u) + c*pu(28u) + j*4u); }
++    if (j < d1) { return ldf(0u, s*pu(22u) + c*pu(21u) + j*4u); }
++    return ldf(1u, s*pu(25u) + c*pu(24u) + (j - d1)*pu(23u));
++}
++@compute @workgroup_size(256)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let i = wid_lin(wid, nwg)*256u + lid.x;
++    let mode = pu(16u);
++    let d = pu(17u);
++    let C = pu(18u);
++    let T = pu(19u);
++    let S = pu(20u);
++    if (mode == 2u) {
++        // one thread per (j, c, s) of x
++        let L = d - 1u + T;
++        if (i >= L*C*S) { return; }
++        let j = i % L;
++        let c = (i / L) % C;
++        let s = i / (L*C);
++        let v = x_at(j, c, s);
++        stf(7u, s*pu(29u) + c*pu(28u) + j*4u, v);
++        if (j >= T) { stf(6u, s*pu(27u) + (c*(d - 1u) + (j - T))*4u, v); }
++        return;
++    }
++    if (i >= C*T*S) { return; }
++    let c = i % C;
++    let t = (i / C) % T;
++    let s = i / (C*T);
++    var sum = 0.0;
++    for (var k = 0u; k < d; k++) { sum += x_at(t + k, c, s) * ldf(2u, c*pu(26u) + k*4u); }
++    var y = (ldf(3u, i*4u) + sum)*pf(30u) + pf(31u);
++    if (pu(32u) != 0u) { y = ldf(4u, i*4u) + y; }
++    if (pu(33u) != 0u && t == 0u) {
++        for (var k = 0u; k + 1u < d; k++) { stf(6u, s*pu(27u) + (c*(d - 1u) + k)*4u, x_at(T + k, c, s)); }
++    }
++    stf(5u, i*4u, y);
++}
++)";
++
++// SITU: slots g0 u1 dst2; p (from 6): nf rows ne1 g_nb1 g_nb2 u_nb1 u_nb2 a0 a1 b0 b1 c0 c1 e0 e1
++//   y = ((tanh(g*a0 + a1)*b0 + b1) * sigmoid(g)) * (tanh(u*c0 + c1)*e0 + e1)
++static const char * wf_wgsl_situ = R"(
++@compute @workgroup_size(256)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let i = wid_lin(wid, nwg)*256u + lid.x;
++    let nf = pu(6u);
++    if (i >= nf*pu(7u)) { return; }
++    let f = i % nf;
++    let row = i / nf;
++    let e = row % pu(8u);
++    let t = row / pu(8u);
++    let g = ldf(0u, t*pu(10u) + e*pu(9u) + f*4u);
++    let u = ldf(1u, t*pu(12u) + e*pu(11u) + f*4u);
++    let lg = (tanh_s(g*pf(13u) + pf(14u))*pf(15u) + pf(16u)) * sigmoid_s(g);
++    let lu = tanh_s(u*pf(17u) + pf(18u))*pf(19u) + pf(20u);
++    stf(2u, i*4u, lg*lu);
++}
++)";
++
++// MOE_SUM: slots down0 w1 dst2; p (from 6): C E T d_nb1 d_nb2 w_nb1 w_nb2 dst_nb1
++//   y[c,t] = sum_e down[c,e,t]*w[e,t]
++static const char * wf_wgsl_moe_sum = R"(
++@compute @workgroup_size(256)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let i = wid_lin(wid, nwg)*256u + lid.x;
++    let C = pu(6u);
++    if (i >= C*pu(8u)) { return; }
++    let c = i % C;
++    let t = i / C;
++    var s = 0.0;
++    for (var e = 0u; e < pu(7u); e++) {
++        s += ldf(0u, t*pu(10u) + e*pu(9u) + c*4u) * ldf(1u, t*pu(12u) + e*pu(11u));
++    }
++    stf(2u, t*pu(13u) + c*4u, s);
++}
++)";
++
++// MIX: slots st0 q1 dst2; p (from 6): n L Q T st_nb1 st_nb2 q_nb1 d_nb1 d_nb2 eps sm_scale nchunk
++//   per token: z_l = rms_norm(st_l), w_q = softmax_l(sm_scale*<z_l, q_q>), y_q = sum_l w_ql z_l
++//   workgroups of 128 per (output chunk of 128, token); each recomputes the (small) scores; L <= 16, Q <= 4
++static const char * wf_wgsl_mix = R"(
++var<workgroup> part: array<f32, 2048>;   // 16 sums x 128 threads
++var<workgroup> wsh: array<f32, 80>;
++@compute @workgroup_size(128)
++fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nwg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
++    let nch = pu(17u);
++    let lin = wid_lin(wid, nwg);
++    let t = lin / nch;
++    let chunk = lin % nch;
++    let n = pu(6u);
++    let L = pu(7u);
++    let Q = pu(8u);
++    if (t >= pu(9u)) { return; }
++    let tid = lid.x;
++    var v: array<f32, 80>;   // 0..15 sum of squares per state, 16 + q*16 + l dots
++    for (var k = 0u; k < 80u; k++) { v[k] = 0.0; }
++    for (var c = tid; c < n; c += 128u) {
++        var qv: array<f32, 4>;
++        for (var q = 0u; q < Q; q++) { qv[q] = ldf(1u, q*pu(12u) + c*4u); }
++        for (var l = 0u; l < L; l++) {
++            let x = ldf(0u, t*pu(11u) + l*pu(10u) + c*4u);
++            v[l] += x*x;
++            for (var q = 0u; q < Q; q++) { v[16u + q*16u + l] += x * qv[q]; }
++        }
++    }
++    for (var bt = 0u; bt < 5u; bt++) {
++        for (var j = 0u; j < 16u; j++) { part[j*128u + tid] = v[bt*16u + j]; }
++        workgroupBarrier();
++        if (tid < 16u) {
++            var s = 0.0;
++            for (var j = 0u; j < 128u; j++) { s += part[tid*128u + j]; }
++            wsh[bt*16u + tid] = s;
++        }
++        workgroupBarrier();
++    }
++    if (tid < Q) {
++        let q = tid;
++        var mx = -3.4e38;
++        for (var l = 0u; l < L; l++) {
++            let rs = inverseSqrt(wsh[l]/f32(n) + pf(15u));
++            let sc = wsh[16u + q*16u + l]*rs*pf(16u);
++            wsh[16u + q*16u + l] = sc;
++            mx = max(mx, sc);
++        }
++        var den = 0.0;
++        for (var l = 0u; l < L; l++) { den += exp(wsh[16u + q*16u + l] - mx); }
++        for (var l = 0u; l < L; l++) {
++            let rs = inverseSqrt(wsh[l]/f32(n) + pf(15u));
++            wsh[16u + q*16u + l] = exp(wsh[16u + q*16u + l] - mx) / den * rs;   // weight times the norm scale
++        }
++    }
++    workgroupBarrier();
++    let c = chunk*128u + tid;
++    if (c < n) {
++        for (var q = 0u; q < Q; q++) {
++            var y = 0.0;
++            for (var l = 0u; l < L; l++) { y += wsh[16u + q*16u + l] * ldf(0u, t*pu(11u) + l*pu(10u) + c*4u); }
++            stf(2u, t*pu(14u) + q*pu(13u) + c*4u, y);
++        }
++    }
++}
++)";
++
++/* ---------------------------------------------------------------------------------------------------------------- */
++/* matchers                                                                                                         */
++
++static bool wf_match_clip(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    const bool has_w = cgraph->nodes[i]->op == GGML_OP_MUL;
++    int        idx[9];
++    const int  n = has_w ? 9 : 8;
++    if (has_w) {
++        if (!wf_real(cgraph, i, 9, idx, { GGML_OP_MUL, GGML_OP_SQR, GGML_OP_SUM_ROWS, GGML_OP_SQRT, GGML_OP_SCALE,
++                                          GGML_OP_FILL, GGML_OP_DIV, GGML_OP_CLAMP, GGML_OP_MUL })) {
++            return false;
++        }
++    } else if (!wf_real(cgraph, i, 8, idx, { GGML_OP_SQR, GGML_OP_SUM_ROWS, GGML_OP_SQRT, GGML_OP_SCALE, GGML_OP_FILL,
++                                              GGML_OP_DIV, GGML_OP_CLAMP, GGML_OP_MUL })) {
++        return false;
++    }
++    ggml_tensor * N[9];
++    for (int k = 0; k < n; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    const int           b   = has_w ? 1 : 0;
++    const ggml_tensor * a   = has_w ? N[0] : N[0]->src[0];
++    const ggml_tensor * x   = has_w ? N[0]->src[0] : a;
++    const ggml_tensor * w   = has_w ? N[0]->src[1] : nullptr;
++    ggml_tensor *       dst = N[b + 7];
++    // SQR(a) SUM_ROWS SQRT SCALE FILL(norm) DIV(fill, norm) CLAMP MUL(a, clamp)
++    if (N[b]->src[0] != a || N[b + 1]->src[0] != N[b] || N[b + 2]->src[0] != N[b + 1] || N[b + 3]->src[0] != N[b + 2] ||
++        N[b + 4]->src[0] != N[b + 3] || N[b + 5]->src[0] != N[b + 4] || N[b + 5]->src[1] != N[b + 3] ||
++        N[b + 6]->src[0] != N[b + 5] || dst->src[1] != N[b + 6] || wf_base(dst->src[0]) != wf_base(a) ||
++        N[b + 4]->view_src != nullptr) {
++        return false;
++    }
++    if (dst->src[0] != a && !(ggml_are_same_shape(dst->src[0], a))) {
++        return false;
++    }
++    if (x->type != GGML_TYPE_F32 || !ggml_is_contiguous(x) || dst->type != GGML_TYPE_F32 || !ggml_is_contiguous(dst) ||
++        ggml_nelements(x) != ggml_nelements(dst) || x->ne[0] != dst->ne[0] || x->ne[0] != a->ne[0] ||
++        ggml_nrows(a) != ggml_nrows(dst)) {
++        return false;
++    }
++    if (w && (!wf_f32_rows(w) || w->ne[0] != x->ne[0] || (w->ne[1] != 1 && w->ne[1] != a->ne[1]) || w->ne[2] != 1 ||
++              w->ne[3] != 1)) {
++        return false;
++    }
++    if (!wf_same_or_disjoint(dst, x) || (w && wf_overlap(dst, w))) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[n - 1], { dst })) {
++        return false;
++    }
++    c.type    = WF_CLIP;
++    c.n_nodes = idx[n - 1] - i + 1;
++    c.slot[0] = x;
++    c.slot[1] = w ? w : x;
++    c.slot[2] = dst;
++    const ggml_tensor * sc = N[b + 3];
++    const ggml_tensor * fi = N[b + 4];
++    const ggml_tensor * cl = N[b + 6];
++    c.p = { (uint32_t) a->ne[0],
++            (uint32_t) ggml_nrows(a),
++            (uint32_t) a->ne[1],
++            (uint32_t) (w ? w->ne[1] : 1),
++            (uint32_t) (w != nullptr),
++            wf_f(ggml_get_op_params_f32(sc, 0)),
++            wf_f(ggml_get_op_params_f32(sc, 1)),
++            wf_f(ggml_get_op_params_f32(fi, 0)),
++            wf_f(ggml_get_op_params_f32(cl, 0)),
++            wf_f(ggml_get_op_params_f32(cl, 1)),
++            (uint32_t) (w ? w->nb[1] : 0) };
++    c.wg_x = (uint32_t) ggml_nrows(a);
++    return true;
++}
++
++static int wf_wtype(const ggml_tensor * w) {
++    switch (w->type) {
++        case GGML_TYPE_F32:
++            return 0;
++        case GGML_TYPE_F16:
++            return 1;
++        case GGML_TYPE_Q8_0:
++            return 2;
++        default:
++            return -1;
++    }
++}
++
++static bool wf_match_ctrl_out(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    int idx[8];
++    if (!wf_real(cgraph, i, 8, idx, { GGML_OP_MUL_MAT, GGML_OP_UNARY, GGML_OP_MUL, GGML_OP_SUB, GGML_OP_MUL_MAT,
++                                      GGML_OP_UNARY, GGML_OP_MUL, GGML_OP_ADD })) {
++        return false;
++    }
++    ggml_tensor * N[8];
++    for (int k = 0; k < 8; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    if (ggml_get_unary_op(N[1]) != GGML_UNARY_OP_TANH || ggml_get_unary_op(N[5]) != GGML_UNARY_OP_TANH) {
++        return false;
++    }
++    // MM(F, h) TANH MUL(tf, x) SUB(x, .) MM(G, h) TANH MUL(tg, m) ADD(sub, mul)
++    const ggml_tensor * F   = N[0]->src[0];
++    const ggml_tensor * h   = N[0]->src[1];
++    const ggml_tensor * G   = N[4]->src[0];
++    const ggml_tensor * x   = N[2]->src[1];
++    const ggml_tensor * m   = N[6]->src[1];
++    ggml_tensor *       dst = N[7];
++    if (N[1]->src[0] != N[0] || N[2]->src[0] != N[1] || N[3]->src[0] != x || N[3]->src[1] != N[2] || N[4]->src[1] != h ||
++        N[5]->src[0] != N[4] || N[6]->src[0] != N[5] || N[7]->src[0] != N[3] || N[7]->src[1] != N[6]) {
++        return false;
++    }
++    const int ft = wf_wtype(F), gt = wf_wtype(G);
++    if (ft < 0 || gt < 0 || F->ne[0] != G->ne[0] || F->ne[1] != G->ne[1] || F->ne[2] != 1 || G->ne[2] != 1 ||
++        F->ne[0] != h->ne[0] || (ft == 2 && F->ne[0] % 32) || !wf_f32_rows(h) || h->ne[2] != 1 || !wf_f32_rows(x) ||
++        !wf_f32_rows(m) || !ggml_are_same_shape(x, dst) || !ggml_are_same_shape(m, dst) || dst->type != GGML_TYPE_F32 ||
++        !ggml_is_contiguous(dst) || dst->ne[0] != F->ne[1] || dst->ne[1] != h->ne[1] || dst->ne[2] != 1 ||
++        dst->ne[3] != 1 || F->ne[0] > 4096) {
++        return false;
++    }
++    if (wf_overlap(dst, h) || wf_overlap(dst, F) || wf_overlap(dst, G) || !wf_same_or_disjoint(dst, x) ||
++        !wf_same_or_disjoint(dst, m)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[7], { dst })) {
++        return false;
++    }
++    c.type    = WF_CTRL_OUT;
++    c.n_nodes = idx[7] - i + 1;
++    c.slot[0] = h;
++    c.slot[1] = F;
++    c.slot[2] = G;
++    c.slot[3] = x;
++    c.slot[4] = m;
++    c.slot[5] = dst;
++    c.p       = { (uint32_t) dst->ne[0], (uint32_t) F->ne[0], (uint32_t) dst->ne[1], (uint32_t) F->nb[1],
++                  (uint32_t) G->nb[1],   (uint32_t) h->nb[1], (uint32_t) x->nb[1],   (uint32_t) m->nb[1],
++                  (uint32_t) dst->nb[1], (uint32_t) ft,       (uint32_t) gt };
++    c.wg_x    = (uint32_t) CEIL_DIV(ggml_nelements(dst), 64);
++    return true;
++}
++
++// a CONT of a row view (nb0 == 4, one row per token) into a contiguous [n, T]
++static bool wf_cont_row(const ggml_tensor * t) {
++    return t->op == GGML_OP_CONT && t->type == GGML_TYPE_F32 && wf_f32_rows(t->src[0]) && t->src[0]->ne[2] == 1 &&
++           t->src[0]->ne[3] == 1 && ggml_is_contiguous(t) && t->ne[2] == 1 && t->ne[3] == 1;
++}
++
++static bool wf_match_norm2cat(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // [CONT a] RMS_NORM(a) [CONT b] RMS_NORM(b) CONCAT(rms_a, rms_b, 0); a missing RMS_NORM(a) is an input normalized before
++    int           idx[5];
++    int           n = 0;
++    ggml_tensor * N[5];
++    int           k = i;
++    for (; n < 5 && k < cgraph->n_nodes; k++) {
++        if (wf_is_noop(cgraph->nodes[k])) {
++            continue;
++        }
++        idx[n]   = k;
++        N[n]     = cgraph->nodes[k];
++        n++;
++        if (N[n - 1]->op == GGML_OP_CONCAT) {
++            break;
++        }
++        if (N[n - 1]->op != GGML_OP_CONT && N[n - 1]->op != GGML_OP_RMS_NORM) {
++            return false;
++        }
++    }
++    if (n < 2 || N[n - 1]->op != GGML_OP_CONCAT) {
++        return false;
++    }
++    ggml_tensor *       dst = N[n - 1];
++    const ggml_tensor * ra  = dst->src[0];
++    const ggml_tensor * rb  = dst->src[1];
++    if (ggml_get_op_params_i32(dst, 0) != 0 || rb->op != GGML_OP_RMS_NORM) {
++        return false;
++    }
++    // which nodes are ours
++    const ggml_tensor *a = nullptr, *b = rb->src[0], *ca = nullptr, *cb = nullptr;
++    bool               norm_a = false;
++    int                used   = 0;
++    for (int q = 0; q < n - 1; q++) {
++        if (N[q] == rb) {
++            used++;
++        } else if (N[q] == ra && ra->op == GGML_OP_RMS_NORM) {
++            norm_a = true;
++            used++;
++        } else if (N[q]->op == GGML_OP_CONT && N[q] == rb->src[0]) {
++            cb = N[q];
++            used++;
++        } else if (N[q]->op == GGML_OP_CONT && ra->op == GGML_OP_RMS_NORM && N[q] == ra->src[0]) {
++            ca = N[q];
++            used++;
++        } else {
++            return false;
++        }
++    }
++    if (used != n - 1) {
++        return false;
++    }
++    a = norm_a ? ra->src[0] : ra;
++    // read a and b through the CONTs' sources: the CONTs are written too
++    const ggml_tensor * sa = ca ? ca->src[0] : a;
++    const ggml_tensor * sb = cb ? cb->src[0] : b;
++    if ((ca && !wf_cont_row(ca)) || (cb && !wf_cont_row(cb))) {
++        return false;
++    }
++    const int64_t nn = sb->ne[0];
++    if (!wf_f32_rows(sa) || !wf_f32_rows(sb) || sa->ne[0] != nn || sa->ne[1] != sb->ne[1] || sa->ne[2] != 1 ||
++        sb->ne[2] != 1 || sa->ne[3] != 1 || sb->ne[3] != 1 || dst->type != GGML_TYPE_F32 || !ggml_is_contiguous(dst) ||
++        dst->ne[0] != 2 * nn || dst->ne[1] != sb->ne[1] || dst->ne[2] != 1) {
++        return false;
++    }
++    if (wf_overlap(dst, sa) || wf_overlap(dst, sb) || (ca && (wf_overlap(ca, sa) || wf_overlap(ca, sb) || wf_overlap(ca, dst))) ||
++        (cb && (wf_overlap(cb, sa) || wf_overlap(cb, sb) || wf_overlap(cb, dst) || wf_overlap(cb, ca)))) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[n - 1], { dst, ca, cb })) {
++        return false;
++    }
++    c.type        = WF_NORM2CAT;
++    c.n_nodes     = idx[n - 1] - i + 1;
++    c.slot[0]     = sa;
++    c.slot[1]     = sb;
++    c.slot[2]     = dst;
++    c.slot[3]     = ca ? ca : dst;
++    c.slot[4]     = cb ? cb : dst;
++    uint32_t fl   = (norm_a ? 1u : 0u) | 2u | (ca ? 4u : 0u) | (cb ? 8u : 0u);
++    c.p           = { (uint32_t) nn,
++                      (uint32_t) sb->ne[1],
++                      (uint32_t) sa->nb[1],
++                      (uint32_t) sb->nb[1],
++                      (uint32_t) dst->nb[1],
++                      (uint32_t) (ca ? ca->nb[1] : 0),
++                      (uint32_t) (cb ? cb->nb[1] : 0),
++                      fl,
++                      wf_f(norm_a ? ggml_get_op_params_f32(ra, 0) : 0.0f),
++                      wf_f(ggml_get_op_params_f32(rb, 0)) };
++    c.wg_x        = (uint32_t) sb->ne[1];
++    return true;
++}
++
++// the residual ADD(res, scale) right after the conv's SCALE at real node index j; nullptr if none
++static ggml_tensor * wf_conv_residual(const ggml_cgraph * cgraph, int j, int & add_idx) {
++    int idx[1];
++    if (!wf_real(cgraph, j + 1, 1, idx, { GGML_OP_ADD })) {
++        return nullptr;
++    }
++    ggml_tensor * scale = cgraph->nodes[j];
++    ggml_tensor * add   = cgraph->nodes[idx[0]];
++    if (add->src[1] != scale || add->src[0] == scale || ggml_node_get_use_count(cgraph, j) != 1 ||
++        (scale->flags & GGML_TENSOR_FLAG_OUTPUT) || !(add->flags & GGML_TENSOR_FLAG_COMPUTE)) {
++        return nullptr;
++    }
++    const ggml_tensor * res = add->src[0];
++    if (res->type != GGML_TYPE_F32 || !ggml_is_contiguous(res) || !ggml_are_same_shape(res, scale) ||
++        add->type != GGML_TYPE_F32 || !ggml_is_contiguous(add)) {
++        return nullptr;
++    }
++    add_idx = idx[0];
++    return add;
++}
++
++// CONCAT(past, cur^T, 0) VIEW VIEW CPY: x = [past, cur], cell = the last d-1 columns of x
++static bool wf_cat_state_parts(const ggml_cgraph * cgraph, int i, int * idx, const ggml_tensor *& past,
++                               const ggml_tensor *& cur, ggml_tensor *& cpy, ggml_tensor *& x) {
++    if (!wf_real(cgraph, i, 2, idx, { GGML_OP_CONCAT, GGML_OP_CPY })) {
++        return false;
++    }
++    x                       = cgraph->nodes[idx[0]];
++    cpy                     = cgraph->nodes[idx[1]];
++    past                    = x->src[0];
++    cur                     = x->src[1];
++    const ggml_tensor * last = cpy->src[0];
++    if (ggml_get_op_params_i32(x, 0) != 0 || x->type != GGML_TYPE_F32 || last->view_src != x || x->ne[3] != 1 ||
++        !ggml_is_contiguous(x) || past->type != GGML_TYPE_F32 || past->nb[0] != sizeof(float) || cur->type != GGML_TYPE_F32 ||
++        cpy->type != GGML_TYPE_F32 || cpy->nb[0] != sizeof(float) || cpy->ne[2] != 1 || cpy->ne[3] != 1) {
++        return false;
++    }
++    const int64_t d1  = past->ne[0];
++    const int64_t n_t = cur->ne[0];
++    const int64_t n_c = x->ne[1];
++    const int64_t n_s = x->ne[2];
++    if (x->ne[0] != d1 + n_t || last->ne[0] != d1 || last->ne[1] != n_c || last->ne[2] != n_s ||
++        last->view_offs != (size_t) n_t * sizeof(float) || last->nb[1] != x->nb[1] || last->nb[2] != x->nb[2] ||
++        cpy->ne[0] != d1 * n_c || cpy->ne[1] != n_s || d1 < 1 || d1 > 7) {
++        return false;
++    }
++    if (wf_overlap(cpy, past) || wf_overlap(cpy, cur) || wf_overlap(cpy, x) || wf_overlap(x, past) || wf_overlap(x, cur)) {
++        return false;
++    }
++    return true;
++}
++
++static void wf_conv_params(wf_call & c, uint32_t mode, int64_t d, int64_t C, int64_t T, int64_t S, const ggml_tensor * past,
++                           const ggml_tensor * cur, const ggml_tensor * w, const ggml_tensor * cpy, const ggml_tensor * x,
++                           float s0, float s1, bool has_res) {
++    c.p = { mode,
++            (uint32_t) d,
++            (uint32_t) C,
++            (uint32_t) T,
++            (uint32_t) S,
++            (uint32_t) (past ? past->nb[1] : 0),
++            (uint32_t) (past ? past->nb[2] : 0),
++            (uint32_t) (cur ? cur->nb[0] : 0),
++            (uint32_t) (cur ? cur->nb[1] : 0),
++            (uint32_t) (cur ? cur->nb[2] : 0),
++            (uint32_t) (w ? w->nb[1] : 0),
++            (uint32_t) (cpy ? cpy->nb[1] : 0),
++            (uint32_t) (x ? x->nb[1] : 0),
++            (uint32_t) (x ? x->nb[2] : 0),
++            wf_f(s0),
++            wf_f(s1),
++            (uint32_t) has_res,
++            (uint32_t) (cpy != nullptr) };
++}
++
++static bool wf_match_conv(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // [CONCAT VIEW VIEW CPY] SSM_CONV RESHAPE ADD(r, conv) SCALE [ADD(res, scale)]
++    const ggml_tensor *past = nullptr, *cur = nullptr;
++    ggml_tensor *      cpy = nullptr, *x = nullptr;
++    int                cidx[2];
++    int                start = i;
++    if (cgraph->nodes[i]->op == GGML_OP_CONCAT) {
++        if (!wf_cat_state_parts(cgraph, i, cidx, past, cur, cpy, x)) {
++            return false;
++        }
++        start = cidx[1] + 1;
++    }
++    int idx[3];
++    if (!wf_real(cgraph, start, 3, idx, { GGML_OP_SSM_CONV, GGML_OP_ADD, GGML_OP_SCALE })) {
++        return false;
++    }
++    const ggml_tensor * conv = cgraph->nodes[idx[0]];
++    const ggml_tensor * add  = cgraph->nodes[idx[1]];
++    ggml_tensor *       dst  = cgraph->nodes[idx[2]];
++    const ggml_tensor * cv   = add->src[1];
++    const ggml_tensor * r    = add->src[0];
++    if (wf_base(cv) != conv || dst->src[0] != add || (x && conv->src[0] != x)) {
++        return false;
++    }
++    const ggml_tensor * xs = conv->src[0];
++    const ggml_tensor * w  = conv->src[1];
++    const int64_t       d  = w->ne[0];
++    const int64_t       C  = conv->ne[0];
++    const int64_t       T  = conv->ne[1];
++    const int64_t       S  = conv->ne[2];
++    const int64_t       n  = C * T * S;
++    if (!wf_f32_rows(xs) || !wf_f32_rows(w) || w->ne[1] != C || xs->ne[0] != d - 1 + T || xs->ne[1] != C || xs->ne[3] != 1 ||
++        d > 8 || r->type != GGML_TYPE_F32 || !ggml_is_contiguous(r) || ggml_nelements(r) != n ||
++        dst->type != GGML_TYPE_F32 || !ggml_is_contiguous(dst) || ggml_nelements(dst) != n) {
++        return false;
++    }
++    int           add_idx = -1;
++    ggml_tensor * radd    = wf_conv_residual(cgraph, idx[2], add_idx);
++    ggml_tensor * out     = radd ? radd : dst;
++    if (!wf_same_or_disjoint(out, r) || wf_overlap(out, xs) || wf_overlap(out, w) || (cpy && wf_overlap(out, cpy)) ||
++        (past && (wf_overlap(out, past) || wf_overlap(out, cur))) || (radd && !wf_same_or_disjoint(out, radd->src[0]))) {
++        return false;
++    }
++    if (T > 1 && (wf_overlap(out, r) || (radd && wf_overlap(out, radd->src[0])))) {
++        return false;
++    }
++    const int end = radd ? add_idx : idx[2];
++    if (!wf_window_ok(cgraph, i, end, { out, cpy })) {
++        return false;
++    }
++    c.type    = WF_CONV;
++    c.n_nodes = end - i + 1;
++    c.slot[0] = past ? past : xs;
++    c.slot[1] = cur ? cur : xs;
++    c.slot[2] = w;
++    c.slot[3] = r;
++    c.slot[4] = radd ? radd->src[0] : r;
++    c.slot[5] = out;
++    c.slot[6] = cpy ? (const ggml_tensor *) cpy : out;
++    c.slot[7] = xs;
++    wf_conv_params(c, past ? 0 : 1, d, C, T, S, past, cur, w, cpy, xs, ggml_get_op_params_f32(dst, 0),
++                   ggml_get_op_params_f32(dst, 1), radd != nullptr);
++    c.wg_x = (uint32_t) CEIL_DIV(n, 256);
++    return true;
++}
++
++static bool wf_match_cat_state(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    const ggml_tensor *past, *cur;
++    ggml_tensor *      cpy, *x;
++    int                idx[2];
++    if (!wf_cat_state_parts(cgraph, i, idx, past, cur, cpy, x)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[1], { x, cpy })) {
++        return false;
++    }
++    const int64_t d = past->ne[0] + 1, C = x->ne[1], T = cur->ne[0], S = x->ne[2];
++    c.type          = WF_CAT_STATE;
++    c.n_nodes       = idx[1] - i + 1;
++    c.slot[0]       = past;
++    c.slot[1]       = cur;
++    c.slot[2]       = x;
++    c.slot[3]       = x;
++    c.slot[4]       = x;
++    c.slot[5]       = x;
++    c.slot[6]       = cpy;
++    c.slot[7]       = x;
++    wf_conv_params(c, 2, d, C, T, S, past, cur, nullptr, cpy, x, 1.0f, 0.0f, false);
++    c.wg_x = (uint32_t) CEIL_DIV((d - 1 + T) * C * S, 256);
++    return true;
++}
++
++static bool wf_match_situ(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // SCALE(g) TANH SCALE SIGMOID(g) MUL SCALE(u) TANH SCALE MUL
++    int idx[9];
++    if (!wf_real(cgraph, i, 9, idx, { GGML_OP_SCALE, GGML_OP_UNARY, GGML_OP_SCALE, GGML_OP_UNARY, GGML_OP_MUL,
++                                      GGML_OP_SCALE, GGML_OP_UNARY, GGML_OP_SCALE, GGML_OP_MUL })) {
++        return false;
++    }
++    ggml_tensor * N[9];
++    for (int k = 0; k < 9; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    if (ggml_get_unary_op(N[1]) != GGML_UNARY_OP_TANH || ggml_get_unary_op(N[3]) != GGML_UNARY_OP_SIGMOID ||
++        ggml_get_unary_op(N[6]) != GGML_UNARY_OP_TANH) {
++        return false;
++    }
++    const ggml_tensor * g   = N[0]->src[0];
++    const ggml_tensor * u   = N[5]->src[0];
++    ggml_tensor *       dst = N[8];
++    if (N[1]->src[0] != N[0] || N[2]->src[0] != N[1] || N[3]->src[0] != g || N[4]->src[0] != N[2] || N[4]->src[1] != N[3] ||
++        N[6]->src[0] != N[5] || N[7]->src[0] != N[6] || N[8]->src[0] != N[4] || N[8]->src[1] != N[7]) {
++        return false;
++    }
++    if (!wf_f32_rows(g) || !wf_f32_rows(u) || !ggml_are_same_shape(g, u) || !ggml_are_same_shape(g, dst) ||
++        dst->type != GGML_TYPE_F32 || !ggml_is_contiguous(dst) || g->ne[3] != 1 || wf_overlap(dst, g) || wf_overlap(dst, u)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[8], { dst })) {
++        return false;
++    }
++    c.type    = WF_SITU;
++    c.n_nodes = idx[8] - i + 1;
++    c.slot[0] = g;
++    c.slot[1] = u;
++    c.slot[2] = dst;
++    c.p       = { (uint32_t) g->ne[0],
++                  (uint32_t) (g->ne[1] * g->ne[2]),
++                  (uint32_t) g->ne[1],
++                  (uint32_t) g->nb[1],
++                  (uint32_t) g->nb[2],
++                  (uint32_t) u->nb[1],
++                  (uint32_t) u->nb[2],
++                  wf_f(ggml_get_op_params_f32(N[0], 0)),
++                  wf_f(ggml_get_op_params_f32(N[0], 1)),
++                  wf_f(ggml_get_op_params_f32(N[2], 0)),
++                  wf_f(ggml_get_op_params_f32(N[2], 1)),
++                  wf_f(ggml_get_op_params_f32(N[5], 0)),
++                  wf_f(ggml_get_op_params_f32(N[5], 1)),
++                  wf_f(ggml_get_op_params_f32(N[7], 0)),
++                  wf_f(ggml_get_op_params_f32(N[7], 1)) };
++    c.wg_x    = (uint32_t) CEIL_DIV(ggml_nelements(dst), 256);
++    return true;
++}
++
++static bool wf_match_moe_sum(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // MUL(down, w) then E views of its rows, summed left to right by E-1 ADDs
++    const ggml_tensor * mul = cgraph->nodes[i];
++    const ggml_tensor * dn  = mul->src[0];
++    const ggml_tensor * w   = mul->src[1];
++    const int64_t       E   = mul->ne[1];
++    if (E < 2 || E > 32 || !wf_f32_rows(dn) || !ggml_is_contiguous(mul) || mul->type != GGML_TYPE_F32 || w->type != GGML_TYPE_F32 ||
++        w->ne[0] != 1 || w->ne[1] != E || w->ne[2] != mul->ne[2] || mul->ne[3] != 1 || !ggml_are_same_shape(dn, mul)) {
++        return false;
++    }
++    int idx[32];
++    if (!wf_real(cgraph, i + 1, (int) E - 1, idx)) {
++        return false;
++    }
++    const ggml_tensor * prev = nullptr;
++    for (int e = 0; e < E - 1; e++) {
++        const ggml_tensor * a = cgraph->nodes[idx[e]];
++        if (a->op != GGML_OP_ADD) {
++            return false;
++        }
++        const ggml_tensor * v1 = a->src[1];
++        if (v1->op != GGML_OP_VIEW || v1->view_src != mul || v1->view_offs != (size_t) (e + 1) * mul->nb[1]) {
++            return false;
++        }
++        if (e == 0) {
++            const ggml_tensor * v0 = a->src[0];
++            if (v0->op != GGML_OP_VIEW || v0->view_src != mul || v0->view_offs != 0) {
++                return false;
++            }
++        } else if (a->src[0] != prev) {
++            return false;
++        }
++        prev = a;
++    }
++    ggml_tensor * dst = cgraph->nodes[idx[E - 2]];
++    if (dst->type != GGML_TYPE_F32 || dst->ne[0] != mul->ne[0] || dst->ne[1] != mul->ne[2] || dst->nb[0] != sizeof(float) ||
++        wf_overlap(dst, dn) || wf_overlap(dst, w)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[E - 2], { dst })) {
++        return false;
++    }
++    c.type    = WF_MOE_SUM;
++    c.n_nodes = idx[E - 2] - i + 1;
++    c.slot[0] = dn;
++    c.slot[1] = w;
++    c.slot[2] = dst;
++    c.p       = { (uint32_t) mul->ne[0], (uint32_t) E,      (uint32_t) mul->ne[2], (uint32_t) dn->nb[1],
++                  (uint32_t) dn->nb[2],  (uint32_t) w->nb[1], (uint32_t) w->nb[2], (uint32_t) dst->nb[1] };
++    c.wg_x    = (uint32_t) CEIL_DIV(mul->ne[0] * mul->ne[2], 256);
++    return true;
++}
++
++static bool wf_match_mix(const ggml_cgraph * cgraph, int i, wf_call & c) {
++    // RMS_NORM(st) [TRANSPOSE] CONT(rms^T) REPEAT(q) MUL_MAT(rms, rep) SOFT_MAX MUL_MAT(cont, sm)
++    int idx[6];
++    if (!wf_real(cgraph, i, 6, idx, { GGML_OP_RMS_NORM, GGML_OP_CONT, GGML_OP_REPEAT, GGML_OP_MUL_MAT, GGML_OP_SOFT_MAX,
++                                      GGML_OP_MUL_MAT })) {
++        return false;
++    }
++    ggml_tensor * N[6];
++    for (int k = 0; k < 6; k++) {
++        N[k] = cgraph->nodes[idx[k]];
++    }
++    const ggml_tensor * st  = N[0]->src[0];
++    const ggml_tensor * q   = N[2]->src[0];
++    ggml_tensor *       dst = N[5];
++    const ggml_tensor * tr  = N[1]->src[0];
++    if (tr->op != GGML_OP_TRANSPOSE || tr->src[0] != N[0] || N[3]->src[0] != N[0] || N[3]->src[1] != N[2] ||
++        N[4]->src[0] != N[3] || N[4]->src[1] != nullptr || N[5]->src[0] != N[1] || N[5]->src[1] != N[4]) {
++        return false;
++    }
++    const int64_t n = st->ne[0], L = st->ne[1], T = st->ne[2], Q = q->ne[1];
++    float         sm_scale, max_bias;
++    memcpy(&sm_scale, (const float *) N[4]->op_params + 0, sizeof(float));
++    memcpy(&max_bias, (const float *) N[4]->op_params + 1, sizeof(float));
++    if (!wf_f32_rows(st) || st->ne[3] != 1 || L < 1 || L > 16 || Q < 1 || Q > 4 || !wf_f32_rows(q) || q->ne[0] != n ||
++        q->ne[2] != 1 || q->ne[3] != 1 || N[2]->ne[1] != Q || N[2]->ne[2] != T || max_bias != 0.0f ||
++        dst->type != GGML_TYPE_F32 || dst->nb[0] != sizeof(float) || dst->ne[0] != n || dst->ne[1] != Q || dst->ne[2] != T ||
++        wf_overlap(dst, st) || wf_overlap(dst, q)) {
++        return false;
++    }
++    if (!wf_window_ok(cgraph, i, idx[5], { dst })) {
++        return false;
++    }
++    c.type    = WF_MIX;
++    c.n_nodes = idx[5] - i + 1;
++    c.slot[0] = st;
++    c.slot[1] = q;
++    c.slot[2] = dst;
++    c.p       = { (uint32_t) n,          (uint32_t) L,          (uint32_t) Q,         (uint32_t) T,
++                  (uint32_t) st->nb[1],  (uint32_t) st->nb[2],  (uint32_t) q->nb[1],  (uint32_t) dst->nb[1],
++                  (uint32_t) dst->nb[2], wf_f(ggml_get_op_params_f32(N[0], 0)), wf_f(sm_scale), (uint32_t) CEIL_DIV(n, 128) };
++    c.wg_x    = (uint32_t) (CEIL_DIV(n, 128) * T);
++    return true;
++}
++
++static bool wf_match(const ggml_cgraph * cgraph, int i, wf_call & c, uint32_t mask) {
++    const ggml_tensor * n = cgraph->nodes[i];
++    auto                on = [&](wf_type t) { return (mask >> t) & 1u; };
++    switch (n->op) {
++        case GGML_OP_MUL:
++            return (on(WF_CLIP) && wf_match_clip(cgraph, i, c)) || (on(WF_MOE_SUM) && wf_match_moe_sum(cgraph, i, c));
++        case GGML_OP_SQR:
++            return on(WF_CLIP) && wf_match_clip(cgraph, i, c);
++        case GGML_OP_MUL_MAT:
++            return on(WF_CTRL_OUT) && wf_match_ctrl_out(cgraph, i, c);
++        case GGML_OP_CONT:
++        case GGML_OP_RMS_NORM:
++            return (on(WF_MIX) && n->op == GGML_OP_RMS_NORM && wf_match_mix(cgraph, i, c)) ||
++                   (on(WF_NORM2CAT) && wf_match_norm2cat(cgraph, i, c));
++        case GGML_OP_CONCAT:
++            return (on(WF_CONV) && wf_match_conv(cgraph, i, c)) || (on(WF_CAT_STATE) && wf_match_cat_state(cgraph, i, c));
++        case GGML_OP_SSM_CONV:
++            return on(WF_CONV) && wf_match_conv(cgraph, i, c);
++        case GGML_OP_SCALE:
++            return on(WF_SITU) && wf_match_situ(cgraph, i, c);
++        default:
++            return false;
++    }
++}
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+index 95040c4..e118a0d 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -192,7 +192,8 @@ struct webgpu_capabilities {
+ struct webgpu_stats {
+     int      every = 0;  // 0 = off
+     uint64_t graphs = 0, nodes = 0, dispatches = 0, bind_groups = 0, bind_group_hits = 0, param_writes = 0,
+-             param_bytes = 0, submits = 0, set_tensors = 0, get_tensors = 0, memsets = 0, pipeline_sets = 0, syncs = 0;
++             param_bytes = 0, submits = 0, set_tensors = 0, get_tensors = 0, memsets = 0, pipeline_sets = 0, syncs = 0,
++             fused[16] = {}, fused_nodes = 0;
+     double   encode_ms = 0, submit_ms = 0, get_ms = 0, set_ms = 0, gap_ms = 0, compute_ms = 0, sync_ms = 0;
+     std::chrono::steady_clock::time_point last_end;
+     bool     have_last = false;
+@@ -211,6 +212,15 @@ struct webgpu_stats {
+             bind_group_hits / g, param_writes / g, param_bytes / g, submits / g, set_tensors / g, set_ms / g,
+             get_tensors / g, get_ms / g, memsets / g, syncs / g, compute_ms / g, encode_ms / g, submit_ms / g, gap_ms / g,
+             sync_ms / g);
++        if (fused_nodes) {
++            std::string f;
++            for (int i = 0; i < 16; i++) {
++                if (fused[i]) {
++                    f += " " + std::to_string(i) + ":" + std::to_string((double) fused[i] / g).substr(0, 6);
++                }
++            }
++            GGML_LOG_INFO("ggml_webgpu stats: fused per graph: %.0f nodes in%s\n", fused_nodes / g, f.c_str());
++        }
+         const int  keep      = every;
+         const auto keep_last = last_end;
+         const bool keep_have = have_last;
+@@ -329,6 +339,10 @@ struct webgpu_context_struct {
+     size_t                   param_staging_end   = 0;
+     bool                     param_batch_write   = true;
+     WGPUComputePipeline      last_pipeline       = nullptr;  // in the active compute pass
++    // fused chains (ggml-webgpu-fuse.hpp)
++    uint32_t                                 fuse_mask = 0;
++    std::unordered_map<int, webgpu_pipeline> fuse_pipelines;
++    wgpu::Buffer                             fuse_dummy;
+     wgpu::Buffer             set_rows_dev_error_buf;
+     wgpu::Buffer             set_rows_host_error_buf;
+     wgpu::CommandEncoder     active_command_encoder;
+@@ -3762,6 +3776,91 @@ static webgpu_encoded_op ggml_webgpu_upscale(webgpu_context ctx, ggml_tensor * s
+     return ggml_backend_webgpu_build(ctx, pipeline, params, entries, wg_x, wg_y);
+ }
+ 
++#include "ggml-webgpu-fuse.hpp"
++
++#ifndef GGML_WEBGPU_FUSE
++#    define GGML_WEBGPU_FUSE 1
++#endif
++
++static std::optional<webgpu_encoded_op> ggml_webgpu_fused(webgpu_context & ctx, const wf_call & c) {
++    static const char * kernels[WF_COUNT] = { wf_wgsl_clip, wf_wgsl_ctrl_out, wf_wgsl_norm2cat, wf_wgsl_conv,
++                                              wf_wgsl_conv, wf_wgsl_situ,     wf_wgsl_moe_sum,  wf_wgsl_mix };
++    const auto & lim   = ctx->global_ctx->capabilities.limits;
++    const size_t align = lim.minStorageBufferOffsetAlignment;
++
++    wgpu::Buffer gb[4];
++    size_t       glo[4] = {}, ghi[4] = {};
++    int          ng = 0;
++    uint32_t     sg[WF_MAX_SLOTS];
++    int          n_slots = 0;
++    for (int k = 0; k < WF_MAX_SLOTS && c.slot[k]; k++) {
++        const ggml_tensor * t   = c.slot[k];
++        wgpu::Buffer        buf = ggml_webgpu_tensor_buf(t);
++        const size_t        lo = wf_off(t), hi = lo + ggml_nbytes(t);
++        int                 g = 0;
++        while (g < ng && gb[g].Get() != buf.Get()) {
++            g++;
++        }
++        if (g == ng) {
++            if (ng == 4) {
++                return std::nullopt;
++            }
++            gb[ng]  = buf;
++            glo[ng] = lo;
++            ghi[ng] = hi;
++            ng++;
++        } else {
++            glo[g] = std::min(glo[g], lo);
++            ghi[g] = std::max(ghi[g], hi);
++        }
++        sg[k]   = g;
++        n_slots = k + 1;
++    }
++    std::vector<uint32_t> params(2 * n_slots);
++    for (int g = 0; g < ng; g++) {
++        glo[g] &= ~(align - 1);
++        if (ROUNDUP_POW2(ghi[g] - glo[g], 4) > lim.maxStorageBufferBindingSize) {
++            return std::nullopt;
++        }
++    }
++    for (int k = 0; k < n_slots; k++) {
++        params[2 * k]     = sg[k];
++        params[2 * k + 1] = (uint32_t) (wf_off(c.slot[k]) - glo[sg[k]]);
++    }
++    params.insert(params.end(), c.p.begin(), c.p.end());
++    if (params.size() > WEBGPU_PARAMS_BUF_SIZE_BYTES / 4) {
++        return std::nullopt;
++    }
++    params.resize(WEBGPU_PARAMS_BUF_SIZE_BYTES / 4, 0);
++
++    if (!ctx->fuse_dummy) {
++        ggml_webgpu_create_buffer(ctx->global_ctx->device, ctx->fuse_dummy, 1024, wgpu::BufferUsage::Storage,
++                                  "ggml_webgpu_fuse_dummy");
++    }
++    std::vector<wgpu::BindGroupEntry> entries;
++    for (int g = 0; g < 4; g++) {
++        if (g < ng) {
++            entries.push_back(ggml_webgpu_make_bind_group_entry(g, gb[g], glo[g], ROUNDUP_POW2(ghi[g] - glo[g], 4)));
++        } else {
++            // one disjoint piece of the dummy buffer per unused binding: writable bindings may not alias
++            entries.push_back(ggml_webgpu_make_bind_group_entry(g, ctx->fuse_dummy, g * 256, 256));
++        }
++    }
++
++    auto it = ctx->fuse_pipelines.find((int) c.type);
++    if (it == ctx->fuse_pipelines.end()) {
++        std::string code = std::string(wf_wgsl_prelude) + kernels[c.type];
++        std::string name = std::string("fused_") + wf_names[c.type];
++        it = ctx->fuse_pipelines.emplace((int) c.type, ggml_webgpu_create_pipeline(ctx->global_ctx->device, code.c_str(),
++                                                                                   name.c_str())).first;
++    }
++    uint32_t wg_x, wg_y;
++    compute_2d_workgroups(std::max(1u, c.wg_x), lim.maxComputeWorkgroupsPerDimension, wg_x, wg_y);
++    ctx->global_ctx->stats.fused[c.type]++;
++    ctx->global_ctx->stats.fused_nodes += c.n_nodes;
++    return ggml_backend_webgpu_build(ctx, it->second, params, entries, wg_x, wg_y);
++}
++
+ // Returns the encoded command, or std::nullopt if the operation is a no-op
+ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+                                                            ggml_cgraph *  cgraph,
+@@ -3778,6 +3877,16 @@ static std::optional<webgpu_encoded_op> ggml_webgpu_encode(webgpu_context ctx,
+     }
+     WEBGPU_LOG_DEBUG("ggml_webgpu_encode(" << node << ", " << ggml_op_name(node->op) << ")");
+ 
++    if (ctx->fuse_mask) {
++        wf_call fc;
++        if (wf_match(cgraph, node_idx, fc, ctx->fuse_mask)) {
++            if (auto op = ggml_webgpu_fused(ctx, fc)) {
++                num_encoded_ops = fc.n_nodes;
++                return op;
++            }
++        }
++    }
++
+     ggml_tensor * src0 = node->src[0];
+     ggml_tensor * src1 = node->src[1];
+     ggml_tensor * src2 = node->src[2];
+@@ -4009,6 +4118,35 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+         }
+         GGML_LOG_INFO("ggml_webgpu ops in a %d-node graph: %s\n", cgraph->n_nodes, line.c_str());
+     }
++    if (const char * dump = getenv("GGML_WEBGPU_DUMP")) {
++        // the node list of the first big graph, for writing fusion matchers
++        static bool dumped = false;
++        if (!dumped && cgraph->n_nodes > 1000) {
++            dumped = true;
++            FILE * f = fopen(dump, "w");
++            std::unordered_map<const ggml_tensor *, int> idx;
++            for (int i = 0; f && i < cgraph->n_nodes; i++) {
++                const ggml_tensor * n = cgraph->nodes[i];
++                idx[n] = i;
++                fprintf(f, "%d %s %s [%lld,%lld,%lld,%lld] nb[%zu,%zu,%zu] %s%s", i, ggml_op_desc(n), ggml_type_name(n->type),
++                        (long long) n->ne[0], (long long) n->ne[1], (long long) n->ne[2], (long long) n->ne[3], n->nb[1], n->nb[2],
++                        n->nb[3], n->name, n->view_src ? " view" : "");
++                for (int j = 0; j < GGML_MAX_SRC && n->src[j]; j++) {
++                    auto it = idx.find(n->src[j]);
++                    if (it != idx.end()) {
++                        fprintf(f, " s%d=#%d", j, it->second);
++                    } else {
++                        fprintf(f, " s%d=%s:%s[%lld,%lld,%lld]", j, n->src[j]->name, ggml_type_name(n->src[j]->type),
++                                (long long) n->src[j]->ne[0], (long long) n->src[j]->ne[1], (long long) n->src[j]->ne[2]);
++                    }
++                }
++                fprintf(f, "\n");
++            }
++            if (f) {
++                fclose(f);
++            }
++        }
++    }
+     if (st.have_last) {
+         st.gap_ms += std::chrono::duration<double, std::milli>(t_start - st.last_end).count();
+     }
+@@ -5005,6 +5143,8 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+     webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
+     webgpu_ctx->param_batch_write =
+         ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
++    webgpu_ctx->fuse_mask = ggml_webgpu_env_int("GGML_WEBGPU_FUSE", GGML_WEBGPU_FUSE) == 0 ? 0u :
++                            (uint32_t) ggml_webgpu_env_int("GGML_WEBGPU_FUSE_MASK", 0xffff);
+     webgpu_ctx->param_arena.init(
+         webgpu_ctx->global_ctx->device, WEBGPU_PARAMS_BUF_SIZE_BYTES,
+         webgpu_ctx->global_ctx->command_submit_batch_size + WEBGPU_NUM_PARAM_SLOT_SAFETY_MARGIN,
