@@ -1077,7 +1077,13 @@ function breakObject(mesh,kind='hit'){
   for(let i=0;i<count;i++){ const s=BABYLON.MeshBuilder.CreateBox('rubble_'+m.type,{size:.18+Math.random()*.22},state.scene); s.position=p.add(new BABYLON.Vector3((Math.random()-.5)*.55,.2+Math.random()*.4,(Math.random()-.5)*.55)); s.rotation.set(Math.random(),Math.random(),Math.random()); s.material=material||state.materials.stone; addBody(s,'dynamic','BOX',.18,{restitution:.18}); addShadow(s); tag(s,'rubble',{health:1,interactive:false}); const v=new BABYLON.Vector3(Math.random()-.5,.6,Math.random()-.5).scale(1.8); s.physicsBody?.applyImpulse(v,s.position); setTimeout(()=>disposeWorldObject(s),8500); }
 }
 function impulse(mesh,from,power,up=.25){ if(!mesh?.physicsBody) return; const dir=mesh.getAbsolutePosition().subtract(from); if(dir.length()<.001) dir.set(Math.random()-.5,0,Math.random()-.5); dir.y=up; dir.normalize(); mesh.physicsBody.applyImpulse(dir.scale(power),mesh.getAbsolutePosition()); }
-function emitBadge(target,text){ const div=document.createElement('div'); div.className='badge'; div.textContent=text; document.body.appendChild(div); const node=target.root||target; state.badges.push({div,node,ttl:1.05,vy:-28}); }
+function emitBadge(target,text){
+  // the others' badges ("+1 bread") follow the activity bubbles' rule, at most one a second and a half each
+  if(target?.root && target!==state.playerAvatar && state.characters?.includes(target) && activityMode()!=='all' && !NOTEWORTHY.test(text)){
+    if(activityMode()==='off' || !(focusedOn(target) || nearOnScreen(target)) || performance.now()-(target._badgeAt||0)<1500) return;
+    target._badgeAt=performance.now();
+  }
+  const div=document.createElement('div'); div.className='badge'; div.textContent=text; document.body.appendChild(div); const node=target.root||target; state.badges.push({div,node,ttl:1.05,vy:-28}); }
 function lowPolyBlob(name,scene,rx=.5,ry=.6,rz=.4,rings=5,seg=8){ const positions=[],indices=[],normals=[],uvs=[]; for(let r=0;r<=rings;r++){ const v=r/rings,phi=-Math.PI/2+v*Math.PI,y=Math.sin(phi)*ry,cr=Math.cos(phi); const wob=1+(r%2?.06:-.025); for(let s=0;s<seg;s++){ const u=s/seg,th=u*Math.PI*2; positions.push(Math.cos(th)*rx*cr*wob*(1+.04*Math.sin(3*th)),y,Math.sin(th)*rz*cr*wob*(1+.04*Math.cos(2*th))); uvs.push(u,v); } } for(let r=0;r<rings;r++) for(let s=0;s<seg;s++){ const a=r*seg+s,b=r*seg+(s+1)%seg,c=(r+1)*seg+s,d=(r+1)*seg+(s+1)%seg; indices.push(a,c,b,b,c,d); } BABYLON.VertexData.ComputeNormals(positions,indices,normals); const vd=new BABYLON.VertexData(); vd.positions=positions; vd.indices=indices; vd.normals=normals; vd.uvs=uvs; const mesh=new BABYLON.Mesh(name,scene); vd.applyToMesh(mesh); return mesh; }
 function createCrystal(name,scene,height=1.1,radius=.25){ const pts=[],idx=[],uv=[],seg=6; pts.push(0,height/2,0); uv.push(.5,0); pts.push(0,-height/2,0); uv.push(.5,1); for(let i=0;i<seg;i++){ const th=i/seg*Math.PI*2; pts.push(Math.cos(th)*radius,0,Math.sin(th)*radius); uv.push(i/seg,.5); } for(let i=0;i<seg;i++){ const a=2+i,b=2+(i+1)%seg; idx.push(0,a,b,1,b,a); } const normals=[]; BABYLON.VertexData.ComputeNormals(pts,idx,normals); const vd=new BABYLON.VertexData(); vd.positions=pts; vd.indices=idx; vd.normals=normals; vd.uvs=uv; const m=new BABYLON.Mesh(name,scene); vd.applyToMesh(m); return m; }
 function addToScene(mesh,material,body={}){ if(material) mesh.material=material; if(body.shape) addBody(mesh,body.motion||'dynamic',body.shape,body.mass??1,body); addShadow(mesh); return mesh; }
@@ -3336,7 +3342,44 @@ const entryKey=e=>String(e||'').split(' -> ')[0].replace(/^(T\d+ [^:]+):.*$/s,'$
 function markFailed(g){ const h=state.globalHistory, last=h?.[h.length-1]; if(g && g!==state.playerAvatar && last && last.startsWith('T') && last.includes(g.id+':')){ failedEntries.add(entryKey(last)); if(failedEntries.size>200) failedEntries.delete(failedEntries.values().next().value); } }
 function isFailedEntry(e){ return failedEntries.has(entryKey(e)); }
 function fail(g,text){ markFailed(g); return say(g,text,false); }
-function say(g,text,voiced=false,{whisper=false,templated=false}={}){
+// Activity bubbles (2026-11-22): a character's unvoiced lines ("Bram makes a loaf at the
+// oven", "eats the bread", "gets up") are activity, not speech. Setting "Activity
+// bubbles" (localStorage tablefolkActivityBubbles): 'nearby' (default) shows them only
+// for the character you talk to or have selected, or one within ACT_NEAR m of you and on
+// screen, one every ACT_GAP ms per character (a newer one replaces the shown one), small
+// and quiet; routine work with its own clip or pose (kind 'routine': uses.js act, sitting,
+// lying down, getting up) only for the one you talk to. Noteworthy ones always show: a
+// fight, a theft, a raid, anything to or about you (kind 'event', NOTEWORTHY, your name).
+// 'all' shows every one (as before), 'off' only the noteworthy. Speech is never gated;
+// the log, the Messages pane and the characters' history keep everything.
+const ACT_NEAR=6, ACT_GAP=5000;
+const NOTEWORTHY=/\b(steal|steals|stole|snatch\w*|rob|robs|robbed|thie[fv]\w*|attack\w*|strikes?|stabs?|kills?|killed|defeat\w*|raid\w*|fights?)\b/i;
+function activityMode(){ try{ const v=localStorage.getItem('tablefolkActivityBubbles'); return v==='all'||v==='off'?v:'nearby'; }catch{ return 'nearby'; } }
+function aboutPlayer(text){ const n=String(document.getElementById('chatName')?.value||state.player?.name||'').trim(); return /\bthe player\b/i.test(text) || (n.length>1 && new RegExp('\\b'+n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(text)); }
+function focusedOn(g){ return !!g && (g===state.selected || (g._spoke?.to==='player' && performance.now()-g._spoke.at<20000) || (g._heard?.who===state.playerAvatar && performance.now()-g._heard.at<20000)); }
+function nearOnScreen(g){
+  const me=state.playerAvatar, p=me?(me.logicalPos||me.root.position):state.camera?.target, q=g.logicalPos||g.root?.position;
+  if(!p||!q||Math.hypot(q.x-p.x,q.z-p.z)>ACT_NEAR) return false;
+  if(g._shellHidden||g._fogHidden||g.root?.isEnabled?.()===false) return false;
+  try{ const sc=state.scene, cam=sc.activeCamera, e=sc.getEngine(), w=e.getRenderWidth(), h=e.getRenderHeight();
+    const v=BABYLON.Vector3.Project(new BABYLON.Vector3(q.x,(q.y||0)+1,q.z),BABYLON.Matrix.Identity(),sc.getTransformMatrix(),cam.viewport.toGlobal(w,h));
+    return v.z>0 && v.z<1 && v.x>=0 && v.x<=w && v.y>=0 && v.y<=h; }catch{ return true; }
+}
+// 'show' | 'replace' (the character's shown activity bubble takes the new words) | 'skip'
+function activityBubble(g,text,kind){
+  if(!g || g===state.playerAvatar) return 'show';
+  const mode=activityMode(); if(mode==='all') return 'show';
+  if(kind==='event' || NOTEWORTHY.test(text) || aboutPlayer(text)) return 'show';
+  if(mode==='off') return 'skip';
+  const focus=focusedOn(g);
+  if(kind==='routine' ? !focus : !(focus || nearOnScreen(g))) return 'skip';
+  const shown=state.bubbles.find(b=>b.activity && b.agent===g && b.ttl>0);
+  if(shown) return 'replace';
+  return performance.now()-(g._actBubbleAt||0)<ACT_GAP ? 'skip' : 'show';
+}
+window.tablefolkActivityBubble=activityBubble;
+(()=>{ const sel=document.getElementById('activityBubbles'); if(!sel) return; sel.value=activityMode(); sel.addEventListener('change',()=>{ try{ localStorage.setItem('tablefolkActivityBubbles',sel.value); }catch{} }); })();
+function say(g,text,voiced=false,{whisper=false,templated=false,kind=null}={}){
   // The dead say nothing (a turn that was thinking when it died ends here).
   if(g?.defeated){ clearStreamingBubble(g); return; }
   // A character repeating one of its recent spoken lines: say nothing at all.
@@ -3365,7 +3408,11 @@ function say(g,text,voiced=false,{whisper=false,templated=false}={}){
   log(g.id+': '+text);
   try{ window.dispatchEvent(new CustomEvent('tablefolk-say',{detail:{agentId:g.id,text:String(text||''),voiced,templated,to:voiced&&g!==state.playerAvatar?g._spoke?.to||null:null}})); }catch{}
   const speechRequested=localStorage.getItem('tablefolkTtsEnabled')!=='0' && getBrainConfig(g.id).ttsEnabled!==false;
-  showSpeechBubble(g,text,{whisper,waitVoice:voiced && speechRequested && !!window.tablefolkTTS?.ready});
+  // unvoiced lines of the others are activity: shown by the rule above (activityBubble)
+  const act=!voiced && g!==state.playerAvatar ? activityBubble(g,String(text||''),kind) : 'show';
+  if(act==='replace'){ const b=state.bubbles.find(x=>x.activity && x.agent===g && x.ttl>0); b.div.textContent=clipBubble(text); b.ttl=readingTime(b.div.textContent); g._actBubbleAt=performance.now(); }
+  else if(act==='show'){ showSpeechBubble(g,text,{whisper,waitVoice:voiced && speechRequested && !!window.tablefolkTTS?.ready,cls:!voiced && g!==state.playerAvatar?'activity':''}); if(!voiced && g!==state.playerAvatar){ const b=state.bubbles[state.bubbles.length-1]; b.activity=true; g._actBubbleAt=performance.now(); } }
+  else { (g._lines||=[]).push({text:clipBubble(text),at:Date.now(),activity:true}); if(g._lines.length>20) g._lines.shift(); }
   g.anim='talk'; playRig(g,'talk',true); g.speaking=true; g.voiced=voiced && speechRequested;
   if(voiced && g!==state.playerAvatar){
     if(to){ faceToward(g,to); if(to!==state.playerAvatar && !to.turnMove && !to.speaking) faceToward(to,g); }

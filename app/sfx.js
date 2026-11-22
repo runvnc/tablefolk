@@ -3,8 +3,14 @@
  *   window.tablefolkSfx.play(name, pos)   name: doorOpen, doorClose,
  *       chestOpen, coins, pickup, swing, swingHeavy, hit (fists), hitBlade,
  *       hitBlunt, miss, step
- *   pos (optional {x, z}): quieter with distance from the listener (the
- *   player's avatar, else the camera target).
+ *   pos (optional {x, z} or {x, y, z}): a world sound, placed in 3D (2026-11-22): a
+ *   Web Audio PannerNode at that spot, panned by where it is relative to the view
+ *   (the listener faces the way the camera looks) and fainter with distance from
+ *   the listener's position (the player's avatar, else the camera's target; in first
+ *   person the eyes): full within 1.5 m, half at 3 m, silent beyond MAX_DIST (20 m).
+ *   No pos: a UI sound, not placed (the player's own swing, a threat's horn).
+ *   window.tablefolkSfx.volume            the effects' volume 0..1 (Settings; saved)
+ *   window.tablefolkSfx.measure(name)     peak and RMS of one effect (tests: level checks)
  *   window.tablefolkSfx.enabled           false mutes (saved in localStorage)
  *   window.tablefolkSfx.context()         { ctx, master, noise } for spells.js's
  *       positional sounds (null while muted or before the first gesture)
@@ -25,13 +31,14 @@
 (function () {
   let ctx = null, master = null, noiseBuf = null;
   const KEY = 'tablefolk.sfx';
-  let enabled = true;
-  try { enabled = localStorage.getItem(KEY) !== 'off'; } catch {}
+  let enabled = true, volume = .8;
+  try { enabled = localStorage.getItem(KEY) !== 'off'; const v = parseFloat(localStorage.getItem(KEY + '.volume')); if (v >= 0 && v <= 1) volume = v; } catch {}
+  const MASTER = .55;
 
   function audio() {
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
-    ctx = new AC(); master = ctx.createGain(); master.gain.value = .55; master.connect(ctx.destination);
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = MASTER * volume; master.connect(ctx.destination);
     const n = ctx.sampleRate; noiseBuf = ctx.createBuffer(1, n, n);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return ctx;
@@ -94,16 +101,35 @@
   addEventListener('pointerdown', wake, { capture: true });
   addEventListener('keydown', wake, { capture: true });
 
+  // the listener: at the player (ear height), facing the way the view looks
+  const MAX_DIST = 20, REF = 1.5;
   function listener() {
-    const s = window.TABLEFOLK_STATE, g = s?.playerAvatar;
-    const p = g?.logicalPos || g?.root?.position || s?.camera?.target;
-    return p ? { x: p.x, z: p.z } : null;
+    const s = window.TABLEFOLK_STATE, g = s?.playerAvatar, cam = s?.scene?.activeCamera;
+    const p = s?.firstPerson && cam ? cam.globalPosition : g?.logicalPos || g?.root?.position || cam?.target;
+    if (!p) return null;
+    const top = s?.terrainTopY ?? 0, y = s?.firstPerson ? p.y : top + 1.5;
+    let fx = 0, fy = 0, fz = 1;
+    const f = cam?.getForwardRay?.(1)?.direction; if (f) { fx = f.x; fy = f.y; fz = f.z; }
+    return { x: p.x, y, z: p.z, fx, fy, fz };
   }
-  function volumeAt(pos) {
-    if (!pos) return 1;
-    const l = listener(); if (!l) return 1;
-    const d = Math.hypot(pos.x - l.x, pos.z - l.z);
-    return d > 14 ? 0 : 1 / (1 + d * d * .05);
+  // how far a sound is (for the cut-off and the tests); 0 for UI sounds
+  function distanceOf(pos) { const l = pos && listener(); return l ? Math.hypot(pos.x - l.x, pos.z - l.z) : 0; }
+  // the chain a placed sound goes through: its own gain (the fade to nothing near MAX_DIST)
+  // into a panner at its spot; the listener set from the view at each sound
+  function placed(pos) {
+    const l = listener(), out = ctx.createGain();
+    if (!l) { out.connect(master); return out; }
+    const d = Math.hypot(pos.x - l.x, pos.z - l.z); if (d > MAX_DIST) return null;
+    const L = ctx.listener, t = ctx.currentTime;
+    // Babylon's left-handed world into Web Audio's right-handed one: z flipped
+    if (L.positionX) { L.positionX.setValueAtTime(l.x, t); L.positionY.setValueAtTime(l.y, t); L.positionZ.setValueAtTime(-l.z, t); L.forwardX.setValueAtTime(l.fx, t); L.forwardY.setValueAtTime(l.fy, t); L.forwardZ.setValueAtTime(-l.fz, t); L.upX.setValueAtTime(0, t); L.upY.setValueAtTime(1, t); L.upZ.setValueAtTime(0, t); }
+    else { L.setPosition(l.x, l.y, -l.z); L.setOrientation(l.fx, l.fy, -l.fz, 0, 1, 0); }
+    const p = ctx.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = REF; p.rolloffFactor = 1; p.maxDistance = 10000;
+    const y = pos.y ?? (window.TABLEFOLK_STATE?.terrainTopY ?? 0) + 1;
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = y; p.positionZ.value = -pos.z; } else p.setPosition(pos.x, y, -pos.z);
+    out.gain.value = d > MAX_DIST - 6 ? (MAX_DIST - d) / 6 : 1;   // the last 6 m fade out
+    out.connect(p); p.connect(master);
+    return out;
   }
   function noise(t, dur, { type = 'bandpass', freq = 1000, q = 1, gain = .4, attack = .005 } = {}) {
     const src = ctx.createBufferSource(); src.buffer = noiseBuf;
@@ -162,6 +188,10 @@
     noise(t, .08, { type: 'lowpass', freq: 500, gain: .5 * gain, attack: .001 }).connect(out);
   }
 
+  // Each effect's level (2026-11-22, a pass with measure(): doors were the loudest thing
+  // in the game, a full-scale recording, ~14x a footstep's RMS at .55): doors and chests
+  // now at about a footstep's RMS (~.013), blows ~.13 (they were ~.2), a miss a little up.
+  const LEVEL = { doorOpen: .07, doorClose: .08, chestOpen: .25, coins: 1, pickup: .8, swing: .8, swingHeavy: .8, hit: .45, hitNatural: .45, hitBlade: .45, hitBlunt: .45, hitMetal: .55, miss: 1.5, step: 1 };
   const SOUNDS = {
     doorOpen(out, t) { latch(out, t); creak(out, t + .03, .5, { rate0: 22, rate1: 55, body: 820 + Math.random() * 200 }); },
     doorClose(out, t) {
@@ -225,18 +255,35 @@
   // every sound asked for, played or not (muted, no audio yet): tests and the dev console
   const requested = [];
   function play(name, pos) {
-    requested.push({ name: String(name), at: Date.now() }); if (requested.length > 50) requested.shift();
+    const d = pos && Number.isFinite(pos.x) ? distanceOf(pos) : null;
+    requested.push({ name: String(name), at: Date.now(), dist: d == null ? null : Math.round(d * 10) / 10 }); if (requested.length > 50) requested.shift();
     if (!enabled || (!SOUNDS[name] && !REG[name])) return;
     if (!audio() || ctx.state !== 'running') return;
-    if (REG[name]) { const v = volumeAt(pos); if (v < .02) return; const out = ctx.createGain(); out.gain.value = v; out.connect(master); registered(name, out, ctx.currentTime); return; }
-    const v = volumeAt(pos); if (v < .02) return;
-    const out = ctx.createGain(); out.gain.value = v; out.connect(master);
-    try { (SAMPLES[name] && sample(name, out, ctx.currentTime)) || SOUNDS[name](out, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
-    setTimeout(() => { try { out.disconnect(); } catch {} }, 3000);
+    const out = d == null ? ctx.createGain() : placed(pos); if (!out) return;   // too far to hear
+    if (d == null) out.connect(master);
+    if (REG[name]) { registered(name, out, ctx.currentTime); return; }
+    const lv = ctx.createGain(); lv.gain.value = LEVEL[name] ?? 1; lv.connect(out);
+    try { (SAMPLES[name] && sample(name, lv, ctx.currentTime)) || SOUNDS[name](lv, ctx.currentTime + .01); } catch (e) { console.warn('sfx', name, e); }
+    setTimeout(() => { try { out.disconnect(); lv.disconnect(); } catch {} }, 3000);
+  }
+  // one effect rendered offline: { peak, rms } (the level pass, tests); its own context swapped in
+  async function measure(name) {
+    if (!SOUNDS[name] || !audio()) return null;
+    const real = ctx, sr = real.sampleRate, off = new OfflineAudioContext(1, Math.round(sr * 1.5), sr);
+    ctx = off; let buf;
+    try { const lv = off.createGain(); lv.gain.value = LEVEL[name] ?? 1; lv.connect(off.destination); (SAMPLES[name] && sample(name, lv, 0)) || SOUNDS[name](lv, .01); } finally { ctx = real; }
+    buf = await off.startRendering();
+    const a = buf.getChannelData(0); let pk = 0, ss = 0, n = 0; for (const v of a) { pk = Math.max(pk, Math.abs(v)); ss += v * v; } for (const v of a) if (Math.abs(v) > pk * .05) n++;
+    return { peak: +pk.toFixed(3), rms: +Math.sqrt(ss / Math.max(1, n)).toFixed(3), sampled: !!(SAMPLES[name] && decoded[name]?.length) };
   }
 
+  // Settings: the effects' volume slider
+  const wire = () => { const el = document.getElementById('sfxVolume'); if (!el || el._tf) return; el._tf = true; el.value = volume; el.addEventListener('input', () => { window.tablefolkSfx.volume = el.value; }); };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', wire); else setTimeout(wire, 0);
   window.tablefolkSfx = {
-    play, voiceBuffer, register, registerAll, unregister, requested, has: name => !!(SOUNDS[name] || REG[name]),
+    play, voiceBuffer, register, registerAll, unregister, requested, measure, distanceOf, MAX_DIST, has: name => !!(SOUNDS[name] || REG[name]),
+    get volume() { return volume; },
+    set volume(v) { volume = Math.max(0, Math.min(1, +v || 0)); if (master) master.gain.value = MASTER * volume; try { localStorage.setItem(KEY + '.volume', String(volume)); } catch {} },
     get names() { return [...Object.keys(REG), ...Object.keys(SOUNDS)]; },
     // spells.js builds its own 3D (HRTF) sounds on the same context:
     // { ctx, master, noise } once audio is running, else null.

@@ -226,7 +226,7 @@
       if (dist(posOf(c), posOf(m)) > 1.6) { if (!c.turnMove) walkTo(c, posOf(m).x, posOf(m).z); return true; }
       const inv = charInventory(m), n = Math.min(inv.gold || 0, 5 + Math.floor(Math.random() * 6));
       inv.gold -= n; W().setBrainConfig(m.id, { inventory: inv }); c._loot = n; gr.stole += n;
-      try { emitBadge(c, `steals ${n} gold`); say(c, `${c.id} snatches ${n} gold from ${m.id} and runs`, false); window.tablefolkMind?.addMemory?.(m, `${c.id} robbed you of ${n} gold.`, 3); window.tablefolkMind?.event?.(m, 'attacked', { by: c.id, hit: false }); } catch {}
+      try { emitBadge(c, `steals ${n} gold`); say(c, `${c.id} snatches ${n} gold from ${m.id} and runs`, false, { kind: 'event' }); window.tablefolkMind?.addMemory?.(m, `${c.id} robbed you of ${n} gold.`, 3); window.tablefolkMind?.event?.(m, 'attacked', { by: c.id, hit: false }); } catch {}
       retreatOne(c, gr); return true;
     }
     return false;   // raid: the usual monster (play.js fighterTurn: everyone is prey in a living world)

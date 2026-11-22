@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tablefolk — Local Agent Toybox</title>
-  <link rel="stylesheet" href="style.css?v=20261121c" />
+  <link rel="stylesheet" href="style.css?v=20261122a" />
 </head>
 <body class="tablefolk-preflight-pending">
   <main id="compatibilityScreen" class="compatibility-screen" hidden role="alert" aria-live="assertive">
@@ -131,6 +131,11 @@
       <div id="autonomyPick" class="autonomy-pick"></div>
       <div class="section-subtitle">Characters' brain online</div>
       <div id="onlineBrain" class="online-brain"></div>
+      <div class="section-subtitle">Sound and bubbles</div>
+      <div class="settings-quick">
+        <label>Sound effects <input id="sfxVolume" type="range" min="0" max="1" step=".05" value=".8" title="doors, blows, coins and the like (voices have their own slider)" /></label>
+        <label>Activity bubbles <select id="activityBubbles" title="what the others are doing, over their heads (speech always shows)"><option value="nearby">nearby (default)</option><option value="all">all</option><option value="off">off</option></select></label>
+      </div>
       <div class="section-subtitle">More</div>
       <nav class="settings-links" aria-label="settings">
         <button type="button" data-open="voice"><b>Voice and speech</b><small>speech on or off, voices, the 🎤 microphone</small></button>
@@ -479,6 +484,6 @@
   <div id="hint" class="dev-only">Pick a character (Character panel) to shape its mind, chat below, then start the local brain from the top bar.</div>
   <script src="browser-check.js?v=20261121a"></script>
   <script src="diagnostics.js?v=20261121a"></script>
-  <script src="preflight.js?v=20261122e"></script>
+  <script src="preflight.js?v=20261122f"></script>
 </body>
 </html>

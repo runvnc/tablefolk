@@ -215,7 +215,7 @@
   // narrate, then the clip: say() turns the speaker to its talk clip, so the
   // work clip starts after it (and back to idle, or the pose, when done)
   function act(g, text, mode, ms, loop = true) {
-    const r = say(g, text, false);
+    const r = say(g, text, false, { kind: 'routine' });   // its clip shows it: an activity bubble only for the one you talk to (app.js activityBubble)
     g.anim = mode; g.speaking = false; g.rigMode = null; playRig(g, mode, loop);
     if (g._useTimer) clearTimeout(g._useTimer);
     g._useTimer = setTimeout(() => { if (g.anim === mode) { g.anim = 'idle'; playRig(g, 'idle', true); } }, ms);
@@ -516,7 +516,7 @@
     const cfg = getBrainConfig(g.id), mind = cfg.mind;
     if (mind) { mind.tired = how === 'lie' ? 0 : Math.max(0, (mind.tired || 0) - .3); }
     toastIfPlayer(g, how === 'lie' ? 'You lie down on the ' + nice(o.type) : 'You sit on the ' + nice(o.type));
-    return say(g, `${g.id} ${how === 'lie' ? 'lies down on the ' + nice(o.type) + ' to rest' : 'sits down on the ' + nice(o.type)}`, false);
+    return say(g, `${g.id} ${how === 'lie' ? 'lies down on the ' + nice(o.type) + ' to rest' : 'sits down on the ' + nice(o.type)}`, false, { kind: 'routine' });
   }
   function fit(g) {
     if (!g.pose || !g.rigRoot || g.root.isDisposed?.()) return;
@@ -550,7 +550,7 @@
     state.scene.onAfterRenderObservable.addOnce(() => state.scene.onAfterRenderObservable.addOnce(() => fit(g)));
     const mind = getBrainConfig(g.id).mind; if (mind) mind.tired = 0;
     emitBadge(g, 'sleeps');
-    return say(g, `${g.id} lies down on the floor to sleep`, false);
+    return say(g, `${g.id} lies down on the floor to sleep`, false, { kind: 'routine' });
   }
   // the next action that is not talk stands it up, beside the thing
   function standUp(g, quiet) {
@@ -589,7 +589,7 @@
       if (bed && Math.random() < .6) { useThing(g, bed); return true; }
       return false;
     }
-    if (g.pose?.mode === 'lie') { standUp(g); say(g, `${g.id} gets up`, false); return true; }   // morning
+    if (g.pose?.mode === 'lie') { standUp(g); say(g, `${g.id} gets up`, false, { kind: 'routine' }); return true; }   // morning
     const cfg = getBrainConfig(g.id), who = [cfg.role, g.style, cfg.personality].filter(Boolean).join(' ');
     const k = STATION.find(([re]) => re.test(who))?.[1];
     const station = k && nearby(g, 9).find(o => o.k === k);

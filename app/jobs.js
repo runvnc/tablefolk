@@ -1107,7 +1107,7 @@
     if (r.done) setDoing(g, s, 'asleep');
     return { ms: r.ms || 4000 };
   }
-  function wake(g, s) { if (g.pose?.mode === 'lie') { U().standUp(g); say(g, `${g.id} gets up`, false); } }
+  function wake(g, s) { if (g.pose?.mode === 'lie') { U().standUp(g); say(g, `${g.id} gets up`, false, { kind: 'routine' }); } }
 
   // ---------------------------------------------------------------- the evening
   // the social window (17-21): at the tavern (or the square) people talk.
