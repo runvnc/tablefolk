@@ -43,6 +43,10 @@ export const MODELS = {
   'bonsai2-27b': { engine: 'bonsai2', id: 'bonsai2-27b', label: 'Bonsai 2 27B', size: '5.9 GB', needGB: 10, readGB: 5.9, prefer: 1 },
   'gemma4-12b': { engine: 'litert', id: 'gemma4-12b-litert', label: 'Gemma 4 12B', size: '5.6 GB', needGB: 10, readGB: 5.6 },
   'bonsai2-9b': { engine: 'bonsai2', size9: true, id: 'bonsai2-9b', label: 'Bonsai 2 9B', size: '1.9 GB', needGB: 6, readGB: 1.9 },
+  // on the faster wllama build (engines/wllama-fast): not picked by needGB; ask for them by key
+  'inkling2-mini': { engine: 'wllama', id: 'inkling2-mini-wllama', label: 'Inkling 2 Mini', size: '8.7 GB', readGB: 2.1, hidden: true },
+  'inkling2-mini-small': { engine: 'wllama', id: 'inkling2-mini-small-wllama', label: 'Inkling 2 Mini (8GB-64K)', size: '6.6 GB', readGB: 1.9, hidden: true },
+  'sensenova-loop-9b': { engine: 'wllama', id: 'sensenova-loop-9b-wllama', label: 'SenseNova-Loop-9B', size: '6 GB', readGB: 5.4, hidden: true },
   'qwen1.5-0.5b': { engine: 'wllama', id: 'qwen1.5-0.5b', label: 'Qwen1.5 0.5B', size: '0.4 GB', tiny: true },
   'qwen2.5-0.5b': { engine: 'wllama', id: 'qwen2.5-0.5b', label: 'Qwen2.5 0.5B', size: '0.5 GB', tiny: true },
 };

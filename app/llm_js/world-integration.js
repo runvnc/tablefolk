@@ -1,7 +1,7 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261122b';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261122c';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261122b';
+import { installDevConsole } from './dev-console.js?v=20261122c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -760,6 +760,8 @@ async function main() {
     for (const m of manager.getSupportedModels()) {
       // Hidden models only appear if one was picked explicitly via ?model=.
       if (m.hidden && m.key !== manager.getModelKey()) continue;
+      // fitGB: big models listed only where they fit (graphics memory known and enough)
+      if (m.fitGB && m.key !== manager.getModelKey() && !(usableGB(device?.hw) >= m.fitGB)) continue;
       const opt = document.createElement('option');
       opt.value = m.key;
       opt.textContent = m.label + (device?.key === m.key && m.needGB ? ' ✓ best fit for this device' : '');

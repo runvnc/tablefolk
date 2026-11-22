@@ -14,7 +14,34 @@ import { getCurrentModel } from './wllama.js';
 // must be literal - they were once mangled into the bare words 'thinking' /
 // 'response', which made the model emit stray closing </think> tags and drift
 // out of command syntax.
+// Inkling 2: its own message tokens; thinking is skipped by opening the answer message in the prompt (with
+// reasoning_effort 0 it still thinks 100-540 tokens; brains.md, "Inkling 2 Mini")
+const INKLING_ROLE = { system: 'system', user: 'user', assistant: 'model' };
+function inklingPrompt(messages) {
+  let p = '', effort = false;
+  for (const m of messages) {
+    p += `<|message_${INKLING_ROLE[m.role] || 'user'}|><|content_text|>${m.content}<|end_message|>`;
+    if (m.role === 'system' && !effort) { p += '<|message_system|><|content_text|>Thinking effort level: 0<|end_message|>'; effort = true; }
+  }
+  return p + '<|message_model|><|content_text|>';
+}
+// where the part of a prompt shared between turns ends: before the last user message
+function primeEnd(prompt, template) {
+  const i = prompt.lastIndexOf(template === 'inkling' ? '<|message_user|>' : '<|im_start|>user');
+  return i > 0 ? i : -1;
+}
+// stop strings: the end of the answer; for Inkling also 1-2% of answers that run on into reasoning ("The user wants me to...")
+function stopsFor(template) {
+  if (template === 'inkling') return ['<|end_message|>', '<|content_model_end_sampling|>', '<|message_', 'The user'];
+  if (/^(chatml|raon|qwen-nothink)$/.test(template)) return ['<|im_end|>', '<|im_start|>'];
+  return [MINICPM_END];
+}
+const cutAt = (text, stops) => stops.reduce((t, s) => { const i = t.indexOf(s); return i >= 0 ? t.slice(0, i) : t; }, text);
+
 function buildPrompt(messages, think, template) {
+  if (template === 'inkling') return inklingPrompt(messages);
+  // Qwen 3.5 style (SenseNova-Loop-9B): ChatML with an empty think block unless thinking
+  if (template === 'qwen-nothink') return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n' + (think ? '<think>\n' : '<think>\n\n</think>\n\n');
   // Qwen: plain ChatML (its template adds nothing else when a system message is there)
   // Raon-1 nano: ChatML, and its template's empty think block unless thinking
   if (template === 'raon') return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n' + (think ? '<think>\n' : '<think></think>\n\n');
@@ -46,8 +73,19 @@ export function createWllama3Engine(wllamaInstance) {
             : null;
 
           const prompt = buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
-          const stopToken = /^(chatml|raon)$/.test(wllamaInstance.tablefolkTemplate) ? '<|im_end|>' : MINICPM_END;
+          const stops = stopsFor(wllamaInstance.tablefolkTemplate);
           const t0 = performance.now();
+          // hybrid models: read the shared prefix on its own when it changed, so a cache checkpoint sits at its end
+          if (wllamaInstance.tablefolkPrime) {
+            const end = primeEnd(prompt, wllamaInstance.tablefolkTemplate);
+            const prefix = end > 0 ? prompt.slice(0, end) : null;
+            if (prefix && prefix !== wllamaInstance.tablefolkPrimed) {
+              try {
+                await wllamaInstance.createCompletion({ prompt: prefix, max_tokens: 1, temperature: 0, cache_prompt: true });
+                wllamaInstance.tablefolkPrimed = prefix;
+              } catch (e) { console.warn('[tablefolk-wllama3] priming failed:', e?.message); }
+            }
+          }
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
             'prompt chars:', prompt.length, 'maxTokens:', maxTokens, 'sampling:', { temperature, top_p: config.top_p, top_k: config.top_k, repeat: config.repetition_penalty },
             'grammar:', grammar ? 'yes' : 'no', 'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
@@ -65,6 +103,7 @@ export function createWllama3Engine(wllamaInstance) {
             await wllamaInstance.createCompletion({
               prompt,
               stream: true,
+              cache_prompt: true,
               abortSignal: aborter.signal,
               max_tokens: maxTokens,
               temperature,
@@ -96,7 +135,7 @@ export function createWllama3Engine(wllamaInstance) {
                     'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
                 }
                 full += piece;
-                if (full.includes(stopToken) || shouldAbort?.()) { aborter.abort(); return; }
+                if (stops.some(st => full.includes(st)) || shouldAbort?.()) { aborter.abort(); return; }
                 onToken?.(full, true);
               },
             });
@@ -108,7 +147,7 @@ export function createWllama3Engine(wllamaInstance) {
             clearInterval(poll);
           }
 
-          const text = full.split(stopToken)[0].trim();
+          const text = cutAt(full, stops).trim();
           const totalMs = performance.now() - t0;
           const genMs = firstTokenAt !== null ? performance.now() - firstTokenAt : null;
 

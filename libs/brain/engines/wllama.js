@@ -73,7 +73,50 @@ const raon = (quant, parts, gb) => ({
   get js() { return RAON_JS(); },
 });
 
+// Inkling 2 Mini and SenseNova-Loop-9B need a newer llama.cpp than wllama 3.8.1 (inkling2_loop, the SenseNova Loop
+// PR) and are only fast with our ggml-webgpu patches (cached bind groups, fused kernels): wllama 4.0.0 built against
+// llama.cpp 5bacb7c + PR #32588 + tools/wllama-inkling/*.patch (build-fast.sh; brains.md, "Faster in Chrome").
+// ?fastwasm= / ?fastjs= override its files. The GGUFs come from Hugging Face at pinned revisions.
+const FAST_WASM = () => q().get('fastwasm') || new URL('./wllama-fast/wllama.wasm', import.meta.url).href;
+const FAST_JS = () => q().get('fastjs') || new URL('./wllama-fast/index.js', import.meta.url).href;
+const fast = cfg => ({
+  gpuLayers: 99,
+  ctx: 8192,
+  // what the speed was measured with: 512-token batches, flash attention
+  loadOpts: { n_batch: 512, n_ubatch: 512, flash_attn: true },
+  // hybrid models (recurrent state): the cache rolls back only to checkpoints, so the shared prefix is read
+  // once on its own first (a checkpoint at its end) and each turn reads only its own tokens
+  prime: true,
+  get wasm() { return FAST_WASM(); },
+  get js() { return FAST_JS(); },
+  ...cfg,
+});
+
 const MODEL_CONFIG = {
+  // Thinking Machines' Inkling 2 Mini (26.4B looped MoE): AtomicChat's AD-IQ2_M, ~10.5 GB on the card
+  'inkling2-mini-wllama': fast({
+    label: 'Inkling 2 Mini AD-IQ2_M (llama.cpp WebGPU)',
+    base: 'https://huggingface.co/AtomicChat/Inkling-2-Mini-GGUF/resolve/4f0c56af7e0c242e620be6394983d245b8c3fd27/',
+    file: 'Inkling-2-Mini-AD-IQ2_M.gguf',
+    size: 8665091680,
+    template: 'inkling',
+  }),
+  // drofn's 8GB-64K file (6.62 GB, ~8.9 GB on the card natively): for 12 GB cards
+  'inkling2-mini-small-wllama': fast({
+    label: 'Inkling 2 Mini 8GB-64K (llama.cpp WebGPU)',
+    base: 'https://huggingface.co/drofn/Inkling-2-Mini-8GB-GGUF/resolve/1101a9e52698296910262e191abde703e4f9e2ea/',
+    file: 'Inkling-2-Mini-8GB-64K.gguf',
+    size: 6623451456,
+    template: 'inkling',
+  }),
+  // SenseTime's SenseNova-Loop-9B: AtomicChat's AD-Q4_K_M (loads on the PR #32588 graph)
+  'sensenova-loop-9b-wllama': fast({
+    label: 'SenseNova-Loop-9B AD-Q4_K_M (llama.cpp WebGPU)',
+    base: 'https://huggingface.co/AtomicChat/SenseNova-Loop-9B-GGUF/resolve/6c661668960d4f50a2b0bbc63feb0b971255cd71/',
+    file: 'SenseNova-Loop-9B-AD-Q4_K_M.gguf',
+    size: 5960615008,
+    template: 'qwen-nothink',
+  }),
   'raon1-nano-q4-wllama': raon('Q4_K_M', 5, 1.94),
   'raon1-nano-q6-wllama': raon('Q6_K', 5, 2.46),
   'raon1-nano-q8-wllama': raon('Q8_0', 6, 3.16),
@@ -211,6 +254,7 @@ export async function loadModel(modelKey, onProgress) {
     const W = cfg.js ? (await import(cfg.js)).Wllama : Wllama;
     wllama = new W(cfg.wasm ? { default: cfg.wasm } : WLLAMA3_WASM, { allowOffline: false });
     await wllama.loadModelFromUrl(modelUrl, {
+      ...(cfg.loadOpts || {}),
       n_ctx: cfg.ctx || 4096,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
@@ -257,6 +301,7 @@ export async function loadModel(modelKey, onProgress) {
     currentModel = modelKey;
     note('brain', `${cfg.label} loaded on the ${usedLayers > 0 ? 'graphics card' : 'processor'} (${usedLayers > 0 ? usedLayers + ' layers on the GPU' : 'no WebGPU for it here'})`);
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
+    wllama.tablefolkPrime = !!cfg.prime;
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);
     return wllama;
