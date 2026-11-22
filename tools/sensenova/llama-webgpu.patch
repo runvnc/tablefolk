@@ -1,0 +1,15 @@
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+index a09b8a5e1..bb8d70e4c 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -4917,7 +4917,9 @@ static bool ggml_backend_webgpu_device_supports_op(ggml_backend_dev_t dev, const
+                     default:
+                         break;
+                 }
+-                if (ggml_prec_get_src(op, 1) == GGML_PREC_BF16 || ggml_prec_get_src(op, 1) == GGML_PREC_F32) {
++                // SenseNova Loop asks for F32 src1 precision on its F32 mHC routers: F32 x F32 is computed in F32 here
++                if (ggml_prec_get_src(op, 1) == GGML_PREC_BF16 ||
++                    (ggml_prec_get_src(op, 1) == GGML_PREC_F32 && !(src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32))) {
+                     supports_op = false;
+                 }
+                 break;

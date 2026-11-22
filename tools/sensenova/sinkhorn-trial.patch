@@ -1,0 +1,63 @@
+diff --git a/src/models/sensenova-loop.cpp b/src/models/sensenova-loop.cpp
+index 5cd339138..0d087018d 100644
+--- a/src/models/sensenova-loop.cpp
++++ b/src/models/sensenova-loop.cpp
+@@ -1,6 +1,7 @@
+ #include "models.h"
+ 
+ #include <cmath>
++#include <cstdlib>
+ #include <stdexcept>
+ 
+ void llama_model_sensenova_loop::load_arch_hparams(llama_model_loader & ml) {
+@@ -131,6 +132,50 @@ llama_model_sensenova_loop::graph::routing llama_model_sensenova_loop::graph::bu
+             x = ggml_neg(ctx0, ggml_softplus(ctx0, ggml_neg(ctx0, delta)));
+             y = ggml_neg(ctx0, ggml_softplus(ctx0, delta));
+         };
++        static const bool closed = getenv("SN_SINKHORN_CLOSED") != nullptr;
++        if (closed) {
++            // Trial only: the 2x2 Sinkhorn limit, p = sigmoid((m00 + m11 - m01 - m10) / 2); the model was trained with 20 iterations.
++            ggml_tensor * d = ggml_scale(ctx0, ggml_sub(ctx0, ggml_add(ctx0, result.mix[0], result.mix[3]), ggml_add(ctx0, result.mix[1], result.mix[2])), 0.5f);
++            ggml_tensor * p = ggml_sigmoid(ctx0, d), * q = ggml_sigmoid(ctx0, ggml_neg(ctx0, d));
++            result.mix[0] = p; result.mix[3] = p; result.mix[1] = q; result.mix[2] = q;
++            cb(result.input, "mhc_input", il);
++            return result;
++        }
++        static const bool powered = getenv("SN_SINKHORN_POW") != nullptr;
++        if (powered) {
++            // Exact for the finite iteration count, in ~80 nodes instead of ~480: the 2x2 log-domain
++            // Sinkhorn map composed by binary powering (the CPU kernel of PR ggml-org/llama.cpp#32588).
++            auto sp = [&](ggml_tensor * x) { return ggml_softplus(ctx0, x); };
++            ggml_tensor * d0 = ggml_sub(ctx0, result.mix[0], result.mix[1]);
++            ggml_tensor * d1 = ggml_sub(ctx0, result.mix[2], result.mix[3]);
++            ggml_tensor * ca = ggml_sub(ctx0, sp(ggml_neg(ctx0, d1)), sp(ggml_neg(ctx0, d0)));
++            ggml_tensor * cb_ = ggml_sub(ctx0, sp(d1), sp(d0));
++            if (hparams.mhc_iterations > 1) {
++                const float l2 = logf(2.0f);
++                ggml_tensor * hi = ggml_add(ctx0, ggml_relu(ctx0, ca), ggml_relu(ctx0, cb_));
++                ggml_tensor * lo = ggml_neg(ctx0, ggml_add(ctx0, ggml_relu(ctx0, ggml_neg(ctx0, ca)), ggml_relu(ctx0, ggml_neg(ctx0, cb_))));
++                ggml_tensor * range = ggml_sub(ctx0, hi, lo);
++                ggml_tensor * power = ggml_scale_bias(ctx0, sp(ggml_neg(ctx0, range)), -1.0f, l2);
++                ggml_tensor * sum = nullptr;
++                for (uint32_t n = hparams.mhc_iterations - 1; n; n >>= 1) {
++                    if (n & 1) {
++                        sum = sum ? ggml_sub(ctx0, ggml_add(ctx0, sum, sp(ggml_sub(ctx0, power, sum))), sp(ggml_sub(ctx0, ggml_add(ctx0, sum, power), range))) : power;
++                    }
++                    if (n > 1) {
++                        power = ggml_scale_bias(ctx0, ggml_sub(ctx0, power, sp(ggml_sub(ctx0, ggml_scale(ctx0, power, 2.0f), range))), 1.0f, l2);
++                    }
++                }
++                ggml_tensor * shift = ggml_sub(ctx0, sp(ggml_sub(ctx0, sum, hi)), sp(ggml_add(ctx0, sum, lo)));
++                ca = ggml_add(ctx0, ca, shift);
++                cb_ = ggml_add(ctx0, cb_, shift);
++            }
++            result.mix[0] = ggml_sigmoid(ctx0, ca);
++            result.mix[1] = ggml_sigmoid(ctx0, cb_);
++            result.mix[2] = ggml_sigmoid(ctx0, ggml_neg(ctx0, ca));
++            result.mix[3] = ggml_sigmoid(ctx0, ggml_neg(ctx0, cb_));
++            cb(result.input, "mhc_input", il);
++            return result;
++        }
+         for (uint32_t i = 0; i < hparams.mhc_iterations; ++i) {
+             normalize(result.mix[0], result.mix[1]);
+             normalize(result.mix[2], result.mix[3]);

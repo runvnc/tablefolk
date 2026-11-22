@@ -1136,6 +1136,102 @@ load. Weak GPUs with lots of RAM: no (the CPU path in the browser writes 0.6
 tok/s). What would unblock it: elementwise fusion in ggml-webgpu for this
 graph (or a custom engine), and sending `llama-webgpu.patch` upstream.
 
+## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
+
+SenseTime's `sensenova/SenseNova-Loop-9B` (released 2026-11-17; the Preview
+2026-10-31), Apache-2.0, English and Chinese, text + images in. A Qwen3.5-style
+hybrid (3 Gated DeltaNet layers per gated full-attention layer, hidden 4096,
+FFN 12288, 16 query / 4 KV heads of 256, vocabulary 248,320, dense, no MoE),
+32 stored layers of which 4-27 run twice (56 layer visits, "14.6B
+inference-equivalent"), plus **two-stream mHC** over the looped block: before
+each attention and each FFN a tiny F32 router (8,192 -> 8) mixes the two
+residual streams through a 2x2 matrix normalised by **20 Sinkhorn
+iterations**. 512K context. Thinks by default (Qwen template, `<think>`);
+`enable_thinking: false` puts an empty think block and it answers directly.
+MTP draft head shipped. The base repo is gated (auto-approve); the GGUF and
+AWQ repos are open.
+
+Quants: official GGUF BF16 / Q8_0 9.8 GB / Q5_K_M 6.7 / Q4_K_M 5.8 (+ mmproj
+0.9) and AWQ 4-bit 4.9 GB; AtomicChat AD-Q6_K 8.8 / AD-Q5_K_M 6.9 /
+**AD-Q4_K_M 6.0** (mean KLD 0.045 against BF16, half the official Q4_K_M's
+0.10) / AD-IQ4_XS 5.8 / AD-IQ3_S 4.9; drofn's full ladder (Q8_0 KLD 0.005 ...
+Q4_K_M 0.062, IQ3_XXS 0.34, IQ2_M 0.56; Q2_0 / Q1_0 / IQ1_* broken or near it):
+**nothing usable at 2 bits or below**, no QAT/ternary GGUF (cyankiwi's
+"QAT-HAWQ" is 9 GB safetensors). EXL3, MLX, NInfer, a "QSA" GGUF. Nothing for
+WebLLM/MLC, transformers.js/ONNX or LiteRT (searched 2026-11-22).
+
+Engines: llama.cpp needs SenseNova's fork (`OpenSenseNova/llama.cpp` 24ea7bb,
+on no branch: fetch the sha) or the open upstream PR ggml-org/llama.cpp#32588
+(`blueswhen/llama.cpp` branch `sensenova-loop`); `loop_backend` there has
+Metal/Vulkan fused kernels. SGLang PR #47281, vLLM PR #64832, LightLLM. The
+fork adds **no ggml ops**: every op exists in ggml-webgpu, so wllama builds as
+is. Two costs in it:
+- The router matmul asks for F32 input precision, which CUDA (Ampere and up),
+  Vulkan and WebGPU refuse, so 96 matmuls a token ran on the CPU (194 graph
+  splits): fork on CUDA 1-2 tok/s (10 with `-t 8`), Chrome 0.1.
+  `tools/sensenova/llama-webgpu.patch` lets ggml-webgpu take F32 x F32 at F32
+  precision: 2 splits.
+- The Sinkhorn is unrolled as ~480 elementwise nodes per route: **52,729 graph
+  nodes a token** (Inkling 2 Mini: ~12,000). The PR rewrites it as an exact
+  closed form (binary powering of the 2x2 map; 14,145 nodes, CUDA 46 tok/s
+  Q4 / 35 Q8_0 writing, 4,400-4,600 reading on a 4090).
+  `tools/sensenova/sinkhorn-trial.patch` (trial only, env switches) adds that
+  exact form to the fork's graph (`SN_SINKHORN_POW=1`: 12,985 nodes, the same
+  greedy text as the 20 iterations; the formula checked to 3e-16 in Python)
+  and the iteration's limit, `sigmoid((m00+m11-m01-m10)/2)`
+  (`SN_SINKHORN_CLOSED=1`: 6,937 nodes; **mean KLD 0.062** against the 20
+  iterations, 87% same top token: as lossy as Q4_K_M, so not shippable, but it
+  is the speed a fused one-dispatch Sinkhorn kernel would give).
+
+Measured on a rented RTX 4090 (vast.ai, driver 595.99, Chrome 158), AD-Q4_K_M,
+the innkeeper prompt (`tools/sensenova/turns.py`, `sensenova-test.html`: 3,327
+tokens of shared prefix primed, then 30-35 new tokens a turn, thinking off):
+
+| | read tok/s | write tok/s | a turn (16-45 tokens written) | graph nodes |
+|---|---|---|---|---|
+| native WebGPU (Dawn), 20 iterations | 409-890 | 2.0-2.1 | 11-22 s | 52,729 |
+| native WebGPU, exact powered form | - | 5.2 (contended) | - | 12,985 |
+| native WebGPU, limit form (lossy) | 889-1,107 | 18-20 | 2.0-3.0 s | 6,937 |
+| **Chrome (wllama), 20 iterations** | 183 (prefix 18.6 s) | **1.0-1.2** | **20-34 s** | 52,729 |
+| Chrome, limit form (lossy) | 196-210 (prefix 16 s) | 8.6-9.5 | 2.5-6.2 s | 6,937 |
+| CUDA, PR #32588 build (reference) | 4,400-4,600 | 35 (Q8_0) - 46 (Q4) | - | 14,145 |
+
+Chrome: load 41-82 s from a local server, peak graphics memory 6.7 GB for the
+whole card (model 5.0 GB, KV 112 MB and recurrent state 88 MB at 8k, compute
+535 MB); answers correct and in character ("Five gold, and no less. The
+harvest's thin, but my stew's worth it."); prefix reuse works after priming
+(reused 3,327 each turn). The exact powered form was built into wllama but the
+box was lost before the Chrome run.
+
+**Ability (the endpoint as the measuring device)**: the PR build's llama-server,
+Q8_0, thinking off by `--chat-template-kwargs`, run by URL
+(`probe.mjs --model=endpoint --llm=http://127.0.0.1:8081/v1`): capability
+check v3 **7/10** at 27 tok/s -> guided (talk in code); missed the sums, the
+character (talked about being an AI) and the plan format. Bonsai 2 9B: 5/10,
+27B: 6/10. Hearthvale's day at guided (12 min, endpoint on the 4090): 97%
+model-chosen activities, 25 self-started interactions (13 pairs), 15 plans /
+15 revised, 58 surprises, depth 0.65, wasted 2%, all 8 ate, nobody hungry at
+the end, 6 things made, 2 sales, 58% indoors in the raid, 8.8 model calls a
+game hour, 3.3 s a turn median. Judge 3.5 / 3.88 / 4.13 / 2.88 (Bonsai 2 9B
+guided 3.5 / 3.88 / 4.13 / 3.0; 27B 4.0 / 4.25 / 4.5 / 3.25): wren once called
+himself the baker. The free day did not finish (the rented box vanished at
+minute ~2).
+
+**Verdict**: the strongest check score of any brain measured, judged like
+Bonsai 2 9B at guided, but in Chrome as shipped it writes ~1 tok/s (20-34 s a
+turn): no for every card size today. Memory is not the problem (AD-Q4_K_M:
+6.7 GB with Chrome, ~8.5 GB with the game: fits 12 GB; Q8_0 ~11 GB, ~13 with
+the game: 16 GB). What would unblock it: a fused 2x2 Sinkhorn kernel in
+ggml-webgpu (or the exact powered form plus fusing its ~80 elementwise nodes),
+which the limit-form run puts at ~9 tok/s and 2.5-6 s a turn on a 4090 (in
+Inkling's range; Bonsai 2 9B's engine does 76-145 tok/s), plus
+`llama-webgpu.patch` upstream. Not wired into the picker.
+
+Build: `tools/sensenova/build-native.sh` (CUDA + Dawn WebGPU from the fork;
+the linux-desktop image needs `libcublas-dev-12-9`, and `cuda-nvml-dev-12-9`
+for the PR branch), `build-wllama.sh` (wllama fa1019a against the fork, the
+Inkling glue patch not needed), `brun.sh` (one Chrome run on the box).
+
 ## Autonomy: rails, guided, free (2026-11-21)
 
 `app/agency.js` (minds.md, "autonomy"). Measured on vast.ai, one RTX 3090

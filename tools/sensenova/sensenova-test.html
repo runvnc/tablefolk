@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SenseNova wllama test</title></head>
+<body><pre id="log"></pre>
+<script type="module">
+// Trial page (brains.md, "SenseNova-Loop-9B"): served from the wllama checkout
+// (MULTITHREAD=1 node scripts/http_server.js), the GGUF beside it as m.gguf.
+// The innkeeper prompt of tools/sensenova/turns.py in ChatML, thinking off
+// (empty think block). ?ctx=8192&ub=512&prime=1&n=64&raw=1&think=1&ngl=
+// Results go to the console as "SN {...}" (tools/wllama-inkling/brun.sh greps INK: pass TAG=SN).
+import { Wllama } from '/esm/index.js';
+const q = new URLSearchParams(location.search);
+const out = (o) => { const s = 'SN ' + JSON.stringify(o); console.log(s); document.getElementById('log').textContent += s + '\n'; };
+const names = ['rosa', 'tam', 'odo', 'maren', 'hector', 'brann', 'jory', 'wren'];
+const p2 = (n) => String(n).padStart(2, '0');
+const lines = [];
+for (let i = 0; i < 70; i++) {
+  lines.push(`[${p2(8 + Math.floor(i / 6))}:${p2((i * 7) % 60)}] ${names[i % 8]} walks to the well near the bakery, looks at the apples in the cart, ` +
+    `and says to ${names[(i + 3) % 8]}: "The harvest is thin this year; bread costs ${2 + i % 4} gold now."`);
+}
+const system = 'You are Greta, the innkeeper of Hearthvale. You are warm but drive a hard bargain. Stew costs 5 gold; never sell under 4. ' +
+  'Answer with one action: say("..."), give(item, name), walk(place) or wait(). Keep it under 30 words.\n\nWhat happened today:\n' + lines.join('\n');
+const prefix = `<|im_start|>system\n${system}<|im_end|>\n`;
+const users = ["Player (wren): Greta, I'd like a bowl of stew. Will you take 3 gold?",
+  'Player (wren): Fine. What about 4 gold, and you tell me the news?',
+  'Player (tam): Greta! Did you see the crows in the orchard?'];
+const stats = (t, r) => { const tm = r.timings || {}; return { wall_s: ((performance.now() - t) / 1000).toFixed(2), read: tm.prompt_n, reused: tm.cache_n,
+  read_tps: tm.prompt_per_second?.toFixed(1), written: tm.predicted_n, write_tps: tm.predicted_per_second?.toFixed(1), text: (r.choices?.[0]?.text || '').slice(0, 300) }; };
+try {
+  const w = new Wllama({ default: '/src/wasm/wllama.wasm' });
+  const t0 = performance.now(); let lastPct = -10;
+  await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
+    n_ctx: +(q.get('ctx') || 8192), n_batch: +(q.get('ub') || 512), n_ubatch: +(q.get('ub') || 512),
+    flash_attn: q.get('fa') !== '0', n_gpu_layers: +(q.get('ngl') ?? 999), ...(q.get('threads') ? { n_threads: +q.get('threads') } : {}),
+    progressCallback: ({ loaded, total }) => { const p = Math.floor(100 * loaded / total); if (p >= lastPct + 10) { lastPct = p; out({ dl: p, s: ((performance.now() - t0) / 1000).toFixed(1) }); } },
+  });
+  out({ loaded_s: ((performance.now() - t0) / 1000).toFixed(1) });
+  if (q.get('raw') === '1') {
+    const t = performance.now();
+    out({ raw: stats(t, await w.createCompletion({ prompt: 'The capital of France is Paris. The capital of Germany is', max_tokens: 8, temperature: 0 })) });
+  }
+  if (q.get('prime') === '1') {
+    const t = performance.now();
+    out({ prime: stats(t, await w.createCompletion({ prompt: prefix, max_tokens: 1, temperature: 0, cache_prompt: true })) });
+  }
+  const opener = q.get('think') === '1' ? '<think>\n' : '<think>\n\n</think>\n\n';
+  for (const u of users) {
+    const t = performance.now();
+    try {
+      const r = await w.createCompletion({ prompt: prefix + `<|im_start|>user\n${u}<|im_end|>\n<|im_start|>assistant\n${opener}`,
+        max_tokens: +(q.get('n') || 64), temperature: 0.2, cache_prompt: true, stop: ['<|im_end|>', '<|im_start|>'] });
+      out(stats(t, r));
+    } catch (e) { out({ call_error: String(e).slice(0, 200) }); }
+  }
+  out({ done: true });
+} catch (e) { out({ error: String(e?.stack || e) }); }
+</script></body></html>
