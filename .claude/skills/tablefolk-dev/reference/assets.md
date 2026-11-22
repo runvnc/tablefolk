@@ -294,6 +294,22 @@ decimation for other generated models), `analyze.py`, `check.py` (the gate),
    raw + 500 or whose parts jump past raw + max(5, raw). Run it before
    committing any processed model.
 
+Rebuild of 2026-11-22: every env model passes (welded open edges within 15%
+of the raw's, one part; the decompressed finals match Blender's output edge
+for edge). Sizes kept within 1-2%, except: `fantasy_house` keeps its front
+steps (`w` 5.44 binds, so the walls keep the first run's scale; footprint
+5.44 x 5.18); `bed` is 33k triangles, not 10k (welded, its cloth folds are
+non-manifold and the collapse stops there; splitting those edges let it
+through but wrecked the frame); `hay` 1.64 m high (decimation pushed strands
+16 cm below the ground: proc.py now clamps at 0). The other generated
+models torn the same way are the Hunyuan3D animals reskinned with
+`reskin-animal.py` (it decimated past 60k faces unwelded; welds now): bull,
+dog, donkey, horse, husky, pig, stag and white_horse still are (25-50k open
+edges each; their raw `hunyuan31.glb` files were deleted, so they need
+regenerating); the bear was rebuilt from its raw (50k open edges to 4).
+Meshy characters, Quaternius, KayKit, village/farm/nature packs and the
+`gen/` props are not torn (the packs' many parts are authored pieces).
+
 Faults to watch for: soft cast shadows and ground or grass discs under the
 object (ask for none, reject inputs that keep them), hollow things filled in
 (a well's shaft), plaster whiter than the scenes, spiky roof-ridge noise,

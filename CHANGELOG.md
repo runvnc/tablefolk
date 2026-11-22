@@ -6,6 +6,8 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-22
 
+- **Buildings without holes up close**: the village buildings and the furniture made from the concept scenes looked fine from afar but had holes, cracks and missing bits up close (the inn's stone base and steps were gone). All 25 are rebuilt from the original models with their seams kept together: the same sizes, no gaps, and the bases and doorsteps are back. The bear is rebuilt the same way; a check now stops a torn model before it ships.
+
 - **Ways between sections show before you take them**: a road off the edge has a soft warm band along that rim and an on-screen prompt within two squares ("To the Wolfwood → keep walking east · press E"); walking off the rim goes on only once the prompt has shown (or E, or a tap on it), never the moment you touch the edge. Doors, stairs, caves, gates and trapdoors name where they go on a label shown near or when looked at, and arriving shows the section's name as a title card.
 - **Inkling 2 Mini runs correctly in the browser on a 16 GB card, still slow**: a fix to llama.cpp's WebGPU backend (expert matmuls added up in half precision and overflowed; one quant type was missing) makes the small 8-10 GB versions of Thinking Machines' 26B model answer correctly in Chrome, with 10.5 GB of graphics memory. With thinking turned off and the shared start of the prompt read once, a character's turn takes 5-9 s on 16-24 GB cards (Bonsai 2 27B: 2-4 s), so it is not offered yet. The build and the fix are in `tools/wllama-inkling/`.
 

@@ -51,6 +51,10 @@ bpy.context.view_layer.objects.active = news[0]
 if len(news) > 1: bpy.ops.object.join()
 new = bpy.context.view_layer.objects.active
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# weld first: the GLB splits every vertex along UV seams; decimating the split
+# fragments one by one tore the 2026-11-14/15 animals open (bear: 50k open edges)
+import bmesh
+_bm = bmesh.new(); _bm.from_mesh(new.data); bmesh.ops.remove_doubles(_bm, verts=_bm.verts[:], dist=1e-5); _bm.to_mesh(new.data); _bm.free(); new.data.update()
 # heavy models (Hunyuan3D's default is 500k faces): down to about 40k
 if len(new.data.polygons) > 60000:
     dm = new.modifiers.new('dec', 'DECIMATE'); dm.ratio = 40000 / len(new.data.polygons)

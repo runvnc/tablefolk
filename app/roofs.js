@@ -255,8 +255,9 @@
   // its doorway), see-through when it hides the player from the follow camera;
   // while it stands, the characters inside are hidden (they are indoors).
   // "shells": false in a scenario turns them off.
-  const SHELL_FOOT = { house: [4.69, 4.99], fantasy_house: [5.44, 5.01], tall_house: [3.68, 6.01], stone_house: [3.82, 5.52], inn: [6.71, 8], blacksmith: [6.94, 6.01],
-    barracks: [7.52, 4.94], stable: [7.05, 4.62], barn: [6.51, 9], mill_house: [4.7, 5] };
+  // the models' footprints (env manifest; rebuilt welded 2026-11-22: fantasy_house's depth now includes its front steps)
+  const SHELL_FOOT = { house: [4.68, 5.0], fantasy_house: [5.44, 5.18], tall_house: [3.68, 6.0], stone_house: [3.78, 5.5], inn: [6.67, 8], blacksmith: [6.94, 6.0],
+    barracks: [7.5, 4.92], stable: [7.0, 4.58], barn: [6.5, 9], mill_house: [4.7, 5] };
   // where each model's front door is, along its front (model x, metres; read off its front
   // view, look pass 4; also "door_x" in the env manifest): the shell slides to line it up
   const DOOR_X = { house: 1.0, fantasy_house: .45, tall_house: 0, stone_house: 0, inn: 0, barracks: .5, mill_house: -.85, blacksmith: 0, stable: 0, barn: 0 };
