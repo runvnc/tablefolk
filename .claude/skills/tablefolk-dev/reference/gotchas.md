@@ -67,6 +67,10 @@ in the code.
 - Bloom washes out emissive or white things (notes, the torch flame).
 - A freeze at start-up was GPU frame time, not the main thread: measure with
   `jank.mjs`.
+- Holes and cracks up close in generated models: they were decimated (and
+  loose-part filtered) without welding the GLB's seam-split vertices first.
+  Weld by position before anything; `tools/env-assets/check.py` is the gate
+  (assets.md, environment models).
 
 ## Browser and network
 

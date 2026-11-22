@@ -8,14 +8,14 @@
     "1k": "house.1k.glb"
    },
    "footprint_m": [
-    4.69,
-    4.99
+    4.68,
+    5.0
    ],
    "footprint_cells": [
     5,
     5
    ],
-   "height_m": 4.53,
+   "height_m": 4.48,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
    "triangles": 30000,
@@ -28,8 +28,8 @@
     ]
    },
    "kb": {
-    "full": 2710,
-    "1k": 1425
+    "full": 2408,
+    "1k": 1123
    },
    "replaces": {
     "house": {
@@ -62,13 +62,13 @@
    },
    "footprint_m": [
     5.44,
-    5.01
+    5.18
    ],
    "footprint_cells": [
     6,
     5
    ],
-   "height_m": 5.57,
+   "height_m": 5.53,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
    "triangles": 30000,
@@ -81,8 +81,8 @@
     ]
    },
    "kb": {
-    "full": 2842,
-    "1k": 1421
+    "full": 2478,
+    "1k": 1057
    },
    "replaces": {
     "fantasy_house": {
@@ -103,7 +103,7 @@
      ]
     }
    },
-   "notes": "walk-in size (WALK_IN fantasy_house 6x5). Two-storey timber frame, clay tile. Made in the style test (its cost is in the test's ledger, not this one)."
+   "notes": "walk-in size (WALK_IN fantasy_house 6x5). Two-storey timber frame, clay tile. Made in the style test (its cost is in the test's ledger, not this one). Footprint includes the front steps (0.17 m); the walls are 5.44 x 5.01."
   },
   {
    "type": "stone_house",
@@ -112,17 +112,17 @@
     "1k": "stone_house.1k.glb"
    },
    "footprint_m": [
-    3.82,
-    5.52
+    3.78,
+    5.5
    ],
    "footprint_cells": [
     4,
     6
    ],
-   "height_m": 4.7,
+   "height_m": 4.66,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
-   "triangles": 30000,
+   "triangles": 29998,
    "textures_px": {
     "full": [
      2048
@@ -132,8 +132,8 @@
     ]
    },
    "kb": {
-    "full": 2255,
-    "1k": 1157
+    "full": 1967,
+    "1k": 868
    },
    "replaces": {
     "stone_house": {
@@ -165,16 +165,16 @@
    },
    "footprint_m": [
     3.68,
-    6.01
+    6.0
    ],
    "footprint_cells": [
     4,
     6
    ],
-   "height_m": 6.35,
+   "height_m": 6.34,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
-   "triangles": 30000,
+   "triangles": 29999,
    "textures_px": {
     "full": [
      2048
@@ -184,8 +184,8 @@
     ]
    },
    "kb": {
-    "full": 2522,
-    "1k": 1332
+    "full": 2177,
+    "1k": 988
    },
    "replaces": {
     "tall_house": {
@@ -215,17 +215,17 @@
     "1k": "inn.1k.glb"
    },
    "footprint_m": [
-    6.71,
+    6.67,
     8.0
    ],
    "footprint_cells": [
     7,
     8
    ],
-   "height_m": 6.44,
+   "height_m": 6.43,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
-   "triangles": 30000,
+   "triangles": 29998,
    "textures_px": {
     "full": [
      2048
@@ -235,8 +235,8 @@
     ]
    },
    "kb": {
-    "full": 2933,
-    "1k": 1487
+    "full": 2581,
+    "1k": 1134
    },
    "replaces": {
     "inn": {
@@ -268,16 +268,16 @@
    },
    "footprint_m": [
     6.94,
-    6.01
+    6.0
    ],
    "footprint_cells": [
     7,
     6
    ],
-   "height_m": 6.96,
+   "height_m": 6.95,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "open forge front",
-   "triangles": 30000,
+   "triangles": 29999,
    "textures_px": {
     "full": [
      2048
@@ -287,8 +287,8 @@
     ]
    },
    "kb": {
-    "full": 2185,
-    "1k": 1104
+    "full": 1925,
+    "1k": 844
    },
    "replaces": {
     "blacksmith": {
@@ -319,7 +319,7 @@
     "1k": "barn.1k.glb"
    },
    "footprint_m": [
-    6.51,
+    6.5,
     9.0
    ],
    "footprint_cells": [
@@ -329,7 +329,7 @@
    "height_m": 7.02,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
-   "triangles": 30000,
+   "triangles": 29999,
    "textures_px": {
     "full": [
      2048
@@ -339,8 +339,8 @@
     ]
    },
    "kb": {
-    "full": 2140,
-    "1k": 1112
+    "full": 1875,
+    "1k": 847
    },
    "replaces": {
     "barn": {
@@ -370,17 +370,17 @@
     "1k": "stable.1k.glb"
    },
    "footprint_m": [
-    7.05,
-    4.62
+    7.0,
+    4.58
    ],
    "footprint_cells": [
     7,
     5
    ],
-   "height_m": 3.92,
+   "height_m": 3.9,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "row of stall doors",
-   "triangles": 30000,
+   "triangles": 29999,
    "textures_px": {
     "full": [
      2048
@@ -390,8 +390,8 @@
     ]
    },
    "kb": {
-    "full": 2271,
-    "1k": 1195
+    "full": 1969,
+    "1k": 894
    },
    "replaces": {
     "stable": {
@@ -420,14 +420,14 @@
     "1k": "barracks.1k.glb"
    },
    "footprint_m": [
-    7.52,
-    4.94
+    7.5,
+    4.92
    ],
    "footprint_cells": [
     8,
     5
    ],
-   "height_m": 7.55,
+   "height_m": 7.54,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
    "triangles": 30000,
@@ -440,8 +440,8 @@
     ]
    },
    "kb": {
-    "full": 2119,
-    "1k": 1168
+    "full": 1808,
+    "1k": 857
    },
    "replaces": {
     "barracks": {
@@ -481,7 +481,7 @@
     5,
     5
    ],
-   "height_m": 7.68,
+   "height_m": 7.67,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
    "triangles": 30000,
@@ -494,8 +494,8 @@
     ]
    },
    "kb": {
-    "full": 2550,
-    "1k": 1420
+    "full": 2069,
+    "1k": 939
    },
    "replaces": {
     "mill_house": {
@@ -545,8 +545,8 @@
     ]
    },
    "kb": {
-    "full": 1726,
-    "1k": 682
+    "full": 1661,
+    "1k": 618
    },
    "replaces": {
     "well": {
@@ -577,7 +577,7 @@
    },
    "footprint_m": [
     1.9,
-    1.59
+    1.57
    ],
    "footprint_cells": [
     2,
@@ -586,7 +586,7 @@
    "height_m": 2.22,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "counter side",
-   "triangles": 12000,
+   "triangles": 11999,
    "textures_px": {
     "full": [
      2048
@@ -596,8 +596,8 @@
     ]
    },
    "kb": {
-    "full": 2092,
-    "1k": 812
+    "full": 2004,
+    "1k": 724
    },
    "replaces": {
     "market_stand": {
@@ -628,16 +628,16 @@
    },
    "footprint_m": [
     1.85,
-    1.31
+    1.3
    ],
    "footprint_cells": [
     2,
     1
    ],
-   "height_m": 0.95,
+   "height_m": 0.94,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "handles",
-   "triangles": 12000,
+   "triangles": 11999,
    "textures_px": {
     "full": [
      2048
@@ -647,8 +647,8 @@
     ]
    },
    "kb": {
-    "full": 1662,
-    "1k": 680
+    "full": 1615,
+    "1k": 633
    },
    "replaces": {
     "cart": {
@@ -679,16 +679,16 @@
    },
    "footprint_m": [
     2.0,
-    0.26
+    0.23
    ],
    "footprint_cells": [
     2,
     1
    ],
-   "height_m": 1.04,
+   "height_m": 1.02,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "either long side",
-   "triangles": 6000,
+   "triangles": 5999,
    "textures_px": {
     "full": [
      2048
@@ -729,7 +729,7 @@
    },
    "footprint_m": [
     1.63,
-    1.99
+    1.98
    ],
    "footprint_cells": [
     1,
@@ -748,8 +748,8 @@
     ]
    },
    "kb": {
-    "full": 1249,
-    "1k": 406
+    "full": 1229,
+    "1k": 386
    },
    "replaces": "new type",
    "notes": "code-built in app.js (no pack.json item; glyph I). New file."
@@ -761,17 +761,17 @@
     "1k": "hay.1k.glb"
    },
    "footprint_m": [
-    1.92,
-    1.91
+    1.91,
+    1.84
    ],
    "footprint_cells": [
     1,
     1
    ],
-   "height_m": 1.71,
+   "height_m": 1.64,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "door",
-   "triangles": 10424,
+   "triangles": 14316,
    "textures_px": {
     "full": [
      2048
@@ -781,8 +781,8 @@
     ]
    },
    "kb": {
-    "full": 2617,
-    "1k": 989
+    "full": 2708,
+    "1k": 1080
    },
    "replaces": {
     "hay": {
@@ -812,14 +812,14 @@
     "1k": "table.1k.glb"
    },
    "footprint_m": [
-    1.41,
-    0.87
+    1.4,
+    0.86
    ],
    "footprint_cells": [
     1,
     1
    ],
-   "height_m": 0.77,
+   "height_m": 0.76,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "long side",
    "triangles": 8000,
@@ -832,8 +832,8 @@
     ]
    },
    "kb": {
-    "full": 1328,
-    "1k": 495
+    "full": 1307,
+    "1k": 473
    },
    "replaces": {
     "table": {
@@ -860,16 +860,16 @@
    },
    "footprint_m": [
     1.4,
-    0.4
+    0.39
    ],
    "footprint_cells": [
     1,
     1
    ],
-   "height_m": 0.48,
+   "height_m": 0.47,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "long side",
-   "triangles": 6000,
+   "triangles": 5999,
    "textures_px": {
     "full": [
      2048
@@ -879,8 +879,8 @@
     ]
    },
    "kb": {
-    "full": 1122,
-    "1k": 405
+    "full": 1112,
+    "1k": 395
    },
    "replaces": {
     "bench": {
@@ -907,16 +907,16 @@
    },
    "footprint_m": [
     1.0,
-    1.95
+    1.94
    ],
    "footprint_cells": [
     1,
     2
    ],
-   "height_m": 0.7,
+   "height_m": 0.69,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "foot end",
-   "triangles": 10000,
+   "triangles": 33271,
    "textures_px": {
     "full": [
      2048
@@ -926,8 +926,8 @@
     ]
    },
    "kb": {
-    "full": 3114,
-    "1k": 1088
+    "full": 3616,
+    "1k": 1590
    },
    "replaces": {
     "bed": {
@@ -947,7 +947,7 @@
      ]
     }
    },
-   "notes": "pack.json bed 1.0x1.9, length along z. Meshy made it 1.12 long; the middle was stretched to 1.95 (ends and posts kept)."
+   "notes": "pack.json bed 1.0x1.9, length along z. Meshy made it 1.12 long; the middle was stretched to 1.95 (ends and posts kept). 33k triangles: its cloth folds are non-manifold once welded and stop the decimator; decimating unwelded tore it."
   },
   {
    "type": "bookcase",
@@ -957,7 +957,7 @@
    },
    "footprint_m": [
     0.96,
-    0.54
+    0.53
    ],
    "footprint_cells": [
     1,
@@ -976,8 +976,8 @@
     ]
    },
    "kb": {
-    "full": 1260,
-    "1k": 558
+    "full": 1224,
+    "1k": 522
    },
    "replaces": {
     "bookcase": {
@@ -1008,13 +1008,13 @@
    },
    "footprint_m": [
     0.93,
-    0.76
+    0.75
    ],
    "footprint_cells": [
     1,
     1
    ],
-   "height_m": 0.76,
+   "height_m": 0.75,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "lock",
    "triangles": 8000,
@@ -1027,8 +1027,8 @@
     ]
    },
    "kb": {
-    "full": 1519,
-    "1k": 648
+    "full": 1512,
+    "1k": 642
    },
    "replaces": {
     "chest": {
@@ -1066,7 +1066,7 @@
     3,
     1
    ],
-   "height_m": 1.19,
+   "height_m": 1.18,
    "front": "+z (glTF; the game's +z at ry 0)",
    "front_is": "plain panelled customer side",
    "triangles": 15000,
@@ -1079,8 +1079,8 @@
     ]
    },
    "kb": {
-    "full": 1991,
-    "1k": 867
+    "full": 1867,
+    "1k": 743
    },
    "replaces": "new type bar_counter (3x1); shelves and cupboards on the keeper's side (-z). Made in the style test (its cost is in the test's ledger).",
    "notes": "New type."
@@ -1092,8 +1092,8 @@
     "1k": "torch.1k.glb"
    },
    "footprint_m": [
-    0.5,
-    0.49
+    0.55,
+    0.5
    ],
    "footprint_cells": [
     1,
@@ -1112,8 +1112,8 @@
     ]
    },
    "kb": {
-    "full": 1261,
-    "1k": 429
+    "full": 1247,
+    "1k": 415
    },
    "replaces": {
     "torch": {
@@ -1144,7 +1144,7 @@
    },
    "footprint_m": [
     0.97,
-    0.55
+    0.54
    ],
    "footprint_cells": [
     1,
@@ -1163,8 +1163,8 @@
     ]
    },
    "kb": {
-    "full": 1334,
-    "1k": 513
+    "full": 1342,
+    "1k": 521
    },
    "replaces": {
     "anvil": {
@@ -1212,8 +1212,8 @@
     ]
    },
    "kb": {
-    "full": 436,
-    "1k": 222
+    "full": 416,
+    "1k": 203
    },
    "replaces": {
     "cauldron": {

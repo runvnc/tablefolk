@@ -235,8 +235,15 @@ out speckled and walked worse than Hunyuan3D's: not used. fal is the way.
 `assets/models/props/env/` (manifest.json lists each model's footprint,
 height, front, triangles and the pack.json type it replaces; LICENSE.txt):
 buildings and props in the style of the approved concept scenes (weathered,
-muted, painterly semi-realistic, matte). The pipeline, scripts in
-`work/env/scripts/` (git-ignored; the ledger is `work/env/ledger.jsonl`):
+muted, painterly semi-realistic, matte). The pipeline: generation scripts
+in `work/env/scripts/` (git-ignored, with the raw files and the ledger
+`work/env/ledger.jsonl`); processing in **`tools/env-assets/`** (in git):
+`finish.sh <name>...` rebuilds a model from `work/env/raw/<name>.glb` with
+its options from **`options.json`** (every model's `tris`, `w`/`d` or
+`fit: height`/`h`, `yaw`, `cream`, `core`, `stretch_y`...: add a model's
+options there, never only on a command line), `proc.py`, `dec.py` (plain
+decimation for other generated models), `analyze.py`, `check.py` (the gate),
+`decomp.mjs`, `render2.py`.
 
 1. **Scene crop -> FLUX Kontext isolate** (`fal-ai/flux-pro/kontext`, $0.04):
    edit a crop of a concept scene: "show only this one object, complete,
@@ -257,16 +264,35 @@ muted, painterly semi-realistic, matte). The pipeline, scripts in
    image's view comes out facing glTF +Z (the game's front at ry 0) for most
    models; check the four-view sheet and turn it (`yaw`). Hunyuan3D drifted
    cartoonish/blue; trees fail in image-to-3D.
-4. **Process** (`proc.py`, headless Blender): join, drop tiny loose parts and
-   flat ones at the base (ground discs), turn, scale to the footprint in metres
-   (door about 2 m), origin at the centre of the footprint on the ground,
-   decimate (buildings 30k triangles, props 6-15k), normals, and warm
-   near-white plaster toward the scenes' cream (`cream`).
+4. **Process** (`proc.py`, headless Blender): join, **weld by position**
+   (`remove_doubles`, 1e-5 m), drop tiny loose parts and flat ones at the
+   base (ground discs), turn, scale to the footprint in metres (door about
+   2 m), origin at the centre of the footprint on the ground, decimate
+   (buildings 30k triangles, props 6-15k), normals, and warm near-white
+   plaster toward the scenes' cream (`cream`).
+   **Weld before anything.** A generated GLB (Meshy, Hunyuan, Trellis) stores
+   every vertex split along UV seams and hard edges: the raw inn is one welded
+   surface with 391 open edges but imports as 29,580 fragments. Without the
+   weld the loose-part filter deletes real fragments as "tiny" or "flat at the
+   base", and the Decimate modifier collapses each fragment on its own and
+   tears every seam open. The first run (2026-11-20) shipped that way: fine
+   from afar, holes and cracks up close (the inn: 46k open edges in 1,600
+   pieces). Never filter loose parts, or decimate, unwelded geometry; with the
+   weld a ground disc fused to the model is no longer a loose part (use `cut`).
 5. **Tiers**: `tools/compress-glb.sh --max 2048 in out/<name>.glb` and the
-   default (1024) for `<name>.1k.glb`; AVIF + meshopt.
-6. **Check** from the final file: `~/.cache/tablefolk-gltf/env-decomp.mjs`
-   (like `tools/decompress-glb.mjs`, and re-encodes AVIF as PNG so Blender can
-   texture it), then `render2.py`: four views and a shot with the swordswoman.
+   default (1024) for `<name>.1k.glb`; AVIF + meshopt (measured 2026-11-21:
+   meshopt's quantisation opens no seams; the decompressed final has the same
+   open edges as Blender's output).
+6. **Check** from the final file: `decomp.mjs` (copied to
+   `~/.cache/tablefolk-gltf/env-decomp.mjs`, where the gltf-transform modules
+   are; like `tools/decompress-glb.mjs`, and re-encodes AVIF as PNG so Blender
+   can texture it), then `render2.py`: four views and a shot with the
+   swordswoman (`work/env/renders/<name>_sheet.jpg`).
+7. **Gate**: `python3 tools/env-assets/check.py [name...]` (or `--pair raw.glb
+   final.glb` for any model) welds raw and decompressed final and counts open
+   edges and connected parts; it fails a model whose open edges exceed 2 x
+   raw + 500 or whose parts jump past raw + max(5, raw). Run it before
+   committing any processed model.
 
 Faults to watch for: soft cast shadows and ground or grass discs under the
 object (ask for none, reject inputs that keep them), hollow things filled in
