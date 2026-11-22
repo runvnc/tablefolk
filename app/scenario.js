@@ -1635,10 +1635,10 @@
   }
 
   // ---- the pads and the edges ----
-  function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; window.tablefolkSections?.clearMarkers?.(); }
+  function clearPads() { clearInterval(padTimer); for (const m of pads) try { m.dispose(); } catch {} pads = []; hideExit(); window.tablefolkSections?.clearMarkers?.(); }
   function placePads(links) {
     clearPads();
-    W().state.edgeLinks = links.filter(l => l.edge).map(l => ({ edge: l.edge, road: edgeRoad(l), name: l.name || '' }));
+    W().state.edgeLinks = links.filter(l => l.edge).map(l => ({ edge: l.edge, road: edgeRoad(l), name: l.name || exitName(l) }));
     const sc = W().state.scene; if (!sc || window.TABLEFOLK_TABLETOP) return;
     let mat = sc.getMaterialByName('link_pad_mat');
     if (!mat) { mat = new BABYLON.StandardMaterial('link_pad_mat', sc); mat.disableLighting = true; mat.emissiveColor = new BABYLON.Color3(1, .82, .35); mat.alpha = .32; }
@@ -1648,24 +1648,56 @@
       if (l.kind && l.kind !== 'door' && window.tablefolkSections?.marker?.(l)) continue;
       const m = BABYLON.MeshBuilder.CreateCylinder('link_pad', { diameter: .9, height: .03, tessellation: 40 }, sc);
       m.position.set(l.at[0], (W().state.terrainTopY ?? 0) + .07, l.at[1]); m.material = mat; m.isPickable = false; pads.push(m);
+      // a door's destination on a small label too (shown near, or looked at: sections.js)
+      window.tablefolkSections?.doorLabel?.(l, exitName(l));
     }
     for (const e of W().state.edgeLinks) window.tablefolkSections?.edgeMarker?.(e);
     lastCell = playerCell();
     if (links.length) padTimer = setInterval(watchPads, 150);
   }
-  let rimHint = '';
+  // A way out within reach (an edge within 2 squares, a link's square within 1.5): the
+  // on-screen prompt (sections.js prompt) and the gate: an edge travels only on a step
+  // off the rim once the prompt has shown for EDGE_ARM ms (or E / a tap on the prompt),
+  // never on the first touch of the rim.
+  const EDGE_ARM = 500;
+  let exitNear = null;   // { l, since }
+  function nearestExit() {
+    const av = W().getPlayerAvatar?.(); if (!av || av.defeated || !world.links?.length) return null;
+    const p = av.logicalPos || av.root.position, Wd = W().WORLD, bx = Wd.halfW - 1, bz = Wd.halfH - 1;
+    let best = null;
+    for (const l of world.links) {
+      let d;
+      if (l.edge) d = l.edge === 'east' ? p.x + bx : l.edge === 'west' ? bx - p.x : l.edge === 'north' ? p.z + bz : bz - p.z;
+      else if (l.at) d = Math.hypot(p.x - l.at[0], p.z - l.at[1]);
+      else continue;
+      if (d <= (l.edge ? 2.05 : 1.6) && (!best || d < best.d)) best = { l, d };
+    }
+    return best;
+  }
+  const exitName = l => { if (l.name) return l.name; if (l.to === 'back') return journey.stack[journey.stack.length - 1]?.name || 'the way back'; const id = typeof l.to === 'string' && !isExternal(l.to) ? targetId(l, world.id) : null; return id != null ? titleOf(id) : 'somewhere new'; };
+  function showExit(l) {
+    if (!exitNear || exitNear.l !== l) exitNear = { l, since: performance.now() };
+    const name = exitName(l), touch = matchMedia?.('(pointer: coarse)').matches;
+    const how = l.edge ? `keep walking ${l.edge} · ${touch ? 'tap here' : 'press E'}` : `step onto it · ${touch ? 'tap here' : 'press E'}`;
+    window.tablefolkSections?.prompt?.({ text: `To ${name} →`, how, locked: !!(l.key && !journey.unlocked[lockKey(world.id, l)]), edge: l.edge || null, onGo: () => { if (exitNear?.l === l) travel(l); } });
+  }
+  function hideExit() { if (!exitNear) return; exitNear = null; window.tablefolkSections?.prompt?.(null); }
+  const armed = l => !!exitNear && exitNear.l === l && performance.now() - exitNear.since >= EDGE_ARM;
+  // E (or the prompt tapped) follows the way out in reach; before play.js's E (use)
+  addEventListener('keydown', e => {
+    if (e.key !== 'e' && e.key !== 'E' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !exitNear || transition || !active) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
+    e.preventDefault(); e.stopImmediatePropagation(); travel(exitNear.l);
+  }, true);
   function watchPads() {
     if (transition || !active) return;
+    const n = nearestExit(); if (n) showExit(n.l); else hideExit();
     edgeFirstPerson();
     if (edgeClick()) return;
     const c = playerCell(); if (!c || c === lastCell) return;
     lastCell = c;
     const l = world.links.find(l => l.at && !l.edge && l.at.join(',') === c);
     if (l) { travel(l); return; }
-    // standing on an edge with a way off it: say so, once per edge
-    const [x, z] = c.split(',').map(Number), Wd = W().WORLD;
-    const e = world.links.find(l => l.edge && ((l.edge === 'east' && x === -(Wd.halfW - 1)) || (l.edge === 'west' && x === Wd.halfW - 1) || (l.edge === 'north' && z === -(Wd.halfH - 1)) || (l.edge === 'south' && z === Wd.halfH - 1)));
-    if (e && rimHint !== world.id + e.edge) { rimHint = world.id + e.edge; toast(`${e.edge[0].toUpperCase() + e.edge.slice(1)}: ${e.name ? 'the way to ' + e.name : 'a way on'}. Keep walking ${e.edge} to go.`); }
   }
   // A click on a rim square (or past it) where an edge leads on: once the player
   // has walked there and stopped, one more step, off the board (a click-walk
@@ -1692,7 +1724,8 @@
   function hookEdges() {
     if (typeof window.playerStep !== 'function' || window.playerStep._tfSections) return;
     const orig = window.playerStep;
-    const hooked = function (dir) { try { const l = dir && edgeOff(dir); if (l) { setCharacterFacing(W().getPlayerAvatar(), dir); travel(l); return true; } } catch (e) { console.warn('[sections] edge', e); } return orig.apply(this, arguments); };
+    // a step off the rim travels once the prompt has shown (EDGE_ARM); the first one only shows it
+    const hooked = function (dir) { try { const l = dir && edgeOff(dir); if (l) { setCharacterFacing(W().getPlayerAvatar(), dir); if (armed(l)) travel(l); else { showExit(l); window.tablefolkSections?.nudge?.(); } return true; } } catch (e) { console.warn('[sections] edge', e); } return orig.apply(this, arguments); };
     hooked._tfSections = true; window.playerStep = hooked;
   }
   // first person walks smoothly (fpWalk): held forward at the rim, looking off the board
@@ -1700,7 +1733,8 @@
   function edgeFirstPerson() {
     const st = W().state; if (!st.firstPerson || typeof fpHeld === 'undefined' || !fpHeld.has('fwd') || typeof fpForward !== 'function') { fpPush = 0; return; }
     const l = edgeOff(fpForward()); if (!l) { fpPush = 0; return; }
-    if (++fpPush >= 3) { fpPush = 0; travel(l); }
+    if (!exitNear || exitNear.l !== l) showExit(l);
+    if (++fpPush >= 3 && armed(l)) { fpPush = 0; travel(l); }
   }
 
   // ---- the world as a whole: the goal across sections, here(), agentDef ----

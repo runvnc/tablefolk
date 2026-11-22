@@ -121,10 +121,27 @@ try {
   await ev(() => __s.S().travel({ to: 'back' })); await ev(() => __s.waitSection(''));
 
   // ---- the edge: walk off the east rim ----
-  await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(-(Wd.halfW - 1), 2); });
+  await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(-(Wd.halfW - 1) + 3, 0); });
   await page.waitForTimeout(400);
+  check('no way-out prompt 3 squares from the edge (nor any link)', await ev(() => !document.getElementById('exitPrompt')?.classList.contains('on')), await ev(() => document.getElementById('exitPrompt')?.textContent || ''));
+  await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(-(Wd.halfW - 1) + 1, 2); });
+  await page.waitForTimeout(400);
+  const pr = await ev(() => ({ on: !!document.getElementById('exitPrompt')?.classList.contains('on'), text: document.getElementById('exitPrompt')?.textContent || '' }));
+  check('within 2 squares of the east edge: the prompt names the field', pr.on && /East Field/i.test(pr.text) && /press E|tap/.test(pr.text), pr);
+  check('the edge has its threshold band', await ev(() => window.tablefolk.state.scene.meshes.some(m => m.name === 'link_edge_strip' && !m.isDisposed())));
+  await shot('edge-prompt');
+  // away, then straight onto the rim and off at once (the prompt not shown long enough): stays
+  await ev(() => __s.put(0, 2)); await page.waitForTimeout(400);
+  await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(-(Wd.halfW - 1), 2); });
+  await page.waitForTimeout(160);
   await ev(() => playerStep(new BABYLON.Vector3(-1, 0, 0)));
-  check('walking off the east edge: the east field', await ev(() => __s.waitSection('field')));
+  await page.waitForTimeout(300);
+  check('a step off the rim before the prompt has shown long enough does not travel', await ev(() => window.tablefolkScenario.section === ''));
+  await page.waitForTimeout(500);
+  await ev(() => playerStep(new BABYLON.Vector3(-1, 0, 0)));
+  check('walking on off the east edge: the east field', await ev(() => __s.waitSection('field')));
+  check('arriving: the title card names the field', await ev(() => { const el = document.getElementById('sectionTitleCard'); return !!el && el.classList.contains('on') && /East Field/i.test(el.textContent); }));
+  await shot('edge-arrived');
   const fieldIn = await ev(() => ({ cell: __s.cell(), west: window.tablefolk.WORLD.halfW - 1, explored: window.tablefolkDark.exploredCount(), mode: window.tablefolkDark.mode() }));
   check('arrived on the field\'s west rim at the same row', fieldIn.cell[0] === fieldIn.west && fieldIn.cell[1] === 2, fieldIn);
   check('the field reveals as you go (cells, outdoors: the mist)', fieldIn.mode.reveal === 'cells' && fieldIn.explored > 0 && await ev(() => window.tablefolk.state.scene.meshes.some(m => m.name === 'board_mist_low' && m.isEnabled())), fieldIn);
@@ -134,11 +151,11 @@ try {
   const explored1 = await ev(() => window.tablefolkDark.exploredCount());
   await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(Wd.halfW - 1, 2); });
   await page.waitForTimeout(400);
-  await ev(() => playerStep(new BABYLON.Vector3(1, 0, 0)));
-  check('walking off the west edge goes back', await ev(() => __s.waitSection('')));
+  await ev(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', bubbles: true })));
+  check('E at the west edge goes back', await ev(() => __s.waitSection('')));
   check('back on the top map\'s east rim', await ev(() => __s.cell()[0] === -(window.tablefolk.WORLD.halfW - 1)), await ev(() => __s.cell()));
   await ev(() => { const Wd = window.tablefolk.WORLD; __s.put(-(Wd.halfW - 1), 2); });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(800);
   await ev(() => playerStep(new BABYLON.Vector3(-1, 0, 0)));
   await ev(() => __s.waitSection('field'));
   check('the field kept what was explored', await ev(n => window.tablefolkDark.exploredCount() >= n, explored1), { before: explored1, now: await ev(() => window.tablefolkDark.exploredCount()) });

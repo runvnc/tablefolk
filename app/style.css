@@ -717,3 +717,14 @@ body.user-mode #playerHp { font-size:11px; }
 .online-brain button { padding:6px 10px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
 
 /* menus.js: the menu box's look comes from libs/menus/box.js (MENU_CSS) */
+
+/* sections.js: the way-out prompt near a link or an edge that leads on, and the title card on arrival */
+.exit-prompt { position:fixed; left:50%; bottom:calc(150px + env(safe-area-inset-bottom)); transform:translate(-50%, 12px); z-index:11; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 20px 10px; border-radius:999px; border:1px solid rgba(255,214,140,.55); background:rgba(20,18,14,.82); color:#f6e8c6; font:600 16px/1.25 system-ui,sans-serif; box-shadow:0 6px 22px rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; cursor:pointer; max-width:calc(100vw - 32px); }
+.exit-prompt.on { opacity:1; pointer-events:auto; transform:translate(-50%, 0); }
+.exit-prompt small { font-weight:500; font-size:12.5px; opacity:.78; letter-spacing:.02em; }
+.exit-prompt.nudge { animation:exitNudge .38s ease; }
+@keyframes exitNudge { 0%,100% { transform:translate(-50%,0); } 25% { transform:translate(calc(-50% - 7px),0); } 75% { transform:translate(calc(-50% + 7px),0); } }
+.section-title-card { position:fixed; left:50%; top:18%; transform:translate(-50%,-8px); z-index:11; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none; color:#f8ecd0; text-shadow:0 2px 14px rgba(0,0,0,.75), 0 0 2px rgba(0,0,0,.9); opacity:0; transition:opacity .6s ease, transform .6s ease; text-align:center; max-width:calc(100vw - 32px); }
+.section-title-card.on { opacity:1; transform:translate(-50%,0); }
+.section-title-card small { font:500 14px/1.2 system-ui,sans-serif; letter-spacing:.14em; text-transform:uppercase; opacity:.85; }
+.section-title-card b { font:600 clamp(28px, 5vw, 46px)/1.1 Georgia, 'Times New Roman', serif; letter-spacing:.02em; }

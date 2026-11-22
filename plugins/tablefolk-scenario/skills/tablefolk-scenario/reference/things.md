@@ -175,6 +175,19 @@ region; `at` on an edge link is where its road leaves the board, default a
 path on the rim, else the middle). The land past an edge link shows a dirt
 road running on, with no trees on it.
 
+**Every way out shows before you take it**: an edge that leads on has a
+signpost naming where it goes between two waymarker stones, a gap in the
+trees, and a soft warm band along that whole rim (brighter when you are
+near). Within two squares of it a prompt shows on screen ("To the Wolfwood →
+keep walking east · press E"); you go on by walking off the rim once the
+prompt has shown (a step off the very moment you reach it only shows the
+prompt), by E, or by tapping the prompt. Stairs, caves, gates, trapdoors and
+doors have their destination's name on a small floating label, shown within
+about 8 m or when you look straight at it; within a square and a half of one
+the same prompt shows (step onto it, or E). Arriving, the section's name
+shows as a title card for a moment. Characters never travel by edges (only
+companions and followers come along with you).
+
 **Where it goes** (`to`):
 - a key of `subworlds`: looked up in this section, then in the sections
   above it (so a forest next to the village can lead to the village's cave);
@@ -190,8 +203,8 @@ road running on, with no trees on it.
 `stairs_down` (steps going down into the dark, a stone rim), `stairs_up`
 (steps rising to a dark opening), `cave` (a dark mouth in a rock mound),
 `gate` (posts and bars), `trapdoor` (a hatch with an iron ring), `edge`. A
-stair runs toward the wall beside it (or `"facing": "n"`). Every one but a
-door has its destination's name on a small label.
+stair runs toward the wall beside it (or `"facing": "n"`). Every one has its
+destination's name on a small label (shown near or looked at).
 
 **Other fields**: `name` (shown, and said when you go: "You go down into The
 Old Workings."), `arrive` (`[x, z]`, or the `name` of a link in the target:

@@ -15,7 +15,13 @@
  *                      waymarker stones, a signpost names where it goes, and a
  *                      faint arrow shows on the ground while the player is within
  *                      3 squares (terrain.js draws the road past the board,
- *                      surroundings.js keeps trees off it)
+ *                      surroundings.js keeps trees off it), and a soft warm band
+ *                      along the whole rim (brighter while its prompt shows)
+ *   doorLabel(l, name) a door link's destination on a label (labels show within
+ *                      8 m or when looked at)
+ *   prompt({ text, how, edge, locked, onGo }) / prompt(null), nudge()
+ *                      the on-screen way-out prompt (scenario.js watchPads)
+ *   titleCard(title, sub)  the section's name on arrival (tablefolk-section)
  *   clearMarkers()
  *   catchUp({ minutes, agents, places })
  *                      a section coming back after game time passed, in code (no
@@ -29,7 +35,7 @@
  *   showMap(list)      the 🗺 map card: every known section, the one you are in,
  *                      visited or not, and its ways out (scenario.js sectionsMap)
  *
- *   window.tablefolkSections = { marker, edgeMarker, clearMarkers, catchUp, showMap, hideMap }
+ *   window.tablefolkSections = { marker, edgeMarker, doorLabel, clearMarkers, catchUp, showMap, hideMap, prompt, nudge, titleCard }
  * Loaded after scenario.js; uses app.js globals (state, meta, setCharacterLogicalPosition).
  */
 (function () {
@@ -37,6 +43,7 @@
   let markers = [];
   const top = () => state.terrainTopY ?? 0;
   const W = () => window.tablefolk;
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const mats = {};
   function mat(name, make) {
     const sc = state.scene, m = mats[name];
@@ -87,7 +94,36 @@
     m.material = mm; m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; m.position.set(x, top() + y, z); m.isPickable = false;
     if (parent) m.parent = parent;
     m.onDisposeObservable.add(() => { try { t.dispose(); mm.dispose(); } catch {} });
+    m.visibility = 0; m.setEnabled(false); labels.push(m); watch();
     return m;
+  }
+  // Labels show within LABEL_NEAR metres of the player (or the camera's target), or
+  // when looked at (within ~7 degrees of the view's centre, up to 40 m), fading in and out.
+  const LABEL_NEAR = 8;
+  let labels = [], obs = null;
+  function watch() {
+    const sc = state.scene; if (obs || !sc) return;
+    obs = sc.onBeforeRenderObservable.add(() => {
+      const cam = sc.activeCamera, av = state.playerAvatar, p = av?.logicalPos || av?.root?.position || cam?.target; if (!cam || !p) return;
+      const dt = Math.min(.1, (sc.getEngine().getDeltaTime() || 16) / 1000), from = cam.globalPosition || cam.position, fwd = cam.getForwardRay?.(1)?.direction;
+      for (const m of labels) {
+        if (m.isDisposed()) continue;
+        const q = m.getAbsolutePosition(), near = Math.hypot(q.x - p.x, q.z - p.z) <= LABEL_NEAR;
+        let look = false;
+        if (!near && fwd) { const dx = q.x - from.x, dy = q.y - from.y, dz = q.z - from.z, d = Math.hypot(dx, dy, dz); look = d < 40 && (dx * fwd.x + dy * fwd.y + dz * fwd.z) / d > .992; }
+        const want = near || look ? 1 : 0, v = m.visibility + (want - m.visibility) * Math.min(1, dt * 6);
+        m.visibility = Math.abs(v - want) < .02 ? want : v;
+        if (m.isEnabled() !== m.visibility > .01) m.setEnabled(m.visibility > .01);
+      }
+      for (const r of arrows) if (!r.a.isDisposed()) { const on = !!av && Math.hypot(p.x - r.x, p.z - r.z) <= 3; if (r.a.isEnabled() !== on) r.a.setEnabled(on); }
+      for (const s of strips) if (!s.m.isDisposed()) { const want = promptEdge === s.edge ? .9 : .38; s.m.visibility += (want - s.m.visibility) * Math.min(1, dt * 4); }
+    });
+  }
+  // a door link (scenario.js's glowing disc): its destination on a label like the others
+  function doorLabel(l, name) {
+    if (!state.scene || !l.at || window.TABLEFOLK_TABLETOP) return null;
+    const lb = label(name || l.name || '', l.at[0], l.at[1], 1.9); if (lb) markers.push(lb);
+    return lb;
   }
   const ARROW = { stairs_down: '↓ ', stairs_up: '↑ ', trapdoor: '↓ ', cave: '', gate: '', door: '' };
   // boxes merged per material under a root (one draw call per material a marker)
@@ -173,7 +209,7 @@
   // An edge that leads on: the road runs off the board between two waymarker
   // stones, a signpost names where it goes; a faint arrow on the ground only
   // while the player is within 3 squares of the road's last square.
-  let arrows = [], arrowObs = null;
+  let arrows = [], strips = [];
   function signTex(text) {
     const sc = state.scene, t = new BABYLON.DynamicTexture('link_sign_tex', { width: 512, height: 128 }, sc, true), c = t.getContext();
     c.fillStyle = '#5a4026'; c.fillRect(0, 0, 512, 128);
@@ -201,12 +237,62 @@
     const a = BABYLON.MeshBuilder.CreateDisc('link_edge_arrow', { radius: .38, tessellation: 3 }, sc);
     a.rotation.x = Math.PI / 2; a.rotation.y = Math.atan2(d[0], d[1]) - Math.PI / 2; a.position.set(rx + d[0] * .15, top() + .05, rz + d[1] * .15);
     a.material = glow(); a.isPickable = false; a.setEnabled(false); markers.push(a); arrows.push({ a, x: rx, z: rz });
-    if (!arrowObs) arrowObs = sc.onBeforeRenderObservable.add(() => {
-      const p = state.playerAvatar?.logicalPos || state.playerAvatar?.root?.position;
-      for (const r of arrows) if (!r.a.isDisposed()) { const on = !!p && Math.hypot(p.x - r.x, p.z - r.z) <= 3; if (r.a.isEnabled() !== on) r.a.setEnabled(on); }
+    // the threshold: a soft warm band along the whole rim of that edge (the board's last
+    // half square and a little past it), brighter while the way-out prompt shows for it
+    const WB = window.tablefolk?.WORLD;
+    if (WB) {
+      const alongX = e.edge === 'north' || e.edge === 'south', len = alongX ? 2 * WB.halfW - 1 : 2 * WB.halfH - 1;
+      const rimX = e.edge === 'east' ? -(WB.halfW - 1) : e.edge === 'west' ? WB.halfW - 1 : 0, rimZ = e.edge === 'north' ? -(WB.halfH - 1) : e.edge === 'south' ? WB.halfH - 1 : 0;
+      const st = BABYLON.MeshBuilder.CreateGround('link_edge_strip', { width: alongX ? len : 1.3, height: alongX ? 1.3 : len }, sc);
+      st.position.set(alongX ? 0 : rimX + d[0] * .4, top() + .035, alongX ? rimZ + d[1] * .4 : 0);
+      st.material = stripMat(alongX, d); st.isPickable = false; st.visibility = .38; markers.push(st); strips.push({ m: st, edge: e.edge });
+    }
+    watch();
+  }
+  // the band's look: transparent on the board side, warm toward the rim, fading again past it
+  function stripMat(alongX, d) {
+    return mat('strip' + (alongX ? 'z' : 'x') + d.join(''), sc => {
+      const t = new BABYLON.DynamicTexture('link_strip_tex', { width: 64, height: 64 }, sc, false), c = t.getContext();
+      // u across the board's edge: 0 board side, 1 off the board (flipped for the edges facing -x / -z)
+      const flip = (alongX ? d[1] : d[0]) < 0, g = alongX ? c.createLinearGradient(0, flip ? 0 : 64, 0, flip ? 64 : 0) : c.createLinearGradient(flip ? 64 : 0, 0, flip ? 0 : 64, 0);
+      g.addColorStop(0, 'rgba(255,214,120,0)'); g.addColorStop(.55, 'rgba(255,214,120,.55)'); g.addColorStop(.72, 'rgba(255,226,150,.7)'); g.addColorStop(1, 'rgba(255,214,120,0)');
+      c.fillStyle = g; c.fillRect(0, 0, 64, 64); t.update(); t.hasAlpha = true;
+      const m = new BABYLON.StandardMaterial('link_strip_mat', sc); m.diffuseTexture = t; m.useAlphaFromDiffuseTexture = true; m.emissiveColor = C3(1, .85, .5); m.disableLighting = true; m.disableDepthWrite = true; m.backFaceCulling = false;
+      return m;
     });
   }
-  function clearMarkers() { for (const m of markers) try { m.dispose(false, false); } catch {} markers = []; arrows = []; if (arrowObs) { try { state.scene?.onBeforeRenderObservable.remove(arrowObs); } catch {} arrowObs = null; } holes.clear(); window.tablefolkTerrain?.setHoles?.([]); }
+  function clearMarkers() { for (const m of markers) try { m.dispose(false, false); } catch {} markers = []; arrows = []; labels = []; strips = []; if (obs) { try { state.scene?.onBeforeRenderObservable.remove(obs); } catch {} obs = null; } holes.clear(); window.tablefolkTerrain?.setHoles?.([]); prompt(null); }
+
+  // ---------------------------------------------------------------- the way-out prompt and the title card
+  // prompt({ text, how, locked, edge, onGo }) shows "To the Wolfwood → / keep walking east · press E"
+  // over the scene (a button: a tap goes); prompt(null) hides it. nudge(): a little shake (a step
+  // off the rim before the prompt had shown long enough). scenario.js watchPads drives it.
+  let promptEl = null, promptGo = null, promptEdge = null, promptKey = '';
+  function prompt(o) {
+    if (!o) { promptGo = null; promptEdge = null; promptKey = ''; if (promptEl) promptEl.classList.remove('on'); return; }
+    promptGo = o.onGo || null; promptEdge = o.edge || null;
+    if (!promptEl) {
+      promptEl = document.createElement('button'); promptEl.type = 'button'; promptEl.id = 'exitPrompt'; promptEl.className = 'exit-prompt';
+      promptEl.addEventListener('click', e => { e.preventDefault(); promptGo?.(); });
+      document.body.appendChild(promptEl);
+    }
+    const k = o.text + '|' + o.how + '|' + !!o.locked;
+    if (k !== promptKey) { promptKey = k; promptEl.innerHTML = `<b>${esc(o.text)}</b><small>${o.locked ? '🔒 locked · ' : ''}${esc(o.how || '')}</small>`; }
+    promptEl.classList.add('on');
+  }
+  function nudge() { if (!promptEl) return; promptEl.classList.remove('nudge'); void promptEl.offsetWidth; promptEl.classList.add('nudge'); }
+  // a section's name for a moment on arrival (the tablefolk-section event)
+  let cardTimer = 0;
+  function titleCard(title, sub) {
+    if (!title || window.TABLEFOLK_TABLETOP) return;
+    let el = document.getElementById('sectionTitleCard');
+    if (!el) { el = document.createElement('div'); el.id = 'sectionTitleCard'; el.className = 'section-title-card'; el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+    el.innerHTML = (sub ? `<small>${esc(sub)}</small>` : '') + `<b>${esc(title)}</b>`;
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    clearTimeout(cardTimer); cardTimer = setTimeout(() => el.classList.remove('on'), 2800);
+  }
+  const SUB = { stairs_down: 'down into', stairs_up: 'up to', trapdoor: 'down into', cave: 'into', gate: 'through the gate to', edge: 'on to', door: 'into', back: 'back to' };
+  addEventListener('tablefolk-section', e => { const d = e.detail || {}; titleCard(d.title, d.kind ? 'You go ' + (SUB[d.kind] || 'into') : ''); });
 
   // ---------------------------------------------------------------- time passed elsewhere
   const inHours = (h, w) => Array.isArray(w) && (w[0] <= w[1] ? h >= w[0] && h < w[1] : h >= w[0] || h < w[1]);
@@ -285,7 +371,6 @@
   let lastCatchUp = null;
 
   // ---------------------------------------------------------------- the map card
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const KIND_WORD = { door: 'door', stairs_down: 'stairs down', stairs_up: 'stairs up', cave: 'cave', gate: 'gate', trapdoor: 'trapdoor', edge: 'edge' };
   function showMap(list) {
     let el = document.getElementById('sectionMap');
@@ -301,5 +386,5 @@
   addEventListener('keydown', e => { if (e.key === 'Escape') hideMap(); });
   addEventListener('tablefolk-section', () => { const el = document.getElementById('sectionMap'); if (el && !el.hidden) showMap(window.tablefolkScenario?.sections?.() || []); });
 
-  window.tablefolkSections = { marker, edgeMarker, clearMarkers, catchUp, showMap, hideMap, get lastCatchUp() { return lastCatchUp; } };
+  window.tablefolkSections = { marker, edgeMarker, doorLabel, clearMarkers, catchUp, showMap, hideMap, prompt, nudge, titleCard, get lastCatchUp() { return lastCatchUp; } };
 })();

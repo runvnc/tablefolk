@@ -224,8 +224,18 @@ goes; read by `openLink`, which resumes when the code matches unless
   prices, food and menus); `tablefolk-scenario-started` carries the world's
   `live`, so live.js restarts.
 - Edges: app.js `playerStep` is wrapped (`hookEdges`): a step off the board
-  where an edge link lies travels; in first person `watchPads` sees the held
-  forward key at the rim. `state.edgeLinks` (edge, road square) is read by
+  where an edge link lies travels only when `armed` (the way-out prompt has
+  shown for `EDGE_ARM` 500 ms); otherwise it shows the prompt and nudges it.
+  In first person `watchPads` sees the held forward key at the rim (3 ticks
+  and armed). `watchPads` (150 ms) finds the nearest exit (`nearestExit`: an
+  edge within 2.05 squares, a link square within 1.6) and drives
+  `tablefolkSections.prompt({text, how, edge, onGo})`; a capture-phase E
+  listener travels through `exitNear` before play.js's E (use). sections.js
+  draws the prompt (`#exitPrompt`, a button: a tap goes), the threshold band
+  along the rim (`link_edge_strip`, brighter while its edge's prompt shows),
+  the labels (distance 8 m or within ~7 degrees of the view's centre, faded
+  by `visibility`; doors get one through `doorLabel`) and the title card
+  (`#sectionTitleCard`) on `tablefolk-section`. `state.edgeLinks` (edge, road square) is read by
   terrain.js (a dirt road past the rim) and surroundings.js (no trees on it).
 - Links with `in` get a square of the place (`placeLinks`: free, not beside
   a door, by a wall first, kept in `journey.linkAt`).
