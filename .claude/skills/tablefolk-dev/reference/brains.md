@@ -1136,6 +1136,25 @@ load. Weak GPUs with lots of RAM: no (the CPU path in the browser writes 0.6
 tok/s). What would unblock it: elementwise fusion in ggml-webgpu for this
 graph (or a custom engine), and sending `llama-webgpu.patch` upstream.
 
+### Inkling 2 Mini in the game, by URL (2026-11-22, in progress)
+
+Ability measured with the endpoint brain, natively: a rented RTX 4070 Ti
+Super 16 GB (vast.ai, driver 595.91, Chrome 158 on the box), upstream
+llama.cpp 5bacb7c (CUDA, sm_89), `-c 16384 -np 1`, AtomicChat AD-IQ2_M (the
+file that runs in Chrome). Thinking skipped as in the trial above, by a small
+proxy in front of llama-server (`work/inkfree/nothink-proxy.py`, not shipped:
+chat request -> `/apply-template` with `reasoning_effort` 0 -> raw
+`/completion` of the prompt plus `<|message_model|><|content_text|>`, stop at
+`<|end_message|>`); 10.9 GB on the card, ~62 tok/s writing, 0.6 s for a short
+answer.
+
+- Capability check v3: **8/10**, the best of any brain (SenseNova-Loop-9B 7,
+  Bonsai 2 27B 6, Bonsai 2 9B and Spark 5), 46 tok/s -> **guided** (temper in
+  code); one item short of free (9/10). Missed the false belief (mind) and
+  the haggle, where it wrote `sell(sword, 40, Ana)` and then its reasoning
+  ("The user wants me to reply with...") in the same answer: the thinking
+  skip leaks now and then.
+
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
 SenseTime's `sensenova/SenseNova-Loop-9B` (released 2026-11-17; the Preview
