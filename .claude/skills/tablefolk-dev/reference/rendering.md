@@ -231,6 +231,27 @@ own set-up (weights onto the card, warm-up: 9-13 s) is GPU-bound: the main
 thread is idle through most of it. The bandwidth figure cached in the test
 profile (30 GB/s, measured under load once) is kept 30 days.
 
+Since 2026-11-22 the world builds under the loading cover (`app/loading.js`,
+architecture.md "The loading cover") and the model starts only after it lifts,
+so `tablefolkDressGate` no longer waits for a model at start-up (and never
+while the cover is up). Measured on this laptop while other agents' Chromes
+and builds were running (load average 10-18, numbers vary 2x run to run; s from
+navigation, 800x500, `startup-time.mjs`):
+
+| | before: dressed / brain / first turn | after: reveal (dressed) / brain / first turn |
+|---|---|---|
+| hearthvale, light, Gemma 4 E2B (2 runs each) | 27.6, 31.4 / 27.1, 30.8 / 31.5, 32.3 | 15.0, 16.1 (13.9, 14.1) / 30.7, 28.0 / 33.4, 28.8 |
+| hearthvale, art, light | dressed 14.8-16.6 | reveal 17.1-22.0 |
+| market-village, art, light | dressed 14.0 | reveal 14.7-17.7 |
+| market-village, art, high | dressed 17.7 | reveal 23.7 |
+
+Frames sampled every 500 ms (`--shots`): before, 7-11 samples per run showed
+the world half built (a stand-in figure on a grey-green board, the saved
+world, the layout without walls, the ground before its textures); after, 0
+in every run, and the mesh count never changed after the reveal. The world
+is complete and in view about 12-15 s sooner with a model; the first reply
+comes at about the same time (31.9 s before, 31.1 s after, averages of two).
+
 ### The edge of the world (terrain.js, surroundings.js)
 
 `tablefolkTerrain.mode()`: the scenario's `"outside"` (land | sea | rock |
