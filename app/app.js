@@ -2510,7 +2510,7 @@ function buildRug(cells){
     atlas.wrapU=atlas.wrapV=BABYLON.Texture.CLAMP_ADDRESSMODE;
     // atlas UV of a cell-local (u,v); the canvas is uploaded with invertY, so v counts up from its bottom
     const uvOf=(slot,u,v)=>{ const cx=slot%cols, cy=slot/cols|0; return [(cx*P+G+u*S)/cv.width, 1-(cy*P+G+(1-v)*S)/cv.height]; };
-    const Pp=[],N=[],U=[],U2=[],I=[], y1=top+RUG_H, y0=top-.004, W=3;
+    const lift=list.some(([x,z])=>roomFloorLift(x,z)) ? state.roomFloor.up : 0, Pp=[],N=[],U=[],U2=[],I=[], y1=top+lift+RUG_H, y0=top+lift-.004, W=3;
     const quad=(pts,n,uvs)=>{ const b=Pp.length/3; pts.forEach((p,k)=>{ Pp.push(...p); N.push(...n); U.push(...uvs[k]); U2.push((p[0]+p[1])*W,(p[2]+p[1])*W); }); I.push(b,b+1,b+2,b,b+2,b+3); };
     list.forEach(([x,z],i)=>{
       const m=masks[i], slot=kinds.indexOf(m), x0=x-.5, x1=x+.5, z0=z-.5, z1=z+.5;
@@ -2539,7 +2539,17 @@ function buildRug(cells){
 // stand on it instead of sinking into it.
 const FLOOR_LIFT={ planks:.048, squares:.034, slab:.045, crust:.07, pile:RUG_H };
 // Only the rug stands on the ground now: planks, tiles and slabs are flat textures in the terrain (terrain.js).
-function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return d?.layout==='pile' ? FLOOR_LIFT.pile : 0; }
+// A walk-in room's floor slab (walls.js floors(), state.roomFloor) adds its 3 cm.
+function roomFloorLift(x,z){ const f=state.roomFloor; return f && f.cells.has(Math.round(x)+','+Math.round(z)) ? f.up : 0; }
+function floorLiftAt(x,z){ const p=paintAt(x,z), d=p && SOLID_FLOORS[p.mat]; return (d?.layout==='pile' ? FLOOR_LIFT.pile : 0)+roomFloorLift(x,z); }
+// walls.js: the room floors changed under rugs: rebuild only the rugs
+function rebuildRugs(){
+  const keep=[], cells=[];
+  for(const m of state.paintMeshes||[]){ if(m?.name==='floor_carpet') try{ m.dispose(); }catch{} else keep.push(m); }
+  state.paintMeshes=keep;
+  for(const [k,v] of state.paint||[]) if(SOLID_FLOORS[v.mat]?.layout==='pile'){ let tint=null; if(v.tint) try{ const c=BABYLON.Color3.FromHexString(v.tint); tint=[c.r,c.g,c.b]; }catch{} cells.push([...k.split(',').map(Number),tint]); }
+  if(cells.length) state.paintMeshes.push(...[buildRug(cells)].flat().filter(Boolean));
+}
 function buildFloor(type,cells){
   if(SOLID_FLOORS[type]?.layout==='pile') return buildRug(cells);
   const def=SOLID_FLOORS[type], b=boxBatch(), top=state.terrainTopY??0;

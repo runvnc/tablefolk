@@ -513,7 +513,15 @@ default, stone_floor_rough, flagstone, dirt_path, cobblestone), with the room's
 house door's threshold is 6 cm. The board is flat under every walkable square
 and ground cover keeps off room and door squares (terrain.js), so a shell's
 base, set on the ground by its lowest point, meets it with no gap; nothing
-pokes through. procgen's door clutter stands two squares out (the rebuilt
+pokes through. Things stand on the slab (2026-11-22): floors() sets `state.roomFloor`
+({ up, cells }), app.js `floorLiftAt` adds `up` on those squares (characters'
+roots, new props, books; `roomFloorLift`), each slab mesh gets a static
+`floorCollider` (loose props rest on its top), and `relevel` lifts props
+whose base sat on the old height (static ones by `forceBodyTransform`, dynamic
+ones with one pre-step) and rebuilds rugs (`rebuildRugs`, drawn on the slab)
+when the floored squares change. Measured in hearthvale and a generated
+village (seed 23): every prop on a floor square has its base at +.03 (0 before).
+procgen's door clutter stands two squares out (the rebuilt
 models' steps and porches cover the first). `tablefolkRoofs.doorway()` and `shells()`
 (alpha, target, walls enabled) for tests.
 

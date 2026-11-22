@@ -238,7 +238,7 @@
     for (const name of ['rubble', 'blocks', 'cap', 'plaster', 'timber', 'glass']) {
       const m = B0[name].mesh('tt_walls_' + name, () => M[name]); if (m) out.push(m);
     }
-    if (!dark) floors(houses.rooms || [], out);
+    if (!dark) floors(houses.rooms || [], out); else if (state.roomFloor) { const was = state.roomFloor.cells; state.roomFloor = null; relevel(was, new Set()); }
     for (const [rk, Bq] of perRoom) for (const name of ['rubble', 'cap', 'plaster', 'timber', 'glass']) {
       const m = Bq[name].mesh('tt_walls_' + name + '_room', () => M[name]); if (m) { out.push(m); m.metadata = { ...(m.metadata || {}), room: rk }; (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); }
     }
@@ -259,7 +259,14 @@
     const f = pbr('floor_' + env, env, env === 'wood_planks_worn' ? [.95, .88, .8] : [1, 1, 1], { bump: .8 }); f.backFaceCulling = true;
     return (floorMats[env] = f);
   }
+  // Things stand on the slab, not 3 cm into it (2026-11-22): state.roomFloor lists the floored
+  // squares (app.js floorLiftAt adds FLOOR_UP there: characters, new props, books), each slab
+  // gets a static collider (app.js floorCollider) so loose props rest on its top, and props
+  // and rugs placed before the floor was known are lifted onto it (relevel).
   function floors(rooms, out) {
+    const was = state.roomFloor?.cells || new Set(), cells = new Set();
+    for (const r of rooms) for (const c of r.cells) cells.add(c);
+    state.roomFloor = cells.size ? { up: FLOOR_UP, cells } : null;
     for (const r of rooms) {
       const rk = roomKey(r), byMat = new Map();
       for (const c of r.cells) {
@@ -271,8 +278,28 @@
         const x0 = x - e(-1, 0), x1 = x + e(1, 0), z0 = z - e(0, -1), z1 = z + e(0, 1), top = state.terrainTopY ?? 0;
         b.add((x0 + x1) / 2, top + FLOOR_UP / 2 - .01, (z0 + z1) / 2, x1 - x0, FLOOR_UP + .02, z1 - z0, [1, 1, 1]);
       }
-      for (const [env, b] of byMat) { const m = b.mesh('tt_floor_room', () => floorMat(env)); if (m) { m.metadata = { room: rk }; out.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); } }
+      for (const [env, b] of byMat) { const m = b.mesh('tt_floor_room', () => floorMat(env)); if (m) { m.metadata = { room: rk }; out.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); if (typeof floorCollider === 'function') floorCollider(m); } }
     }
+    relevel(was, cells);
+  }
+  function relevel(was, cells) {
+    const top = state.terrainTopY ?? 0, key = (x, z) => Math.round(x) + ',' + Math.round(z);
+    const delta = k => (cells.has(k) ? FLOOR_UP : 0) - (was.has(k) ? FLOOR_UP : 0);
+    // props whose base sat on the old floor height (not ones on tables, held or hung)
+    for (const p of state.props || []) {
+      if (!p || p.isDisposed?.()) continue;
+      const k = key(p.position.x, p.position.z), d = delta(k); if (!d) continue;
+      const bb = p.getBoundingInfo?.().boundingBox; if (!bb) continue;
+      const base = bb.minimumWorld.y, floor = top + (was.has(k) ? FLOOR_UP : 0);
+      if (Math.abs(base - floor) > .02) continue;
+      const pos = p.position.clone(); pos.y += d;
+      if (typeof forceBodyTransform === 'function' && p.physicsBody?.getMotionType?.() === BABYLON.PhysicsMotionType.STATIC) forceBodyTransform(p, pos);
+      else if (p.physicsBody) { p.position.copyFrom(pos); try { p.physicsBody.disablePreStep = false; state.scene.onAfterPhysicsObservable.addOnce(() => { p.physicsBody && (p.physicsBody.disablePreStep = true); }); } catch {} }
+      else p.position.copyFrom(pos);
+    }
+    // rugs (app.js buildRug) stand on the room's floor too: rebuilt when a floored square has one
+    const rug = [...state.paint || []].some(([k, v]) => v.mat === 'carpet' && delta(k));
+    if (rug && typeof rebuildRugs === 'function') rebuildRugs();
   }
   function runLength(cell, x, z, alongX) {
     const has = (a) => { const k = alongX ? a + ',' + z : x + ',' + a, w = cell.get(k); return w && meta(w).type === 'wall'; };
