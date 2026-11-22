@@ -33,6 +33,8 @@
  * The player can move, talk and act at any time: the live round waits while
  * the player's own turn round runs (play.js), and the brains take one
  * decision at a time (world.runAgentTurn).
+ * A "live" world starts 1.5 s after the loading cover lifts (loading.js
+ * whenRevealed): under the cover the clock and everyone stand still.
  * Loaded after play.js; uses app.js globals (state, getBrainConfig,
  * cellPassable, occupantAt, findRoute, startTurnPath, playRig).
  */
@@ -242,8 +244,18 @@
   addEventListener('click', e => { if (e.target.closest?.('#liveBtn')) toggle(); });
   addEventListener('change', e => { if (e.target.id === 'paceSel') setPace(e.target.value); });
   addEventListener('tablefolk-scenario-started', () => { const p = window.tablefolkScenario?.active?.scn?.pace; let mine = null; try { mine = localStorage.getItem('tablefolk.pace'); } catch {} if (!urlPace && !mine && PACES[p]) setPace(p); const sel = document.getElementById('paceSel'); if (sel) sel.value = pace; });
-  // a new scenario starts paused (its settings may start it: "live": true)
-  addEventListener('tablefolk-scenario-started', e => { stop(); turns = 0; if (!e.detail?.sub) ticks = 0; if (e.detail?.live) setTimeout(start, 1500); });
+  // a new scenario starts paused (its settings may start it: "live": true).
+  // Under the loading cover (loading.js: the world's build, the model waking,
+  // a section's travel) nothing lives unseen: the clock, routines, needs and
+  // talk all follow `on`, so it starts 1.5 s after the cover lifts and the
+  // player sees the day from its first minute. A newer world cancels the wait.
+  let startGen = 0;
+  addEventListener('tablefolk-scenario-started', e => {
+    stop(); turns = 0; if (!e.detail?.sub) ticks = 0;
+    const g = ++startGen; if (!e.detail?.live) return;
+    const go = () => setTimeout(() => { if (g === startGen) start(); }, 1500);
+    const L = window.tablefolkLoading; if (L?.whenRevealed) L.whenRevealed().then(go); else go();
+  });
   window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; }, get ticks() { return ticks; },
     // a moment for a line (jobs.js remarks and evening talk wait for it)
     quiet: () => performance.now() - lastSpeechAt >= P0().quiet * 1000 * tempo(),

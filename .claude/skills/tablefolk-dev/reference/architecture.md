@@ -150,6 +150,14 @@ that asked for a turn has released, or 90 s):
    downloaded asks first and starts after the reveal; the question waits
    while the cover is up. Until the brain is ready characters run on code
    (rails).
+   Nothing lives unseen meanwhile: live.js starts a `"live"` world 1.5 s
+   after `whenRevealed()` (not after `tablefolk-scenario-started`), and the
+   clock, routines (jobs.js), needs (mind.js), greetings (chatter.js) and
+   threats all wait for `tablefolkLive.on`, so the day starts at the
+   scenario's `time` in view. Also after a section's short cover and the
+   cap; `?cover=0` resolves at once (as before). `startup-time.mjs`
+   reports it as `unseen` (the clock at the reveal against the scenario's
+   `time`, who moved).
 3. `voice` (tts-ui.js auto-load, `tablefolkTTS.prepare`).
 4. `speech` (speech-input.js: Underdog Bark's preload, which also waits for
    the brain's status as before).

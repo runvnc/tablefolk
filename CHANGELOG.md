@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-22
 
+- **The day starts when you see it**: while the loading screen is up (the world built and the characters waking) the clock stands still and nobody moves, talks or gets hungry; a living world starts once the screen lifts, at the scenario's start time.
 - **No frozen picture after the loading screen**: when the characters' model is already in the browser, it now starts while the loading screen is still up ("Waking the characters…", at most 30 s), so the world appears with the characters ready instead of freezing for several seconds right after it appears. The last two preparation steps that could stutter the first seconds in view also run behind the loading screen now. A model that still needs downloading, a server brain and art mode start after the world shows, as before.
 - **Farm animals' sizes checked**: the rebuilt horses, stag, bull, dog and pig look longer than before because the old ones were squashed (short bodies on long legs); they keep their heights with their true proportions. Horses and the stag still take one square, as before, so they don't block lanes and stable doors.
 - **Furniture stands on the room floors**: since walk-in rooms got their own floor 3 cm above the ground, beds, tables, chests and the people in them had their feet 3 cm in it; now everything indoors (furniture, loose things, characters, rugs) stands on the floor, which is solid to loose things too. Checked in hearthvale and a freshly generated village (every thing on a floor square on top of it).

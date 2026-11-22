@@ -8,7 +8,10 @@
 // the loading stages (window.tablefolkLoading.log) are included. `gap`: the
 // longest pause between drawn frames (`frame`, a held or frozen picture) and
 // between animation frames (`raf`, the main thread) in the 20 s after the
-// reveal, in ms, with when (`frameAt`, `rafAt`, s); the run waits for them. Never
+// reveal (with ?cover=0: after 'active'), in ms, with when (`frameAt`, `rafAt`,
+// s); the run waits for them. `unseen`: the game clock
+// when the cover lifted against the scenario's `time` (`clockAtStart`), and the
+// characters that moved since the world started (`moved`, ids): nothing should live unseen under the cover (live.js). Never
 // approves a model download.
 //
 //   node startup-time.mjs <scenario name> [--art] [--base=http://localhost:8000]
@@ -47,21 +50,30 @@ await page.addInitScript(() => {
   addEventListener('tablefolk-agent-turn', e => { if (!e.detail?.reflex) at('firstTurn'); });
   addEventListener('tablefolk-scene-ready', () => at('ready'));
   addEventListener('tablefolk-scenario-started', () => at('started'));
-  addEventListener('tablefolk-world-ready', () => at('reveal'));
+  // nothing lives unseen under the cover: the clock and every character's square
+  // when the world started and when it was shown (`unseen`: clock at both, how many moved)
+  const snap = () => { const S = window.TABLEFOLK_STATE; return { clock: S?.clock ? { ...S.clock } : null, live: !!window.tablefolkLive?.on, pos: Object.fromEntries((S?.characters || []).map(c => { const p = c.logicalPos || c.root?.position; return [c.id, p ? [Math.round(p.x * 10) / 10, Math.round(p.z * 10) / 10] : null]; })) }; };
+  addEventListener('tablefolk-scenario-started', e => { if (!e.detail?.sub && !T.unseen) T.unseen = { start: snap() }; });
+  addEventListener('tablefolk-world-ready', () => {
+    at('reveal');
+    const u = T.unseen; if (u && !u.reveal) { u.reveal = snap(); u.moved = Object.keys(u.start.pos).filter(k => JSON.stringify(u.start.pos[k]) !== JSON.stringify(u.reveal.pos[k])); u.scenarioTime = window.tablefolkScenario?.active?.scn?.time || null; const m = /^(\d+):(\d+)$/.exec(u.scenarioTime || ''); u.clockAtStart = !!(m && u.reveal.clock && u.reveal.clock.min === +m[1] * 60 + +m[2] && u.reveal.clock.day === 1); u.liveAtReveal = u.reveal.live; u.reveal = { clock: u.reveal.clock }; delete u.start; }
+  });
   window.__tfAt = at;
   // the longest gap between drawn frames (TABLEFOLK_FRAMES steps) and between
   // animation frames (the main thread) in the first 20 s after the reveal
   const G = T.gap = { frame: 0, frameAt: null, raf: 0, rafAt: null };
   let lastF = -1, lastFT = 0, lastR = 0;
+  // with the cover off (?cover=0) the world is in view from the start: measured from 'active'
+  const shownAt = () => T.reveal ?? (window.tablefolkLoading?.off ? T.active : null);
   const tick = () => {
-    const t = performance.now(), sec = +((t - T.t0) / 1000).toFixed(2);
-    if (T.reveal != null && sec <= T.reveal + 20) {
+    const t = performance.now(), sec = +((t - T.t0) / 1000).toFixed(2), R = shownAt();
+    if (R != null && sec <= R + 20) {
       const f = window.TABLEFOLK_FRAMES || 0;
       if (lastR) { const d = t - lastR; if (d > G.raf) { G.raf = Math.round(d); G.rafAt = sec; } }
       if (f !== lastF) { if (lastF >= 0) { const d = t - lastFT; if (d > G.frame) { G.frame = Math.round(d); G.frameAt = sec; } } lastF = f; lastFT = t; }
       else if (lastF >= 0 && t - lastFT > G.frame) { G.frame = Math.round(t - lastFT); G.frameAt = sec; }
     }
-    if (T.reveal != null && sec >= T.reveal + 20) G.done = true;
+    if (R != null && sec >= R + 20) G.done = true;
     lastR = t; requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -101,7 +113,7 @@ for (;;) {
     if (window.tablefolk?.brainReady?.()) at?.('brain');
     const c = document.getElementById('loadCover');
     if (c && !c.hidden) at?.('coverShown');
-    return { T: window.__tfStart, consent: !document.getElementById('modelConsent')?.hidden && !!document.getElementById('modelConsent'), st: document.getElementById('brainStatus')?.textContent || '', meshes: window.TABLEFOLK_STATE?.scene?.meshes.length || 0, pending: window.__tfDressPending?.() || 0, marks: window.__tfMarks || null, hasLoading: !!window.tablefolkLoading };
+    return { T: window.__tfStart, consent: !document.getElementById('modelConsent')?.hidden && !!document.getElementById('modelConsent'), st: document.getElementById('brainStatus')?.textContent || '', meshes: window.TABLEFOLK_STATE?.scene?.meshes.length || 0, pending: window.__tfDressPending?.() || 0, marks: window.__tfMarks || null, hasLoading: !!window.tablefolkLoading, coverOff: !!window.tablefolkLoading?.off };
   }).catch(() => ({}));
   const t = (Date.now() - t0) / 1000;
   if (s.consent && !art) { r.error = 'model download prompt: not approved'; break; }
@@ -113,8 +125,9 @@ for (;;) {
     else if (t - Math.max(stableSince, lastChange) >= 3) r.dressed = +Math.max(stableSince, lastChange).toFixed(1);
   }
   const doneBrain = art || (T.brain != null && T.firstTurn != null);
-  const doneReveal = T.reveal != null || !s.hasLoading || t > 60;
-  const doneGap = !s.hasLoading || (T.reveal != null && (T.gap?.done || t > T.reveal + 25));
+  const doneReveal = T.reveal != null || !s.hasLoading || s.coverOff || t > 60;
+  const R = T.reveal ?? (s.coverOff ? T.active : null);
+  const doneGap = !s.hasLoading || (R != null && (T.gap?.done || t > R + 25));
   if (r.dressed != null && doneReveal) sampling = false;
   if (r.dressed != null && doneBrain && doneReveal && doneGap) { Object.assign(r, T, { t0: undefined, lt: undefined }); r.marks = s.marks; break; }
   if (t > limit) { Object.assign(r, T, { t0: undefined, lt: undefined }); r.timeout = true; r.status = status; r.marks = s.marks; break; }
