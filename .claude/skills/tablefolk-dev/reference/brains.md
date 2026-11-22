@@ -1232,6 +1232,91 @@ the linux-desktop image needs `libcublas-dev-12-9`, and `cuda-nvml-dev-12-9`
 for the PR branch), `build-wllama.sh` (wllama fa1019a against the fork, the
 Inkling glue patch not needed), `brun.sh` (one Chrome run on the box).
 
+## Spark-X2.6-4B (SparkLLM / XHToken, 2026-11-22): the benchmarks don't carry over to the game
+
+4.11B dense (36 layers, hidden 2560, 16 query / 4 KV heads of 256, three
+sliding-window-512 layers per full-attention layer, partial RoPE on the full
+layers, a sigmoid gate per head on the attention output, GELU gated MLP, a
+131,072-word tied vocabulary; `spark2_5`, remote code), English and Chinese,
+Apache-2.0, released 2026-10-19. A reasoning model: `enable_thinking` false
+(or `reasoning_effort` low/high) through the chat template. Upstream llama.cpp
+runs it since b10828 (no custom ops), and there are many quants (bartowski
+Q4_K_M 2.62 GB).
+
+**The publisher**: "SparkLLM", the Hugging Face and GitHub org XHToken. The
+GitHub org dates from 2026-08-09 (Singapore, xhtoken.ai), and its only other
+models are Spark-X2.5 (August 2026). Third-party sites link it to iFlytek, but
+nothing primary confirms that.
+
+**The claims** (all from its own card, in SVG charts, all in thinking mode at
+`high`): an average of 63.3 against Qwen3.5-9B's 49.1 and Gemma 4 E4B's 29.7.
+Some of the numbers are implausible for a 4B model: SWE-bench Verified 62.8, SWE Pro 54.3,
+BrowseComp 53.1 (Qwen3.5-9B 8.3), HLE with tools 36.9. Two of the benchmarks
+are in-house (SWebBench, PAgentBench), and the starred Qwen3.5 numbers come
+from another small-model vendor's card (Nanbeige4.2-3B). Its thinking runs
+36k tokens on average at `high` and 28k at `low` (its own chart). When asked on HF,
+the vendor gave the SWE-bench setup: Claude Code as the harness, 250 turns,
+256k-1M context, git history removed. τ³ turned out to be the Banking
+subset only. Independent checks: not on Artificial Analysis (the vendor has
+been asking them since September); Tiny League and BenchLM only copy the
+card. MakoBench (an unseen-task suite) ranks it 44th of 47 (total 4.9,
+chat 2.3). Users on HF report long, looping thoughts that often never finish
+("loves to yap"; a coding task took 8-9 min where a 27B took 3). One user's
+MMLU-Pro run on X2.5 (direct 40.7 vs Qwen3.5-4B 56.4) shows weak knowledge,
+with a strong MATH score that depends on a long budget (68% at 4k tokens, 83% at 8k).
+Reading: probably no contamination, but heavy RL on agentic and maths tasks
+with very long thinking; the headline numbers are not what a short,
+non-thinking turn gets.
+
+**Formats for the browser** (both exist; neither tried here): litert-community's
+`Spark-X2.6-4B_int4.litertlm` (2.48 GB, LiteRT-LM 0.19.0, 4,096-token KV,
+fp32 GPU activations, int4 GSM8K 89 vs bf16 90, 91 tok/s on an M4 Max with
+native LiteRT-LM's WebGPU backend). Thinking is turned off with the preface's `extra_context`
+`{enable_thinking: false}` (the web API's `Preface.extra_context`; our worker
+does not pass it yet). The other is mohdmahmodi's ONNX q4f16 for transformers.js
+(2.77 GB, 92 tok/s on a 3090 Ti in Chrome, by its author).
+Estimate (not measured): with Raon's 1.82 GB bundle at 4.1 GB on the card,
+this one is likely 4-5 GB, plus the game's 1-2 GB: no on 6 GB, tight on 8 GB,
+fine on 12 GB.
+
+**Measured** (vast.ai RTX 4070 12 GB; upstream llama.cpp e300919, CUDA,
+bartowski Q4_K_M, thinking off with the server's
+`--chat-template-kwargs '{"enable_thinking":false}'`; the game and its
+Chrome on the same box against `--model=endpoint --llm=http://localhost:8080/v1`):
+- Native speed: pp2500 6,627 tok/s, tg50 143. 3.7 GB on the card with 16k
+  context, 2 slots. The innkeeper prompt (3,384 tokens) took 0.97 s; each
+  follow-up re-read only ~20 tokens (prefix reuse works, SWA or not) and took
+  0.2-0.3 s. Thinking at `low`: 240-420 tokens a turn, 2.5-4.3 s natively.
+- Sanity: with thinking off it sold stew at 3 gold against "never under 4";
+  at `low` it held 5. Its replies are short and well formed.
+- Capability check v3: **5/10** (missed steps, sums, mind, haggle,
+  shelter), 123 tok/s -> assisted (danger and temper in code). Bonsai 2 9B
+  scores the same; Bonsai 2 27B 6/10.
+- 36 evals (RUNS=2): **31/36**. Sword at full price 0/2 in shop-role-chaos,
+  where it wrote prose outside `say()` ("I've got the magic sword...
+  sell(magic sword, 50)": it never parsed). Haggle to 45 0/2 in shop-chaos
+  (it agreed in words but never called `sell`). One lowball sale ("Fine, 5
+  gold."). Compare E2B 32-35, Raon-1 nano 36.
+- hearthvale's day at guided (12 min): 99% of activities model-chosen, 37
+  self-started lines across 11 pairs, 15 plans / 40 revisions, 117 surprises,
+  10% wasted (42 failed activities, 7 loops), 376 model calls (15.6 a game
+  hour). But the village barely worked: 5 job cycles in all, 2 hungry at the
+  end, 61% indoors in the raid, 15 sales between characters. Judge
+  (deepseek-v4.1-flash): coherence 3.63, personality 3.5, purpose 3.75,
+  surprise 2.63. E4B at guided got 4.0 / 4.0 / 4.38 / 2.88; Raon-1 nano 3.5 /
+  2.88 / 3.63 / 2.38; Bonsai 2 9B 3.13-3.88.
+
+**Verdict**: not E4B-class in this game: below E2B on the evals, and a
+guided day like Raon's or Bonsai 2 9B's at 2.5 GB of weights. The browser step was not
+run (the brief's stop: only if E4B-class). For 6 GB cards: no (doesn't fit
+beside the game). 8 GB: it would probably fit, but E4B is better.
+12 GB and up: Bonsai 2 9B on Auto scored higher on the same card
+(judge 3.88 / 4.13 / 4.5, a working village). What it is good
+at (long agentic thinking) costs thousands of tokens a turn, which in-browser
+speeds cannot pay for. If it comes up again, the cheap route is the
+litert-community int4 bundle in the existing worker: one `MODEL_CONFIG` entry
+(`maxTokens: 4096`, `charBudget: 10500`) plus passing `extra_context`. Nothing is wired in.
+
 ## Autonomy: rails, guided, free (2026-11-21)
 
 `app/agency.js` (minds.md, "autonomy"). Measured on vast.ai, one RTX 3090
