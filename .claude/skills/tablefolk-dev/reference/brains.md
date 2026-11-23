@@ -1287,6 +1287,73 @@ reasoning after the command, costing a full max_tokens turn; (2) the
 AD-IQ2_M or Unsloth UD-IQ2_XXS (mainline) files, not drofn's, unless 12 GB
 cards matter more than two check items.
 
+### Inkling 2 Mini in the game, in Chrome (2026-11-23)
+
+Wired as brains on the wllama-fast build (`libs/brain/engines/wllama.js`:
+`inkling2-mini-wllama`, `inkling2-mini-small-wllama`, `sensenova-loop-9b-wllama`;
+GGUFs from Hugging Face at pinned revisions; picker entries in
+`app/llm_js/agent-brain.js` with `fitGB`: listed only where the card has
+that much, never auto-picked (no `needGB`); Inkling counts as an ambitious
+brain in `mind.js`). Prompt: Inkling's own message tokens with the answer
+message opened (no thinking) and the "Thinking effort level: 0" line; stops
+`<|end_message|>`, `<|content_model_end_sampling|>`, `<|message_`,
+`The user`, handled by llama.cpp (not by cancelling the stream). No mirror
+on R2 yet; one would hold `Inkling-2-Mini-AD-IQ2_M.gguf` (8.67 GB),
+`Inkling-2-Mini-8GB-64K.gguf` (6.62 GB) and `SenseNova-Loop-9B-AD-Q4_K_M.gguf`
+(5.96 GB) plus the 11 MB `wllama-fast/wllama.wasm`.
+
+Problems found and fixed on the way: (1) the wasm aborted 2-3 minutes into
+a village day while restoring a context checkpoint (`~llama_io_read_host` ->
+`ggml_backend_tensor_set_n`; with llama.cpp's 32 checkpoints a slot and with
+3; the cancel path also crashed: "Failed to cancel request ... unaligned
+accesses"). Checkpoints are now off (`n_ctx_checkpoints: 0`, passed through
+the wllama JS, which dropped it) and stops are server-side: stable for whole
+days since. Without checkpoints each of wllama's 4 slots still extends its
+own cached prompt. (2) Priming the shared prefix first only pays with
+checkpoints: 5.8 s against 5.2 s a turn without them, so it is off. (3) The
+MoE mat-vec path for batches up to 512 tokens is slower than the tiled
+kernel above 64 (127 against 194 tok/s reading): kept at 64.
+
+Measured on a rented RTX 4080 Super 16 GB (Ryzen 9 5900X, Chrome 158,
+hearthvale; `tools/browser-test/brainload.mjs` for load, memory and turns,
+`probe.mjs`, `live-eval.mjs --day --day-minutes=12`, `judge.mjs`):
+
+| | Inkling AD-IQ2_M, Chrome | Inkling AD-IQ2_M, endpoint (native) | Bonsai 2 27B, Chrome 4080 S |
+|---|---|---|---|
+| capability check v3 | **8/10**, 21 tok/s, guided (danger, temper in code) | 8/10 | 6/10 (4070) |
+| load, first time / cached | 265 s (download from HF) / 33-40 s | - | - |
+| peak graphics memory, game at medium | 12.8 GB of 16 | 10.9 GB (server alone) | - |
+| a call in the world (median, p90) | 4.7-5.2 s, 10-13 s; reads 420-750 new tokens at ~190 tok/s, writes ~38 at 27-30 tok/s | 1.3 s (2.5 s p90) | ~7 s |
+| guided day: judge (c / p / u / s) | 3.75 / 3.88 / **4.75** / 3.0 | 4.0 / 3.88 / 4.63 / 3.0 | 4.0 / 3.88 / 4.38 / 3.38 |
+| guided day: calls, model-chosen, hungry at end | 102 (4.2 a game hour), 92%, 3 | 259 (10.8), 98%, 1 | - |
+| free day: judge | 3.63 / 3.38 / 4.0 / 2.5 | 3.88 / 3.5 / 4.38 / 2.63 | 3.88 / 3.75 / 4.5 / 2.75 |
+| free day: calls, model-chosen, plans, hungry | 56 (2.3), 50%, 0, 3 | 186 (7.7), 44%, -, 2 | 77, -, -, 3 |
+
+Guided day in Chrome: 14 self-started (6 pairs), 12 plans / 6 revised, 30
+surprises, depth 0.07, wasted 7%, 11 safety nets, 4 sales, jobs mostly not
+cycled (hector 9, wren 1, tam 1), 83% indoors in the raid. Free day: 12
+self-started (3 pairs), 8 notes, no plans, no surprises, depth 0.2, 3 sales.
+
+**Why a call in the world takes ~5 s when the bench turn took 1.7-2.6 s**:
+the bench re-read only its 25-30 new tokens after a primed, unchanging
+prefix. A village call reads 420-750 new tokens (each turn's state card,
+perception and the moving history window, ~2,000-token prompts in all; 8
+characters share 4 cache slots) at ~190 tok/s in Chrome, about 2.2-3.5 s,
+before writing ~38 tokens (1.3 s); calls queue behind each other, so the
+game measured 13-16 s from asking to answer. What would bring it down:
+faster reading in Chrome (native Dawn reads 440+ tok/s on the same graph:
+Chrome has no subgroup-matrix kernels, and the tiled MoE kernel is the
+largest cost there), 8 slots for 8 characters, a smaller per-turn tail, and
+working checkpoints (the restore crash above) so a moved history window
+does not cost a full re-read.
+
+**Verdict**: wired and stable, as smart in Chrome as natively on the check
+(8/10) and as good a guided day by the judge, but at ~5 s a call the
+village gets 40% of the model calls it got from the native server, so the
+guided day leaves 3 hungry and the free day does little (half the
+activities picked by code, no plans). Guided is playable on 16 GB; free is
+not, until reading gets faster.
+
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
 SenseTime's `sensenova/SenseNova-Loop-9B` (released 2026-11-17; the Preview
