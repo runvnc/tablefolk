@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-23
+
+- **Inkling 2 Mini in the brain menu, on 16 GB cards**: Inkling 2 Mini (and a smaller copy for 12 GB cards, and SenseNova-Loop-9B for 10 GB) can now be picked as the characters' brain where the graphics card has room; never chosen for you. On a 16 GB RTX 4080 Super it passes 8 of the 10 capability tasks (as it does through a server), takes 12.8 GB with the game, loads in 35-40 s once downloaded (4.5 minutes the first time) and answers in about 5 seconds: a good guided village, but too slow yet for characters deciding everything themselves.
+
 ## 2026-11-22
 
 - **How much characters decide, per world in the world builder**: the Story tab has the same five choices as Settings (Auto, the default; On rails; Assisted; Guided; Free), each with a line saying what it means, and each character's box has its own ("decides for itself"); the choice travels in the world's link. The AI that builds worlds sets it only when asked. A world's level is now a request: on a brain the game would run on rails (Gemma 4 E2B, or a slow machine), or with On rails chosen in Settings, a world asking for free stays on rails and Settings' "Running now" says so; on a stronger brain it runs, with the decisions that brain handles badly (its capability check) still made by the game unless the world says otherwise.
