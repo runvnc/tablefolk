@@ -1334,6 +1334,17 @@ surprises, depth 0.07, wasted 7%, 11 safety nets, 4 sales, jobs mostly not
 cycled (hector 9, wren 1, tam 1), 83% indoors in the raid. Free day: 12
 self-started (3 pairs), 8 notes, no plans, no surprises, depth 0.2, 3 sales.
 
+**drofn's 8GB-64K file** (`inkling2-mini-small-wllama`), same card: check
+**7/10** (17 tok/s, guided; missed mind, danger, haggle; 6/10 natively);
+first load 285 s, peak 10.9 GB with the game at medium (fits a 12 GB card
+with ~1.3 GB to spare; no 12 GB card was rented to confirm); 5.4 s a call
+(21 tok/s writing). Guided day: 105 calls, 92% model-chosen, 15
+self-started (6 pairs), 14 plans / 4 revised, 24 surprises, depth 0.6,
+wasted 1%, 8 safety nets, 1 hungry at the end (maren), 6 sales, 72% indoors
+in the raid; judge 3.88 / 3.63 / 4.38 / 2.88 (natively 3.88 / 3.75 / 4.25 /
+2.75). A guided day as good as AD-IQ2_M's in Chrome (fewer hungry, more
+plans; lower purposefulness), 2 GB smaller.
+
 **Why a call in the world takes ~5 s when the bench turn took 1.7-2.6 s**:
 the bench re-read only its 25-30 new tokens after a primed, unchanging
 prefix. A village call reads 420-750 new tokens (each turn's state card,
