@@ -1,0 +1,189 @@
+{
+ "v": 1,
+ "title": "Two by the Hearth",
+ "subtitle": "Mother's cottage goes to the one the other names, by tomorrow's supper.",
+ "intro": "Ada and Bram buried their mother yesterday. Her will lies on the table: the cottage goes to whichever of them the other names, and if they cannot agree by tomorrow's supper, to the miller. One room, two beds, a pot of stew, and a great deal left unsaid. Watch, or knock and step in.",
+ "autonomy": "free",
+ "live": true,
+ "time": "08:00",
+ "dayMinutes": 24,
+ "base": "plain",
+ "lighting": "bright",
+ "walls": "stone",
+ "floor": "wood",
+ "campfire": false,
+ "director": 6,
+ "temper": "normal",
+ "player": {
+  "name": "Neighbour",
+  "gold": 6,
+  "items": [
+   "apple"
+  ],
+  "model": "peasant"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "food": [
+  "stew",
+  "bread",
+  "carrot",
+  "apple"
+ ],
+ "prices": {
+  "stew": 2,
+  "bread": 2
+ },
+ "lore": [
+  "Mother's will: the cottage goes to whichever child the other names; with no agreement by tomorrow's supper it goes to Hobb the miller.",
+  "The deed to the cottage is in the keepsake chest by the beds.",
+  "Hobb the miller lent money to half the valley, and he wants this cottage for his son.",
+  "Mother kept her books on the shelf by the window and read them to the children every winter."
+ ],
+ "events": [
+  "The kettle on the hearth starts to whistle.",
+  "{who} finds mother's old shawl folded on a bed and goes quiet.",
+  "Someone knocks twice, then walks away: the miller's cart rattles off down the lane.",
+  {
+   "text": "A letter slides under the door: \"I will be by at supper tomorrow. Hobb.\"",
+   "spawn": "note",
+   "note": "I will be by at supper tomorrow, to see which of you I am dealing with. Hobb, the miller."
+  },
+  "Rain starts drumming on the roof.",
+  {
+   "text": "The candle on the table gutters out: half the day is gone, and nothing is agreed.",
+   "round": 10,
+   "to": "ada"
+  }
+ ],
+ "agents": [
+  {
+   "id": "ada",
+   "model": "peasant_woman",
+   "job": "cook",
+   "style": "brisk, tired elder sister",
+   "temper": "short",
+   "ttsVoiceId": "builtin:eponine",
+   "personality": "Ada, the elder sister, a cook who left the valley at sixteen and came back for the funeral. Practical, quick, proud; you hate being pitied. You cook stew at the pot from the carrots in the chest and sell a bowl for 2 gold. You think Bram never did a day's real work: he stayed home and read while you sent money.",
+   "agenda": "You owe Hobb the miller 40 gold. If Bram names you, you will sell Hobb the cottage and be free of the debt. Get Bram to name you without telling him why.",
+   "secret": "You owe Hobb the miller 40 gold and he has threatened to tell the whole valley.",
+   "inventory": {
+    "gold": 4,
+    "items": [
+     {
+      "name": "bread",
+      "qty": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "bram",
+   "model": "villager",
+   "job": "scholar",
+   "style": "gentle, stubborn younger brother",
+   "temper": "long",
+   "ttsVoiceId": "builtin:marius",
+   "personality": "Bram, the younger brother, who stayed and looked after mother for six years. Soft-spoken and stubborn; you read mother's books at the shelf and write in her ledger. You want to keep the cottage and her books. You think Ada only came back for the house.",
+   "agenda": "Keep the cottage. You carry mother's last letter, which says she wanted Ada to have it. Decide whether to show it, burn it, or bargain with it.",
+   "secret": "Mother's last letter says she wanted Ada to have the cottage. You have shown it to nobody.",
+   "inventory": {
+    "gold": 9,
+    "items": [
+     "mother's letter"
+    ]
+   }
+  }
+ ],
+ "goal": {
+  "text": "Will Ada and Bram agree before the miller comes? (Nothing to win: watch, or talk to them.)",
+  "win": {
+   "any": [
+    {
+     "agent_has": [
+      "ada",
+      "deed"
+     ]
+    },
+    {
+     "agent_has": [
+      "bram",
+      "deed"
+     ]
+    }
+   ]
+  },
+  "winText": "One of them holds the deed. The other let them have it."
+ },
+ "grid": [
+  "###########",
+  "#K..t..Z.Z#",
+  "#K..t.....#",
+  "#.........#",
+  "#o.1.n.2..#",
+  "#.........#",
+  "#.....B..v#",
+  "#.........#",
+  "#####Y#####"
+ ],
+ "size": [
+  11,
+  9
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "deed",
+     "qty": 1
+    },
+    {
+     "name": "old shawl",
+     "qty": 1
+    }
+   ],
+   "x": -4,
+   "z": 0
+  },
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "carrot",
+     "qty": 10
+    },
+    {
+     "name": "bread",
+     "qty": 4
+    }
+   ],
+   "x": 4,
+   "z": 1
+  },
+  {
+   "type": "note",
+   "x": 0,
+   "z": -3,
+   "wall": "north",
+   "text": "My will: the cottage goes to the one of you the other names. If you cannot agree by tomorrow's supper, it goes to Hobb. Be kind to each other. Mother."
+  }
+ ],
+ "wallHeight": 2,
+ "legend": {
+  "Z": "bed"
+ }
+}
