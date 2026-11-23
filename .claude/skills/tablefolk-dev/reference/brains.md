@@ -1477,6 +1477,13 @@ divergence against the CPU (2 x 512 tokens): unfused WebGPU 0.084 / 95.7%
 same top token, fused 0.081 / 95.5% (the gap to the CPU predates the fusions;
 not chased).
 
+**In the game, in Chrome** (2026-11-23, RTX 4080 Super, `sensenova-loop-9b-wllama`, AtomicChat AD-Q4_K_M,
+which loads on the merged PR #32588 graph): capability check v3 **10/10** at 24 tok/s -> free (natively 7/10
+by URL: a different run, sampling); cached load 30 s, peak 8.9 GB with the game at medium; 5.0 s a call
+median (15 s p90), reading ~540 new tokens at ~127 tok/s (slower than Inkling's ~190: dense 9B), writing
+25 tok/s. Free day in hearthvale: 50 calls, 21% of activities chosen by the model, 20 self-started, no
+plans, depth 0.67, 4 hungry at the end; judge 3.75 / 3.63 / 3.5 / 2.75. Its check says free, its day says
+the calls are too slow and too few for free (as for Inkling).
 ## Spark-X2.6-4B (SparkLLM / XHToken, 2026-11-22): the benchmarks don't carry over to the game
 
 4.11B dense (36 layers, hidden 2560, 16 query / 4 KV heads of 256, three
