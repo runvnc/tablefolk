@@ -543,7 +543,8 @@ request that gives the model `activity` on a rails base is not followed
 why); otherwise it runs, and on Auto the base's code domains among talk,
 danger, needs, temper stay code unless the request names them (`kept`). The
 capability check now runs on Auto in worlds that set `autonomy` too (it
-decides the cap). The builder writes it (Story tab radios, a select per
+decides the cap). `?autonomy=<level>` (live-eval `--autonomy=`) beats the
+world's and characters' levels, so a free world can be measured at guided. The builder writes it (Story tab radios, a select per
 character; builder.js `setAutonomy` keeps per-domain keys); worldgen-core.js
 `checkScenario` drops invalid values; fast-skill.md tells the generator to
 leave it out unless asked; worldgen-browser.js `autonomyAsked(prompt)` sets it

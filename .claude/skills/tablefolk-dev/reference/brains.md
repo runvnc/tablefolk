@@ -1775,3 +1775,53 @@ often, the fighters of the night raid end hungry in both runs, and the judge
 puts both free days below the guided day on the same card (coherence 3.5-3.88
 vs 4.0, surprise 2.75 vs 3.38) and below the 4090's free day. Playable, as in
 nothing breaks; not the recommended level: guided stays the 16 GB pick.
+
+### Scenarios suited to free (2026-11-22, not measured yet)
+
+Free's losses above are mostly scale and pace: eight villagers sharing one
+slow brain in a 12-minute day, with needs and raids at once (3-5 calls a game
+hour on 16 GB, the night raid's fighters ending hungry). Three worlds turn
+those knobs the other way (the scenario skill's living.md, "Worlds made for
+free"): 2-4 characters in one room, food in a chest by the pot and beds in
+the same room, one simple job each, no threats, `"dayMinutes": 24`, one shared
+problem and a private `agenda` and `secret` each, `"autonomy": "free"`.
+
+| world | who | the problem | jobs |
+|---|---|---|---|
+| `free-two-by-the-hearth` | ada, bram (siblings) | the will: the cottage goes to whichever one the other names, by tomorrow's supper; she secretly owes the miller 40 gold, he hides mother's letter | cook, scholar |
+| `free-flooded-ferry` | nell, corwin, ysolde | one passenger crosses at dawn; the ferrywoman secretly needs 25 gold for the rope, the merchant can pay, the healer cannot | innkeeper, merchant, healer |
+| `free-snowbound-inn` | marta, pell, ines, aldo | the only map of the way down is gone (pell took it); the innkeeper secretly wants them stuck | innkeeper, merchant, scholar, healer |
+
+The two-character cottage is the candidate for 12 GB cards and below (Bonsai
+2 9B, Inkling's 6.6 GB drofn file): with two characters each gets about four
+times the turns a hearthvale villager gets from the same brain. Its 12 GB
+form: `{"preset": "free", "needs": "code"}`.
+
+Checked without a brain (2026-11-22): the server checks pass (the
+living-world rule for fresh worlds, "one room", would flag them, as it would
+the goblin bakery); `tools/browser-test/scenario-smoke.mjs` (`?model=none`:
+rails, code runs the day) plays each through a 2-minute day with no page
+errors: everyone works (the cook makes stew, the scholar reads), and sleeps
+at night.
+
+To measure (a rented box, as `tools/cloud-gpu/box-queue.sh`; `--day-minutes`
+must match the world's 24, live-eval otherwise uses 8; `--autonomy=` beats the
+world's level, so guided is the comparison on the same world):
+
+```bash
+cd tools/browser-test; export CDP_PORT=9223 APPROVE_DOWNLOAD=1 READY_TIMEOUT=900
+M=bonsai2-27b   # or bonsai2-9b, gemma4-e4b-litert; Inkling by --llm=<url> --llm-model=<name>
+for w in free-two-by-the-hearth free-flooded-ferry free-snowbound-inn; do for lv in free guided; do
+  bash ../cloud-gpu/chrome-restart.sh; sleep 3
+  timeout 3600 node live-eval.mjs scenarios/$w.json --day --day-minutes=24 --model=$M --autonomy=$lv --label=$M-$lv
+done; done
+# the 12 GB form, on the small world (Auto, so the capability check runs: no --autonomy)
+jq '.autonomy={"preset":"free","needs":"code"}' ../../scenarios/free-two-by-the-hearth.json > tmp/free-two-12gb.json
+timeout 3600 node live-eval.mjs tools/browser-test/tmp/free-two-12gb.json --day --day-minutes=24 --model=bonsai2-9b --label=bonsai2-9b-12gb
+node interest-report.mjs results/live-free-*.json
+node judge.mjs results/live-free-*.json        # OpenRouter, JUDGE_BUDGET 2 dollars
+```
+
+Read beside hearthvale: model calls a game hour per character, self-started
+interactions per pair, notes rewritten with plan(), hungry at the end, and
+the judge's purposefulness and surprise against the same brain at guided.

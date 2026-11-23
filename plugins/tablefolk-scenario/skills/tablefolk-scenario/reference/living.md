@@ -198,7 +198,9 @@ character's) level is a request, not an order:
   hands danger to the model anyway.
 - A level the player chose in Settings (other than On rails) is the player
   accepting the cost: the world's request runs as written, with nothing kept
-  in code. `?autonomy=` in the link counts as the player's choice.
+  in code.
+- `?autonomy=<level>` in the page's link (tests and measuring) beats
+  everything: the world's level, the characters' own and Settings.
 
 - **On rails**: as above.
 - **Assisted**: the character chooses what to do, plans its day and starts
@@ -255,6 +257,33 @@ A need a character keeps failing to meet (two failed tries to eat, or to get
 to bed) is handled by the game for three game hours, then handed back.
 Brains below the check's comfortable band see a short menu (needs, their
 plan and work first, then a few others).
+
+### Worlds made for free
+
+Free is hardest where it is usually measured: eight villagers sharing one
+slow brain, a 12-minute day, work, meals and raids all at once. A world
+that suits it is small and about people:
+
+- **2 to 4 characters**, so each gets a turn often (turns are shared out by
+  the brain's speed);
+- **one shared situation** that gives them a reason to talk, trade or
+  disagree (a will, one seat on a ferry, a missing map), not parallel work;
+- **few activities**, each one `do(...)`: a simple job each (`cook`,
+  `innkeeper`, `scholar`, `healer`, `merchant`), food in a chest by the pot
+  and beds in the same room, so needs are quick to meet;
+- **no raids or monsters** (or `"danger": "code"`);
+- **a longer day** (`"dayMinutes": 24`), so slow turns still add up to one;
+- **strong, distinct personalities** with a private `agenda` and a
+  `secret`, so the freedom has something to show;
+- `"autonomy": "free"`; for machines with 12 GB of graphics memory or less,
+  `{"preset": "free", "needs": "code"}` (the game feeds them and puts them
+  to bed; their own turns do the rest).
+
+`scenarios/free-two-by-the-hearth.json` (two siblings, one cottage, a will
+that makes them agree; the one for smaller machines),
+`free-flooded-ferry.json` (three, one crossing at dawn) and
+`free-snowbound-inn.json` (four, a stolen map) are built this way. On a
+brain the game would run on rails they play on rails (above).
 
 What it costs: guided asks the model about once per activity (a few seconds
 on a capable machine); free asks for whole turns. Measured: maintainer skill,

@@ -76,6 +76,7 @@ Each `.json` (and most have an `.html` page that opens it):
 |---|---|
 | `hearthvale`, `frontier-outpost`, `harrow-keep`, `kettlemoor-hunt`, `deepdelve-camp` | the first showcase worlds (`showcase.json`): a working village, a frontier outpost under goblin raids, a dungeon delve with a camp at the entrance, a hunters' camp with wolves and a bear, a mining camp; made by the world builder (2026-11-20) and lightly hand-tuned |
 | `goblin-bakery`, `necromancer-interview`, `goblin-builders`, `dragon-tax-audit`, `haunted-tavern` | the older one-room showcase worlds, after the new ones |
+| `free-two-by-the-hearth`, `free-flooded-ferry`, `free-snowbound-inn` | worlds made for `"autonomy": "free"` ([living.md](living.md#worlds-made-for-free)): two, three and four characters in one room with food and beds at hand, no raids, a 24-minute day, one shared problem and a private aim each (a cottage two siblings must agree on; one ferry crossing at dawn; a stolen map out of a snowed-in inn). The two-character cottage is the one for smaller machines |
 | `the-oracle` | a very small brain (`defaultModel`, `simple`, `systemPrompt`): he knows everything and is wrong |
 | `alchemist` | an ASCII-grid workshop |
 | `low-tide` | earshot, whispers, a password hand-over |
