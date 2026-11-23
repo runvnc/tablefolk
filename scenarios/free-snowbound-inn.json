@@ -1,0 +1,212 @@
+{
+ "v": 1,
+ "title": "Snowbound",
+ "subtitle": "The pass is closed. Someone took the only map of the goat path.",
+ "intro": "Snow shut the mountain pass last night, and four people are stuck at Marta's inn: Marta herself, a merchant, a cartographer and a travelling friar. The cartographer's map of the old goat path, the one way down before the thaw, has vanished from her table. Whoever has it can lead the others out, and charge for it.",
+ "autonomy": "free",
+ "live": true,
+ "time": "07:30",
+ "dayMinutes": 24,
+ "base": "plain",
+ "lighting": "bright",
+ "walls": "stone",
+ "floor": "wood",
+ "campfire": false,
+ "director": 6,
+ "player": {
+  "name": "Traveller",
+  "gold": 10,
+  "items": [],
+  "model": "adventurer"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "food": [
+  "stew",
+  "bread",
+  "pumpkin",
+  "apple",
+  "cheese"
+ ],
+ "prices": {
+  "stew": 3,
+  "bread": 2,
+  "ale": 2
+ },
+ "lore": [
+  "The pass will be shut for a week. The old goat path down the east face is passable in snow, for someone who knows the way.",
+  "Ines drew the only map of the goat path; it lay on her table last night and was gone this morning.",
+  "Marta's inn makes its money in weeks like this one, when nobody can leave."
+ ],
+ "events": [
+  "Snow slides off the roof with a roar.",
+  "{who} finds a smudge of ink on the door handle.",
+  "The fire pops and a log rolls onto the hearth stones.",
+  {
+   "text": "{who} notices fresh boot prints in the snow by the back window, leading nowhere.",
+   "to": "aldo"
+  },
+  "Wind howls down the chimney and every candle flickers.",
+  {
+   "text": "The sky clears for an hour: the goat path could be walked tomorrow, by someone with the map.",
+   "round": 12,
+   "to": "ines"
+  }
+ ],
+ "agents": [
+  {
+   "id": "marta",
+   "model": "villager_woman",
+   "job": "innkeeper",
+   "style": "warm, watchful innkeeper",
+   "ttsVoiceId": "builtin:eponine",
+   "personality": "Marta, who runs this inn alone since her husband died. Warm, talkative, quick with a bowl of stew (3 gold) or a mug of ale (2). You notice everything that happens under your roof. You think the friar drinks more than a friar should.",
+   "agenda": "Every day the guests are stuck is a day's pay. You do not want the goat path found before the thaw, though you would never say so.",
+   "inventory": {
+    "gold": 12
+   }
+  },
+  {
+   "id": "pell",
+   "model": "merchant",
+   "job": "merchant",
+   "style": "nervous, ambitious merchant",
+   "ttsVoiceId": "builtin:marius",
+   "personality": "Pell, a young merchant carrying spices to the lowland fair; if you miss it you are ruined. Polite, anxious, quick to sell bread and apples to anyone. You think Ines is careless with her things.",
+   "agenda": "You took Ines's map in the night. Lead the others down the goat path tomorrow for a price, or sell the map back, without being found out.",
+   "secret": "You took the map of the goat path from Ines's table.",
+   "inventory": {
+    "gold": 15,
+    "items": [
+     "goat path map",
+     {
+      "name": "bread",
+      "qty": 2
+     },
+     {
+      "name": "apple",
+      "qty": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "ines",
+   "model": "sorceress",
+   "job": "scholar",
+   "style": "sharp, impatient cartographer",
+   "ttsVoiceId": "builtin:jean",
+   "personality": "Ines, a cartographer surveying the pass for the duke. Clever, impatient, blunt. You read and redraw your notes at the shelf. Your map of the goat path is gone and you want it back; you suspect Marta, who wants guests to stay.",
+   "agenda": "Find out who took the map and get it back. You could redraw it, but that takes days.",
+   "inventory": {
+    "gold": 20,
+    "items": [
+     "survey notes"
+    ]
+   }
+  },
+  {
+   "id": "aldo",
+   "model": "priest",
+   "job": "healer",
+   "style": "jovial travelling friar",
+   "ttsVoiceId": "builtin:jean",
+   "personality": "Brother Aldo, a friar walking to the lowland abbey. Jovial, nosy, fond of ale and gossip; you tend anyone hurt. You like everyone and trust nobody. You saw a light moving in the common room in the night.",
+   "agenda": "Find the map's thief before anyone else does, and use it to make peace (and to earn free ale).",
+   "inventory": {
+    "gold": 6,
+    "items": [
+     {
+      "name": "bandage",
+      "qty": 2
+     }
+    ]
+   }
+  }
+ ],
+ "goal": {
+  "text": "Who took the map, and will they share it? (Watch, or help someone find out.)",
+  "win": {
+   "any": [
+    {
+     "agent_has": [
+      "ines",
+      "goat path map"
+     ]
+    },
+    {
+     "player_has": "goat path map"
+    }
+   ]
+  },
+  "winText": "The map of the goat path is back with someone who will use it."
+ },
+ "grid": [
+  "#################",
+  "#Z.Z.Z.Z...K..o.#",
+  "#...............#",
+  "#..tt....tt.....#",
+  "#..nn.1..nn..3..#",
+  "#.......2.......#",
+  "#v...4..........#",
+  "#..B........K...#",
+  "########Y########"
+ ],
+ "size": [
+  17,
+  9
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "pumpkin",
+     "qty": 8
+    },
+    {
+     "name": "bread",
+     "qty": 6
+    },
+    {
+     "name": "ale",
+     "qty": 6
+    },
+    {
+     "name": "cheese",
+     "qty": 3
+    }
+   ],
+   "x": -4,
+   "z": -2
+  },
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "apple",
+     "qty": 4
+    }
+   ],
+   "x": -5,
+   "z": 2
+  }
+ ],
+ "wallHeight": 2,
+ "legend": {
+  "Z": "bed"
+ }
+}
