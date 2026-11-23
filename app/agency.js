@@ -8,7 +8,8 @@
  * A world's or character's request is not followed on a brain Auto puts on
  * rails, nor when the player chose On rails; on Auto the decisions the brain
  * keeps in code stay in code unless the request names them
- * (autonomy-profile.js choose(); Running now says so).
+ * (autonomy-profile.js choose(); Running now says so). ?autonomy=<level>
+ * in the link (tests, measuring) beats the world's and characters' own.
  *
  *   rails   code runs the day (jobs.js) and the model talks: the design that
  *           makes Gemma 4 E2B work. Nothing here runs; the prompts stay as
@@ -124,7 +125,9 @@
     // autonomy-profile.js choose(): a world's or character's request on a brain Auto puts on rails (or with
     // "On rails" chosen in Settings) is not followed; on Auto the domains the brain keeps in code stay there
     const set = setting(), d = set === 'auto' ? brainDefault() : null;
-    const p = PF().choose({ character: cfg.autonomy, world: state?.autonomy, setting: set, auto: d?.value });
+    // (?autonomy=<level> in the link is for tests and measuring: it beats the world's and the characters' own)
+    const forced = urlSet && urlSet !== 'auto';
+    const p = PF().choose({ character: forced ? null : cfg.autonomy, world: forced ? null : state?.autonomy, setting: set, auto: d?.value });
     const who = p.source === 'character' ? 'set on the character' : 'set by this world';
     const mine = urlSet ? 'set by the link (?autonomy=)' : 'your choice in Settings';
     const why = p.capped ? `${p.source === 'character' ? 'this character asks' : 'this world asks'} for ${p.capped.asked}, but ${p.capped.by === 'setting' ? 'On rails is ' + mine : 'this brain runs on rails (' + d.why + ')'}: kept on rails`

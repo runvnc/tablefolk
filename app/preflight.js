@@ -84,7 +84,7 @@
     ['threats.js?v=20261122a'],
     ['chatter.js?v=20261121b'],
     ['autonomy-profile.js?v=20261122a'],
-    ['agency.js?v=20261122a'],
+    ['agency.js?v=20261122b'],
     ['speech-input.js?v=20261122a'],
     ['worldgen-own.js?v=20261115a'],
     ['online-brain.js?v=20261112b'],
