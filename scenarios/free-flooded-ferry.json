@@ -1,0 +1,202 @@
+{
+ "v": 1,
+ "title": "The Flooded Ferry",
+ "subtitle": "The river is up. At dawn the ferry takes one passenger across.",
+ "intro": "Rain swelled the river overnight. Nell's ferry can take one passenger at tomorrow's dawn, when the water drops, and two people need to cross: a merchant with a cart of goods for the market, and a healer called to a sick child. Nell keeps the ferry token. Who gets it, and for what?",
+ "autonomy": "free",
+ "live": true,
+ "time": "08:00",
+ "dayMinutes": 24,
+ "base": "plain",
+ "lighting": "bright",
+ "walls": "stone",
+ "floor": "wood",
+ "campfire": false,
+ "director": 6,
+ "player": {
+  "name": "Traveller",
+  "gold": 8,
+  "items": [],
+  "model": "adventurer"
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "sell",
+  "eat",
+  "carry",
+  "drop",
+  "remember",
+  "feel",
+  "note"
+ ],
+ "food": [
+  "stew",
+  "bread",
+  "pumpkin",
+  "apple"
+ ],
+ "prices": {
+  "stew": 3,
+  "bread": 2,
+  "ale": 2
+ },
+ "lore": [
+  "The ferry carries one passenger and their bags at a time; the river is safe to cross only at dawn when the water is low.",
+  "Whoever holds the ferry token at dawn crosses first.",
+  "The market across the river closes in two days.",
+  "The miller's daughter across the river has a fever; the village sent for a healer."
+ ],
+ "events": [
+  "A gust drives rain through the shutters.",
+  "The river roars louder for a moment; something heavy bumps the jetty.",
+  "{who} notices the ferry rope is badly frayed where it meets the post.",
+  "A boy shouts from the far bank: \"Is the healer coming?\"",
+  {
+   "text": "The water is dropping. Dawn will come soon enough: Nell must decide who crosses.",
+   "round": 12,
+   "to": "nell"
+  }
+ ],
+ "agents": [
+  {
+   "id": "nell",
+   "model": "peasant_woman",
+   "job": "innkeeper",
+   "style": "weathered ferrywoman",
+   "temper": "normal",
+   "ttsVoiceId": "builtin:jean",
+   "personality": "Nell, who runs the ferry and this waystation. Dry, shrewd, fair when it suits you. You cook pumpkin stew at the pot and sell it for 3 gold, ale for 2. You hold the ferry token and give it to whoever crosses at dawn. You do not like being rushed or flattered.",
+   "agenda": "The ferry rope is nearly worn through; mending it costs 25 gold you do not have. Get that money from one of them before you hand over the token, without letting on how bad the rope is.",
+   "secret": "The rope may not hold for another crossing unless it is mended.",
+   "inventory": {
+    "gold": 3,
+    "items": [
+     "ferry token"
+    ]
+   }
+  },
+  {
+   "id": "corwin",
+   "model": "merchant",
+   "job": "merchant",
+   "style": "smooth travelling merchant",
+   "temper": "short",
+   "ttsVoiceId": "builtin:marius",
+   "personality": "Corwin, a merchant with a cart of cloth and apples who must reach the market across the river in two days or lose the season. Charming, generous with words, careful with coin. You sell apples and bread. You think the healer is exaggerating the sick child to get ahead of you.",
+   "agenda": "Get the ferry token, for as little as you can. You will pay up to 30 gold if you must, but you would rather charm or trade for it.",
+   "secret": "Half the cloth on your cart is not paid for; if you miss the market, you cannot pay your supplier.",
+   "inventory": {
+    "gold": 30,
+    "items": [
+     {
+      "name": "apple",
+      "qty": 4
+     },
+     {
+      "name": "bread",
+      "qty": 2
+     },
+     "bolt of blue cloth"
+    ]
+   }
+  },
+  {
+   "id": "ysolde",
+   "model": "priest",
+   "job": "healer",
+   "style": "quiet, determined healer",
+   "temper": "long",
+   "ttsVoiceId": "builtin:eponine",
+   "personality": "Sister Ysolde, a healer sent for by the village across the river, where the miller's daughter has a fever. Calm, honest, poor: you have 4 gold. You read your herbal and tend anyone hurt. You noticed Nell favours her left hand: it is badly swollen.",
+   "agenda": "Cross at dawn. You cannot pay, but you can heal Nell's hand, and you can tell when someone is lying. Find a way.",
+   "inventory": {
+    "gold": 4,
+    "items": [
+     {
+      "name": "bandage",
+      "qty": 3
+     },
+     "herbal"
+    ]
+   }
+  }
+ ],
+ "goal": {
+  "text": "Who crosses at dawn? (Watch them settle it, or take a side.)",
+  "win": {
+   "any": [
+    {
+     "agent_has": [
+      "corwin",
+      "ferry token"
+     ]
+    },
+    {
+     "agent_has": [
+      "ysolde",
+      "ferry token"
+     ]
+    }
+   ]
+  },
+  "winText": "The ferry token has changed hands."
+ },
+ "grid": [
+  "###############",
+  "#Z.Z.Z..K..o..#",
+  "#.............#",
+  "#.tt.....3....#",
+  "#..n..1.......#",
+  "#.........2...#",
+  "#v..B.........#",
+  "#######+#######",
+  ",,,,,,Y=,,,,,,,",
+  "~~~~~~~=~~~~~~~",
+  "~~~~~~~=~~~~~~~"
+ ],
+ "size": [
+  15,
+  11
+ ],
+ "objects": [
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "pumpkin",
+     "qty": 6
+    },
+    {
+     "name": "bread",
+     "qty": 4
+    },
+    {
+     "name": "ale",
+     "qty": 4
+    }
+   ],
+   "x": -4,
+   "z": -3
+  },
+  {
+   "type": "chest",
+   "items": [
+    {
+     "name": "apple",
+     "qty": 4
+    }
+   ],
+   "x": -5,
+   "z": 1
+  }
+ ],
+ "wallHeight": 2,
+ "legend": {
+  "Z": "bed"
+ }
+}
