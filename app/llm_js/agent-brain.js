@@ -68,10 +68,11 @@ const SUPPORTED_MODELS = {
   'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1 },   // the pick for 10-12 GB+ cards: 10.2 GB peak with the game at high quality on a 4070 (2026-11-15)   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
   // Inkling 2 Mini and SenseNova-Loop-9B on our faster wllama build (libs/brain/engines/wllama-fast; brains.md,
   // "Faster in Chrome"). fitGB: listed in the picker only where the card has that much (with the game beside
-  // it); never picked for a device by itself (no needGB) until measured in the game.
-  'inkling2-mini-wllama': { label: 'Inkling 2 Mini (llama.cpp WebGPU; needs a 16 GB graphics card)', engine: 'wllama3', size: '~8.7 GB', fitGB: 14, memGB: 10.5, readGB: 2.1, autoLoad: true },
-  'inkling2-mini-small-wllama': { label: 'Inkling 2 Mini, smaller file (llama.cpp WebGPU; needs a 12 GB graphics card)', engine: 'wllama3', size: '~6.6 GB', fitGB: 11, memGB: 8.9, readGB: 1.9, autoLoad: true },
-  'sensenova-loop-9b-wllama': { label: 'SenseNova-Loop-9B (llama.cpp WebGPU; needs a 10 GB graphics card)', engine: 'wllama3', size: '~6 GB', fitGB: 9, memGB: 6.4, readGB: 5.4, autoLoad: true },
+  // it); never picked for a device by itself (no needGB). Measured in the game in Chrome on an RTX 4080 Super
+  // (game at medium): 12.8 / 10.9 / 8.9 GB peak; capability check 8, 7 and 10 of 10 (brains.md).
+  'inkling2-mini-wllama': { label: 'Inkling 2 Mini (llama.cpp WebGPU; needs a 16 GB graphics card)', engine: 'wllama3', size: '~8.7 GB', fitGB: 14, memGB: 11, readGB: 2.1, autoLoad: true },
+  'inkling2-mini-small-wllama': { label: 'Inkling 2 Mini, smaller file (llama.cpp WebGPU; needs a 12 GB graphics card)', engine: 'wllama3', size: '~6.6 GB', fitGB: 11, memGB: 9.2, readGB: 1.9, autoLoad: true },
+  'sensenova-loop-9b-wllama': { label: 'SenseNova-Loop-9B (llama.cpp WebGPU; needs a 10 GB graphics card)', engine: 'wllama3', size: '~6 GB', fitGB: 10, memGB: 7.2, readGB: 5.4, autoLoad: true },
   // Ternary Bonsai 2 9B on the same WebGPU kernel engine (bonsai2.js): 1.86 GB
   // download, ~3.4 GB on the card at an 8192 window, ~107 tokens/s on an RTX 4070
   'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU kernels; needs a 6 GB graphics card)', engine: 'bonsai2', bonsaiSize: '9B', size: '~1.9 GB', needGB: 6, readGB: 1.9, memGB: 3.4 },
