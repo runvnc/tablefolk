@@ -288,6 +288,15 @@
   const THREAT_WORDS = [[/\bwol(f|ves)\b/i, { kind: 'raid', who: 'wolf' }], [/\bgoblins?\b/i, { kind: 'raid', who: 'goblin', name: 'goblin' }], [/\b(orcs?)\b/i, { kind: 'raid', who: 'orc' }],
     [/\b(skeletons?|undead|dead rise)\b/i, { kind: 'raid', who: 'skeleton' }], [/\bspiders?\b/i, { kind: 'raid', who: 'spider' }], [/\b(bandits?|brigands?|raiders?|thieves)\b/i, { kind: 'bandits' }],
     [/\brats?\b/i, { kind: 'rats' }], [/\b(bears?)\b/i, { kind: 'raid', who: 'bear', count: 1 }], [/\b(ghosts?|spirits?)\b/i, { kind: 'raid', who: 'ghost' }]];
+  // "autonomy" only when the request asks how much the characters decide (else Auto: the player's brain decides)
+  function autonomyAsked(p) {
+    const t = String(p || '');
+    const named = t.match(/\bautonomy\b[\s:=("']*(rails|assisted|guided|free)\b/i) || t.match(/\b(rails|assisted|guided|free)\b[\s-]*autonomy\b/i);
+    if (named) return named[1].toLowerCase();
+    if (/\bon rails\b/i.test(t)) return 'rails';
+    if (/\b(decide|act|choose)\w* (everything |all )?(for|on) their own\b|\bdecide\w* (everything )?for themselves\b|\bfully autonomous\b/i.test(t)) return 'free';
+    return null;
+  }
   function pressure(plan, scn) {
     if (plan.talk) { scn.talk = true; return; }
     scn.live = true; scn.time = '07:00'; scn.dayMinutes = 12;
@@ -461,6 +470,7 @@
       if (!scn.agents.length) throw new Error('the model wrote no characters');
       autoLock(scn, built);
       pressure(plan, scn);
+      const auto = autonomyAsked(prompt); if (auto) scn.autonomy = auto;
       // 5. what happens now and then (director.js), and the world lives on its own
       scn.live = true;
       try {

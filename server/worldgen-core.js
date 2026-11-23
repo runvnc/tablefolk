@@ -13,6 +13,7 @@
 //   worldPage(url, opts)           the /world/ page (builder or loading view), HTML
 import { deflateRawSync } from 'node:zlib';
 import '../app/procgen.js';
+import '../app/autonomy-profile.js';
 import { validate as validateScript } from '../libs/script/validate.js';
 import { livingWorld } from './worldgen-living.js';
 const Procgen = globalThis.TablefolkProcgen;
@@ -102,6 +103,10 @@ export function checkScenario(s, packVoices = [], opts = {}) {
   }
   if (new Set(ids).size !== ids.length) problems.push('agent ids must be unique');
   if (s.player?.model && !knownBody(s.player.model)) delete s.player.model;
+  // "autonomy" (scenario and characters): a preset or an object of decisions; anything else is dropped (Auto)
+  const autonomyOk = v => globalThis.tablefolkProfile.normalize(v);
+  if (s.autonomy != null) { const v = autonomyOk(s.autonomy); if (v) s.autonomy = v; else delete s.autonomy; }
+  for (const a of s.agents || []) if (a && typeof a === 'object' && a.autonomy != null) { const v = autonomyOk(a.autonomy); if (v) a.autonomy = v; else delete a.autonomy; }
   for (const c of s.allowed || []) if (!knownCommand(c)) problems.push(`"allowed": unknown command ${c}`);
   if (!Array.isArray(s.allowed)) s.allowed = ['say', 'walk', 'face', 'emote'];
   // Person-height doors and first person need the tall walls (twice the
@@ -392,6 +397,7 @@ button.primary{display:inline-flex;align-items:center;gap:7px;background:var(--a
 #editor legend{font-weight:700;padding:0 6px}#editor .cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px}
 #editor label{display:flex;flex-direction:column;font-size:.78rem;color:var(--muted);gap:3px}#editor label.wide{grid-column:1/-1}
 #editor input,#editor select,#editor textarea{font-size:.92rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:.4rem .55rem;width:100%}
+#editor .autopick{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin:0;border:0;padding:0}#editor .autopick>span{font-size:.78rem;color:var(--muted)}#editor .autopick label{display:grid;grid-template-columns:18px 1fr;gap:0 8px;padding:6px 9px;border-radius:9px;border:1px solid var(--line);cursor:pointer}#editor .autopick label.on{border-color:var(--accent)}#editor .autopick input{width:auto;margin:3px 0 0}#editor .autopick b{color:var(--fg);font-size:.9rem;font-weight:600}#editor .autopick label small{grid-column:2}
 #editor textarea{resize:vertical}.mono{font:12.5px/1.35 ui-monospace,monospace!important;white-space:pre}.bad{border-color:var(--bad)!important}
 #editor fieldset.agent{background:var(--bg);box-shadow:none;margin-bottom:10px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:.4rem 0}
 #editor button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:.35rem .8rem;cursor:pointer;font-weight:600;font-size:.86rem}#editor button:hover{border-color:var(--accent)}#editor button.go{background:var(--accent);color:var(--bg);border:0}
@@ -411,7 +417,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261122a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261120c"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261122a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261122a"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -552,7 +558,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261122a').then(()=>load('/app/worldgen-browser.js?v=20261120c')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261122a').then(()=>load('/app/worldgen-browser.js?v=20261122a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261115a'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))

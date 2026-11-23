@@ -5,6 +5,10 @@
  * characters decide for themselves?": auto | rails | guided | free;
  * ?autonomy= for one page) > on auto, a default from the brain loaded: the
  * capability check below, else the brain's tier by name (mind.js tier).
+ * A world's or character's request is not followed on a brain Auto puts on
+ * rails, nor when the player chose On rails; on Auto the decisions the brain
+ * keeps in code stay in code unless the request names them
+ * (autonomy-profile.js choose(); Running now says so).
  *
  *   rails   code runs the day (jobs.js) and the model talks: the design that
  *           makes Gemma 4 E2B work. Nothing here runs; the prompts stay as
@@ -117,11 +121,15 @@
     if (g && W()?.isSimpleBrain?.(g, cfg)) return { ...PF().resolve(['rails']), level: 'rails', why: 'simple mode' };
     // a scripted world ("brain": "none") or no model at all: rails, whatever is cached for the last brain
     if (window.tablefolkScenario?.active?.scn?.brain === 'none' || window.tablefolkBrainInfo?.()?.engine === 'none' || qs.has('art')) return { ...PF().resolve(['rails']), level: 'rails', why: 'no model in this world' };
+    // autonomy-profile.js choose(): a world's or character's request on a brain Auto puts on rails (or with
+    // "On rails" chosen in Settings) is not followed; on Auto the domains the brain keeps in code stay there
     const set = setting(), d = set === 'auto' ? brainDefault() : null;
-    const sources = [cfg.autonomy, state?.autonomy, set !== 'auto' ? set : d.value];
-    const p = PF().resolve(sources);
-    const n = x => PF().normalize(x);
-    const why = n(cfg.autonomy) ? 'set on the character' : n(state?.autonomy) ? 'set by this world' : set !== 'auto' ? (urlSet ? 'set by the link (?autonomy=)' : 'your choice in Settings') : 'auto: ' + d.why;
+    const p = PF().choose({ character: cfg.autonomy, world: state?.autonomy, setting: set, auto: d?.value });
+    const who = p.source === 'character' ? 'set on the character' : 'set by this world';
+    const mine = urlSet ? 'set by the link (?autonomy=)' : 'your choice in Settings';
+    const why = p.capped ? `${p.source === 'character' ? 'this character asks' : 'this world asks'} for ${p.capped.asked}, but ${p.capped.by === 'setting' ? 'On rails is ' + mine : 'this brain runs on rails (' + d.why + ')'}: kept on rails`
+      : p.source === 'character' || p.source === 'world' ? who + (p.kept?.length ? `; ${p.kept.join(' and ')} kept in code for this brain (${d.why})` : '')
+      : p.source === 'setting' ? mine : 'auto: ' + d.why;
     return { ...p, level: p.domains.activity === 'code' ? 'rails' : p.free ? 'free' : 'guided', why };
   }
   const level = g => { try { return resolve(g).level; } catch { return 'rails'; } };
@@ -246,7 +254,8 @@
   // on auto, once a brain with no result is ready (not for scripted worlds or the endpoint picker)
   setInterval(() => {
     if (probe.running || probe.done === probeKey()) return;
-    const want = qs.get('probe') === '1' || (qs.get('probe') !== '0' && setting() === 'auto' && !PF()?.normalize?.(state?.autonomy));
+    // (a world that asks for a level still needs the brain's: it decides whether the request is followed)
+    const want = qs.get('probe') === '1' || (qs.get('probe') !== '0' && setting() === 'auto');
     if (!want || qs.has('art') || window.tablefolkScenario?.active?.scn?.brain === 'none' || !W()?.brainReady?.() || !window.tablefolkLLM || /^none/.test(brainKey()) || !brainKey()) return;
     probe.done = probeKey();
     if (qs.get('probe') !== '1' && probe.result()) return;

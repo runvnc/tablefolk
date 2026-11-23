@@ -517,7 +517,7 @@ budget gap allows (median turn seconds x free characters x .75, at least
 evening, rest; 25 game min). Safety nets in `safety()`.
 
 Profiles (2026-11-21, later): `app/autonomy-profile.js` (pure; Node test
-`tools/browser-test/profile-test.mjs`, 20 checks) turns presets (rails,
+`tools/browser-test/profile-test.mjs`, 36 checks with `choose`) turns presets (rails,
 assisted, guided, free) and objects into six domains. agency.js `resolve`
 feeds it [character, world, setting, Auto's value]; Auto's value is the
 check's preset plus `{domain: 'code'}` for every domain whose items it
@@ -533,6 +533,23 @@ activities hand that need to code for 180 game minutes. `shortMenu`: below
 the check's comfortable band (score share < .7) picks, plans and free menus
 keep 7 options ranked needs > plan's next > work > help > talk > evening.
 A world with `"brain": "none"`, no engine or `?art=1` is always rails.
+
+A world's or character's `autonomy` is a request (2026-11-22):
+`tablefolkProfile.choose({character, world, setting, auto})` (pure, tested in
+profile-test.mjs) is the whole rule agency.js `resolve` applies. Base = the
+player's level when set (Settings or `?autonomy=`), else Auto's value. A
+request that gives the model `activity` on a rails base is not followed
+(`capped: {asked, by: brain|setting}`: everyone on rails, Running now says
+why); otherwise it runs, and on Auto the base's code domains among talk,
+danger, needs, temper stay code unless the request names them (`kept`). The
+capability check now runs on Auto in worlds that set `autonomy` too (it
+decides the cap). The builder writes it (Story tab radios, a select per
+character; builder.js `setAutonomy` keeps per-domain keys); worldgen-core.js
+`checkScenario` drops invalid values; fast-skill.md tells the generator to
+leave it out unless asked; worldgen-browser.js `autonomyAsked(prompt)` sets it
+only for an explicit ask ("autonomy: free", "on rails", "decide for
+themselves"). Builder test: `tools/browser-test/autonomy-builder-test.mjs
+[base]` (15 checks, the test Chrome).
 
 Measuring: live-eval `--autonomy=`; `interest-report.mjs`; `judge.mjs`
 (OpenRouter, ledger in work/openrouter-spend.json). Results: brains.md,

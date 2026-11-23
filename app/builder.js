@@ -35,6 +35,11 @@
  * subworlds, with a few lines about the whole world, and put back in place.
  * The forms (story, player, characters) stay the top map's.
  *
+ * How much the characters decide ("autonomy"): five choices on the Story tab
+ * (Auto, the default, leaves it out; the scenario skill's living.md) and a
+ * "decides for itself" select in each character's box; the choice sets the
+ * preset and keeps per-decision keys written in the JSON.
+ *
  * The map editor and the forms change the same scenario: an edit in one
  * redraws the other. A layout written as "map" lines is placed by the app,
  * so the editor has it laid out once by the tabletop page in a hidden frame
@@ -84,6 +89,25 @@
   const simpleSelect = (path, v) => `<label><span>simple mode (short prompt, replies are spoken)</span><select data-path="${path}" data-type="bool3"><option value=""${v == null ? ' selected' : ''}>auto (very small brains)</option><option value="true"${v === true ? ' selected' : ''}>on</option><option value="false"${v === false ? ' selected' : ''}>off</option></select></label>`;
   const spokenSelect = (path, v) => `<label><span>speaks only when spoken to</span><select data-path="${path}" data-type="bool3"><option value=""${v == null ? ' selected' : ''}>auto (in simple mode)</option><option value="true"${v === true ? ' selected' : ''}>yes</option><option value="false"${v === false ? ' selected' : ''}>no</option></select></label>`;
   const directorSelect = v => `<label><span>director (random events in a living world)</span><select data-path="director" data-type="bool3"><option value=""${v == null || Number.isFinite(+v) && v !== false ? ' selected' : ''}>${Number.isFinite(+v) && v != null && v !== false ? 'on: every ' + esc(v) + ' turns' : 'on'}</option><option value="false"${v === false ? ' selected' : ''}>off</option></select></label>`;
+  // How much characters decide ("autonomy": a preset, or an object such as {"preset": "free", "needs": "code"}:
+  // the scenario skill's living.md). The choice sets the preset and keeps any per-decision keys the JSON has.
+  const AUTONOMY = [
+    ['', 'Auto (recommended)', 'The game picks for the player\'s brain and machine (a short check of how well it decides).'],
+    ['rails', 'On rails', 'The game runs their day and they talk. Works on every brain, the smallest too.'],
+    ['assisted', 'Assisted', 'They choose what to do, plan and talk; the game keeps them fed, in bed at night and safe in a raid.'],
+    ['guided', 'Guided', 'They pick each next thing to do from what the world offers, and plan their day.'],
+    ['free', 'Free', 'They act on their own: plans, deals, favours, feuds. Wants a strong, fast brain; on a weak one the game keeps them on rails.'],
+  ];
+  const autoPreset = v => typeof v === 'string' ? v : v && typeof v === 'object' ? v.preset || '' : '';
+  const autoExtra = v => v && typeof v === 'object' ? Object.entries(v).filter(([k]) => k !== 'preset').map(([k, x]) => `${k} by ${x === 'code' ? 'the game' : 'the model'}`).join(', ') : '';
+  const autonomyPick = () => { const v = scn.autonomy, cur = autoPreset(v), extra = autoExtra(v); return `<div class="autopick" role="radiogroup"><span>How much do characters decide for themselves?</span>${AUTONOMY.map(([k, t, line]) => `<label class="${k === cur ? 'on' : ''}"><input type="radio" name="scnAutonomy" value="${k}" data-path="autonomy" data-type="autonomy"${k === cur ? ' checked' : ''}><b>${esc(t)}</b><small>${esc(line)}</small></label>`).join('')}${extra ? `<small class="muted">Also set in the JSON: ${esc(extra)}.</small>` : ''}</div>`; };
+  const autonomySelect = (path, v) => `<label><span>decides for itself</span><select data-path="${path}" data-type="autonomy">${[['', "(the world's)"], ...AUTONOMY.slice(1).map(([k, t]) => [k, t.toLowerCase()])].map(([k, t]) => `<option value="${k}"${k === autoPreset(v) ? ' selected' : ''}>${esc(t)}${k && k === autoPreset(v) && autoExtra(v) ? ' (+ JSON: ' + esc(autoExtra(v)) + ')' : ''}</option>`).join('')}</select></label>`;
+  // the choice replaces the preset; per-decision keys written in the JSON stay
+  function setAutonomy(path, v) {
+    const old = get(path);
+    if (old && typeof old === 'object') { const o = { ...old }; if (v) o.preset = v; else delete o.preset; set(path, Object.keys(o).length ? o : undefined); }
+    else set(path, v || undefined);
+  }
   // + the bodies its packs and packages bring (the scenario's "bodies" hint, bodies.js)
   const modelOptions = () => [['', '(critter)'], ...PEOPLE.map(m => [m, 'person: ' + m]), ...MONSTERS.map(m => [m, 'monster: ' + m]), ...ANIMALS.map(m => [m, 'animal: ' + m]), ...OLDER.filter(m => m !== 'critter').map(m => [m, 'chibi: ' + m]), ...(Array.isArray(scn?.bodies) ? scn.bodies.map(m => [String(m), 'package: ' + m]) : [])];
   // voices: the world's own first (Voices tab), then mine (this browser), the library, ZONOS3-Mini's and Pocket-TTS's built-in ones
@@ -224,7 +248,7 @@
       ${field('id', p + '.id')}${field('body', p + '.model', 'select', { options: modelOptions() })}${field('voice', p + '.ttsVoiceId', 'select', { options: voiceOptions() })}
       <label><span>hostile</span><select data-path="${p}.hostile" data-type="bool3"><option value=""${hostile === '' ? ' selected' : ''}>auto${MINDLESS.has(a.model) ? ' (yes)' : ' (no)'}</option><option value="true"${hostile === 'true' ? ' selected' : ''}>yes: fights, no LLM</option><option value="false"${hostile === 'false' ? ' selected' : ''}>no: talks</option></select></label>
       ${field('hit points', p + '.hp', 'num', { ph: 'default' })}${field('wields', p + '.wield')}
-      ${field('job (a living world runs it)', p + '.job', 'select', { options: jobOptions(a.job) })}${field('home (a place)', p + '.home', 'text', { ph: placeHint() })}${field('workplace (a place or a thing)', p + '.workplace', 'text', { ph: placeHint() })}${field('temper', p + '.temper', 'select', { options: [['', '(the world\'s)'], 'short', 'normal', 'long'] })}
+      ${field('job (a living world runs it)', p + '.job', 'select', { options: jobOptions(a.job) })}${field('home (a place)', p + '.home', 'text', { ph: placeHint() })}${field('workplace (a place or a thing)', p + '.workplace', 'text', { ph: placeHint() })}${field('temper', p + '.temper', 'select', { options: [['', '(the world\'s)'], 'short', 'normal', 'long'] })}${autonomySelect(p + '.autonomy', a.autonomy)}
       ${field('style (a few words)', p + '.style', 'text', { wide: true })}
       ${field('personality / brief', p + '.personality', 'area', { wide: true, rows: 5 })}
       ${field('allowed commands (comma)', p + '.allowed', 'list', { wide: true, ph: 'scenario default' })}
@@ -266,6 +290,7 @@
         <label><span>living (characters act on their own: jobs, meals, sleep)</span><select data-path="live" data-type="bool3"><option value=""${!scn.live ? ' selected' : ''}>no</option><option value="true"${scn.live ? ' selected' : ''}>yes</option></select></label>
         ${field('start time (HH:MM)', 'time', 'text', { ph: '08:00' })}${field('day length (real minutes; 0 stops the clock)', 'dayMinutes', 'num', { ph: '12' })}
         ${field('temper (how fast insults anger them)', 'temper', 'select', { options: [['', '(normal)'], 'short', 'normal', 'long'] })}${field('monsters hunt', 'monsters', 'select', { options: [['', '(default: everyone in a living world)'], 'everyone', 'player'] })}
+        ${autonomyPick()}
         <label><span>talk-only scene (no jobs or threats added by the builder)</span><select data-path="talk" data-type="bool3"><option value=""${scn.talk ? '' : ' selected'}>no</option><option value="true"${scn.talk ? ' selected' : ''}>yes</option></select></label>
         <div class="wide"><span class="muted">threats (on the clock: raid attacks people, rats eat the stores, bandits steal gold)</span>${(scn.threats || []).map((t, i) => `<div class="cols" style="align-items:end">${field('kind', `threats.${i}.kind`, 'select', { options: [...new Set(['raid', 'rats', 'bandits', t.kind].filter(Boolean))] })}${field('who (a body)', `threats.${i}.who`, 'text', { ph: 'wolf' })}${field('count', `threats.${i}.count`, 'num', { ph: '2' })}${field('when', `threats.${i}.when`, 'select', { options: [['', '(the kind\'s)'], 'night', 'day', 'any'] })}${field('every (days)', `threats.${i}.every`, 'num', { ph: '1' })}<button type="button" class="ghost small" data-act="removeThreat" data-i="${i}">remove</button></div>`).join('')}<button type="button" class="ghost small" data-act="addThreat">+ add a threat</button></div>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}
@@ -539,6 +564,7 @@
         if (v === '__new') { assignTo = el.dataset.path; tabNow = 'voices'; render(); return; }
         remember(); const id = addMine(String(v).slice(3)); if (id) set(el.dataset.path, 'pack:' + id); render(); mapSoon(); return;
       }
+      if (el.dataset.type === 'autonomy') { if ((el.type === 'radio' && !el.checked) || (el.tagName === 'SELECT' && e.type === 'input')) return; setAutonomy(el.dataset.path, v); msg(''); render(); mapSoon(); return; }
       if (el.dataset.path === '__rules') { scn.goal = { ...(scn.goal?.text ? { text: scn.goal.text } : {}), ...(v || {}) }; if (!Object.keys(scn.goal).length) delete scn.goal; }
       else set(el.dataset.path, v);
       msg('');

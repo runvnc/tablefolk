@@ -170,12 +170,35 @@ slowly and cannot work. It does not die of it unless the world is
 
 The day above is **on rails**: code runs it and the model talks. That suits
 small brains (Gemma 4 E2B). With a stronger brain characters can decide for
-themselves. `"autonomy"` on a character or the scenario (`rails`, `guided`,
-`free`), else the player's choice in Settings ("How much do characters decide
-for themselves?"), else **Auto**: a short capability check the first time a
-brain runs on this device (eight small tasks and its speed, about 20-60 s,
-kept in the browser) picks the level; a slow machine gets a lower one.
-Settings' "Running now" says which level runs and why.
+themselves. `"autonomy"` on a character or the scenario (`rails`,
+`assisted`, `guided`, `free`, or an object: below), else the player's choice
+in Settings ("How much do characters decide for themselves?"), else **Auto**:
+a short capability check the first time a brain runs on this device (ten
+small tasks and its speed, about 20-60 s, kept in the browser) picks the
+level; a slow machine gets a lower one. Settings' "Running now" says which
+level runs and why. The world builder sets the scenario's level on the Story
+tab (the same five choices, Auto by default) and a character's own in its
+box on the Characters tab ("decides for itself"); the AI that builds worlds
+sets it only when the request asks.
+
+**A world that asks for more than the brain can carry.** A scenario's (or a
+character's) level is a request, not an order:
+
+- On a brain that Auto puts **on rails** (a small brain such as Gemma 4 E2B,
+  or any brain on a slow machine), or when the player chose **On rails** in
+  Settings, a request that would let the model choose its activities is not
+  followed: everyone stays on rails, and Running now says "this world asks
+  for free, but this brain runs on rails (...): kept on rails". A world made
+  for free still plays on the smallest brain; it plays as a rails world.
+- On a stronger brain the request runs. On Auto, the decisions this brain
+  keeps in code (talk, danger, needs or temper: the ones its check failed,
+  or assisted's danger and needs) stay in code unless the request names
+  them: `"free"` on a brain that checked out as "guided (danger in code)"
+  runs as "free (danger in code)"; `{"preset": "free", "danger": "model"}`
+  hands danger to the model anyway.
+- A level the player chose in Settings (other than On rails) is the player
+  accepting the cost: the world's request runs as written, with nothing kept
+  in code. `?autonomy=` in the link counts as the player's choice.
 
 - **On rails**: as above.
 - **Assisted**: the character chooses what to do, plans its day and starts

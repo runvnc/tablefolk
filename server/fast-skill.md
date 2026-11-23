@@ -60,6 +60,11 @@ in living worlds) | "player"; "temper": short | normal | long (how fast
 insults make people refuse, order out or fight); "harsh": true (starving
 hurts); "prices": {"bread": 3}; "food": extra food names, or
 {"name": "ale", "drink": true}.
+"autonomy" (how much characters decide for themselves): leave it out (the
+game picks for the player's brain) unless the request asks for it: "rails"
+(the game runs their day), "assisted", "guided" (they pick each activity),
+"free" (they act on their own), or {"preset": "free", "needs": "code"}; a
+character may have its own.
 "threats": [{"kind": "raid" (attacks people) | "rats" (eat the stores) |
 "bandits" (steal gold), "who": body, "count": 2, "when": "night" | "day" |
 "any" | [from, to] hours, "every": days, "from": "edge" or a place id (a
