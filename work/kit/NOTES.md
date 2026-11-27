@@ -251,3 +251,28 @@ Startup (startup-time.mjs, hearthvale --art): reveal 23.5 s high (kit) vs 24.4 s
 the largest frame after the reveal is 139-165 ms (shells 144). The kit costs more draw calls (60-130) and 1-6 ms of
 CPU a frame on this laptop; it saves 0.07-0.65 GB of graphics memory and loads faster. Left: door leaves are one
 mesh each; a world's merged set is drawn whole (no culling per house); pieces near and far are two meshes each.
+
+## Phase 7: fixes after the port (2026-11-27)
+Draw calls (tools/kit/game-shots.mjs KIT_BREAKDOWN=1: engine draws per mesh name, main pass / render targets): each
+kit mesh was drawn three times (main, sun shadow map, glow layer occluders) and a house's inside (floors, furniture,
+folk: 60-90 draws with their shadows) drew under its roof, where the shells had hidden it. Now one shadow caster for the
+whole kit (CAST_LAYER), only wall and roof surfaces in the glow layer, door leaves as instances, roofs.js kitHide,
+room floors cast no shadow. Not done, and why: chunking the merged sets (culling) adds draws whenever several chunks
+are in view and the kit is ~1-4% of the triangles drawn; a merged far LOD of whole houses likewise (triangles are not
+what costs); frozen materials (the cutaway, storey, fade and glow plugins update uniforms every frame).
+Far view, RTX 2060 headless 1100x700, kit / ?kit=0 (before this phase: 441 / 369 and 344 / 213 at high):
+| world, quality | draw calls | triangles | graphics GB | CPU frame ms | world ready s |
+|---|---|---|---|---|---|
+| hearthvale high | 260 / 364 | 4.13M / 4.34M | 2.48 / 3.12 | 15.9 / 13.6 | 21.5 / 19.3-24.3 |
+| hearthvale light | 95-139 / 115-205 | 0.97M / 1.20M | 1.13 / 1.21 | 7.3 / 9.3 | 14.3-17.7 / 17.0-27.1 |
+| village 23 high | 229 / 213 | 3.88M / 4.03M | 1.92 / 2.52 | 7.6 / 16.7 | 18.8 / 20.0 |
+| village 23 light | 118 / 105 | 0.85M / 1.00M | 0.87 / 0.95 | 9.5 / 5.0 | 11.0 / 10.0 |
+(light redraws the shadow map every second frame: the median and max differ; the CPU times swing by several ms between
+runs on this laptop while it is in use, another test Chrome ran beside some of them.)
+Kit textures in graphics memory (RGBA8 with mips): 100-116 MB at high, 21-24 MB at light, the pieces' 50-86 MB.
+KTX2 (BC7/ASTC) would save about three quarters of that at high, ~150 MB; skipped: it needs Babylon's KTX2 decoder and
+transcoders vendored (they load from cdn.babylonjs.com by default; tablefolk.world should not depend on it), a second
+texture set, and UASTC files 2-4x the WebP download; ktx2-encoder 0.6.0 (npm, 3.4 MB) would do the encoding.
+Other fixes: glow by per-vertex class (glowClasses), gable window opening, two-storey thatch, sign placement, outside
+stair (the reference placed its origin a flight's length off, and its direction depends on the wall's side), lean-to as
+structure, protruding pieces hidden on cut squares, build_house.py rects and stair.

@@ -626,9 +626,12 @@ loading cover, with the walls).
   `?kit=0` shells): hearthvale far view, high: 441 / 369 draw calls, 4.28M / 4.34M triangles, 2.48 / 3.12 GB
   graphics memory (tablefolkGfxGB), CPU frame 15 / 12 ms; light: 1.13 / 1.21 GB; a generated village (seed 23)
   high: 344 / 213 draw calls, 1.92 / 2.52 GB. Kit build 90-170 ms a village (+ the pieces' load under the cover).
-- Not done: impostors or a merged far version of a whole village; KTX2 (no
-  encoder here); door leaves are still one mesh each (they swing); the shadow
-  map draws the merged sets in every cascade.
+  After round 2 of draw calls (same views): hearthvale high 260 / 364, light 95-139 / 115-205; village 23 high
+  229 / 213, light 118 / 105 (work/kit/NOTES.md phase 7 has the whole table).
+- Not done: chunked merged sets or a merged far version of whole houses (more
+  draws whenever several are in view; the kit is 1-4% of the triangles); KTX2
+  (needs Babylon's KTX2 decoder vendored and a second texture set: ~150 MB
+  saved at high, NOTES.md phase 7).
 
 ## Roofs
 
