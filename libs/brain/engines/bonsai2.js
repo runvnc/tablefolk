@@ -177,6 +177,15 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
     let text = '';
     const g = sessionFor(engine, opts.agentId).generate(messages, { max_new_tokens: opts.maxTokens || 256, enable_thinking: !!opts.enableThinking, ...sampling });
     for await (const e of g) {
+      // the engine reads Qwen's <tool_call> blocks itself and sends them as events (the text
+      // has none): written back as the template's text, for a caller that reads calls
+      // (the world builder's agent mode, app/worldgen-agent.js parseToolCalls)
+      if (e.type === 'tool_call' && e.tool_call?.function?.name) {
+        const f = e.tool_call.function, args = typeof f.arguments === 'string' ? (() => { try { return JSON.parse(f.arguments); } catch { return {}; } })() : f.arguments || {};
+        text += `\n<tool_call>\n<function=${f.name}>\n` + Object.entries(args).map(([k, v]) => `<parameter=${k}>\n${v && typeof v === 'object' ? JSON.stringify(v) : v}\n</parameter>\n`).join('') + '</function>\n</tool_call>';
+        opts.onToken?.(answerOf(text, false));
+        continue;
+      }
       if (e.type !== 'text') continue;
       text += e.text ?? e.delta ?? '';
       opts.onToken?.(answerOf(text, false));

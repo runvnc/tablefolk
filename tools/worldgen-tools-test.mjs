@@ -82,6 +82,10 @@ t('Inkling: native invoke blocks', () => {
   assert.deepEqual(d.calls.map(x => x.name), ['preview', 'validate']);
   const e = P('<|content_text|>All done, the village stands.', 'inkling'); assert.equal(e.calls.length, 0); assert.equal(e.text, 'All done, the village stands.');
 });
+t('Bonsai 2.5 in the browser (the engine tool_call events written back as text; recorded 2026-11-27)', () => {
+  const c = P('\n<tool_call>\n<function=set_meta>\n<parameter=fields>\n{"title": "Tiny Village with a Baker", "lighting": "bright", "dayMinutes": 1440}\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=set_map>\n<parameter=method>\ngenerate\n</parameter>\n<parameter=kind>\nvillage\n</parameter>\n<parameter=buildings>\n5\n</parameter>\n<parameter=places>\n["tavern", "house", "baker"]\n</parameter>\n<parameter=size>\n[10, 10]\n</parameter>\n</function>\n</tool_call>', 'qwen-xml');
+  assert.deepEqual(c.calls.map(x => x.name), ['set_meta', 'set_map']); assert.equal(c.calls[0].args.fields.title, 'Tiny Village with a Baker'); assert.equal(c.calls[1].args.buildings, 5); assert.deepEqual(c.calls[1].args.size, [10, 10]); assert.deepEqual(c.calls[1].args.places, ['tavern', 'house', 'baker']);
+});
 t('no call in plain text', () => { assert.equal(P('Sure! I will build it now.', 'qwen-xml').calls.length, 0); });
 t('unknown tool names are kept for the loop to answer', () => { assert.equal(P('<tool_call>\n<function=fly>\n</function>\n</tool_call>', 'qwen-xml').calls[0].name, 'fly'); });
 t('rendering: qwen prompt has the tool list and the history', () => {
