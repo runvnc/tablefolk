@@ -228,7 +228,8 @@
     const gate = !!c.gate;
     if (isBuild) {
       const type = gate ? w.gate : w.build;
-      if (type && !isBlocked(c.x, c.z)) { makeObject(type, c.x, c.z, {}); }
+      // (a yard wall: roofs.js and the building kit never make a house of what it encloses)
+      if (type && !isBlocked(c.x, c.z)) { const m = makeObject(type, c.x, c.z, {}); if (m && meta(m)) meta(m).yard = true; }
       sayDid(g, gate ? (type ? `${g.id} hangs a ${nice(type)} in the ${kind.label}` : `${g.id} leaves a gap for the gate`) : `${g.id} ${w.verb || 'builds'}`);
     } else if (w.dig) {
       const t = thingAt(c.x, c.z, m => meta(m)?.type === 'wall' || ROCK.test(meta(m)?.type || ''));

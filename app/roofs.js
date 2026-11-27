@@ -101,7 +101,11 @@
       for (const c of cells) { const [x, z] = c.split(',').map(Number); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = cellKey(x + dx, z + dz); if (D.has(n)) { r.here.add(n); if (!r.doors.some(d => d[0] === x + dx && d[1] === z + dz)) r.doors.push([x + dx, z + dz, dx, dz]); } } }
       rooms.push(r);
     }
-    return { rooms, outsideShare: ground ? outside / ground : 0, outside: out };
+    // a yard (walls built from a designation, designate.js meta.yard) is outdoors: no roof, no house, no room floor
+    const yard = new Set(); for (const b of state.blocks || []) if (b && !b.isDisposed?.() && meta(b)?.yard) { const p = b.position; yard.add(cellKey(Math.round(p.x), Math.round(p.z))); }
+    const yardRoom = room => { let n = 0, y = 0; for (const c of room.cells) { const [x, z] = c.split(',').map(Number); for (const k of [cellKey(x + 1, z), cellKey(x - 1, z), cellKey(x, z + 1), cellKey(x, z - 1)]) if (W.has(k)) { n++; if (yard.has(k)) y++; } } return n && y / n >= .5; };
+    const kept = yard.size ? rooms.filter(r => { if (!yardRoom(r)) return true; for (const c of r.cells) out.add(c); return false; }) : rooms;
+    return { rooms: kept, outsideShare: ground ? outside / ground : 0, outside: out };
   }
   function wanted() {
     const s = state.envScn || window.tablefolkScenario?.active?.scn || {};

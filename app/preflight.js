@@ -64,7 +64,7 @@
     ['walls.js?v=20261127b'],
     ['darkness.js?v=20261122a'],
 
-    ['roofs.js?v=20261127d'],
+    ['roofs.js?v=20261127f'],
     ['cutaway.js?v=20261127b'],
     ['head-window.js?v=20261101f'],
     ['locks.js?v=20261024a'],
@@ -92,7 +92,7 @@
     ['orders-core.js?v=20261127b'],
     ['weather.js?v=20261127b'],
     ['powers.js?v=20261127d'],
-    ['designate.js?v=20261127d'],
+    ['designate.js?v=20261127e'],
     ['orders.js?v=20261127e'],
     ['speech-input.js?v=20261122a'],
     ['worldgen-own.js?v=20261127b'],
