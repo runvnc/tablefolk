@@ -1891,7 +1891,7 @@ other, a fresh Chrome for each:
 | writing, the check's measure | 26.7 tokens/s | 26.3 tokens/s |
 | reading a prompt (llm-sweep: 1,000 / 2,000 / 4,000 tokens) | 6.4 / 12.2 / 25.7 s | 6.3 / 12.1 / 25.5 s |
 | graphics memory, model alone (8192 window) | 9.8-10.1 GB | 9.8-10.1 GB |
-| peak with the game (hearthvale's day) | 11.3 GB | 11.3 GB |
+| peak with the game: hearthvale's day (light) / roles evals at high graphics | 11.3 / 10.45 GB | 11.3 / 10.46 GB |
 | capability check v3 | 8/10 (missed steps, haggle) -> guided | 8/10 (missed sums, danger) -> guided, danger in code |
 | the 36 evals (run-evals, RUNS=2) | 35/36 (commission a dagger 1/2) | **36/36** |
 
@@ -1911,3 +1911,42 @@ hearthvale's day at guided (12 real minutes, the player idle, one run each):
 | model calls (a game hour) | 94 (3.9) | 90 (3.7) |
 | a model turn, median | 13.8 s | 14.0 s |
 | judge: coherence / personality / purpose / surprise | 4.0 / 4.25 / 4.5 / 3.25 | 4.0 / 4.0 / 4.63 / 3.0 |
+
+The free day on `free-two-by-the-hearth` (`--day-minutes=24 --autonomy=free`,
+the first measured run of that world; the 9B on the same box for comparison):
+
+| | Bonsai 2.5 27B | Bonsai 2 9B |
+|---|---|---|
+| model-chosen activities | 91% | 31% |
+| self-started lines (one pair) | 27 | 25 |
+| notes rewritten with plan() | 8 | 1 |
+| surprises | 9 | 6 |
+| reply depth | 0.43 | 0 |
+| wasted / safety nets | 8% / 4 | 19% / 2 |
+| ate / slept / hungry at the end | 2 / 2 / 0 | 2 / 2 / 0 |
+| model calls (a game hour) | 119 (5.0) | 129 (5.4) |
+| a model turn, median | 10.3 s | 3.6 s |
+| peak graphics memory | 10.4 GB | 4.7 GB |
+| judge: coherence / personality / purpose / surprise | **4.0 / 4.5 / 4.5 / 3.5** | 3.5 / 4.5 / 4.0 / 3.0 |
+
+Reading: Bonsai 2.5 27B is a drop-in replacement: the same speed, memory and
+load, at least as good on everything measured here (36/36 evals, the haggle to
+45 now 2/2 twice; the check 8/10 like Bonsai 2's 8/10, sampled, so both near
+the top of the band), its hearthvale guided day a working village (everyone
+fed, 91% indoors in the raid) with judge scores level with Bonsai 2's (within
+one run's noise), and the best free day measured so far on the two-sibling
+world (judge 4.0 / 4.5 / 4.5 / 3.5: Ada pressing Bram about the will, Bram
+keeping the letter back in his notes). The vendor's tool-calling gains do not
+show as a jump in this game's single-command turns; nothing got worse. Picks
+unchanged in shape: **16 GB** Bonsai 2.5 27B at guided (Auto gives guided with
+danger in code); **free** is good for it on small worlds (2-4 characters,
+`dayMinutes` 24) on 16 GB; on hearthvale-sized worlds guided stays the pick.
+**12 GB**: the 9B on Auto stays the easy fit; its free day on the small world
+is playable but thin (31% model-chosen, coherence 3.5). The memory-with-the-game
+run (`memrun.sh`-style, roles at high graphics) hung at first because the
+status line ended on the cache-removal message instead of "ready" (fixed:
+that is a console line now).
+
+Box: vast.ai RTX 4080 16 GB, about 4.7 hours rented (the run waited out an
+agent pause), $1.46 in all including downloads; destroyed and checked by API.
+

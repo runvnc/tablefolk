@@ -177,7 +177,7 @@ before.
 | Gemma 4 E2B (LiteRT-LM) | the default, ~2 GB, in the browser on WebGPU |
 | Gemma 4 E4B | larger (~3 GB), better at following rules |
 | Gemma 4 E2B with sight | the full multimodal model (~2.6 GB, needs a 6 GB graphics card): characters see when they `look` |
-| Bonsai 2.5 27B | Prism ML's ternary 27B (~6 GB; Bonsai 2.5 since 2026-11-27, the same size and speed as Bonsai 2, better at tool use), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
+| Bonsai 2.5 27B | Prism ML's ternary 27B (~6 GB; Bonsai 2.5 since 2026-11-27, the same size and speed as Bonsai 2, at least as good in the tests), much smarter; needs a 10 GB+ graphics card (or an Apple Pro/Max chip); runs on the webml-community WebGPU kernels |
 | Raon-1 nano | KRAFTON's 3B model (~1.8 GB download), Korean and English: smarter than Gemma 4 E2B in the tests (it haggles, keeps prices, sells in Korean) but its turns take 3-4 times as long, and it needs a graphics card with 8 GB or more (about 4.8 GB with the game). Loading takes 1.5-3 minutes each time the page starts it; a 4,096-token window, so characters remember less of the conversation |
 | Qwen1.5 0.5B | the older 0.5B chat model (Q4_0 GGUF, ~395 MB, on wllama) people laugh at: "10 + 10 = 11", "The Earth has 46,942 moons". Simple mode by default; The Oracle runs on it. If the graphics card is too full it loads on the CPU, about 3x slower |
 | Qwen2.5 0.5B | Alibaba's smallest chat model (Q4_K_M GGUF, ~490 MB, on wllama), about 50 tokens a second: gets facts wrong with confidence. Simple mode by default (see "Very small brains" in [characters.md](characters.md)) |
