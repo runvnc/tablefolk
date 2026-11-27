@@ -147,7 +147,10 @@ Then the priest (an elder, priest or chief by role or look) has a **vision**
 **council**: the villagers walk there (half a minute at most), the priest
 says the demand, up to five speak (the most devout first): on rails a
 templated line for their vote (by belief and side), above rails their own
-words, read as agree, refuse or bargain by the matcher. The votes decide
+words, read as agree, refuse or bargain: by code first (`stanceOf`: a yes
+or a no with a condition or a delay, or a deal such as "half now", is a
+bargain; "we must not" and "I will not" are refusals), and words code
+cannot place by the decider when one is loaded, else the menus' matcher. The votes decide
 (`vote`): **accept**, **bargain** (half as much time again) or **refuse**.
 The demand is then made (the core: on everyone's card, the priest says it):
 those who voted no refuse it when the village refused, and the bitterest
@@ -171,9 +174,10 @@ group's `"autonomy"`: the doubters are `"free"` in God of Ashford), prayers,
 speeches, omen readings and dream tellings are the characters' own words,
 and a council vote comes from what they said. Each such line is one short
 model call (`tablefolk-model-call` kind `god`). Measured with Gemma 4 E2B on
-an RTX 2060 (`tools/browser-test/god-words-eval.mjs`): prayers in 0.35-1 s,
-a council of five speeches in about 15 s of model time, and the votes read
-from the words matched what was said (a cautious "I will, but first..." as a
+an RTX 2060 (`tools/browser-test/god-words-eval.mjs`): prayers in 0.35-3 s,
+a council of four or five speeches in about 15 s of model time, and in
+three councils all 12 votes read from the words matched what was said (9
+read by code, 3 by the matcher; a cautious "I will, but first..." as a
 bargain, a doubter's objection as no).
 
 ## For authors

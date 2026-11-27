@@ -282,7 +282,8 @@ once).
   the council and one missed (its anger), the village tab, the save hook.
 - `node tools/god-rules-test.mjs` (no browser): the God package's rules
   (`packages/god/god-core.js`): belief and sides, mana, prayers, powers,
-  cruelty, omens, demands, the council's vote, decrees and deadlines (exact
+  cruelty, omens, demands, the council's vote, council speeches read by code
+  (`stanceOf`, 24 labelled lines with traps), decrees and deadlines (exact
   numbers with the balance off), then the balance itself: diminishing
   returns, headroom, drift, and five seeds of the simulation below.
 - `node tools/god-balance-sim.mjs [--seeds=20] [--answers=.9] [--seed=3]`
@@ -301,6 +302,15 @@ once).
   first"), 1 against (finn: "I don't think a sheep would be the proper
   sacrifice"), accepted, finn refused. A first run showed stage directions
   ("(Ada takes a slow, deep breath...)"): brackets and asterisks are stripped.
+  `--councils=3` (default) holds three councils (a sheep, three bread,
+  prayer at dawn) and prints each speech with the stance read and how
+  (`stanceOf` by code, else the decider or the matcher). Gemma 4 E2B, RTX
+  2060, 2026-11-27: 12 speeches, every stance matching what was said (judged
+  by hand): 9 read by code, 3 by the matcher (bram's "Lead a sheep, they want
+  something. I can lift a sheep." as yes; "I'll walk through. It's just a
+  place, not magic." as yes); wren's "I will take this duty, but I will seek
+  guidance on the proper offering first" a bargain, finn's "I don't think a
+  sheep would be the proper sacrifice" a no; councils of 21-48 s.
 - `node tools/browser-test/plan-words-eval.mjs` (a brain on :8000, never
   downloads): words to plans with the loaded brain against code alone.
   Gemma 4 E2B, RTX 2060, 2026-11-27: 11/12 resolve (code alone 8/12),

@@ -3,7 +3,7 @@
 // powers (fitting, cruel, justified, a beast struck down), omens and prophecies,
 // demands met (and rewarded or not) and missed (anger or mercy), the council's
 // vote, decrees and deadlines from words.   node tools/god-rules-test.mjs
-import { createGod, parseDecree, parseWhen, vote, needsOf, prophecyOf, RULES } from '../packages/god/god-core.js';
+import { createGod, parseDecree, parseWhen, vote, needsOf, prophecyOf, stanceOf, RULES } from '../packages/god/god-core.js';
 let n = 0, fails = 0;
 const ok = (name, cond, info = '') => { n++; if (!cond) fails++; console.log(cond ? 'ok  ' : 'FAIL', name, info && !cond ? '- ' + info : ''); };
 let T = 8 * 60; const now = () => T;
@@ -95,6 +95,22 @@ v = vote([{ id: 'ada', belief: 90, side: 'faithful' }, { id: 'bram', belief: 25,
 ok('council: a bargain in the middle', v.outcome === 'bargain', JSON.stringify(v));
 v = vote([{ id: 'bram', belief: 25, side: 'doubters', stance: 'yes' }, { id: 'finn', belief: 20, side: 'doubters', stance: 'yes' }]);
 ok('council: their own words (stance) win over belief', v.outcome === 'accept');
+
+// council speeches read by code (the templated lines, Gemma E2B's lines from god-words-eval, and traps:
+// "we must not", "no one should doubt", "I will not, unless")
+{ const L = [
+ ['The god has spoken. We do as it asks.', 'yes'], ['I will do my part. Who will help me?', 'yes'], ['After all it has given us? Of course we will.', 'yes'],
+ ['Madness. I will not give up what little we have for a voice in Ada’s head.', 'no'], ['No. I want to see this god before I bow to it.', 'no'], ['We are hungry enough already. I say no.', 'no'],
+ ['We will do it, but give us more time.', 'bargain'], ['Half now, and the rest when the harvest is in.', 'bargain'], ['I will go along, if the god sends rain first.', 'bargain'],
+ ['I will take this duty, but I will seek guidance first.', 'bargain'], ["I don't think a sheep would be the proper sacrifice.", 'no'],
+ ['We must not give our only sheep to the fire.', 'no'], ['No one should doubt the god. We will bring the bread.', 'yes'], ['I know we must, and I will.', 'yes'],
+ ['Never! Let Ada bring her own bread.', 'no'], ['Aye, it shall be done before the moon is full.', 'yes'], ['I will not, unless the god shows itself to me.', 'bargain'],
+ ["I'll fetch the sheep myself.", 'yes'], ['Perhaps, if the harvest is good.', 'bargain'], ['Praise be. Let us do it tonight.', 'yes'],
+ ['I refuse to kill a beast for a ring of light in the sky.', 'no'], ['Fine. I will do it. But I do not like it.', 'bargain'],
+ ["I won't be part of this.", 'no'], ['The god provides; we owe it this much.', null],
+];
+  const miss = L.filter(([l, w]) => stanceOf(l) !== w);
+  ok(`council stances from words by code: ${L.length - miss.length}/${L.length}`, !miss.length, miss.map(([l, w]) => `${l} -> ${stanceOf(l)} (want ${w})`).join(' | ')); }
 
 // decrees and deadlines
 const ctx = { now: 1440 + 9 * 60, items: ['bread', 'wheat'], animals: ['sheep', 'pig'], groups: { faithful: { name: 'the faithful' }, doubters: { name: 'the doubters' } }, people: ['bram'], shrine: 'temple' };

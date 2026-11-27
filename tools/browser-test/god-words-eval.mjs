@@ -3,7 +3,7 @@
 // villager's own words, and a council where the villagers above rails speak for themselves and
 // their stance is read from their words. ?autonomy=guided puts everyone above rails (a small brain
 // would otherwise stay on rails). Never approves a model download: stops if the page asks for one.
-//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240]
+//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240] [--councils=3]
 import { chromium } from 'playwright-core';
 const arg = (k, d) => { const a = process.argv.find(s => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const BASE = arg('base', 'http://localhost:8000'), MODEL = arg('model', 'gemma4-e2b-litert'), WAIT = +arg('wait', 240);
@@ -42,13 +42,21 @@ console.log(`decrees: ${right}/${DECREES.length} read as meant`);
 // prayers in the villagers' own words (the words the prayer list shows)
 const pr = await page.evaluate(async () => { const out = []; for (const [id, need] of [['tilly', 'food'], ['finn', 'sign'], ['wren', 'heal']]) { const t = performance.now(); const w = await tablefolkGod.prayerWords(state.characters.find(c => c.id === id), need); out.push({ id, need, ...w, ms: Math.round(performance.now() - t) }); } return out; });
 for (const p of pr) console.log(`prayer ${p.id} (${p.need}, ${p.by}, ${p.ms} ms): ${p.text}`);
-// a council: the priest's call, up to five speeches, the vote (nobody walks: the village is paused, so it starts after 25 s)
-const c = await page.evaluate(async () => {
-  const n0 = __says.length, k0 = __calls, t = performance.now();
-  const d = await tablefolkGod.decree('I require a goat sacrifice by the full moon', { anger: 'storm' });
-  return { ms: Math.round(performance.now() - t), says: __says.slice(n0), calls: __calls - k0, council: d.data?.council, votes: d.data?.votes, refused: d.refused?.map(r => r.who) };
-});
-console.log(`council (${Math.round(c.ms / 1000)} s, ${c.calls} model calls): ${c.council}; votes ${JSON.stringify(c.votes)}; refused ${c.refused}`);
-for (const l of c.says) console.log('   ', l);
+// councils: the priest's call, up to five speeches, the vote (nobody walks: the village is paused, so each
+// starts after 25 s). Each speech with the stance read from it and how (code, decider, matcher, rails) for a
+// person to judge: does the stance match what was said?
+const COUNCILS = ['I require a goat sacrifice by the full moon', 'the faithful must bring three bread to the temple by evening', 'everyone shall gather and pray at dawn'].slice(0, +arg('councils', 3));
+const tally = { code: 0, decider: 0, matcher: 0, rails: 0, none: 0 };
+for (const words of COUNCILS) {
+  const c = await page.evaluate(async w => {
+    const n0 = __says.length, k0 = __calls, t = performance.now();
+    const d = await tablefolkGod.decree(w, { anger: 'storm' }), lc = tablefolkGod.lastCouncil() || {};
+    return { ms: Math.round(performance.now() - t), says: __says.slice(n0), calls: __calls - k0, council: d.data?.council, votes: d.data?.votes, refused: d.refused?.map(r => r.who), said: lc.said, stance: lc.stance, read: lc.read };
+  }, words);
+  console.log(`\ncouncil on "${words}" (${Math.round(c.ms / 1000)} s, ${c.calls} model calls): ${c.council}; refused ${c.refused || 'none'}`);
+  for (const id of Object.keys(c.said || {})) { tally[c.read[id]] = (tally[c.read[id]] || 0) + 1; console.log(`   ${id.padEnd(10)} ${String(c.stance[id]).padEnd(8)} (${c.read[id]}): ${c.said[id]}`); }
+  await page.evaluate(() => { for (const d of tablefolkDemands.list()) if (d.status === 'open') d.status = 'cancelled'; });
+}
+console.log('stances read by', JSON.stringify(tally));
 await b.close().catch(() => {});
 process.exit(0);

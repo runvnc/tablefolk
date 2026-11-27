@@ -14,7 +14,7 @@
 //   cards       faith (belief, sickness, dreams, signs) for characters with the "faith" skill
 // Flags: god_shrine (the shrine's place id; else the first place named shrine or temple), god_anger (the
 // default anger for a missed decree: storm, plague, blight, beast, smite, drought or none), blight, drought.
-import { createGod, parseDecree, vote, prophecyOf, FITS, HARMFUL } from './god-core.js';
+import { createGod, parseDecree, vote, prophecyOf, stanceOf, FITS, HARMFUL } from './god-core.js';
 
 export default function (api) {
   const W = window, J = () => W.tablefolkJobs, K = () => J()?.kit, B = () => W.tablefolkBar, BAB = () => W.BABYLON;
@@ -551,7 +551,7 @@ export default function (api) {
   }
 
   // ---------------------------------------------------------------- decrees: a vision, a council, a demand
-  let councilNow = null;   // { members, priest, until, said }
+  let councilNow = null, lastCouncil = null;   // { members, priest, until, said: { id: line }, stance: { id: vote }, read: { id: 'code' | 'decider' | 'matcher' | 'rails' } }
   const STANCE = [
     { id: 'yes', label: 'agrees to do it', keywords: ['yes', 'we must', 'we will', 'obey', 'agree', 'gladly', 'of course', 'praise'] },
     { id: 'no', label: 'refuses', keywords: ['no', 'never', 'refuse', 'will not', "won't", 'madness', 'nonsense', 'not doing'] },
@@ -625,7 +625,7 @@ export default function (api) {
   }
   async function council(priest, d) {
     const sh = shrine(), members = villagers().filter(g => g !== priest).sort((a, b) => dist(posOf(a), sh) - dist(posOf(b), sh)).slice(0, 6).map(g => g.id);
-    councilNow = { members: [priest.id, ...members], priest: priest.id, until: performance.now() + 30000, said: {} };
+    councilNow = { members: [priest.id, ...members], priest: priest.id, until: performance.now() + 30000, said: {}, read: {}, stance: {} };
     narrate(`The village gathers at the ${sh.id} to hear the god's will.`);
     // wait until most have come (or half a minute)
     const t0 = performance.now();
@@ -638,12 +638,13 @@ export default function (api) {
       let stance = null, line = null;
       if (words(g)) {
         line = await say1(g, who(g), `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}". Do you agree, refuse, or want to bargain? Say it in one or two sentences, in your own words, nothing else.`, 60);
-        if (line) stance = await choose(line, STANCE, `Does ${g.id} agree, refuse, or bargain?`);
+        // by code first (yes / no / a condition: a bargain); unclear words go to the decider, else the matcher
+        if (line) { stance = stanceOf(line); councilNow.read[g.id] = stance ? 'code' : null; if (!stance) { stance = await choose(line, STANCE, `Does ${g.id} agree, refuse, or bargain?`); councilNow.read[g.id] = stance ? (W.tablefolkDecider ? 'decider' : 'matcher') : 'none'; } }
       }
       const v = vote([{ id: g.id, belief: G.belief(g.id), side: sideOf(g.id), stance }]).votes[0];
       line ||= pick(COUNCIL[v.vote]);
       try { api.say(g, line, true); } catch {}
-      councilNow.said[g.id] = line;
+      councilNow.said[g.id] = line; councilNow.stance[g.id] = v.vote; if (!councilNow.read[g.id]) councilNow.read[g.id] = 'rails';
       voters.push({ id: g.id, belief: G.belief(g.id), side: sideOf(g.id), stance: v.vote });
       await sleep(1600);
     }
@@ -652,7 +653,7 @@ export default function (api) {
     try { api.say(priest, end, true); } catch {}
     for (const id of councilNow.members) api.addMemory?.(byId(id), `At the council about "${d.text}" the village ${r.outcome === 'accept' ? 'agreed' : r.outcome === 'refuse' ? 'refused' : 'bargained for more time'}.`, 2.5);
     narrate(r.outcome === 'accept' ? 'The council agrees to the god’s demand.' : r.outcome === 'refuse' ? 'The council refuses the god’s demand.' : 'The council bargains for more time.');
-    councilNow = null;
+    lastCouncil = councilNow; councilNow = null;
     return r;
   }
   // the Decree tool
@@ -848,7 +849,7 @@ html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:f
   W.tablefolkJobs?.addUrgent?.(hooks.urgent); W.tablefolkJobs?.addWork?.(hooks.work, true); W.tablefolkAgency?.addOptions?.(hooks.options);
   (W.tablefolkSaveHooks ||= {}).god = { save: () => ({ g: G.data(), sick: [...sick], drought: droughtUntil, dreams: [...dreams] }), restore: x => { if (!x) return; G.load(x.g); sick.clear(); for (const [id, v] of x.sick || []) { sick.set(id, v); const g = byId(id); if (g) sickMotes(g, true); } droughtUntil = x.drought || 0; dreams.clear(); for (const [k, v] of x.dreams || []) dreams.set(k, v); sync([]); } };
   // what tests and other packages may read
-  W.tablefolkGod = { rules: G, decree, readDecree, prayerWords, council: () => councilNow, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil,
+  W.tablefolkGod = { rules: G, decree, readDecree, prayerWords, council: () => councilNow, lastCouncil: () => lastCouncil, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil,
     stains: () => ({ crops: stains.size, areas: areas.length }), ringSpot, onScreen, praySpot };
 
   return {

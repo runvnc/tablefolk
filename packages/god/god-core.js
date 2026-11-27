@@ -11,7 +11,7 @@
 //   powers:   G.onPower(name, { who, group, members, near, threat }, { justified }) -> { answered, changes, cruel, prophecy }
 //   omens:    G.omen(text) -> { id, prophecy: power | null }  (a prophecy kept when that power is used in time)
 //   demands:  G.demandMet(members, everyone, id) / G.demandMissed(members, everyone, anger, refusers); rewards owed after a met demand
-//   council:  vote(voters) -> { yes, no, outcome: 'accept' | 'bargain' | 'refuse', votes }
+//   council:  vote(voters) -> { yes, no, outcome: 'accept' | 'bargain' | 'refuse', votes }; stanceOf(speech) -> 'yes' | 'no' | 'bargain' | null
 //   decrees:  parseDecree(text, ctx) -> { kind, text, of, by, item, n, animal, plan } | { error }; parseWhen(text, now)
 //   time:     G.tick() -> { expired, changes, broken, unrewarded }  (call it every game quarter hour; belief drifts to G.rest(id))
 //   balance:  gains shrink with the villager's recent gains (rules.diminish) and near 0 / 100 (rules.headroom); tools/god-balance-sim.mjs
@@ -90,6 +90,25 @@ export function vote(voters = []) {
   const yes = votes.filter(v => v.vote === 'yes').length, no = votes.filter(v => v.vote === 'no').length, bargain = votes.filter(v => v.vote === 'bargain').length;
   const outcome = no > yes + bargain ? 'refuse' : yes > no + bargain ? 'accept' : 'bargain';
   return { yes, no, bargain, outcome, votes };
+}
+
+// a council speech -> its stance, by code: 'yes' | 'no' | 'bargain' | null (unclear: a decider or the brain reads it)
+// a condition or a delay with a yes (or a no) is a bargain, and so is a deal ("half now"); a yes and a no with
+// nothing else is unclear
+const ST_NO = /\b(no|nay|never|refuse[sd]?|will not|won'?t|shall not|cannot|can'?t|must not|should not|shouldn'?t|not (?:do|give|bring|kill|go|lead|build|pray|kneel|bow|let|going|doing|part|sacrifice|spare)\w*|not (?:right|proper|wise|fair)|don'?t think|do not think|madness|nonsense|foolish(?:ness)?|absurd|over my dead body|i say no|not a chance|leave me out|without me)\b/;
+const ST_YES = /\b(yes|aye|we must|we shall|we will|i will|i shall|obey|agree[ds]?|gladly|of course|so be it|it shall be done|as the god wills|praise|i am ready|count me|let us do|let's do|we do as|i'?ll (?:do|bring|go|help|lead|fetch)|willingly|happily|blessed be)\b/;
+const ST_IF = /\b(but|if|unless|only if|provided|as long as|first|later|after the|wait|until)\b/;
+const ST_DEAL = /\b(half|more time|in return|in exchange|on one condition|bargain|give us (?:more|until|time)|the rest (?:when|after|later))\b/;
+export function stanceOf(text) {
+  const t = ' ' + String(text || '').toLowerCase().replace(/[’']/g, "'").replace(/[^a-z' ,.!?;:-]+/g, ' ') + ' ';
+  // "no one", "no doubt", "not only" are not refusals; "i will not", "we must not" are not a yes
+  const clean = t.replace(/\bno (?:one|doubt|longer|matter|more than|other)\b|\bnot only\b/g, ' ');
+  const no = ST_NO.test(clean), yes = ST_YES.test(clean.replace(/\b(i|we) (will|shall|must) not\b|\b(i|we) (won'?t|cannot|can'?t)\b/g, ' ')), cond = ST_IF.test(clean);
+  if (ST_DEAL.test(clean) || ((yes || no) && cond)) return 'bargain';
+  if (yes && !no) return 'yes';
+  if (no && !yes) return 'no';
+  if (/\b(perhaps|maybe)\b/.test(clean) && /\bif\b/.test(clean)) return 'bargain';
+  return null;
 }
 
 // ---------------------------------------------------------------- decrees: the player's words -> a demand's parts
