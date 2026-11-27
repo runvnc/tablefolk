@@ -108,7 +108,8 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
     },
   });
   local.set(key, source === S.mirror ? 'r2' : '1');
-  if (S.replaces) dropCached(S.replaces).then(n => { if (n) { local.remove(LOADED); onStatus(`removed the replaced Bonsai 2 27B from the cache`); } }).catch(() => {});
+  // (a console line, not onStatus: the status line must end on the caller's "ready")
+  if (S.replaces) dropCached(S.replaces).then(n => { if (n) { local.remove(LOADED); console.info('[bonsai2] removed the replaced Bonsai 2 27B from the cache'); } }).catch(() => {});
   // A session per speaker (sessions > 1): each keeps its own cache, so a
   // character's next turn reuses its own prompt prefix instead of reading the
   // whole prompt again after someone else spoke (14 s cold, 1.4 s warm for a
