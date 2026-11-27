@@ -48,6 +48,22 @@ export default function (api) {
     const c = Array.isArray(p.center) ? { x: p.center[0], z: p.center[1] } : { x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2 };
     return { id: p.id, ...c, p };
   }
+  // where a villager prays: outside the shrine's door, kneeling toward it, when the shrine is a building (seen from
+  // above at any zoom, roof on or off); in an open shrine, in it
+  function praySpot(g) {
+    const sh = shrine(), P = sh.p; if (!P || P.x0 == null) return null;
+    const ds = (api.state.blocks || []).filter(b => b && !b.isDisposed?.() && api.meta(b)?.type === 'door' && b.position.x >= P.x0 - 1.01 && b.position.x <= P.x1 + 1.01 && b.position.z >= P.z0 - 1.01 && b.position.z <= P.z1 + 1.01);
+    if (!ds.length) return null;
+    const d = ds.sort((a, b) => dist(a.position, posOf(g)) - dist(b.position, posOf(g)))[0], cx = (P.x0 + P.x1) / 2, cz = (P.z0 + P.z1) / 2;
+    const ax = d.position.x - cx, az = d.position.z - cz, ox = Math.abs(ax) >= Math.abs(az) ? Math.sign(ax) : 0, oz = ox ? 0 : Math.sign(az);
+    // a free square in front of the door, not one another villager is on its way to
+    const taken = [...intents.values()].map(i => i.spot).filter(Boolean);
+    for (const k of [2, 3]) for (const side of [0, 1, -1, 2, -2]) {
+      const x = Math.round(d.position.x + ox * k + oz * side), z = Math.round(d.position.z + oz * k + ox * side), c = api.freeCell(x, z, 0);
+      if (c && !J().places.inPlace(P, c.x, c.z) && !taken.some(t => t.x === c.x && t.z === c.z)) return { x: c.x, z: c.z, door: d };
+    }
+    return null;
+  }
   const atShrine = g => { const s = shrine(); return s.p ? J().places.inPlace(s.p, posOf(g).x, posOf(g).z) || dist(posOf(g), s) < 2.5 : dist(posOf(g), s) < 2.5; };
   const groupsOf = id => W.tablefolkGroups?.of?.(id) || [];
   const household = id => { const all = W.tablefolkGroups?.all?.() || {}; const h = groupsOf(id).find(gid => /^house|household|family/.test(gid) || /\b(house|household|family)\b/i.test(all[gid]?.description || '')); return h ? W.tablefolkGroups.members(h) : [id]; };
@@ -84,6 +100,24 @@ export default function (api) {
     if (o.ms !== 0) setTimeout(() => { try { ps.stop(); } catch {} setTimeout(() => { try { ps.dispose(); } catch {} fxAll.delete(ps); }, (ps.maxLifeTime + .2) * 1000); }, o.ms || 1500);
     return ps;
   }
+  // is a point on the screen (with a margin), from the active camera
+  function onScreen(x, y, z, margin = .08) {
+    const BB = BAB(), sc = api.scene, cam = sc?.activeCamera; if (!cam) return true;
+    const eng = sc.getEngine(), w = eng.getRenderWidth(), h = eng.getRenderHeight();
+    const v = BB.Vector3.Project(new BB.Vector3(x, y, z), BB.Matrix.Identity(), sc.getTransformMatrix(), cam.viewport.toGlobal(w, h));
+    return v.z > 0 && v.z < 1 && v.x > w * margin && v.x < w * (1 - margin) && v.y > h * margin && v.y < h * (1 - margin);
+  }
+  // where an omen's ring goes so that it is seen at any zoom: over the shrine if that is in view (as high as
+  // still shows), else over the middle of the view; its size follows the camera's distance
+  const grow = 1.8;   // an omen's ring at its widest, times its size
+  function ringSpot(x, z) {
+    const c = api.state.camera, top = api.state.terrainTopY ?? 0, r = c?.radius ?? 30;
+    const size = Math.max(2.4, Math.min(9, r * .11)), heights = [7, 5, 3.5, 2.2, 1.2].map(h => h * Math.max(.6, Math.min(2, r / 22)));
+    // the whole ring at its widest (it grows to grow x size) must show, not only its middle
+    const R = size * grow / 2, whole = (px, y, pz) => onScreen(px, top + y, pz, .1) && [[R, 0], [-R, 0], [0, R], [0, -R]].every(([dx, dz]) => onScreen(px + dx, top + y, pz + dz, .02));
+    for (const [px, pz] of [[x, z], c?.target ? [c.target.x, c.target.z] : null].filter(Boolean)) for (const y of heights) if (whole(px, y, pz)) return { x: px, z: pz, y, size };
+    return { x: c?.target?.x ?? x, z: c?.target?.z ?? z, y: 1.2, size };
+  }
   // a ring of light in the sky over a spot that grows and fades (an omen, a vision)
   function skyRing(x, z, { color = [1, .85, .4], y = 7, ms = 5000, size = 3 } = {}) {
     const BB = BAB(); if (!api.scene || !BB) return;
@@ -95,7 +129,7 @@ export default function (api) {
     beam.position.set(x, (api.state.terrainTopY ?? 0) + y / 2, z);
     const t0 = performance.now(), obs = api.scene.onBeforeRenderObservable.add(() => {
       const u = Math.min(1, (performance.now() - t0) / ms);
-      ring.rotation.y += .02; ring.scaling.setAll(1 + u * 1.5); mat.alpha = .95 * (1 - u * u); bm.alpha = .28 * (1 - u);
+      ring.rotation.y += .02; ring.scaling.setAll(1 + u * (grow - 1)); mat.alpha = .95 * (1 - u * u); bm.alpha = .28 * (1 - u);
       if (u >= 1) { api.scene.onBeforeRenderObservable.remove(obs); ring.dispose(); beam.dispose(); mat.dispose(); bm.dispose(); fxAll.delete(obs); }
     });
     fxAll.add(obs);
@@ -145,8 +179,40 @@ export default function (api) {
   }
   function cure(g) { if (!g || !sick.has(g.id)) return false; sick.delete(g.id); sickMotes(g, false); badge(g, 'well again'); api.addMemory?.(g, 'The sickness left me. I am well again.', 3); return true; }
   const withered = new Map();   // mesh -> its scaling.y
-  function wither(o) { if (!o.mesh || withered.has(o.mesh)) return; withered.set(o.mesh, o.mesh.scaling.y); o.mesh.scaling.y *= .4; const m = api.meta(o.mesh); if (m?.opts && m.opts.stock != null) m.opts.stock = 0; }
-  function revive(o, add = 1) { if (o.mesh && withered.has(o.mesh)) { o.mesh.scaling.y = withered.get(o.mesh); withered.delete(o.mesh); } const m = api.meta(o.mesh); if (m?.opts && m.opts.stock != null) m.opts.stock = (+m.opts.stock || 0) + add; return true; }
+  // the ground under a blight: a grey-brown stain round each withered crop, and one over the whole blighted area
+  // (flat decals just above the ground, soft-edged; they go when the crops revive)
+  let stainMat = null; const stains = new Map(), areas = [];   // crop mesh -> decal; [{ x, z, r, mesh }]
+  function stainMaterial() {
+    const BB = BAB(); if (stainMat && !stainMat.isDisposed?.()) return stainMat;
+    const t = new BB.DynamicTexture('god_blight_tex', { width: 128, height: 128 }, api.scene, true), c = t.getContext();
+    c.clearRect(0, 0, 128, 128);
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 46; i++) {   // blotches, denser in the middle
+      const a = rnd() * Math.PI * 2, d = Math.pow(rnd(), .7) * 46, x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d, r = 10 + rnd() * 18;
+      const g = c.createRadialGradient(x, y, 0, x, y, r), k = .85 * (1 - d / 64);
+      g.addColorStop(0, `rgba(${62 + rnd() * 26 | 0},${54 + rnd() * 16 | 0},${34 + rnd() * 12 | 0},${k.toFixed(2)})`); g.addColorStop(.6, `rgba(70,60,38,${(k * .6).toFixed(2)})`); g.addColorStop(1, 'rgba(70,60,38,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+    t.hasAlpha = true; t.update();
+    const m = new BB.StandardMaterial('god_blight_mat', api.scene); m.diffuseTexture = t; m.useAlphaFromDiffuseTexture = true; m.specularColor = new BB.Color3(0, 0, 0);
+    m.emissiveColor = new BB.Color3(.05, .04, .02); m.zOffset = -3; m.backFaceCulling = false; m.disableDepthWrite = true;
+    return (stainMat = m);
+  }
+  function decal(x, z, size) {
+    const BB = BAB(); if (!api.scene || !BB) return null;
+    const g = BB.MeshBuilder.CreateGround('god_blight', { width: size, height: size }, api.scene);
+    g.material = stainMaterial(); g.isPickable = false; g.position.set(x, (api.state.terrainTopY ?? 0) + .035, z); g.rotation.y = Math.random() * Math.PI * 2;
+    g.visibility = 0; const t0 = performance.now(), obs = api.scene.onBeforeRenderObservable.add(() => { const u = Math.min(1, (performance.now() - t0) / 1500); g.visibility = u; if (u >= 1 || g.isDisposed()) api.scene.onBeforeRenderObservable.remove(obs); });
+    return g;
+  }
+  function stainArea(x, z, r) { const m = decal(x, z, r * 2.2); if (m) areas.push({ x, z, r, mesh: m }); }
+  function cleanStains() {
+    for (const [cm, d] of [...stains]) if (!withered.has(cm) || cm.isDisposed?.()) { d.dispose(); stains.delete(cm); }
+    for (let i = areas.length - 1; i >= 0; i--) { const a = areas[i]; if (![...withered.keys()].some(m => !m.isDisposed?.() && Math.hypot(m.position.x - a.x, m.position.z - a.z) <= a.r + .5)) { a.mesh.dispose(); areas.splice(i, 1); } }
+  }
+  function clearStains() { for (const d of stains.values()) d.dispose(); stains.clear(); for (const a of areas) a.mesh.dispose(); areas.length = 0; try { stainMat?.diffuseTexture?.dispose(); stainMat?.dispose(); } catch {} stainMat = null; }
+  function wither(o) { if (!o.mesh || withered.has(o.mesh)) return; withered.set(o.mesh, o.mesh.scaling.y); o.mesh.scaling.y *= .4; const m = api.meta(o.mesh); if (m?.opts && m.opts.stock != null) m.opts.stock = 0; try { const d = decal(o.x, o.z, 1.6); if (d) stains.set(o.mesh, d); } catch (e) { console.warn('[god] stain', e); } }
+  function revive(o, add = 1) { if (o.mesh && withered.has(o.mesh)) { o.mesh.scaling.y = withered.get(o.mesh); withered.delete(o.mesh); } const m = api.meta(o.mesh); if (m?.opts && m.opts.stock != null) m.opts.stock = (+m.opts.stock || 0) + add; cleanStains(); return true; }
   const blightCount = () => [...withered.keys()].filter(m => !m.isDisposed?.()).length;
   let droughtUntil = 0;
   function setDrought(minutes) { droughtUntil = minutes ? gm() + minutes : 0; api.flag('drought', !!minutes); }
@@ -247,6 +313,7 @@ export default function (api) {
     },
     blight(t) {
       let n = 0; for (const o of crops()) if (near(o, t.x, t.z, 4.5) && !withered.has(o.mesh)) { wither(o); n++; }
+      if (n) stainArea(t.x, t.z, 4.5);
       burst(t.x, t.z, { color: [.42, .36, .18], color2: [.28, .3, .2], n: 900, ms: 2600, r: 4, up: .7, blend: 'std', size: [.3, .7], life: [1.6, 2.8] });
       api.flag('blight', blightCount() > 0);
       for (const id of within(t.x, t.z, 9)) api.addMemory?.(byId(id), 'A grey rot came over the crops overnight. They wither on the stalk.', 3);
@@ -270,7 +337,7 @@ export default function (api) {
     async omen(t) {
       const text = t?.words ?? await ask('☄ An omen for all. Words to go with it (a prophecy), or leave it empty:', 'rain will come to the fields', true);
       if (text === null) return { fail: 'No omen was sent' };
-      const s = shrine(); skyRing(s.x, s.z, {});
+      const s = shrine(), at = ringSpot(s.x, s.z); skyRing(at.x, at.z, { y: at.y, size: at.size, ms: 6000 });
       const r = G.omen(text || ''); apply(r.changes);
       for (const id of vid()) api.addMemory?.(byId(id), `A ring of light burned in the sky over the ${s.id}${text ? ': ' + text : ''}.`, 3);
       setTimeout(() => readOmen(r.omen).catch(e => console.warn('[god] omen', e)), 1500);
@@ -374,20 +441,25 @@ export default function (api) {
   async function prayWork(g, s, j) {
     const it = intents.get(g.id); if (!it) return null;
     const k = K(), sh = shrine();
-    if (!atShrine(g)) {
+    if (it.spot === undefined) it.spot = praySpot(g);
+    const there = it.spot ? dist(posOf(g), it.spot) < 1.3 : atShrine(g);
+    if (!there) {
+      if ((it.tries = (it.tries || 0) + 1) > 12) { intents.delete(g.id); return null; }
       k.setDoing(g, s, `going to the ${sh.id} to pray`);
-      const spot = sh.p ? J().places.spotIn(sh.p, g) : sh;
+      const spot = it.spot || (sh.p ? J().places.spotIn(sh.p, g) : sh);
       const r = await k.goTo(g, s, spot?.x ?? sh.x, spot?.z ?? sh.z, 'the ' + sh.id);
-      if (r.fail) { intents.delete(g.id); return null; }
+      if (r.fail) { if (it.spot) { it.spot = null; return { ms: 500 }; } intents.delete(g.id); return null; }
       return { ms: r.ms || 2500 };
     }
     intents.delete(g.id);
     k.setDoing(g, s, `praying for ${needWord(it.need)}`);
-    try { W.tablefolkBodies?.emote?.(g, 'bow') || api.playClip(g, 'pickup'); } catch {}
+    // kneeling (a bow held) toward the door, and a column of light over them while they pray
+    if (it.spot?.door) g._faceAt = { node: it.spot.door, until: performance.now() + 6000 };
+    try { api.playClip(g, 'bow', true); setTimeout(() => { if (g.anim === 'bow') api.playClip(g, 'idle', true); }, 3600); } catch {}
+    burst(posOf(g).x, posOf(g).z, { color: [1, .93, .62], color2: [1, 1, .85], n: 220, ms: 3200, r: .22, y: .2, up: 2.6, gravity: .25, life: [1.1, 1.7], size: [.06, .15] });
     const w = await prayerWords(g, it.need);
     const p = G.addPrayer({ who: g.id, need: it.need, text: w.text, at: posOf(g), place: sh.id }); p.by = w.by;
     try { api.say(g, w.text, true); } catch {}
-    burst(posOf(g).x, posOf(g).z, { color: [1, .9, .6], n: 60, ms: 800, r: .3, y: 1.2, up: 1.2 });
     // an offering from the faithful who carry food to spare
     if (G.belief(g.id) >= 60) { const inv = api.inventory(g); const it2 = (inv?.items || []).find(i => (i.qty ?? 1) >= 2 && G.offeringValue(i.name) >= 1 && /bread|apple|wheat|fish|meat|cheese|milk|wool|ale|honey/.test(i.name)); if (it2 && api.take(g, it2.name, 1)) { const v = G.offeringValue(it2.name); api.resource('mana', v); badge(g, `offers ${it2.name}`); W.tablefolkJobs?.addNews?.(g.id, `${g.id} left ${it2.name} at the ${sh.id} as an offering`, 'news'); } }
     // a demand to pray at the shrine counts it
@@ -752,7 +824,7 @@ html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:f
   function start() {
     on = true;
     const scn = W.tablefolkScenario?.active?.scn || {};
-    G.clear(); sick.clear(); intents.clear(); dreams.clear(); thanks.clear(); withered.clear(); droughtUntil = 0; councilNow = null;
+    G.clear(); sick.clear(); intents.clear(); dreams.clear(); thanks.clear(); withered.clear(); clearStains(); droughtUntil = 0; councilNow = null;
     const GR = W.tablefolkGroups?.all?.() || {};
     for (const a of scn.agents || []) { const g = byId(a.id); if (!g || isAnimal(g)) continue; const gs = W.tablefolkGroups?.of?.(a.id) || []; const b = Number.isFinite(+a.belief) ? +a.belief : gs.includes('faithful') ? 70 : gs.includes('doubters') ? 25 : 50; G.set(a.id, b); G.setSide(a.id, gs.includes('faithful') ? 'faithful' : gs.includes('doubters') ? 'doubters' : null); }
     for (const g of villagers()) if (!G.ids().includes(g.id)) G.set(g.id, 50);
@@ -773,7 +845,8 @@ html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:f
   W.tablefolkJobs?.addUrgent?.(hooks.urgent); W.tablefolkJobs?.addWork?.(hooks.work, true); W.tablefolkAgency?.addOptions?.(hooks.options);
   (W.tablefolkSaveHooks ||= {}).god = { save: () => ({ g: G.data(), sick: [...sick], drought: droughtUntil, dreams: [...dreams] }), restore: x => { if (!x) return; G.load(x.g); sick.clear(); for (const [id, v] of x.sick || []) { sick.set(id, v); const g = byId(id); if (g) sickMotes(g, true); } droughtUntil = x.drought || 0; dreams.clear(); for (const [k, v] of x.dreams || []) dreams.set(k, v); sync([]); } };
   // what tests and other packages may read
-  W.tablefolkGod = { rules: G, decree, readDecree, prayerWords, council: () => councilNow, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil };
+  W.tablefolkGod = { rules: G, decree, readDecree, prayerWords, council: () => councilNow, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil,
+    stains: () => ({ crops: stains.size, areas: areas.length }), ringSpot, onScreen, praySpot };
 
   return {
     resources: {
@@ -788,7 +861,7 @@ html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:f
       W.tablefolkJobs?.removeUrgent?.(hooks.urgent); W.tablefolkJobs?.removeWork?.(hooks.work); W.tablefolkAgency?.removeOptions?.(hooks.options);
       if (W.tablefolkSaveHooks?.god) delete W.tablefolkSaveHooks.god;
       for (const x of fxAll) { try { if (x.dispose) { x.stop?.(); x.dispose(); } else api.scene?.onBeforeRenderObservable.remove(x); } catch {} } fxAll.clear(); sickFx.clear();
-      try { flareTex?.dispose(); } catch {} flareTex = null;
+      try { flareTex?.dispose(); } catch {} flareTex = null; clearStains();
       W.tablefolkModes?.setSpeed?.(1); document.documentElement.classList.remove('god-game');
       if (W.tablefolkGod?.rules === G) delete W.tablefolkGod;
     },

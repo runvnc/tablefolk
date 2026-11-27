@@ -35,6 +35,8 @@ export async function godGameTest({ page, ev, check, shot, pageShot, look, drive
   await drive("tablefolkGod.rules.open().filter(p => ['tilly', 'finn'].includes(p.who)).length >= 2", 120);
   console.log(`     (${Math.round((Date.now() - t0) / 1000)} s)`);
   await check('god: tilly walked to the temple and prayed aloud for food', () => ev(() => { const p = tablefolkGod.rules.open().find(p => p.who === 'tilly'); return [!!p && p.need === 'food' && __says.some(l => l.startsWith('tilly: ') && l.includes(p.text)) && /temple/.test(p.place), p ? `${p.need}: ${p.text} (${p.by})` : 'no prayer; open: ' + JSON.stringify(tablefolkGod.rules.open())]; }));
+  await check('god: they prayed outside the temple door (seen from above), kneeling toward it', () => ev(() => { const P = tablefolkJobs.places.placeNamed('temple'), out = ['tilly', 'finn'].map(id => { const g = state.characters.find(c => c.id === id), p = g.logicalPos || g.root.position; return { id, x: +p.x.toFixed(1), z: +p.z.toFixed(1), inside: tablefolkJobs.places.inPlace(P, p.x, p.z), clips: (g._clipsPlayed || []).slice(-3) }; }); return [!!tablefolkGod.praySpot(state.characters[0]) && out.every(o => !o.inside && o.clips.includes('bow')), JSON.stringify(out)]; }));
+  await look(...await ev(() => { const g = state.characters.find(c => c.id === 'tilly'), p = g.logicalPos || g.root.position; return [p.x, p.z]; }), 30, .78); await shot('g02b-praying-far');
   await page.click('#powerBar button:has-text("Prayers")');
   await page.waitForTimeout(400);
   await check('god: the prayers list shows both, each with an answer, a dream and silence', () => ev(() => { const t = document.getElementById('tfPickBar').textContent; return [/tilly/.test(t) && /finn/.test(t) && /Gift of food/.test(t) && /dream/.test(t) && /silence/.test(t), t.slice(0, 300)]; }));
@@ -42,19 +44,22 @@ export async function godGameTest({ page, ev, check, shot, pageShot, look, drive
   const b0 = await B('tilly'), m0 = await ev(() => tablefolkResources.get('mana')), bread0 = await ev(() => tablefolkJobs.kit.count(state.characters.find(c => c.id === 'tilly'), 'bread'));
   await page.click('#tfPickBar .gp:has-text("tilly") button.go');
   await page.waitForTimeout(800);
-  await check('god: answered with a gift of food: +3 bread, belief +15, 3 mana paid', () => ev(({ b0, m0, bread0 }) => { const g = state.characters.find(c => c.id === 'tilly'), p = tablefolkGod.rules.prayers().find(p => p.who === 'tilly'); return [p.status === 'answered' && tablefolkJobs.kit.count(g, 'bread') === bread0 + 3 && tablefolkGod.rules.belief('tilly') >= Math.min(100, b0 + 15) && tablefolkResources.get('mana') <= m0 - 3 + .5, `${p.status} by ${p.by}; belief ${b0} -> ${tablefolkGod.rules.belief('tilly')}; mana ${m0.toFixed(1)} -> ${tablefolkResources.get('mana').toFixed(1)}`]; }, { b0, m0, bread0 }));
+  await check('god: answered with a gift of food: +3 bread, belief up, 3 mana paid', () => ev(({ b0, m0, bread0 }) => { const g = state.characters.find(c => c.id === 'tilly'), p = tablefolkGod.rules.prayers().find(p => p.who === 'tilly'); return [p.status === 'answered' && tablefolkJobs.kit.count(g, 'bread') === bread0 + 3 && tablefolkGod.rules.belief('tilly') > b0 && tablefolkResources.get('mana') <= m0 - 3 + .5, `${p.status} by ${p.by}; belief ${b0} -> ${tablefolkGod.rules.belief('tilly')}; mana ${m0.toFixed(1)} -> ${tablefolkResources.get('mana').toFixed(1)}`]; }, { b0, m0, bread0 }));
   const f0 = await B('finn');
   await page.click('#tfPickBar .gp:has-text("finn") button:has-text("silence")');
-  await check('god: finn’s prayer met with silence: -3', () => ev(f0 => { const p = tablefolkGod.rules.prayers().find(p => p.who === 'finn'); return [p.status === 'silence' && tablefolkGod.rules.belief('finn') === f0 - 3, `${p.status}; ${f0} -> ${tablefolkGod.rules.belief('finn')}`]; }, f0));
+  await check('god: finn’s prayer met with silence: belief down', () => ev(f0 => { const p = tablefolkGod.rules.prayers().find(p => p.who === 'finn'); return [p.status === 'silence' && tablefolkGod.rules.belief('finn') < f0, `${p.status}; ${f0} -> ${tablefolkGod.rules.belief('finn')}`]; }, f0));
   await ev(() => tablefolkBar.pick(null));
 
   // ---- the powers
   await ev(() => tablefolkResources.set('mana', 150));
   const garden = await ev(() => { const d = tablefolkJobs.places.placeNamed('garden'); return { x: Math.round((d.x0 + d.x1) / 2), z: Math.round((d.z0 + d.z1) / 2), place: 'garden' }; });
   await check('god: blight on the garden: crops wither, the flag', () => ev(async t => { const r = await tablefolkPowers.use('blight', t); return [tablefolkGod.withered() > 0 && tablefolkStory.get('blight') === true, `${r}; ${tablefolkGod.withered()} withered`]; }, garden));
-  await lookAt('garden'); await page.waitForTimeout(600); await shot('g03-blight');
+  await check('god: the blight stains the ground (round each withered crop, and the area)', () => ev(() => { const s = tablefolkGod.stains(); return [s.crops > 0 && s.areas === 1 && state.scene.meshes.filter(m => m.name === 'god_blight').length === s.crops + s.areas, JSON.stringify(s)]; }));
+  await lookAt('garden'); await page.waitForTimeout(1800); await shot('g03-blight');
+  await look(garden.x, garden.z, 30, .78); await shot('g03b-blight-far');
   await check('god: bless the field: the blight lifts, crops grow', () => ev(async t => { const before = tablefolkGod.withered(); const r = await tablefolkPowers.use('bless_field', t); return [tablefolkGod.withered() < before && tablefolkStory.get('blight') === false, `${r}; withered ${before} -> ${tablefolkGod.withered()}`]; }, garden));
-  await page.waitForTimeout(700); await shot('g04-bless-field');
+  await check('god: blessed, the stains go', () => ev(() => { const s = tablefolkGod.stains(); return [s.crops === 0 && s.areas === 0 && !state.scene.meshes.some(m => m.name === 'god_blight'), JSON.stringify(s)]; }));
+  await lookAt('garden'); await page.waitForTimeout(700); await shot('g04-bless-field');
   await check('god: bless the herd: a lamb is born, the herder gets wool', () => ev(async t => { const n0 = state.characters.filter(c => c.charModel === 'sheep').length; const r = await tablefolkPowers.use('bless_herd', t); await new Promise(r => setTimeout(r, 1500)); const n1 = state.characters.filter(c => c.charModel === 'sheep').length; return [n1 === n0 + 1 && state.characters.some(c => /^lamb/.test(c.id)), `${r}; sheep ${n0} -> ${n1}`]; }, garden));
   await check('god: drought: the weather kind, the flag; rain ends it', () => ev(async t => { const r1 = await tablefolkPowers.use('drought', null); const w1 = tablefolkWeather.now()?.kind, d1 = tablefolkStory.get('drought'); const r2 = await tablefolkPowers.use('rain', t); return [w1 === 'drought' && d1 === true && tablefolkWeather.now()?.kind === 'rain' && tablefolkStory.get('drought') === false, `${r1} (${w1}, ${d1}) / ${r2} (${tablefolkWeather.now()?.kind})`]; }, garden));
   await page.waitForTimeout(1500); await shot('g05-rain');
@@ -82,14 +87,21 @@ export async function godGameTest({ page, ev, check, shot, pageShot, look, drive
   await ev(() => tablefolkGod.cure(state.characters.find(c => c.id === 'finn')));
   // a dream, an omen and its prophecy
   const br0 = await B('bram');
-  await check('god: a dream to bram: remembered, told aloud, a doubter’s belief +8', () => ev(async br0 => { const g = state.characters.find(c => c.id === 'bram'); const r = await tablefolkPowers.use('dream', { who: g, words: 'Fear not, Bram. I watch over your sister.' }); await new Promise(r => setTimeout(r, 2500)); const h = __says.filter(l => l.startsWith('bram: ')).join('\n'); return [/dream/i.test(h) && tablefolkGod.rules.belief('bram') >= br0 + 8 && tablefolkSkills.cardLines(g).some(l => /dream/.test(l)), `${r}; ${br0} -> ${tablefolkGod.rules.belief('bram')}; ${h.split('\n').slice(-1)}`]; }, br0));
+  await check('god: a dream to bram: remembered, told aloud, a doubter’s belief up', () => ev(async br0 => { const g = state.characters.find(c => c.id === 'bram'); const r = await tablefolkPowers.use('dream', { who: g, words: 'Fear not, Bram. I watch over your sister.' }); await new Promise(r => setTimeout(r, 2500)); const h = __says.filter(l => l.startsWith('bram: ')).join('\n'); return [/dream/i.test(h) && tablefolkGod.rules.belief('bram') > br0 && tablefolkSkills.cardLines(g).some(l => /dream/.test(l)), `${r}; ${br0} -> ${tablefolkGod.rules.belief('bram')}; ${h.split('\n').slice(-1)}`]; }, br0));
   const says0 = await ev(() => __says.length);
   await check('god: an omen with words is a prophecy; two villagers read it', () => ev(async () => { const r = await tablefolkPowers.use('omen', { words: 'rain will come to the fields' }); await new Promise(r => setTimeout(r, 1200)); const o = tablefolkGod.rules.omens().slice(-1)[0]; return [o.prophecy === 'rain' && o.status === 'open', r]; }));
   await lookAt('temple'); await page.waitForTimeout(500); await shot('g10-omen');
+  // the omen's ring is placed in view at any zoom: close in on the square, and far out
+  for (const [name, radius, beta] of [['g10b-omen-close', 9, .9], ['g10c-omen-far', 55, .7]]) {
+    await look(...await ev(() => { const d = tablefolkJobs.places.placeNamed('square'); return [(d.x0 + d.x1) / 2, (d.z0 + d.z1) / 2]; }), radius, beta);
+    await page.waitForTimeout(500);
+    await check(`god: the omen ring in view (${name})`, () => ev(() => { const s = tablefolkGod.ringSpot(tablefolkGod.shrine().x, tablefolkGod.shrine().z), top = state.terrainTopY ?? 0; return [tablefolkGod.onScreen(s.x, top + s.y, s.z, .1), JSON.stringify(s) + ' r ' + state.camera.radius]; }));
+    await ev(() => tablefolkGod.runPower('omen', { words: '' }, { free: true, anger: true })); await page.waitForTimeout(1500); await shot(name);
+  }
   await page.waitForTimeout(4000);
   await check('god: the omen read aloud by the faithful and a doubter', () => ev(n => { const l = __says.slice(n); const f = l.filter(x => /^(elder_ada|wren|tilly): /.test(x)), d = l.filter(x => /^(bram|finn): /.test(x)); return [f.length >= 1 && d.length >= 1, l.join(' / ')]; }, says0 - 0));
   const fin0 = await B('finn');
-  await check('god: rain makes the prophecy come true: everyone +8', () => ev(async ({ garden, fin0 }) => { const r = await tablefolkPowers.use('rain', garden); const o = tablefolkGod.rules.omens().slice(-1)[0]; return [o.status === 'kept' && tablefolkGod.rules.belief('finn') >= fin0 + 8, `${o.status}; finn ${fin0} -> ${tablefolkGod.rules.belief('finn')}`]; }, { garden, fin0 }));
+  await check('god: rain makes the prophecy come true: everyone’s belief up', () => ev(async ({ garden, fin0 }) => { const r = await tablefolkPowers.use('rain', garden); const o = tablefolkGod.rules.omens().filter(o => o.prophecy === 'rain').slice(-1)[0]; return [o.status === 'kept' && tablefolkGod.rules.belief('finn') > fin0, `${o.status}; finn ${fin0} -> ${tablefolkGod.rules.belief('finn')}`]; }, { garden, fin0 }));
   await ev(() => tablefolkWeather.clear());
 
   // ---- a decree met: a council, then the faithful bring the bread

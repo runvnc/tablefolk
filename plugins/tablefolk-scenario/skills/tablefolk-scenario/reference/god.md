@@ -97,8 +97,10 @@ blight (harvest), a decree to meet (strength), a prayer answered lately
 (thanks), or, for a doubter with nothing wrong, a sign. The weightier the
 need and the stronger the belief the likelier (doubters pray mostly in need);
 at most four prayers wait at once, one each, and not again within 2.5 game
-hours. On rails the villager walks to the shrine before its own work, bows,
-and says a templated prayer; above rails (guided or free, a brain loaded)
+hours. On rails the villager walks to the shrine before its own work,
+kneels and says a templated prayer: outside its door, facing it, when the
+shrine is a building (so you see it from above at any zoom, roof on or off),
+with a column of light over them while they pray; above rails (guided or free, a brain loaded)
 the prayer is in its own words, and praying is one of the activities it may
 choose. A prayer waits 3 game hours for an answer.
 
@@ -120,10 +122,10 @@ cast from: the Prayers list, the bar, or a decree.
 | 🍞 Gift of food | 3 | a villager | three loaves in their hands |
 | ⚡ Smite | 8 | anyone | lightning from the sky (`tablefolkSpells.strike`): kills a beast or raider, wounds a villager (4) |
 | ☣ Plague | 14 | a villager | their household falls sick: they keep to their beds (no work), grow hungry, lose health down to 3; each hour it may spread to anyone within 2.5 squares (1 in 4) unless healed; it passes after a day and a half |
-| 🥀 Blight | 10 | a square | crops within 4.5 squares wither (stock 0; the flag `blight`) |
+| 🥀 Blight | 10 | a square | crops within 4.5 squares wither (stock 0; the flag `blight`) and the ground there takes a grey-brown stain (round each withered crop and over the area) until they are blessed or rained on |
 | 🐺 Beast | 12 | none | two beasts come out of the wild (the core `raid` threat) |
 | 💭 Dream | 2 | a villager | your words, privately: remembered, on its card for half a day, told to those near in the morning; what it asks (a demand, a warning, go somewhere, comfort) is read from the words, and a demand in a dream becomes a decree through the dreamer |
-| ☄ Omen | 6 | none | a ring of fire in the sky over the shrine; with words it is a prophecy; a believer and a doubter say what they make of it |
+| ☄ Omen | 6 | none | a ring of fire in the sky over the shrine (lower, or over the middle of the view, when the shrine is out of view; its size follows the zoom, so it is seen whole at any zoom); with words it is a prophecy; a believer and a doubter say what they make of it |
 
 ## Decrees and the council
 
