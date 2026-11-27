@@ -50,7 +50,9 @@ sun = bpy.data.lights.new('sun', 'SUN'); sun.energy = 4.0; sun.angle = math.radi
 so = bpy.data.objects.new('sun', sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(45), 0, math.radians(-35))
 cd = bpy.data.cameras.new('c'); co = bpy.data.objects.new('c', cd); sc.collection.objects.link(co); sc.camera = co; cd.clip_end = 1000; cd.clip_start = .05
 sc.render.resolution_x = sc.render.resolution_y = RES
+ONLY = os.environ.get('ONLY')   # render only these shots (comma list)
 def shot(tag, loc, tgt, lens):
+    if ONLY and tag not in ONLY.split(','): return
     cd.lens = lens; co.location = Vector(loc); co.rotation_euler = (Vector(tgt) - co.location).to_track_quat('-Z', 'Y').to_euler()
     sc.render.filepath = f'{OUT}_{tag}.png'; bpy.ops.render.render(write_still=True)
 shot('far', (-0.45 * 22, -22 * 0.9, 22 * 0.62), (0, 0, H * 0.4), 50)

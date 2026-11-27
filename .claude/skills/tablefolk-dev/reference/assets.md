@@ -590,8 +590,17 @@ notes in `work/kit/` (`NOTES.md` is in git: every number and decision; sheets in
   `work/kit/shots/side_by_side.jpg`. In Babylon (WebGPU, `tools/kit/viewer.html`, `shots.mjs`):
   `work/kit/shots/babylon_sheet.jpg`; the roof fades by visibility (set `transparencyMode` null:
   the glTF loader pins OPAQUE) and the storey above is clipped by a plane, with no shell swap.
-- Open: piece LODs (windows), a chimney that reaches a hearth, thatch with real body, merging
-  across houses, KTX2 textures. $11.62 of fal in all (ledger `work/kit/ledger.jsonl`).
+- **Round 2** (no fal): roofs in courses (shingle; clay tile, `"roof": "tile"`) with fascia,
+  verge bargeboards, a profiled ridge and a seeded sag; thatch as a rounded, lumpy body with a
+  ridge roll and spars; a full chimney (hearth and breast inside on timber houses, outside the
+  gable on stone ones, the Tripo piece only as the top); seeded porch, bench, window boxes,
+  lean-to with a workbench or log pile; fieldstone 1.5 m a repeat; Patina roughness raised (it
+  made roofs glossy). LODs: `lod_piece.py` (window 250, door 300 ... porch 1000, stair 1400
+  triangles) and `build_house.py --far` (slab roofs): near 23-89k, far 3.6-13.5k triangles a
+  house; switch at about 20 units. Sheet with the concepts and the old inn:
+  `work/kit/shots/side_by_side_2.jpg`.
+- Open: merging across houses, KTX2 textures, per-panel infill tint, darker roof grading.
+  $11.62 of fal in all (ledger `work/kit/ledger.jsonl`).
 
 ### Procedural trees, plants and the environment texture set (2026-11-20)
 

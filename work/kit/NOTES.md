@@ -163,3 +163,50 @@ WebGPU, the GLBs as exported, headless test Chrome on :8001 (stopped). Sheet: sh
 8. The barn's shingle roof looks glossy in Babylon (the roughness map through glTF's packed
    metallicRoughness): check the roughness channel before wiring.
 9. Fieldstone at 2.2 m a repeat made boulders next to a 1.7 m figure: 1.5 m is right.
+
+## Round 2 (2026-11-27, after the coordinator's review: plainer than the concepts, roofs weakest)
+No fal spending (ledger still $11.615). Sheet: shots/side_by_side_2.jpg (columns: concept, far,
+far with the LOD file, door, corner, first person, inside; row 1 the old Meshy inn); Babylon:
+shots/babylon_sheet_2.jpg.
+1. Roofs with body (build_house.py `courses`, `thatch_body`, `roof`): shingle and clay tile laid in
+   courses (rows 20/24 cm, each tipped 3-6 deg steeper than the roof and overlapping the one below,
+   split into seeded lengths with their own lift and shade, its texture row aligned per course) on
+   a board underlay (boards seen inside); a fascia board along each eave, bargeboards 30 cm on the
+   verges; ridge: two boards in an inverted V (shingle), round ridge tiles (tile), a thick roll with
+   crossed spars (thatch); the ridge sags 1.5-6 cm mid-span per building seed (zero at the gables,
+   so they still meet). Clay tile (CC0 clay_roof_tiles graded warm) is the new `"roof": "tile"`
+   (l_house). Thatch: a grid body 46 cm thick, rounding down at the eave and both verges, lumpy
+   (noise), flat underside; roll and spars on the ridge. Roof triangles: 3.0-5.7k per house.
+2. Fieldstone at 1.5 m a repeat (from 2.2): stones 25-40 cm against the 1.7 m figure (door and
+   corner views); quoins 32/20 cm alternating, unchanged.
+3. Chimney: a full stack. Timber houses: a fireplace (jambs, sooty back, hearth stone, timber
+   mantel) and breast inside the gable wall on the ground floor, the stack up through the upper
+   floor and the roof; stone houses: the breast outside the gable wall with quoins and a weathering
+   course, the stack up past the ridge, a fireplace inside on the same wall. The Tripo chimney piece
+   is only the top (scale 1, its foot inside the stack). No window where the breast stands
+   (`CHIM` in openings()). No floating stack indoors.
+4. LODs: tools/kit/lod_piece.py (collapse, textures 256): window 2500 -> 250, window_shut 3000 -> 150,
+   door 5284 -> 300, leaf 2636 -> 120, chimney 4000 -> 300, dormer 5000 -> 400, porch 4000 -> 1000,
+   sign 3000 -> 200, corbel 1500 -> 80, stair 4000 -> 1400 (porch and stair at 300/400 shredded).
+   `build_house.py --far` uses them, a plain textured slab roof instead of courses, coarse thatch:
+   | house | near tris | far tris | near geometry | far geometry |
+   |---|---|---|---|---|
+   | half_timber | 45.1k | 6.2k | 1.29 MB | 0.36 MB |
+   | l_house | 88.8k | 13.5k | 1.98 MB | 0.68 MB |
+   | cottage | 23.1k | 3.6k | 0.96 MB | 0.28 MB |
+   | barn | 51.7k | 5.9k | 1.17 MB | 0.28 MB |
+   At the far camera (34 m, house ~250 px of 560) near vs far differ by 7-16/255 mean over the
+   house, mostly the roof's shading (courses vs slab); pieces are indistinguishable. Switch: about
+   20 game units (26 m) camera distance at 1080p; the roof courses could switch later (~35 units).
+   Draw calls stay 14-17 (the far file has the same materials).
+5. Glossy roof: Patina's roughness maps averaged .3; make_textures.py now raises them to .78 mean
+   (keeping the variation): the barn's roof is matte in Babylon. The L-house's white floor was the
+   old `inside` camera standing outside the L (in the notch) and seeing lit ground; the camera now
+   stands at the house's centre line, and the floor shows boards.
+6. Life (seeded, `life` in the json overrides): a porch on the main door (50%), a plank bench by the
+   door (60%), window boxes with leaves and flowers under some windows of plaster houses, a lean-to
+   on posts against the gable away from the chimney (barn: a workbench under it; cottage: a log
+   pile), the jetty's corbels as before.
+Still plainer than the concepts in two ways: the concepts' roofs are steeper and darker with more
+contrast between courses, and their walls have more varied infill colour (ochre panels in concept
+2). Next would be per-panel tint jitter and darker roof grading, both cheap.

@@ -27,6 +27,7 @@ PIECES = os.environ.get('KIT_PIECES', os.path.join(ROOT, 'work/kit/pieces'))
 bpy.ops.wm.read_factory_settings(use_empty=True)   # no default cube, camera or light
 a = sys.argv[sys.argv.index('--') + 1:]
 SPEC = json.load(open(a[0])); OUT = a[1]; NOTEX = '--notex' in a
+FAR = '--far' in a   # the far version: roofs as plain slabs (no courses), coarse thatch, the pieces' _lod files
 NAME = SPEC.get('name', 'house'); RNG = random.Random(SPEC.get('seed', 1))
 
 # ---- dimensions (game units: a square is 1, a character 1.3 tall) ----
@@ -40,9 +41,10 @@ STYLE = SPEC.get('style', 'plaster_timber')
 STOREYS = SPEC.get('storeys', 1)
 ROOF = SPEC.get('roof', 'shingle')
 PITCH = math.radians(SPEC.get('pitch', 50))
-OV = .38 if ROOF != 'thatch' else .48          # eave overhang (horizontal)
-VERGE = .28 if ROOF != 'thatch' else .34       # gable overhang
-RT = .12 if ROOF != 'thatch' else .36          # roof (eave) thickness
+OV = .38 if ROOF != 'thatch' else .5           # eave overhang (horizontal)
+VERGE = .28 if ROOF != 'thatch' else .36       # gable overhang
+RT = .12 if ROOF != 'thatch' else .46          # roof (eave) thickness: boards + courses, or the thatch's body
+SAG = SPEC.get('sag', RNG.uniform(.015, .06))  # the ridge sags this much mid-span (per building)
 JET = SPEC.get('jetty', {})
 JD = JET.get('d', .3) if JET else 0
 TINT = SPEC.get('tint') or [RNG.uniform(.92, 1.04), RNG.uniform(.9, 1.0), RNG.uniform(.84, .96)]
@@ -56,10 +58,10 @@ LOOK = {
 }[STYLE]
 def look(k): return LOOK[min(k, len(LOOK) - 1)]
 GABLE = {'plaster_timber': 'plaster', 'stone_timber': 'plaster', 'plank_barn': 'siding', 'stone_cottage': 'fieldstone'}[STYLE]
-ROOFMAT = {'shingle': 'shingle', 'thatch': 'thatch'}[ROOF]
+ROOFMAT = {'shingle': 'shingle', 'thatch': 'thatch', 'tile': 'tile'}[ROOF]
 TILES = json.load(open(os.path.join(TEX, 'manifest.json'))) if os.path.exists(os.path.join(TEX, 'manifest.json')) else {}
 def tile(m): return TILES.get(m, {}).get('tileMeters', [2, 2])
-MATS = ['plaster', 'fieldstone', 'quoin', 'timber', 'siding', 'floor', 'shingle', 'thatch']
+MATS = ['plaster', 'fieldstone', 'quoin', 'timber', 'siding', 'floor', 'shingle', 'thatch', 'tile']
 MI = {m: i for i, m in enumerate(MATS)}
 
 # ---- grid, rooms, runs ----
@@ -157,6 +159,7 @@ def openings(run, k):
     cand.sort(key=lambda rc: abs(s_of(run, rc) - mid))
     for rc in cand:
         s = s_of(run, rc)
+        if CHIM and run['axis'] == CHIM[0] and abs(run['fixed'] - CHIM[1]) < .01 and abs(s - CHIM[2]) < 1.1: continue
         if all(abs(s - t) >= step - 1e-6 for t in taken) and all(abs(s - t) > 1.2 for t in [o['s'] for o in ops if o['kind'] == 'door']):
             taken.append(s); ops.append(dict(kind='window', s=s, w=WW, zb=WSILL, zt=WSILL + WH, rc=rc))
     return ops
@@ -172,8 +175,9 @@ def dirt(z, m):
     return 1 - .32 * max(0.0, 1 - z / .75) ** 1.5
 
 def colour(m, z, jit):
-    t = TINT if m in ('plaster', 'siding', 'fieldstone', 'thatch', 'shingle') else (1, 1, 1)
-    d = dirt(z, m); return (t[0] * d * jit, t[1] * d * jit, t[2] * d * jit, 1.0)
+    t = TINT if m in ('plaster', 'siding', 'fieldstone', 'thatch', 'shingle', 'tile') else (1, 1, 1)
+    j = jit if isinstance(jit, (tuple, list)) else (jit, jit, jit)   # a tuple: an explicit colour (plants, soot)
+    d = dirt(z, m); return (t[0] * d * j[0], t[1] * d * j[1], t[2] * d * j[2], 1.0)
 
 def uv_world(p, n, m):
     tu, tv = tile(m); an = [abs(n.x), abs(n.y), abs(n.z)]; i = an.index(max(an))
@@ -235,7 +239,7 @@ def beam(B, p0, p1, nrm, w, d, jit=None, m='timber'):
     box(B, (p0 + p1) / 2, ax, ay, az, L / 2, w / 2, d / 2, lambda n: m, uv='local', jit=jit or RNG.uniform(.82, 1.1),
         uvoff=(RNG.random(), RNG.random()))
 
-def cyl(B, p0, p1, r, m, sides=10, squash=1.0):
+def cyl(B, p0, p1, r, m, sides=10, squash=1.0, jit=1.0):
     """a round timber or a thatch roll from p0 to p1 (u along it, v round it)"""
     ax = (p1 - p0); L = ax.length; ax.normalize()
     e1 = ax.cross(Vector((0, 0, 1))); e1 = e1.normalized() if e1.length > 1e-6 else Vector((1, 0, 0)); e2 = e1.cross(ax).normalized()
@@ -246,12 +250,12 @@ def cyl(B, p0, p1, r, m, sides=10, squash=1.0):
         n = (q[1] - q[0]).cross(q[2] - q[0])
         if n.dot((q[0] + q[1]) / 2 - p0 - ax * (q[0] - p0).dot(ax)) < 0: q.reverse(); uvs = [(L / tu, (i + 1) * r * 2 * math.pi / sides / tv), (L / tu, i * r * 2 * math.pi / sides / tv), (0, i * r * 2 * math.pi / sides / tv), (0, (i + 1) * r * 2 * math.pi / sides / tv)]
         else: uvs = [(0, i * r * 2 * math.pi / sides / tv), (0, (i + 1) * r * 2 * math.pi / sides / tv), (L / tu, (i + 1) * r * 2 * math.pi / sides / tv), (L / tu, i * r * 2 * math.pi / sides / tv)]
-        add_face(B, q, m, uvs)
+        add_face(B, q, m, uvs, jit)
     for p, sg in ((p0, -1), (p1, 1)):
         q = [ring(p, i) for i in range(sides)]
         n = (q[1] - q[0]).cross(q[2] - q[0])
         if n.dot(ax * sg) < 0: q.reverse()
-        add_face(B, q, m, [((v - p).dot(e1) / tu, (v - p).dot(e2) / tv) for v in q])
+        add_face(B, q, m, [((v - p).dot(e1) / tu, (v - p).dot(e2) / tv) for v in q], jit)
 
 # ---- pieces placed (layer 3) ----
 PMETA = json.load(open(os.path.join(PIECES, 'pieces.json'))) if os.path.exists(os.path.join(PIECES, 'pieces.json')) else {}
@@ -260,128 +264,6 @@ def place(name, loc, nrm, scale=(1, 1, 1), part=None, roof=False):
     ang = math.atan2(nrm.y, nrm.x) + math.pi / 2
     M = Matrix.Translation(loc) @ Matrix.Rotation(ang, 4, 'Z') @ Matrix.Diagonal((*scale, 1))
     placed.append((name, M, 'roof' if roof else part))
-
-# ---- layer 1 + 2: walls by storey ----
-stats = dict(windows=0, doors=0)
-corner_posts = set()
-for k in range(STOREYS):
-    outer, inner, framed = look(k); z0 = k * H
-    for run in runs:
-        f, s0, s1 = jettied(run, k)
-        O, A, N = frame_of(run, f)
-        if run['kind'] == 'inner': N = N  # partition: both faces inner
-        e0, e1 = s0 - T / 2, s1 + T / 2
-        ops = sorted(openings(run, k), key=lambda o: o['s'])
-        mo = outer if run['kind'] == 'outer' else inner
-        def matf(n, mo=mo, N=N, run=run):
-            if run['kind'] == 'inner': return inner
-            d = n.dot(N)
-            return mo if d > -.5 else inner
-        zc = [.4 - H / 2] if k == 0 else []
-        def wbox(sa, sb, za, zb):
-            if sb - sa < 1e-4 or zb - za < 1e-4: return
-            c = O + A * ((sa + sb) / 2) + Vector((0, 0, z0 + (za + zb) / 2))
-            box(S, c, A, N, Vector((0, 0, 1)), (sb - sa) / 2, T / 2, (zb - za) / 2, matf, zcuts=[z - (za + zb) / 2 for z in ([.4] if k == 0 else []) if za < z < zb])
-        cur = e0
-        for o in ops:
-            a0, a1 = o['s'] - o['w'] / 2, o['s'] + o['w'] / 2
-            wbox(cur, a0, 0, H); wbox(a0, a1, 0, o['zb']); wbox(a0, a1, o['zt'], H); cur = a1
-            if o['kind'] == 'window': stats['windows'] += 1
-            else: stats['doors'] += 1
-        wbox(cur, e1, 0, H)
-        # plinth: stone along the outside of a ground storey that is not stone already (broken at doors)
-        if k == 0 and run['kind'] == 'outer' and outer != 'fieldstone':
-            pd = T / 2 + .07; cur = e0 - .05
-            for o in [o for o in ops if o['kind'] == 'door'] + [dict(s=e1 + 10, w=0)]:
-                end = min(o['s'] - o['w'] / 2, e1 + .05)
-                if end > cur:
-                    c = O + A * ((cur + end) / 2) + N * (pd / 2) + Vector((0, 0, PLINTH / 2))
-                    box(S, c, A, N, Vector((0, 0, 1)), (end - cur) / 2, pd / 2, PLINTH / 2, lambda n: 'fieldstone')
-                cur = o['s'] + o['w'] / 2
-        # pieces in the openings
-        for o in ops:
-            loc = O + A * o['s'] + Vector((0, 0, z0 + o['zb']))
-            if o['kind'] == 'door':
-                place('door', loc, N); place('door_leaf', loc, N, part='leaf')
-                if k == 0 and run['kind'] == 'outer' and SPEC.get('porch') and o['rc'] in doors:
-                    place('porch', O + A * o['s'] + N * (T / 2 + BT) + Vector((0, 0, z0 + DH + .55)), N)
-            else:
-                kind = 'window' if (RNG.random() < SPEC.get('leaded', .6) or k > 0) else 'window_shut'
-                if k == 0 and STYLE in ('stone_cottage', 'plank_barn'): kind = 'window_shut'
-                place(kind, loc + Vector((0, 0, -.06)), N)
-        # ---- frame on timber storeys ----
-        if framed:
-            dpt = T + 2 * BT; zb0 = z0 + (PLINTH if k == 0 and outer != 'siding' else 0)
-            PW, PL = .17, .15
-            def P(s, z): return O + A * s + Vector((0, 0, z))
-            # sill plate (broken at doors) and top plate
-            cur = e0
-            for o in [o for o in ops if o['kind'] == 'door' and not o.get('upper')] + [dict(s=e1 + 10, w=0)]:
-                end = min(o['s'] - o['w'] / 2 - .09, e1)
-                if end > cur: beam(S, P(cur, zb0 + PL / 2), P(end, zb0 + PL / 2), N, PL, dpt)
-                cur = o['s'] + o['w'] / 2 + .09
-            beam(S, P(e0, z0 + H - PL / 2), P(e1, z0 + H - PL / 2), N, PL, dpt)
-            # posts: corners, jambs, bays
-            posts = [(e0 + PW / 2, .2), (e1 - PW / 2, .2)]
-            for o in ops:
-                posts += [(o['s'] - o['w'] / 2 - .075, .15), (o['s'] + o['w'] / 2 + .075, .15)]
-            bay = SPEC.get('bay', 2) if STYLE != 'plank_barn' else 1
-            s = round(s0) + .5
-            while s < s1:
-                if (s - round(s0) - .5) % bay < 1e-6 and all(abs(s - p) > .45 for p, _ in posts): posts.append((s, .16))
-                s += 1
-            posts.sort()
-            for p, w in posts: beam(S, P(p, zb0 + PL), P(p, z0 + H - PL), N, w, dpt + .01)
-            # rails round openings and braces in the panels between posts
-            mid = z0 + H * .5
-            for o in ops:
-                a0, a1 = o['s'] - o['w'] / 2 - .15, o['s'] + o['w'] / 2 + .15
-                if o['kind'] == 'window': beam(S, P(a0, z0 + o['zb'] - .05), P(a1, z0 + o['zb'] - .05), N, .1, dpt)
-                beam(S, P(a0, z0 + o['zt'] + .06), P(a1, z0 + o['zt'] + .06), N, .12, dpt)
-            pat = SPEC.get('braces', 'corner')
-            for (pa, wa), (pb, wb) in zip(posts[:-1], posts[1:]):
-                sa, sb = pa + wa / 2, pb - wb / 2
-                if sb - sa < .45: continue
-                if any(sa - .05 < o['s'] < sb + .05 for o in ops): continue
-                lo, hi = zb0 + PL, z0 + H - PL
-                first, last = abs(pa - (e0 + PW / 2)) < 1e-6, abs(pb - (e1 - PW / 2)) < 1e-6
-                if pat == 'corner' or (pat == 'chevron' and (first or last)):
-                    if first: beam(S, P(sa + .05, hi - .05), P(sb - .05, lo + .05), N, .13, dpt)
-                    elif last: beam(S, P(sa + .05, lo + .05), P(sb - .05, hi - .05), N, .13, dpt)
-                    else: beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
-                elif pat == 'chevron':
-                    m_ = (sa + sb) / 2; beam(S, P(sa + .05, lo + .05), P(m_, hi - .05), N, .12, dpt); beam(S, P(m_, hi - .05), P(sb - .05, lo + .05), N, .12, dpt)
-                elif pat == 'cross':
-                    beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
-                    beam(S, P(sa + .04, lo + .04), P(sb - .04, mid - .04), N, .1, dpt); beam(S, P(sa + .04, mid - .04), P(sb - .04, lo + .04), N, .1, dpt + .005)
-                elif pat == 'herringbone':
-                    beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
-                    beam(S, P(sa + .04, lo + .04), P(sb - .04, mid - .04), N, .1, dpt)
-                    beam(S, P(sa + .04, mid + .04), P(sb - .04, hi - .04), N, .1, dpt)
-            # jetty: joist ends under a moved line, corbels at the lower storey's posts
-            if k > 0 and abs(f - run['fixed']) > 1e-6:
-                Ol, _, _ = frame_of(run, run['fixed'])
-                s = s0
-                while s <= s1 + 1e-6:
-                    p0 = Ol + A * s + Vector((0, 0, z0 - .07)); beam(S, p0 - N * (T / 2), p0 + N * (JD + T / 2 + .06), Vector((0, 0, 1)), .12, .12)
-                    s += .5
-                beam(S, Ol + A * e0 + N * (JD + T / 2 + .06) + Vector((0, 0, z0 - .07)), Ol + A * e1 + N * (JD + T / 2 + .06) + Vector((0, 0, z0 - .07)), N, .14, .1)
-                for p in [s0 + .1, s1 - .1] + [x for x in [round(s0) + .5 + i for i in range(int(s1 - s0))] if (x - round(s0) - .5) % 2 < 1e-6 and s0 + .5 < x < s1 - .5]:
-                    place('corbel', Ol + A * p + N * (T / 2) + Vector((0, 0, z0 - .13)), N)
-        # stone: quoins at the outer corners, timber lintels over openings
-        if outer == 'fieldstone' and run['kind'] == 'outer':
-            for o in ops:
-                beam(S, O + A * (o['s'] - o['w'] / 2 - .14) + Vector((0, 0, z0 + o['zt'] + .08)),
-                     O + A * (o['s'] + o['w'] / 2 + .14) + Vector((0, 0, z0 + o['zt'] + .08)), N, .16, T + .03)
-            for e, sg in ((e0, 1), (e1, -1)):
-                z = z0; i = 0
-                while z < z0 + H - .05:
-                    hq = min(.26, z0 + H - z); lq = .42 if i % 2 == 0 else .26
-                    c = O + A * (e + sg * lq / 2) + N * .0 + Vector((0, 0, z + hq / 2))
-                    box(S, c, A, N, Vector((0, 0, 1)), lq / 2 + .012, T / 2 + .022, hq / 2 - .006, lambda n: 'quoin', jit=RNG.uniform(.85, 1.08))
-                    z += hq; i += 1
-    # floors: ground slab over the inside, a timber floor between storeys
-    pass
 
 # ---- floors and roofs per rectangle ----
 def rects(cells):
@@ -470,6 +352,197 @@ for i, rc in enumerate(RECTS):
             else: y1 = mid; ext['hi'] = 1
         roof_info.append(dict(x0=x0, x1=x1, y0=y0, y1=y1, along=along, ext=ext))
 
+
+# the chimney's wall: a gable end of the main roof; no window where its breast stands
+CHIM = None
+if SPEC.get('chimney'):
+    _ri = roof_info[0]; _sg = 1 if SPEC['chimney'] == 'right' else -1
+    if _ri['along'] == 'x': CHIM = ('y', (_ri['x1'] if _sg > 0 else _ri['x0']) - _sg * T / 2, (_ri['y0'] + _ri['y1']) / 2)
+    else: CHIM = ('x', (_ri['y1'] if _sg > 0 else _ri['y0']) - _sg * T / 2, (_ri['x0'] + _ri['x1']) / 2)
+WINS, DOORS = [], []
+
+# ---- layer 1 + 2: walls by storey ----
+stats = dict(windows=0, doors=0)
+corner_posts = set()
+for k in range(STOREYS):
+    outer, inner, framed = look(k); z0 = k * H
+    for run in runs:
+        f, s0, s1 = jettied(run, k)
+        O, A, N = frame_of(run, f)
+        if run['kind'] == 'inner': N = N  # partition: both faces inner
+        e0, e1 = s0 - T / 2, s1 + T / 2
+        ops = sorted(openings(run, k), key=lambda o: o['s'])
+        mo = outer if run['kind'] == 'outer' else inner
+        def matf(n, mo=mo, N=N, run=run):
+            if run['kind'] == 'inner': return inner
+            d = n.dot(N)
+            return mo if d > -.5 else inner
+        zc = [.4 - H / 2] if k == 0 else []
+        def wbox(sa, sb, za, zb):
+            if sb - sa < 1e-4 or zb - za < 1e-4: return
+            c = O + A * ((sa + sb) / 2) + Vector((0, 0, z0 + (za + zb) / 2))
+            box(S, c, A, N, Vector((0, 0, 1)), (sb - sa) / 2, T / 2, (zb - za) / 2, matf, zcuts=[z - (za + zb) / 2 for z in ([.4] if k == 0 else []) if za < z < zb])
+        cur = e0
+        for o in ops:
+            a0, a1 = o['s'] - o['w'] / 2, o['s'] + o['w'] / 2
+            wbox(cur, a0, 0, H); wbox(a0, a1, 0, o['zb']); wbox(a0, a1, o['zt'], H); cur = a1
+            if o['kind'] == 'window': stats['windows'] += 1
+            else: stats['doors'] += 1
+        wbox(cur, e1, 0, H)
+        # plinth: stone along the outside of a ground storey that is not stone already (broken at doors)
+        if k == 0 and run['kind'] == 'outer' and outer != 'fieldstone':
+            pd = T / 2 + .07; cur = e0 - .05
+            for o in [o for o in ops if o['kind'] == 'door'] + [dict(s=e1 + 10, w=0)]:
+                end = min(o['s'] - o['w'] / 2, e1 + .05)
+                if end > cur:
+                    c = O + A * ((cur + end) / 2) + N * (pd / 2) + Vector((0, 0, PLINTH / 2))
+                    box(S, c, A, N, Vector((0, 0, 1)), (end - cur) / 2, pd / 2, PLINTH / 2, lambda n: 'fieldstone')
+                cur = o['s'] + o['w'] / 2
+        # pieces in the openings
+        for o in ops:
+            loc = O + A * o['s'] + Vector((0, 0, z0 + o['zb']))
+            if o['kind'] == 'door':
+                place('door', loc, N); place('door_leaf', loc, N, part='leaf')
+                if run['kind'] == 'outer': DOORS.append((loc, N, A, k, o))
+                if k == 0 and run['kind'] == 'outer' and SPEC.get('porch') and o['rc'] in doors:
+                    place('porch', O + A * o['s'] + N * (T / 2 + BT) + Vector((0, 0, z0 + DH + .55)), N)
+            else:
+                kind = 'window' if (RNG.random() < SPEC.get('leaded', .6) or k > 0) else 'window_shut'
+                if k == 0 and STYLE in ('stone_cottage', 'plank_barn'): kind = 'window_shut'
+                place(kind, loc + Vector((0, 0, -.06)), N); WINS.append((loc, N, A, k, kind))
+        # ---- frame on timber storeys ----
+        if framed:
+            dpt = T + 2 * BT; zb0 = z0 + (PLINTH if k == 0 and outer != 'siding' else 0)
+            PW, PL = .17, .15
+            def P(s, z): return O + A * s + Vector((0, 0, z))
+            # sill plate (broken at doors) and top plate
+            cur = e0
+            for o in [o for o in ops if o['kind'] == 'door' and not o.get('upper')] + [dict(s=e1 + 10, w=0)]:
+                end = min(o['s'] - o['w'] / 2 - .09, e1)
+                if end > cur: beam(S, P(cur, zb0 + PL / 2), P(end, zb0 + PL / 2), N, PL, dpt)
+                cur = o['s'] + o['w'] / 2 + .09
+            beam(S, P(e0, z0 + H - PL / 2), P(e1, z0 + H - PL / 2), N, PL, dpt)
+            # posts: corners, jambs, bays
+            posts = [(e0 + PW / 2, .2), (e1 - PW / 2, .2)]
+            for o in ops:
+                posts += [(o['s'] - o['w'] / 2 - .075, .15), (o['s'] + o['w'] / 2 + .075, .15)]
+            bay = SPEC.get('bay', 2) if STYLE != 'plank_barn' else 1
+            s = round(s0) + .5
+            while s < s1:
+                if (s - round(s0) - .5) % bay < 1e-6 and all(abs(s - p) > .45 for p, _ in posts): posts.append((s, .16))
+                s += 1
+            posts.sort()
+            for p, w in posts: beam(S, P(p, zb0 + PL), P(p, z0 + H - PL), N, w, dpt + .01)
+            # rails round openings and braces in the panels between posts
+            mid = z0 + H * .5
+            for o in ops:
+                a0, a1 = o['s'] - o['w'] / 2 - .15, o['s'] + o['w'] / 2 + .15
+                if o['kind'] == 'window': beam(S, P(a0, z0 + o['zb'] - .05), P(a1, z0 + o['zb'] - .05), N, .1, dpt)
+                beam(S, P(a0, z0 + o['zt'] + .06), P(a1, z0 + o['zt'] + .06), N, .12, dpt)
+            pat = SPEC.get('braces', 'corner')
+            for (pa, wa), (pb, wb) in zip(posts[:-1], posts[1:]):
+                sa, sb = pa + wa / 2, pb - wb / 2
+                if sb - sa < .45: continue
+                if any(sa - .05 < o['s'] < sb + .05 for o in ops): continue
+                lo, hi = zb0 + PL, z0 + H - PL
+                first, last = abs(pa - (e0 + PW / 2)) < 1e-6, abs(pb - (e1 - PW / 2)) < 1e-6
+                if pat == 'corner' or (pat == 'chevron' and (first or last)):
+                    if first: beam(S, P(sa + .05, hi - .05), P(sb - .05, lo + .05), N, .13, dpt)
+                    elif last: beam(S, P(sa + .05, lo + .05), P(sb - .05, hi - .05), N, .13, dpt)
+                    else: beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
+                elif pat == 'chevron':
+                    m_ = (sa + sb) / 2; beam(S, P(sa + .05, lo + .05), P(m_, hi - .05), N, .12, dpt); beam(S, P(m_, hi - .05), P(sb - .05, lo + .05), N, .12, dpt)
+                elif pat == 'cross':
+                    beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
+                    beam(S, P(sa + .04, lo + .04), P(sb - .04, mid - .04), N, .1, dpt); beam(S, P(sa + .04, mid - .04), P(sb - .04, lo + .04), N, .1, dpt + .005)
+                elif pat == 'herringbone':
+                    beam(S, P(sa, mid), P(sb, mid), N, .11, dpt)
+                    beam(S, P(sa + .04, lo + .04), P(sb - .04, mid - .04), N, .1, dpt)
+                    beam(S, P(sa + .04, mid + .04), P(sb - .04, hi - .04), N, .1, dpt)
+            # jetty: joist ends under a moved line, corbels at the lower storey's posts
+            if k > 0 and abs(f - run['fixed']) > 1e-6:
+                Ol, _, _ = frame_of(run, run['fixed'])
+                s = s0
+                while s <= s1 + 1e-6:
+                    p0 = Ol + A * s + Vector((0, 0, z0 - .07)); beam(S, p0 - N * (T / 2), p0 + N * (JD + T / 2 + .06), Vector((0, 0, 1)), .12, .12)
+                    s += .5
+                beam(S, Ol + A * e0 + N * (JD + T / 2 + .06) + Vector((0, 0, z0 - .07)), Ol + A * e1 + N * (JD + T / 2 + .06) + Vector((0, 0, z0 - .07)), N, .14, .1)
+                for p in [s0 + .1, s1 - .1] + [x for x in [round(s0) + .5 + i for i in range(int(s1 - s0))] if (x - round(s0) - .5) % 2 < 1e-6 and s0 + .5 < x < s1 - .5]:
+                    place('corbel', Ol + A * p + N * (T / 2) + Vector((0, 0, z0 - .13)), N)
+        # stone: quoins at the outer corners, timber lintels over openings
+        if outer == 'fieldstone' and run['kind'] == 'outer':
+            for o in ops:
+                beam(S, O + A * (o['s'] - o['w'] / 2 - .14) + Vector((0, 0, z0 + o['zt'] + .08)),
+                     O + A * (o['s'] + o['w'] / 2 + .14) + Vector((0, 0, z0 + o['zt'] + .08)), N, .16, T + .03)
+            for e, sg in ((e0, 1), (e1, -1)):
+                z = z0; i = 0
+                while z < z0 + H - .05:
+                    hq = min(.26, z0 + H - z); lq = .42 if i % 2 == 0 else .26
+                    c = O + A * (e + sg * lq / 2) + N * .0 + Vector((0, 0, z + hq / 2))
+                    box(S, c, A, N, Vector((0, 0, 1)), lq / 2 + .012, T / 2 + .022, hq / 2 - .006, lambda n: 'quoin', jit=RNG.uniform(.85, 1.08))
+                    z += hq; i += 1
+    # floors: ground slab over the inside, a timber floor between storeys
+    pass
+
+from mathutils import noise as _noise
+CRNG = random.Random(SPEC.get('seed', 1) * 7919 + 1)   # courses draw from their own stream: near and far stay alike
+NOFF = Vector((CRNG.uniform(0, 100), CRNG.uniform(0, 100), 0))
+
+def courses(B, pe, up, U, nrm, ul, uh, L, mat, first_over=.05):
+    """roofing laid in courses: rows of boxes along U from the eave (pe, s = 0) up the slope (up) to L, each
+    row tipped a little steeper than the roof and overlapping the one below; split into seeded lengths with
+    their own lift, tilt and shade, so the rows read at a distance and no two roofs repeat"""
+    cs = {'shingle': .2, 'tile': .24}.get(mat, .2); ct = .035 if mat == 'shingle' else .045
+    tv = tile(mat)[1]; rows_in_tex = round(tv / cs) or 1
+    k = 0; s = -first_over
+    while s < L - .04:
+        lo = s; hi = min(s + cs * 1.65, L + .06)
+        u = ul
+        while u < uh - 1e-3:
+            ln = min(uh - u, CRNG.uniform(.7, 2.2)); ln = uh - u if uh - u - ln < .35 else ln
+            tilt = math.radians(CRNG.uniform(3, 6)); lift = CRNG.uniform(-.006, .01)
+            ax = U; sdir = (up * math.cos(tilt) - nrm * math.sin(tilt)).normalized(); nr = ax.cross(sdir).normalized()
+            if nr.dot(nrm) < 0: nr = -nr
+            c = pe + U * (u + ln / 2) + up * ((lo + hi) / 2) + nrm * (.05 + ct / 2 + lift + (hi - lo) / 2 * math.sin(tilt))
+            jit = CRNG.uniform(.82, 1.12)
+            box(B, c, ax, -sdir, nr, ln / 2, (hi - lo) / 2, ct / 2,
+                lambda n: mat if n.dot(nrm) > .3 else ('floor' if n.dot(nrm) < -.3 else mat), uv='local', jit=jit,
+                uvoff=(CRNG.random(), (k % rows_in_tex + .5) / rows_in_tex))
+            u += ln
+        s += cs; k += 1
+
+def thatch_body(B, pe, up, U, nrm, ul, uh, L, coarse=False):
+    """thatch with body: a grid over the slope, thick in the middle, rounding down at the eave and the
+    verges, lumpy (noise), its underside flat (the boards seen from inside)"""
+    du = .35 * (3 if coarse else 1); ds = .3 * (3 if coarse else 1)
+    nu = max(2, int((uh - ul) / du) + 1); ns = max(2, int(L / ds) + 1)
+    def rnd(x): x = max(0.0, min(1.0, x)); return math.sqrt(1 - (1 - x) ** 2)
+    def P(i, j, top):
+        u = ul + (uh - ul) * i / nu; sv = L * j / ns
+        p = pe + U * u + up * sv
+        if not top: return p
+        th = RT * max(.18, rnd(min(u - ul, uh - u) / .5) * rnd(sv / .6))
+        th += .05 * _noise.noise(Vector((u * 1.1, sv * 1.1, 0)) + NOFF) * rnd(min(u - ul, uh - u) / .5)
+        return p + nrm * th
+    tu, tv = tile('thatch')
+    for top in (True, False):
+        for i in range(nu):
+            for j in range(ns):
+                q = [P(i, j, top), P(i + 1, j, top), P(i + 1, j + 1, top), P(i, j + 1, top)]
+                n = (q[1] - q[0]).cross(q[2] - q[0])
+                if (n.dot(nrm) < 0) == top: q.reverse()
+                m = 'thatch' if top else 'floor'
+                add_face(B, q, m, [((p - pe).dot(U) / tu, (p - pe).dot(up) / tv) for p in q])
+    # the rims between top and underside: eave, verges, top
+    edges = [[(i, 0) for i in range(nu + 1)], [(i, ns) for i in range(nu + 1)], [(0, j) for j in range(ns + 1)], [(nu, j) for j in range(ns + 1)]]
+    ctr = pe + U * ((ul + uh) / 2) + up * (L / 2)
+    for e in edges:
+        for (a0, b0), (a1, b1) in zip(e[:-1], e[1:]):
+            q = [P(a0, b0, False), P(a1, b1, False), P(a1, b1, True), P(a0, b0, True)]
+            n = (q[1] - q[0]).cross(q[2] - q[0]); mid = sum(q, Vector()) / 4
+            if n.dot(mid - ctr) < 0: q.reverse()
+            add_face(B, q, 'thatch', [((p - pe).dot(U) / tu, ((p - pe).dot(up) + (p - pe).dot(nrm)) / tv) for p in q])
+
 def roof(ri):
     x0, x1, y0, y1, al = ri['x0'], ri['x1'], ri['y0'], ri['y1'], ri['along']
     # work in a frame where the ridge runs along +u: (u, v) -> world
@@ -481,29 +554,53 @@ def roof(ri):
     lo_ext = VERGE if 'lo' not in ri['ext'] else 0
     hi_ext = VERGE if 'hi' not in ri['ext'] else 0
     ul, uh = u0 - lo_ext, u1 + hi_ext
-    rm = lambda n: ROOFMAT if n.z > .3 else ('floor' if n.z < -.3 else (ROOFMAT if ROOF == 'thatch' else 'timber'))
+    RF.bm.verts.ensure_lookup_table(); start = len(RF.bm.verts)
+    BOARD = .05
     for sg in (-1, 1):   # the two slopes: sg -1 eave at v0
         ve = vc + sg * (half + OV); ze = ZT - OV * tn
-        ext = RT * tn * .9
-        vr = vc - sg * ext; zrr = zr + ext * tn
-        pe, pr = W(0, ve, ze), W(0, vr, zrr)
-        up = (pr - pe).normalized()
+        pe = W(0, ve, ze)
+        up = (W(0, vc, zr) - pe).normalized()
         nrm = (V * sg * math.sin(PITCH) + Vector((0, 0, math.cos(PITCH)))).normalized()
-        c = (pe + pr) / 2 + nrm * (RT / 2) + U * ((ul + uh) / 2)
-        box(RF, c, U, -up, nrm, (uh - ul) / 2, (pr - pe).length / 2, RT / 2, rm, uv='local')
-        if ROOF == 'thatch':   # a rolled eave: the thatch's thick, rounded lower edge
-            pe2 = pe + nrm * (RT * .5) - up * .02
-            cyl(RF, W(ul, 0, 0) + pe2, W(uh, 0, 0) + pe2, RT * .62, 'thatch', squash=.8)
-        if ROOF != 'thatch':
-            for uu, ext_ in ((ul, lo_ext), (uh, hi_ext)):
-                if not ext_: continue
-                beam(RF, W(uu, ve, ze) + nrm * (RT - .11), W(uu, vc, zr) + nrm * (RT - .11), U, .24, .06)
-    # ridge
-    zc = zr + RT / math.cos(PITCH) - .02
-    rr = .16 if ROOF != 'thatch' else .3
-    d1 = (V + Vector((0, 0, 1))).normalized(); d2 = (-V + Vector((0, 0, 1))).normalized()
-    if ROOF == 'thatch': cyl(RF, W(ul + .05, vc, zc - rr * .45), W(uh - .05, vc, zc - rr * .45), rr * .75, 'thatch', squash=.7)
-    else: box(RF, W((ul + uh) / 2, vc, zc - rr * .3), U, d1, d2, (uh - ul) / 2 + .02, rr / 2, rr / 2, lambda n: 'timber', uv='local')
+        L = (W(0, vc, zr) - pe).length + (RT if ROOF == 'thatch' else .02) * tn
+        if ROOF == 'thatch':
+            thatch_body(RF, pe, up, U, nrm, ul, uh, L, coarse=FAR)
+            continue
+        # boards under the roofing (seen from inside), then the courses (near) or one textured slab (far)
+        c = pe + up * (L / 2) + nrm * (BOARD / 2) + U * ((ul + uh) / 2)
+        rm = lambda n, nrm=nrm: ('floor' if n.dot(nrm) < -.3 else ('timber' if abs(n.dot(nrm)) < .3 else (ROOFMAT if FAR else 'floor')))
+        box(RF, c, U, -up, nrm, (uh - ul) / 2, L / 2, BOARD / 2, rm, uv='local')
+        if not FAR: courses(RF, pe, up, U, nrm, ul, uh, L, ROOFMAT)
+        # fascia board along the eave, bargeboards on the verges
+        fz = Vector((0, 0, 1)); out_ = V * sg
+        box(RF, pe + out_ * .02 + fz * (-.04), U, out_, fz, (uh - ul) / 2 + .03, .025, .13, lambda n: 'timber', uv='local', jit=.8)
+        for uu, ext_ in ((ul, lo_ext), (uh, hi_ext)):
+            if not ext_: continue
+            beam(RF, W(uu, ve, ze) + nrm * .03 - up * .02, W(uu, vc, zr) + nrm * .03, U, .3, .07, jit=.8)
+    # ridge: boards in an inverted V (shingle), round ridge tiles (tile), a thick roll with crossed spars (thatch)
+    zc = zr + (RT if ROOF == 'thatch' else .12) / math.cos(PITCH)
+    if ROOF == 'thatch':
+        cyl(RF, W(ul + .1, vc, zc - .2), W(uh - .1, vc, zc - .2), .34, 'thatch', squash=.62, sides=12)
+        if not FAR:
+            n_ = int((uh - ul - .6) / .7)
+            for i in range(n_ + 1):
+                uu = ul + .3 + i * (uh - ul - .6) / max(1, n_)
+                for sg in (-1, 1):
+                    cyl(RF, W(uu, vc + sg * .32, zc - .3), W(uu - sg * .0, vc - sg * .1, zc + .18), .025, 'timber', sides=5)
+    elif ROOF == 'tile':
+        cyl(RF, W(ul - .02, vc, zc - .04), W(uh + .02, vc, zc - .04), .11, 'tile', squash=.8, sides=8, jit=.85)
+    else:
+        for sg in (-1, 1):
+            d = (V * -sg * math.cos(PITCH) * 0 + Vector((0, 0, 1)))
+            sl = (V * sg * math.cos(PITCH) - Vector((0, 0, math.sin(PITCH)))).normalized()   # down this slope
+            nn = (V * sg * math.sin(PITCH) + Vector((0, 0, math.cos(PITCH)))).normalized()
+            box(RF, W((ul + uh) / 2, vc, zc - .01) + sl * .1 + nn * .02, U, sl, nn, (uh - ul) / 2 + .03, .11, .02, lambda n: 'timber', uv='local', jit=.75)
+    # sag and unevenness (zero at the gable ends, so the gables still meet the roof)
+    RF.bm.verts.ensure_lookup_table()
+    for v in RF.bm.verts[start:]:
+        t = ((v.co - W(0, 0, 0)).dot(U) - ul) / max(1e-3, uh - ul)
+        if not 0 <= t <= 1: continue
+        h = max(0.0, min(1.0, (v.co.z - (ZT - OV * tn)) / max(1e-3, zr - ZT + OV * tn)))
+        v.co.z -= SAG * math.sin(math.pi * t) * (.35 + .65 * h)
     # gables (not at an end that runs into another roof)
     for uu, key, sg in ((u0, 'lo', -1), (u1, 'hi', 1)):
         if key in ri['ext']: continue
@@ -523,20 +620,103 @@ def roof(ri):
             if STYLE != 'plank_barn':
                 beam(RF, P(vc - .08, ZT + (zcol - ZT) * .25), P(vc - hw * .8, ZT + .14), nrm_g, .1, dpt)
                 beam(RF, P(vc + .08, ZT + (zcol - ZT) * .25), P(vc + hw * .8, ZT + .14), nrm_g, .1, dpt)
-            if 'window' and half > 1.6 and SPEC.get('gableWindow', True):
-                place('window_shut' if STYLE == 'plank_barn' else 'window', P(vc, ZT + .3) + nrm_g * .0, nrm_g, (.85, 1, .85), roof=True)
-    ri.update(zr=zr, vc=vc, U=U, V=V, u0=u0, u1=u1, v0=v0, v1=v1)
+            if half > 1.6 and SPEC.get('gableWindow', True) and not (SPEC.get('chimney') and (sg > 0) == (SPEC['chimney'] == 'right')):
+                place('window_shut' if STYLE == 'plank_barn' else 'window', P(vc, ZT + .3), nrm_g, (.85, 1, .85), roof=True)
+    ri.update(zr=zr, vc=vc, U=U, V=V, u0=u0, u1=u1, v0=v0, v1=v1, ul=ul, uh=uh)
 
 for ri in roof_info: roof(ri)
 
 # chimney, dormers, sign, stair on the main roof / walls
 m0 = roof_info[0]
 if SPEC.get('chimney'):
+    # a full stack: a hearth on the ground floor, the breast and stack up through the floors and the roof
+    # (inside on timber houses; outside the gable wall on stone ones, as in the concepts), the chimney
+    # piece only as the top above the roof
     sg = 1 if SPEC['chimney'] == 'right' else -1
-    U, V = m0['U'], m0['V']
-    uu = (m0['u1'] - .7) if sg > 0 else (m0['u0'] + .7)
-    ztop = m0['zr'] + .9; zb = max(ZT - .2, ztop - 2.6 * 1.25)   # stretched at most 1.25x; the foot is hidden in the roof
-    place('chimney', U * uu + V * (m0['vc'] + .25) + Vector((0, 0, zb)), -V, (1, 1, (ztop - zb) / 2.6), roof=True)
+    U, V = m0['U'], m0['V']; vcen = m0['vc']
+    uo = m0['u1'] if sg > 0 else m0['u0']            # the gable wall's outer face
+    ui = uo - sg * T                                  # its inner face
+    WP = lambda u, v, z: U * u + V * v + Vector((0, 0, z))
+    ext = SPEC.get('chimneyOutside', STYLE in ('stone_cottage', 'stone_timber'))
+    ztop = m0['zr'] + .9; zj = ztop - 2.6
+    def column(uc, hu, hv, z0, z1, out=None, quoins=True):
+        box(S, WP(uc, vcen, (z0 + z1) / 2), U, V, UPZ, hu, hv, (z1 - z0) / 2, lambda n: 'fieldstone', jit=.92)
+        if not quoins or out is None: return
+        for sv in (-1, 1):
+            z = z0; i = 0
+            while z < z1 - .05:
+                hq = min(.24, z1 - z); lq = .32 if i % 2 == 0 else .2
+                cu = uc + out * (hu - lq / 2 + .012) if i % 2 == 0 else uc + out * (hu - .1)
+                cv = vcen + sv * (hv - (.1 if i % 2 == 0 else lq / 2) + .012)
+                box(S, WP(cu, cv, z + hq / 2), U, V, UPZ, (lq / 2 if i % 2 == 0 else .1) + .01, (.1 if i % 2 == 0 else lq / 2) + .01, hq / 2 - .006, lambda n: 'quoin', jit=RNG.uniform(.85, 1.05))
+                z += hq; i += 1
+    def hearth(u_face, inward, depth, top):
+        """a fireplace against the wall face at u_face, opening into the room (inward = +-1 along U)"""
+        ow, oh = .78, .82; hw = .66
+        uc = u_face + inward * depth / 2
+        for sv in (-1, 1):   # jambs
+            box(S, WP(uc, vcen + sv * (ow / 2 + (hw - ow / 2) / 2), oh / 2), U, V, UPZ, depth / 2, (hw - ow / 2) / 2, oh / 2, lambda n: 'fieldstone')
+        box(S, WP(uc, vcen, (oh + top) / 2), U, V, UPZ, depth / 2, hw, (top - oh) / 2, lambda n: 'fieldstone')   # above the opening
+        box(S, WP(u_face + inward * .04, vcen, oh / 2), U, V, UPZ, .04, ow / 2, oh / 2, lambda n: 'fieldstone', jit=(.22, .2, .19))   # sooty back
+        box(S, WP(u_face + inward * (depth + .18), vcen, .03), U, V, UPZ, .2 + depth / 2 * 0, hw + .1, .03, lambda n: 'quoin')        # hearth stone
+        beam(S, WP(u_face + inward * (depth + .05), vcen - hw - .06, oh + .06), WP(u_face + inward * (depth + .05), vcen + hw + .06, oh + .06), U * inward, .14, .14)  # mantel
+    if ext:
+        out = sg
+        column(uo + out * .36, .36, .62, 0, ZT - .55, out=out)                       # the breast outside the gable
+        box(S, WP(uo + out * .3, vcen, ZT - .45), U, V, UPZ, .3, .5, .1, lambda n: 'quoin')   # weathering course
+        column(uo + out * .3, .27, .34, ZT - .55, zj + .4, out=out, quoins=False)    # the stack, into the piece
+        hearth(ui, -sg, .32, 1.55)
+        place('chimney', WP(uo + out * .3, vcen, zj), -V, roof=True)
+    else:
+        inn = -sg
+        hearth(ui, inn, .6, H)                                                        # breast + fire, ground storey
+        column(ui + inn * .3, .27, .34, H, zj + .4)                                  # stack through the floors
+        place('chimney', WP(ui + inn * .3, vcen, zj), -V, roof=True)
+
+# ---- life at a distance: seeded from the pieces and a few procedural things ----
+LIFE = SPEC.get('life', {})
+def want(k, p): return LIFE.get(k, RNG.random() < p)
+if DOORS:
+    dloc, dN, dA, dk, do = DOORS[0]
+    if want('porch', .5) and not SPEC.get('porch') and STYLE != 'stone_cottage':
+        place('porch', dloc + dN * (T / 2 + BT) + Vector((0, 0, DH + .55)), dN)
+    if want('bench', .6):   # a plank bench beside the door
+        sd = RNG.choice((-1, 1)); bc = dloc + dA * sd * 1.05 + dN * (T / 2 + .2)
+        box(S, bc + Vector((0, 0, .42)), dA, dN, UPZ, .45, .14, .03, lambda n: 'timber', uv='local', jit=.9)
+        for e in (-1, 1): box(S, bc + dA * e * .36 + Vector((0, 0, .2)), dA, dN, UPZ, .03, .12, .2, lambda n: 'timber', uv='local', jit=.8)
+if WINS and STYLE in ('plaster_timber', 'stone_timber') and want('windowBoxes', .6):
+    for loc, N_, A_, k, kind in WINS:
+        if k == 0 and STYLE == 'stone_timber': continue
+        if RNG.random() < .55: continue
+        c = loc + N_ * (T / 2 + .12) + Vector((0, 0, -.12))
+        box(S, c, A_, N_, UPZ, .33, .09, .07, lambda n: 'timber', uv='local', jit=.85)
+        box(S, c + Vector((0, 0, .1)), A_, N_, UPZ, .3, .08, .05, lambda n: 'thatch', jit=(.28, .5, .2))          # leaves
+        for i in range(5):
+            box(S, c + A_ * RNG.uniform(-.27, .27) + N_ * RNG.uniform(-.05, .05) + Vector((0, 0, .15)), A_, N_, UPZ, .03, .03, .03,
+                lambda n: 'plaster', jit=RNG.choice(((.85, .2, .15), (.95, .8, .3), (.8, .4, .6))))
+lean = LIFE.get('leanto', STYLE in ('plank_barn', 'stone_cottage') and RNG.random() < .8)
+if lean:
+    # a lean-to on posts against the gable wall away from the chimney, over a workbench or a log pile
+    sg = -1 if SPEC.get('chimney') == 'right' else 1
+    U, V = m0['U'], m0['V']; vcen = m0['vc']; uo = m0['u1'] if sg > 0 else m0['u0']
+    WP = lambda u, v, z: U * u + V * v + Vector((0, 0, z))
+    span = min(3.2, (m0['v1'] - m0['v0']) * .7); dep = 1.5; zh = min(ZT - .15, 2.15); zl = zh - .55
+    for sv in (-1, 1): beam(S, WP(uo + sg * dep, vcen + sv * span / 2, 0), WP(uo + sg * dep, vcen + sv * span / 2, zl), U, .14, .14)
+    beam(S, WP(uo + sg * dep, vcen - span / 2 - .1, zl - .07), WP(uo + sg * dep, vcen + span / 2 + .1, zl - .07), U * sg, .14, .14)
+    pe = WP(uo + sg * (dep + .25), vcen, zl - .02 - .25 * (zh - zl) / dep); top = WP(uo, vcen, zh)
+    up = (top - pe).normalized(); nrm = V.cross(up) if V.cross(up).z > 0 else up.cross(V)
+    lm = 'shingle' if ROOF == 'thatch' else ROOFMAT
+    box(RF, pe + up * ((top - pe).length / 2) + nrm * .025, V, -up, nrm.normalized(), span / 2 + .2, (top - pe).length / 2, .025,
+        lambda n, nn=nrm.normalized(): lm if FAR and n.dot(nn) > .3 else 'floor', uv='local')
+    if not FAR: courses(RF, pe, up, V, nrm.normalized(), vcen - span / 2 - .2, vcen + span / 2 + .2, (top - pe).length, lm)
+    if STYLE == 'plank_barn':   # a workbench
+        box(S, WP(uo + sg * .45, vcen, .8), U, V, UPZ, .3, span * .3, .04, lambda n: 'timber', uv='local')
+        for sv in (-1, 1): box(S, WP(uo + sg * .45, vcen + sv * (span * .3 - .06), .4), U, V, UPZ, .25, .04, .4, lambda n: 'timber', uv='local', jit=.8)
+    else:                       # a log pile
+        for row in range(4):
+            for i in range(8 - row):
+                vv = vcen - .75 + (i + row * .5) * .2; zz = .1 + row * .17
+                cyl(S, WP(uo + sg * .2, vv, zz), WP(uo + sg * .85, vv, zz), .09, 'timber', sides=7, jit=RNG.uniform(.7, 1.1))
 for i in range(SPEC.get('dormers', 0)):
     U, V = m0['U'], m0['V']; L = m0['u1'] - m0['u0']
     uu = m0['u0'] + L * (i + 1) / (SPEC['dormers'] + 1)
@@ -597,6 +777,7 @@ srcs = {}
 def piece_src(name):
     if name in srcs: return srcs[name]
     p = os.path.join(PIECES, name + '.glb')
+    if FAR and os.path.exists(os.path.join(PIECES, name + '_lod.glb')): p = os.path.join(PIECES, name + '_lod.glb')
     obs = []
     if os.path.exists(p):
         before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=p)

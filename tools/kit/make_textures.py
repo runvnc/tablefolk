@@ -5,6 +5,7 @@ CC0 plaster_aged from assets/textures/env) to one warm palette and writes work/k
 at 1024 px (the trim strip 1024 x 256), plus a manifest (tileMeters: the size one repeat covers in
 game units, 1 square = 1 unit). Grading: the image is scaled per channel so its mean is the target
 colour (sRGB), then large-scale tone is flattened a little (so repeats do not show).
+Patina roughness is raised to a mean of .78 (it came out ~.3, which made the roofs glossy in Babylon).
   python3 tools/kit/make_textures.py
 """
 import os, glob, json
@@ -22,6 +23,7 @@ SETS = {
     'floor':      ('floor', (112, 82, 58), [2.0, 2.0], .2),
     'siding':     ('siding', (118, 96, 74), [2.0, 2.0], .3),
     'timber':     ('timber', (76, 58, 44), [2.0, .5], .2),
+    'tile':       ('env:clay_roof_tiles', (172, 100, 68), [2.5, 2.5], .3),
 }
 
 
@@ -51,7 +53,10 @@ def main():
         size = (1024, 256) if name == 'timber' else (1024, 1024)
         grade(load(src, 'basecolor'), target, flat).resize(size, Image.LANCZOS).save(f'{OUT}/{name}_color.jpg', quality=92)
         load(src, 'normal').convert('RGB').resize(size, Image.LANCZOS).save(f'{OUT}/{name}_normal.png')
-        load(src, 'roughness').convert('L').resize(size, Image.LANCZOS).save(f'{OUT}/{name}_rough.jpg', quality=92)
+        r = np.asarray(load(src, 'roughness').convert('L'), np.float32) / 255
+        if not src.startswith('env:'):   # Patina's roughness runs low (mean .3: glossy roofs): keep the variation, raise it
+            r = np.clip(.78 + (r - r.mean()) * .8, .5, 1)
+        Image.fromarray((r * 255 + .5).astype(np.uint8)).resize(size, Image.LANCZOS).save(f'{OUT}/{name}_rough.jpg', quality=92)
         man[name] = {'tileMeters': tile, 'source': src if src.startswith('env:') else 'fal-ai/patina/material', 'mean': target}
         print(name, size)
     json.dump(man, open(f'{OUT}/manifest.json', 'w'), indent=1)

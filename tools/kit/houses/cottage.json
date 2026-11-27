@@ -1,7 +1,17 @@
-{"name": "cottage", "seed": 3, "style": "stone_cottage", "storeys": 1,
- "grid": ["######",
-          "#....#",
-          "#....#",
-          "#....#",
-          "##+###"],
- "roof": "thatch", "pitch": 52, "chimney": "left", "gableWindow": false}
+{
+ "name": "cottage",
+ "seed": 3,
+ "style": "stone_cottage",
+ "storeys": 1,
+ "grid": [
+  "######",
+  "#....#",
+  "#....#",
+  "#....#",
+  "##+###"
+ ],
+ "roof": "thatch",
+ "pitch": 52,
+ "chimney": "right",
+ "gableWindow": false
+}
