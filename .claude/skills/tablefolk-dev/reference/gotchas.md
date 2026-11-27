@@ -111,3 +111,12 @@ in the code.
   ed25519 key). Commits need `-c user.name=... -c user.email=...` (no global
   identity on this machine).
 - Don't `rm -rf tools/browser-test/tmp`: it holds the tracked `gltf.html`.
+
+- **Shared materials and `disposeCharacter`** (2026-11-27): it disposes the
+  materials of a character's child meshes unless they are in
+  `state.materials`. The contact shadow's material (`state.contactShadowMat`)
+  is shared by every character; disposed with one, its opacity texture went
+  and every other shadow drew as a white disc. Keep any material shared
+  between characters out of that loop (it is listed there now), or in
+  `state.materials`.
+

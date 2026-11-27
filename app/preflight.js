@@ -52,7 +52,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261127b'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261127g'],
+    ['app.js?v=20261127h'],
     ['bodies.js?v=20261120c'],
     ['scenery.js?v=20261121a'],
     ['combat.js?v=20261120b'],

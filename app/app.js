@@ -5074,7 +5074,7 @@ function figClipName(n){
 // its rugs and runes. One shared texture and material.
 function contactShadow(g,h){
   const sc=state.scene;
-  if(!state.contactShadowMat){
+  if(!state.contactShadowMat || state.contactShadowMat._isDisposed || !state.contactShadowMat.opacityTexture?.getInternalTexture?.()){
     const S=128, tex=new BABYLON.DynamicTexture('contact_shadow_tex',S,sc,false), c=tex.getContext(), gr=c.createRadialGradient(S/2,S/2,0,S/2,S/2,S/2);
     gr.addColorStop(0,'rgba(0,0,0,.82)'); gr.addColorStop(.35,'rgba(0,0,0,.6)'); gr.addColorStop(.7,'rgba(0,0,0,.22)'); gr.addColorStop(1,'rgba(0,0,0,0)');
     c.fillStyle=gr; c.fillRect(0,0,S,S); tex.hasAlpha=true; tex.update();
@@ -5535,7 +5535,9 @@ function disposeCharacter(g){
   for (const m of o?.meshes||[]) { try{ if(!m.isDisposed()) m.dispose(false,false); }catch{} }
   for (const sk of o?.skeletons||[]) { try{ sk.dispose(); }catch{} }
   for (const mt of morphs) { try{ mt.dispose(); }catch{} }
-  const shared=new Set(Object.values(state.materials||{}));
+  // (the contact shadow's material is shared by everyone: disposing it with one character turned every other one's
+  // shadow into a white disc, its opacity texture gone; seen in the God game after a beast left, 2026-11-27)
+  const shared=new Set([...Object.values(state.materials||{}), state.contactShadowMat].filter(Boolean));
   for (const m of mats) { if(!shared.has(m)) disposeOwnMaterial(m); }
 }
 function clearWorld() {
