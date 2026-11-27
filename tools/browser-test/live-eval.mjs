@@ -92,9 +92,11 @@ const ctx = b.contexts()[0];
 const page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close().catch(() => {});
 const T0 = Date.now(), ts = () => +((Date.now() - T0) / 1000).toFixed(1);
-const raws = [], errors = [];
+const raws = [], errors = [], engine = [];
 page.on('console', m => {
   const t = m.text();
+  // the llama.cpp engines' own lines (prefix reads, timings: tokens read / reused / written and their speeds), saved as "engine"
+  if (/\[tablefolk-wllama3\] (prefix read|llama\.cpp timings|RAW OUTPUT)/.test(t)) engine.push(ts() + ' ' + t.replace(/\s+/g, ' ').slice(0, 300));
   const r = t.match(/RAW LLM OUTPUT for agent (\S+) at \S+ elapsed ms: (\d+) : ([\s\S]*)$/);
   if (r && !r[1].includes('~')) raws.push({ t: ts(), agent: r[1], ms: +r[2], raw: r[3] });
   if (m.type() === 'error' && !/Failed to load resource|favicon/.test(t)) errors.push(ts() + ' ' + t.slice(0, 300));
@@ -371,7 +373,7 @@ fs.mkdirSync('results', { recursive: true });
 const shown = [];
 for (const l of transcript) { const body = l.replace(/^\[[^\]]*\]\s*(\d\d:\d\d\s+)?/, ''), prev = shown.at(-1); if (prev && prev.body === body && !/: "/.test(body)) { prev.n++; continue; } shown.push({ l, body, n: 1 }); }
 fs.writeFileSync(`results/live-${name}-${label}-transcript.txt`, shown.map(x => x.n > 1 ? `${x.l} (x${x.n})` : x.l).join('\n') + '\n');
-fs.writeFileSync(out, JSON.stringify({ summary, url, agents, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors, activity: extra.activity, plans: extra.plans, agency: extra.agency, calls: extra.calls, capTurns: extra.turns, samples: extra.samples, levels: extra.levels, agencyStats: extra.agencyStats }, null, 1));
+fs.writeFileSync(out, JSON.stringify({ engine, summary, url, agents, day: dayCap, transcript, turns, says: cap.says, hist, prompts: cap.prompts, minds, prov, errors, activity: extra.activity, plans: extra.plans, agency: extra.agency, calls: extra.calls, capTurns: extra.turns, samples: extra.samples, levels: extra.levels, agencyStats: extra.agencyStats }, null, 1));
 console.log('saved', out);
 await page.close().catch(() => {}); await b.close().catch(() => {});
 process.exit(0);
