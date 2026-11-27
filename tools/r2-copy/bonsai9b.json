@@ -1,0 +1,3 @@
+[
+  { "repo": "prism-ml/Ternary-Bonsai-2-9B-gguf", "rev": "82265ccc78ddaac4700286a35e9badcc32376dd9", "dest": "bonsai/hf/", "include": "^Ternary-Bonsai-2-9B-PTQ1_0\\.gguf$" }
+]
