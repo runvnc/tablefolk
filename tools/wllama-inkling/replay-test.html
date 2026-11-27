@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Inkling replay bench</title></head>
+<body><pre id="log"></pre>
+<script type="module">
+// Bench page for the record-and-replay work (brains.md, "Inkling 2 Mini in the game, faster turns"): served from the
+// wllama checkout like inkling-test.html (crun.sh), the GGUF beside it as m.gguf, real game prompts in prompts.json
+// (a list of strings, Inkling's own message tokens, taken from a game day with ?wdump=1).
+//   ?wasm=NAME (src/wasm/NAME.wasm) &ub=512 &ckpt=0 &par=4 &n=96 (tokens written greedily) &reads=6 (prompts read)
+//   &prefix=1 (with &ckpt=1 and the server-checkpoints.patch build: each prompt's first 2,700 characters (the turn
+//   rules) read by a request of its own that leaves a checkpoint, the prompt with checkpoints:false in the same slot;
+//   the turn prompts come again in a second round, which should then read only past the rules)
+// Prints INK {...} lines: per prompt read tokens / ms / tok/s, written tokens / tok/s and the text (to compare builds).
+import { Wllama } from '/esm/index.js';
+const q = new URLSearchParams(location.search);
+const out = (o) => { const s = 'INK ' + JSON.stringify(o); console.log(s); document.getElementById('log').textContent += s + '\n'; };
+try {
+  const prompts = await (await fetch('/prompts.json')).json();
+  const w = new Wllama({ default: '/src/wasm/' + (q.get('wasm') || 'fast') + '.wasm' });
+  const t0 = performance.now();
+  const ub = +(q.get('ub') || 512);
+  await w.loadModelFromUrl(location.origin + '/' + (q.get('model') || 'm.gguf'), {
+    n_ctx: +(q.get('ctx') || 8192), n_batch: ub, n_ubatch: ub, flash_attn: true, n_gpu_layers: 999,
+    n_ctx_checkpoints: +(q.get('ckpt') || 0), ...(q.get('par') ? { n_parallel: +q.get('par') } : {}),
+  });
+  out({ loaded_s: ((performance.now() - t0) / 1000).toFixed(1) });
+  const stop = ['<|end_message|>', '<|content_model_end_sampling|>', '<|message_'];
+  const call = async (prompt, n, extra = {}) => {
+    const t = performance.now();
+    const r = await w.createCompletion({ prompt, max_tokens: n, temperature: 0, top_k: 1, seed: 1, cache_prompt: true, stop, ...extra });
+    const tm = r.timings || {};
+    return { wall_ms: Math.round(performance.now() - t), read: tm.prompt_n, cache: tm.cache_n, read_ms: Math.round(tm.prompt_ms || 0),
+      read_tps: +(tm.prompt_per_second || 0).toFixed(1), wrote: tm.predicted_n, write_tps: +(tm.predicted_per_second || 0).toFixed(1),
+      slot: r.id_slot, keys: Object.keys(r).join(','), text: (r.choices?.[0]?.text || '').slice(0, 200) };
+  };
+  // reading: distinct prompts (no shared cache), 1 token written
+  const reads = +(q.get('reads') || 6);
+  for (let i = 0; i < Math.min(reads, prompts.length); i++) {
+    if (q.get('prefix') === '1') {
+      for (const round of [0, 1]) {
+        const p = prompts[i], cut = p.lastIndexOf('\n', 2700) + 1;
+        const a = await call(p.slice(0, cut), 1, { checkpoints: true });
+        const b = await call(p, 1, { checkpoints: false, ...(Number.isInteger(a.slot) ? { id_slot: a.slot } : {}) });
+        out({ read: i, round, chars: p.length, prefix: a, rest: b });
+      }
+    } else out({ read: i, chars: prompts[i].length, ...(await call(prompts[i], 1)) });
+  }
+  // two characters at once (n_seqs batching): the two write prompts started together, against one after the other
+  if (q.get('both') === '1') {
+    const n2 = +(q.get('n') || 96), ps = [prompts[1], prompts[3]];
+    for (const p of ps) await call(p, 1);   // both prompts cached in their slots first
+    let t = performance.now();
+    const seq = []; for (const p of ps) seq.push(await call(p, n2, { stop: [] }));
+    const seq_ms = performance.now() - t;
+    t = performance.now();
+    const par = await Promise.all(ps.map(p => call(p, n2, { stop: [] })));
+    const par_ms = performance.now() - t;
+    out({ both: true, seq_ms: Math.round(seq_ms), par_ms: Math.round(par_ms), seq: seq.map(r => [r.wrote, r.write_tps, r.read]), par: par.map(r => [r.wrote, r.write_tps, r.read]),
+      same_text: seq.map((r, i) => r.text === par[i].text) });
+  }
+  // writing: greedy, n tokens, each prompt twice (the second time its prompt is cached: mostly decode)
+  const n = +(q.get('n') || 96);
+  for (const i of [0, 1]) {
+    const p = prompts[i % prompts.length] + (q.get('long') === '1' ? '' : '');
+    out({ write: i, ...(await call(p, n, { stop: [] })) });
+  }
+  out({ done: true });
+} catch (e) { out({ error: String(e?.stack || e) }); }
+</script></body></html>

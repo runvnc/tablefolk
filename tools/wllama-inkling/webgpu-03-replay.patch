@@ -1,0 +1,352 @@
+diff --git a/ggml/src/ggml-webgpu/ggml-webgpu.cpp b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+index a7feb08..a3a97a6 100644
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -193,7 +193,8 @@ struct webgpu_stats {
+     int      every = 0;  // 0 = off
+     uint64_t graphs = 0, nodes = 0, dispatches = 0, bind_groups = 0, bind_group_hits = 0, param_writes = 0,
+              param_bytes = 0, submits = 0, set_tensors = 0, get_tensors = 0, memsets = 0, pipeline_sets = 0, syncs = 0,
+-             fused[16] = {}, fused_nodes = 0;
++             fused[16] = {}, fused_nodes = 0, replays = 0, records = 0;
++    double   sig_ms = 0, replay_ms = 0;
+     double   encode_ms = 0, submit_ms = 0, get_ms = 0, set_ms = 0, gap_ms = 0, compute_ms = 0, sync_ms = 0;
+     std::chrono::steady_clock::time_point last_end;
+     bool     have_last = false;
+@@ -212,6 +213,11 @@ struct webgpu_stats {
+             bind_group_hits / g, param_writes / g, param_bytes / g, submits / g, set_tensors / g, set_ms / g,
+             get_tensors / g, get_ms / g, memsets / g, syncs / g, compute_ms / g, encode_ms / g, submit_ms / g, gap_ms / g,
+             sync_ms / g);
++        if (replays || records) {
++            GGML_LOG_INFO("ggml_webgpu stats: replayed %llu of %llu graphs (%llu recorded) | ms per graph: signature %.2f replay %.2f\n",
++                          (unsigned long long) replays, (unsigned long long) graphs, (unsigned long long) records, sig_ms / g,
++                          replays ? replay_ms / (double) replays : 0.0);
++        }
+         if (fused_nodes) {
+             std::string f;
+             for (int i = 0; i < 16; i++) {
+@@ -257,6 +263,7 @@ struct webgpu_global_context_struct {
+     webgpu_stats stats;
+     bool         bind_group_cache_on = true;
+     std::unordered_map<webgpu_bind_group_key, wgpu::BindGroup, webgpu_bind_group_key_hash> bind_group_cache;
++    uint64_t     buffer_gen = 0;  // bumped when a buffer is freed: recorded graphs (replay) made before are stale
+ 
+     wgpu::Instance instance;
+     wgpu::Adapter  adapter;
+@@ -326,6 +333,36 @@ struct webgpu_global_context_struct {
+ 
+ typedef std::shared_ptr<webgpu_global_context_struct> webgpu_global_context;
+ 
++// Record and replay (webgpu-03-replay.patch): a decode graph is the same every token (same nodes, shapes, strides,
++// buffers, offsets, op parameters), so its dispatches are too. The second time a big graph's signature comes in a
++// row, its encoding is recorded (pipelines, bind groups, workgroup counts, with the parameters in the recording's own
++// uniform buffer); from then on a graph with that signature is replayed: no graph walk, no parameter building, no
++// bind-group lookups, no parameter writes, only SetPipeline/SetBindGroup/Dispatch and the submits.
++struct webgpu_replay_cmd {
++    WGPUComputePipeline pipeline;
++    wgpu::BindGroup     bind_group;
++    uint32_t            wg_x, wg_y;
++};
++
++struct webgpu_recording {
++    uint64_t                       sig      = 0;
++    uint64_t                       gen      = 0;
++    uint64_t                       last_use = 0;
++    bool                           valid    = false;
++    wgpu::Buffer                   params;  // kept for the context's life: cached bind groups name it
++    std::vector<webgpu_replay_cmd> cmds;
++};
++
++#ifndef GGML_WEBGPU_REPLAY
++#    define GGML_WEBGPU_REPLAY 1
++#endif
++#ifndef GGML_WEBGPU_REPLAY_BATCH
++#    define GGML_WEBGPU_REPLAY_BATCH 0  // kernels a submit when replaying; 0 = the normal submit batch
++#endif
++#define WEBGPU_REPLAY_SLOTS     8u      // recordings kept
++#define WEBGPU_REPLAY_MAX_CMDS  8192u   // parameter slots a recording has (dispatches in one graph)
++#define WEBGPU_REPLAY_MIN_NODES 256
++
+ // All the base objects needed to run operations on a WebGPU device
+ struct webgpu_context_struct {
+     // Points to global instances owned by ggml_backend_webgpu_reg_context
+@@ -339,6 +376,17 @@ struct webgpu_context_struct {
+     size_t                   param_staging_end   = 0;
+     bool                     param_batch_write   = true;
+     WGPUComputePipeline      last_pipeline       = nullptr;  // in the active compute pass
++    // record and replay
++    bool                          replay_on    = false;
++    uint32_t                      replay_batch = 0;
++    std::vector<webgpu_recording> recs;
++    webgpu_recording *            rec          = nullptr;  // being recorded now
++    uint32_t                      rec_next     = 0;        // its next parameter slot
++    std::vector<uint8_t>          rec_staging;
++    size_t                        rec_flushed = 0, rec_end = 0;
++    bool                          rec_failed  = false;
++    uint64_t                      last_sig = 0, use_clock = 0;
++    uint64_t                      last_dispatches = 0;
+     // fused chains (ggml-webgpu-fuse.hpp)
+     uint32_t                                 fuse_mask = 0;
+     std::unordered_map<int, webgpu_pipeline>         fuse_pipelines;
+@@ -703,17 +751,30 @@ static webgpu_encoded_op ggml_backend_webgpu_build_multi(webgpu_context &
+     webgpu_encoded_op            result = {};
+     std::vector<wgpu::BindGroup> bind_groups;
+     std::vector<size_t>          param_offsets;
++    std::vector<bool>            param_in_rec;
+     result.num_kernels = dispatches.size();
+ 
+     webgpu_global_context & g = ctx->global_ctx;
+     for (size_t i = 0; i < dispatches.size(); i++) {
+         const webgpu_dispatch_desc & dispatch     = dispatches[i];
+         const size_t                 param_size   = dispatch.params.size() * sizeof(uint32_t);
+-        const size_t                 param_offset = ctx->param_arena.alloc_slot(param_size);
++        size_t                       param_offset;
++        wgpu::Buffer                 param_buf;
++        if (ctx->rec && ctx->rec_next < WEBGPU_REPLAY_MAX_CMDS) {
++            GGML_ASSERT(param_size <= ctx->param_arena.slot_size);
++            param_offset = (size_t) ctx->rec_next++ * ctx->param_arena.slot_stride;
++            param_buf    = ctx->rec->params;
++        } else {
++            if (ctx->rec) {
++                ctx->rec_failed = true;  // more dispatches than a recording holds: this one is not replayed
++            }
++            param_offset = ctx->param_arena.alloc_slot(param_size);
++            param_buf    = ctx->param_arena.buffer;
++        }
+ 
+         std::vector<wgpu::BindGroupEntry> entries            = dispatch.bind_group_entries;
+         uint32_t                          params_binding_num = entries.size();
+-        entries.push_back(ggml_webgpu_make_bind_group_entry(params_binding_num, ctx->param_arena.buffer, param_offset,
++        entries.push_back(ggml_webgpu_make_bind_group_entry(params_binding_num, param_buf, param_offset,
+                                                             ctx->param_arena.slot_size));
+ 
+         wgpu::BindGroup bind_group;
+@@ -750,11 +811,19 @@ static webgpu_encoded_op ggml_backend_webgpu_build_multi(webgpu_context &
+         }
+         bind_groups.push_back(bind_group);
+         param_offsets.push_back(param_offset);
++        param_in_rec.push_back(param_buf.Get() != ctx->param_arena.buffer.Get());
+     }
+ 
+     for (size_t i = 0; i < param_offsets.size(); i++) {
+         const size_t n = dispatches[i].params.size() * sizeof(uint32_t);
+-        if (ctx->param_batch_write) {
++        if (param_in_rec[i]) {
++            // the recording's parameters, written before each of its batches is submitted
++            if (ctx->rec_staging.size() < param_offsets[i] + ctx->param_arena.slot_stride) {
++                ctx->rec_staging.resize((size_t) WEBGPU_REPLAY_MAX_CMDS * ctx->param_arena.slot_stride);
++            }
++            memcpy(ctx->rec_staging.data() + param_offsets[i], dispatches[i].params.data(), n);
++            ctx->rec_end = std::max(ctx->rec_end, param_offsets[i] + ROUNDUP_POW2(n, 4));
++        } else if (ctx->param_batch_write) {
+             // staged; ggml_backend_webgpu_flush_params writes the batch before it is submitted
+             if (ctx->param_staging.size() < param_offsets[i] + n) {
+                 ctx->param_staging.resize(ctx->param_arena.slot_stride * ctx->param_arena.slot_count);
+@@ -801,6 +870,10 @@ static webgpu_encoded_op ggml_backend_webgpu_build_multi(webgpu_context &
+             ctx->active_compute_pass.SetBindGroup(0, bind_groups[i]);
+             ctx->active_compute_pass.DispatchWorkgroups(dispatches[i].workgroups.first, dispatches[i].workgroups.second,
+                                                         1);
++            if (ctx->rec) {
++                ctx->rec->cmds.push_back({ dispatches[i].pipeline.pipeline.Get(), bind_groups[i],
++                                           dispatches[i].workgroups.first, dispatches[i].workgroups.second });
++            }
+         } else {
+             wgpu::ComputePassEncoder pass = ctx->active_command_encoder.BeginComputePass();
+             pass.SetPipeline(dispatches[i].pipeline.pipeline);
+@@ -4098,6 +4171,13 @@ static void ggml_backend_webgpu_check_set_rows(webgpu_context & ctx, uint32_t &
+ 
+ // Writes the staged parameters of the current batch with one WriteBuffer (queued before the batch's submit).
+ static void ggml_backend_webgpu_flush_params(webgpu_context & ctx) {
++    if (ctx->rec && ctx->rec_end > ctx->rec_flushed) {
++        ctx->global_ctx->queue.WriteBuffer(ctx->rec->params, ctx->rec_flushed, ctx->rec_staging.data() + ctx->rec_flushed,
++                                           ctx->rec_end - ctx->rec_flushed);
++        ctx->global_ctx->stats.param_writes++;
++        ctx->global_ctx->stats.param_bytes += ctx->rec_end - ctx->rec_flushed;
++        ctx->rec_flushed = ctx->rec_end;
++    }
+     if (ctx->param_staging_end > 0) {
+         ctx->global_ctx->queue.WriteBuffer(ctx->param_arena.buffer, 0, ctx->param_staging.data(), ctx->param_staging_end);
+         ctx->global_ctx->stats.param_writes++;
+@@ -4116,6 +4196,77 @@ static void ggml_backend_webgpu_submit_batch(webgpu_context & ctx, uint32_t & nu
+     st.submit_ms += webgpu_stats::ms_since(t0);
+ }
+ 
++// Everything a graph's encoding depends on: per node its op, flags, type, shape, strides, buffer and offset, op
++// parameters, and the same for each source (sources by content, not by pointer: a rebuilt graph with the same
++// tensors in the same places matches).
++static uint64_t ggml_webgpu_graph_sig(const ggml_cgraph * g) {
++    uint64_t h   = 0x243f6a8885a308d3ull ^ (uint64_t) g->n_nodes;
++    auto     mix = [&h](uint64_t v) {
++        h = (h ^ v) * 0x9e3779b97f4a7c15ull;
++        h ^= h >> 31;
++    };
++    auto tensor = [&mix](const ggml_tensor * t) {
++        const ggml_tensor * b = t->view_src ? t->view_src : t;
++        mix((uint64_t) (uintptr_t) b->buffer);
++        mix((uint64_t) ((uintptr_t) b->data + t->view_offs));
++        mix((uint64_t) t->type | ((uint64_t) (t->view_src != nullptr) << 32));
++        for (int k = 0; k < GGML_MAX_DIMS; k++) {
++            mix((uint64_t) t->ne[k]);
++            mix((uint64_t) t->nb[k]);
++        }
++    };
++    for (int i = 0; i < g->n_nodes; i++) {
++        const ggml_tensor * n = g->nodes[i];
++        mix((uint64_t) n->op | ((uint64_t) n->flags << 16));
++        tensor(n);
++        const uint32_t * op = (const uint32_t *) n->op_params;
++        for (size_t k = 0; k < GGML_MAX_OP_PARAMS / sizeof(uint32_t); k += 2) {
++            mix((uint64_t) op[k] | ((uint64_t) op[k + 1] << 32));
++        }
++        for (int j = 0; j < GGML_MAX_SRC; j++) {
++            if (n->src[j]) {
++                mix(0x100 + j);
++                tensor(n->src[j]);
++            }
++        }
++    }
++    return h;
++}
++
++static void ggml_backend_webgpu_replay(webgpu_context & ctx, const webgpu_recording & r) {
++    webgpu_global_context & g   = ctx->global_ctx;
++    const uint32_t          per = ctx->replay_batch ? ctx->replay_batch : g->command_submit_batch_size;
++    uint32_t                inflight = 0, in_batch = 0;
++    WGPUComputePipeline     last = nullptr;
++    wgpu::CommandEncoder     enc  = g->device.CreateCommandEncoder();
++    wgpu::ComputePassEncoder pass = enc.BeginComputePass();
++    WGPUComputePassEncoder   p    = pass.Get();
++    const size_t             n    = r.cmds.size();
++    for (size_t i = 0; i < n; i++) {
++        const webgpu_replay_cmd & c = r.cmds[i];
++        if (c.pipeline != last) {
++            wgpuComputePassEncoderSetPipeline(p, c.pipeline);
++            last = c.pipeline;
++        }
++        wgpuComputePassEncoderSetBindGroup(p, 0, c.bind_group.Get(), 0, nullptr);
++        wgpuComputePassEncoderDispatchWorkgroups(p, c.wg_x, c.wg_y, 1);
++        if (++in_batch >= per && i + 1 < n) {
++            pass.End();
++            ggml_backend_webgpu_submit_commands(ctx, enc.Finish(), inflight);
++            g->stats.submits++;
++            enc      = g->device.CreateCommandEncoder();
++            pass     = enc.BeginComputePass();
++            p        = pass.Get();
++            last     = nullptr;
++            in_batch = 0;
++        }
++    }
++    pass.End();
++    ggml_backend_webgpu_submit_commands(ctx, enc.Finish(), inflight);
++    g->stats.submits++;
++    g->stats.dispatches += n;
++}
++
+ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+     WEBGPU_LOG_DEBUG("ggml_backend_webgpu_graph_compute(" << cgraph->n_nodes << " nodes)");
+ 
+@@ -4181,6 +4332,70 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+ 
+     WEBGPU_CPU_PROFILE_TOTAL_START(graph_compute);
+ 
++    // record and replay (see webgpu_recording)
++    ctx->rec = nullptr;
++    if (ctx->replay_on && cgraph->n_nodes >= WEBGPU_REPLAY_MIN_NODES) {
++        const auto     t_sig = std::chrono::steady_clock::now();
++        const uint64_t sig   = ggml_webgpu_graph_sig(cgraph);
++        st.sig_ms += webgpu_stats::ms_since(t_sig);
++        webgpu_recording * hit = nullptr;
++        for (auto & r : ctx->recs) {
++            if (r.valid && r.sig == sig && r.gen == ctx->global_ctx->buffer_gen) {
++                hit = &r;
++            }
++        }
++        if (hit) {
++            const auto t_rep = std::chrono::steady_clock::now();
++            hit->last_use    = ++ctx->use_clock;
++            ggml_backend_webgpu_replay(ctx, *hit);
++            st.replays++;
++            st.replay_ms += webgpu_stats::ms_since(t_rep);
++            ctx->last_sig = sig;
++            const double total_ms = webgpu_stats::ms_since(t_start);
++            st.graphs++;
++            st.nodes += cgraph->n_nodes;
++            st.compute_ms += total_ms;
++            st.encode_ms += total_ms;
++            st.last_end  = std::chrono::steady_clock::now();
++            st.have_last = true;
++            if (st.every > 0 && st.graphs >= (uint64_t) st.every) {
++                st.encode_ms -= st.submit_ms;
++                st.print_and_reset();
++            }
++            return GGML_STATUS_SUCCESS;
++        }
++        if (sig == ctx->last_sig && ctx->last_dispatches <= WEBGPU_REPLAY_MAX_CMDS) {
++            // the second time in a row: record this one (the least recently used slot)
++            if (ctx->recs.size() < WEBGPU_REPLAY_SLOTS) {
++                ctx->recs.emplace_back();
++                ggml_webgpu_create_buffer(ctx->global_ctx->device, ctx->recs.back().params,
++                                          (size_t) WEBGPU_REPLAY_MAX_CMDS * ctx->param_arena.slot_stride,
++                                          wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform, "ggml_webgpu_replay_params");
++            }
++            webgpu_recording * slot = &ctx->recs[0];
++            for (auto & r : ctx->recs) {
++                if (!r.valid || r.gen != ctx->global_ctx->buffer_gen) {
++                    slot = &r;
++                    break;
++                }
++                if (r.last_use < slot->last_use) {
++                    slot = &r;
++                }
++            }
++            slot->valid = false;
++            slot->sig   = sig;
++            slot->gen   = ctx->global_ctx->buffer_gen;
++            slot->cmds.clear();
++            ctx->rec         = slot;
++            ctx->rec_next    = 0;
++            ctx->rec_flushed = 0;
++            ctx->rec_end     = 0;
++            ctx->rec_failed  = false;
++        }
++        ctx->last_sig = sig;
++    }
++    const uint64_t dispatches_before = st.dispatches;
++
+     uint32_t num_batched_kernels  = 0;
+     uint32_t num_inflight_batches = 0;
+     bool     contains_set_rows    = false;
+@@ -4259,6 +4474,14 @@ static ggml_status ggml_backend_webgpu_graph_compute(ggml_backend_t backend, str
+         ggml_backend_webgpu_check_set_rows(ctx, num_inflight_batches);
+     }
+ 
++    ctx->last_dispatches = st.dispatches - dispatches_before;
++    if (ctx->rec) {
++        ctx->rec->valid    = !ctx->rec_failed && ctx->rec->cmds.size() == ctx->last_dispatches;
++        ctx->rec->last_use = ++ctx->use_clock;
++        st.records += ctx->rec->valid;
++        ctx->rec = nullptr;
++    }
++
+     WEBGPU_CPU_PROFILE_TOTAL_END(graph_compute, ctx->global_ctx);
+ 
+     const double total_ms = webgpu_stats::ms_since(t_start);
+@@ -4390,6 +4613,7 @@ static void ggml_backend_webgpu_buffer_free_buffer(ggml_backend_buffer_t buffer)
+     ggml_backend_webgpu_buffer_context * ctx = static_cast<ggml_backend_webgpu_buffer_context *>(buffer->context);
+     if (ctx != nullptr && ctx->buffer != nullptr) {
+         ctx->global_ctx->bind_group_cache.clear();  // cached bind groups may name this buffer
++        ctx->global_ctx->buffer_gen++;              // and so may recorded graphs
+         ctx->buffer.Destroy();
+         delete ctx;
+     }
+@@ -5172,6 +5396,11 @@ static webgpu_context initialize_webgpu_context(ggml_backend_dev_t dev) {
+     webgpu_ctx->shader_lib = std::make_unique<ggml_webgpu_shader_lib>(dev_ctx->webgpu_global_ctx->device);
+     webgpu_ctx->param_batch_write =
+         ggml_webgpu_env_int("GGML_WEBGPU_PARAM_BATCH_WRITE", GGML_WEBGPU_PARAM_BATCH_WRITE) != 0;
++    webgpu_ctx->replay_on    = ggml_webgpu_env_int("GGML_WEBGPU_REPLAY", GGML_WEBGPU_REPLAY) != 0;
++    webgpu_ctx->replay_batch = (uint32_t) std::max(0, ggml_webgpu_env_int("GGML_WEBGPU_REPLAY_BATCH", GGML_WEBGPU_REPLAY_BATCH));
++#ifdef GGML_WEBGPU_GPU_PROFILE
++    webgpu_ctx->replay_on = false;
++#endif
+     webgpu_ctx->fuse_mask = ggml_webgpu_env_int("GGML_WEBGPU_FUSE", GGML_WEBGPU_FUSE) == 0 ? 0u :
+                             (uint32_t) ggml_webgpu_env_int("GGML_WEBGPU_FUSE_MASK", 0xffff);
+     webgpu_ctx->param_arena.init(
