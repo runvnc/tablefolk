@@ -1,34 +1,71 @@
 <!doctype html><meta charset="utf-8"><title>Decider test</title>
 <pre id="out">loading…</pre>
 <script type="module">
-// The Strands Decider in the browser (app/llm_js/decider.js) on the menu cases.
-// ?local=1 loads the GGUF and head from /work/decider/ (a copy of the files, not
-// in git) instead of Hugging Face. window.result has the answers.
-import { loadDecider } from '/libs/decider/index.js';
+// The Strands Decider in the browser (libs/decider) on the menu cases and a few yes/no items.
+// ?local=1 loads the GGUF and head from /work/decider/ (a copy of the files, not in git) instead of
+// Hugging Face, without wllama's model cache. ?engine=embeddings: the old way (a forward per option);
+// ?lib=<url>: another copy of the library (e.g. the old one); ?gpu=N GPU layers; ?n=N first N menu cases;
+// ?short=1 shorter states; ?reps=N repeats of the timing loop. window.result has the answers.
 const q = new URLSearchParams(location.search), out = document.getElementById('out'), log = [];
-const say = t => { log.push(t); out.textContent = log.join('\n'); console.log(t); };
-const opts = q.has('local') ? { ggufUrl: location.origin + '/work/decider/strands-decider-2B-qwen3.5-v1-2610-Q8_0.gguf', headUrl: '/work/decider/decider-head.safetensors' } : {};
+const { loadDecider } = await import(q.get('lib') || '/libs/decider/index.js');
+const say = t => { log.push(t); out.textContent = log.join('\n'); console.log('DEC ' + t); };
+const opts = q.has('local') ? { ggufUrl: location.origin + '/work/decider/strands-decider-2B-qwen3.5-v1-2610-Q8_0.gguf', headUrl: '/work/decider/decider-head.safetensors', useCache: false } : {};
 if (q.has('gpu')) opts.gpuLayers = +q.get('gpu');
+if (q.has('engine')) opts.engine = q.get('engine');
+try {
 const t0 = performance.now();
 const d = await loadDecider(s => { out.textContent = log.join('\n') + '\n' + s; }, opts);
-say(`loaded in ${Math.round(performance.now() - t0)} ms`);
+window.decider = d;
+say(`loaded in ${Math.round(performance.now() - t0)} ms (${d.engine || 'embeddings'})`);
+if (q.has('load')) { window.result = { loaded: true }; throw 'loaded only (?load=1)'; }
 const ITEMS = { buy: 'Buy a sword (30 gold)', wolves: 'Ask about the wolves', repair: 'Get my armour repaired', hit: 'Attack her', bye: 'Leave', none: 'None of these: the player wants something else' };
 const CASES0 = [['can you fix my armor', 'repair'], ['I need a new blade', 'buy'], ["what's going on with those beasts in the forest", 'wolves'], ['goodbye then', 'bye'],
   ["let's fight", 'hit'], ['how much for a weapon', 'buy'], ['my chainmail is dented', 'repair'], ['heard anything about the howling at night?', 'wolves'],
   ['what is the weather like', 'none'], ['do you sell potions', 'none'], ['tell me a joke', 'none'], ['I have to go now', 'bye'],
   ['the second one', 'wolves'], ['I will take the blade', 'buy'], ['never mind, see you', 'bye'], ['can I buy a shield', 'none'], ['die, smith!', 'hit'], ['those wolves took my sheep', 'wolves']];
 const CASES = q.has('n') ? CASES0.slice(0, +q.get('n')) : CASES0; const results = []; let ok = 0;
+// warm-up (first-use shader compiles), not counted
+await d.decide('A warm-up.', { w: { type: 'choice', instructions: 'Pick one.', criteria: { a: 'the first', b: 'the second' } } });
 for (const [text, want] of CASES) {
-  // ?short=1: the menu's question and the player's words only (the options carry the choices)
   const state = q.has('short') ? `Brakka the smith asks: "What do you need, traveller?"\nThe player said: "${text}"`
     : 'A game menu. Brakka the smith asks: "What do you need, traveller?" The choices are: ' + Object.values(ITEMS).slice(0, -1).map((v, i) => `${i + 1}. ${v}`).join('; ') + `.\nThe player said: "${text}"`;
   const t = performance.now();
   const r = (await d.decide(state, { pick: { type: 'choice', instructions: 'Which choice did the player pick with what they said?', criteria: ITEMS } })).pick;
   const ms = Math.round(performance.now() - t), good = r.choice === want; ok += good;
-  results.push({ text, want, got: r.choice, conf: +r.confidence.toFixed(2), p: +r.probabilities[r.choice].toFixed(2), ms });
-  say(`${good ? 'ok  ' : 'MISS'} ${JSON.stringify(text).padEnd(48)} -> ${r.choice.padEnd(7)} conf ${r.confidence.toFixed(2)} p ${r.probabilities[r.choice].toFixed(2)} (want ${want}) ${ms} ms`);
+  results.push({ text, want, got: r.choice, conf: +r.confidence.toFixed(3), probs: Object.fromEntries(Object.entries(r.probabilities).map(([k, v]) => [k, +v.toFixed(4)])), ms });
+  say(`${good ? 'ok  ' : 'MISS'} ${JSON.stringify(text).padEnd(48)} -> ${r.choice.padEnd(7)} conf ${r.confidence.toFixed(2)} p ${r.probabilities[r.choice].toFixed(3)} (want ${want}) ${ms} ms`);
 }
 const ms = results.map(r => r.ms).sort((a, b) => a - b);
 say(`${ok}/${CASES.length}, median ${ms[ms.length >> 1]} ms`);
-window.result = { ok, n: CASES.length, results, medianMs: ms[ms.length >> 1] };
+// yes/no items
+const NOUL = [['The goblin is two steps west. Its club is raised. The farmer holds a pitchfork.', 'The farmer is in danger.', true],
+  ['The farmer sits by the fire in his locked house. It is night and quiet.', 'The farmer is in danger.', false],
+  ['Mira has 3 gold. The sword costs 30 gold.', 'Mira can afford the sword.', false],
+  ['Mira has 45 gold. The sword costs 30 gold.', 'Mira can afford the sword.', true],
+  ['Tom has not eaten since yesterday morning and his stomach growls.', 'Tom is hungry.', true]];
+const noul = []; let nok = 0;
+for (const [state, statement, want] of NOUL) {
+  const t = performance.now(), p = (await d.decide(state, { q: { type: 'noul', instructions: statement } })).q.noul, ms = Math.round(performance.now() - t);
+  const good = (p >= 0.5) === want; nok += good; noul.push({ state, statement, want, p: +p.toFixed(4), ms });
+  say(`${good ? 'ok  ' : 'MISS'} noul ${statement.padEnd(30)} p ${p.toFixed(3)} (want ${want}) ${ms} ms`);
+}
+// a typical small choice (which job next / fight or flee), timed: 4 and 6 options, and two questions on one state
+const reps = +q.get('reps') || 5, timing = {};
+const JOBS = { chop: 'chop firewood at the woodpile', mill: 'take the grain to the mill', fish: 'fish at the pond', rest: 'rest at home' };
+const FF = { fight: 'fight the wolf with the pitchfork', flee: 'run to the house and bar the door', call: 'shout for the guard', hide: 'hide in the barn', climb: 'climb the haystack', wait: 'stand still and wait' };
+const st = 'Bram the farmer, 34, strong but tired. Noon, sunny. Firewood: 2 logs (low). Grain sacks: 5 (the miller waits). Food at home: bread, cheese. Bram slept well.';
+const st2 = 'Bram the farmer is in his field at dusk. A grey wolf crouches four steps away, growling. Bram holds a pitchfork. The house is 30 steps north; the barn 10 steps east. The guard patrols the road nearby.';
+for (const [name, fn] of [['4 options', () => d.decide(st, { job: { type: 'choice', instructions: 'Which job should Bram do next?', criteria: JOBS } })],
+  ['6 options', () => d.decide(st2, { act: { type: 'choice', instructions: 'What should Bram do now?', criteria: FF } })],
+  ['6 options + yes/no, one state', () => d.decide(st2, { act: { type: 'choice', instructions: 'What should Bram do now?', criteria: FF }, scared: { type: 'noul', instructions: 'Bram is in danger.' } })]]) {
+  const t = [];
+  for (let i = 0; i < reps; i++) { const a = performance.now(); await fn(); t.push(Math.round(performance.now() - a)); }
+  t.sort((a, b) => a - b); timing[name] = { median: t[t.length >> 1], all: t };
+  say(`time ${name}: median ${t[t.length >> 1]} ms (${t.join(', ')})`);
+}
+const sample = { job: (await d.decide(st, { job: { type: 'choice', instructions: 'Which job should Bram do next?', criteria: JOBS } })).job, act: (await d.decide(st2, { act: { type: 'choice', instructions: 'What should Bram do now?', criteria: FF } })).act };
+say('sample ' + JSON.stringify(sample));
+window.result = { ok, n: CASES.length, results, medianMs: ms[ms.length >> 1], noul, nok, timing, sample, stats: d.stats, engine: d.engine };
+say('RESULT ' + JSON.stringify(window.result));
+} catch (e) { if (!window.result) { say('ERROR ' + (e?.stack || e)); window.result = { error: String(e) }; } }
 </script>

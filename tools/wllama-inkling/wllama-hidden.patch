@@ -1,0 +1,144 @@
+diff --git a/cpp/wllama-context.h b/cpp/wllama-context.h
+index f6e9b1c..297b3b1 100644
+--- a/cpp/wllama-context.h
++++ b/cpp/wllama-context.h
+@@ -1367,6 +1367,127 @@ struct wllama_context
+     return res;
+   }
+ 
++  // The final hidden states at chosen positions of one prompt, in one forward pass (tablefolk: the Strands Decider's
++  // pointer head reads the hidden state at the end of each option line and at the last token; the embeddings API
++  // gives one pooled vector per input, so each option cost a forward of the whole prompt).
++  // Needs a model loaded with embeddings = true and pooling_type = none. Runs llama_decode itself, outside the server
++  // slots: use this context only for this action. Sequence 0 is the work sequence; with "prefix" = P > 0 the first
++  // P tokens are kept as a snapshot in sequence 1 (n_parallel >= 2) and reused while the next request starts with the
++  // same P tokens (a state asked several questions). No output may fall inside the prefix.
++  // req: embd_req, data_json {"tokens": [ids], "outputs": [positions], "prefix": P}
++  // res: gres_res, data_raw = float32 [outputs][n_embd], data_json {"n_embd", "n_eval", "n_reused"}
++  std::vector<llama_token> hidden_prefix;
++
++  glue_msg_get_result_res action_hidden(const char *req_raw)
++  {
++    PARSE_REQ(glue_msg_embedding_req);
++    glue_msg_get_result_res res;
++    llama_context *lctx = ctx_server.get_llama_context();
++    if (!lctx)
++      throw app_exception("hidden: no model loaded");
++    if (llama_pooling_type(lctx) != LLAMA_POOLING_TYPE_NONE)
++      throw app_exception("hidden: load the model with embeddings = true and pooling_type = none");
++    json body = json::parse(req.data_json.value);
++    const std::vector<llama_token> tokens = body.at("tokens").get<std::vector<llama_token>>();
++    const std::vector<int32_t> outputs = body.at("outputs").get<std::vector<int32_t>>();
++    int32_t prefix = body.value("prefix", 0);
++    const int32_t n = (int32_t)tokens.size();
++    const int32_t n_vocab = llama_vocab_n_tokens(vocab);
++    if (n == 0 || outputs.empty())
++      throw app_exception("hidden: no tokens or no outputs");
++    if (n > (int32_t)llama_n_ctx(lctx))
++      throw app_exception("hidden: prompt longer than the context");
++    for (auto t : tokens)
++      if (t < 0 || t >= n_vocab)
++        throw app_exception("hidden: token id out of range");
++    std::vector<int32_t> row(n, -1); // row of each output position in the result
++    for (size_t i = 0; i < outputs.size(); i++)
++    {
++      const int32_t p = outputs[i];
++      if (p < 0 || p >= n)
++        throw app_exception("hidden: output position out of range");
++      if (p < prefix)
++        throw app_exception("hidden: an output falls inside the prefix");
++      row[p] = (int32_t)i;
++    }
++    if (prefix < 0 || prefix >= n || llama_n_seq_max(lctx) < 2)
++      prefix = 0;
++
++    llama_memory_t mem = llama_get_memory(lctx);
++    llama_set_embeddings(lctx, true);
++    const int32_t n_batch = (int32_t)llama_n_batch(lctx);
++    const int32_t n_embd = llama_model_n_embd_out(model);
++    std::vector<float> out(outputs.size() * (size_t)n_embd, 0.0f);
++
++    // decode tokens [from, to) of sequence seq, copying the hidden states of the output positions
++    auto decode = [&](int32_t from, int32_t to, llama_seq_id seq) {
++      llama_batch batch = llama_batch_init(n_batch, 0, 1);
++      for (int32_t start = from; start < to; start += n_batch)
++      {
++        const int32_t end = std::min(to, start + n_batch);
++        batch.n_tokens = 0;
++        for (int32_t p = start; p < end; p++)
++        {
++          const int32_t j = batch.n_tokens++;
++          batch.token[j] = tokens[p];
++          batch.pos[j] = p;
++          batch.n_seq_id[j] = 1;
++          batch.seq_id[j][0] = seq;
++          // llama.cpp wants at least one output a batch
++          batch.logits[j] = row[p] >= 0 || p == end - 1;
++        }
++        if (llama_decode(lctx, batch) != 0)
++        {
++          llama_batch_free(batch);
++          throw app_exception("hidden: llama_decode failed");
++        }
++        for (int32_t p = start; p < end; p++)
++        {
++          if (row[p] < 0)
++            continue;
++          const float *e = llama_get_embeddings_ith(lctx, p - start);
++          if (!e)
++          {
++            llama_batch_free(batch);
++            throw app_exception("hidden: no embeddings");
++          }
++          std::copy(e, e + n_embd, out.begin() + (size_t)row[p] * n_embd);
++        }
++      }
++      llama_batch_free(batch);
++    };
++
++    int32_t reused = 0;
++    llama_memory_seq_rm(mem, 0, -1, -1);
++    if (prefix > 0)
++    {
++      const bool same = (int32_t)hidden_prefix.size() == prefix && std::equal(hidden_prefix.begin(), hidden_prefix.end(), tokens.begin());
++      if (same)
++      {
++        llama_memory_seq_cp(mem, 1, 0, -1, -1);
++        reused = prefix;
++      }
++      else
++      {
++        llama_memory_seq_rm(mem, 1, -1, -1);
++        hidden_prefix.clear();
++        decode(0, prefix, 0);
++        llama_memory_seq_cp(mem, 0, 1, -1, -1);
++        hidden_prefix.assign(tokens.begin(), tokens.begin() + prefix);
++      }
++    }
++    decode(prefix, n, 0);
++    llama_memory_seq_rm(mem, 0, -1, -1);
++
++    res.success.value = true;
++    res.has_more.value = false;
++    res.is_error.value = false;
++    res.data_json.value = json{{"n_embd", n_embd}, {"n_eval", n - reused}, {"n_reused", reused}}.dump();
++    const char *bytes = (const char *)out.data();
++    res.data_raw.buf.assign(bytes, bytes + out.size() * sizeof(float));
++    return res;
++  }
++
+   glue_msg_rerank_res action_rerank(const char *req_raw)
+   {
+     PARSE_REQ(glue_msg_rerank_req);
+diff --git a/cpp/wllama.cpp b/cpp/wllama.cpp
+index 0474154..669552e 100644
+--- a/cpp/wllama.cpp
++++ b/cpp/wllama.cpp
+@@ -121,6 +121,7 @@ extern "C" const char *wllama_action(const char *name, const char *req_raw)
+     WLLAMA_ACTION(completion)
+     WLLAMA_ACTION(embedding)
+     WLLAMA_ACTION(rerank)
++    WLLAMA_ACTION(hidden)
+     WLLAMA_ACTION(systemone)
+     WLLAMA_ACTION(tts)
+     WLLAMA_ACTION(realtime_start)
