@@ -27,7 +27,7 @@ const ENGINE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai
 // Bonsai 2 copy in the cache does not pass for 2.5. The 9B stays unpinned: pinning
 // would change its URL and so the engine's cache key (a fresh download for everyone).
 export const SIZES = {
-  '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: null, flag: '_bonsai25_loaded', name: 'Bonsai 2.5 27B', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // not on R2 yet: it would go at bonsai-2.5-27b/
+  '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai/hf/prism-ml/Ternary-Bonsai-2.5-27B-GGUF/resolve/28a7093cc25bc151cc2b284c5570f12ce343fdcf/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', flag: '_bonsai25_loaded', name: 'Bonsai 2.5 27B', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // mirrored on R2 2026-11-27 (SHA-256 checked)
   '27B-v2': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', revision: '839bd57023c1558945afea70a74fa83c054f35f9', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf', flag: '_bonsai2_loaded', name: 'Bonsai 2 27B' },
   '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: null, flag: '_bonsai2_loaded_9B', name: 'Bonsai 2 9B' },   // not mirrored on R2 yet
 };

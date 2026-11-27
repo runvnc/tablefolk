@@ -666,7 +666,7 @@ from the four hostnames. The speech model is under `underdog-bark-3.0/`
 Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader
 trying R2 first and Hugging Face as the fallback: `qwen1_5-0_5b-chat-q4_0.gguf`
 (the Oracle's Qwen1.5), `gemma-4-E2B-it.litertlm` (Gemma E2B with sight) and
-`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B: since 2026-11-27 only the hidden `bonsai2-27b-v2` uses it; **Bonsai 2.5 27B is not mirrored yet**: it loads from Hugging Face. To mirror, with the maintainer's OK: `prism-ml/Ternary-Bonsai-2.5-27B-GGUF` revision `28a7093cc25bc151cc2b284c5570f12ce343fdcf`, `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf`, 5,993,834,848 bytes, to `bonsai-2.5-27b/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` with `tools/r2-copy/`, then set `mirror` for `27B` in `SIZES` (bonsai2.js); the old object can go once nobody needs the hidden entry. Bonsai 2 9B is not mirrored either), and Raon-1
+`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B: since 2026-11-27 only the hidden `bonsai2-27b-v2` uses it; Bonsai 2.5 27B is mirrored since 2026-11-27 at `bonsai/hf/prism-ml/Ternary-Bonsai-2.5-27B-GGUF/resolve/28a7093cc25bc151cc2b284c5570f12ce343fdcf/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` (Hugging Face layout, copied with `tools/r2-copy/bonsai25.json`, SHA-256 checked; the old object can go once nobody needs the hidden entry); Bonsai 2 9B is not mirrored either), and Raon-1
 nano's 4-bit LiteRT-LM bundle (2026-11-21, `tools/r2-copy/`, 1.82 GB in 78 s,
 sha256 8f8ab92b...) at
 `litert/hf/KRAFTON/Raon-1-nano-litert-lm/resolve/54312d339f6ed417257a166055fcb130a6dbf80e/model.litertlm`
