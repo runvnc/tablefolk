@@ -22,3 +22,9 @@ vast.ai account.
    repo there and restarts its server; `chrome-restart.sh` gives a fresh
    Chrome (do it between models: the GPU is not freed by navigating).
 5. `echo y | uvx vastai destroy instance <id>` when done.
+
+`gpu-checks.sh <log dir> <kind:model ...>` runs the checks ON the box (copy nothing: it is in
+the repo there): game modes (`living`, `adventure`, `turnsg`, `turnsf`, `when`, `live12`), the
+decider (`godoff`, `godon`, `godauto`), windows and memory (`sweephigh`, `roleshigh`, `wg`:
+the world builder through `wg-run.mjs`), each with a fresh Chrome and its peak graphics memory
+in `<log dir>/peaks.txt` (2026-11-27, brains.md "Rented-card checks").
