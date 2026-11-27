@@ -282,7 +282,15 @@ once).
   the council and one missed (its anger), the village tab, the save hook.
 - `node tools/god-rules-test.mjs` (no browser): the God package's rules
   (`packages/god/god-core.js`): belief and sides, mana, prayers, powers,
-  cruelty, omens, demands, the council's vote, decrees and deadlines.
+  cruelty, omens, demands, the council's vote, decrees and deadlines (exact
+  numbers with the balance off), then the balance itself: diminishing
+  returns, headroom, drift, and five seeds of the simulation below.
+- `node tools/god-balance-sim.mjs [--seeds=20] [--answers=.9] [--seed=3]`
+  (no browser): five game days of God of Ashford with a scripted player
+  (answers about half the prayers, an omen kept, a decree and its reward, a
+  cruel lightning strike, beasts), the old rules against `RULES`: each
+  villager's belief every 6 game hours, conversions, mana earned, spent and
+  the lowest, prayers the player could not afford. Tune `RULES` with it.
 - `node tools/browser-test/god-words-eval.mjs` (a brain on :8000, never
   downloads; `?autonomy=guided`): decree words read (code, then the menus'
   matcher), prayers in the villagers' words, a council spoken by the model.

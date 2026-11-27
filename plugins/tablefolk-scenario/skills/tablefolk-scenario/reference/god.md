@@ -41,27 +41,51 @@ keeps its side (the narrator says when someone converts). Groups named
 `house_...` (or described as a household) are households: plague takes a
 household, cruelty hurts one.
 
-**Mana** comes every game hour from belief (each villager's belief / 100;
-five villagers at 50 give 2.5 an hour), from offerings (a faithful villager
-with food to spare leaves one when praying: bread 2, meat 3, wheat 1...) and
-from met decrees (an offering's worth + 5, a sacrifice 15, worship 3 + 2 a
-worshipper, work 10). Up to 150.
+**Mana** comes every game hour from belief (each villager's belief / 100 x
+0.25; five villagers at 60 give 0.75 an hour, 18 a game day), from offerings
+(a faithful villager with food to spare leaves one when praying: bread 2,
+meat 3, wheat 1...) and from met decrees (an offering's worth + 5, a
+sacrifice 15, worship 3 + 2 a worshipper, work 10). Up to 150. It is meant to
+run short: a player who answers every prayer has little left for omens,
+decrees' rewards and the dearer powers.
 
 | what happens | belief |
 |---|---|
-| a prayer answered by a fitting power | +15 to the one who prayed, +4 to those near, +2 to its side |
-| a prayer answered with a dream | +5 (+8 for a doubter) |
-| silence chosen / a prayer left to lapse (3 game hours) | -3 / -6 (none for thanks) |
-| harm for no reason (smite, plague, blight, beast, drought on someone who refused nothing and missed nothing) | -15 to the victims, -10 to their household, -5 to everyone else |
-| harm with a reason (they refused a decree, or one they were bound by was missed) | +3 to the faithful, +4 to the rest (fear) |
-| a beast or raider struck down | +6 to those near |
-| an omen | +3 to the faithful, +1 to the rest |
-| a prophecy kept (the omen's words, then that power within 12 game hours) / broken | +8 / -6 to everyone |
-| a decree met | +6 to those bound, +2 to everyone else |
-| a blessing on one who met it within 6 game hours / none | +4 / -3 to those bound |
-| a decree missed and punished | +2 to the faithful, +4 to the rest (fear) |
-| a decree missed and let go (mercy) | -6 to the doubters and refusers, +1 to the faithful |
-| voted against a decree at the council and refused it | -4 |
+| a prayer answered by a fitting power | +8 to the one who prayed, +2 to those near, +1 to its side |
+| a dream (whether or not it answers a prayer) | +3 (+5 for a doubter) |
+| silence chosen / a prayer left to lapse (3 game hours) | -2 / -4 (none for thanks) |
+| harm for no reason (smite, plague, blight, beast, drought on someone who refused nothing and missed nothing) | -15 to the victims, -8 to their household, -4 to everyone else |
+| harm with a reason (they refused a decree, or one they were bound by was missed) | +2 to the faithful, +3 to the rest (fear) |
+| a beast or raider struck down | +4 to those near |
+| an omen | +2 to the faithful, +1 to the rest |
+| a prophecy kept (the omen's words, then that power within 12 game hours) / broken | +5 / -5 to everyone |
+| a decree met | +5 to those bound, +1 to everyone else |
+| a blessing on one who met it within 6 game hours / none | +3 / -3 to those bound |
+| a decree missed and punished | +2 to the faithful, +3 to the rest (fear) |
+| a decree missed and let go (mercy) | -5 to the doubters and refusers, +1 to the faithful |
+| voted against a decree at the council and refused it | -3 |
+
+Belief moves over days, not minutes:
+
+- **Diminishing returns**: a gain is divided by 1 + (what that villager
+  gained in the last game day) / 10: a second +8 the same day gives about
+  +4, a third about +3. A doubter is won over in three or four days of
+  attention, not one afternoon.
+- **Near the ends**: within 30 of 100 a gain shrinks in proportion (at 90 a
+  third of it), and within 30 of 0 a loss does; 100 is all but out of reach.
+- **Drift**: every game hour belief moves 2% of the way back to the
+  villager's resting value (its starting belief), and the resting value 0.6%
+  of the way toward belief: a burst of favour fades in a day or two, but
+  faith kept up for days lasts.
+
+Measured with `node tools/god-balance-sim.mjs` (five game days of God of
+Ashford with a scripted player who answers about half the prayers, sends
+one omen and keeps it, one decree and its reward, one cruel lightning
+strike, beasts on day 4): with the old numbers someone reached 100 in every
+run, the first after 2.5 game hours, and mana sat at its cap; now no one
+reaches 100, the faithful end near 75-95, the doubters near 35-45, and mana
+dips to about 13 (a player answering nine prayers in ten runs out now and
+then).
 
 The numbers are `RULES` in `packages/god/god-core.js`.
 

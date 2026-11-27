@@ -7,7 +7,9 @@ import { createGod, parseDecree, parseWhen, vote, needsOf, prophecyOf, RULES } f
 let n = 0, fails = 0;
 const ok = (name, cond, info = '') => { n++; if (!cond) fails++; console.log(cond ? 'ok  ' : 'FAIL', name, info && !cond ? '- ' + info : ''); };
 let T = 8 * 60; const now = () => T;
-const G = createGod({ now });
+// the exact numbers first (no diminishing returns, no headroom, no drift); the balance after
+const EXACT = { diminish: 0, headroom: 0, drift: 0, restFollow: 0 };
+const G = createGod({ now, rules: EXACT });
 for (const [id, b] of Object.entries({ ada: 80, wren: 65, tilly: 55, bram: 30, finn: 20 })) G.set(id, b);
 
 // sides with a gap
@@ -17,7 +19,7 @@ G.set('wren', 50); ok('between the marks a villager keeps its side', G.classify(
 G.set('bram', 62); conv = G.classify(); ok('a doubter above 60 converts to the faithful', conv.some(c => c.id === 'bram' && c.from === 'doubters' && c.to === 'faithful'));
 G.set('bram', 30); G.classify(); G.set('wren', 65);
 ok('average belief of a group', Math.abs(G.average(['ada', 'wren']) - 72.5) < .01);
-ok('mana an hour: the sum of belief / 100', Math.abs(G.manaPerHour() - (80 + 65 + 55 + 30 + 20) / 100) < .01);
+ok('mana an hour: the sum of belief / 100, times manaPerBelief', Math.abs(G.manaPerHour() - (80 + 65 + 55 + 30 + 20) / 100 * RULES.manaPerBelief) < .01);
 ok('offering value: bread 2 each, unknown 1', G.offeringValue('bread', 3) === 6 && G.offeringValue('pebble', 2) === 2);
 
 // needs and prayers
@@ -110,7 +112,30 @@ ok('nonsense is an error', !!parseDecree('purple', ctx).error);
 ok('deadlines: in 3 hours, noon, tomorrow', parseWhen('in 3 hours', 600) === 780 && parseWhen('by noon', 600) === 720 && parseWhen('by noon', 800) === 1440 + 720 && parseWhen('by tomorrow', 600) === 1440 + 1080);
 
 // save
-const G2 = createGod({ now }); G2.load(G.data());
+const G2 = createGod({ now, rules: EXACT }); G2.load(G.data());
 ok('saved and loaded', G2.belief('finn') === G.belief('finn') && G2.side('ada') === 'faithful' && G2.prayers().length === G.prayers().length);
+
+// dreams: one bonus a dream, whether or not it answers a prayer
+{ const D = createGod({ now, rules: EXACT }); D.set('a', 50); D.set('b', 50); D.addPrayer({ who: 'a', need: 'sign' });
+  const r = D.onPower('dream', { who: 'a', members: ['a'] }, {}); D.onPower('dream', { who: 'b', members: ['b'] }, {});
+  ok('a dream answers the dreamer\'s prayer with one dream bonus (no prayer: the same bonus)', r.answered.length === 1 && D.belief('a') === 50 + RULES.dream && D.belief('b') === 50 + RULES.dream, D.belief('a') + ' ' + D.belief('b')); }
+
+// the balance (RULES as they are)
+{ let t = 0; const H = createGod({ now: () => t });
+  H.set('a', 50); const g1 = H.adjust('a', 8).d, g2 = H.adjust('a', 8).d, g3 = H.adjust('a', 8).d;
+  ok('diminishing returns: each gain to the same villager smaller than the last', g1 === 8 && g2 < g1 && g3 < g2, [g1, g2, g3].join());
+  t += RULES.diminishWindow + 1; ok('a day later a gain is whole again', H.adjust('a', 4).d === 4);
+  H.set('z', 90); ok('near 100 a gain shrinks (headroom)', H.adjust('z', 9).d < 4);
+  H.set('y', 10); ok('near 0 a loss shrinks', H.adjust('y', -9).d > -4);
+  const S = createGod({ now: () => t }); S.set('d', 25); S.tick(); S.set('d', 65); const r0 = S.rest('d');
+  for (let i = 0; i < 96; i++) { t += 15; S.tick(); }
+  ok('belief drifts back toward the resting value over a day, and the resting value follows a little', S.belief('d') < 55 && S.belief('d') > 30 && S.rest('d') > r0, `${S.belief('d')} rest ${S.rest('d')}`);
+  const mod = await import('./god-balance-sim.mjs');
+  const runs = [1, 2, 3, 4, 5].map(seed => mod.simulate({}, { seed }));
+  ok('simulation: no one reaches 100 in five game days of typical play', runs.every(r => !r.at100.length), runs.map(r => r.at100.join()).join('|'));
+  ok('simulation: the doubters stay doubters on day 1', runs.every(r => r.curve.filter(c => c.h <= 24).every(c => c.bram < 60 && c.finn < 60)));
+  ok('simulation: mana does not pile up to its cap', runs.every(r => r.mana < 120), runs.map(r => r.mana).join());
+  const old = mod.simulate(mod.OLD, { seed: 1 }); ok('simulation: the old rules did put someone at 100 (the problem this fixes)', old.at100.length > 0); }
+
 console.log(fails ? `${fails}/${n} FAILED` : `all ${n} passed`);
 process.exit(fails ? 1 : 0);

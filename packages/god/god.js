@@ -459,7 +459,7 @@ export default function (api) {
     if (words(g)) line = await say1(g, who(g), `Last night you dreamed the god said to you: "${text}". Tell the people near you about it, and what you will do: one or two sentences, nothing else.`, 60);
     line ||= kind === 'demand' ? `I had a dream. The god spoke to me: "${text}" We must do it.` : kind === 'warning' ? `I dreamed a warning from the god: "${text}" Be careful, all of you.` : kind === 'go' ? `The god came to me in a dream: "${text}" I am going.` : pick([`I dreamed the god spoke to me: "${text}" I feel... at peace.`, `A dream, so real: "${text}" The god knows my name.`]);
     try { api.say(g, line, true); } catch {}
-    apply(G.many([g.id], sideOf(g.id) === 'doubters' ? G.rules.dreamDoubter : G.rules.dream, 'a dream'));
+    // (its belief bonus came with the power: core onPower('dream'), one a dream)
     W.tablefolkJobs?.addNews?.(g.id, `${g.id} dreamed the god spoke: "${text}"`, 'news');
     for (const id of within(posOf(g).x, posOf(g).z, 8)) if (id !== g.id) api.addMemory?.(byId(id), `${g.id} says the god spoke in a dream: "${text}"`, 2);
     if (kind === 'demand') { const d = parseDecree(text, decreeCtx()); if (!d.error) await decree(text, { via: g.id, parsed: d, council: false }); }

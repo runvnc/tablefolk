@@ -13,25 +13,35 @@
 //   demands:  G.demandMet(members, everyone, id) / G.demandMissed(members, everyone, anger, refusers); rewards owed after a met demand
 //   council:  vote(voters) -> { yes, no, outcome: 'accept' | 'bargain' | 'refuse', votes }
 //   decrees:  parseDecree(text, ctx) -> { kind, text, of, by, item, n, animal, plan } | { error }; parseWhen(text, now)
-//   time:     G.tick() -> { expired, changes, broken, unrewarded }  (call it every game quarter hour)
+//   time:     G.tick() -> { expired, changes, broken, unrewarded }  (call it every game quarter hour; belief drifts to G.rest(id))
+//   balance:  gains shrink with the villager's recent gains (rules.diminish) and near 0 / 100 (rules.headroom); tools/god-balance-sim.mjs
 //   save:     G.data() / G.load(x)
 export const RULES = {
+  // tuned 2026-11-27 with tools/god-balance-sim.mjs (a scripted player over five game days): belief moves
+  // over days, not minutes; mana runs short when the player answers everything
   faithfulAt: 60, doubterAt: 35,                       // belief (0-100) to join the faithful / fall to the doubters
-  answered: 15, answeredWitness: 4, answeredSide: 2,   // a prayer answered with a fitting power: the one who prayed, those near, their side
-  dream: 5, dreamDoubter: 8,                           // a dream: the dreamer
-  silence: -3, ignored: -6,                            // a prayer met with silence (chosen) / left until it lapsed
-  cruelVictim: -15, cruelHousehold: -10, cruelAll: -5, // harm with no reason (no refusal, no missed demand)
-  justFaithful: 3, justFear: 4,                        // harm with a reason: the faithful approve, the rest are afraid (belief from fear)
-  threatSmitten: 6,                                    // a beast or raider struck down: everyone near
-  omenFaithful: 3, omenOthers: 1,                      // an omen for all
-  prophecyKept: 8, prophecyBroken: -6,                 // an omen's words came true in time / did not
-  demandMet: 6, demandMetOthers: 2,                    // a demand met: those it bound, everyone else
-  rewarded: 4, unrewarded: -3,                         // a blessing on those who met it, within rewardWindow / none
-  angerFaithful: 2, angerFear: 4,                      // a missed demand punished: the faithful, the rest (fear)
-  mercyDoubters: -6, mercyFaithful: 1,                 // a missed demand let go: "nothing happened"
-  refused: -4,                                         // voted against the decree at the council
+  answered: 8, answeredWitness: 2, answeredSide: 1,    // a prayer answered with a fitting power: the one who prayed, those near, their side
+  dream: 3, dreamDoubter: 5,                           // a dream: the dreamer (one bonus a dream, whether or not it answers a prayer)
+  silence: -2, ignored: -4,                            // a prayer met with silence (chosen) / left until it lapsed
+  cruelVictim: -15, cruelHousehold: -8, cruelAll: -4,  // harm with no reason (no refusal, no missed demand)
+  justFaithful: 2, justFear: 3,                        // harm with a reason: the faithful approve, the rest are afraid (belief from fear)
+  threatSmitten: 4,                                    // a beast or raider struck down: everyone near
+  omenFaithful: 2, omenOthers: 1,                      // an omen for all
+  prophecyKept: 5, prophecyBroken: -5,                 // an omen's words came true in time / did not
+  demandMet: 5, demandMetOthers: 1,                    // a demand met: those it bound, everyone else
+  rewarded: 3, unrewarded: -3,                         // a blessing on those who met it, within rewardWindow / none
+  angerFaithful: 2, angerFear: 3,                      // a missed demand punished: the faithful, the rest (fear)
+  mercyDoubters: -5, mercyFaithful: 1,                 // a missed demand let go: "nothing happened"
+  refused: -3,                                         // voted against the decree at the council
   prayerWindow: 180, rewardWindow: 360, prophecyWindow: 720, prayerCooldown: 150,   // game minutes
-  manaPerBelief: 1,                                    // mana an hour from a villager at belief 100
+  manaPerBelief: .25,                                   // mana an hour from a villager at belief 100
+  // diminishing returns: a gain is divided by 1 + (the villager's gains in the last diminishWindow minutes) / diminish
+  diminish: 10, diminishWindow: 1440,
+  // near the ends: a gain is scaled by (100 - belief) / headroom when closer than that to 100 (a loss likewise near 0)
+  headroom: 30,
+  // drift: each game hour belief moves this share of the way back to the villager's resting value, and the
+  // resting value this share of the way toward belief (what lasts: a conversion kept up for days sticks)
+  drift: .02, restFollow: .006,
 };
 // what answers a need; what harms
 export const FITS = {
@@ -147,11 +157,22 @@ export function parseDecree(text, ctx = {}) {
 // ---------------------------------------------------------------- the state
 export function createGod({ now = () => 0, rules = {} } = {}) {
   const R = { ...RULES, ...rules };
-  let B = {}, side = {}, prayers = [], omens = [], owed = [], seq = 0, lastPray = {}, log = [];
+  let B = {}, side = {}, prayers = [], omens = [], owed = [], seq = 0, lastPray = {}, log = [], rest = {}, gains = {}, lastTick = null;
   const ids = () => Object.keys(B);
   const belief = id => B[id] ?? 50;
-  const set = (id, v) => { B[id] = clamp(Math.round(+v * 10) / 10, 0, 100); return B[id]; };
-  function adjust(id, d, why = '') { if (!id || !d) return null; const from = belief(id), to = set(id, from + d); const c = { id, from, to, d: Math.round((to - from) * 10) / 10, why }; log.push({ ...c, at: now() }); if (log.length > 200) log.shift(); return c; }
+  const set = (id, v) => { B[id] = clamp(Math.round(+v * 10) / 10, 0, 100); if (rest[id] == null) rest[id] = B[id]; return B[id]; };
+  // what a change comes to: less for a villager who gained much lately (diminish), less near the ends (headroom)
+  function scaled(id, d) {
+    const b = belief(id);
+    if (d > 0) {
+      const t = now(), g = (gains[id] || []).filter(x => t - x.at < R.diminishWindow); gains[id] = g;
+      if (R.diminish) d /= 1 + g.reduce((a, x) => a + x.d, 0) / R.diminish;
+      if (R.headroom) d *= clamp((100 - b) / R.headroom, 0, 1);
+    } else if (R.headroom) d *= clamp(b / R.headroom, 0, 1);
+    return d;
+  }
+  function adjust(id, d, why = '') { if (!id || !d) return null; d = scaled(id, d); const from = belief(id), to = set(id, from + d);
+    if (to > from) (gains[id] ||= []).push({ at: now(), d: to - from }); const c = { id, from, to, d: Math.round((to - from) * 10) / 10, why }; log.push({ ...c, at: now() }); if (log.length > 200) log.shift(); return c; }
   const many = (list, d, why) => [...new Set(list)].map(id => adjust(id, d, why)).filter(Boolean);
   const average = list => { const l = (list || ids()).filter(id => id in B); return l.length ? l.reduce((a, id) => a + B[id], 0) / l.length : 0; };
   // sides with a gap: above faithfulAt joins the faithful, below doubterAt the doubters; between keeps its side
@@ -202,6 +223,15 @@ export function createGod({ now = () => 0, rules = {} } = {}) {
   function onPower(name, target = {}, ctx = {}) {
     const changes = [], answered = [], everyone = ctx.everyone || ids();
     const hit = [...new Set([...(target.members || []), ...(target.who ? [target.who] : [])])];
+    // a dream: its dreamer's prayer answered by a dream, else a dream's bonus (one either way)
+    if (name === 'dream') {
+      for (const id of hit) {
+        const p = open().find(x => x.who === id);
+        if (p) { const r = answer(p.id, { how: 'dream' }); answered.push(p); changes.push(...r.changes); }
+        else changes.push(adjust(id, sideOf(id) === 'doubters' ? R.dreamDoubter : R.dream, 'a dream'));
+      }
+      return { answered, changes: changes.filter(Boolean), cruel: false, prophecy: null };
+    }
     // prayers this answers: by the one who prayed being the target or near it (a place), and the power fitting the need
     for (const p of open()) {
       if (!fits(p, name)) continue;
@@ -253,15 +283,22 @@ export function createGod({ now = () => 0, rules = {} } = {}) {
   // ---- time: lapsed prayers, prophecies, rewards
   function tick() {
     const t = now(), expired = [], broken = [], unrewarded = [], changes = [];
+    // drift toward each villager's resting value, and the resting value toward belief
+    const hours = lastTick == null ? 0 : Math.max(0, Math.min(48, (t - lastTick) / 60)); lastTick = t;
+    if (hours && (R.drift || R.restFollow)) for (const id of ids()) {
+      const b = B[id], r0 = rest[id] ?? b, k = 1 - Math.pow(1 - R.drift, hours);
+      B[id] = clamp(Math.round((b + (r0 - b) * k) * 100) / 100, 0, 100);
+      rest[id] = r0 + (b - r0) * (1 - Math.pow(1 - R.restFollow, hours));
+    }
     for (const p of open()) if (t >= p.until) { p.status = 'ignored'; p.closed = t; expired.push(p); if (p.need !== 'thanks') changes.push(adjust(p.who, R.ignored, 'prayer ignored')); }
     for (const o of omens) if (o.status === 'open' && t >= o.until) { o.status = 'broken'; broken.push(o); changes.push(...many(ids(), R.prophecyBroken, 'the omen did not come true')); }
     for (const o of owed) if (!o.paid && !o.lapsed && t >= o.until) { o.lapsed = true; unrewarded.push(o); changes.push(...many(o.members, R.unrewarded, 'the god took and gave nothing')); }
     return { expired, broken, unrewarded, changes: changes.filter(Boolean) };
   }
 
-  const data = () => JSON.parse(JSON.stringify({ B, side, prayers, omens, owed, seq, lastPray }));
-  function load(x) { if (!x) return; ({ B = {}, side = {}, prayers = [], omens = [], owed = [], seq = 0, lastPray = {} } = JSON.parse(JSON.stringify(x))); }
-  const clear = () => { B = {}; side = {}; prayers = []; omens = []; owed = []; seq = 0; lastPray = {}; log = []; };
-  return { rules: R, belief, set, adjust, many, average, ids, classify, side: sideOf, setSide, manaPerHour, offeringValue, needsOf, maybePray, addPrayer, open, prayers: () => prayers.slice(),
+  const data = () => JSON.parse(JSON.stringify({ B, side, prayers, omens, owed, seq, lastPray, rest, gains, lastTick }));
+  function load(x) { if (!x) return; ({ B = {}, side = {}, prayers = [], omens = [], owed = [], seq = 0, lastPray = {}, rest = {}, gains = {}, lastTick = null } = JSON.parse(JSON.stringify(x))); for (const id of Object.keys(B)) if (rest[id] == null) rest[id] = B[id]; }
+  const clear = () => { B = {}; side = {}; prayers = []; omens = []; owed = []; seq = 0; lastPray = {}; log = []; rest = {}; gains = {}; lastTick = null; };
+  return { rules: R, belief, set, adjust, many, average, ids, classify, side: sideOf, setSide, manaPerHour, offeringValue, needsOf, maybePray, addPrayer, open, prayers: () => prayers.slice(), rest: id => rest[id] ?? belief(id),
     get: id => prayers.find(p => p.id === id) || null, fits, answer, onPower, omen, omens: () => omens.slice(), demandMet, demandMissed, owed: () => owed.slice(), tick, data, load, clear, log: () => log.slice() };
 }
