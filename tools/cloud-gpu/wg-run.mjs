@@ -4,7 +4,7 @@ const [model, mode] = process.argv.slice(2);
 const b = await chromium.connectOverCDP('http://127.0.0.1:9223');
 const page = await b.contexts()[0].newPage();
 const logs = []; page.on('console', m => { const t = m.text(); if (/window|context|out of memory|lost|error/i.test(t)) logs.push(t.slice(0, 200)); });
-await page.goto('http://localhost:8000/tools/browser-test/worldgen-test.html?prompt=x&t=0').catch(() => {});
+await page.goto('http://localhost:8000/scenarios/hearthvale.json').catch(() => {});   // the origin, to set the model (the test page would start building at once)
 await page.evaluate(m => localStorage.setItem('tablefolk_model', m), model);
 const t0 = Date.now();
 await page.goto(`http://localhost:8000/tools/browser-test/worldgen-test.html?${mode === 'oneanswer' ? 'oneanswer=1&' : ''}prompt=${encodeURIComponent('a fishing village where the boats have not come back and the baker hoards flour')}&t=${Date.now()}`);
