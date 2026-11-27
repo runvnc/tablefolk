@@ -575,7 +575,9 @@ html.cover-up #hud:has(#modelLoadNotice.consent:not(.hidden):not(.ducked)) { z-i
   #topBar #brainStatus { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
   #chatDock .avatar-hint { display:none; }
   #chatDock { max-height:46vh; overflow:auto; }
-  #scenarioBanner { top:60px !important; bottom:auto !important; left:70px !important; right:8px !important; max-width:none !important; font-size:12px; }
+  /* (it stops short of the compass, top right: right 18 + 76 wide) */
+  #scenarioBanner { top:60px !important; bottom:auto !important; left:70px !important; right:102px !important; width:auto !important; max-width:none !important; font-size:12px; }
+  #scenarioBanner.collapsed { justify-self:start; }
 }
 /* live.js: how much happens */
 .view-btns > .pace-pick { grid-column:1 / -1; order:-1; display:flex; align-items:center; justify-content:flex-end; gap:6px; margin:-2px 2px -2px 0; font-size:11px; color:#cfe9d4; }

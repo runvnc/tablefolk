@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-27
 
+- Phones: the world's name chip stops short of the compass (it ran under it, top right).
 - **Men no longer come out in a woman's body**: `"model": "villager"` (the world builder's and the generators' default) was always the village woman, so God of Ashford's Bram and Finn looked like Wren. A generic villager now gets a man's body when its `"gender"`, its style, the first words of its personality or what the others say of it make it a man (the wanderer for wood and hunting, the farmer for fields, else the peasant), and villagers of one world get different bodies while there are any left; with no sign either way it stays the village woman. God of Ashford's Tilly is a woman's body now (she was the male farmer); Bram (Hearth Spirit), Jory (Hearthvale) and Barnaby (Haunted Tavern) say `"gender": "male"`. format.md, "Bodies".
 - Fixed: when any character left the world (a beast driven off, an animal sacrificed, one removed by a script), every other character's shadow under its feet turned into a white disc for the rest of the session: the shadow's shared material was disposed with the one character. Seen in the God game's council; affected every world.
 - Fixed: a demand's messenger walking to the people it binds threw "runAs is not a function" in a world with no brain wired (`model=none`), and a dream telling a villager to go somewhere could too.
