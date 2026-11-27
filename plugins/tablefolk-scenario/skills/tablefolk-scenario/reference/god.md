@@ -13,8 +13,9 @@ high over the shrine (drag to look, wheel to zoom; zoomed in on a building,
 its roof fades and you see who is inside), and the player acts
 through the power bar at the bottom left:
 
-- **⏸ Pause / ▶ Go on** and **×1 / ×2 / ×4** (the clock and everyone's turns
-  that much faster; `tablefolkModes.setSpeed`).
+- **⏸ Pause / ▶ Go on** and **×1 / ×2 / ×4** (the clock, everyone's turns,
+  their walking, their animations and physics that much faster;
+  `tablefolkModes.setSpeed`).
 - **🙏 Prayers**: the prayers waiting, each with who prays (their side and
   belief), what for and in what words, the hours left, and three answers: the
   power that fits (a gift of food for hunger, heal for sickness, rain for a

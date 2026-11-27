@@ -114,7 +114,7 @@ supported part (other members are internal and may change).
 | `tablefolkClock.now()`, `.set(min, day)`, `.isNight()` | the time of day |
 | `tablefolkThreats.now(kind)`, `.active()`, `.retreat(why)`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats (`retreat`: every group about turns for the edge) |
 | `tablefolkSpells.strike(x, z)` | a bolt of lightning from the sky on a square (sound and light; the damage is yours to do) |
-| `tablefolkModes.speed`, `.setSpeed(k)` | the world's speed (1, 2, 4: the clock and everyone's turns that much faster), for time controls; `tablefolkLive.start()`, `.stop()`, `.toggle()`, `.on` pause it |
+| `tablefolkModes.speed`, `.setSpeed(k)` | the world's speed (1, 2, 4: the clock, everyone's turns, walks (a walk's `turnMove.dur` is divided when it starts), body clips (`scene.animationTimeScale`) and physics (fixed 1/60 s steps, that many more a frame) that much faster), for time controls; `tablefolkLive.start()`, `.stop()`, `.toggle()`, `.on` pause it |
 | `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
 | `tablefolkProfile.normalize(v)`, `.resolve(sources)`, `.describe(p)`, `.PRESETS`, `.DOMAINS` | autonomy profiles: a preset or an object to a profile of six domains, `code` or `model` |
 | `tablefolkAgency.profile(g)`, `.domain(g, name)`, `.level(g)`, `.why(g)`, `.setting()`, `.setSetting(v)`, `.options(g, state, job)`, `.stats()`, `.probe.run()`, `.probe.result()` | autonomy: `rails`, `guided` or `free` for a character and why; the player's setting (`auto` or a level); the activities it could start now; plans and results; the capability check (living.md, "How much characters decide") |

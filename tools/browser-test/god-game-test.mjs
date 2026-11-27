@@ -27,6 +27,16 @@ export async function godGameTest({ page, ev, check, shot, pageShot, look, drive
   await ev(() => { tablefolkLive.start(); });
   await page.click('#powerBar button:has-text("×1")');
   await check('god: speed ×2 (the clock twice as fast), then back', () => ev(async () => { const k = tablefolkModes.speed, r = tablefolkModes.clockRate(); document.querySelector('#powerBar [data-bar="god:speed"]').click(); document.querySelector('#powerBar [data-bar="god:speed"]').click(); return [k === 2 && r === 2 && tablefolkModes.speed === 1, `speed ${k}, clock rate ${r}, then ${tablefolkModes.speed}`]; }));
+  await check('god: ×4 speeds walking (a walk a quarter as long), body clips and physics too; ×1 back', () => ev(async () => {
+    const g = state.characters.find(c => c.id === 'finn');
+    const walk = () => { const p = g.logicalPos || g.root.position; for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (tablefolkJobs.walkTo(g, Math.round(p.x) + dx, Math.round(p.z) + dz) && g.turnMove?.path?.length === 3) return g.turnMove.dur; return g.turnMove?.dur || 0; };
+    tablefolkModes.setSpeed(1); const d1 = walk(); await new Promise(r => setTimeout(r, d1 * 1000 + 300));
+    tablefolkModes.setSpeed(4); const d4 = walk();
+    await new Promise(r => setTimeout(r, 120)); const ts = state.scene.animationTimeScale, sub = state.scene.getPhysicsEngine()?.getSubTimeStep?.();
+    await new Promise(r => setTimeout(r, d4 * 1000 + 300)); const arrived = !g.turnMove;
+    tablefolkModes.setSpeed(1); await new Promise(r => setTimeout(r, 120));
+    return [d1 > 0 && Math.abs(d4 - .64 / 4) < .02 && Math.abs(d1 - .64) < .02 && ts === 4 && sub === 17 && arrived && state.scene.animationTimeScale === 1, `walk ${d1.toFixed(2)} s at x1, ${d4.toFixed(2)} s at x4 (arrived ${arrived}); animationTimeScale ${ts}; physics sub-step ${sub}`];
+  }));
   await pageShot('g01-bar-hud');
 
   // ---- a prayer: tilly is hungry and goes to the temple

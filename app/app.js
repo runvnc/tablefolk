@@ -3275,7 +3275,7 @@ function startTurnMove(g,d,distance=null){
   const end=start.add(d.scale(travel));
   end.x=clamp(end.x,-WORLD.halfW-2.5,WORLD.halfW+2.5); end.z=clamp(end.z,-WORLD.halfH-2.5,WORLD.halfH+2.5); end.y=0;
   const actual=BABYLON.Vector3.Distance(start,end);
-  g.turnMove={start,end,t:0,dur:Math.max(.48,actual*.32)};
+  g.turnMove={start,end,t:0,dur:Math.max(.48,actual*.32)/worldSpeed()};
   g.collider?.physicsBody?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
   zeroMeshMotion(g.collider);
 }
@@ -3678,12 +3678,16 @@ function findRouteInner(from,to){
 }
 // Leg direction -> facing: drop a component smaller than ~22 degrees so a
 // nearly straight leg doesn't face diagonally.
+// the world's speed (modes.js setSpeed: a god's x2 / x4): a walk is that much shorter when it starts (so every
+// timer reading turnMove.dur agrees), body clips (scene.animationTimeScale), turning, breathing and handovers run
+// that much faster, and physics takes that many fixed steps a frame (scene._advancePhysicsEngineStep below)
+function worldSpeed(){ const s=window.tablefolkModes?.speed; return s>0 ? s : 1; }
 function legFacing(d){ const l=Math.hypot(d.x,d.z)||1, x=d.x/l, z=d.z/l; return new BABYLON.Vector3(Math.abs(x)>.38?Math.sign(x):0,0,Math.abs(z)>.38?Math.sign(z):0); }
 function startTurnPath(g,waypoints){
   const lp=g.logicalPos || new BABYLON.Vector3(g.root.position.x,0,g.root.position.z);
   const path=[new BABYLON.Vector3(lp.x,0,lp.z),...waypoints.map(p=>new BABYLON.Vector3(p.x,0,p.z))];
   const lens=[]; let total=0; for(let i=1;i<path.length;i++){ const l=BABYLON.Vector3.Distance(path[i-1],path[i]); lens.push(l); total+=l; }
-  g.turnMove={start:path[0],end:path[path.length-1],path,lens,total,t:0,dur:Math.max(.48,total*.32)};
+  g.turnMove={start:path[0],end:path[path.length-1],path,lens,total,t:0,dur:Math.max(.48,total*.32)/worldSpeed()};
   setCharacterFacing(g,legFacing(path[1].subtract(path[0])));
   g.collider?.physicsBody?.setMotionType?.(BABYLON.PhysicsMotionType.ANIMATED);
   zeroMeshMotion(g.collider);
@@ -6005,20 +6009,20 @@ function updateCompassHUD(){
   const charFacing=character ? facingNameFromDir(character.dir)[0].toUpperCase() : '—';
   compassHud.querySelector('small').textContent='camera '+name+' · character '+charFacing+' · N=-Z E=-X';
 }
-function animate(dt){ updateFirstPersonView(dt); followAvatarCamera(dt); autoChatTarget(); updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
+function animate(rdt){ updateFirstPersonView(rdt); followAvatarCamera(rdt); autoChatTarget(); const ws=worldSpeed(), dt=rdt*ws; if(state.scene && state.scene.animationTimeScale!==ws) state.scene.animationTimeScale=ws; updateHandovers(dt); for(const g of (state.playerAvatar?state.characters.concat(state.playerAvatar):state.characters)){ if(g.falling){ g.t+=dt; updateFall(g,dt); continue; } if(g.turnMove){ g.turnMove.t+=dt/g.turnMove.dur; const u=clamp(g.turnMove.t,0,1); const k=u*u*(3-2*u); let p;
       if(g.turnMove.path){ const pp=pathPoint(g.turnMove,k); p=pp.p; if(pp.dir.lengthSquared()>1e-6) setCharacterFacing(g,legFacing(pp.dir)); } else p=BABYLON.Vector3.Lerp(g.turnMove.start,g.turnMove.end,k);
       // Walked off the island: fall instead of hovering over the sea.
       // Off the board where there is no water (land, rock, a street): the walk stops at the edge.
       if(!hasGroundAt(p.x,p.z) && window.tablefolkTerrain && !window.tablefolkTerrain.waterAt(p.x,p.z)){ const q=g.root.position; delete g.turnMove; setCharacterLogicalPosition(g,new BABYLON.Vector3(Math.round(q.x),0,Math.round(q.z))); playRig(g,'idle',true); continue; }
       if(!hasGroundAt(p.x,p.z)){ const tm=g.turnMove, len=BABYLON.Vector3.Distance(tm.start,tm.end)||1; g.lastSafePos=tm.start.clone(); startFall(g,tm.end.subtract(tm.start).scale(clamp(len/tm.dur,1.4,3.4)/len)); continue; }
-      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); continueHeldStep(g); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,dt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
+      g.root.position.x=p.x; g.root.position.z=p.z; g.root.position.y=(state.terrainTopY??0)+floorLiftAt(p.x,p.z); if(g.collider) forceBodyTransform(g.collider,new BABYLON.Vector3(p.x,(state.terrainTopY??0)+.74,p.z)); if(u>=1){ const end=g.turnMove.end.clone(); delete g.turnMove; setCharacterLogicalPosition(g,end); continueHeldStep(g); } } g.t+=dt; if(g.rigged){ g.root.rotation.y=bodyYaw(g,dt); updateProceduralEmote(g,dt); if(g.mouth) updateMouth(g,rdt); else if(g.speaking && !g.charModel){ const heads=findHeadNodes(g); if(heads.length){ const mouth=Math.abs(Math.sin(g.t*14))*.18+.82; for(const h of heads) h.scaling.y=mouth; } } positionHeldItem(g,dt); poseReach(g); continue; } positionHeldItem(g,dt);
     const breathe=1+Math.sin(g.t*3.1)*.026; g.body.scaling.y=breathe; g.head.position.y=1.08+Math.sin(g.t*2.2)*.025; g.root.rotation.y=bodyYaw(g,dt); if(g.anim==='walk'){ g.feet[0].rotation.x=Math.sin(g.t*17)*.75; g.feet[1].rotation.x=-Math.sin(g.t*17)*.75; }
     else if(g.anim==='panic'){ g.root.rotation.y+=Math.sin(g.t*28)*.055; g.arms[0].rotation.z=.92+Math.sin(g.t*21)*.5; g.arms[1].rotation.z=-.92-Math.sin(g.t*19)*.5; g.head.scaling.x=1.06; }
     else if(g.anim==='talk'){ g.head.scaling.y=1+Math.sin(g.t*24)*.065; g.arms[0].rotation.z=.44; g.arms[1].rotation.z=-.44; }
     else if(g.anim==='cast'){ g.arms[0].rotation.z=1.05+Math.sin(g.t*18)*.1; g.arms[1].rotation.z=-1.05-Math.sin(g.t*18)*.1; g.head.position.y=1.15; }
     else if(g.anim==='push'){ g.body.rotation.x=Math.sin(g.t*18)*.08; g.arms[0].rotation.z=.72; g.arms[1].rotation.z=-.72; }
     else { g.head.scaling.set(1,1,1); g.body.rotation.x=0; g.arms[0].rotation.z=.28+Math.sin(g.t*2)*.04; g.arms[1].rotation.z=-.28-Math.sin(g.t*2.1)*.04; }
-  } if(isTurnMode() && state.turn.phase==='ready'){ for(const g of state.characters) if(!g.falling) zeroMeshMotion(g.collider); } updateBubbles(dt); updateCompassHUD(); }
+  } if(isTurnMode() && state.turn.phase==='ready'){ for(const g of state.characters) if(!g.falling) zeroMeshMotion(g.collider); } updateBubbles(rdt); updateCompassHUD(); }
 
 // v12 terrain patch: avoid WebGPU vertex-color/material weirdness and water z-fighting.
 // Uses simple StandardMaterial colored meshes at separated Y heights.
@@ -6400,7 +6404,9 @@ async function main(){ window.TABLEFOLK_STATE=state; await window.tablefolkPacks
   // bones; WebGPU's uniform room (16384 vectors) holds thousands.
   scene.onNewSkeletonAddedObservable.add(sk=>{ sk.useTextureToStoreBoneMatrices=false; });
   scene.clearColor=new BABYLON.Color4(.030,.058,.088,1);
-  scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk)); if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
+  scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=.0075; scene.fogColor=new BABYLON.Color3(.045,.105,.145); const hk=await HavokPhysics(); scene.enablePhysics(new BABYLON.Vector3(0,-9.81,0),new BABYLON.HavokPlugin(true,hk));
+  // fast-forward (worldSpeed): the frame's time times the speed, taken in fixed ~1/60 s steps (no bigger steps, no tunnelling)
+  { const step0=scene._advancePhysicsEngineStep; if(step0) scene._advancePhysicsEngineStep=function(e){ const pe=this._physicsEngine, k=worldSpeed(); if(pe && k!==1){ if(pe.getSubTimeStep()!==17) pe.setSubTimeStep(17); return step0.call(this,Math.min(250,e*k)); } if(pe && pe.getSubTimeStep()===17) pe.setSubTimeStep(0); return step0.call(this,e); }; } if(window.TABLEFOLK_STILL_MODE){ try{ scene.getPhysicsEngine()?.setTimeStep(0); console.warn('TABLEFOLK: still mode - physics frozen'); }catch(e){} }
   // Initial three-quarter composition: house high-right, fire/character left of
   // centre, and the near tree/crates framing the lower-right foreground.
   const camera=new BABYLON.ArcRotateCamera('camera',-Math.PI*.69+Math.PI,1.16,20.5,new BABYLON.Vector3(.9,.62,-.15),scene); state.camera=camera; camera.fov=.46; camera.lowerRadiusLimit=.25; camera.upperRadiusLimit=60; camera.panningSensibility=60; camera.minZ=.5; camera.maxZ=600; camera.upperBetaLimit=1.42; camera.lowerBetaLimit=.22; camera.attachControl(canvas,true); setupMouseWheelZoom(camera);

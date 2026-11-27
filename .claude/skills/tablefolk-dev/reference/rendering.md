@@ -1090,3 +1090,17 @@ follow camera's angle), body (idle, facing the camera) and floor (straight
 down) at a shared pixels-per-unit on a transparent background, recording
 each anchor; `assets/tiles/tiles.json` lists them. The map editor draws
 these, and renders missing ones on the spot in a hidden frame.
+
+## Fast-forward (`worldSpeed()` in app.js, 2026-11-27)
+
+`tablefolkModes.setSpeed(k)` (the God game's ×2 / ×4) speeds the whole world,
+not only the clock: a walk's duration is divided by k when it starts
+(`startTurnMove`, `startTurnPath`), so every timer that reads
+`turnMove.dur` (jobs, live, play, uses) agrees with it and pathing is
+unchanged; `animate()` scales its per-character time (turning, breathing,
+procedural walk, handovers, falls) but not the camera, bubbles or a talking
+mouth; `scene.animationTimeScale` follows k (body clips); physics takes the
+frame's time times k in fixed 17 ms sub-steps (`scene._advancePhysicsEngineStep`
+wrapped; at ×1 the sub-step is off as before), so a thrown thing flies faster
+without bigger steps.
+
