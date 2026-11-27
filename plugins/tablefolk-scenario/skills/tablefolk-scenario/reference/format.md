@@ -69,10 +69,11 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `dark` | fog of war; default true for generated dungeons | [board.md](board.md) |
 | `reveal` | what is hidden until found: `"rooms"` (each room until seen into), `"cells"` (square by square; outdoors a mist), `false`; default `"cells"` in dark worlds, `"rooms"` in generated lit dungeons, else none | [board.md](board.md) |
 | `surroundings` | trees beyond the board's edge: `forest` (thick woods), `fields` (open ground, scattered trees) or `none`; default: forest for a generated forest, fields for every other outdoor board | [board.md](board.md) |
-| `shells` | `false`: walled rooms keep code-built roofs instead of the building models over them | [board.md](board.md) |
+| `kit` | `false`: houses are the building models and code-built roofs instead of the building kit (houses assembled from the walls) | [board.md](board.md#houses-and-roofs) |
+| `shells` | with `"kit": false`: `false` keeps code-built roofs instead of the building models over walled rooms | [board.md](board.md) |
 | `outside` | what lies past the board: `land` (hills), `rock` (dungeons), `street` (a lone building), `sea` (islands), `none`; default by the kind of world | [board.md](board.md) |
 | `walls`, `wallHeight` | wall style and height | [board.md](board.md) |
-| `roofs` | `true` / `false` overrides the automatic thatched roofs | [board.md](board.md) |
+| `roofs` | `true` / `false` overrides the automatic houses and roofs | [board.md](board.md) |
 | `pathfinding`, `earshot`, `safety` | walking, hearing, crisis banner | [board.md](board.md), [characters.md](characters.md) |
 | `grid`, `legend` | ASCII map | [grid.md](grid.md) |
 | `objects` | things at exact positions | [things.md](things.md) |

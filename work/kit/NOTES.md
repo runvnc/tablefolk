@@ -210,3 +210,30 @@ shots/babylon_sheet_2.jpg.
 Still plainer than the concepts in two ways: the concepts' roofs are steeper and darker with more
 contrast between courses, and their walls have more varied infill colour (ochre panels in concept
 2). Next would be per-panel tint jitter and darker roof grading, both cheap.
+
+## Phase 6: in the game (2026-11-27, app/buildings.js)
+A JS port of build_house.py assembles every roofed room's house in the browser from the world's grid (walls.js
+skips the squares it claims; roofs.js only fades). Shots: work/kit/game/ (tools/kit/game-shots.mjs). What changed
+from the reference on the way:
+- Coordinates: the reference's houses stood at the origin; the game's are absolute. The fascia box was centred at
+  u = 0 (long timbers across the village until fixed); everything else used absolute u already.
+- rects(): the scan grew through the whole footprint, so a wing on the -x/-z side of the main block met the main
+  block, found no rectangle and got no roof (build_house.py has the same flaw). It scans the cells left now.
+  Rooms need only half their rectangle filled with the kit (L shapes), 80% for code roofs.
+- Door on a gable: the chimney and lean-to keep off it (tested against the footprint: a jetty moves the roof's
+  edge past the wall line, and the test against the roof missed); a near-square house turns its ridge so the
+  door is under an eave. Quoins on the outer face only (through the wall they showed in the room).
+- Draw calls: one mesh per material per building nearly doubled hearthvale's draw calls (light, far: 463 vs 210
+  with the shells). Now every kit building of a world is one set (one structure and one roof mesh per material,
+  15 meshes in hearthvale), roofs faded per pixel by a building index (vertex attribute tfRid + a 256 x 1 alpha
+  texture, dithered), roof pieces thin-instanced with the same index, flush pieces out of the shadow pass, the far
+  roof dropped (2-6k triangles a house either way; the piece LOD is what counts).
+- Free camera: the cutaway cuts every wall to half height there; kit walls ignore that mode (noHalf), and cut kit
+  squares get no lid (it was a square wide, the wall .18).
+- Window glow: the Tripo glass is neutral mid grey (linear b - r ~ 0), not the shells' dark cool panes: its own
+  plugin keys on neutral mid-grey texels (8% of the window texture: the panes); not on the dormer (its slate is
+  neutral too).
+- Shaders of the far pieces compiled on first use after the reveal (a 0.75 s frame at high): every piece mesh
+  draws a zero-size copy until 4 s after world-ready.
+- Closed buildings (the env models placed as things) are kit houses with the door shut, from the model's
+  footprint; their collider is the thing's as before.

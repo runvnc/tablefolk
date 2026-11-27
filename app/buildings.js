@@ -1016,36 +1016,26 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     b.roofBox = { lo: new BABYLON.Vector3(x0 + .3, top + A.ZT - .5, z0 + .3), hi: new BABYLON.Vector3(x1 - .3, top + A.zr + .5, z1 - .3) };
     return b;
   }
-  let walkStruct = [], walkRoof = [];
-  function mergeWalkIn(top) {
-    const M = materials(), acc = {}, racc = {};
-    for (const b of list) { mergeInto(acc, b.A.S); mergeInto(racc, b.A.RF, b.rid); }
-    walkStruct = [];
-    for (const [mn, bk] of Object.entries(acc)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) { walkStruct.push(m); state.wallVisuals.push(m); } }
-    for (const m of walkRoof) try { m.dispose(false, false); } catch {}
-    walkRoof = [];
-    for (const [mn, bk] of Object.entries(racc)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top, new Float32Array(bk.R)); if (m) { m.metadata = { roof: true }; walkRoof.push(m); } }
+  // every kit building of the world (walk-in and closed) in one set: per material one structure mesh and one roof
+  // mesh (closed buildings' roofs carry index 0: they never fade); merged again when either changes
+  let merged = [], mergeQueued = false;
+  function remerge() {
+    for (const m of merged) try { m.dispose(false, false); } catch {}
+    merged = [];
+    if (!state.scene || !(list.length + closedList.length)) return;
+    const M = materials(), S = {}, R = {}, top = (list[0] || closedList[0]).top;
+    for (const b of all()) { mergeInto(S, b.A.S); mergeInto(R, b.A.RF, b.rid || 0); }
+    for (const [mn, bk] of Object.entries(S)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) merged.push(m); }
+    for (const [mn, bk] of Object.entries(R)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top, new Float32Array(bk.R)); if (m) { m.metadata = { roof: true }; merged.push(m); } }
   }
-  let closedMeshes = [], closedQueued = false;
   function mergeClosed() {
-    if (closedQueued) return; closedQueued = true;
-    queueMicrotask(() => {
-      closedQueued = false;
-      for (const m of closedMeshes) try { m.dispose(false, false); } catch {}
-      closedMeshes = [];
-      if (!closedList.length || !state.scene) return;
-      const M = materials(), S = {}, R = {}, top = closedList[0].top;
-      for (const b of closedList) { mergeInto(S, b.A.S); mergeInto(R, b.A.RF); }
-      for (const [mn, bk] of Object.entries(S)) { const m = meshOf('wall_kit_closed_' + mn, bk, M.wall[mn], top); if (m) closedMeshes.push(m); }
-      for (const [mn, bk] of Object.entries(R)) { const m = meshOf('roof_kit_closed_' + mn, bk, M.roof[mn], top, 0); if (m) closedMeshes.push(m); }
-    });
+    if (mergeQueued) return; mergeQueued = true;
+    queueMicrotask(() => { mergeQueued = false; remerge(); });
   }
   function disposeAll() {
-    for (const m of walkRoof) try { m.dispose(false, false); } catch {}
-    claimedCells = new Set(); walkStruct = []; walkRoof = [];   // (the structure is in state.wallVisuals: disposed with the walls)
+    claimedCells = new Set();
     fadeData.fill(255); fadeDirty = true;
     list = []; byKey.clear();
-    if (instanced.length) refreshInstances();
   }
   // the squares beyond a gable (a lean-to wants two free squares of ground there)
   function freeBeyond(spec) {
@@ -1061,7 +1051,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
   function build(cell, top, rooms) {
     const t0 = performance.now();
     disposeAll();
-    if (!enabled() || !rooms?.length || !state.scene) return null;
+    if (!enabled() || !rooms?.length || !state.scene) { remerge(); if (instanced.length) refreshInstances(); return null; }
     const M = materials(), H = wallH(), claimed = new Set(), tok = ++builtTok;
     const scnSeed = (state.envScn || window.tablefolkScenario?.active?.scn || {}).seed | 0;
     const isW = k => { const w = cell.get(k); return w && (meta(w).type === 'wall' || meta(w).type === 'door'); };
@@ -1093,8 +1083,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
       list.push(b); byKey.set(b.key, b);
       timing.push(+(performance.now() - t1).toFixed(1));
     }
-    if (!list.length) return null;
-    mergeWalkIn(top);
+    remerge();
+    if (!list.length) { if (instanced.length) refreshInstances(); return null; }
     // the pieces: now if loaded, else when they are (under the loading cover)
     const place = P => { if (tok !== builtTok) return; placePieces(P, cell, top); };
     const loaded = loadPieces();
@@ -1152,7 +1142,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
       const buf = new Float32Array(mats.length * 16); mats.forEach((M, i) => M.copyToArray(buf, i * 16));
       it.mesh.thinInstanceSetBuffer('matrix', buf, 16, true); it.mesh.thinInstanceSetBuffer('tfRid', new Float32Array(rids), 1, true);
       it.mesh.thinInstanceRefreshBoundingInfo(false); it.mesh.isVisible = true;
-      if (!it.shadow) { it.shadow = true; addShadow(it.mesh); }
+      // (flush pieces, windows, corbels, door frames, cast nothing worth a shadow pass)
+      if (!it.shadow && /^(chimney|dormer|porch|stair|sign)$/.test(it.name)) { it.shadow = true; addShadow(it.mesh); }
     }
   }
   // near / far by camera distance (checked four times a second)
@@ -1223,7 +1214,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
   function stats() {
     const tris = ms => ms.reduce((n, m) => n + (m.isDisposed?.() ? 0 : (m.getTotalIndices?.() || 0) / 3), 0);
     let inst = 0; for (const it of instanced) if (it.mesh.isVisible) inst += (it.mesh.getTotalIndices() / 3) * (it.mesh.thinInstanceCount || 0);
-    return { ...lastStats, closed: closedList.length, struct: tris(walkStruct), closedTris: tris(closedMeshes), roof: tris(walkRoof), meshes: walkStruct.length + walkRoof.length + closedMeshes.length,
+    return { ...lastStats, closed: closedList.length, tris: tris(merged), meshes: merged.length,
       pieceTris: inst, far: list.filter(b => b.far).length, list: list.map(b => ({ key: b.key, role: b.spec.role, style: b.spec.style, storeys: b.spec.storeys, roof: b.spec.roof, far: b.far, center: b.center })) };
   }
   window.tablefolkBuildings = {

@@ -807,6 +807,24 @@
     return { ...scn, objects, paint, places, agents, player, subworlds, links, gridWarnings: [...(scn.gridWarnings || []), ...warnings, ...keptWarnings] };
   }
 
+  // A place's building, for the building kit (buildings.js specFor): style, storeys, roof, pitch, jetty, chimney,
+  // porch, sign, dormers, seed; what is not valid is dropped (the defaults by the place's kind then apply)
+  const KIT_STYLES = ['plaster_timber', 'stone_timber', 'plank_barn', 'stone_cottage'], KIT_ROOFS = ['shingle', 'tile', 'thatch'];
+  function kitPlace(p) {
+    if (!p || typeof p !== 'object') return p;
+    const o = { ...p }, drop = k => { delete o[k]; };
+    if ('style' in o && !KIT_STYLES.includes(o.style)) drop('style');
+    if ('roof' in o && !KIT_ROOFS.includes(o.roof)) drop('roof');
+    if ('storeys' in o && !(o.storeys === 1 || o.storeys === 2)) drop('storeys');
+    if ('pitch' in o && !(Number.isFinite(+o.pitch) && +o.pitch >= 30 && +o.pitch <= 60)) drop('pitch');
+    if ('jetty' in o && !(typeof o.jetty === 'boolean' || (Number.isFinite(+o.jetty) && +o.jetty >= .1 && +o.jetty <= .5))) drop('jetty');
+    if ('chimney' in o && ![false, 'left', 'right'].includes(o.chimney)) drop('chimney');
+    for (const k of ['porch', 'sign']) if (k in o && typeof o[k] !== 'boolean') drop(k);
+    if ('dormers' in o && !(Number.isInteger(+o.dormers) && +o.dormers >= 0 && +o.dormers <= 3)) drop('dormers');
+    if ('seed' in o && !Number.isFinite(+o.seed)) drop('seed');
+    return o;
+  }
+
   // Scenario with explicit objects/paint/positions -> the same in grid form,
   // over the whole board. Whatever a glyph can't say exactly (turned or
   // off-cell objects, tinted paint, characters 10+) stays in objects/paint/at.
@@ -1040,7 +1058,8 @@
       memory: s.memory === false ? false : null,   // false: no meaning-based recall (embed.js not loaded; mind.js prepare skipped)   // false: no character speaks aloud in this world (ttsEnabled on each)
       surroundings: ['forest', 'fields', 'none'].includes(s.surroundings) ? s.surroundings : null,   // surroundings.js: beyond the board's edge
       outside: ['land', 'sea', 'rock', 'street', 'none'].includes(s.outside) ? s.outside : null,
-      shells: s.shells === false ? false : null,   // roofs.js: building models over homes and workplaces (false: code-built roofs)   // terrain.js: what the ground beyond the board is (default by world kind)
+      shells: s.shells === false ? false : null,
+      kit: s.kit === false ? false : null,   // buildings.js: walk-in and closed buildings assembled from the building kit (false: the building models and roofs.js)   // roofs.js: building models over homes and workplaces (false: code-built roofs)   // terrain.js: what the ground beyond the board is (default by world kind)
       view: VIEWS.includes(s.view) ? s.view : null,   // the camera at the start: overview | follow | first (startView)
       defaultModel: s.brain === 'none' ? 'none' : typeof s.defaultModel === 'string' && s.defaultModel ? s.defaultModel : null,
       simple: typeof s.simple === 'boolean' ? s.simple : null,
@@ -1051,6 +1070,7 @@
     if (gen || s._gen) Object.assign(out, { _gen: true, generate: gen?.generate || s.generate, places: gen?.places || s.places || [], genWarnings: gen?.warnings || s.genWarnings || [] });
     // a frozen layout (freezeLayout) keeps the generated map's rooms
     else if (Array.isArray(s.places)) out.places = s.places;
+    if (Array.isArray(out.places)) out.places = out.places.map(kitPlace);
     // Normalising twice (restart) must not wrap the turn limit again.
     if (out.goal?.maxTurns && !JSON.stringify(out.goal.lose || {}).includes('turns_over')) {
       const t = { turns_over: +out.goal.maxTurns };

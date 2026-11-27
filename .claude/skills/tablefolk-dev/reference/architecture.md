@@ -109,6 +109,7 @@ is one event, `tablefolk-world-ready` ({ms, timedOut, pending, stages}), and
 | `ground` | terrain.js, on `tablefolk-scenario-started` | the rebuild with the texture arrays, and the ground cover |
 | `walls` | walls.js, on `tablefolk-scenario-started` | the 650 ms rebuild |
 | `roofs` | roofs.js, on `tablefolk-scenario-started` | the last roof or shell (one a frame) |
+| `buildings` | buildings.js, a world's first kit build | the hero pieces loaded and placed |
 | `travel` | scenario.js `curtain(true)` (a section) | `curtain(false)` |
 
 With nothing pending for 300 ms it settles: the finishing steps
@@ -186,6 +187,7 @@ and whether it came before the settle.
 | `look.js` | the shared matte materials and post-processing (`TABLEFOLK_LOOK`) |
 | `sky.js` | the sun/moon, sky fill, shadow map, time of day, sky dome, clouds, fog (`tablefolkSky`, `tablefolkLook.setTimeOfDay`) |
 | `terrain.js` | the blended ground, ground cover, what lies beyond the board (`tablefolkTerrain`) |
+| `buildings.js` | the building kit: houses assembled from the grid (walls, frame, roofs, hero pieces from `assets/models/kit`), walk-in and closed; roof fade per pixel, storey clip, piece LOD (`tablefolkBuildings`; rendering.md "Buildings: the kit") |
 | `walls.js` | stone, dungeon and timber-framed walls, door frames, windows (`tablefolkWalls`) |
 | `surroundings.js` | trees on the land beyond the board (`tablefolkSurroundings`) |
 | `terrain-hd.js` | floor tiles, water, lava, the shelved HD island (`TablefolkHD`) |

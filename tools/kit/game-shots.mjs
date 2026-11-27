@@ -25,12 +25,17 @@ await p.waitForTimeout(2500);
 const measure = () => p.evaluate(async () => {
   const s = TABLEFOLK_STATE, sc = s.scene, e = sc.getEngine();
   const ins = window._tfIns || (window._tfIns = new BABYLON.SceneInstrumentation(sc)); ins.captureFrameTime = true; ins.captureActiveMeshesEvaluationTime = true;
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 800));
+  // medians over 3 s of frames: draw calls per frame (the shadow map is redrawn every second frame at light) and
+  // the frame's CPU time
+  const dcs = [], fts = [], ob = sc.onAfterRenderObservable.add(() => { dcs.push(e._drawCalls?.current ?? 0); fts.push(ins.frameTimeCounter.current); });
+  await new Promise(r => setTimeout(r, 3000)); sc.onAfterRenderObservable.remove(ob);
+  const med = a => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(b.length / 2)] || 0; };
   const act = sc.getActiveMeshes(); let tris = 0, kitTris = 0;
   for (let i = 0; i < act.length; i++) { const m = act.data[i]; const n = (m.getTotalIndices?.() || 0) / 3 * (m.thinInstanceCount || 1) * (m.isVisible ? 1 : 0); tris += n; if (/kit/.test(m.name)) kitTris += n; }
   const ws = window.tablefolkLoading?.log?.find?.(l => /world-ready|revealed/.test(l.what || ''));
-  return { buildings: window.tablefolkBuildings?.stats?.(), activeMeshes: act.length, drawCalls: e._drawCalls ? Math.round(e._drawCalls.lastSecAverage || e._drawCalls.current) : null, trisDrawn: Math.round(tris), kitTris: Math.round(kitTris),
-    gfxGB: +window.tablefolkGfxGB?.().toFixed(3), textures: sc.textures.length, frameMs: +ins.frameTimeCounter.lastSecAverage.toFixed(2), fps: +e.getFps().toFixed(1),
+  return { buildings: window.tablefolkBuildings?.stats?.(), activeMeshes: act.length, drawCalls: med(dcs), drawCallsMax: Math.max(0, ...dcs), trisDrawn: Math.round(tris), kitTris: Math.round(kitTris),
+    gfxGB: +window.tablefolkGfxGB?.().toFixed(3), textures: sc.textures.length, frameMs: +med(fts).toFixed(2), frames: fts.length, fps: +e.getFps().toFixed(1),
     quality: window.TABLEFOLK_GFX?.quality, shells: window.tablefolkRoofs?.shells?.().length, roofs: window.tablefolkRoofs?.roofed?.().length };
 });
 const shot = async name => { await p.waitForTimeout(+(process.env.SHOT_WAIT || 1400)); const url = await p.evaluate(() => document.getElementById('renderCanvas').toDataURL('image/jpeg', .86)); writeFileSync(`${dir}/${prefix}_${name}.jpg`, Buffer.from(url.split(',')[1], 'base64')); console.log('shot', `${dir}/${prefix}_${name}.jpg`); };
@@ -79,6 +84,17 @@ for (const v of views.split(',')) {
     await p.evaluate(([x, z, yaw]) => { const s = TABLEFOLK_STATE; tablefolk.setCharacterLogicalPosition(s.playerAvatar, { x, z });
       tablefolk.setCameraView('first'); s.fpYaw = yaw; s.fpPitch = -.05; },
       [dx + nx * 2.2, dz + nz * 2.2, Math.atan2(-nx, -nz)]);
+  }
+  // walking in with the follow camera: walkN = N squares out from the door (walk0 in the doorway, walkin 1.5 inside)
+  if (/^walk/.test(v)) {
+    const n = v === 'walkin' ? -1.5 : +v.slice(4);
+    await p.evaluate(() => { if (TABLEFOLK_STATE.firstPerson) tablefolk.setFirstPerson(false); tablefolk.setCameraView('follow'); });
+    await player(dx + nx * n, dz + nz * n); await p.waitForTimeout(900);
+  }
+  if (v === 'fpdoor') {   // first person a step outside the doorway, looking in: the leaf swings open
+    await p.evaluate(([x, z, yaw]) => { const s = TABLEFOLK_STATE; tablefolk.setCharacterLogicalPosition(s.playerAvatar, { x, z });
+      tablefolk.setCameraView('first'); s.fpYaw = yaw; s.fpPitch = -.02; }, [dx + nx * 1.1, dz + nz * 1.1, Math.atan2(-nx, -nz)]);
+    await p.waitForTimeout(1200);
   }
   if (v === 'night') { await player(dx + nx * 6, dz + nz * 6); await p.evaluate(() => window.tablefolk?.setTimeOfDay?.(22)); await free(cx, top + 2, cz, aOut + .5, 1.12, 18); }
   if (process.env.KIT_JS) console.log('KIT_JS', JSON.stringify(await p.evaluate(process.env.KIT_JS)));

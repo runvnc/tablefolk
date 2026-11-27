@@ -550,9 +550,19 @@ TRELLIS.2 seed and its other settings (`remesh_project`, shape guidance),
 the Step1X-3D label model (symmetry and sharp-edge controls; 8.8 GB more),
 textured Hunyuan3D.
 
-### Modular building kit, a trial (2026-11-27)
+### Modular building kit (2026-11-27)
 
-Not in the game yet. Buildings assembled by code from the description the world already has (the
+In the game since 2026-11-27 (`app/buildings.js`; rendering.md "Buildings: the kit"): the default for walk-in
+and closed buildings; the Meshy building models (`props/env`) are only loaded with `?kit=0` / `"kit": false`
+(still in the repo). Game files: `tools/kit/export_game.py` writes `assets/textures/kit/` (the graded sets as
+WebP, 1024 and `_512`; shingle darkened and given more contrast there) and `assets/models/kit/` (the pieces
+through `tools/compress-glb.sh`: door, leaf and window at 1024 with `_512` copies for light quality, the rest
+512, the `_lod` files 256; `pieces.json`). Licences: `LICENSE.txt` in both (Tripo and Patina outputs through
+fal.ai are paid generations owned by the project, like the Meshy models; plaster and clay tile are Poly Haven
+CC0). Texture memory, all of it once for any number of houses: 9 sets x 3 maps + 20 piece files. Checked in the
+game with `tools/kit/game-shots.mjs` (shots and numbers; `work/kit/game/`).
+
+Buildings assembled by code from the description the world already has (the
 wall/door grid, rooms by flood fill) instead of one image-to-3D model per house: the whole-house
 models spread their triangles and one texture over the building, and the shell-to-room swap looked
 wrong. Scripts in `tools/kit/` (headers say how to run each); scratch, raw files and the running
@@ -599,7 +609,8 @@ notes in `work/kit/` (`NOTES.md` is in git: every number and decision; sheets in
   triangles) and `build_house.py --far` (slab roofs): near 23-89k, far 3.6-13.5k triangles a
   house; switch at about 20 units. Sheet with the concepts and the old inn:
   `work/kit/shots/side_by_side_2.jpg`.
-- Open: merging across houses, KTX2 textures, per-panel infill tint, darker roof grading.
+- In the game: merged across houses (one mesh per material for the world), per-panel infill tint and darker
+  shingle done. Open: KTX2 textures (no encoder installed), impostors or a merged far village.
   $11.62 of fal in all (ledger `work/kit/ledger.jsonl`).
 
 ### Procedural trees, plants and the environment texture set (2026-11-20)

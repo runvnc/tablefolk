@@ -147,7 +147,8 @@ generated the first time the player goes in ([things.md](things.md#sections-worl
 
 `normalizeScenario` keeps `places` (id, kind, centre, bounds, who is there) on
 the result for tools and prompts; characters' prompts say which place they are
-in and which they can walk to (`app/senses.js`).
+in and which they can walk to (`app/senses.js`). A place may also say what its building looks
+like (`style`, `storeys`, `roof`, `jetty`, ...: [board.md](board.md#houses-and-roofs)).
 
 ## Fixed layouts (`freezeLayout`)
 
@@ -168,7 +169,8 @@ setting), `add_objects`, `paint_area` (a whole patch of floor tiles
 ### Buildings in a generated village (2026-11-20)
 
 A building nobody lives or works in (no character's `home`, `workplace` or
-`in`, no object placed `in` it) becomes one of the real building models,
+`in`, no object placed `in` it) becomes a closed building (a kit house with
+its door shut; with `"kit": false` one of the real building models),
 chosen by its role (a house: house, timber house, tall house or stone house;
 a tavern: the inn; a smithy: the blacksmith; a guardhouse: the barracks; a
 stable: the stable; and so on), seeded, no two alike in a row where another

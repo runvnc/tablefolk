@@ -222,36 +222,69 @@ characters' own sight is unchanged. What you have explored is kept with each
 section of a world ([things.md](things.md)). `?nofog=1` turns it all off;
 the tabletop map shows everything.
 
-## Roofs
+## Houses and roofs
 
-Walled rooms in a world that has an outside get gable roofs (`app/roofs.js`):
-thatch on small houses, clay tiles or slate on bigger ones, with plaster
-gables and timber trim. Rooms are found from the walls (a door, or a
-one-square gap between two walls, closes a room), so generated villages,
-drawn grids and hand-edited maps all get them. Not in dark worlds, dungeons,
-or a world that is all one building (the roof would be the whole sky).
-`"roofs": false` turns them off, `true` forces them on.
+Walled rooms in a world that has an outside become houses (`app/buildings.js`,
+the building kit, 2026-11-27): each is assembled from the map's own walls and
+doors, so generated villages, drawn grids and hand-edited maps all get them.
+Rooms that share a wall are one building. A house has real walls (both faces
+finished: plaster, fieldstone or planks outside, plaster or planks inside), a
+timber frame with braces, a stone plinth, small detailed doors and windows,
+and a gable roof of wooden shingles, clay tiles or thatch over each part (an
+L-shaped room gets a main roof and a wing). Many have two storeys (the upper
+one only seen from outside: the ground floor is where everyone lives), some
+with the upper storey jutting out over the street on carved brackets; a
+chimney stack from a fireplace inside, dormers, a porch over the door, a
+bench, window boxes, a lean-to with a log pile or a workbench, a hanging sign
+on shops and taverns. No two houses come out alike (seeded by where they
+stand). At dusk and night their windows glow warm. A building placed as a
+thing (a village's inn, stone or tall house, mill, barracks) is built the
+same way, with its door shut. Not in dark worlds, dungeons, or a world that
+is all one building (the roof would be the whole sky). `"roofs": false` turns
+them off (plain walls), `true` forces them on.
 
-Outside, a room someone lives or works in wears a real building (a house,
-the inn, the blacksmith, a stable or barn, the barracks, the mill) over its
-walls, chosen by what the room is and fitted to its size. Walk up to its
-door and, before the door swings open, the building opens round the doorway
-to show the room's own door, frame and walls there (the door you open is the
-one you see, and you can see in); once you are through, the rest of the
-building lifts to show the room, and it closes up again the same way as you
-leave. Whoever and whatever is inside (beds, chests, tables) is hidden while
-it stands closed, so nothing pokes out through its walls. A walk-in room has
-its own floor a few centimetres above the ground (planks, or the floor painted
-in it: a smithy's stone, a barn's earth), with a raised threshold at the door,
-so it never blends into the grass outside. In a generated village the barrels,
-crates and flowers by the doors stand two squares out, clear of a building's
-steps and porch. It is only a picture: the room's walls and door
-are what count. `"shells": false` keeps the plain roofs.
+What each house looks like comes from its place's kind (a tavern: stone
+ground floor, timbered upper storey, clay tiles, a sign and a dormer; a
+smithy: a stone cottage; a stable or barn: planks; a shop: two storeys
+jutting over the street with a sign; a home: one of several) and can be set
+per place: a scenario's `places` entry (with its bounds `x0`, `x1`, `z0`,
+`z1`, as a generated or frozen world has them) may carry
+
+| field | values |
+|---|---|
+| `style` | `plaster_timber`, `stone_timber`, `stone_cottage`, `plank_barn` |
+| `storeys` | `1` or `2` |
+| `roof` | `shingle`, `tile`, `thatch` |
+| `pitch` | roof pitch in degrees, 30-60 |
+| `jetty` | `true` (the upper storey juts out over the door side), a depth (.1-.5), or `false` |
+| `chimney` | `left`, `right` (which gable end) or `false` |
+| `porch`, `sign` | `true` / `false` |
+| `dormers` | 0-3 |
+| `seed` | another number gives another house of the same kind |
+
+```json
+"places": [{ "id": "bakery", "kind": "shop", "x0": 3, "x1": 6, "z0": -4, "z1": -2,
+             "style": "plaster_timber", "storeys": 2, "roof": "tile", "jetty": true, "sign": true }]
+```
+
+The roof of the house the player is in (or whose doorway it stands in)
+fades away, and with it the storey above, so the room shows; in first person
+it stays (it is the ceiling). With the follow camera, a roof between the
+camera and the player turns see-through; walls between them drop low as
+before. The free camera never peeks: roofs stay on, and houses keep their
+whole walls. Nothing is swapped when you walk in or out: the walls, the door
+you open and the room are the same from outside and in. It is only a
+picture: the room's walls and door are what count (paths, sight, locks).
+
+`"kit": false` brings back the earlier look: building models (Meshy) over
+homes and workplaces, and code-built roofs elsewhere (`"shells": false` then
+keeps the code-built roofs everywhere). The kit also needs walls at least
+about two squares high (`"wallHeight": 2`, the default for generated
+villages): lower walls keep the plain roofs. A walk-in room has its own floor
+a few centimetres above the ground (planks, or the floor painted in it: a
+smithy's stone, a barn's earth), so it never blends into the grass outside.
 
 Lanterns outdoors stand on timber posts; indoors and underground they hang
 on the nearest wall (or stand on a short iron stand in the middle of a
 room).
 
-The roof of the room the player is in (or whose doorway they stand in) fades
-away; with the follow camera, a roof between the camera and the player turns
-see-through. The free camera never peeks: roofs stay on.

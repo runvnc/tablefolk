@@ -396,6 +396,9 @@ the ground is outside them (a world that is all one building); else land.
   as before. A door swings open as anyone approaches; locked ones stay shut.
 - Walls are rebuilt again 650 ms after a scenario starts (the rooms and the
   outside are known then).
+- Kit houses (buildings.js, above): the wall and door squares of the rooms the
+  kit builds are skipped here; the "house" look stays for `?kit=0`, low walls
+  and the tabletop view.
 - `app/cutaway.js`: with the follow camera, walls between the camera and the
   player are cut per pixel in the walls' own materials (a material plugin
   discards fragments above a stub height in the cut squares); geometry is
@@ -406,7 +409,10 @@ the ground is outside them (a world that is all one building); else land.
   rather than hollow with timber "teeth". Cut squares get a stone lid. The free camera uses
   a second mode (`half()`, uniform `tfCut.z` = 2): every wall fragment above
   half the wall height is discarded, with no lids; the fog boxes' plugin
-  (`attach(mat, true)`) ignores that mode. `suspend(true)` returns the mode,
+  (`attach(mat, true)`) ignores that mode. So do kit houses (`attach(mat, false, true)`,
+  `noHalf`: a house keeps its walls under its roof), and cut kit wall squares
+  get no lid (`tablefolkBuildings.claims`: the solid kit wall needs none, and
+  the 1-square lid stuck out past its .18 thickness). `suspend(true)` returns the mode,
   `suspend(mode)` restores it.
 
 ## Darkness
@@ -473,6 +479,97 @@ Dungeon walls (pass 4): the `blocks` tint is (.7,.74,.82) and lanterns light
 plugin darkens and greens the albedo low on the walls (under ~.75 m) in
 value-noise patches.
 
+## Buildings: the kit (buildings.js, 2026-11-27)
+
+`app/buildings.js` assembles houses in the browser from the world's grid; on
+by default outdoors (not `?kit=0`, `"kit": false`, the tabletop view; walk-in
+houses need `wallH() >= 1.9`, i.e. `"wallHeight": 2`). A JS port of
+`tools/kit/build_house.py` (the reference, `work/kit/NOTES.md`): `assemble(spec)`
+is pure (spec: the building's wall, door and inside squares, H = `wallH()`,
+style, storeys, roof, pitch, jetty, chimney, porch, sign, dormers, seed) and
+returns per-material buckets (structure `S`, roof `RF`; the far roof `RFF`
+only with `farRoof`) of flat-shaded faces with UVs in metres / the texture's
+tile and vertex colours (dirt, tint, panel tint), plus the hero pieces placed.
+It works in the reference's frame (X = x, Y = z, Z up) and is emitted as
+(X, Z + top, Y); winding is fixed per triangle from its normal (`orient`:
+front when `((b - a) x (c - a)) . n < 0`, walls.js's rule), so the mirror is
+harmless. ~5-20 ms a building; hearthvale's 11 in 130-200 ms (under the
+loading cover, with the walls).
+
+- **Which rooms**: `tablefolkRoofs.planned()` (walls.js `houseCells`), grouped
+  into buildings by `group()` (rooms whose wall rings touch); with the kit a
+  room needs only half its rectangle filled (an L gets a main roof and a wing:
+  `rects()` scans the cells not yet covered; build_house.py's scan grew into
+  the main block and dropped wings on its -x/-z side). walls.js `build0` calls
+  `tablefolkBuildings.build(cell, top, rooms)` and skips the wall and door
+  squares it returns (a door at a run's end, which the kit can't open, stays
+  walls.js's).
+- **Defaults** (`specFor`): by the place's kind (`state.places` overlapping
+  the room; tavern: stone_timber, tile, sign, dormer; smithy: stone_cottage;
+  stable/barn/mill: plank_barn; temple/library/guard: stone_timber 2 storeys;
+  shop/bakery/alchemist: plaster_timber 2 storeys, jetty, sign; homes: one of
+  four seeded), then the place's own fields (scenario.js `kitPlace` drops bad
+  values). Seed: the first room's corner and the scenario's seed. The door
+  side is the front (jetty, sign); a near-square house with its door on a
+  gable gets its ridge turned; the chimney and lean-to keep off a gable with a
+  door (tested against the footprint: a jetty moves the roof's edge).
+- **Draw calls**: every kit building of the world (walk-in and closed) is one
+  set: per material one structure mesh and one roof mesh (`remerge`, again on
+  every wall rebuild and closed building added). Per building meshes nearly
+  doubled hearthvale's draw calls; merged, the kit is 15 meshes there. Roofs
+  fade one building at a time without their own meshes: each roof vertex
+  carries its building's index (`tfRid`, a vertex attribute; 0 = never fades,
+  closed buildings), and `TfRoofFade` (plugin on the roof materials and the
+  piece materials) looks up the alpha in a 256 x 1 texture (`setAlpha(key, a)`,
+  roofs.js) and dithers the fragment away below it (screen door: no blending
+  or sorting). Roof pieces (chimney top, dormer, gable windows) are thin
+  instances with `tfRid` per instance.
+- **Hero pieces** (`assets/models/kit`, `loadPieces`): each GLB's meshes baked
+  into a template mesh in Babylon space (the loader's mirror applied, front
+  faces by the normals) and a thin-instance twin with its own geometry
+  (shared geometry leaks instance buffers). `pieceMatrix` maps a placement to
+  a Babylon matrix (reference local -> rotate about Z -> Babylon; no mirror
+  left, so thin instances work). Near and far (`_lod`) sets, switched per
+  building at `LOD_FAR` (20 units camera distance, 1.5 hysteresis, checked 4
+  times a second; `refreshInstances` rebuilds the buffers). Light quality
+  loads `<name>_512.glb` for the door, leaf and window. Only pieces that stand
+  out (chimney, dormer, porch, stair, sign) cast shadows. Until 4 s after
+  `tablefolk-world-ready` every piece mesh draws (a zero-size copy if unused)
+  so its shaders compile under the cover (a far piece's first use hitched a
+  frame by 0.7 s at high).
+- **Doors**: the kit's door frame is a piece; the leaf is the kit's leaf
+  (template clone, `door_leaf_kit`) on the game's hinge: a pivot like
+  app.js `buildDoorLeaf` (hinge at the square's centre - .3 along the wall),
+  pushed to `state.doorLeaves`, so `ensureDoorAnimator` swings it; metadata
+  `proxy` is the door object (picking, locks). A closed building's door is a
+  shut leaf piece (pieces.json offset).
+- **Materials**: one PBR set per kit material (`assets/textures/kit`, WebP,
+  1024; `_512` for quoin and floor, every map at light, the roughness maps at
+  medium), albedo x vertex colour, OpenGL normals like walls.js
+  (`invertNormalMapX`), `backFaceCulling` false (the cut's dark section). The
+  wall set has `TfStorey` and the cutaway's cut with `noHalf`; the roof set
+  (same textures) has `TfRoofFade` and the see-through dither. Shingle is
+  darker and more contrasty (export_game.py grading, course shade .62-1.16),
+  plaster panels between posts get seeded tints (ochres).
+- **Storey clip** (`TfStorey`, on the wall set and the pieces): roofs.js
+  calls `clip(key)` for the building the player is in while its roof is away
+  (not in first person: the upper floor is the ceiling); fragments above
+  `H - .2` inside its box are discarded, so the upper storey, its floor and
+  the stack go and the room shows. `clip('all')` with `tablefolkRoofs.toggle()`.
+- **Windows at night**: `TfKitGlow` on the window piece: neutral mid-grey
+  texels (the Tripo glass; timber is warm, lead dark) glow warm by
+  `TABLEFOLK_NIGHT` (roofs.js `windowGlow` keyed on dark cool texels and
+  missed it; the dormer's slate is neutral too, so not on the dormer).
+- **Closed buildings**: app.js `makeCatalogItem` gives an env building model
+  type (`ENV_BUILDINGS`) a kit house when `closedWanted(type)`: the thing's
+  proxy and collider as before, the house from the model's footprint (odd
+  squares, at least 5) round the proxy, door in the middle of its front (ry),
+  no lean-to; disposed with the thing (`meta.cleanup`). `?kitclosed=0` keeps
+  the models for those only.
+- Not done: impostors or a merged far version of a whole village; KTX2 (no
+  encoder here); door leaves are still one mesh each (they swing); the shadow
+  map draws the merged sets in every cascade.
+
 ## Roofs
 
 `app/roofs.js`: rooms are found by flood-filling the board from its edge over
@@ -489,6 +586,13 @@ so the fade is per roof through each mesh's `visibility` (and roofs are
 disposed without their materials). Pieces are merged per material with
 `BABYLON.Mesh.MergeMeshes`; one roof a frame, nearest the player first (all
 at once took ~2.5 s of one frame in a big village).
+
+With the building kit on (the default since 2026-11-27, above) roofs.js
+builds none of this: it makes one entry per kit building (`kitEntry`: its
+rooms as one, `kit` = the building's key) and fades it with the same rule,
+through `tablefolkBuildings.setAlpha` (per pixel) and `roofBox` (the camera
+ray), and calls `clip()` for the storey above. What follows (code roofs and
+shells) is the `?kit=0` / `"kit": false` path.
 
 Building shells (look pass 3): homes and workplaces stay walk-in rooms
 (jobs.js needs their beds and stations on the same map), but outside a room
