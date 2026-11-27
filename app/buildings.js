@@ -724,8 +724,13 @@
     // corners; none if nothing is clear (it hangs .86 out, H - 1.2 .. H - .25 high: level with the windows)
     if (SP.sign) {
       const SW = .06, GAP = .12, PGAP = .3, d0 = DOORS.find(d => d.k === 0 && !d.o.upper), best = { sc: 1e9 };
+      // other houses: their signs (none within 1.8 of this one, so two never hang into each other across a lane)
+      // and their footprints (the sign's tip, .9 out, never in another house)
+      const others = SP.otherSigns?.() || [], foreign = SP.foreignAt || (() => false);
       for (const run of runs) {
         if (run.kind !== 'outer') continue;
+        const [fr] = jettied(run, 0), [FO, FA, FN] = frameOf(run, fr);
+        const clearOfOthers = s => { const p = at(FO, FA, s, FN, T / 2 + BT), tip = [p[0] + FN[0] * .9, p[1] + FN[1] * .9]; return !others.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1.8) && !foreign(Math.round(tip[0]), Math.round(tip[1])); };
         const obs = [];
         for (const o of runOps0.get(run) || []) obs.push([o.s, o.kind === "door" ? (porches.some(p => p.run === run && Math.abs(p.s - o.s) < .01) ? .75 + PGAP - GAP : .53) : o.piece === 'window' ? .65 : .4]);
         for (const c of corbels) if (c.run === run) obs.push([c.s, .06]);
@@ -733,7 +738,7 @@
         if (CHIM && run.axis === CHIM[0] && Math.abs(run.fixed - CHIM[1]) < .6) obs.push([CHIM[2], .7]);
         const e0 = run.s0 - T / 2 + .45, e1 = run.s1 + T / 2 - .45, onDoor = d0 && d0.run === run, mid = (run.s0 + run.s1) / 2;
         for (let s = e0; s <= e1 + 1e-6; s += .125) {
-          if (!obs.every(([os, h]) => Math.abs(s - os) >= h + SW + GAP)) continue;
+          if (!obs.every(([os, h]) => Math.abs(s - os) >= h + SW + GAP) || !clearOfOthers(s)) continue;
           const sc = onDoor ? Math.abs(s - d0.o.s) : 100 + Math.abs(s - mid);
           if (sc < best.sc) Object.assign(best, { sc, run, s });
         }
@@ -1237,7 +1242,28 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
     if (mergeQueued) return; mergeQueued = true;
     queueMicrotask(() => { mergeQueued = false; remerge(); });
   }
+  // an outside stair's physics: three static boxes stepping up toward its door (the first solid square, by the
+  // upper door, as tall as the storey), so thrown or knocked things and a falling body meet it as they meet a wall;
+  // walking round it is solidAt (app.js isBlocked) for characters and the player, first person included
+  const stairBodies = [];
+  // what a new house's sign keeps clear of: the signs already hung on other houses, and their footprints
+  const otherSigns = () => all().flatMap(b => (b.A?.placed || []).filter(p => p.name === 'sign').map(p => [p.loc[0], p.loc[1]]));
+  const foreignAt = (x, z) => all().some(b => { const bb = b.A?.bbox; return bb && x >= bb[0] + 1 && x <= bb[2] - 1 && z >= bb[1] + 1 && z <= bb[3] - 1; });
+  function stairColliders(A, top) {
+    if (!A.solid?.length || typeof BABYLON === 'undefined' || !state.scene?.getPhysicsEngine?.()) return;
+    A.solid.forEach(([x, z], i) => {
+      const h = Math.max(.3, A.H * (A.solid.length - i) / A.solid.length);
+      try {
+        const m = BABYLON.MeshBuilder.CreateBox('kit_stair_collider', { width: .96, depth: .96, height: h }, state.scene);
+        m.position.set(x, top + h / 2, z); m.isVisible = false; m.isPickable = false; m.metadata = { stairCollider: true };
+        const agg = new BABYLON.PhysicsAggregate(m, BABYLON.PhysicsShapeType.BOX, { mass: 0, friction: .8, restitution: .05 }, state.scene);
+        agg.body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+        stairBodies.push({ m, agg });
+      } catch (e) { console.warn('[buildings] stair collider', e); }
+    });
+  }
   function disposeAll() {
+    for (const { m, agg } of stairBodies.splice(0)) { try { agg.dispose(); } catch {} try { m.dispose(); } catch {} }
     claimedCells = new Set(); solidCells.clear();
     fadeData.fill(255); fadeDirty = true;
     list = []; byKey.clear();
@@ -1276,7 +1302,7 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
       if (d0) { const [x, z] = d0; front = !inside.has(x + ',' + (z + 1)) && inside.has(x + ',' + (z - 1)) ? '+y' : !inside.has(x + ',' + (z - 1)) && inside.has(x + ',' + (z + 1)) ? '-y' : !inside.has((x + 1) + ',' + z) && inside.has((x - 1) + ',' + z) ? '+x' : '-x'; }
       const blocked = (x, z) => { const k = x + ',' + z; return isW(k) || allInside.has(k) || !window.tablefolk?.hasGroundAt?.(x, z) || (typeof isBlocked === 'function' && isBlocked(x, z)); };
       // (the sign finds its own place, assemble; some two-storey houses get an outside stair to a shut upper door)
-      const SP = { ...o, H, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, blocked,
+      const SP = { ...o, H, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, blocked, otherSigns, foreignAt,
         stairAuto: o.storeys > 1 && rng(o.seed + 101)() < STAIR_P };
       SP.room4lean = freeBeyond(SP);
       let A;
@@ -1284,6 +1310,7 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
       const b = makeBuilding({ key: g.key, rooms: g.rooms, spec: o, sp: SP }, A, top, true);
       for (const k of walls) claimed.add(k);
       for (const [x, z] of A.solid || []) solidCells.add(x + ',' + z);
+      stairColliders(A, top);
       // a door square the kit did not open (at a run's end) keeps walls.js's door
       for (const k of doors) if (!A.doorOps.some(d => d.o.rc[0] + ',' + d.o.rc[1] === k)) claimed.delete(k);
       list.push(b); byKey.set(b.key, b);
@@ -1410,7 +1437,7 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
     const front = ['+y', '+x', '-y', '-x'][q], scnSeed = (state.envScn || window.tablefolkScenario?.active?.scn || {}).seed | 0;
     const seed = (Math.imul(cx * 92821 ^ cz * 68917 ^ type.length * 7, 2654435761) ^ scnSeed * 7919) >>> 0 & 0x7fffffff;
     const o = specFor({ rooms: [] }, seed, role);
-    const SP = { ...o, H: 2.2, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, closedDoor: true, blocked: () => true, room4lean: () => false };
+    const SP = { ...o, H: 2.2, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, closedDoor: true, blocked: () => true, room4lean: () => false, otherSigns, foreignAt };
     const top = state.terrainTopY ?? 0, A = assemble(SP);
     const b = makeBuilding({ key: 'closed:' + type + ':' + cx + ',' + cz, rooms: [], spec: { ...o, role }, sp: SP, closed: true }, A, top, false);
     closedList.push(b); mergeClosed();
@@ -1444,7 +1471,7 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
     setAlpha: (key, a) => { const b = byKey.get(key); if (!b || !b.rid || b.rid > 255) return; const v = Math.round(Math.max(0, Math.min(1, a)) * 255); if (fadeData[b.rid * 4] !== v) { fadeData[b.rid * 4] = v; fadeDirty = true; } },
     roofBox: key => byKey.get(key)?.roofBox || null,
     claims: (x, z) => claimedCells.has(x + ',' + z),
-    solidAt: (x, z) => solidCells.size > 0 && solidCells.has(Math.round(x) + ',' + Math.round(z)),
+    solidAt: (x, z) => solidCells.size > 0 && solidCells.has(Math.round(x) + ',' + Math.round(z)), stairBodies: () => stairBodies.length,
     has: key => byKey.has(key), roomBuilding, clip, list: () => list, stats, lod: () => lod(true), get clipState() { return { ...clipU }; },
   };
 })();

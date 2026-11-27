@@ -521,7 +521,10 @@ loading cover, with the walls).
   the door frame (.53) or porch (.75 + .3), windows with their shutters open
   (.65; shut .4), corbels, the stair and an outside chimney, by .12 plus the
   sign's half thickness; nearest the front door on its wall, else the middle
-  of another outer wall; none if nothing is clear.
+  of another outer wall; none if nothing is clear. Other houses count too
+  (2026-11-27): no spot within 1.8 of a sign already hung on another house
+  (`SP.otherSigns`, walk-in and closed buildings alike), and none whose tip
+  (0.9 out) would hang inside another house's footprint (`SP.foreignAt`).
 - **Outside stairs** (2026-11-27): the game has one floor (characters stand on
   `terrainTopY` + the room floor's lift; paths are one grid), so upper floors
   are not walkable; the stair and upper door are decoration on 40% of
@@ -533,7 +536,12 @@ loading cover, with the walls).
   top step (anchor x max), it runs down along the piece's local -x, which is
   +A or -A by the wall's side (`sg`); stretched to H / 1.40 (its top step is
   1.40 up). Its three squares are solid: `tablefolkBuildings.solidAt` in
-  app.js `isBlocked`, so characters walk round it.
+  app.js `isBlocked`, so characters walk round it, and the player too in
+  first person (`fpWalk` asks `isBlocked`); each square also has an
+  invisible static physics box stepping up toward the door (storey height
+  by the door, a third of it at the low end; `kit_stair_collider`), so
+  thrown or knocked things and a falling body stop against it
+  (2026-11-27; `tools/browser-test/kit-test.mjs`).
 - **Gable windows**: the gable is built in four convex parts round the
   window's opening (it stood inside the solid gable, only its shutters
   showed); the king post starts above it, the collar clears it.

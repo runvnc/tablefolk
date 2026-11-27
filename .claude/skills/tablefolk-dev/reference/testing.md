@@ -282,6 +282,11 @@ once).
   temple (one answered from the Prayers list, one met with silence), every
   power and its effects and belief, a dream, an omen kept, a decree met after
   the council and one missed (its anger), the village tab, the save hook.
+- `node tools/browser-test/kit-test.mjs --base=http://localhost:8003` (no
+  model; hearthvale): outside stairs solid with a static physics box on each
+  square, the player in first person stopped beside a stair from every side,
+  a ball rolled at one stops against it, a sign kept 1.8 from another house's
+  sign and out of another house's footprint.
 - `node tools/god-rules-test.mjs` (no browser): the God package's rules
   (`packages/god/god-core.js`): belief and sides, mana, prayers, powers,
   cruelty, omens, demands, the council's vote, council speeches read by code
