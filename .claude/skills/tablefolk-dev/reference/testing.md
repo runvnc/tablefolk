@@ -277,6 +277,9 @@ once).
   garden.
 - `node tools/browser-test/plan-words-eval.mjs` (a brain on :8000, never
   downloads): words to plans with the loaded brain against code alone.
+  Gemma 4 E2B, RTX 2060, 2026-11-27: 11/12 resolve (code alone 8/12),
+  median 0.43 s a command; its misses: "west of the blacksmith" (not a
+  place on that map) went to the tavern, "the holy house" read as "house".
 
 ## Sections (`sections-test.mjs`, 2026-11-20)
 

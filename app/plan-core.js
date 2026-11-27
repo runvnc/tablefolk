@@ -328,8 +328,9 @@
       else {
         const target = after(/\b(around|round|enclos\w*|in|surround\w*)\b/) || ids[0];
         if (target) plan.around = target; else missing.push('around');
-        const g = t.match(new RegExp('\\bgate\\b[^.]*?\\b' + dirRe + '\\b')) || t.match(new RegExp('\\b' + dirRe + '\\b[^.]*?\\bgate\\b'));
-        const tw = t.match(/\bgate\b[^.]*?\b(toward|towards|facing|to|on the side of|by|near)\s+(the\s+)?(.+)/);
+        const GATE = '(?:gate|opening|entrance|way in|door)';
+        const g = t.match(new RegExp('\\b' + GATE + '\\b[^.]*?\\b' + dirRe + '\\b')) || t.match(new RegExp('\\b' + dirRe + '\\b[^.]*?\\b' + GATE + '\\b'));
+        const tw = t.match(new RegExp('\\b' + GATE + '\\b[^.]*?\\b(toward|towards|facing|to|on the side of|by|near)\\s+(the\\s+)?(.+)'));
         const twp = tw && (findPlaces(tw[3], places || [])[0] || (/road|path|street/.test(tw[3]) ? { p: { id: 'road' } } : null));
         if (twp && /\b(toward|towards|facing)\b/.test(tw[1])) plan.gate = { toward: twp.p.id };
         else if (g) plan.gate = sideWord(g);
@@ -473,5 +474,5 @@
   const toBoard = (map, c) => ({ x: Math.floor((map.W - 1) / 2) - c[0], z: c[1] - Math.floor((map.H - 1) / 2) });
   const fromBoard = (map, x, z) => [Math.floor((map.W - 1) / 2) - Math.round(x), Math.round(z) + Math.floor((map.H - 1) / 2)];
 
-  root.TablefolkPlanCore = { VERBS, SHAPES, SIDE_NAME, ctx, canon, resolve, validate, plan, parseWords, findPlaces, modelPrompt, parseAnswer, merge, describe, mapFromScenario, placesText, toBoard, fromBoard, sideOf, line4, outline };
+  root.TablefolkPlanCore = { VERBS, SHAPES, SIDE_NAME, ctx, canon, resolve, validate, plan, parseWords, findPlaces, modelPrompt, parseAnswer, merge, describe, mapFromScenario, addRoads, placesText, toBoard, fromBoard, sideOf, line4, outline };
 })(typeof window !== 'undefined' ? window : globalThis);

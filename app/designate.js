@@ -128,7 +128,9 @@
       places.push(pl);
     }
     // characters with a name the player may use as a place ("around the elder")
-    return { W, H, rows: g.map(r => r.join('')), places };
+    const map = { W, H, rows: g.map(r => r.join('')), places };
+    PC().addRoads(map);   // a village's road arms as places ("the east road")
+    return map;
   }
 
   // ---------------------------------------------------------------- the workers
