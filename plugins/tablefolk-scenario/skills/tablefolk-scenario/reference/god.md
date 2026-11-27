@@ -138,9 +138,10 @@ core plan language marks it). Of whom: a group or a person named, else
 everyone. By when: "by evening", "by noon", "at dawn", "tomorrow", "in 3
 hours", "in 2 days", "by the full moon" (21:00 of every third day), else a
 day. Words code cannot read go to a fixed choice of the four kinds: the
-Strands decider when a page has loaded one (`window.tablefolkDecider`; the
-game does not load it yet), else the menus' matcher (keywords, meaning, the
-brain).
+decision model (the Strands Decider) when it is loaded beside the brain
+(This device pane: auto loads it when the graphics card has room and it is
+downloaded; on downloads it, 2 GB), else the menus' matcher (keywords,
+meaning, the brain).
 
 Then the priest (an elder, priest or chief by role or look) has a **vision**
 (a ring of light over them) and calls the village to the shrine. The

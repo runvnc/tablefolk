@@ -3,10 +3,10 @@
 // villager's own words, and a council where the villagers above rails speak for themselves and
 // their stance is read from their words. ?autonomy=guided puts everyone above rails (a small brain
 // would otherwise stay on rails). Never approves a model download: stops if the page asks for one.
-//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240] [--councils=3]
+//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240] [--councils=3] [--decider=on]
 import { chromium } from 'playwright-core';
 const arg = (k, d) => { const a = process.argv.find(s => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
-const BASE = arg('base', 'http://localhost:8000'), MODEL = arg('model', 'gemma4-e2b-litert'), WAIT = +arg('wait', 240);
+const BASE = arg('base', 'http://localhost:8000'), MODEL = arg('model', 'gemma4-e2b-litert'), WAIT = +arg('wait', 240), DECIDER = arg('decider', '');
 const DECREES = [
   ['I require a goat sacrifice by the full moon', 'sacrifice'],
   ['the faithful must bring three bread to the temple by evening', 'offering'],
@@ -20,7 +20,8 @@ const DECREES = [
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 page.on('pageerror', e => console.log('  page error:', String(e).slice(0, 200)));
-await page.goto(`${BASE}/app/?model=${MODEL}&autonomy=guided&gfx=light&fps=10&intro=0&scenario=/scenarios/god-village.json&t=${Date.now()}`);
+// --decider=on: the decision model beside the brain (app/decider.js; read from /work/decider/, no download)
+await page.goto(`${BASE}/app/?model=${MODEL}&autonomy=guided&gfx=light&fps=10&intro=0${DECIDER ? `&decider=${DECIDER}&deciderLocal=1` : ''}&scenario=/scenarios/god-village.json&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
   const s = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.() && !!window.tablefolkGod, consent: !document.getElementById('modelConsent')?.hidden, text: document.getElementById('modelLoadText')?.textContent || '' })).catch(() => ({}));
@@ -30,6 +31,16 @@ for (;;) {
   await page.waitForTimeout(2000);
 }
 console.log(`brain ready in ${Math.round((Date.now() - t0) / 1000)} s:`, await page.evaluate(() => tablefolkBrainInfo?.()?.key));
+if (DECIDER) {
+  const t1 = Date.now(); let st = null;
+  while (Date.now() - t1 < 180000) { st = await page.evaluate(() => tablefolkDecision.state()); if (/ready|failed|off|available/.test(st.status)) break; await page.waitForTimeout(2000); }
+  console.log(`decider: ${st.status} (${st.why}) after ${Math.round((Date.now() - t1) / 1000)} s; ${st.free} GB left beside the brain`);
+  // speeches code cannot place (stanceOf null): the decider against the menus' matcher
+  const LINES = [['The god provides; we owe it this much.', 'yes'], ['A sheep is a sheep. Ada can have the old ewe, the lame one.', 'yes'], ['My hands are for the axe, not the altar.', 'no'], ['Let the faithful bleed their own flocks.', 'no'], ['Three loaves is a week of bread for the children.', 'no'], ['Give it to the god before sundown, I say.', 'yes'], ['After the harvest there will be bread enough for gods and men.', 'bargain'], ['The temple can wait for the next market day.', 'bargain']];
+  const r = await page.evaluate(async L => { const items = [{ id: 'yes', label: 'agrees to do it' }, { id: 'no', label: 'refuses' }, { id: 'bargain', label: 'wants to bargain: more time or less' }]; const out = []; for (const [l, want] of L) { const d = await tablefolkDecision.choose(`bram answers: "${l}"`, items, 'Does bram agree to the demand, refuse it, or bargain for more time or less?', { min: 0, context: 'At a council at the temple, elder_ada says the god demands: "Bring 3 bread to the temple as an offering."' }); const m = await tablefolkMenu?.match?.({ items }, l).catch(() => null); out.push({ l, want, decider: d?.id, conf: d ? +d.confidence.toFixed(2) : null, ms: d?.ms, matcher: m?.item?.id || null, by: m?.by }); } return out; }, LINES);
+  let dOk = 0, mOk = 0; for (const x of r) { if (x.decider === x.want) dOk++; if (x.matcher === x.want) mOk++; console.log(`  ${x.decider === x.want ? 'ok  ' : 'MISS'} decider ${x.decider} (${x.conf}, ${x.ms} ms) · matcher ${x.matcher} (${x.by}) · want ${x.want}: ${x.l}`); }
+  console.log(`stances by the decider ${dOk}/${r.length}, by the matcher ${mOk}/${r.length}`);
+}
 await page.evaluate(() => { tablefolkLive.stop(); window.__says = []; addEventListener('tablefolk-say', e => __says.push(e.detail.agentId + ': ' + e.detail.text)); window.__calls = 0; addEventListener('tablefolk-model-call', e => { if (e.detail.kind === 'god') __calls++; }); });
 await page.waitForTimeout(1500);
 let right = 0;

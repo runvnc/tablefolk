@@ -86,6 +86,9 @@ state inside the function, not at the top of the file.
 | `api.scene`, `api.BABYLON`, `api.vec(x, y, z)` | the Babylon.js scene and library for effects of your own |
 | `api.bar.add({ id, label, icon, title, run })`, `api.bar.remove(id)` | a button on the power bar (removed when the scenario ends) |
 | `api.resource(name)`, `api.resource(name, delta)` | a resource's value; add to it (clamped to its limits) |
+| `api.decider()` | true when the decision model (the Strands Decider, `app/decider.js`) is loaded beside the brain on this device; off by default where it does not fit (see brains, "Strands Decider in the game") |
+| `await api.choose(text, items, question, { min = .4, context })` | words to one of `items` (`[{ id, label }]`) by the decision model: `{ id, confidence, probabilities, ms }` (`id` null with `unsure` below `min`), or null when it is not loaded: fall back to your own rules, `tablefolkMenu.match` or the brain. 0.25-0.5 s on a 12 GB card, 1.2-2 s on a 6 GB one |
+| `await api.decide(state, questions)` | the decision model's own call (`{ key: { type: 'choice', instructions, criteria: { id: description } } | { type: 'noul', instructions } }` -> `{ key: { choice, probabilities, confidence } | { noul } }`), or null when it is not loaded |
 | `api.weather()`, `api.weather(kind, { intensity, duration, area, wind })` | the weather now; set it (a base kind or a package's) |
 | `api.designate(spec)` | mark squares for work: `{ kind, cells: [{ x, z }], priority, who }` or a plan by relation `{ verb: "wall", around: "shrine", gate: "north" }`; returns the designation (a plan: `{ d, warnings }` or `{ error }`) |
 | `api.demand(spec)` | make a demand (below); returns it, or `{ error }` |

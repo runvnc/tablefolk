@@ -164,8 +164,38 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `#brainStatus` shows a failure (no WebGPU, a load error), a toast offers
     it once a session. The key is in localStorage and goes only to
     OpenRouter.
-- **Strands Decider** (experiment, 2026-11-12; `libs/decider/index.js`, not
-  wired into the game): AWS Strands Labs' decision models (Apache-2.0) pick
+- **Strands Decider in the game** (2026-11-27, `app/decider.js`): loaded
+  beside a brain that runs in this browser, after the brain is ready, never
+  under `?art=1`, the tabletop, `"brain": "none"` or an endpoint. The
+  setting (This device pane: auto, on, off; `localStorage tablefolk.decider`;
+  `?decider=` for a page): **auto** (default) loads it when
+  `tablefolkDevice.freeGB` (less 3 GB for a Breeze voice) leaves its
+  `NEED_GB` (2.6: Q8_0 weights, a 4.6k window, 512-token batches) plus 0.5,
+  and only when the model is already in the browser's cache
+  (`deciderCached()`: auto never starts the 2 GB download); otherwise the
+  pane says it would fit and offers **on**, which downloads it once and
+  loads it even when the budget is tight (said so). So it is off by default
+  on the RTX 2060 with Gemma E2B (3 GB left: 3.1 wanted) and on for a 12 GB
+  card with E2B or E4B once downloaded. Used for words to fixed outcomes:
+  decree words code cannot read (offering, sacrifice, worship, work), what a
+  dream asks, and council speeches `stanceOf` cannot place (with the
+  demand as context, kept only at confidence 0.6+: it leans to "yes" on a
+  hedged speech); packages get `api.decider()`, `api.choose(text, items,
+  question, { min, context })` and `api.decide(state, questions)` (api.md).
+  Below the confidence asked, or not loaded, callers fall back to the menus'
+  matcher (and its brain call). Measured with Gemma E2B on the RTX 2060
+  (`god-words-eval.mjs --decider=on`, files from `/work/decider/` with
+  `?deciderLocal=1`): loaded in 9 s beside the brain, no out-of-memory;
+  1.2-2.1 s a question (each a new state); both hard decrees read right
+  ("my people shall honour me with their finest loaves": offering; "I
+  thirst for the blood of a beast from the flock": sacrifice, 1.2 s each);
+  eight hand-made hard council speeches: 4/8 (E2B's one-number pick 5/8;
+  misses on bargains like "the temple can wait for the next market day", read
+  as no at 0.79). On the 2060 it is no faster than E2B's own pick; it earns
+  its place on cards where it answers in 0.25-0.5 s and the brain is a big
+  slow model.
+- **Strands Decider** (experiment, 2026-11-12; `libs/decider/index.js`, wired
+  into the game 2026-11-27, above): AWS Strands Labs' decision models (Apache-2.0) pick
   one of a list of options (or yes/no, or a level) with calibrated
   probabilities instead of writing text: a LoRA and a pointer head (LayerNorm,
   q/k projections) on a base model. Sizes: the Gemma 4 E4B one is 8.0B

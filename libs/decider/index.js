@@ -26,6 +26,7 @@
 //   await d.decide(state, { pick: { type: 'choice', instructions, criteria: { id: description } } })
 //     -> { pick: { choice, probabilities: { id: p }, confidence } }
 //   noul (yes/no) questions: { type: 'noul', instructions } -> { noul: P(true) }
+//   await deciderCached() -> true when the model is already in this browser's cache; FILES, NEED_GB
 const WLLAMA3 = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.13.0/esm/index.js';
 
 const GGUF = 'https://huggingface.co/ArminBurkhardt/strands-decider-2B-qwen3.5-v1-2610-GGUF/resolve/main/strands-decider-2B-qwen3.5-v1-2610-Q8_0.gguf';
@@ -90,6 +91,18 @@ function head(H, type, names, hidden) {
   if (type === 'noul') return { noul: probs[names.indexOf('true')] };
   const best = probs.indexOf(Math.max(...probs)), n = names.length;
   return { choice: names[best], probabilities: Object.fromEntries(names.map((nm, i) => [nm, probs[i]])), confidence: n === 1 ? 1 : (n * probs[best] - 1) / (n - 1) };
+}
+
+// the files, and whether this browser already holds the model (wllama's cache: a load would not download it)
+export const FILES = { gguf: GGUF, head: HEAD, ggufGB: 2.0 };
+// graphics memory the decider takes when loaded: Q8_0 weights 2.0 GB, a 4.6k window, 512-token batches
+export const NEED_GB = 2.6;
+export async function deciderCached({ ggufUrl = GGUF, jsUrl = FAST_JS } = {}) {
+  try {
+    const { CacheManager } = await import(jsUrl), cm = new CacheManager();
+    const size = await cm.getSize(await cm.getNameFromURL(ggufUrl));
+    return size > 1e9;
+  } catch { return false; }
 }
 
 let loading = null;

@@ -43,6 +43,8 @@
     const ag = b && window.tablefolkAgency?.diagRow?.(); if (ag) out.push(ag);
     // the game mode (modes.js: living, adventure, turns) and why
     const md = window.tablefolkModes?.diagRow?.(); if (md) out.push(md);
+    // the decision model beside the brain (decider.js)
+    const dr = window.tablefolkDecision?.diagRow?.(); if (dr) out.push(dr);
     // the voice
     const tts = window.tablefolkTTS;
     if (tts) {
@@ -62,8 +64,10 @@
     const box = document.getElementById('runningNow'); if (!box) return;
     const tts = window.tablefolkTTS;
     const offer = tts?.canOfferBreeze?.() ? `<button type="button" class="diag-offer" data-diag="breeze">Get the better voice: ${esc(tts.offerLabel?.() || 'Breeze TTS 2 (2.5 GB, runs on this graphics card)')}</button>` : '';
-    box.innerHTML = rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + offer;
+    box.innerHTML = rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + offer + deciderButtons();
   }
+  // the decision model: auto (when it fits beside the brain and is already downloaded), on, off
+  const deciderButtons = () => { const D = window.tablefolkDecision; if (!D) return ''; const v = D.setting(); return `<div class="diag-decider"><small>Decision model (Strands Decider, 2 GB: words to fixed outcomes, faster than the brain):</small> ${['auto', 'on', 'off'].map(k => `<button type="button" class="diag-vram${k === v ? ' on' : ''}" data-diag="decider" data-v="${k}">${k}</button>`).join(' ')}</div>`; };
   const gb = n => n == null ? '?' : (Math.round(n * 10) / 10) + ' GB';
   let storage = null;
   function renderDevice() {
@@ -94,7 +98,7 @@
         ['System memory (as the browser reports it, rounded)', navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '?'],
         ['Stored by this site', storage ? `${gb(storage.usage / 2 ** 30)} of ${gb(storage.quota / 2 ** 30)} allowed` : 'checking…'],
       ])],
-      ['Running now', '<div class="running-now">' + rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + '</div>'],
+      ['Running now', '<div class="running-now">' + rows().map(([what, val, st, cls, why]) => `<div class="diag-row ${cls}"><b>${esc(what)}</b><span>${esc(val)}</span><small>${esc(st)}${why ? ` · <i>${esc(why)}</i>` : ''}</small></div>`).join('') + deciderButtons() + '</div>'],
       ['Decisions and fallbacks', list.length ? '<ol class="diag-log">' + list.map(n => `<li><span>${((n.t - t0) / 1000).toFixed(1)} s</span><b>${esc(n.area)}</b> ${esc(n.text)}</li>`).join('') + '</ol>' : '<p class="pane-note">none yet</p>'],
     ];
     const vram = (hw?.vramOptions || []).map(n => `<button type="button" class="diag-vram${n === hw.vramGB ? ' on' : ''}" data-diag="vram" data-gb="${n}">${n} GB</button>`).join(' ') + ' <small>(the page reloads to pick models again)</small>';
@@ -110,6 +114,7 @@
     const b = e.target.closest?.('[data-diag]'); if (!b) return;
     if (b.dataset.diag === 'breeze') window.tablefolkTTS?.upgradeToBreezeWeb?.();
     if (b.dataset.diag === 'vram') window.tablefolkSetCardMemory?.(+b.dataset.gb);
+    if (b.dataset.diag === 'decider') { window.tablefolkDecision?.set?.(b.dataset.v); render(); }
     if (b.dataset.diag === 'copy') navigator.clipboard?.writeText(text()).then(() => window.tablefolkToast?.('report copied'), () => {});
   });
   setInterval(() => { if (visible()) render(); }, 1500);

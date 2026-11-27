@@ -17,6 +17,12 @@ r.move   // { choice: 'east', probabilities: {...}, confidence: 0.71 }
 r.scared // { noul: 0.93 }
 ```
 
+`await deciderCached()` says whether this browser already holds the model
+(a load would not download it); `NEED_GB` (2.6) is the graphics memory it
+takes, for deciding whether it fits beside another model. Tablefolk loads
+it beside the characters' brain only when it fits and is downloaded, or
+when the player turns it on (`app/decider.js`).
+
 Measured (2026-11-12, RTX 2060): 17 of 18 menu choices right; its confidence
 is honest (every answer at 0.5 or above was right). Pass it to
 `@tablefolk/brain` (`createBrain({ decider })`) and `pick()` and `yesno()` use

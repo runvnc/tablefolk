@@ -137,6 +137,10 @@
       // a button on the power bar (removed with the scenario); a resource's value (and a change to it)
       bar: { add: b => window.tablefolkBar?.add({ ...b, from: b.from || 'package' }), remove: id => window.tablefolkBar?.remove(id) },
       resource: (name, delta) => delta == null ? window.tablefolkResources?.get(name) : window.tablefolkResources?.add(name, +delta || 0),
+      // the decision model (decider.js; null when it is not loaded here: fall back to your own rules or the menus' matcher)
+      decider: () => !!window.tablefolkDecision?.ready,
+      decide: (stateText, questions) => window.tablefolkDecision?.decide?.(stateText, questions) ?? Promise.resolve(null),
+      choose: (text, items, question, opts) => window.tablefolkDecision?.choose?.(text, items, question, opts) ?? Promise.resolve(null),
       weather: (kind, opts) => kind === undefined ? window.tablefolkWeather?.now() : window.tablefolkWeather?.set(kind, opts || {}),
       // squares marked for work: { kind, cells: [{x, z}] } or a plan by relation ({ verb: "wall", around: "shrine" }); -> the designation or { error }
       designate: (spec, opts = {}) => spec?.cells ? window.tablefolkDesignate?.add({ by: 'package', ...spec }) : window.tablefolkDesignate?.addPlan(spec, { by: 'package', ...opts }),

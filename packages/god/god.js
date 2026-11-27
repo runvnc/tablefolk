@@ -393,9 +393,12 @@ export default function (api) {
     } catch (e) { console.warn('[god] brain', e); return null; }
   }
   const who = g => { const c = cfgOf(g); return `You are ${g.id}. ${String(c.personality || '').slice(0, 220)} You believe in the god ${beliefWord(G.belief(g.id))} (${Math.round(G.belief(g.id))} of 100)${sideOf(g.id) ? ', one of the ' + sideOf(g.id) : ''}.`; };
-  // fixed outcomes from words: a decider (window.tablefolkDecider, when a page has loaded one), else the menus' matcher (keywords, meaning, then the brain)
-  async function choose(text, items, question = 'Which fits these words best?') {
-    try { const D = W.tablefolkDecider; if (D?.decide) { const r = await D.decide(text, { q: { type: 'choice', instructions: question, criteria: Object.fromEntries(items.map(i => [i.id, i.label])) } }); if (r?.q?.choice && (r.q.confidence ?? 1) >= .4) return r.q.choice; } } catch (e) { console.warn('[god] decider', e); }
+  // fixed outcomes from words: the decision model when it is loaded beside the brain (app/decider.js; api.choose),
+  // confident enough, else the menus' matcher (keywords, meaning, then the brain); lastRead says which
+  let lastRead = null;
+  async function choose(text, items, question = 'Which fits these words best?', context = '', min = .4) {
+    try { if (api.decider?.()) { const r = await api.choose(text, items, question, { min, context }); if (r?.id) { lastRead = { by: 'decider', confidence: r.confidence, ms: r.ms }; return r.id; } } } catch (e) { console.warn('[god] decider', e); }
+    lastRead = { by: 'matcher' };
     try { const m = await W.tablefolkMenu?.match?.({ items }, text); if (m?.item?.id) return m.item.id; } catch {}
     const t = String(text).toLowerCase(); for (const i of items) if ((i.keywords || []).some(k => t.includes(k))) return i.id;
     return null;
@@ -579,7 +582,7 @@ export default function (api) {
   async function readDecree(text) {
     const ctx = decreeCtx(); let d = parseDecree(text, ctx), by = 'code';
     if (d.error) {
-      const kind = await choose(text, KINDS, 'What does the god require?'); by = W.tablefolkDecider ? 'decider' : 'matcher';
+      const kind = await choose(text, KINDS, 'What does the god require?'); by = lastRead?.by || 'matcher';
       if (kind === 'offering') d = { ...parseDecree('bring 2 bread', ctx), by: parseDecree(text, ctx).by };
       else if (kind === 'sacrifice' && ctx.animals.length) d = parseDecree(`sacrifice a ${ctx.animals[0]}`, ctx);
       else if (kind === 'worship') d = parseDecree('come and pray', ctx);
@@ -639,7 +642,7 @@ export default function (api) {
       if (words(g)) {
         line = await say1(g, who(g), `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}". Do you agree, refuse, or want to bargain? Say it in one or two sentences, in your own words, nothing else.`, 60);
         // by code first (yes / no / a condition: a bargain); unclear words go to the decider, else the matcher
-        if (line) { stance = stanceOf(line); councilNow.read[g.id] = stance ? 'code' : null; if (!stance) { stance = await choose(line, STANCE, `Does ${g.id} agree, refuse, or bargain?`); councilNow.read[g.id] = stance ? (W.tablefolkDecider ? 'decider' : 'matcher') : 'none'; } }
+        if (line) { stance = stanceOf(line); councilNow.read[g.id] = stance ? 'code' : null; if (!stance) { stance = await choose(`${g.id} answers: "${line}"`, STANCE, `Does ${g.id} agree to the demand, refuse it, or bargain for more time or less?`, `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}"`, .6);   // (the decider leans to yes on a hedged speech: below .6 the matcher reads it) councilNow.read[g.id] = stance ? (lastRead?.by || 'matcher') : 'none'; } }
       }
       const v = vote([{ id: g.id, belief: G.belief(g.id), side: sideOf(g.id), stance }]).votes[0];
       line ||= pick(COUNCIL[v.vote]);
