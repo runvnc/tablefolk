@@ -362,11 +362,12 @@
   }, 1000);
 
   // ---------------------------------------------------------------- the model, narrowly
-  const brainOk = () => !!(W()?.brainReady?.() && window.tablefolkLLM && window.tablefolkBrainInfo?.()?.engine !== 'none');
+  // (and the game mode lets this character use it: modes.js mayThink, adventure outside the encounter, far in living)
+  const brainOk = g => !!(W()?.brainReady?.() && window.tablefolkLLM && window.tablefolkBrainInfo?.()?.engine !== 'none' && (!g || window.tablefolkModes?.mayThink?.(g) !== false));
   // one short numbered pick: options [{ label, run }], plus "something else" (an open turn)
   async function pick(g, question, options, why) {
     if (!options.length) return null;
-    if (options.length === 1 || !brainOk()) return options[0];
+    if (options.length === 1 || !brainOk(g)) return options[0];
     const cfg = W().getBrainConfig(g.id), s = S(g);
     const list = [...options.map(o => o.label), 'something else'];
     const card = (M()?.cardLines?.(g) || []).filter(l => /^(You feel|Body|You like|You dislike|Current goal|What you are quietly after)/.test(l)).join('\n');
@@ -391,7 +392,7 @@
   async function remark(g, s) {
     // (above rails the model speaks on its own initiative: no code-chosen remarks)
     if (window.tablefolkAgency?.domain?.(g, 'talk') === 'model') return false;
-    if (!brainOk() || gm() - s.lastRemark < 180 || Math.random() > .3 || window.tablefolkLive?.quiet?.() === false || window.tablefolkTalk?.mayStart?.(g.id) === false) return false;
+    if (!brainOk(g) || gm() - s.lastRemark < 180 || Math.random() > .3 || window.tablefolkLive?.quiet?.() === false || window.tablefolkTalk?.mayStart?.(g.id) === false) return false;
     const near = nearPeople(g); if (!near.length) return false;
     s.lastRemark = gm();
     const cfg = W().getBrainConfig(g.id), j = jobOf(g), who = near.map(nameOf).slice(0, 3).join(', ');
@@ -1125,7 +1126,7 @@
     if (tav && !inPlace(tav, posOf(g).x, posOf(g).z)) { if (!s.sub.eve) s.sub.eve = spotIn(tav, g); const r = await goTo(g, s, s.sub.eve.x, s.sub.eve.z, 'the ' + tav.id); if (!r.fail) return { ms: r.ms || 3000 }; }
     s.sub.eve = null;
     const near = nearPeople(g, 4).filter(c => c !== state.playerAvatar && c.pose?.mode !== 'lie');
-    if (near.length && gm() - s.lastSocial >= 40 && Math.random() < .8 && brainOk() && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
+    if (near.length && gm() - s.lastSocial >= 40 && Math.random() < .8 && brainOk(g) && window.tablefolkTalk?.mayStart?.(g.id) !== false) {
       const day = K()?.now()?.day || 0, n = x => PAIR_LINES.get(day + '|' + [g.id, x.id].sort().join('|')) || 0;
       const free = near.filter(x => window.tablefolkTalk?.mayStart?.(x.id) !== false);
       const x = (free.length ? free : near).slice().sort((a, b) => n(a) - n(b) || Math.random() - .5)[0];

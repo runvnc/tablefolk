@@ -302,7 +302,7 @@
     emitBadge(c, '+' + given.replace(/^the /, ''));
     window.tablefolk?.startHandover?.(me(), c, what === 'gold' ? 'gold' : what);
     note(`${who} gives ${c.id} ${given}`);
-    inventoryChanged(); render(); acted('give');
+    inventoryChanged(); render(); acted('give', c.id);
   }
   // how much gold: a small box where it was dropped
   function askGold(c, x, y) {
@@ -351,9 +351,12 @@
   // Characters with a brain think and talk in the background: the player
   // keeps moving meanwhile, and a small note says who is thinking.
   let busy = false, queued = false, talking = null;
-  function acted(kind) {
+  // (to: the character it was done to, a give's: modes.js opens an encounter with it)
+  function acted(kind, to = null) {
     if (!me()) return;
-    try { window.dispatchEvent(new CustomEvent('tablefolk-player-turn', { detail: { kind } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent('tablefolk-player-turn', { detail: { kind, to } })); } catch {}
+    // turn mode (modes.js): the others act when the player ends the turn, not after each step
+    if (window.tablefolkModes?.mode?.() === 'turns') return;
     if (busy) { queued = true; return; }
     round().catch(e => console.error('[play] turn round', e));
   }

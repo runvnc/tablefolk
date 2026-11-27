@@ -41,6 +41,8 @@
     if (tier && b) out.push(['Character help', tier, { basic: 'the game fights back, drinks potions and eats for them in a pinch; short memory', capable: 'they choose from concrete options in danger; the game steps in at the brink; they plan, reflect and glance', ambitious: 'no reflexes; longer memory and conversation' }[tier], 'ok', 'by the brain\'s size; a world can set "expect"']);
     // how much the characters decide for themselves (agency.js: the setting, the capability check)
     const ag = b && window.tablefolkAgency?.diagRow?.(); if (ag) out.push(ag);
+    // the game mode (modes.js: living, adventure, turns) and why
+    const md = window.tablefolkModes?.diagRow?.(); if (md) out.push(md);
     // the voice
     const tts = window.tablefolkTTS;
     if (tts) {

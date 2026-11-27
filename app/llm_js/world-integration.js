@@ -699,20 +699,24 @@ async function main() {
   // One model call at a time, in order: the in-page engines keep one conversation cache, and
   // calls that overlapped (agency.js turns and picks, reflection, a reply) left one that never
   // returned and the living world stalled (Gemma 4 12B and Bonsai 2 27B on an RTX 3090, 2026-11-21)
-  { const decide = manager.decide.bind(manager); let chain = Promise.resolve();
+  // (modes-core.js createQueue: the highest "priority" first, then in order: the player's conversation (2) goes
+  // before queued background calls, an adventure encounter's turns (1) before the rest; a call already running
+  // is never stopped; a turn started early in turn mode (-1) last)
+  { const decide = manager.decide.bind(manager), Q = window.tablefolkModesCore?.createQueue?.();
     // (window.tablefolkDecideSecs: the model's own seconds per call, without the wait: agency.js budgets turns by it)
     // (a call that never comes back, Gemma 4 12B on LiteRT with an above-rails prompt, is given up after
     // two minutes: the caller gets an error and the world goes on instead of stopping for good)
     const GIVE_UP = 120000;
     // (?llmqueue=0: calls overlap as before, to diagnose an engine: tools/browser-test/llm-sweep.mjs)
-    if (new URLSearchParams(location.search).get('llmqueue') !== '0') manager.decide = agent => { const p = chain.then(() => { const t0 = performance.now(); return Promise.race([decide(agent), new Promise((_, no) => setTimeout(() => no(new Error('the model did not answer in 2 minutes')), GIVE_UP))]).finally(() => { const a = window.tablefolkDecideSecs ||= []; a.push((performance.now() - t0) / 1000); if (a.length > 30) a.shift(); }); }); chain = p.catch(() => {}); return p; }; }
+    const call = agent => { const t0 = performance.now(); return Promise.race([decide(agent), new Promise((_, no) => setTimeout(() => no(new Error('the model did not answer in 2 minutes')), GIVE_UP))]).finally(() => { const a = window.tablefolkDecideSecs ||= []; a.push((performance.now() - t0) / 1000); if (a.length > 30) a.shift(); }); };
+    if (Q && new URLSearchParams(location.search).get('llmqueue') !== '0') { manager.decide = agent => Q.push(() => call(agent), +agent.priority || 0, agent.agentId || null); window.tablefolkModelQueue = Q; } }
   installDevConsole(() => manager);
   // The active brain (in-page LiteRT or an endpoint) as an OpenAI-style client:
   // tablefolkLLM.chat.completions.create({ messages, stream }) from anywhere.
   window.tablefolkLLM = localClient({
     // temperature 0 means greedy (the model's recommended sampling otherwise wins)
     // (thinking: true asks a model that reasons to think first: agency.js plans and emergencies, a small budget)
-    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, greedy: opts.temperature === 0, enableThinking: !!opts.thinking, onToken: onToken ? t => onToken(t) : null }),
+    generate: (messages, opts, onToken) => manager.decide({ messages, raw: true, agentId: opts.agentId || 'api', maxTokens: opts.max_tokens, temperature: opts.temperature, greedy: opts.temperature === 0, enableThinking: !!opts.thinking, priority: +opts.priority || 0, onToken: onToken ? t => onToken(t) : null }),
   }, { model: 'active-brain' });
   let running = false;
   let stepIndex = 0;
@@ -1036,7 +1040,9 @@ async function main() {
     }
   });
 
-  async function runOneAgentTurn(g) {
+  // opt.prefetch: build the prompt and start the model call only (turn mode, modes.js: a turn started before the
+  // player ends theirs); opt.lock: the turn lock's release, let go while the model writes (world.runAgentTurn)
+  async function runOneAgentTurn(g, opt = {}) {
     const cfg = world.getBrainConfig(g.id);
     if (cfg.enabled === false || cfg.defeated) return false;
     // hostile characters fight with play.js's routine; mindless ones never
@@ -1078,6 +1084,12 @@ async function main() {
     }
     // a scripted world ("brain": "none"): characters act only through menus and workflows
     if (getActiveEngine(manager) === 'none') { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
+    // modes.js: a character the game mode keeps off the model (adventure: outside the encounter; living and turns:
+    // farther from the player than "modeRadius") runs on rails without it; what was said to it goes into its history
+    if (window.tablefolkModes?.mayThink?.(g) === false) {
+      if (!opt.prefetch && cfg.pendingChat?.length) { const lines = cfg.pendingChat.map(l => /^\s*\[event\]/.test(String(l)) ? '[happened] ' + String(l).replace(/^\s*\[event\]\s*/, '') : String(l).replace(/^(.+?)\s+says:\s*/, '[$1] ')); world.setBrainConfig(g.id, { pendingChat: [], messages: (cfg.messages || []).concat([{ role: 'user', content: lines.join('\n') }]).slice(-40) }); }
+      return false;
+    }
     try {
       world.state.nextAgentId = g.id;
       updatePerceptionUI();
@@ -1105,9 +1117,13 @@ async function main() {
       const railsTalk = (window.tablefolkAgency?.domain?.(g, 'talk') || 'code') !== 'model';
       const muted = crowded || (railsTalk && !told && !(cfg.quietTurns > 0) && !!window.tablefolkMind && world.state?.mind !== false && !window.tablefolkMind.speechCause?.(g));
       // Speaks only when spoken to (app.js onlySpokenTo): no model call; what merely happened is let go
+      if (opt.prefetch && (chatTestMode || el('agentVision')?.checked || (world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)))) return null;
       if (!chatTestMode && world.onlySpokenTo?.(g, cfg) && !world.heardSpeech(cfg)) { if (cfg.pendingChat?.length) { cfg.pendingChat = []; world.setBrainConfig(g.id, cfg); } return false; }
       const budgetQuiet = !spokenTo && cfg.quietTurns > 0, quiet = budgetQuiet || (muted && !chatTestMode);
       const simple = !chatTestMode && !!world.isSimpleBrain?.(g, cfg);
+      if (opt.prefetch && simple && quiet) return null;
+      // the model queue's order (modes-core.js createQueue): the player's conversation first, then an encounter's
+      const prio = opt.prefetch ? -1 : fromPlayer ? 2 : window.tablefolkModes?.inEncounter?.(g) ? 1 : 0;
       // In simple mode whatever it writes is spoken, so a quiet turn costs no model time.
       if (simple && quiet) { if (budgetQuiet) cfg.quietTurns--; world.setBrainConfig(g.id, cfg); return false; }
       let messages;
@@ -1160,8 +1176,18 @@ async function main() {
       appendLog(g.id + ' sending ' + messages.length + ' messages to LLM (' + (cfg.messages||[]).length + ' history)' + (chatTestMode ? ' [CHAT TEST]' : ''));
       console.log('[tablefolk-world] ABOUT TO CALL manager.decide for agent', g.id, 'with', messages.length, 'messages', 'at', new Date().toISOString());
       const decideT0 = performance.now();
+      // turn mode (modes.js): a turn started before the player ended theirs is used only when its prompt is still
+      // the same now (nothing the player or the others did reached it); otherwise the model is asked again
+      const thinking = cfg.thinking === true || !!window.tablefolkMind?.thinkNow?.(g);
+      const allowedTurn = allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper'));
+      // (the "Stay yourself" line picks one of its traits at random each time: the traits are left out of the comparison)
+      const traits = (String(cfg.personality || '').match(/[^.!?]+[.!?]+/g) || []).map(x => x.trim()).filter(x => x.length > 25);
+      const pfKey = JSON.stringify([messages.map(m => [m.role, traits.reduce((x, t) => x.split(t).join(''), typeof m.content === 'string' ? m.content : JSON.stringify(m.content))]), allowedTurn, thinking, simple]);
+      const early = !opt.prefetch && g._prefetch?.key === pfKey ? g._prefetch : null;
+      if (!opt.prefetch && g._prefetch) { console.info('[modes] early turn for', g.id, early ? 'used' : 'dropped: its prompt changed'); window.tablefolkModes?.noteEarly?.(g, !!early); }
+      g._prefetch = null;
       // what this model call is for (live-eval --day counts them): jobs.js names its own (agenda, social, choice, danger)
-      try { window.dispatchEvent(new CustomEvent('tablefolk-model-call', { detail: { agentId: g.id, kind: g._callKind || (hadSpeech ? 'reply' : told ? 'event' : quiet ? 'open' : 'cause') } })); } catch {}
+      if (!early) try { window.dispatchEvent(new CustomEvent('tablefolk-model-call', { detail: { agentId: g.id, kind: g._callKind || (hadSpeech ? 'reply' : told ? 'event' : quiet ? 'open' : 'cause') } })); } catch {}
       // Vision (Brain options): what the character sees, as an image on its
       // newest message, for endpoint brains whose model takes images.
       let sendMessages = messages;
@@ -1173,21 +1199,15 @@ async function main() {
           sendMessages[sendMessages.length - 1] = { ...last, content: [{ type: 'text', text: String(last.content) + '\n\n(The image is your own view: what you see in front of you right now.)' }, { type: 'image_url', image_url: { url: img } }] };
         }
       }
-      window.TABLEFOLK_PAUSE_RENDER = true;
-      console.log('[tablefolk-world] render paused at', new Date().toISOString());
-      let line;
-      // thinking: always when the character is set to; otherwise a big brain
+      // (thinking, above: always when the character is set to; otherwise a big brain
       // (mind.js tier "ambitious") thinks only when it matters (danger, an
       // offer, a fresh request): Bonsai 2 27B won 12/12 hard tasks thinking,
-      // 8 without, but a thinking turn takes 10-35 s
-      const thinking = cfg.thinking === true || !!window.tablefolkMind?.thinkNow?.(g);
-      if (thinking) world.showThought?.(g.id, '', true);
-      try {
-        line = await manager.decide({
-          agentId: g.id,
+      // 8 without, but a thinking turn takes 10-35 s)
+      const ask = extra => manager.decide({
+          agentId: g.id, priority: prio, ...extra,
           messages: sendMessages,
           useGrammar: !chatTestMode,
-          allowedCommands: allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper')),
+          allowedCommands: allowedTurn,
           // Per-character (Character setup). Reasoning needs room before the
           // command lines, so raise the token budget too: 2048, LFM3's own
           // quick-start budget (its agent eval ran at 1024 a turn; at 256 all
@@ -1196,14 +1216,27 @@ async function main() {
           // a turn the game chose to think on (mind.js thinkNow) gets less room
           // (above rails, agency.js, a small budget: a 27B at 28 tokens/s spent ~55 s on each danger turn)
           maxTokens: thinking ? (cfg.thinking === true ? 4096 : (window.tablefolkAgency?.level?.(g) || 'rails') !== 'rails' ? 512 : 1536) : simple ? 70 : undefined,
-          chaos: cfg.chaos ?? 1,   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
-        });
+          chaos: cfg.chaos ?? 1 });   // libs/brain/sampling.js withChaos: counts from the model's recommended settings
+      if (opt.prefetch) { const p = ask({}); p.catch(() => {}); g._prefetch = { key: pfKey, p, at: performance.now() }; return 'prefetched'; }
+      window.TABLEFOLK_PAUSE_RENDER = true;
+      console.log('[tablefolk-world] render paused at', new Date().toISOString());
+      let line;
+      if (thinking) world.showThought?.(g.id, '', true);
+      // the turn lock is let go while the model writes (world.runAgentTurn): a reply to the player waiting
+      // for it goes next instead of after this whole turn; taken back (in its order) before acting
+      const relock = opt.lock ? opt.lock.yield() : null;   // -> a function that takes it back
+      // the player's reply streams into a bubble while they keep walking (the words of its say(...))
+      const stream = fromPlayer && !thinking ? full => { const m = String(full || '').match(/say\(\s*"([^"]*)/); if (m && m[1].trim()) world.showStreamingBubble?.(g.id, m[1]); } : null;
+      try {
+        line = early ? await early.p.catch(() => ask({})) : await ask({ onToken: stream });
         // thought and never answered (out of room): answer at once without thinking
         if (thinking && !String(line || '').trim()) {
           console.warn('[tablefolk-world] thinking gave no answer; asking again without thinking');
-          line = await manager.decide({ agentId: g.id, messages: sendMessages, useGrammar: !chatTestMode, allowedCommands: allowedCmds().filter(c => !quiet || (c !== 'say' && c !== 'whisper')), enableThinking: false, maxTokens: simple ? 70 : undefined, chaos: cfg.chaos ?? 1 });
+          line = await ask({ enableThinking: false, maxTokens: simple ? 70 : undefined });
         }
       } finally {
+        if (stream) world.clearStreamingBubble?.(g.id);
+        if (relock) await relock();
         world.clearPendingThought?.(g.id);
         window.TABLEFOLK_PAUSE_RENDER = false;
         console.log('[tablefolk-world] render resumed at', new Date().toISOString());
@@ -1532,28 +1565,45 @@ async function main() {
     // which runs characters in turn order: you'd talk to Bram and Hale would
     // answer, while your words waited for Bram's turn.) With the brains
     // running, the loop takes characters with new speech first instead.
-    if (!running && manager.isLoaded()) replyNow(g);
+    // (turn mode, modes.js: it answers on its turn in the round, after the player ends theirs)
+    if (!running && manager.isLoaded() && !window.tablefolkModes?.holdReplies?.()) replyNow(g);
   }
   // Someone walked up to a character (senses.js): it may greet them.
   window.addEventListener('tablefolk-approached', e => {
     const g = world.getAgents().find(a => a.id === e.detail?.agentId);
-    if (g && !running && manager.isLoaded()) setTimeout(() => replyNow(g), 300);
+    if (g && !running && manager.isLoaded() && !window.tablefolkModes?.holdReplies?.()) setTimeout(() => replyNow(g), 300);
   });
   // Someone attacked a character: it answers now when the brains are idle.
   window.addEventListener('tablefolk-attacked', e => {
     const g = world.getAgents().find(a => a.id === e.detail?.agentId);
-    if (g && !running && manager.isLoaded()) setTimeout(() => replyNow(g), 600);
+    if (g && !running && manager.isLoaded() && !window.tablefolkModes?.holdReplies?.()) setTimeout(() => replyNow(g), 600);
   });
-  let replying = false;
+  // One character's turn at a time (the turn lock, modes-core.js createLock): a reply to the player first, then an
+  // adventure encounter's, then the rest in order; a turn lets it go while its model call runs (runOneAgentTurn
+  // opt.lock), so a reply to the player waits for no one's whole turn, only for a model call already running.
+  const turnLock = window.tablefolkModesCore.createLock();
+  const playerSpokeTo = g => { const pn = (world.playerName?.() || el('chatName')?.value || '').trim().toLowerCase(); return !!pn && (world.getBrainConfig(g.id).pendingChat || []).some(l => String(l).toLowerCase().startsWith(pn + ' says')); };
+  const turnPrio = g => playerSpokeTo(g) ? 2 : window.tablefolkModes?.inEncounter?.(g) ? 1 : 0;
+  async function withTurnLock(g, fn) {
+    let release = await turnLock.acquire(turnPrio(g), g.id);
+    const lock = { yield() { release(); return async () => { release = await turnLock.acquire(turnPrio(g), g.id); }; } };
+    try { return await fn(lock); } finally { release(); }
+  }
+  // the one spoken to answers now, ahead of the queued background turns (living mode fix (a), modes.js);
+  // live.js leaves a character with a reply on the way to it (g._replying)
   async function replyNow(g) {
-    if (replying) return;
-    replying = true;
+    if (g._replying) return;
+    g._replying = true;
     try {
-      while (!world.isTurnReady()) await sleep(100);
-      // inside a workflow: it goes on until it waits again (workflows.js)
-      if (window.tablefolkWorkflows?.active(g.id)) await world.driveWorkflow(g.id);
-      else if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g);
-    } finally { replying = false; }
+      // its own turn already under way (live.js, above rails): this one follows it
+      while (g._turnRunning) await sleep(100);
+      await withTurnLock(g, async lock => {
+        while (!world.isTurnReady()) await sleep(100);
+        // inside a workflow: it goes on until it waits again (workflows.js)
+        if (window.tablefolkWorkflows?.active(g.id)) await world.driveWorkflow(g.id);
+        else if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g, { lock });
+      });
+    } finally { g._replying = false; }
   }
   // Programmatic chat for the scenario tactic tester (scenario.js): queue a
   // message exactly like the chat box does, run that character's turn, and
@@ -1582,10 +1632,8 @@ async function main() {
   world.isBrainLoopRunning = () => running;
   // play.js's turn round: one character's turn, never two decisions at once.
   world.brainReady = () => manager.isLoaded();
-  world.runAgentTurn = async g => {
-    while (replying) await sleep(100);
-    replying = true;
-    try {
+  world.runAgentTurn = g => withTurnLock(g, async lock => {
+    {
       while (!world.isTurnReady()) await sleep(100);
       // mind.js reflexes: the game acts for a character in danger or starving
       // when its brain is small (or let things get bad); no model call
@@ -1606,10 +1654,12 @@ async function main() {
         try { window.dispatchEvent(new CustomEvent('tablefolk-agent-turn', { detail: { agentId: g.id, line: rx.line, reflex: true } })); } catch {}
         return;
       }
-      return await runOneAgentTurn(g);
+      return await runOneAgentTurn(g, { lock });
     }
-    finally { replying = false; }
-  };
+  });
+  // turn mode (modes.js): start a character's model call before the player ends their turn; used at its turn
+  // only if its prompt is unchanged then (runOneAgentTurn opt.prefetch)
+  world.prefetchTurn = g => runOneAgentTurn(g, { prefetch: true }).catch(e => { console.warn('[modes] early turn', g.id, e); return null; });
   world.ensureBrainLoaded = async () => { if (!manager.isLoaded()) await manager.load(); };
   // A command line run as a character now (menus.js "act", "reply"): the same
   // path as a model's command; waits for the turn (and any walking) to settle.

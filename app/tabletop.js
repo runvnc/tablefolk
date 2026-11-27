@@ -18,7 +18,10 @@
  * - Zoom and pan: the mouse wheel zooms about the pointer, dragging empty
  *   space pans (any square with the middle or right button), double-click or
  *   0 fits the board, + / - zoom, arrows pan; two fingers pinch and pan.
- * Game input is off: nobody walks, fights or takes turns here.
+ * Game input is off: nobody walks, fights or takes turns here, except in turn
+ * mode (modes.js, "mode": "turns" or ?mode=turns): click a square to walk the
+ * player there (up to the squares left this turn), Space or N or the End turn
+ * button ends the turn; whose turn it is shows as a ring with "thinking…".
  */
 (function () {
   if (!window.TABLEFOLK_TABLETOP) return;
@@ -164,6 +167,7 @@
     if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; }
     const ctx = overlay.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, v.cw, v.ch);
     paintOverlay(ctx, v, v.cw / (2 * v.hw));
+    paintTurn(ctx, v, v.cw / (2 * v.hw));
     if (opt.edit) {
       const cell = v.cw / (2 * v.hw);
       const box = (x, z, color, dash) => { const [px, py] = toPx(v, x, z); ctx.setLineDash(dash ? [6, 4] : []); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(px - cell / 2, py - cell / 2, cell, cell); ctx.setLineDash([]); };
@@ -172,6 +176,42 @@
     }
   }
 
+  // turn mode (modes.js): a ring on whose turn it is, with "thinking…", and the player's squares left (not printed)
+  function paintTurn(ctx, v, scale) {
+    const M = window.tablefolkModes; if (M?.mode?.() !== 'turns') return;
+    const ring = (g, color, text) => {
+      const p = posOf(g), [px, py] = toPx(v, p.x, p.z);
+      ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, scale * .06); ctx.beginPath(); ctx.arc(px, py, scale * .48, 0, Math.PI * 2); ctx.stroke();
+      if (!text) return;
+      const fs = Math.max(10, scale * .22); ctx.font = `italic 600 ${fs}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(text).width + fs, th = fs * 1.4, ty = py - scale * .72;
+      ctx.fillStyle = 'rgba(20,24,30,.85)'; roundRect(ctx, px - tw / 2, ty - th / 2, tw, th, th / 3); ctx.fill(); ctx.fillStyle = '#ffe2a6'; ctx.fillText(text, px, ty + 1);
+    };
+    const a = M.turn.actor && W().getAgents().find(g => g.id === M.turn.actor);
+    if (a && !opt.hidden.has(a.id)) ring(a, '#ffd34d', 'thinking…');
+    const pl = W().getPlayerAvatar?.();
+    if (pl && !M.turn.busy) ring(pl, '#7fe08a', M.turn.left + ' left');
+  }
+  // turn mode: a click on a square walks the player there, square by square, while squares are left
+  let walking = false;
+  async function walkTo(x, z) {
+    const M = window.tablefolkModes, pl = W().getPlayerAvatar?.(); if (walking || !pl || M?.mode?.() !== 'turns' || M.turn.busy) return;
+    const p = posOf(pl), route = window.findRoute?.(new BABYLON.Vector3(p.x, 0, p.z), new BABYLON.Vector3(x, 0, z));
+    if (!route?.length) { status('no way there'); return; }
+    walking = true;
+    try {
+      // (the route is waypoints: a square at a time toward each, along x then z)
+      walk: for (const q of route) {
+        for (let n = 0; n < 40; n++) {
+          const c = posOf(pl), dx = Math.round(q.x) - Math.round(c.x), dz = Math.round(q.z) - Math.round(c.z);
+          if (!dx && !dz) break;
+          if (M.blockStep() || !window.playerStep?.(new BABYLON.Vector3(dx ? Math.sign(dx) : 0, 0, dx ? 0 : Math.sign(dz)))) break walk;
+          const t0 = performance.now(); while (pl.turnMove && performance.now() - t0 < 20000) await new Promise(r => setTimeout(r, 40));
+          draw();
+        }
+      }
+    } finally { walking = false; }
+  }
   // ---- export: PNG and print ----
   async function render(ppc) {
     const w = W(), scene = w.state.scene, engine = scene.getEngine(), b = bounds();
@@ -320,6 +360,8 @@
   }
   function onUp(e) {
     if (e?.pointerType === 'touch') { touches.delete(e.pointerId); if (pan?.pinch) { pan = null; return; } }
+    // turn mode: a click (not a pan) on a square walks there
+    if (pan && pan.moved < 5 && !opt.edit && e?.button === 0 && window.tablefolkModes?.mode?.() === 'turns') { const [x, z] = cellAt(e); walkTo(x, z); }
     if (pan) { pan = null; document.documentElement.classList.remove('tt-panning'); return; }
     if (!drag) return;
     const d = drag; drag = null;
@@ -391,12 +433,13 @@
   }
 
   // Game input off: keys and clicks stop here unless they belong to the toolbar.
-  const mine = e => e.target?.closest?.('#ttBar');
+  const mine = e => e.target?.closest?.('#ttBar, #modeLine');
   addEventListener('keydown', e => {
     if (mine(e)) return;
     if (opt.edit && sel && (e.key === 'r' || e.key === 'R')) { const s = sel; turn(s); sel = thingAt(s.x, s.z); draw(); }
     else if (opt.edit && sel && (e.key === 'Delete' || e.key === 'Backspace')) { remove(sel); sel = null; draw(); }
     else if (e.key === 'Escape') { sel = null; draw(); }
+    else if (window.tablefolkModes?.mode?.() === 'turns' && !e.repeat && (e.key === ' ' || e.key === 'n' || e.key === 'N')) window.tablefolkModes.endTurn();
     else if (view && (e.key === '+' || e.key === '=')) zoomAt(1.25);
     else if (view && (e.key === '-' || e.key === '_')) zoomAt(1 / 1.25);
     else if (view && e.key === '0') fitAll();
@@ -438,5 +481,5 @@
       }, 1500);
     }, 300);
   }
-  window.tablefolkTabletop = { render, freeze: () => window.tablefolkScenario.freezeLayout(), toPx: (x, z) => toPx(view, x, z), zoomAt, fitAll, get view() { return view; }, get options() { return opt; } };
+  window.tablefolkTabletop = { render, redraw: () => draw(), freeze: () => window.tablefolkScenario.freezeLayout(), toPx: (x, z) => toPx(view, x, z), zoomAt, fitAll, get view() { return view; }, get options() { return opt; } };
 })();

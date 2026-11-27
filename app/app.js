@@ -5260,12 +5260,15 @@ function removePlayerAvatar(){
 // One cell in a direction, unless blocked or off the edge (no accidental falls).
 function playerStep(dir){
   const g=state.playerAvatar; if(!g || g.turnMove || g.falling || g.defeated || state.npcBusy) return false;
+  // turn mode (modes.js): the squares left this turn, none while the others take theirs
+  if(window.tablefolkModes?.blockStep?.()) return false;
   setCharacterFacing(g,dir);
   const lp=g.logicalPos||g.root.position, nx=Math.round(lp.x+dir.x), nz=Math.round(lp.z+dir.z);
   // a locked door opens if you carry its key (locks.js)
   const lock=window.tablefolkLocks?.lockedAt(nx,nz); if(lock && !window.tablefolkLocks.tryOpen(lock)) { emitBadge(g,'locked'); return false; }
   if(isBlocked(nx,nz) || !hasGroundAt(nx,nz) || bigBodyAt(nx,nz,g)) { emitBadge(g,'bonk'); return false; }
   startTurnMove(g,dir,Math.hypot(nx-lp.x,nz-lp.z)); g.anim='walk'; playRig(g,'walk',true);
+  window.tablefolkModes?.stepTaken?.();
   setTimeout(()=>{ if(g.anim==='walk' && !g.turnMove){ g.anim='idle'; playRig(g,'idle',true); } },g.turnMove.dur*1000+120);
   state.followAvatar=true;
   window.tablefolkPlay?.acted('move');
@@ -5311,7 +5314,7 @@ const fpHeld=new Set();
 const FP_KEYS={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back'};
 function fpWalk(g,dt){
   const sign=(fpHeld.has('fwd')?1:0)-(fpHeld.has('back')?1:0);
-  if(!sign || g.turnMove || g.falling || !state.firstPerson || g.defeated || state.npcBusy){
+  if(!sign || g.turnMove || g.falling || !state.firstPerson || g.defeated || state.npcBusy || window.tablefolkModes?.blockStep?.()){
     if(g.fpWalking){ g.fpWalking=false; if(g.anim==='walk'){ g.anim='idle'; playRig(g,'idle',true); } }
     return;
   }
@@ -5328,7 +5331,7 @@ function fpWalk(g,dt){
     state.followAvatar=true;
     // entering a new cell is a turn (play.js): nearby characters act
     const cell=Math.round(x)+','+Math.round(z);
-    if(g.fpCell!==cell){ const was=g.fpCell; g.fpCell=cell; if(was) window.tablefolkPlay?.acted('move'); }
+    if(g.fpCell!==cell){ const was=g.fpCell; g.fpCell=cell; if(was){ window.tablefolkModes?.stepTaken?.(); window.tablefolkPlay?.acted('move'); } }
   } else if(g.fpWalking){ g.fpWalking=false; g.anim='idle'; playRig(g,'idle',true); }
 }
 // Third person: a key held down walks on, step after step, with no stop
@@ -5345,7 +5348,9 @@ function setupPlayerControls(){
   window.addEventListener('keydown',e=>{
     const g=state.playerAvatar; if(!g) return;
     const tag=(e.target?.tagName||'').toLowerCase();
-    if(tag==='input'||tag==='textarea'||tag==='select'||e.target?.isContentEditable||e.ctrlKey||e.metaKey||e.altKey) return;
+    // the arrow keys walk while the chat box is empty: say something, then walk on while the reply comes
+    const emptyChat=e.target?.id==='chatInput' && !e.target.value && /^Arrow/.test(e.key);
+    if(!emptyChat && (tag==='input'||tag==='textarea'||tag==='select'||e.target?.isContentEditable||e.ctrlKey||e.metaKey||e.altKey)) return;
     const k=e.key.toLowerCase();
     if(k==='v'){ setFirstPerson(!state.firstPerson); e.preventDefault(); return; }
     if(k==='c'){ toggleCameraMode(); e.preventDefault(); return; }
@@ -5732,6 +5737,9 @@ function installWorldAPI(){
     setWallHeight:v=>{ state.wallHeightScale=Number.isFinite(+v) && +v>0 ? Math.min(4,Math.max(.25,+v)) : 1; },
     setLighting, setTimeOfDay:h=>window.tablefolkSky?.setTimeOfDay(h),
     showThought:(agentId,text,pending=false)=>showThought(state.characters.find(x=>x.id===agentId),text,pending),
+    // a reply to the player as it is written (world-integration.js: the words of its say(...) streaming in)
+    showStreamingBubble:(agentId,text)=>{ const g=state.characters.find(x=>x.id===agentId); if(g) showStreamingBubble(g,text); },
+    clearStreamingBubble:(agentId)=>{ const g=state.characters.find(x=>x.id===agentId); if(g) clearStreamingBubble(g); },
     clearPendingThought:agentId=>clearPendingThought(state.characters.find(x=>x.id===agentId)),
     executeAgentCommand:(agentId,cmd)=>beginTurnForAgent(agentId,cmd,'agent-object'),
     runAgentCommand:(agentId,raw)=>beginTurnForAgent(agentId,parseCommand(raw),'agent-text'),

@@ -10,6 +10,7 @@
 //        [--day [--day-minutes=8]] (one whole game day: the scored day below)
 //        [--autonomy=rails|guided|free] (agency.js: how much the characters decide; the
 //        capability check is skipped) -- every run ends with the interest report
+//        [--mode=living|adventure|turns] [--mode-radius=12] (modes.js; default: living, everyone on the model)
 //        (interest-report.mjs: activities, who chose them, self-initiated
 //        interactions, plans, surprises, depth, failures, cost per game hour)
 //
@@ -59,7 +60,10 @@ const minutes = dayMode ? dayMinutes : +(flag('minutes') || 6), maxTurns = dayMo
 const base = flag('base') || 'http://localhost:8000', label = flag('label') || 'run';
 const provoke = flag('provoke'), K = +(flag('k') || 8), insultSet = flag('insults') || (name === 'goblin-bakery' ? 'bakery' : 'generic');
 const autonomy = flag('autonomy');
-const pick = [dayMode && 'dayMinutes=' + dayMinutes, autonomy && 'autonomy=' + autonomy + '&probe=0', flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
+// (--mode=adventure|turns: the game mode, modes.js; by default living with every character on the model,
+// modeRadius=0, as the measurements before the modes: an idle player would otherwise leave the far ones on rails;
+// --mode-radius=12 measures living as the player gets it)
+const pick = ['modeRadius=' + (flag('mode-radius') ?? '0'), flag('mode') && 'mode=' + flag('mode'), dayMode && 'dayMinutes=' + dayMinutes, autonomy && 'autonomy=' + autonomy + '&probe=0', flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), flag('query')].filter(Boolean).join('&');
 const INSULTS = {
   bakery: [
     'You are a useless, smelly little goblin and your pies taste like mud.',

@@ -294,7 +294,7 @@
   let reflecting = false;
   async function reflectWithModel(g) {
     const m = mindOf(g), cfg = getBrainConfig(g.id);
-    if (reflecting || state.reflect === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated) return;
+    if (reflecting || state.reflect === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated || window.tablefolkModes?.mayThink?.(g) === false) return;
     const raw = m.mem.filter(e => e.kind !== 'thought').slice(-12).map(e => '- ' + e.text);
     if (raw.length < 4) return;
     reflecting = true; m.lastReflected = m.turn;
@@ -318,7 +318,7 @@
   async function planDay(g) {
     const m = mindOf(g), cfg = getBrainConfig(g.id);
     if (aboveRails(g) && window.tablefolkJobs?.handles?.(g)) return;   // agency.js plans the day itself
-    if (planning || reflecting || state.plans === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated || cfg.goal || cfg.quest) return;
+    if (planning || reflecting || state.plans === false || tier(g) === 'basic' || !window.tablefolkLLM || cfg.defeated || cfg.goal || cfg.quest || window.tablefolkModes?.mayThink?.(g) === false) return;
     planning = true; m.lastPlanned = m.turn;
     try {
       const things = (window.tablefolkUses?.nearby(g, 10) || []).map(o => String(o.type).replace(/_/g, ' ')).slice(0, 8);
@@ -936,9 +936,14 @@
   // character mostly idles without its model.) Turn-by-turn play: tick().
   const HUNGER_PER_S = .55 / 480, TIRED_PER_S = .7 / 720;
   let needsAt = performance.now();
+  // (the game mode's speed scales it: modes.js clockRate, 0 in turn mode, where each round passes its time at
+  // once through passTime(seconds); slower beside an adventure encounter)
   setInterval(() => {
-    const now = performance.now(), dt = Math.min(5, (now - needsAt) / 1000); needsAt = now;
-    if (!window.tablefolkLive?.on) return;
+    const now = performance.now(), dt = Math.min(5, (now - needsAt) / 1000) * (window.tablefolkModes?.clockRate?.() ?? 1); needsAt = now;
+    if (!window.tablefolkLive?.on || !(dt > 0)) return;
+    needsStep(dt);
+  }, 1000);
+  function needsStep(dt) {
     for (const g of state.characters || []) {
       const cfg = getBrainConfig(g.id);
       if (g.defeated || cfg.defeated || !needsOn(g) || window.tablefolkPlay?.isAnimal?.(g) || window.tablefolkPlay?.isHostile?.(g)) continue;
@@ -952,7 +957,7 @@
       }
       if (!g.pose || g.pose.mode !== 'lie') m.tired = clamp01(m.tired + dt * TIRED_PER_S);
     }
-  }, 1000);
+  }
 
   const gameMinute = () => { const k = window.tablefolkClock?.now?.(); return k ? (k.day - 1) * 1440 + k.min : null; };
   function weak(g) { const m = getBrainConfig(g.id).mind, t = gameMinute(); return !!(m && t != null && m.starvingSince != null && t - m.starvingSince > 480); }
@@ -1124,5 +1129,5 @@
     for (const o of state.characters) if (o !== v && !o.defeated && Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z) < range) event(o, 'saw_defeat', { by: e.detail.by, victim: name });
   });
 
-  window.tablefolkMind = { startFight, mayFight, calmDown, fleeSpot, bestWeapon, insult, isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
+  window.tablefolkMind = { passTime: s => needsStep(+s || 0), startFight, mayFight, calmDown, fleeSpot, bestWeapon, insult, isDrink, weak, endQuarrel, food, provoked, insultIn, refuses, speechCause, temperLines, standDown, callForHelp, angerLevel, thinkNow, recipeLine, urgentLines, planDay, persist, reflex, dangerLines, foes, tier, consolidate, reflectWithModel, hearGossip, gossipLine, onSpoke, prepare, learnFromPlayer, playerLines, pfOf, event, tick, cardLines, opinion, wantsTurn, remember, feel, eat, addMemory, recall, mindOf, temperament, FOOD, isFood };
 })();

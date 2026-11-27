@@ -120,6 +120,9 @@
   function resolve(g) {
     const cfg = g ? cfgOf(g) : {};
     if (g && W()?.isSimpleBrain?.(g, cfg)) return { ...PF().resolve(['rails']), level: 'rails', why: 'simple mode' };
+    // the game mode keeps it off the model for now (modes.js: adventure outside the encounter; living and turns
+    // farther from the player than "modeRadius"): on rails until it may think again
+    if (g && window.tablefolkModes?.mayThink?.(g) === false) return { ...PF().resolve(['rails']), level: 'rails', why: window.tablefolkModes.whyNot?.(g) || 'the game mode' };
     // a scripted world ("brain": "none") or no model at all: rails, whatever is cached for the last brain
     if (window.tablefolkScenario?.active?.scn?.brain === 'none' || window.tablefolkBrainInfo?.()?.engine === 'none' || qs.has('art')) return { ...PF().resolve(['rails']), level: 'rails', why: 'no model in this world' };
     // autonomy-profile.js choose(): a world's or character's request on a brain Auto puts on rails (or with

@@ -1040,6 +1040,14 @@
       threats: Array.isArray(s.threats) ? s.threats.filter(t => t && typeof t === 'object' && typeof t.kind === 'string').slice(0, 12).map(t => ({ ...t, kind: String(t.kind) })) : [], harsh: s.harsh === true,
       // jobs.js: the world's prices (item: gold), over the jobs' own
       prices: s.prices && typeof s.prices === 'object' && !Array.isArray(s.prices) ? Object.fromEntries(Object.entries(s.prices).filter(([, v]) => Number.isFinite(+v)).map(([k, v]) => [String(k).toLowerCase(), Math.max(0, +v)])) : {},
+      // modes.js: the game mode ("living" | "adventure" | "turns"; unset: living), its automatic switches
+      // ("modeWhen": {"fight": "turns", "talk": "adventure", "indoors": "turns"}) and settings: "modeRadius" (who uses
+      // the model, squares from the player; 0 everyone), "encounterWorld" (slow | pause | run), "turnMoves", "turnMinutes"
+      mode: window.tablefolkModesCore?.normalize?.(s.mode) ?? null, modeWhen: window.tablefolkModesCore?.normalizeWhen?.(s.modeWhen) ?? null,
+      modeRadius: Number.isFinite(+s.modeRadius) && s.modeRadius !== null && s.modeRadius !== '' ? Math.max(0, Math.min(999, +s.modeRadius)) : null,
+      encounterWorld: ['slow', 'pause', 'run'].includes(s.encounterWorld) ? s.encounterWorld : null,
+      turnMoves: Number.isFinite(+s.turnMoves) && +s.turnMoves >= 1 ? Math.min(30, Math.round(+s.turnMoves)) : null,
+      turnMinutes: Number.isFinite(+s.turnMinutes) && s.turnMinutes !== null && s.turnMinutes !== '' ? Math.max(0, Math.min(240, +s.turnMinutes)) : null,
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // subworlds: other maps (a building's inside, a dungeon level, a forest next door): sections the player walks into through links
       subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},

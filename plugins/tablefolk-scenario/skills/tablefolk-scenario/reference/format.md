@@ -50,6 +50,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "tempers": true, "temper": "normal",   // insults anger characters (false: off); short | normal | long for everyone (characters.md)
   "gossip": true, "reflect": true, "reflexes": true, "expect": null, "autonomy": null, "monsters": null, "remembers": true, "plans": true, "glances": true, "autoThink": true,   // characters.md
   "live": false, "pace": "calm", "director": 5, "events": [],
+  "mode": "living", "modeWhen": null, "modeRadius": 12, "encounterWorld": "slow", "turnMoves": 6, "turnMinutes": 10,   // how the game runs: living | adventure | turns (living.md)
   "time": "08:00", "dayMinutes": 12, "clock": true,   // the time of day (living.md)
   "talk": false,                   // true: a talk-only scene (the world builder adds no jobs, threats or living-world rules)
   "threats": [], "harsh": false, "prices": {},          // raids on the clock; starving hurts; the world's prices (living.md, characters.md)
@@ -90,6 +91,7 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `lore`, `needs`, `mind`, `food` | world facts, hunger on/off, the mind on/off, extra food | [characters.md](characters.md) |
 | `tempers`, `temper` | insults anger characters, who may refuse, call for help or fight (`false`: off); how quickly | [characters.md](characters.md) |
 | `live`, `pace`, `director`, `events` | a world that lives on its own | [living.md](living.md) |
+| `mode`, `modeWhen`, `modeRadius`, `encounterWorld`, `turnMoves`, `turnMinutes` | how the game runs: `living` (real time, the default), `adventure` (the world on rails; whoever the player talks to uses the model), `turns` (nothing moves until the player ends a turn); switches by situation; a section may have its own | [living.md](living.md#how-the-game-runs-mode) |
 | `time`, `dayMinutes`, `clock` | the time of day: start, real minutes a day (0: frozen), `false`: no clock | [living.md](living.md) |
 | `threats` | raids, rats, bandits (and package kinds) on the clock | [living.md](living.md), [combat.md](combat.md) |
 | `talk` | `true`: a talk-only scene; the world builder leaves it one place with no jobs or threats | [world-builder.md](world-builder.md) |

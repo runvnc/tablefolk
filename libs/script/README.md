@@ -43,6 +43,7 @@ effects, run in this order:
 | `give` | `"give": "pie"` |
 | `start` | a workflow: `"start": "riddle"` (also `workflow`) |
 | `stop` | `"stop": true` |
+| `mode` | the host's game mode from here on: `"mode": "turns"` (`host.mode(name)`, optional) |
 
 `world.x` is always a flag. A bare name is a flag in a menu or a trigger, and
 a run variable inside a workflow.

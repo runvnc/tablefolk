@@ -54,7 +54,7 @@ approve the download on a user's behalf.
 
 | key | does |
 |---|---|
-| W A S D / arrows | move; held down, you keep walking (in first person: W/S walk where you look, A/D turn) |
+| W A S D / arrows | move; held down, you keep walking (in first person: W/S walk where you look, A/D turn); the arrows also walk while the chat box is empty, so you can say something and walk on while the answer comes |
 | click the ground | walk there (not in first person: there only the keys walk) |
 | mouse wheel | zoom towards what the pointer is over, close enough to read a face, in every camera (the follow camera keeps following you while zoomed; in first person it narrows the view towards what the pointer is on: point and scroll, no dragging) |
 | drag | turn the free camera about what the pointer is over when you start dragging (right-drag slides it); in the follow camera, turn the view around you (it keeps that angle while it follows you) |
@@ -64,6 +64,7 @@ approve the download on a user's behalf.
 | V | first person and back (C reaches it too) |
 | H | window view: the webcam follows your head and the screen becomes a window onto the board: move your head and the board slides behind the frame; lean in to bring it closer (or, with the Graphics pane's "leaning in", to see more as through a real window) (face tracking in the browser; a small preview shows while it runs; hold still for half a second at the start) |
 | P | let them live (everyone acts on their own) / pause |
+| Space, N | turn mode: end your turn (everyone near takes one; living.md, "How the game runs") |
 | I | the Adventurer pane |
 | Enter | chat |
 | \ | open / close the side panel |
@@ -136,7 +137,7 @@ two icons: **Adventurer** (`I`: health, gold, wielded weapon, goal, items
 with give / drink / read / wield / drop, then the view buttons, pace and
 "let them live", then the controls) and **Settings** (your chat name;
 **Running now**: the characters' model, the voice, the speech input and the
-graphics, each with its state and why it was chosen, and **Characters decide** (on rails, guided or free, and why); **How much do characters decide for themselves?**: Auto (recommended: by what the brain loaded can do here, measured by a short capability check the first time; it may keep some decisions in code, shown as "guided (danger and needs in code)"), On rails, Assisted, Guided or Free, with what each costs (living.md); **Characters' brain online**: sign in with OpenRouter (or paste an OpenRouter key) and the characters think there, on your own account, when this device can't run their model or you want a bigger one; offered by itself when the model fails to load; links to the **Voice**
+graphics, each with its state and why it was chosen, and **Characters decide** (on rails, guided or free, and why), and **Game mode** (living, adventure or turn by turn, and why); **How the game runs**: as the world says (the default), Living world, Adventure or Turn by turn, for every world (living.md, "How the game runs"); **How much do characters decide for themselves?**: Auto (recommended: by what the brain loaded can do here, measured by a short capability check the first time; it may keep some decisions in code, shown as "guided (danger and needs in code)"), On rails, Assisted, Guided or Free, with what each costs (living.md); **Characters' brain online**: sign in with OpenRouter (or paste an OpenRouter key) and the characters think there, on your own account, when this device can't run their model or you want a bigger one; offered by itself when the model fails to load; links to the **Voice**
 and **Graphics** panes, **This device** and **Messages**; and the switch to
 developer mode). **This device** shows what was detected (the graphics card
 and its memory, what is left beside the characters' model, the browser's
@@ -286,4 +287,7 @@ monsters hidden), save PNG (100/150/300 px a square), print at one inch per
 square (tiled over pages) or fitted to one page, full screen. Wheel zooms
 about the pointer, drag pans, double-click / 0 / "fit" fits, +/- and arrows.
 In edit mode drag things to move them, R turns, Delete removes; "use this
-layout" sends the fixed layout back to the world builder (`app/tabletop.js`).
+layout" sends the fixed layout back to the world builder (`app/tabletop.js`). In
+turn mode (`?mode=turns` or a world's `"mode": "turns"`) the table plays:
+click a square to walk there (up to the squares left), Space, N or End turn
+ends the turn, and a ring with "thinking…" marks whose turn it is.

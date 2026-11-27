@@ -166,6 +166,64 @@ hungry. Starving (`.8`) for a third of a day it is **weak**: it walks
 slowly and cannot work. It does not die of it unless the world is
 `"harsh": true` (then it loses health).
 
+## How the game runs (`mode`)
+
+A living world runs in real time, but the characters share one model, and a
+slow model makes the player wait for turns and replies. `"mode"` chooses how
+time and the model are shared (`app/modes.js`):
+
+- **`"living"`** (the default): real time, as above. The player's
+  conversation always goes first: it jumps the queue of model calls the
+  village has waiting (one already running finishes first), the reply streams
+  into a bubble as it is written, and the player can walk on meanwhile (the
+  arrow keys walk while the chat box is empty). Only characters within
+  `"modeRadius"` squares of the player (default 12; `0`: everyone) use the
+  model; those farther away run on rails without it (their day goes on in
+  code, what is said to them waits in their history) until they come near.
+- **`"adventure"`**: the world runs on rails, all in code, while the player
+  explores: no model at all. Engaging a character (talking to it, giving it
+  something, opening its menu, or being spoken to by it: code still has
+  characters greet and approach the player) opens an **encounter**: that
+  character and whoever it was talking with nearby use the model at their
+  autonomy level, and others who speak to them join. Meanwhile the world
+  around goes at a quarter speed (`"encounterWorld": "slow"`, the default),
+  stands still (`"pause"`) or runs on (`"run"`). The encounter ends when the
+  player walks away (farther than earshot + 2 squares from all of them) or the
+  talk has been idle for 90 s; each keeps a memory of the talk and goes back to
+  rails, and what it learnt of the player (what they want, what they promised,
+  trust) stays in its mind for the next time.
+- **`"turns"`**: nothing moves until the player ends a turn (the **End turn**
+  button at the top, Space or N). In a turn the player walks up to
+  `"turnMoves"` squares (default 6) and may talk, give and use; the one spoken
+  to answers on its turn. Then each character within `"modeRadius"` takes
+  exactly one turn, nearest first, with a "thinking…" marker over it (its
+  autonomy decides how: on rails its job's next step in code, free an open
+  turn), walking and animations play, and the clock jumps `"turnMinutes"`
+  (default 10 game minutes). Works in the tabletop view too (click a square to
+  walk there). While the player decides, the first character's model call may
+  start early, but only when nothing the player can still do this turn can
+  reach it (too far to walk to, see or hear), and its answer is used only if
+  its prompt is still the same at its turn.
+
+**Switching mid-scenario.** A section has its own `"mode"` (a building's
+inside in turns, the village in adventure); a trigger's, menu choice's or
+workflow step's `"do"` takes `"mode": "turns"`; a director event can carry
+one (`{"text": "Bandits burst in!", "mode": "turns"}`). `"modeWhen"` switches
+by the situation and back: `{"fight": "turns", "talk": "adventure",
+"indoors": "turns"}` (a fight: a foe within 5 squares the player can see,
+for 6 s after the last; talk: an encounter is open; indoors: under a
+building's roof); a fight wins over talk, talk over indoors. The player can
+choose a mode for every world in Settings ("How the game runs"), and `?mode=`
+in the page's link beats everything (tests). Settings' "Running now" says which
+mode runs and why. The world builder sets the world's mode on the Story tab
+("how the game runs", beside the autonomy choice); the AI that builds worlds
+sets it only when the request asks.
+
+```json
+{ "mode": "adventure", "modeWhen": { "fight": "turns" }, "encounterWorld": "slow",
+  "triggers": [ { "on": "flag", "flag": "trial_begins", "do": { "mode": "turns" } } ] }
+```
+
 ## How much characters decide (`autonomy`)
 
 The day above is **on rails**: code runs it and the model talks. That suits
@@ -369,7 +427,8 @@ player can see, spaced by the pace. It is told to that character and those
 near as an `[event]`, shown to the player as a narrator's line, and sometimes
 made real.
 
-- An event is a string, or `{"text", "spawn", "note", "gold"}`. `{who}` is the
+- An event is a string, or `{"text", "spawn", "note", "gold", "mode"}`; `"mode"`
+  switches the game mode as it happens ("How the game runs"). `{who}` is the
   character it happens to (told to that one as "you"). `spawn` makes the thing
   real beside it (`note` with `"note"` text, `coin_pile` with `gold`,
   `mushroom`, `crate`, any object type).

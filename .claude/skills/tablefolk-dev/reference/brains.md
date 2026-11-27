@@ -277,8 +277,10 @@ costs graphics memory only where the engine allocates its KV cache up front
 
 ## A character's turn
 
-`world-integration.js` `runAgentTurn(g)` (one decision at a time, behind a
-lock) builds the prompt and parses the answer:
+`world-integration.js` `runAgentTurn(g)` (one turn at a time, behind a turn
+lock that is let go while its model call runs; the lock and the model queue
+put a reply to the player first: "Game modes" below) builds the prompt and
+parses the answer:
 
 1. **Stable prefix** (`buildAgentPrompt` in `app/app.js`): who it is (style
    only if set), personality, backstory, the role's duty ("Your job:"), the

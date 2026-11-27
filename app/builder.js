@@ -42,6 +42,8 @@
  * (Auto, the default, leaves it out; the scenario skill's living.md) and a
  * "decides for itself" select in each character's box; the choice sets the
  * preset and keeps per-decision keys written in the JSON.
+ * How the game runs ("mode": living, adventure, turns; modes.js): a select
+ * beside it (living, the default, leaves it out).
  *
  * The map editor and the forms change the same scenario: an edit in one
  * redraws the other. A layout written as "map" lines is placed by the app,
@@ -294,6 +296,7 @@
         ${field('start time (HH:MM)', 'time', 'text', { ph: '08:00' })}${field('day length (real minutes; 0 stops the clock)', 'dayMinutes', 'num', { ph: '12' })}
         ${field('temper (how fast insults anger them)', 'temper', 'select', { options: [['', '(normal)'], 'short', 'normal', 'long'] })}${field('monsters hunt', 'monsters', 'select', { options: [['', '(default: everyone in a living world)'], 'everyone', 'player'] })}
         ${autonomyPick()}
+        ${field('how the game runs (mode)', 'mode', 'select', { options: [['', 'living (default): the world runs in real time'], ['adventure', 'adventure: the world runs by itself; whoever you talk to thinks for themselves'], ['turns', 'turn by turn: nothing moves until you end your turn']] })}
         <label><span>talk-only scene (no jobs or threats added by the builder)</span><select data-path="talk" data-type="bool3"><option value=""${scn.talk ? '' : ' selected'}>no</option><option value="true"${scn.talk ? ' selected' : ''}>yes</option></select></label>
         <div class="wide"><span class="muted">threats (on the clock: raid attacks people, rats eat the stores, bandits steal gold)</span>${(scn.threats || []).map((t, i) => `<div class="cols" style="align-items:end">${field('kind', `threats.${i}.kind`, 'select', { options: [...new Set(['raid', 'rats', 'bandits', t.kind].filter(Boolean))] })}${field('who (a body)', `threats.${i}.who`, 'text', { ph: 'wolf' })}${field('count', `threats.${i}.count`, 'num', { ph: '2' })}${field('when', `threats.${i}.when`, 'select', { options: [['', '(the kind\'s)'], 'night', 'day', 'any'] })}${field('every (days)', `threats.${i}.every`, 'num', { ph: '1' })}<button type="button" class="ghost small" data-act="removeThreat" data-i="${i}">remove</button></div>`).join('')}<button type="button" class="ghost small" data-act="addThreat">+ add a threat</button></div>
         ${field('intro', 'intro', 'area', { wide: true })}${field('goal (what the player is told)', 'goal.text', 'area', { wide: true, rows: 2 })}

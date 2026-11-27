@@ -87,6 +87,8 @@ const host = {
   menu: (actor, ref) => window.tablefolkMenu?.open(ref, { agentId: actor, flow: true }) ?? Promise.resolve(null),
   // "anim" and "sound" in a "do" (menus, workflows, triggers): a clip of the character's body (bodies.js), a named sound (sfx.js)
   anim(actor, name) { const g = agent(actor); if (g) window.tablefolkBodies?.playClip(g, name) || window.tablefolkPackages?.playClip(g, name); },
+  // "mode" in a "do": the game's mode from here on (modes.js: living, adventure, turns)
+  mode(name) { window.tablefolkModes?.set?.(String(name), 'trigger'); },
   sound(actor, name) { const g = agent(actor); window.tablefolkSfx?.play(name, g ? (g.logicalPos || g.root.position) : undefined); },
   ended(actor, run) {
     try { window.dispatchEvent(new CustomEvent('tablefolk-workflow', { detail: { agentId: actor, name: run.name, ended: true, vars: run.vars } })); } catch {}

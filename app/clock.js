@@ -19,7 +19,10 @@
  * (dungeons, caves, "dark": true) keep their lighting; only the clock runs.
  * The lighting rework is expected to take this hook over.
  *
- *   window.tablefolkClock = { now(), hour(), isNight(), running, set(min, day), fmt(min) }
+ * The game mode sets its speed (modes.js clockRate: 0 in turn mode, where each round
+ * moves it on at once with advance(minutes); slower or still beside an adventure encounter).
+ *
+ *   window.tablefolkClock = { now(), hour(), isNight(), running, set(min, day), advance(minutes), fmt(min) }
  * Loaded after live.js; uses app.js globals (state).
  */
 (function () {
@@ -83,7 +86,10 @@
     const c = state.clock;
     if (!c || !cfg.on || !cfg.dayMinutes || !window.tablefolkLive?.on) return;
     const before = c.min;
-    c.min += dt * 1440 / (cfg.dayMinutes * 60);
+    // the game mode's speed (modes.js clockRate): 0 in turn mode (a round moves it: advance), slower or still
+    // beside an adventure encounter
+    const rate = window.tablefolkModes?.clockRate?.() ?? 1; if (!(rate > 0)) return;
+    c.min += dt * rate * 1440 / (cfg.dayMinutes * 60);
     if (c.min >= 1440) { c.min -= 1440; c.day++; }
     const q = Math.floor(c.min / 15) + c.day * 96;
     if (q !== lastQuarter) { lastQuarter = q; quarter(); }
@@ -107,6 +113,17 @@
     el.textContent = `${icon} ${fmt(c.min)} · day ${c.day}`;
   }
 
+  // turn mode (modes.js): a round moves the clock on by its minutes at once, firing each quarter it passes
+  function advance(minutes) {
+    const c = state.clock; if (!c || !cfg.on || !(minutes > 0)) return;
+    let left = +minutes;
+    while (left > 0) {
+      const step = Math.min(left, 15 - (c.min % 15) || 15); left -= step; c.min += step;
+      if (c.min >= 1440) { c.min -= 1440; c.day++; }
+      const q = Math.floor(c.min / 15) + c.day * 96; if (q !== lastQuarter) { lastQuarter = q; quarter(); }
+    }
+    hud();
+  }
   function set(min, day = state.clock?.day || 1) { state.clock = { min: ((+min % 1440) + 1440) % 1440, day: Math.max(1, Math.floor(+day) || 1) }; lastQuarter = -1; quarter(); hud(); }
   addEventListener('tablefolk-scenario-started', e => {
     if (e.detail?.sub) return;
@@ -123,7 +140,7 @@
   // the HUD follows live on/off (a world not live by itself shows the clock once it is started)
   setInterval(hud, 2000);
 
-  window.tablefolkClock = { now, hour, isNight, set, fmt, setTimeOfDay, get running() { return !!(state.clock && cfg.on && cfg.dayMinutes && window.tablefolkLive?.on); }, get dayMinutes() { return cfg.dayMinutes; }, get enabled() { return cfg.on; } };
+  window.tablefolkClock = { now, hour, isNight, set, advance, fmt, setTimeOfDay, get running() { return !!(state.clock && cfg.on && cfg.dayMinutes && window.tablefolkLive?.on); }, get dayMinutes() { return cfg.dayMinutes; }, get enabled() { return cfg.on; } };
   // the hook the lighting rework takes over (window.tablefolk is published by app.js first)
   const hook = () => { if (window.tablefolk && !window.tablefolk.setTimeOfDay) window.tablefolk.setTimeOfDay = setTimeOfDay; };
   hook(); addEventListener('tablefolk-scene-ready', hook);

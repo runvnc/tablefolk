@@ -19,7 +19,8 @@
  * "director": false in a scenario turns it off; "director": 3 makes it
  * every 3 turns (default 5). An event with "round": N happens once when the
  * live rounds reach N, to the character "to" (or the first): turning points
- * ("The candle is out: Morvax must choose now").
+ * ("The candle is out: Morvax must choose now"). An event with "mode"
+ * ("living" | "adventure" | "turns") switches the game mode (modes.js).
  *
  *   window.tablefolkDirector.tick(c)     live.js, after c's turn
  *   window.tablefolkDirector.now(text?)  make something happen now (tests, dev)
@@ -127,6 +128,8 @@
         makeObject(ev.spawn, cell[0], cell[1], opts);
       } catch (e) { console.warn('[director] spawn', e); }
     }
+    // an event may switch the game mode ("mode": "turns": a fight breaks out; modes.js)
+    if (ev.mode) try { window.tablefolkModes?.set?.(ev.mode, 'event'); } catch {}
     if (ev.rumour) try { window.tablefolkMind?.addMemory?.(c, `You overheard a rumour: ${ev.rumour}`, 1.6, 'heard'); } catch {}
     if (ev.hunger) try { const m = window.tablefolkMind?.mindOf?.(c); if (m) m.hunger = Math.min(1, (m.hunger || 0) + ev.hunger); } catch {}
     // told to it and to whoever is near enough to notice

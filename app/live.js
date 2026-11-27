@@ -113,7 +113,8 @@
     if (window.tablefolkAnimals?.following(c)) { nextAt.set(c, performance.now() + 900 + Math.random() * 700); return; }
     // a fight goes at its own speed, whatever the pace: a blow every 1.5-2.5 s
     if (fighting(c)) { nextAt.set(c, performance.now() + 1500 + Math.random() * 1000); return; }
-    const k = (seenByPlayer(c) ? 1 : 2) * tempo();
+    // (modes.js: beside an open adventure encounter the world around goes slower, "encounterWorld": "slow")
+    const k = (seenByPlayer(c) ? 1 : 2) * tempo() * (window.tablefolkModes?.paceFactor?.(c) ?? 1);
     nextAt.set(c, performance.now() + rand(P0().turn) * 1000 * k * (first ? Math.random() : 1));
   }
   addEventListener('tablefolk-player-turn', () => { lastPlayerAt = performance.now(); });
@@ -141,7 +142,9 @@
   // pause), then whoever's time has come
   function due() {
     // (a character whose turn runs on its own, above rails, waits for it: agency.js)
-    const now = performance.now(), all = state.characters.filter(alive).filter(c => !c._turnRunning);
+    // (nor one with a reply to the player on the way, world-integration.js replyNow; nor one the game mode holds
+    // still: modes.js, beside an adventure encounter with "encounterWorld": "pause")
+    const now = performance.now(), all = state.characters.filter(alive).filter(c => !c._turnRunning && !c._replying && (window.tablefolkModes?.mayAct?.(c) ?? true));
     for (const c of all) if (!nextAt.has(c)) schedule(c, true);
     const quietOk = now - lastSpeechAt >= P0().quiet * 1000 * tempo();
     // even an answer waits a little after the last line (a third of the quiet gap)
@@ -163,21 +166,11 @@
     const ready = all.filter(c => nextAt.get(c) <= now).sort((a, b) => nextAt.get(a) - nextAt.get(b));
     return ready[0] || null;
   }
-  async function run() {
-    const w = W();
-    // The page loads the brain itself (asking first when it must download):
-    // wait for that rather than start a second load, which cancelled the
-    // pending download question
-    while (on && !w?.brainReady?.()) { status('waiting for the characters\u2019 brain to load…'); await sleep(1000); }
-    if (!on) return;
-    status('');
-    nextAt.clear();
-    while (on) {
-      // the player's own turn round goes first
-      while (on && (P()?.busy || state.npcBusy)) await sleep(150);
-      const c = on && due();
-      if (!c) { await sleep(300); continue; }
-      turns++; ticks++;
+  // One character's turn: a monster's, an animal's, its job in code (jobs.js), an idle step, or its model turn.
+  // -> the ms until its next step (jobs.js) or null. { wait: true } (turn mode, modes.js): a turn above rails is
+  // waited for too, so each character takes exactly one turn in order.
+  async function turnOf(c, { wait = false } = {}) {
+      const w = W();
       const hostile = P()?.isHostile?.(c), mind = !hostile || P()?.talksToo?.(c), why = reason(c);
       const pendBefore = JSON.stringify(getBrainConfig(c.id).pendingChat || []);
       const J = window.tablefolkJobs, jobbed = !hostile && !P()?.isAnimal?.(c) && !!J?.handles?.(c);
@@ -196,7 +189,7 @@
           if (hostile || P()?.hostileTarget?.(c)) await monsterTurn(c);
           // above rails (agency.js guided, free) its turn runs without holding up everyone else's:
           // a 12B's 10-30 s answers froze the whole village while it waited (RTX 3090, 2026-11-21)
-          if (jobbed && (window.tablefolkAgency?.level?.(c) || 'rails') !== 'rails') {
+          if (!wait && jobbed && (window.tablefolkAgency?.level?.(c) || 'rails') !== 'rails') {
             asyncTurn = true; c._turnRunning = true;
             w.runAgentTurn(c).catch(e => console.warn('[live]', c.id, e)).finally(() => { c._turnRunning = false; });
           } else {
@@ -210,6 +203,26 @@
       // serves pending characters first, and nobody else got a turn.
       { const cfg = getBrainConfig(c.id), now = JSON.stringify(cfg.pendingChat || []);
         if (!asyncTurn && now !== '[]' && now === pendBefore) { cfg.pendingChat = []; console.info('[live] cleared what', c.id, 'never took in'); } }
+      return next;
+  }
+  async function run() {
+    const w = W();
+    // The page loads the brain itself (asking first when it must download):
+    // wait for that rather than start a second load, which cancelled the
+    // pending download question
+    while (on && !w?.brainReady?.()) { status('waiting for the characters\u2019 brain to load…'); await sleep(1000); }
+    if (!on) return;
+    status('');
+    nextAt.clear();
+    while (on) {
+      // the player's own turn round goes first
+      while (on && (P()?.busy || state.npcBusy)) await sleep(150);
+      // turn mode (modes.js): characters act only in the rounds after the player ends a turn
+      if (window.tablefolkModes?.holdLive?.()) { await sleep(200); continue; }
+      const c = on && due();
+      if (!c) { await sleep(300); continue; }
+      turns++; ticks++;
+      const next = await turnOf(c);
       status('');
       schedule(c, false, next);
       try { window.tablefolkDirector?.tick?.(c); } catch (e) { console.warn('[director]', e); }
@@ -262,7 +275,7 @@
     const brain = () => !window.TABLEFOLK_BRAIN_WAKING ? Promise.resolve() : new Promise(r => { const t = setTimeout(r, 600000); addEventListener('tablefolk-brain-settled', () => { clearTimeout(t); r(); }, { once: true }); });
     const L = window.tablefolkLoading; (L?.whenRevealed ? L.whenRevealed() : Promise.resolve()).then(brain).then(go);
   });
-  window.tablefolkLive = { start, stop, toggle, setPace, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; }, get ticks() { return ticks; },
+  window.tablefolkLive = { start, stop, toggle, setPace, turnOf, get pace() { return pace; }, eventGap: () => rand(P0().event) * tempo(), get on() { return on; }, get ticks() { return ticks; },
     // a moment for a line (jobs.js remarks and evening talk wait for it)
     quiet: () => performance.now() - lastSpeechAt >= P0().quiet * 1000 * tempo(),
     // rounds: as many turns as there are characters (the timed events' "round")
