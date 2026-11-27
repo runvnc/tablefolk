@@ -92,6 +92,8 @@ export function createWllama3Engine(wllamaInstance) {
             'prompt chars:', prompt.length, 'maxTokens:', maxTokens, 'sampling:', { temperature, top_p: config.top_p, top_k: config.top_k, repeat: config.repetition_penalty },
             'grammar:', grammar ? 'yes' : 'no', 'renderPaused:', !!globalThis.TABLEFOLK_PAUSE_RENDER);
           console.log('[tablefolk-wllama3] PROMPT PREVIEW:', prompt.slice(0, 1500));
+          // ?wdump=1: the whole prompt as one JSON line (for measuring what turns share)
+          if (new URLSearchParams(globalThis.location?.search || '').get('wdump') === '1') console.log('[tablefolk-wllama3] PROMPT JSON:', JSON.stringify(prompt));
 
           const aborter = new AbortController();
           const poll = setInterval(() => { if (shouldAbort?.()) aborter.abort(); }, 150);
@@ -164,7 +166,7 @@ export function createWllama3Engine(wllamaInstance) {
               'prompt_n=', timings.prompt_n, 'prompt_ms=', Math.round(timings.prompt_ms ?? 0),
               'PREFILL=', timings.prompt_per_second?.toFixed?.(1), 'tok/s',
               '| predicted_n=', timings.predicted_n,
-              'DECODE=', timings.predicted_per_second?.toFixed?.(1), 'tok/s');
+              'DECODE=', timings.predicted_per_second?.toFixed?.(1), 'tok/s', '| cache_n=', timings.cache_n);
           }
           console.log('[tablefolk-wllama3] RAW OUTPUT at', new Date().toISOString(),
             'elapsed ms:', Math.round(totalMs), 'chars:', text.length,

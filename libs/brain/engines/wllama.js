@@ -36,8 +36,11 @@ async function cachedFromUrl(cfg, url) {
   } catch { return false; }
 }
 // the mirror (on tablefolk.world: @tablefolk/models) when the file is there, else Hugging Face
+// `mirror: 'dir/'` names the file's directory on the mirror (Hugging Face's layout under wllama/hf/), `mirrored: true`
+// the mirror's root
 function modelUrls(cfg) {
-  return sources({ mirror: cfg.mirrored ? MIRROR + cfg.file : null, hf: (cfg.base || HF_BASE) + cfg.file });
+  const mirror = cfg.mirror ? MIRROR + cfg.mirror + cfg.file : cfg.mirrored ? MIRROR + cfg.file : null;
+  return sources({ mirror, hf: (cfg.base || HF_BASE) + cfg.file });
 }
 async function pickModelUrl(cfg) {
   const urls = modelUrls(cfg);
@@ -76,7 +79,8 @@ const raon = (quant, parts, gb) => ({
 // Inkling 2 Mini and SenseNova-Loop-9B need a newer llama.cpp than wllama 3.8.1 (inkling2_loop, the SenseNova Loop
 // PR) and are only fast with our ggml-webgpu patches (cached bind groups, fused kernels): wllama 4.0.0 built against
 // llama.cpp 5bacb7c + PR #32588 + tools/wllama-inkling/*.patch (build-fast.sh; brains.md, "Faster in Chrome").
-// ?fastwasm= / ?fastjs= override its files. The GGUFs come from Hugging Face at pinned revisions.
+// ?fastwasm= / ?fastjs= override its files. The GGUFs come from the R2 mirror (copied 2026-11-27 with
+// tools/r2-copy/wllama-fast.json, SHA-256 checked) with Hugging Face at the same pinned revisions as the fallback.
 const FAST_WASM = () => q().get('fastwasm') || new URL('./wllama-fast/wllama.wasm', import.meta.url).href;
 const FAST_JS = () => q().get('fastjs') || new URL('./wllama-fast/index.js', import.meta.url).href;
 const fast = cfg => ({
@@ -101,6 +105,7 @@ const MODEL_CONFIG = {
   'inkling2-mini-wllama': fast({
     label: 'Inkling 2 Mini AD-IQ2_M (llama.cpp WebGPU)',
     base: 'https://huggingface.co/AtomicChat/Inkling-2-Mini-GGUF/resolve/4f0c56af7e0c242e620be6394983d245b8c3fd27/',
+    mirror: 'wllama/hf/AtomicChat/Inkling-2-Mini-GGUF/resolve/4f0c56af7e0c242e620be6394983d245b8c3fd27/',
     file: 'Inkling-2-Mini-AD-IQ2_M.gguf',
     size: 8665091680,
     template: 'inkling',
@@ -109,6 +114,7 @@ const MODEL_CONFIG = {
   'inkling2-mini-small-wllama': fast({
     label: 'Inkling 2 Mini 8GB-64K (llama.cpp WebGPU)',
     base: 'https://huggingface.co/drofn/Inkling-2-Mini-8GB-GGUF/resolve/1101a9e52698296910262e191abde703e4f9e2ea/',
+    mirror: 'wllama/hf/drofn/Inkling-2-Mini-8GB-GGUF/resolve/1101a9e52698296910262e191abde703e4f9e2ea/',
     file: 'Inkling-2-Mini-8GB-64K.gguf',
     size: 6623451456,
     template: 'inkling',
@@ -117,6 +123,7 @@ const MODEL_CONFIG = {
   'sensenova-loop-9b-wllama': fast({
     label: 'SenseNova-Loop-9B AD-Q4_K_M (llama.cpp WebGPU)',
     base: 'https://huggingface.co/AtomicChat/SenseNova-Loop-9B-GGUF/resolve/6c661668960d4f50a2b0bbc63feb0b971255cd71/',
+    mirror: 'wllama/hf/AtomicChat/SenseNova-Loop-9B-GGUF/resolve/6c661668960d4f50a2b0bbc63feb0b971255cd71/',
     file: 'SenseNova-Loop-9B-AD-Q4_K_M.gguf',
     size: 5960615008,
     template: 'qwen-nothink',

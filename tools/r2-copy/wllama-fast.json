@@ -1,0 +1,5 @@
+[
+  { "repo": "AtomicChat/Inkling-2-Mini-GGUF", "rev": "4f0c56af7e0c242e620be6394983d245b8c3fd27", "dest": "wllama/hf/", "include": "^Inkling-2-Mini-AD-IQ2_M\\.gguf$" },
+  { "repo": "drofn/Inkling-2-Mini-8GB-GGUF", "rev": "1101a9e52698296910262e191abde703e4f9e2ea", "dest": "wllama/hf/", "include": "^Inkling-2-Mini-8GB-64K\\.gguf$" },
+  { "repo": "AtomicChat/SenseNova-Loop-9B-GGUF", "rev": "6c661668960d4f50a2b0bbc63feb0b971255cd71", "dest": "wllama/hf/", "include": "^SenseNova-Loop-9B-AD-Q4_K_M\\.gguf$" }
+]

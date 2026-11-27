@@ -1325,10 +1325,9 @@ that much, never auto-picked (no `needGB`); Inkling counts as an ambitious
 brain in `mind.js`). Prompt: Inkling's own message tokens with the answer
 message opened (no thinking) and the "Thinking effort level: 0" line; stops
 `<|end_message|>`, `<|content_model_end_sampling|>`, `<|message_`,
-`The user`, handled by llama.cpp (not by cancelling the stream). No mirror
-on R2 yet; one would hold `Inkling-2-Mini-AD-IQ2_M.gguf` (8.67 GB),
-`Inkling-2-Mini-8GB-64K.gguf` (6.62 GB) and `SenseNova-Loop-9B-AD-Q4_K_M.gguf`
-(5.96 GB) plus the 11 MB `wllama-fast/wllama.wasm`.
+`The user`, handled by llama.cpp (not by cancelling the stream). The three GGUFs
+are mirrored on R2 since 2026-11-27 (`wllama/hf/...`, Hugging Face's layout at the
+pinned revisions; assets.md, Hosting), Hugging Face as the fallback.
 
 Problems found and fixed on the way: (1) the wasm aborted 2-3 minutes into
 a village day while restoring a context checkpoint (`~llama_io_read_host` ->
