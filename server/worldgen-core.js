@@ -157,7 +157,7 @@ export function checkScenario(s, packVoices = [], opts = {}) {
 }
 
 
-export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-9b', 'Bonsai 2 9B (about 2 GB; fast, needs a 6 GB+ graphics card; best with "think first")'], ['gemma4-12b-litert', 'Gemma 4 12B (about 5.6 GB; needs a 10 GB+ graphics card)'], ['bonsai2-27b', 'Bonsai 2.5 27B (about 6 GB; the smartest; needs a 10 GB+ graphics card)']];
+export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-9b', 'Bonsai 2 9B (about 2 GB; fast, needs a 6 GB+ graphics card; best with "think first")'], ['gemma4-12b-litert', 'Gemma 4 12B (about 5.6 GB; needs a 10 GB+ graphics card)'], ['bonsai2-27b', 'Bonsai 2.5 27B (about 6 GB; the smartest; needs a 10 GB+ graphics card)'], ['sensenova-loop-9b-wllama', 'SenseNova-Loop-9B (about 6 GB; agent mode; needs a 10 GB+ graphics card)'], ['inkling2-mini-small-wllama', 'Inkling 2 Mini, smaller file (about 6.6 GB; agent mode; needs a 12 GB graphics card)'], ['inkling2-mini-wllama', 'Inkling 2 Mini (about 8.7 GB; agent mode; needs a 16 GB graphics card)']];
 // The visitor's own model ("own"): presets for the builder's form; the page
 // calls the provider itself, so the key never reaches this server.
 export const OWN_MODELS = ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it', 'openai/gpt-6-luna', 'anthropic/claude-sonnet-5-5'];
@@ -324,9 +324,11 @@ export function worldPage(url, { saved = null, admin = false, defaultView = 'bui
     <label class="field" id="shapeBox" hidden><span class="lbl">Shape</span><select name="shape"><option value="auto">let the builder decide</option><option value="levels">levels (joined by stairs)</option><option value="region">a region (a hub and the land around it)</option></select></label>
     <label class="field" id="thinkBox" hidden><span class="lbl">Think first</span><input type="checkbox" name="think"></label>
     <label class="field" id="improveBox" title="After the world is built, the AI looks at the whole map, finds problems and things to improve, and changes it; then the pictures it asked for are painted in this browser"><span class="lbl">Look it over</span><select name="improve"><option value="">no</option><option value="2">2 rounds</option><option value="3">3 rounds</option><option value="5">5 rounds</option></select></label>
+    <label class="field" id="agentBox" title="The model builds the world with tools, step by step, checks its own work, and stays ready for more changes"><span class="lbl">Agent mode</span><input type="checkbox" name="agent"></label>
     <label class="field" id="modeBox"><span class="lbl">Map</span><select name="mode"><option value="auto">any kind</option><option value="generate">generated rooms</option><option value="grid">drawn grid</option><option value="map">layout lines</option></select></label>
   </div>
   <p class="note" id="whereNote"></p>
+  <p class="note" id="agentNote"></p>
   <p class="note" id="secNote" hidden>Worlds in sections are built on this server or in the browser: with your own key this builds one map.</p>
   ${view === 'builder' ? '<p class="note">Or <a href="#" id="openWorldFile">open a world file</a> (a picture, .zip or .json shared from Tablefolk), or drop one on this page.</p>' : ''}
   <p id="byoNote" hidden>This site does not pay for the AI that writes worlds: use a model that runs in your browser (free, once downloaded), or your own key (an <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a> account, or your own OpenAI-compatible server).</p>
@@ -417,7 +419,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261127a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261127a"></script><script src="/app/worldgen-own.js?v=20261127a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261127a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261127b"></script><script src="/app/worldgen-own.js?v=20261127b"></script>' : ''}<script src="/app/worldgen-agent.js?v=20261127b"></script><script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -451,7 +453,22 @@ if(f){
     $('model').closest('.field').hidden=w.id==='own'; $('ownBox').hidden=w.id!=='own';
     if(w.id==='own') ownShow(w);
     f.dataset.where=w.id;
+    agentShow();
   };
+  // ---- agent mode (app/worldgen-agent.js): on by default for models that can call tools, remembered per model ----
+  const AG='tablefolk.worldgen.agent';
+  const agentPrefs=()=>{ try{ return JSON.parse(localStorage.getItem(AG)||'{}')||{}; }catch{ return {}; } };
+  const agentKey=()=>f.dataset.where==='own'?'own:'+(own().get().model||''):f.dataset.where==='browser'?$('model').value:'';
+  let agentSeq=0;
+  const agentShow=async()=>{ const w=f.dataset.where, A=window.tfWorldAgent, cb=f.agent, my=++agentSeq;
+    let can={ok:false,why:w==='own'||w==='browser'?'loading…':'this server’s own model writes the world as one answer'};
+    if(A&&w==='browser') can=A.canAgent($('model').value);
+    else if(A&&w==='own'){ const c=own().get(); const info=c.model?await own().modelInfo(c).catch(()=>null):null; if(my!==agentSeq) return; can=A.canAgent('own',info); }
+    const pref=agentPrefs()[agentKey()];
+    cb.disabled=!can.ok; cb.checked=can.ok&&(pref??true); $('agentBox').title=can.ok?'The model builds the world with tools, step by step, checks its own work, and stays ready for more changes':'Not available: '+can.why;
+    $('agentNote').textContent=can.ok?(cb.checked?'Agent mode: the model builds the world step by step with tools (the map, each character, things), checks its own work, and you can keep asking it for changes.':'Agent mode off: the model writes the whole world as one answer.'):'Agent mode is not available for this model: '+can.why+'.';
+    if(w==='browser') $('styleBox').hidden=$('thinkBox').hidden=cb.checked; };
+  f.agent.onchange=()=>{ const p=agentPrefs(); p[agentKey()]=f.agent.checked; try{ localStorage.setItem(AG,JSON.stringify(p)); }catch{} agentShow(); };
   // ---- your own key (app/worldgen-own.js keeps it in this browser) ----
   const own=()=>window.tfOwnModel;
   const ownShow=w=>{ const c=own().get();
@@ -468,7 +485,7 @@ if(f){
     return own().set({provider:p,baseURL:p==='custom'?$('ownURL').value.trim().replace(/[/]+$/,''):'',apiKey:key,model:$('ownModel').value.trim(),useForPlay:$('ownPlay').checked}); };
   $('ownProv').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const c=own().get(); own().set({provider:b.dataset.p,apiKey:b.dataset.p===c.provider?c.apiKey:'',model:b.dataset.p===c.provider?c.model:''}); ownShow(); };
   $('ownSignIn').onclick=()=>{ ownSave(); own().signIn(); };
-  for(const id of ['ownKeyOR','ownURL','ownKeyC','ownModel','ownPlay']) $(id).onchange=()=>{ ownSave(); if(id==='ownKeyOR') ownShow(); };
+  for(const id of ['ownKeyOR','ownURL','ownKeyC','ownModel','ownPlay']) $(id).onchange=()=>{ ownSave(); if(id==='ownKeyOR') ownShow(); agentShow(); };
   // back from OpenRouter's sign-in with ?code=: trade it for a key, then the panel shows it
   const signedIn=window.tfOwnModel?.finishSignIn().then(ok=>{ if(ok){ want.where='own'; $('whereNote').textContent='Signed in with OpenRouter: your key is kept in this browser.'; } }).catch(e=>{ want.where='own'; setTimeout(()=>{ $('whereNote').textContent=e.message; },50); });
   Promise.resolve(signedIn).then(()=>fetch('/api/worldgen/options')).then(r=>r.json()).then(o=>{ OPTS=o;
@@ -478,6 +495,7 @@ if(f){
     $('where').onclick=e=>{ const b=e.target.closest('button'); if(b&&!b.disabled){ want.model=null; setWhere(b.dataset.w); } };
     setWhere(want.where&&o.where.some(w=>w.id===want.where&&!w.down)?want.where:o.default);
   }).catch(()=>{ $('where').innerHTML='<span class="muted">could not reach the server</span>'; });
+  $('model').addEventListener('change',()=>agentShow());
   $('model').onchange=()=>{ if($('model').value==='__custom'){ const m=prompt('Model id (as the provider names it, e.g. vendor/model-name):'); if(m){ $('model').insertAdjacentHTML('afterbegin','<option value="'+m.replace(/"/g,'')+'">'+m.replace(/</g,'')+'</option>'); $('model').value=m.replace(/"/g,''); } else $('model').selectedIndex=0; } };
   f.p.addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey||!e.shiftKey)){ e.preventDefault(); f.requestSubmit(); } });
   f.onsubmit=e=>{e.preventDefault(); const p=f.p.value.trim().replace(/\\s+/g,'+'); if(!p) return;
@@ -487,11 +505,12 @@ if(f){
     try{ localStorage.setItem('tablefolk.worldgen',JSON.stringify({where,model,style:f.style.value,think:f.think.checked,size:f.size.value,improve:f.improve.value,sections:f.sections.value,shape:f.shape.value})); }catch{}
     const q=new URLSearchParams(); for(const k of ['art','brain','llm','view','go']) if(qs.has(k)) q.set(k,qs.get(k));
     q.set('where',where); if(model) q.set('model',model); if(where!=='browser') q.set('mode',f.mode.value);
+    q.set('agent',f.agent.checked&&!f.agent.disabled?'1':'0');
     if(f.size.value) q.set('size',f.size.value); else q.delete('size');
     // a world in sections (server/worldgen-sections.js, app/worldgen-browser.js): how many and their shape
     if(f.sections.value&&where!=='own'){ q.set('sections',f.sections.value); q.set('shape',f.shape.value||'auto'); }
     if(f.improve.value&&where!=='browser') q.set('improve',f.improve.value);
-    if(where==='browser'){ if(f.style.value==='one') q.set('oneanswer','1'); if(f.think.checked) q.set('think','1'); }
+    if(where==='browser'&&q.get('agent')!=='1'){ if(f.style.value==='one') q.set('oneanswer','1'); if(f.think.checked) q.set('think','1'); }
     location.href='/world/'+encodeURIComponent(p).replace(/%2B/g,'+')+'?'+q;}; }
 const words=${JSON.stringify(words)};
 // App options pass through: ?art=1 (no model), ?brain=<model key> (the app's ?model=), ?llm=<endpoint URL>.
@@ -547,22 +566,23 @@ if(words){
     if(view==='loading'){ $('fill').style.transition='width .25s linear'; $('fill').style.width='100%'; $('chore').textContent=(d.scenario.title||'Your world')+' is ready'; setTimeout(()=>location.href=appLink(d.link),500); return; }
     // the builder stays: everything generated is below, to change and play
     $('stage').textContent='Built in '+(d.ms/1000).toFixed(1)+'s with '+d.model; $('preview').textContent='';
-    window.tfBuilder?.show(d,{appLink,revise:reviseWith(),improve:+qs.get('improve')||0});
+    window.tfBuilder?.show(d,{appLink,revise:d.agent?(qs.get('where')==='own'?{where:'own',agent:true}:{where:'agent'}):reviseWith(),improve:d.agent?0:+qs.get('improve')||0});
     if(qs.has('go')) setTimeout(()=>location.href=appLink(d.link),700);};
   const fail=msg=>{ ended=true; clearInterval(clock); $('spin')?.classList.add('fail'); $('stage').textContent=msg; if($('stopBuild')) $('stopBuild').hidden=true;
     if(view==='loading'){ $('chore').textContent=msg; const b=new URLSearchParams(qs); b.set('view','builder'); $('result').innerHTML='<p><a href="?'+b+'">open the world builder</a></p>'; } };
   // a world in sections takes a while: it can be stopped
-  let es=null; const nSec=+qs.get('sections')||0;
+  let es=null; const nSec=+qs.get('sections')||0, agentRun=qs.get('agent')==='1'&&(qs.get('where')==='own'||qs.get('where')==='browser');
+  if(agentRun && $('stopBuild')){ $('stopBuild').hidden=false; $('stopBuild').title='Stop the agent: what it has built is checked and shown if it passes'; $('stopBuild').onclick=()=>{ if(ended) return; window.tfWorldAgent&&window.tfWorldAgent.stop(); $('stopBuild').disabled=true; $('stopBuild').textContent='stopping…'; }; }
   if(nSec>1 && $('stopBuild')){ $('stopBuild').hidden=false; $('stopBuild').onclick=()=>{ if(ended) return; try{ es&&es.close(); }catch{} try{ window.tfWorldgen&&window.tfWorldgen.stop&&window.tfWorldgen.stop(); }catch{} $('stopBuild').hidden=true; fail('stopped'); }; }
   if(qs.get('how')==='browser'||qs.get('where')==='browser'){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261127a').then(()=>load('/app/worldgen-browser.js?v=20261127b')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261127a').then(()=>load('/app/worldgen-browser.js?v=20261127c')).then(()=>(agentRun?(cb=>window.tfWorldgen.runAgent(words,cb)):qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
-    (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261127a'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))
-      .then(()=>window.tfOwnModel.run(words,qs.get('mode')||'auto',(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261127b'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))
+      .then(()=>window.tfOwnModel.run(words,qs.get('mode')||'auto',(ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); },{agent:agentRun})).catch(e=>fail('failed: '+e.message));
   } else {
   es=new EventSource('/api/generate?'+q);
   es.addEventListener('progress',e=>onProgress(JSON.parse(e.data)));

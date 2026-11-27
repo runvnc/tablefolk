@@ -10,12 +10,14 @@
 //   /api/worldgen/options       in this browser, your own key
 //   /api/worldgen/messages      POST: the generator's messages for your own model
 //   /api/finish                 POST: checks a world (nothing is saved)
+//   /api/worldgen/agent, /tool  POST: the builder's agent mode (server/worldgen-tools.js)
 //   /api/voices, /api/status, /api/skills, /api/roles   from cloud/data.js
 //   /<world>                    short links to scenarios/<world>.json (as server.js)
 //   /api/generate, /api/revise, /api/llm, /api/local, /api/transcribe, /api/tts, /admin
 //                               not here: a refusal that says what to use instead
 import { worldPage, finishScenario, systemPrompt, generateUser, reviseRequest, critiqueRequest, BROWSER_MODELS, OWN_MODELS } from '../server/worldgen-core.js';
 import DATA from './data.js';
+import { agentRequest, toolRequest } from '../server/worldgen-tools.js';
 
 const ISOLATE = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Referrer-Policy': 'no-referrer' };   // (no Referer: see build.mjs)
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
@@ -78,6 +80,13 @@ export default {
     if (p === '/api/worldgen/options') return json(options());
     if (p === '/api/worldgen/messages') return req.method === 'POST' ? messages(req) : json({ error: 'POST {prompt, mode} or {scenario, request}' }, 405);
     if (p === '/api/finish') return req.method === 'POST' ? finish(req) : json({ error: 'POST {scenario}' }, 405);
+    if (p === '/api/worldgen/agent' || p === '/api/worldgen/tool') {
+      if (req.method !== 'POST') return json({ error: 'POST' }, 405);
+      const text = await req.text().catch(() => ''); if (text.length > 600000) return json({ error: 'scenario too large' }, 413);
+      let b = {}; try { b = JSON.parse(text) || {}; } catch {}
+      const r = p.endsWith('agent') ? agentRequest(b, { skill: DATA.skill, voices: DATA.voicesText }) : toolRequest(b, { packVoices: DATA.packVoices });
+      return json(r, r.status || 200);
+    }
     if (p === '/api/voices') return json(DATA.voices);
     if (p === '/api/skills') return json({ skills: DATA.skills });
     if (p === '/api/roles') return json({ roles: DATA.roles });

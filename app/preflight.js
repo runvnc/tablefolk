@@ -87,7 +87,7 @@
     ['autonomy-profile.js?v=20261122a'],
     ['agency.js?v=20261122b'],
     ['speech-input.js?v=20261122a'],
-    ['worldgen-own.js?v=20261127a'],
+    ['worldgen-own.js?v=20261127b'],
     ['online-brain.js?v=20261112b'],
     ['menus.js?v=20261120a', 'module'],
     ['story.js?v=20261120c', 'module'],

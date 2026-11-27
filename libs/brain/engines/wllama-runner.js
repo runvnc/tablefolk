@@ -72,8 +72,10 @@ export function createWllama3Engine(wllamaInstance) {
             ? config.responseFormat.grammar
             : null;
 
-          const prompt = buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
-          const stops = stopsFor(wllamaInstance.tablefolkTemplate);
+          // rawPrompt: a whole prompt written by the caller in the model's own format (the world
+          // builder's agent mode: Inkling's tool declarations and calls), with its own stops
+          const prompt = config.rawPrompt || buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
+          const stops = config.stops || stopsFor(wllamaInstance.tablefolkTemplate);
           const t0 = performance.now();
           // hybrid models: read the shared prefix on its own when it changed, so a cache checkpoint sits at its end
           if (wllamaInstance.tablefolkPrime && new URLSearchParams(globalThis.location?.search || '').get('wprime') !== '0') {
@@ -191,6 +193,8 @@ export async function generate(engine, prompt, opts = {}) {
     extra_body: { enable_thinking: opts.enableThinking ?? false },
     responseFormat: opts.responseFormat ?? null,
     shouldAbort: opts.shouldAbort ?? null,
+    ...(opts.rawPrompt ? { rawPrompt: opts.rawPrompt } : {}),
+    ...(opts.stops ? { stops: opts.stops } : {}),
   };
 
   opts.debugLog?.('wllama3 request config', {

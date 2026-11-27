@@ -26,6 +26,7 @@ import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';
 import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, critiqueRequest, parseCritique, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
 import '../app/worldgen-plan.js';
+import { agentRequest, toolRequest } from './worldgen-tools.js';
 export { encodeScenario };
 const Plan = globalThis.TablefolkWorldPlan;
 export const checkScenario = (s, opts) => checkCore(s, packVoices(), opts);
@@ -298,6 +299,20 @@ export async function handleWorldgenMessages(req) {
   }
   const prompt = String(b.prompt || '').trim().slice(0, 2000); if (!prompt) return Response.json({ error: 'prompt required' }, { status: 400, headers: cors });
   return Response.json({ messages: [system, { role: 'user', content: generateUser(prompt, String(b.mode || 'auto')) }], maxTokens: 17000, temperature: 0.7 }, { headers: cors });
+}
+
+// POST /api/worldgen/agent, /api/worldgen/tool: the builder's agent mode (server/worldgen-tools.js):
+// the page runs the model (the visitor's own key or a model in the browser) and calls the tools here
+export async function handleWorldgenAgent(req, kind) {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (req.method !== 'POST') return Response.json({ error: 'POST' }, { status: 405, headers: cors });
+  const text = await req.text().catch(() => '');
+  if (text.length > 600000) return Response.json({ error: 'scenario too large' }, { status: 413, headers: cors });
+  if (!isAdmin(req) && !guestMay.build('own') && !guestMay.build('browser')) return Response.json({ error: 'building worlds is not open here' }, { status: 403, headers: cors });
+  if (kind === 'agent' && overLimit(req, 'agent', 60, 3600e3)) return Response.json({ error: 'too many builds this hour' }, { status: 429, headers: cors });
+  let b = {}; try { b = JSON.parse(text) || {}; } catch {}
+  const r = kind === 'agent' ? agentRequest(b, { skill: SKILL, voices: voicesText() }) : toolRequest(b, { packVoices: packVoices() });
+  return Response.json(r, { status: r.status || 200, headers: cors });
 }
 
 // POST /api/finish {scenario, prompt, model, ms[, kept]}: a scenario made elsewhere

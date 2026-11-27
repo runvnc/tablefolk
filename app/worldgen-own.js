@@ -12,9 +12,9 @@
  *                              (this browser's localStorage, 'tablefolk_own_model')
  *     signIn()                 OpenRouter's sign-in (OAuth PKCE): back here with a key of your own
  *     finishSignIn()           on return (?code=...): trades the code for the key; true when it did
- *     run(prompt, mode, emit)  build a world; emit like the server's stream: 'progress'
+ *     run(prompt, mode, emit, {agent})  build a world (agent: the tool-calling agent, worldgen-agent.js); emit like the server's stream: 'progress'
  *                              {stage, chars, thought, preview, model}, 'done' {scenario, code, link, ms, model}, 'failed' {error}
- *     revise(scenario, request, emit)   the same for "ask the AI for changes"
+ *     revise(scenario, request, emit, {agent})   the same for "ask the AI for changes" (agent: the same session)
  *     critique(body, image, say)  one review round of the builder's agent: {text, sawImage, ms, model}
  *   }
  *
@@ -205,8 +205,35 @@
     catch (e) { if (!saw) throw new Error(explain(e, cfg)); saw = false; text = await ask(false).catch(e2 => { throw new Error(explain(e2, cfg)); }); }
     return { text, sawImage: saw, ms: Date.now() - t0, model: cfg.model };
   }
-  const run = (prompt, mode, emit) => runWith({ prompt, mode }, prompt, emit);
-  const revise = (scenario, request, emit) => runWith({ scenario, request }, 'change: ' + request, emit);
+  // ---- agent mode (app/worldgen-agent.js): the model calls the builder's tools ----
+  // A model the provider says takes no tools, or one whose first step is refused for its tools,
+  // falls back to the one-answer run above (the progress line says so).
+  const toolsRefused = e => /tool|function/i.test(String(e)) && /400|404|422|support|not allowed|unrecogni|invalid/i.test(String(e));
+  async function agentFor(cfg) {
+    if (cfg.provider === 'openrouter' && !cfg.apiKey) throw new Error('no OpenRouter key yet: sign in with OpenRouter or paste a key');
+    if (cfg.provider === 'custom' && !/^https?:\/\//.test(cfg.baseURL)) throw new Error('no server address yet (e.g. http://localhost:8080/v1)');
+    if (!cfg.model) throw new Error('no model chosen');
+    if (!window.tfWorldAgent) throw new Error('the agent script is not loaded');
+    const info = await modelInfo(cfg);
+    return { info, backend: window.tfWorldAgent.openaiBackend(cfg, info) };
+  }
+  async function runAgent(prompt, mode, emit, scenario = null, request = null) {
+    const cfg = get();
+    let a; try { a = await agentFor(cfg); } catch (e) { return emit('failed', { error: e.message }); }
+    const json = () => { emit('progress', { stage: 'waiting', label: `${cfg.model} takes no tools here: writing the world as one answer instead`, model: cfg.model }); return scenario ? runWith({ scenario, request }, 'change: ' + request, emit) : runWith({ prompt, mode }, prompt, emit); };
+    if (a.info.tools === false) return json();
+    let fellBack = false;
+    const watch = (ev, d) => {
+      if (ev === 'failed' && !fellBack && toolsRefused(d.error) && (window.tfWorldAgent.session?.steps || 0) <= 1) { fellBack = true; window.tfWorldAgent.reset(); return json(); }
+      if (ev === 'failed') d = { ...d, error: explain({ message: d.error }, cfg) };
+      emit(ev, d);
+    };
+    if (scenario) await window.tfWorldAgent.change(scenario, request, watch, window.tfWorldAgent.session?.backend?.name === cfg.model ? null : a.backend);
+    else await window.tfWorldAgent.build(prompt, a.backend, watch);
+  }
+  // opts.agent: agent mode (the builder's toggle)
+  const run = (prompt, mode, emit, opts = {}) => opts.agent ? runAgent(prompt, mode, emit) : runWith({ prompt, mode }, prompt, emit);
+  const revise = (scenario, request, emit, opts = {}) => opts.agent ? runAgent('', '', emit, scenario, request) : runWith({ scenario, request }, 'change: ' + request, emit);
 
   window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, critique, parseJSON, modelInfo, PLAY_MODEL };
 })();

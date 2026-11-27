@@ -197,8 +197,10 @@ function resolveGpuLayers(cfg) {
   return raw !== null && Number.isFinite(n) && n >= 0 ? n : (cfg.gpuLayers ?? DEFAULT_GPU_LAYERS);
 }
 
-export async function loadModel(modelKey, onProgress) {
-  const cfg = MODEL_CONFIG[modelKey];
+// opts.ctx: a larger window than the model's own (the world builder's agent mode: its guide and
+// tool list alone are about 7k tokens)
+export async function loadModel(modelKey, onProgress, opts = {}) {
+  const cfg = opts.ctx ? { ...MODEL_CONFIG[modelKey], ctx: Math.max(opts.ctx, MODEL_CONFIG[modelKey]?.ctx || 0) } : MODEL_CONFIG[modelKey];
   if (!cfg) throw new Error(`Unknown model: ${modelKey}`);
   if (wllama && currentModel === modelKey) return wllama;
   if (loading) return;

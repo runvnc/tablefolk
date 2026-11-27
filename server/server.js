@@ -14,6 +14,7 @@
 //   /api/revise         POST {scenario, request}: the generator changes a scenario
 //   /api/critique       POST {scenario, mapText, image}: one review round of the builder's agent
 //   /api/worldgen/messages  POST: the generator's prompt, for a visitor's own model
+//   /api/worldgen/agent, /api/worldgen/tool  POST: the builder's agent mode (server/worldgen-tools.js)
 //                       (their browser calls it; /api/finish checks the answer)
 //   --byo-model / BYO_MODEL=1: visitors bring their own model (settings.js guestMay)
 //   /api/status         what is configured (never keys)
@@ -24,7 +25,7 @@
 import { join, normalize, extname } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { config, ROOT, LITERT_URL, SPEECH_MODEL } from './config.js';
-import { handleWorld, handleGenerate, handleRevise, handleCritique, handleFinish, handleWorldgenMessages, worldgenOptions } from './generate.js';
+import { handleWorld, handleGenerate, handleRevise, handleCritique, handleFinish, handleWorldgenMessages, handleWorldgenAgent, worldgenOptions } from './generate.js';
 import { guestMay } from './settings.js';
 import { setupAdmin, handleAdmin, savedWorld, isAdmin, ownerRequests, requestIps, overLimit } from './admin.js';
 
@@ -194,6 +195,7 @@ const server = Bun.serve({
     if (p === '/api/critique') return handleCritique(req, url);
     if (p === '/api/finish') return handleFinish(req);
     if (p === '/api/worldgen/messages') return handleWorldgenMessages(req);
+    if (p === '/api/worldgen/agent' || p === '/api/worldgen/tool') return handleWorldgenAgent(req, p.slice(14));
     if (p === '/api/transcribe' && req.method === 'POST') {
       if (!isAdmin(req) && !config.guestBrain?.local) return Response.json({ error: 'speech input through this server is not open to visitors' }, { status: 403 });
       if (overLimit(req, 'transcribe', 60, 600e3)) return Response.json({ error: 'too many requests: wait a few minutes' }, { status: 429 });

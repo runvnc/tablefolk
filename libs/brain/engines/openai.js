@@ -71,26 +71,38 @@ async function* sseChunks(stream) {
   }
 }
 
-// Collect a stream (or a whole response) into { text, finish_reason, usage },
-// calling onToken(fullTextSoFar) as text arrives.
+// Collect a stream (or a whole response) into { text, finish_reason, usage, tool_calls },
+// calling onToken(fullTextSoFar) as text arrives. tool_calls: the model's calls when the
+// request had "tools" ([{ id, type: 'function', function: { name, arguments } }], the
+// arguments a JSON string as streamed); onToolCall(calls) as they grow.
 // onReasoning(chars) reports a reasoning model's hidden thinking as it streams
 // (OpenRouter's delta.reasoning), which can come seconds before any content.
-export async function collect(result, onToken = null, onReasoning = null) {
+export async function collect(result, onToken = null, onReasoning = null, onToolCall = null) {
   if (!result?.[Symbol.asyncIterator]) {
     const c = result?.choices?.[0];
-    return { text: c?.message?.content || '', finish_reason: c?.finish_reason, usage: result?.usage };
+    return { text: c?.message?.content || '', finish_reason: c?.finish_reason, usage: result?.usage, tool_calls: c?.message?.tool_calls || [] };
   }
   let text = '', finish_reason = null, usage = null, thought = 0, tail = '';
+  const calls = [];
   for await (const chunk of result) {
     const c = chunk.choices?.[0];
     const r = c?.delta?.reasoning ?? c?.delta?.reasoning_content;
     // onReasoning(chars so far, the last ~600 chars of the thought text)
     if (r) { thought += r.length; tail = (tail + r).slice(-600); onReasoning?.(thought, tail); }
     if (c?.delta?.content) { text += c.delta.content; onToken?.(text); }
+    // a call streams in pieces by index: the id and name first, then the arguments
+    for (const d of c?.delta?.tool_calls || []) {
+      const i = Number.isInteger(d.index) ? d.index : calls.length;
+      const t = calls[i] ||= { id: '', type: 'function', function: { name: '', arguments: '' } };
+      if (d.id) t.id = d.id;
+      if (d.function?.name) t.function.name += d.function.name;
+      if (d.function?.arguments) t.function.arguments += d.function.arguments;
+      onToolCall?.(calls);
+    }
     if (c?.finish_reason) finish_reason = c.finish_reason;
     if (chunk.usage) usage = chunk.usage;
   }
-  return { text, finish_reason, usage };
+  return { text, finish_reason, usage, tool_calls: calls.filter(Boolean) };
 }
 
 // An in-page engine behind the same interface. `engine.generate(messages,

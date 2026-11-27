@@ -62,12 +62,13 @@
   // (stored as 'tablefolk_model'), downloaded now if this browser has not got
   // it yet (the menu says how big; it is kept for the game too).
   const BONSAI2 = '/libs/brain/engines/bonsai2.js';
+  const WLLAMA_FAST = /^(inkling2-mini-wllama|inkling2-mini-small-wllama|sensenova-loop-9b-wllama)$/;
   let L = null, modelKey = '';
   async function model(emit, { context } = {}) {
     if (L) return L;
     emit('progress', { stage: 'loading', label: 'loading the model in this browser…' });
     let key = 'gemma4-e4b-litert';
-    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || /^bonsai2-(27b|27b-v2|9b)$/.test(k || '')) key = k; } catch {}
+    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || /^bonsai2-(27b|27b-v2|9b)$/.test(k || '') || WLLAMA_FAST.test(k || '')) key = k; } catch {}
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
     if (/^bonsai2-/.test(key)) {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
@@ -78,6 +79,15 @@
       try { const dev = await import('/libs/device/index.js'), hw = await dev.detectHardware(); ctx = Math.max(ctx, b.contextFor((dev.usableGB(hw) || 0) - (size === '9B' ? 3.4 : 9.4) - .8, size, { max: 32768 })); } catch {}
       const engine = await b.loadBonsai2(status, { size, ...(ctx ? { context: ctx } : {}) });
       L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, enableThinking: !!opts.enableThinking, onToken }), clear: () => {}, context: engine.context || ctx || 8192, engine, bonsai: b };
+    } else if (WLLAMA_FAST.test(key)) {
+      // Inkling 2 Mini, SenseNova-Loop-9B on the fast llama.cpp build (agent mode only):
+      // a 32k window (their caches are small: 112 MB at 8k for SenseNova)
+      if (!navigator.gpu) throw new Error('this model needs WebGPU (Chrome or Edge on a recent graphics card)');
+      const w = await import('/libs/brain/engines/wllama.js'), run = await import('/libs/brain/engines/wllama-runner.js');
+      const ctx = Math.max(context || 0, 32768);
+      const eng = run.createWllama3Engine(await w.loadModel(key, status, { ctx }));
+      const gen = (opts, onToken) => run.generate(eng, '', { maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, onToken: onToken ? t => onToken(t) : null, ...opts });
+      L = { generate: (messages, opts, onToken) => gen({ ...opts, messages }, onToken), raw: (prompt, opts, onToken) => gen({ ...opts, rawPrompt: prompt, messages: [{ role: 'user', content: '' }] }, onToken), clear: () => {}, context: ctx };
     } else {
       const mod = await import(LOADER);
       const has = await mod.hasModelCached?.(key).catch(() => null);
@@ -543,5 +553,21 @@
     } catch (e) { emit('failed', { error: String(e.message || e) }); }
   }
 
-  window.tfWorldgen = { run, runOne, runSections, parsePlan, parseSectionPlan, pressure, json, log, stop: () => { stopping = true; } };
+  // ---- agent mode (app/worldgen-agent.js): the model in this browser calls the builder's tools ----
+  // in its own chat template's format (Bonsai and SenseNova: Qwen 3.5's <tool_call>; Inkling: its
+  // invoke blocks). The window: as large as the card allows (Bonsai: model(); at least 16k).
+  async function agentBackend(emit) {
+    const A = window.tfWorldAgent; if (!A) throw new Error('the agent script is not loaded');
+    await model(emit, { context: 16384 });
+    const can = A.canAgent(modelKey);
+    if (!can.ok) throw new Error(`agent mode cannot run ${modelKey}: ${can.why}`);
+    return A.localBackend({ name: modelKey + ' (in this browser)', format: can.format, context: L.context || 8192,
+      generate: (messages, opts, onToken) => L.generate(messages, { agentId: 'worldgen-agent', temperature: opts.temperature, maxTokens: opts.maxTokens }, onToken),
+      raw: L.raw ? (prompt, opts, onToken) => L.raw(prompt, opts, onToken) : null });
+  }
+  async function runAgent(prompt, emit) {
+    try { const b = await agentBackend(emit); await window.tfWorldAgent.build(prompt, b, emit); }
+    catch (e) { emit('failed', { error: e.message || String(e) }); }
+  }
+  window.tfWorldgen = { run, runOne, runSections, runAgent, agentBackend, parsePlan, parseSectionPlan, pressure, json, log, stop: () => { stopping = true; } };
 })();

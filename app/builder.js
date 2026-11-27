@@ -8,6 +8,9 @@
  *
  * Ask the AI for changes: a request goes to POST /api/revise with the
  * scenario (server/generate.js), the reply replaces it; undo steps back.
+ * A world built in agent mode (app/worldgen-agent.js; revise {where: 'own',
+ * agent: true} or {where: 'agent'} for a model in this browser) sends the
+ * request to the same agent session, which changes the world with its tools.
  * Tabletop map: the app's ?tabletop=1 view in a frame (app/tabletop.js), to
  * print, show on a flat screen, or move things; "use this layout" sends the
  * scenario back with every position fixed.
@@ -304,6 +307,8 @@
       <div data-panel="raw" ${tabNow === 'raw' ? '' : 'hidden'}><fieldset><legend>Raw JSON</legend><textarea id="rawJson" class="mono" rows="22"></textarea><div class="toolbar"><button type="button" data-act="applyRaw">Apply JSON</button></div></fieldset></div>`;
     if (typed && $('aiReq')) $('aiReq').value = typed; if (said && $('aiMsg')) $('aiMsg').textContent = said;
     if ($('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2);
+    // agent mode in this browser: no separate review rounds (ask the agent instead)
+    if (revise.where === 'agent') box.querySelector('[data-act=improve]')?.closest('.toolbar')?.setAttribute('hidden', '');
     // the rules box edits goal.win / goal.lose / goal.maxTurns together
     const rules = $('f___rules'); if (rules) { const g = scn.goal || {}; const r = {}; for (const k of ['win', 'lose', 'maxTurns', 'winText', 'loseText', 'score']) if (g[k] != null) r[k] = g[k]; rules.value = Object.keys(r).length ? JSON.stringify(r, null, 1) : ''; }
   }
@@ -624,7 +629,7 @@
     const json = JSON.stringify(s).replace(/"data:image\/[^"]+"/g, m => { imgs.push(m); return `"[picture ${imgs.length - 1}]"`; });
     return { light: JSON.parse(json), heavy: next => JSON.parse(JSON.stringify(next).replace(/"\[picture (\d+)\]"/g, (m, i) => imgs[+i] || '""')) };
   }
-  const progressText = d => d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars || 0} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
+  const progressText = d => d.label ? d.label : d.stage === 'writing' || d.stage === 'repairing' ? `${d.stage}… ${d.chars || 0} characters` : d.stage === 'problems' ? 'fixing: ' + d.problems.join('; ').slice(0, 160) : d.stage === 'thinking' ? 'thinking…' : `asking ${d.model || ''}…`;
   // one change by the AI: the new scenario replaces this one (undo steps back)
   // a world in sections: the AI changes the section shown, told about the rest
   function worldContext() {
@@ -640,11 +645,12 @@
     req = worldContext() + req;
     const { light, heavy } = lightImages(top ? lightVoices(lightBooks(send)) : send);
     let done = null;
-    // the visitor's own key or server: this page calls it (app/worldgen-own.js)
-    if (revise.where === 'own' && window.tfOwnModel) {
-      done = await new Promise((res, rej) => window.tfOwnModel.revise(light, req, (ev, d) => {
-        if (ev === 'progress') say(progressText(d)); else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error));
-      }));
+    const onEv = (res, rej) => (ev, d) => { if (ev === 'progress') say(progressText(d)); else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error)); };
+    // agent mode with a model in this browser: the same session goes on (app/worldgen-agent.js)
+    if (revise.where === 'agent' && window.tfWorldAgent) done = await new Promise((res, rej) => window.tfWorldAgent.change(light, req, onEv(res, rej)));
+    // the visitor's own key or server: this page calls it (app/worldgen-own.js); agent mode keeps its session
+    else if (revise.where === 'own' && window.tfOwnModel) {
+      done = await new Promise((res, rej) => window.tfOwnModel.revise(light, req, onEv(res, rej), { agent: !!revise.agent }));
     } else {
       const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
       const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: light, request: req }) });
@@ -677,7 +683,7 @@
     asking = true; say('asking…');
     try {
       const done = await reviseAI(req, say);
-      $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
+      $('aiReq').value = ''; say(`changed in ${Math.round(done.ms / 1000)} s${done.agent ? ` (${done.steps} agent steps${done.cost ? ', $' + done.cost.toFixed(4) : ''})${done.summary ? ': ' + done.summary : ''}` : ''}${done.warnings?.length ? ' · notes: ' + done.warnings.join('; ') : ''}`);
       if (pendingPictures().length) render();
     } catch (e) { say('failed: ' + e.message); return; }
     finally { asking = false; }
@@ -750,7 +756,7 @@
     return { added, lost, text };
   }
   async function improve(rounds = agent.rounds) {
-    if (agent.running || asking || revise.where === undefined) return;
+    if (agent.running || asking || revise.where === undefined || revise.where === 'agent') return;   // (the in-browser agent: ask it instead)
     agent.running = true; agent.stop = false; agent.log = []; render();
     const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
     const history = [];
