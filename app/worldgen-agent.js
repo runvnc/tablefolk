@@ -340,7 +340,7 @@
         session.scenario = scenario; session.fresh = false;
       }
       session.log.push('the player asked: ' + request.slice(0, 160));
-      session.steps = 0; session.cost = 0;
+      session.steps = 0; session.cost = 0; session.tokens = 0;   // the step cap and the budget are per request
       await loop(emit, t0);
     } catch (e) { emit('failed', { error: String(e?.message || e) }); }
   }

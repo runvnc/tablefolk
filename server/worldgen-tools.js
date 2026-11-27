@@ -57,6 +57,7 @@ const AGENT_FIELDS = new Set(['id', 'model', 'job', 'home', 'workplace', 'in', '
 
 const clone = v => JSON.parse(JSON.stringify(v ?? {}));
 const words = s => String(s).replace(/_/g, ' ');
+const a_n = s => (/^[aeiou]/i.test(String(s)) ? 'an ' : 'a ') + words(s);
 const near = (w, list) => { w = String(w || '').toLowerCase(); const hits = [...list].filter(x => x.includes(w) || w.includes(x) || x.split('_').some(p => p.length > 2 && w.includes(p))); return hits.slice(0, 8); };
 const fail = (error, extra = {}) => ({ error, ...extra });
 const bodyOk = (s, m) => MODELS.has(m) || (Array.isArray(s.bodies) && s.bodies.map(String).includes(m));
@@ -289,7 +290,7 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         if (args.action === 'add') {
           const o = { ...f }; const bad = checkObject(s, o); if (bad.length) return no(bad.join('; '));
           list.push(o);
-          return ok({ index: list.length - 1 }, `added a ${words(o.type)}${o.in ? ' in the ' + o.in : ''}`);
+          return ok({ index: list.length - 1 }, `added ${a_n(o.type)}${o.in ? ' in the ' + o.in : ''}`);
         }
         const i = +args.index;
         if (!Number.isInteger(i) || !list[i]) return no(`index: 0-${list.length - 1} (get_scenario "objects")`);
@@ -304,7 +305,8 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
       case 'event': {
         const list = s.events ||= [];
         if (args.action === 'add') {
-          const e = args.event; if (!e || (typeof e !== 'string' && !(typeof e === 'object' && e.text))) return no('event: a sentence or {"text": ...}');
+          let e = args.event; if (typeof e === 'string' && /^\s*\{/.test(e)) { try { e = JSON.parse(e); } catch {} }   // an object sent as a JSON string
+          if (!e || (typeof e !== 'string' && !(typeof e === 'object' && e.text))) return no('event: a sentence or {"text": ...}');
           list.push(e); return ok({ index: list.length - 1 }, `added an event: ${String(typeof e === 'string' ? e : e.text).slice(0, 80)}`);
         }
         if (args.action === 'remove') { const i = +args.index; if (!list[i]) return no(`index: 0-${list.length - 1}`); list.splice(i, 1); return ok({}, 'removed an event'); }
