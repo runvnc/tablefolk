@@ -268,9 +268,11 @@
         let best = null;
         for (const k of [...rem].sort()) {
           const [x, z] = k.split(',').map(Number);
+          // (through the cells still to cover: a wing on the -x / -z side of the main block grew into it, found no
+          // rectangle and got no roof; build_house.py has the same flaw)
           for (let z1 = z; ; z1++) {
-            if (!has(x, z1)) break;
-            let x1 = x; const col = xx => { for (let zz = z; zz <= z1; zz++) if (!has(xx, zz)) return false; return true; };
+            if (!rem.has(K(x, z1))) break;
+            let x1 = x; const col = xx => { for (let zz = z; zz <= z1; zz++) if (!rem.has(K(xx, zz))) return false; return true; };
             while (col(x1 + 1)) x1++;
             const a = (z1 - z + 1) * (x1 - x + 1);
             let ok = true; for (let zz = z; zz <= z1 && ok; zz++) for (const xx of [x, x1]) if (!rem.has(K(xx, zz))) ok = false;
@@ -315,6 +317,9 @@
         main = [x0, x1, y0, y1];
         let along = (x1 - x0) >= (y1 - y0) ? 'x' : 'y';
         if (RECTS.length > 1) { const w = rectXY(RECTS[1], STOREYS - 1); along = (w[0] >= x1 - T || w[1] <= x0 + T) ? 'y' : 'x'; }
+        // a near-square house with its door on a gable end: the ridge turned, the door under an eave (the street front)
+        const onGable = al => doors.some(([x, z]) => al === 'x' ? (x === XMIN || x === XMAX) : (z === YMIN || z === YMAX));
+        if (RECTS.length === 1 && Math.abs((x1 - x0) - (y1 - y0)) <= 1.01 && onGable(along) && !onGable(along === 'x' ? 'y' : 'x')) along = along === 'x' ? 'y' : 'x';
         if (SP.ridge) along = SP.ridge;
         roofInfo.push({ x0, x1, y0, y1, along, ext: {} });
       } else {
@@ -331,7 +336,8 @@
       }
     });
     // a door on a gable end (a gable-fronted house): the chimney and the lean-to take the other gable, or none
-    const doorGable = sg => { const ri = roofInfo[0]; return doors.some(([x, z]) => ri.along === 'x' ? (sg > 0 ? x >= ri.x1 - T : x <= ri.x0 + T) : (sg > 0 ? z >= ri.y1 - T : z <= ri.y0 + T)); };
+    // (against the footprint: a jetty moves the roof's edge out past the wall line)
+    const doorGable = sg => { const ri = roofInfo[0]; return doors.some(([x, z]) => ri.along === 'x' ? (sg > 0 ? x >= XMAX && x > ri.x1 - 1.5 : x <= XMIN && x < ri.x0 + 1.5) : (sg > 0 ? z >= YMAX && z > ri.y1 - 1.5 : z <= YMIN && z < ri.y0 + 1.5)); };
     if (SP.chimney && doorGable(SP.chimney === 'right' ? 1 : -1)) SP = { ...SP, chimney: doorGable(SP.chimney === 'right' ? -1 : 1) ? false : (SP.chimney === 'right' ? 'left' : 'right') };
     if (SP.chimney) {
       const ri = roofInfo[0], sg = SP.chimney === 'right' ? 1 : -1;
@@ -865,6 +871,38 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     } catch (e) { console.warn('[buildings] fade plugin', e); }
   }
 
+  // ---- windows at dusk and night: the glass (neutral mid-grey texels: timber is warm, lead and iron dark) glows warm by
+  // TABLEFOLK_NIGHT (walls.js setNight, from sky.js)
+  let Glow = null;
+  function glowPlugin(m) {
+    if (!m || m._tfKitGlow) return; m._tfKitGlow = true;
+    try {
+      const WGSL = BABYLON.ShaderLanguage?.WGSL;
+      Glow ||= class extends BABYLON.MaterialPluginBase {
+        constructor(mat) { super(mat, 'TfKitGlow', 221, { TFKITGLOW: false }); this._enable(true); }
+        getClassName() { return 'TfKitGlowPlugin'; }
+        isCompatible() { return true; }
+        prepareDefines(d) { d.TFKITGLOW = true; }
+        getUniforms(lang) { const ubo = [{ name: 'tfKitNight', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfKitNight;\n' }; }
+        bindForSubMesh(ubo) { ubo.updateFloat4('tfKitNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); }
+        getCustomCode(type, lang) {
+          if (type !== 'fragment') return null;
+          if (lang === WGSL) return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+if (uniforms.tfKitNight.x > 0.01) { let ga = surfaceAlbedo; let gl = dot(ga, vec3f(0.3, 0.59, 0.11));
+  let gk = (1.0 - smoothstep(0.004, 0.02, ga.r - ga.b)) * smoothstep(0.05, 0.1, gl);
+  finalColor = vec4f(finalColor.rgb + vec3f(1.0, 0.6, 0.27) * gk * uniforms.tfKitNight.x * 1.8, finalColor.a); }
+` };
+          return { CUSTOM_FRAGMENT_BEFORE_FOG: `
+if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3, 0.59, 0.11));
+  float gk = (1.0 - smoothstep(0.004, 0.02, ga.r - ga.b)) * smoothstep(0.05, 0.1, gl);
+  finalColor.rgb += vec3(1.0, 0.6, 0.27) * gk * tfKitNight.x * 1.8; }
+` };
+        }
+      };
+      new Glow(m);
+    } catch (e) { console.warn('[buildings] glow plugin', e); }
+  }
+
   // ---------------------------------------------------------------- pieces (loaded once, thin instances)
   let pieces = null;   // Promise<{ name: { near: [{mesh, mat}], far: [...] } }>
   function pieceFile(name, far) { return name + (far ? '_lod' : (lite() && /^(door|door_leaf|window)$/.test(name) ? '_512' : '')) + '.glb'; }
@@ -905,8 +943,9 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     };
     const p = Promise.all(PIECES.flatMap(n => [one(n, false), one(n, true)])).then(list => {
       const o = {}; PIECES.forEach((n, i) => { o[n] = { near: list[2 * i], far: list[2 * i + 1] }; });
-      // glass glows warm at night (roofs.js windowGlow: dark, cool texels on upright faces)
-      for (const n of ['window', 'window_shut', 'dormer']) for (const m of [...o[n].near, ...o[n].far]) window.tablefolkRoofs?.windowGlow?.(m.material);
+      // glass glows warm at night (glowPlugin: the Tripo glass is neutral mid grey, not the shells' dark panes; the
+      // dormer's slate is too, so only the window piece)
+      for (const m of [...o.window.near, ...o.window.far]) glowPlugin(m.material);
       for (const n of PIECES) for (const m of [...o[n].near, ...o[n].far]) { window.tablefolkCutaway?.attach?.(m.material, false, true); if (m.material && !m.material._tfStorey) { m.material._tfStorey = true; storeyPlugin(m.material); fadePlugin(m.material); } }
       o.alive = () => !o.window.near[0].tpl.isDisposed();
       return o;
@@ -1106,6 +1145,9 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     for (const it of instanced) {
       const mats = [], rids = [];
       for (const b of all()) if (b.pl && b.far === it.far) for (const w of b.pl.wall) if (w.name === it.name) { mats.push(w.M); rids.push(w.rid || 0); }
+      // until the world is shown, every piece mesh draws (a zero-size copy in the village if it has none), so its
+      // shaders compile under the loading cover (a far piece's first use hitched a frame by ~0.7 s at high)
+      if (!mats.length && warm && list.length + closedList.length) { const c = all()[0].center; mats.push(BABYLON.Matrix.Scaling(0, 0, 0).multiply(BABYLON.Matrix.Translation(c[0], all()[0].top + 1, c[1]))); rids.push(0); }
       if (!mats.length) { it.mesh.thinInstanceCount = 0; it.mesh.isVisible = false; continue; }
       const buf = new Float32Array(mats.length * 16); mats.forEach((M, i) => M.copyToArray(buf, i * 16));
       it.mesh.thinInstanceSetBuffer('matrix', buf, 16, true); it.mesh.thinInstanceSetBuffer('tfRid', new Float32Array(rids), 1, true);
@@ -1114,7 +1156,9 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     }
   }
   // near / far by camera distance (checked four times a second)
-  let lodAt = 0;
+  let lodAt = 0, warm = true;
+  addEventListener('tablefolk-scenario-started', () => { warm = true; });
+  addEventListener('tablefolk-world-ready', () => setTimeout(() => { warm = false; if (instanced.length) refreshInstances(); }, 4000));
   function lod(force) {
     const now = performance.now(); if (!force && now - lodAt < 250) return; lodAt = now;
     const cam = state.scene?.activeCamera; if (!cam || !(list.length + closedList.length)) return;

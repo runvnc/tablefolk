@@ -60,11 +60,11 @@
     ['reactions.js?v=20261115b'],
     ['terrain.js?v=20261122a'],
     ['surroundings.js?v=20261122b'],
-    ['buildings.js?v=20261127i'],
+    ['buildings.js?v=20261127o'],
     ['walls.js?v=20261127a'],
     ['darkness.js?v=20261122a'],
 
-    ['roofs.js?v=20261127b'],
+    ['roofs.js?v=20261127c'],
     ['cutaway.js?v=20261127a'],
     ['head-window.js?v=20261101f'],
     ['locks.js?v=20261024a'],

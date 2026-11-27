@@ -478,7 +478,7 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     if (s.roofs !== true && outsideShare < .25) return;
     // one roof a frame, nearest the player first (all at once took ~2.5 s of one frame in a big village)
     const p = state.playerAvatar?.logicalPos || state.camera?.target || { x: 0, z: 0 }, my = ++buildToken;
-    const todo = rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); })
+    const todo = rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < minFill() || w * h < 4 || w > 20 || h > 20); })
       .sort((a, b) => Math.hypot((a.x0 + a.x1) / 2 - p.x, (a.z0 + a.z1) / 2 - p.z) - Math.hypot((b.x0 + b.x1) / 2 - p.x, (b.z0 + b.z1) / 2 - p.z));
     const D = doors(), useShells = shellsWanted(); lastShell = null;
     // the building kit (buildings.js) draws these rooms' houses and roofs: one entry per building, its roof fades
@@ -619,13 +619,15 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   setInterval(() => { if (!enabled || !state.scene) return; const s = signature(walls()); if (sig && s !== sig) rebuild(); }, 2500);
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });
+  // a room must fill this much of its rectangle to be roofed: the kit roofs an L (a main roof and a wing), code roofs only rectangles
+  const minFill = () => window.tablefolkBuildings?.enabled?.() ? .5 : .8;
   // walls.js: the rooms that get (or will get) a roof, by the same rule as rebuild()
   function planned() {
     if (!wanted() || !state.scene || !window.tablefolk?.WORLD) return [];
     const W = walls(); if (!W.size) return [];
     const { rooms, outsideShare } = findRooms(W, doors()), s = state.envScn || window.tablefolkScenario?.active?.scn || {};
     if (s.roofs !== true && outsideShare < .25) return [];
-    return rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); });
+    return rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < minFill() || w * h < 4 || w > 20 || h > 20); });
   }
   // terrain.js and walls.js: the rooms of the current walls (no roofs needed)
   function plan() { const W = walls(); return W.size ? findRooms(W, doors()) : { rooms: [], outsideShare: 1, outside: new Set() }; }
