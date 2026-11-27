@@ -12,6 +12,10 @@
 //              the line; model calls by characters farther than modeRadius (expected 0)
 //   turns:     a line to the nearest, then --rounds rounds: seconds per round and per turn, who took them, its
 //              answer in the first, early turns used and dropped
+//   when:      the world living, with "modeWhen": {"fight": "turns", "talk": "adventure", "indoors": "turns"} set on
+//              it: a line to the nearest (adventure while the encounter is open), the encounter ended (living),
+//              a villager turned on the player beside it (turns, and living again 6 s after), the player
+//              put inside a room (turns, living outside); each with the mode and its source
 // Never approves a model download (stops when the consent prompt shows). Uses the test Chrome (CDP_PORT, 9223).
 import { chromium } from 'playwright-core';
 import fs from 'fs';
@@ -27,7 +31,7 @@ const trace = [];
 page.on('console', m => { if (/^\[reply\]/.test(m.text())) trace.push(((Date.now() - T0) / 1000).toFixed(1) + 's ' + m.text()); });
 page.on('console', m => { const r = m.text().match(/RAW LLM OUTPUT for agent (\S+) at \S+ elapsed ms: (\d+) : ([\s\S]*)$/); if (r) raws.push({ t: (Date.now() - T0) / 1000, agent: r[1], ms: +r[2], out: r[3].slice(0, 200) }); });
 await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); for (const k of Object.keys(localStorage)) if (k.startsWith('tablefolk-mind:')) localStorage.removeItem(k); } catch {} });
-await page.goto(`${base}/app/?play=1&gfx=light&fps=15&intro=0&probe=0&mode=${mode}${model ? '&model=' + model : ''}${autonomy ? '&autonomy=' + autonomy : ''}&scenario=/${scn.replace(/^\/+/, '')}&t=${Date.now()}`);
+await page.goto(`${base}/app/?play=1&gfx=light&fps=15&intro=0&probe=0${mode === 'when' ? '' : '&mode=' + mode}${model ? '&model=' + model : ''}${autonomy ? '&autonomy=' + autonomy : ''}&scenario=/${scn.replace(/^\/+/, '')}&t=${Date.now()}`);
 await page.waitForFunction(() => window.tablefolkModes && window.TABLEFOLK_STATE?.playerAvatar, null, { timeout: 120000 });
 for (let i = 0; ; i++) {
   const st = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.(), consent: !!document.getElementById('approveModelDownload')?.offsetParent, status: document.getElementById('brainStatus')?.textContent || '' }));
@@ -101,6 +105,34 @@ if (mode === 'turns') {
     say(`round ${r + 1}: ${x.seconds.toFixed(1)} s; ${x.turns.map(u => u.id + ' ' + u.s + 's').join(', ')}; early turns ${JSON.stringify(x.early)}`);
     if (r === 0) { x.answer = await page.evaluate(id => __said.filter(z => z.id === id).map(z => z.text).slice(-1)[0] || null, who); say(`  ${who} said: ${x.answer}`); }
   }
+}
+if (mode === 'when') {
+  out.when = [];
+  const look = async (what, want, ms = 8000) => {
+    const t = Date.now(); let m;
+    for (;;) { m = await page.evaluate(() => ({ mode: tablefolkModes.mode(), source: tablefolkModes.source })); if (m.mode === want || Date.now() - t > ms) break; await page.waitForTimeout(200); }
+    const r = { what, want, ...m, ok: m.mode === want, s: (Date.now() - t) / 1000 }; out.when.push(r);
+    say(`${r.ok ? 'ok  ' : 'MISS'} ${what}: ${m.mode} (${m.source}) after ${r.s.toFixed(1)} s, want ${want}`); return r;
+  };
+  await page.evaluate(() => { tablefolkScenario.active.scn.modeWhen = { fight: 'turns', talk: 'adventure', indoors: 'turns' }; });
+  await look('living, nothing going on', 'living');
+  const who = await near(); await page.waitForTimeout(600);
+  await page.fill('#chatInput', LINES[0]); await page.click('#chatSend');
+  await look('a line to ' + who, 'adventure');
+  await page.waitForFunction(id => __said.some(x => x.id === id), who, { timeout: 120000 }).catch(() => {});
+  await page.evaluate(() => tablefolkModes.encounter.end('test'));
+  await look('the encounter ended', 'living');
+  const foe = await page.evaluate(id => { const g = TABLEFOLK_STATE.characters.find(c => c.id === id); tablefolk.setBrainConfig?.(g.id, { hostileTo: { player: Date.now() } }) ?? (getBrainConfig(g.id).hostileTo = { player: Date.now() }); return g.id + ' ' + JSON.stringify(getBrainConfig(g.id).hostileTo); }, who);
+  say('hostile: ' + foe);
+  await look('a villager turned on the player beside it', 'turns');
+  await page.evaluate(id => { const c = getBrainConfig(id); delete c.hostileTo; }, who);
+  await look('the fight over (6 s hold)', 'living', 15000);
+  const room = await page.evaluate(() => { const r = (window.tablefolkRoofs?.rooms || []).find(r => r?.cells?.size); if (!r) return null; const k = [...r.cells].find(k => { const [x, z] = k.split(',').map(Number); return cellPassable(x, z); }) || [...r.cells][0]; const [x, z] = k.split(',').map(Number); setCharacterLogicalPosition(TABLEFOLK_STATE.playerAvatar, new BABYLON.Vector3(x, 0, z)); return k + ' of ' + tablefolkRoofs.rooms.length + ' rooms'; });
+  say('inside: ' + room);
+  if (room) await look('the player indoors', 'turns');
+  await page.evaluate(() => { const P = TABLEFOLK_STATE.playerAvatar; for (let d = 1; d < 40; d++) for (const [x, z] of [[d, 0], [-d, 0], [0, d], [0, -d]]) { const px = Math.round((P.logicalPos || P.root.position).x) + x, pz = Math.round((P.logicalPos || P.root.position).z) + z, k = px + ',' + pz; if (cellPassable(px, pz) && !(tablefolkRoofs.rooms || []).some(r => r.cells?.has?.(k))) { setCharacterLogicalPosition(P, new BABYLON.Vector3(px, 0, pz)); return; } } });
+  if (room) await look('the player outdoors again', 'living', 15000);
+  say(`modeWhen: ${out.when.filter(r => r.ok).length}/${out.when.length}`);
 }
 out.replyTrace = trace; if (trace.length) say('reply trace:\n    ' + trace.join('\n    '));
 for (const r of raws) say(`  model ${r.agent} ${r.ms} ms at ${r.t.toFixed(1)}s`);

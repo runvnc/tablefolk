@@ -3,7 +3,7 @@
 // villager's own words, and a council where the villagers above rails speak for themselves and
 // their stance is read from their words. ?autonomy=guided puts everyone above rails (a small brain
 // would otherwise stay on rails). Never approves a model download: stops if the page asks for one.
-//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240] [--councils=3] [--decider=on]
+//   node god-words-eval.mjs [--base=http://localhost:8000] [--model=gemma4-e2b-litert] [--wait=240] [--councils=3] [--decider=on|auto|off] [--local=0]
 import { chromium } from 'playwright-core';
 const arg = (k, d) => { const a = process.argv.find(s => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const BASE = arg('base', 'http://localhost:8000'), MODEL = arg('model', 'gemma4-e2b-litert'), WAIT = +arg('wait', 240), DECIDER = arg('decider', '');
@@ -20,8 +20,10 @@ const DECREES = [
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 page.on('pageerror', e => console.log('  page error:', String(e).slice(0, 200)));
-// --decider=on: the decision model beside the brain (app/decider.js; read from /work/decider/, no download)
-await page.goto(`${BASE}/app/?model=${MODEL}&autonomy=guided&gfx=light&fps=10&intro=0${DECIDER ? `&decider=${DECIDER}&deciderLocal=1` : ''}&scenario=/scenarios/god-village.json&t=${Date.now()}`);
+// --decider=on: the decision model beside the brain (app/decider.js; read from /work/decider/, no download;
+// --local=0: from Hugging Face and the browser's cache, as players get it: on downloads it once, auto loads it when cached)
+const LOCAL = arg('local', '1') !== '0';
+await page.goto(`${BASE}/app/?model=${MODEL}&autonomy=guided&gfx=light&fps=10&intro=0${DECIDER ? `&decider=${DECIDER}${LOCAL ? '&deciderLocal=1' : ''}` : ''}&scenario=/scenarios/god-village.json&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
   const s = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.() && !!window.tablefolkGod, consent: !document.getElementById('modelConsent')?.hidden, text: document.getElementById('modelLoadText')?.textContent || '' })).catch(() => ({}));
@@ -31,9 +33,9 @@ for (;;) {
   await page.waitForTimeout(2000);
 }
 console.log(`brain ready in ${Math.round((Date.now() - t0) / 1000)} s:`, await page.evaluate(() => tablefolkBrainInfo?.()?.key));
-if (DECIDER) {
+if (DECIDER && DECIDER !== 'off') {
   const t1 = Date.now(); let st = null;
-  while (Date.now() - t1 < 180000) { st = await page.evaluate(() => tablefolkDecision.state()); if (/ready|failed|off|available/.test(st.status)) break; await page.waitForTimeout(2000); }
+  while (Date.now() - t1 < (LOCAL ? 180000 : 900000)) { st = await page.evaluate(() => tablefolkDecision.state()); if (/ready|failed|off|available/.test(st.status)) break; await page.waitForTimeout(2000); }
   console.log(`decider: ${st.status} (${st.why}) after ${Math.round((Date.now() - t1) / 1000)} s; ${st.free} GB left beside the brain`);
   // speeches code cannot place (stanceOf null): the decider against the menus' matcher
   const LINES = [['The god provides; we owe it this much.', 'yes'], ['A sheep is a sheep. Ada can have the old ewe, the lame one.', 'yes'], ['My hands are for the axe, not the altar.', 'no'], ['Let the faithful bleed their own flocks.', 'no'], ['Three loaves is a week of bread for the children.', 'no'], ['Give it to the god before sundown, I say.', 'yes'], ['After the harvest there will be bread enough for gods and men.', 'bargain'], ['The temple can wait for the next market day.', 'bargain']];
