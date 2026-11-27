@@ -63,9 +63,11 @@ const SUPPORTED_MODELS = {
   // Prism ML's 1-bit Bonsai on Transformers.js (the webml-community demo's
   // way); replaced in the picker by Bonsai 2 27B (2026-10-30)
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
-  // Prism ML's Ternary Bonsai 2 27B on the webml-community WebGPU kernels
+  // Prism ML's Ternary Bonsai 2.5 27B on the webml-community WebGPU kernels
   // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
-  'bonsai2-27b': { label: 'Bonsai 2 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~5.9 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1 },   // the pick for 10-12 GB+ cards: 10.2 GB peak with the game at high quality on a 4070 (2026-11-15)   // memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
+  'bonsai2-27b': { label: 'Bonsai 2.5 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~6 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1 },   // Bonsai 2.5 since 2026-11-27 (same id, so saved choices and scenarios follow; brains.md "Bonsai 2.5"). The pick for 10-12 GB+ cards: Bonsai 2 was 10.2 GB peak with the game at high quality on a 4070 (2026-11-15); memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
+  // the Bonsai 2 27B it replaced (Ternary-Bonsai-2-27B-gguf at a pinned revision, from the R2 mirror), for comparison: ?model=bonsai2-27b-v2
+  'bonsai2-27b-v2': { label: 'Bonsai 2 27B (the September release)', engine: 'bonsai2', bonsaiSize: '27B-v2', size: '~5.9 GB', readGB: 5.9, memGB: 9.4, hidden: true },
   // Inkling 2 Mini and SenseNova-Loop-9B on our faster wllama build (libs/brain/engines/wllama-fast; brains.md,
   // "Faster in Chrome"). fitGB: listed in the picker only where the card has that much (with the game beside
   // it); never picked for a device by itself (no needGB). Measured in the game in Chrome on an RTX 4080 Super

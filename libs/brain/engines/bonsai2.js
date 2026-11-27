@@ -1,7 +1,7 @@
-// Prism ML's Ternary Bonsai 2 (Apache-2.0, made from Qwen3.5/3.6) on WebGPU,
-// run by webml-community's kernel engine for Bonsai 2 GGUFs: the 27B
-// (Ternary-Bonsai-2-27B-PTQ1_0.gguf, 5.95 GB; ~9.1 GB on the card at an 8192
-// window) and the 9B (Ternary-Bonsai-2-9B-PTQ1_0.gguf, 1.86 GB; ~3.4 GB).
+// Prism ML's Ternary Bonsai 2 and 2.5 (Apache-2.0, made from Qwen3.5/3.8) on WebGPU,
+// run by webml-community's kernel engine for Bonsai 2 GGUFs: the 27B (Bonsai 2.5,
+// Ternary-Bonsai-2.5-27B-PTQ1_0.gguf, 5.99 GB, since 2026-11-27; Bonsai 2's 5.95 GB
+// file before; ~9.1 GB on the card at an 8192 window) and the 9B (Ternary-Bonsai-2-9B-PTQ1_0.gguf, 1.86 GB; ~3.4 GB).
 //
 // The engine is the `qwen35-vision` module of webml-community's "Ternary Bonsai 2
 // Hermes WebGPU" Space (2026-10-15, the release that added the 2B, 4B and 9B):
@@ -19,13 +19,21 @@
 //   const text = await generateBonsai2(engine, '', { messages, maxTokens, enableThinking, onToken });
 const ENGINE_REV = '621e20782f208660f4f58283c2ce58430020f243';
 const ENGINE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai-2-hermes-webgpu/resolve/${ENGINE_REV}/assets/qwen35-vision-Kzp5MMIJ.js`;
+// '27B' is Ternary Bonsai 2.5 27B (2026-11-24: the same Qwen3.8-27B architecture,
+// tokenizer, chat template and Hadamard rotation as Bonsai 2, new weights; only
+// the 96 small ssm_alpha/ssm_beta tensors went from BF16 to F32, 47 MB more), pinned
+// to a revision. '27B-v2' is the Bonsai 2 27B it replaced (hidden picker entry
+// bonsai2-27b-v2). flag: the localStorage key that marks a finished load, so a
+// Bonsai 2 copy in the cache does not pass for 2.5. The 9B stays unpinned: pinning
+// would change its URL and so the engine's cache key (a fresh download for everyone).
 export const SIZES = {
-  '27B': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf' },
-  '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: null },   // not mirrored on R2 yet
+  '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: null, flag: '_bonsai25_loaded', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // not on R2 yet: it would go at bonsai-2.5-27b/
+  '27B-v2': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', revision: '839bd57023c1558945afea70a74fa83c054f35f9', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf', flag: '_bonsai2_loaded' },
+  '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: null, flag: '_bonsai2_loaded_9B' },   // not mirrored on R2 yet
 };
 export const BONSAI2_FILE = SIZES['27B'].file;
 import { mirrorAllowed, local } from '../../models/index.js';
-const LOADED = '_bonsai2_loaded';   // per size: '1' cached from Hugging Face, 'r2' from the mirror
+const LOADED = '_bonsai2_loaded';   // the old flag (Bonsai 2 27B); per size: SIZES[size].flag, '1' cached from Hugging Face, 'r2' from the mirror
 const CONTEXT = 8192;   // tokens
 
 let modulePromise = null;
@@ -79,7 +87,7 @@ const pageContext = () => {
 };
 export async function loadBonsai2(onStatus = () => {}, { context = pageContext() ?? CONTEXT, size = '27B', sessions = pageSessions() ?? 1 } = {}) {
   patchMirrorHead();
-  const S = SIZES[size] || SIZES['27B'], key = LOADED + (size === '27B' ? '' : '_' + size);
+  const S = SIZES[size] || SIZES['27B'], key = S.flag;
   const E = await bonsai2Module();
   // The engine caches by URL: a copy cached from Hugging Face stays there.
   let source = S.repo;
@@ -92,7 +100,7 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
   }
   const gb = n => (n / 2 ** 30).toFixed(2);
   const model = await E.Qwen3_5ForConditionalGeneration.from_pretrained(source, {
-    file: S.file, mmproj: null, maxLength: context,
+    file: S.file, mmproj: null, maxLength: context, ...(S.revision && source === S.repo ? { revision: S.revision } : {}),
     onProgress: e => {
       if (e.kind === 'bytes' && e.total > 0) onStatus(`${e.fromCache ? 'reading cached' : 'downloading'} Bonsai 2 ${size} ${Math.floor(100 * e.loaded / e.total)}% (${gb(e.loaded)} / ${gb(e.total)} GB)`);
       else if (e.kind === 'tensors') onStatus('preparing Bonsai 2 ' + size + '…');
@@ -100,6 +108,7 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
     },
   });
   local.set(key, source === S.mirror ? 'r2' : '1');
+  if (S.replaces) dropCached(S.replaces).then(n => { if (n) { local.remove(LOADED); onStatus(`removed the replaced Bonsai 2 27B from the cache`); } }).catch(() => {});
   // A session per speaker (sessions > 1): each keeps its own cache, so a
   // character's next turn reuses its own prompt prefix instead of reading the
   // whole prompt again after someone else spoke (14 s cold, 1.4 s warm for a
@@ -162,8 +171,29 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
   return p;
 }
 
-export const hasBonsai2Cached = (size = '27B') => !!local.get(LOADED + (size === '27B' ? '' : '_' + size));
+export const hasBonsai2Cached = (size = '27B') => !!local.get((SIZES[size] || SIZES['27B']).flag);
+
+// Deletes the engine's cached copy of a file it no longer uses (its IndexedDB
+// gguf-cache-v1: a meta entry per cache key, chunks keyed [key, begin, end]), so a
+// player who had Bonsai 2 27B does not keep 5.9 GB of it beside 2.5. Returns how
+// many entries went.
+async function dropCached(fileName) {
+  if (typeof indexedDB === 'undefined') return 0;
+  const db = await new Promise((ok, no) => { const r = indexedDB.open('gguf-cache-v1'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  try {
+    if (!db.objectStoreNames.contains('meta') || !db.objectStoreNames.contains('chunks')) return 0;
+    const keys = await new Promise((ok, no) => { const r = db.transaction('meta').objectStore('meta').getAllKeys(); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+    const stale = keys.filter(k => typeof k === 'string' && k.includes('/' + fileName));
+    for (const k of stale) await new Promise((ok, no) => {
+      const t = db.transaction(['chunks', 'meta'], 'readwrite');
+      t.objectStore('chunks').delete(IDBKeyRange.bound([k], [k, [], []]));
+      t.objectStore('meta').delete(k);
+      t.oncomplete = ok; t.onerror = () => no(t.error);
+    });
+    return stale.length;
+  } finally { db.close(); }
+}
 export async function clearBonsai2Cache() {
-  local.remove(LOADED);
+  local.remove(LOADED); for (const S of Object.values(SIZES)) local.remove(S.flag);
   for (const d of await indexedDB.databases?.() || []) if (/bonsai|gguf|kernel/i.test(d.name || '')) indexedDB.deleteDatabase(d.name);
 }

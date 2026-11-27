@@ -157,7 +157,7 @@ export function checkScenario(s, packVoices = [], opts = {}) {
 }
 
 
-export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-9b', 'Bonsai 2 9B (about 2 GB; fast, needs a 6 GB+ graphics card; best with "think first")'], ['gemma4-12b-litert', 'Gemma 4 12B (about 5.6 GB; needs a 10 GB+ graphics card)'], ['bonsai2-27b', 'Bonsai 2 27B (about 6 GB; the smartest; needs a 10 GB+ graphics card)']];
+export const BROWSER_MODELS = [['gemma4-e4b-litert', 'Gemma 4 E4B (about 3 GB download)'], ['gemma4-e2b-litert', 'Gemma 4 E2B (about 2 GB, faster, simpler worlds)'], ['bonsai2-9b', 'Bonsai 2 9B (about 2 GB; fast, needs a 6 GB+ graphics card; best with "think first")'], ['gemma4-12b-litert', 'Gemma 4 12B (about 5.6 GB; needs a 10 GB+ graphics card)'], ['bonsai2-27b', 'Bonsai 2.5 27B (about 6 GB; the smartest; needs a 10 GB+ graphics card)']];
 // The visitor's own model ("own"): presets for the builder's form; the page
 // calls the provider itself, so the key never reaches this server.
 export const OWN_MODELS = ['deepseek/deepseek-v4.1-flash-1017', 'google/gemma-4-26b-a4b-it', 'openai/gpt-6-luna', 'anthropic/claude-sonnet-5-5'];
@@ -417,7 +417,7 @@ button.small{padding:.1rem .5rem!important;font-size:.78rem!important}
 @media (max-width:700px){main{padding:0 12px 40px}.prompt{flex-direction:column}.create{padding:16px}.acts{margin-left:0}}
 </style></head><body><main>
 ${view === 'loading' ? loadingBody : builderBody}
-</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261122a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261122a"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
+</main>${view === 'builder' ? '<script src="/app/procgen.js?v=20261122a"></script><script src="/app/map-editor.js?v=20261120b"></script><script src="/app/books.js?v=20261115f"></script><script src="/app/world-file.js?v=20261115b"></script><script src="/app/tts/voice-sample.js?v=20261115b"></script><script src="/app/builder-paint.js?v=20261115c"></script><script src="/app/builder.js?v=20261127a"></script><script src="/app/worldgen-own.js?v=20261115a"></script>' : ''}<script>
 const qs=new URLSearchParams(${JSON.stringify(qs.toString())}), f=document.getElementById('f'), view=${JSON.stringify(view)};
 const SAVED=${JSON.stringify(saved).replace(/</g, '\\u003c')};
 const $=id=>document.getElementById(id);
@@ -558,7 +558,7 @@ if(words){
     // step by step with the model in this browser (app/worldgen-browser.js)
     try{ if(qs.get('model')) localStorage.setItem('tablefolk_model',qs.get('model')); }catch{}
     const load=src=>new Promise((res,rej)=>{ if(document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); });
-    load('/app/procgen.js?v=20261122a').then(()=>load('/app/worldgen-browser.js?v=20261122a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
+    load('/app/procgen.js?v=20261122a').then(()=>load('/app/worldgen-browser.js?v=20261127a')).then(()=>(qs.has('oneanswer')?(cb=>window.tfWorldgen.runOne(words,qs.get('mode')||'auto',cb)):(cb=>window.tfWorldgen.run(words,cb,nSec>1?{sections:nSec,shape:qs.get('shape')||'auto'}:undefined)))((ev,d)=>{ if(ev==='progress') onProgress(d); else if(ev==='done') onDone(d); else if(ev==='failed') fail('failed: '+d.error); })).catch(e=>fail('failed: '+e.message));
   } else if(qs.get('where')==='own'){
     // the visitor's own key or server, called from this page (app/worldgen-own.js)
     (window.tfOwnModel?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='/app/worldgen-own.js?v=20261115a'; s.onload=res; s.onerror=()=>rej(new Error('could not load the page script')); document.head.appendChild(s); }))

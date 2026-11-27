@@ -67,11 +67,11 @@
     if (L) return L;
     emit('progress', { stage: 'loading', label: 'loading the model in this browser…' });
     let key = 'gemma4-e4b-litert';
-    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || k === 'bonsai2-27b' || k === 'bonsai2-9b') key = k; } catch {}
+    try { const k = localStorage.getItem('tablefolk_model'); if (/litert$/.test(k || '') || /^bonsai2-(27b|27b-v2|9b)$/.test(k || '')) key = k; } catch {}
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
-    if (key === 'bonsai2-27b' || key === 'bonsai2-9b') {
+    if (/^bonsai2-/.test(key)) {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
-      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, { size: key === 'bonsai2-9b' ? '9B' : '27B', ...(context ? { context } : {}) });
+      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, { size: { 'bonsai2-9b': '9B', 'bonsai2-27b-v2': '27B-v2' }[key] || '27B', ...(context ? { context } : {}) });
       L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, enableThinking: !!opts.enableThinking, onToken }), clear: () => {}, context: context || 8192 };
     } else {
       const mod = await import(LOADER);
