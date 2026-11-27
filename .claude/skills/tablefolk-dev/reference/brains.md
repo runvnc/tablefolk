@@ -194,6 +194,31 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   confident choices with Gemma for the unsure ones, but a native helper is
   not this project (CLAUDE.md); in the browser too slow beside the current
   matcher (menus.js, 50-150 ms).
+  **Faster (2026-11-27):** one forward per question. The option inputs were
+  prefixes of the whole prompt and the model is causal (attention and the
+  gated-delta-net layers), so their last hidden states are the whole prompt's
+  states at those positions. wllama's embeddings API cannot return them
+  (pooling `none` is refused, embedding tasks never reuse a cache), so
+  `tools/wllama-inkling/wllama-hidden.patch` adds a glue action `hidden`
+  (`embd_req` with `{tokens, outputs, prefix}` -> `gres_res` with float32 rows;
+  llama_decode on the server's context, outputs only at the asked positions;
+  `prefix` keeps the state part in sequence 1 and `seq_cp`s it back while the
+  next prompt starts with it). Build: `build-fast.sh wasm fast
+  "-DGGML_WEBGPU_MMVQ=0"` (the patch is applied there), shipped as
+  `libs/decider/wllama/` (its own copy of wllama-fast's JS and the patched
+  wasm, so a rebuild of libs/brain's wllama-fast cannot drop the action).
+  Loaded with `pooling_type: 'none'`, `n_parallel: 2`, `kv_unified`. Chrome
+  158 (`decider-test.html?local=1`, `decider-run.mjs`): RTX 4070 6-option menu
+  2.0 -> 0.53 s, a known state 0.24-0.26 s, yes/no 0.3 s; RTX 2060 7.6 -> 2.0
+  s, known state 0.85-0.9 s. 17/18 as before (the miss at 0.46); against the
+  forward-per-option path (raw states) every probability within 0.0009. Raw
+  states now (`embd_normalize: -1`, as decide.py); the old path's L2 norm
+  moved probabilities by up to 0.008 (LayerNorm's eps). Where the time goes
+  now: prompt reading is linear in tokens with no fixed cost (2060: 4 tokens
+  70 ms, 64 tokens 0.57 s, 256 tokens 2.2 s; outputs read cost nothing), and
+  natively on Dawn (4070, 288 tokens, GPU 255 ms) the Q8_0 matmuls are 71%,
+  the norms 6%, the recurrent scan 4.5%. Next steps if wanted: a faster
+  WebGPU Q8_0 prefill matmul, or shorter states.
 - **Qwen2.5 0.5B** (`qwen2.5-0.5b`, engine `wllama3`, 2026-11-06):
   `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, the 491 MB Q4_K_M, the newest official 0.5B
   (Qwen3 starts at 0.6B, Qwen3.5 at 0.8B). Every layer on the GPU: about 50 tok/s,

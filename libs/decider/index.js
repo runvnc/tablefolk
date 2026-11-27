@@ -124,6 +124,8 @@ export function loadDecider(onStatus = () => {}, { gpuLayers = 99, ggufUrl = GGU
       stats.evaluated += info.n_eval; stats.reused += info.n_reused;
       return outputs.map((_, i) => all.subarray(i * n, (i + 1) * n));
     }
+    // compile the GPU kernels now, not on the first question (it took 0.3 s more)
+    if (fast) { const ids = tokenize('<state>\n' + 'The farmer walks to the mill. '.repeat(12) + '\n</state>\n').map(t => t[0]); await hiddenAt(ids, [ids.length - 1], 0); }
     async function decide(state, questions) {
       const t0 = performance.now();
       const rendered = Object.fromEntries(Object.entries(questions).map(([k, q]) => [k, render(q)]));
