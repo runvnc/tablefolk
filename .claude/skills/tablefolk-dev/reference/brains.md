@@ -1441,17 +1441,23 @@ sequence: ~160 KB a token, up to ~245 MB; llama.cpp's 32 (or 3) a slot in the
 4 GB wasm heap is what aborted the day (`std::bad_alloc`), not a bug in the restore.
 
 **Prefix checkpoints** (shipped): the runner (`wllama-runner.js`,
-`sharedPrefixEnd`) finds the part a prompt shares with recent prompts (cut at a
+`prefixPlan`) finds the part a prompt shares with recent prompts (cut at a
 line break; a part read this way before wins, so all characters' turns share
 one: the rules, ~2,750 characters, ~800 tokens), reads it with a request of its
 own that leaves one checkpoint at its end, and sends the prompt with
 `checkpoints: false` (a field added by `server-checkpoints.patch`: the request
 makes none), so a slot keeps one checkpoint (`n_ctx_checkpoints: 1`, ~130 MB;
-4 slots ~0.5 GB of heap). A prompt that carries a recent one on (the world
-builder's agent, which keeps the model's own words) has the whole earlier prompt
-as its prefix: the slot holds that prompt plus the answer as sampled, which the
-next prompt's rendering does not match token for token, so it rolls back to the
-checkpoint the step before left and reads only the two steps' new parts. Replaying the day's prompts through a model of
+4 slots ~0.5 GB of heap). llama.cpp makes a request's checkpoints 4 + n_ubatch
+and 4 tokens before its prompt's end (one kept: the 4-token one). A prompt that
+carries a recent one on (the world builder's agent, which keeps the model's own
+words), or a long one (16,000+ characters) that shares nothing (the agent's
+first step), makes its own checkpoint instead and has no prefix read: the slot
+holds the earlier prompt plus the answer as sampled, which the next prompt's
+rendering does not match token for token, so the next step rolls back to 4
+tokens before the earlier prompt's end and reads only what is new. wllama's
+answers carry no `id_slot`, so the runner cannot pin the second request to the
+prefix's slot; llama.cpp's own choice (the slot whose prompt is most alike)
+finds it. Replaying the day's prompts through a model of
 the server's slots: 77% of the characters read (rules only: 75%; the longest
 shared part every time: 87%, as it keeps moving the one checkpoint). In
 Chrome (`replay-test.html ?prefix=1`): a turn prompt read in full 9.7 s;
@@ -1514,6 +1520,26 @@ Bonsai 2.5 27B's free day there (RTX 4080 Super, above):
 | wasted / safety nets | 14% / 4 | 8% / 4 |
 | meals, hungry at the end | ada 3, bram 2; bram | 2 / 2, none |
 | judge: coherence / personality / purpose / surprise | 2.5 / 3.0 / 3.5 / 2.5 | **4.0 / 4.5 / 4.5 / 3.5** |
+
+**The world builder's agent with Inkling** (`agent-world-test.mjs`, `WHERE=browser
+AGENT_MODEL=inkling2-mini-wllama ENGINE_LOG=1`, the river-village prompt and its tavern
+follow-up; Chrome 158, RTX 4080, no game drawn). Its first prompt (fast-skill.md, the
+tools, the request) is ~9,600 tokens: step 1 takes 74 s (read at 136 tok/s) in every
+version. Each later step adds the model's call and the tool's result (150-350 tokens).
+
+| | prefix read of the earlier prompt | own checkpoint (shipped) |
+|---|---|---|
+| step 2 | 82 s (step 1 left no checkpoint: all 9,600 tokens again) | **12.7 s** (354 read, 9,596 reused) |
+| steps 3+, median / p90 | 8.2 / 13.1 s | **5.9** / 19.2 s (longer answers that run) |
+| tokens read a step (3+) | 392, in two requests | **172**, in one |
+| writing | 25.8 tok/s | 24.6 tok/s |
+| result | 18 steps, `set_map` called 11 times, then it stopped calling tools: failed (no characters) | built in 23 steps (322 s with the 74 s first step), checks passed; the follow-up in 4 steps (1,333 tokens read for the world handed back), no page errors |
+
+Short reads run at ~50-110 tok/s (the restore and the 4-token tail cost ~0.4 s each
+time). What is left is step 1: the same 9,600 tokens every session; a shorter agent
+system message, or saving that slot's state once (llama.cpp's slot save/restore, not
+in wllama), would take most of the 74 s off. The agent's quality with Inkling varies:
+one of the two runs looped on `set_map` and gave up.
 
 **Verdict**: the prefix checkpoints are a real gain (a hearthvale turn 12.7 -> 10.3 s,
 p90 13.8 -> 10.8 s) and the crash is understood (checkpoint size, not the restore), but Inkling in Chrome
