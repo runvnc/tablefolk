@@ -2029,8 +2029,15 @@ Measured on this laptop (RTX 2060 6 GB, Gemma 4 E2B LiteRT, hearthvale,
 adventure, one run): exploring 40 s, 0 model calls (all ten on rails); "Good
 morning! What are you busy with today?" to rosa: the encounter opened, the
 answer in 1.8 s (model 1.3 s), streamed into a bubble; the second line 8.0 s
-(model 1.3 s; where the other 6.7 s went is not traced yet: her first turn
-settling, `isTurnReady`, is the suspect); walking
+(model 1.3 s). Traced (`[reply]` console lines, modes-eval's reply trace): the
+line came while her answer to the first was still being acted out, and
+`replyNow` returned at once when the character was already answering, so the
+line waited for live.js's next turn for her, a quiet gap later. Now it is
+answered right after (`g._replyAgain`, and again while the player's words are
+pending, at most 4 in a row). Re-measured (brann, 4 lines one after the other):
+1.2, 0.3, 0.8, 0.8 s with model calls of 0.96, 0.74, 0.54 s (one call took in
+two lines; the 0.3 s "reply" was his chopping line, which the tool counts as
+speech). Walking
 away closed it at once ("walked away", 3 lines, 9 s), rosa back on rails with
 the memory "You talked with Traveller; the last thing they said: ...", and 0
 model calls in the 30 s after. Turn mode, the same brain and world

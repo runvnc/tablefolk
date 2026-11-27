@@ -1591,19 +1591,29 @@ async function main() {
   }
   // the one spoken to answers now, ahead of the queued background turns (living mode fix (a), modes.js);
   // live.js leaves a character with a reply on the way to it (g._replying)
+  // (a line said while its answer to the last one is still being acted out is answered right after it: it used to be
+  // dropped here and wait for live.js's next turn for it, a quiet gap later: 6.7 s of an 8 s follow-up with Gemma E2B)
   async function replyNow(g) {
-    if (g._replying) return;
+    const t0 = performance.now(), tr = (what) => console.info('[reply]', g.id, what, Math.round(performance.now() - t0) + ' ms');
+    if (g._replying) { g._replyAgain = true; tr('already answering: again after it'); return; }
     g._replying = true;
     try {
-      // its own turn already under way (live.js, above rails): this one follows it
-      while (g._turnRunning) await sleep(100);
-      await withTurnLock(g, async lock => {
-        while (!world.isTurnReady()) await sleep(100);
-        // inside a workflow: it goes on until it waits again (workflows.js)
-        if (window.tablefolkWorkflows?.active(g.id)) await world.driveWorkflow(g.id);
-        else if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g, { lock });
-      });
-    } finally { g._replying = false; }
+      let rounds = 0;
+      do {
+        g._replyAgain = false;
+        // its own turn already under way (live.js, above rails): this one follows it
+        while (g._turnRunning) await sleep(50);
+        await withTurnLock(g, async lock => {
+          tr('lock');
+          while (!world.isTurnReady()) await sleep(50);
+          tr('turn ready');
+          // inside a workflow: it goes on until it waits again (workflows.js)
+          if (window.tablefolkWorkflows?.active(g.id)) await world.driveWorkflow(g.id);
+          else if (world.getBrainConfig(g.id).pendingChat?.length) await runOneAgentTurn(g, { lock });
+          tr('turn done');
+        });
+      } while ((g._replyAgain || playerSpokeTo(g)) && ++rounds < 4);
+    } finally { g._replying = false; g._replyAgain = false; }
   }
   // Programmatic chat for the scenario tactic tester (scenario.js): queue a
   // message exactly like the chat box does, run that character's turn, and

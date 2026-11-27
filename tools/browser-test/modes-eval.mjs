@@ -23,6 +23,8 @@ const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_P
 const page = await b.contexts()[0].newPage(); await page.setViewportSize({ width: 1000, height: 700 });
 const errs = [], raws = [];
 page.on('pageerror', e => errs.push(String(e).slice(0, 200)));
+const trace = [];
+page.on('console', m => { if (/^\[reply\]/.test(m.text())) trace.push(((Date.now() - T0) / 1000).toFixed(1) + 's ' + m.text()); });
 page.on('console', m => { const r = m.text().match(/RAW LLM OUTPUT for agent (\S+) at \S+ elapsed ms: (\d+) : ([\s\S]*)$/); if (r) raws.push({ t: (Date.now() - T0) / 1000, agent: r[1], ms: +r[2], out: r[3].slice(0, 200) }); });
 await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); for (const k of Object.keys(localStorage)) if (k.startsWith('tablefolk-mind:')) localStorage.removeItem(k); } catch {} });
 await page.goto(`${base}/app/?play=1&gfx=light&fps=15&intro=0&probe=0&mode=${mode}${model ? '&model=' + model : ''}${autonomy ? '&autonomy=' + autonomy : ''}&scenario=/${scn.replace(/^\/+/, '')}&t=${Date.now()}`);
@@ -100,6 +102,8 @@ if (mode === 'turns') {
     if (r === 0) { x.answer = await page.evaluate(id => __said.filter(z => z.id === id).map(z => z.text).slice(-1)[0] || null, who); say(`  ${who} said: ${x.answer}`); }
   }
 }
+out.replyTrace = trace; if (trace.length) say('reply trace:\n    ' + trace.join('\n    '));
+for (const r of raws) say(`  model ${r.agent} ${r.ms} ms at ${r.t.toFixed(1)}s`);
 out.modelOutputs = raws; out.errors = errs;
 fs.mkdirSync('results', { recursive: true }); const f = `results/modes-${mode}-${label}.json`; fs.writeFileSync(f, JSON.stringify(out, null, 1));
 say(`saved ${f}; page errors: ${errs.length ? errs.join(' / ') : 'none'}`);
