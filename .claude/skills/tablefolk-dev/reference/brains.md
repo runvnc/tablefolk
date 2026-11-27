@@ -1977,3 +1977,84 @@ that is a console line now).
 Box: vast.ai RTX 4080 16 GB, about 4.7 hours rented (the run waited out an
 agent pause), $1.46 in all including downloads; destroyed and checked by API.
 
+
+## Game modes: living, adventure, turns (2026-11-27)
+
+`app/modes.js` (rules in `app/modes-core.js`; the scenario skill's living.md,
+"How the game runs"). The owner, walking around a living village, kept
+stopping to wait for turns and replies: the world runs in real time and the
+model is slow and shared. What changed underneath:
+
+- **The model queue has priorities** (`createQueue` in world-integration.js,
+  `manager.decide({ priority })`): 2 for a turn answering the player
+  (pendingChat starts with "<player name> says"), 1 for an adventure
+  encounter's member, 0 for the rest, -1 for an early turn. A call already
+  running is never stopped. `window.tablefolkModelQueue` shows the waiting.
+- **The turn lock has the same order and is let go during the model call**
+  (`createLock`; `runOneAgentTurn(g, { lock })` yields before `decide` and takes
+  it back, in its order, before acting). Before, `replying` was held for a
+  whole turn and `replyNow` gave up when it was taken: the player's words then
+  waited for live.js's `due()` after a quiet gap. Now `replyNow` always runs,
+  marks `g._replying` (live.js skips that character) and follows a turn of its
+  own already under way (`g._turnRunning`). `freshen` already covered a world
+  that changed under a turn's model call.
+- **Replies stream** into a bubble (`world.showStreamingBubble`, the words of
+  `say("...` as LiteRT/wllama hand them over), and the arrow keys walk while
+  the chat box is empty (app.js keydown). Where the player's movement still
+  stops: play.js `setBusy` in a fight (after the player's attack, or with a
+  foe within 2.2 of a talker: blows go turn about), kept on purpose.
+- **Who may use the model**: `tablefolkModes.mayThink(g)` gates agency.js
+  `resolve` (rails), world-integration.js (no model call; what was said to it
+  goes into its history), jobs.js `brainOk(g)` (picks, remarks, evening talk)
+  and mind.js reflection and day plans. Living: within `modeRadius` (12) of the
+  player; adventure: encounter members; always: one the player just spoke to.
+  live-eval.mjs passes `modeRadius=0` by default so day measurements stay
+  comparable with the ones above (`--mode-radius=12` for living as played).
+- **The clock and needs** follow `clockRate()` (turns 0, an adventure
+  encounter a quarter or 0); a round calls `tablefolkClock.advance(minutes)`
+  and `tablefolkMind.passTime(seconds)`.
+- **Turn mode** holds live.js's loop (`holdLive`) and runs rounds itself with
+  `tablefolkLive.turnOf(c, { wait: true })` (the live loop's turn body, so each
+  autonomy level acts as it does live, above rails waited for). Early turns:
+  `world.prefetchTurn(g)` builds the prompt and queues its call at -1 for the
+  first in order when `independent()` (not spoken to by the player, farther
+  than the squares left + max(sight 12, earshot) + 1) and its turn will ask the
+  model (something pending, or free); at its turn the prompt is built again and
+  the early answer used only if the prompt is the same (the personality's
+  trait sentences left out of the comparison: the "Stay yourself" line picks
+  one at random). `?prefetch=0` turns it off; "Running now" counts used and
+  dropped.
+
+Measured on this laptop (RTX 2060 6 GB, Gemma 4 E2B LiteRT, hearthvale,
+adventure, one run): exploring 40 s, 0 model calls (all ten on rails); "Good
+morning! What are you busy with today?" to rosa: the encounter opened, the
+answer in 1.8 s (model 1.3 s), streamed into a bubble; the second line 8.0 s
+(model 1.3 s; where the other 6.7 s went is not traced yet: her first turn
+settling, `isTurnReady`, is the suspect); walking
+away closed it at once ("walked away", 3 lines, 9 s), rosa back on rails with
+the memory "You talked with Traveller; the last thing they said: ...", and 0
+model calls in the 30 s after. Turn mode, the same brain and world
+(`modes-eval.mjs --mode=turns`, rails): a line to tam, then End turn: round 1
+in 6.6 s (tam's turn, his answer "I'm busy looking for apples!", 2.3 s; four
+others in code, 0-3.2 s each, mostly walking), round 2 in 6.0 s; no early turn
+(the first in order was always near the player). No model (`scenario-smoke.mjs --mode=`):
+turns on hearthvale, a round of the five within 12 squares in 0.2-8 s, the
+clock 10 minutes on, nothing moving between turns; the tabletop view walks
+the player by click (3 squares, 3 left) and shows the ring and "thinking…".
+
+Not measured yet (needs a capable card): living with a busy guided village
+(how long the player's line waits behind a running call, the queue length),
+turn rounds at guided and free (seconds a round, early turns used), adventure
+with Bonsai 2 9B / 27B. `modes-eval.mjs` measures all three; commands for a
+rented card (tools/cloud-gpu/README.md steps 1-3 first, tunnel on 9231):
+
+    cd tools/browser-test; export CDP_PORT=9231 APPROVE_DOWNLOAD=1
+    for m in bonsai2-9b bonsai2-27b gemma4-e4b-litert; do
+      ssh -p <port> root@<host> 'bash -s' < ../cloud-gpu/chrome-restart.sh; sleep 3
+      node modes-eval.mjs --mode=living --autonomy=guided --model=$m --lines=4 --label=$m-guided
+      node modes-eval.mjs --mode=adventure --model=$m --lines=4 --label=$m
+      node modes-eval.mjs --mode=turns --autonomy=guided --model=$m --rounds=4 --label=$m-guided
+      node modes-eval.mjs --mode=turns --autonomy=free --model=$m --rounds=3 --label=$m-free
+    done
+    # a living village as the player gets it (far characters on rails), scored as before
+    node live-eval.mjs scenarios/hearthvale.json --minutes=6 --autonomy=guided --model=bonsai2-9b --mode-radius=12 --label=living12

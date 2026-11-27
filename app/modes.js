@@ -184,9 +184,10 @@
   }
   function stepTaken() { if (current !== 'turns') return; budget.step(); turnBar(true); }
   const alive = c => !c.defeated && !getBrainConfig(c.id).defeated && getBrainConfig(c.id).enabled !== false;
+  // (and whoever the player spoke to this turn, wherever: its answer comes on its turn, after the others)
   function order() {
-    const p = me(), pp = p ? posOf(p) : null;
-    return C.turnOrder(state.characters.filter(alive).map(c => ({ id: c.id, x: posOf(c).x, z: posOf(c).z, c })), pp, O.radius).map(x => x.c);
+    const p = me(), pp = p ? posOf(p) : null, list = C.turnOrder(state.characters.filter(alive).map(c => ({ id: c.id, x: posOf(c).x, z: posOf(c).z, c })), pp, O.radius).map(x => x.c);
+    return [...list, ...state.characters.filter(c => alive(c) && !list.includes(c) && spokenToBy(c))];
   }
   async function endTurn() {
     if (current !== 'turns' || roundBusy || !state.characters?.length) return;
