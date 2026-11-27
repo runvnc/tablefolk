@@ -93,7 +93,7 @@
     ['weather.js?v=20261127b'],
     ['powers.js?v=20261127f'],
     ['designate.js?v=20261127f'],
-    ['orders.js?v=20261127e'],
+    ['orders.js?v=20261127f'],
     ['decider.js?v=20261127c'],
     ['speech-input.js?v=20261122a'],
     ['worldgen-own.js?v=20261127b'],

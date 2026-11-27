@@ -169,7 +169,7 @@
       const near = memberIds(d).map(byId).filter(c => c && c !== m && !c.defeated).sort((a, b) => dist(posOf(a), posOf(m)) - dist(posOf(b), posOf(m)))[0];
       try { await window.tablefolk.runAs(m.id, `say("${line.replace(/"/g, "'")}")`); } catch {}
       try { window.tablefolkMind?.addMemory?.(m, `I told ${ofText(d)}: ${d.text}`, 2); } catch {}
-      if (near && dist(posOf(near), posOf(m)) > 6) setTimeout(() => window.tablefolk.runAs(m.id, `walk(${near.id})`).catch(() => {}), 2500);
+      if (near && dist(posOf(near), posOf(m)) > 6) setTimeout(() => Promise.resolve(window.tablefolk?.runAs?.(m.id, `walk(${near.id})`)).catch(() => {}), 2500);   // (no runAs with no brain wired: model=none)
     }
     d.delivered = true;
     toast(`${m ? m.id + ' tells ' + ofText(d) : 'Demanded of ' + ofText(d)}: ${d.text}`);

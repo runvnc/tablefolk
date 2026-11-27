@@ -538,7 +538,7 @@ export default function (api) {
     W.tablefolkJobs?.addNews?.(g.id, `${g.id} dreamed the god spoke: "${text}"`, 'news');
     for (const id of within(posOf(g).x, posOf(g).z, 8)) if (id !== g.id) api.addMemory?.(byId(id), `${g.id} says the god spoke in a dream: "${text}"`, 2);
     if (kind === 'demand') { const d = parseDecree(text, decreeCtx()); if (!d.error) await decree(text, { via: g.id, parsed: d, council: false }); }
-    else if (kind === 'go') { const pl = places().find(p => new RegExp(`\\b${p.id}\\b`, 'i').test(text)); if (pl) api.runAs(g.id, `walk(${pl.id})`).catch(() => {}); }
+    else if (kind === 'go') { const pl = places().find(p => new RegExp(`\\b${p.id}\\b`, 'i').test(text)); if (pl) Promise.resolve(api.runAs(g.id, `walk(${pl.id})`)).catch(() => {}); }
     W.dispatchEvent(new CustomEvent('tablefolk-god', { detail: { what: 'dream', who: g.id, text, kind } }));
   }
   const OMEN_LINES = { faithful: ['A sign! The god is watching over us!', 'Look, the sky! Kneel, all of you!', 'The god speaks. We must listen.'], doubters: ['Marsh lights. Nothing more.', 'A trick of the sun, and Ada will make a sermon of it.', 'Hm. I have never seen that before. Still proves nothing.'] };
