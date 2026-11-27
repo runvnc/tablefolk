@@ -91,7 +91,7 @@
     ['plan-core.js?v=20261127c'],
     ['orders-core.js?v=20261127b'],
     ['weather.js?v=20261127b'],
-    ['powers.js?v=20261127d'],
+    ['powers.js?v=20261127e'],
     ['designate.js?v=20261127f'],
     ['orders.js?v=20261127e'],
     ['speech-input.js?v=20261122a'],

@@ -43,7 +43,8 @@
 #tfPickBar button,#tfPickBar select{white-space:nowrap;padding:3px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f3ead7;font:600 12px system-ui,sans-serif;cursor:pointer}
 #tfPickBar button.go{background:#3d8a4f;border-color:#7fd08f}#tfPickBar input{padding:3px 8px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:#fff;font:500 12.5px system-ui,sans-serif;min-width:220px}
 #tfPickBar small{font-weight:500;opacity:.8}
-html.tabletop #powerBar,html.tabletop #resourceHud{display:none}`;
+html.tabletop #powerBar,html.tabletop #resourceHud{display:none}
+@media (max-width:600px){#resourceHud{top:96px}}`;
     document.head.appendChild(css);
   }
 

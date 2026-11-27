@@ -502,8 +502,8 @@ export default function (api) {
         if (pw && targetFor(pw, p)) on['a:' + p.id] = async () => { const r = await W.tablefolkPowers.use(pw, targetFor(pw, p)); if (r?.fail) toast(r.fail, 'warn'); showPanel('prayers'); };
         on['d:' + p.id] = async () => { const g = byId(p.who); if (!g) return; const r = await W.tablefolkPowers.use('dream', { who: g, x: 0, z: 0 }); if (!r?.fail) { apply(G.answer(p.id, { how: 'dream' }).changes); toast(`${p.who} will dream of you.`); } showPanel('prayers'); };
         on['s:' + p.id] = () => { apply(G.answer(p.id, { how: 'silence' }).changes); api.addMemory?.(byId(p.who), 'I prayed and the god was silent.', 2); showPanel('prayers'); };
-        return `<div class="gp"><button type="button" data-pick="l:${p.id}" title="look">👁</button><b>${esc(p.who)}</b> <i>(${esc(sideOf(p.who) || 'undecided')}, ${Math.round(G.belief(p.who))})</i> asks for <b>${esc(needWord(p.need))}</b>: “${esc(p.text.slice(0, 110))}” <small>${left} h left</small>
-          ${pw && on['a:' + p.id] ? `<button type="button" class="go" data-pick="a:${p.id}">${POWERS[pw].icon} ${esc(POWERS[pw].label)} (${cost})</button>` : ''}<button type="button" data-pick="d:${p.id}">💭 dream (2)</button><button type="button" data-pick="s:${p.id}">🤐 silence</button></div>`;
+        return `<div class="gp"><button type="button" data-pick="l:${p.id}" title="look">👁</button><span class="gq"><b>${esc(p.who)}</b> <i>(${esc(sideOf(p.who) || 'undecided')}, ${Math.round(G.belief(p.who))})</i> asks for <b>${esc(needWord(p.need))}</b>: “${esc(p.text.slice(0, 110))}” <small>${left} h left</small></span>
+          <span class="ga">${pw && on['a:' + p.id] ? `<button type="button" class="go" data-pick="a:${p.id}">${POWERS[pw].icon} ${esc(POWERS[pw].label)} (${cost})</button>` : ''}<button type="button" data-pick="d:${p.id}">💭 dream (2)</button><button type="button" data-pick="s:${p.id}">🤐 silence</button></span></div>`;
       }).join('') : `<div class="gp"><small>No one is praying now. Villagers pray at the ${esc(shrine().id)} when hunger, sickness, drought, blight or beasts weigh on them.</small></div>`;
       const past = G.prayers().filter(p => p.status !== 'open').slice(-3).reverse();
       if (past.length) body += `<div class="gp"><small>lately: ${past.map(p => `${esc(p.who)} (${esc(needWord(p.need))}): ${esc(p.status === 'answered' ? 'answered by ' + String(p.by).replace(/_/g, ' ') : p.status)}`).join(' · ')}</small></div>`;
@@ -811,13 +811,16 @@ export default function (api) {
   if (!document.getElementById('tfGodCss')) {
     const css = document.createElement('style'); css.id = 'tfGodCss';
     css.textContent = `#tfPickBar .godPanel{display:flex;flex-direction:column;gap:4px;max-height:42vh;overflow:auto;min-width:min(720px,90vw)}
-#tfPickBar .gtabs{display:flex;gap:6px;align-items:center}#tfPickBar .gp>button:first-child{flex:0 0 auto}
+#tfPickBar .gtabs{display:flex;gap:6px;align-items:center}#tfPickBar .godPanel button{flex:0 0 auto;width:auto}
+#tfPickBar .gp .gq{flex:1 1 280px;min-width:0}#tfPickBar .gp .ga{display:flex;gap:5px;flex:0 0 auto;margin-left:auto}
+html.god-game #tfPickBar:has(.godPanel){background:rgba(20,24,30,.97)}
 #tfPickBar .gp{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:4px 6px;border-radius:9px;background:rgba(255,255,255,.05);font-weight:500}
 #tfPickBar .gp i{opacity:.75;font-style:normal;font-size:11.5px}#tfPickBar .gp small{opacity:.75}
 #tfPickBar .gp .bar{display:inline-block;width:90px;height:7px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}#tfPickBar .gp .bar span{display:block;height:100%}
 html.god-game #powerBar{left:12px;transform:none;bottom:12px;flex-wrap:wrap;max-width:min(760px,calc(100vw - 420px));overflow:visible;justify-content:flex-start}
 html.god-game #powerBar button{flex:0 0 auto;min-width:50px;padding:3px 5px;font-size:10.5px}html.god-game #powerBar button .ic{font-size:17px}
-html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:flex-start;max-width:min(900px,calc(100vw - 24px))}`;
+html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:flex-start;max-width:min(900px,calc(100vw - 24px))}
+@media (max-width:760px){html.god-game #powerBar{max-width:calc(100vw - 24px);flex-wrap:nowrap;overflow-x:auto;bottom:150px}html.god-game #tfPickBar{bottom:222px}#tfPickBar .godPanel{max-height:40vh;min-width:0}}`;
     document.head.appendChild(css);
   }
   const hooks = { urgent, work, options };
