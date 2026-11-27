@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gpu-checks.sh <log dir> <steps...>: run ON the rented box (no tunnel to drop). Steps are kind:model (probe, living, adventure, turnsg, turnsf, when, live12, godoff, godon, godauto, sweephigh, roleshigh, wg). Results in tools/browser-test/results; logs and peaks.txt in <log dir>. A fresh Chrome before each step, graphics memory sampled each second (peak per step).
+# gpu-checks.sh <log dir> <steps...>: run ON the rented box (no tunnel to drop). Steps are kind:model (probe, living, adventure, turnsg, turnsf, when, live12, godoff, godon, godauto, sweephigh, roleshigh, wg, god: god-village at guided for 10 game hours with god-player.mjs beside live-eval). Results in tools/browser-test/results; logs and peaks.txt in <log dir>. A fresh Chrome before each step, graphics memory sampled each second (peak per step).
 L=$1; shift; mkdir -p "$L"; cd /root/tablefolk/tools/browser-test
 command -v npm >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq nodejs npm >/dev/null 2>&1; }
 [ -d node_modules/playwright-core ] || npm install playwright-core >/dev/null 2>&1
@@ -28,6 +28,7 @@ for s in "$@"; do
     deciderrun) step deciderrun 600 node decider-run.mjs "engine=embeddings" --timeout=500 ;;
     sweephigh) step sweephigh-$m 1500 node llm-sweep.mjs --model=$m --gfx=high --scenario=scenarios/hearthvale.json --sizes=2000,8000,${SWEEPMAX:-15000} --limit=300 ;;
     roleshigh) step roleshigh-$m 900 node agenttest.mjs evals/roles.json evals/roles.txt 1 --base=http://localhost:8000 --model=$m --render=high --size=1280x720 ;;
+    god) step god-$m 2700 bash -c "node live-eval.mjs scenarios/god-village.json --minutes=13 --autonomy=guided --model=$m --query=dayMinutes=24 --label=$m-god > $L/god-live-$m.log 2>&1 & node god-player.mjs --hours=10 --label=$m; wait" ;;
     wg) step wg-$m 1900 node _wg-run.mjs $m oneanswer ;;
   esac
 done
