@@ -1,13 +1,13 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127b';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127d';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261127b';
+import { installDevConsole } from './dev-console.js?v=20261127c';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
 import { hasLfm3Cached } from './lfm3-engine.js?v=20261030d';
 import { describeHardware, usableGB, setCardMemory } from '../../libs/device/index.js';
-import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261018a';
+import { clearModelCache as clearWllamaCache, hasModelCached as hasWllamaCached } from './model-loader-wllama.js?v=20261127a';
 import { clearModelCache as clearWllama3Cache, hasModelCached as hasWllama3Cached } from '../../libs/brain/engines/wllama.js';
 import { setMirror, mirrorAllowed, on as onLibNote } from '../../libs/models/index.js';
 

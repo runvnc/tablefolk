@@ -1,16 +1,16 @@
-import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from './model-loader.js?v=20261018a';
+import { loadModel as loadModelWebLLM, getCapabilityInfo as getCapWebLLM } from './model-loader.js?v=20261127a';
 import { generate as generateWebLLM } from './gpt-runner.js?v=20261018a';
 import { loadModel as loadModelTJS, getCapabilityInfo as getCapTJS } from './model-loader-tjs-v2.js?v=20261030g';
 import { generate as generateTJS, createTJSEngine } from './gpt-runner-tjs.js?v=20261030d';
 import { loadModel as loadModelLiteRT, getCapabilityInfo as getCapLiteRT } from '../../libs/brain/engines/litert.js';
 import { generate as generateLiteRT, createLiteRTEngine, clearLiteRTConversations } from '../../libs/brain/engines/litert-runner.js';
-import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261018a';
+import { loadModel as loadModelWllama, getCapabilityInfo as getCapWllama } from './model-loader-wllama.js?v=20261127a';
 import { generate as generateWllama, createWllamaEngine } from './gpt-runner-wllama.js?v=20261018a';
 import { loadModel as loadModelWllama3, getCapabilityInfo as getCapWllama3 } from '../../libs/brain/engines/wllama.js';
 import { generate as generateWllama3, createWllama3Engine } from '../../libs/brain/engines/wllama-runner.js';
 import { OpenAI, collect } from '../../libs/brain/engines/openai.js';
 import { getBuiltInResponseFormat, getGrammarInstruction, buildDynamicGrammar } from './grammar.js?v=20261018a';
-import { loadBonsai2, generateBonsai2 } from '../../libs/brain/engines/bonsai2.js';
+import { loadBonsai2, generateBonsai2, contextFor as bonsaiContextFor, extraGBFor as bonsaiExtraGB } from '../../libs/brain/engines/bonsai2.js';
 import { loadLfm3, generateLfm3 } from './lfm3-engine.js?v=20261030d';
 import { detectHardware, recommendModel, noteBrainSpeed, usableGB, deferMeasuring, runDeferred } from '../../libs/device/index.js';
 // A first visit's GPU measurements (bandwidth, memory probe) do not run during the
@@ -156,6 +156,8 @@ async function generateEndpoint(engine, _prompt, opts = {}) {
   if (out.finish_reason === 'length' && opts.enableThinking) console.warn('[endpoint] thinking turn hit max_tokens', stat);
   return out.text;
 }
+// graphics memory a loaded model's larger window takes beyond its memGB (Bonsai: contextFor)
+const ctxExtraGB = {};
 const DEFAULT_MODEL = 'gemma4-e2b-litert';
 
 // Default model is Gemma 4 E2B. ?model=<key> picks any model, hidden ones
@@ -225,7 +227,14 @@ export function createAgentBrainManager(config = {}) {
       // a turn with one, 6.1 with two). Four on a 16 GB card ran it out of memory (an RTX
       // 4060 Ti, 15.9 GB). ?bonsaisessions=N still tries more.
       const hw = await detectHardware().catch(() => null);
-      engine = await loadBonsai2(status => onStatus(status), { size: SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B' });
+      // The window: 8192 (what every measurement used), more where the card has room beside the
+      // game (1.9 GB: hearthvale's peak 11.3 GB less the 9.4 alone) and a voice (2 GB), up to
+      // 16384 for character turns (their prompts are a few thousand tokens; the builder takes more)
+      const size = SUPPORTED_MODELS[currentModelKey]?.bonsaiSize || '27B', mem = SUPPORTED_MODELS[currentModelKey]?.memGB || 9.4;
+      const context = bonsaiContextFor((usableGB(hw) || 0) - mem - 1.9 - 2, size, { max: 16384 });
+      engine = await loadBonsai2(status => onStatus(status), { size, context });
+      ctxExtraGB[currentModelKey] = bonsaiExtraGB(engine.context || context, size);
+      window.tablefolkDiag?.note('brain', `Bonsai 2 window ${engine.context || context} tokens`);
       const sessions = engine.maxSessions || 1;
       window.tablefolkDiag?.note('brain', `Bonsai 2 keeps ${sessions} conversation cache${sessions > 1 ? 's' : ''} (${usableGB(hw) ?? '?'} GB usable)`);
       loaded = true;
@@ -417,7 +426,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB, readGB: cfg.readGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB != null ? +(cfg.memGB + (ctxExtraGB[key] || 0)).toFixed(2) : cfg.memGB, readGB: cfg.readGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

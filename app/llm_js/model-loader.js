@@ -17,7 +17,7 @@ const MODEL_VARIANTS = {
     vram: '1.2GB',
     model: '/minicpm5/webllm/resolve/main/',
     modelLib: '/minicpm5/webllm/minicpm5-q4f32_1-MLC-webgpu.wasm',
-    overrides: { context_window_size: 4096 },
+    overrides: { context_window_size: 8192 },   // MiniCPM5-1B (no picker entry uses WebLLM now)
   },
 };
 

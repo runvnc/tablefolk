@@ -87,7 +87,7 @@
     ['autonomy-profile.js?v=20261122a'],
     ['agency.js?v=20261122b'],
     ['speech-input.js?v=20261122a'],
-    ['worldgen-own.js?v=20261115a'],
+    ['worldgen-own.js?v=20261127a'],
     ['online-brain.js?v=20261112b'],
     ['menus.js?v=20261120a', 'module'],
     ['story.js?v=20261120c', 'module'],
@@ -100,7 +100,7 @@
     ['tabletop.js?v=20261025a'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261127c', 'module'],
+    ['llm_js/world-integration.js?v=20261127d', 'module'],
   ];
 
   function browserSummary() {

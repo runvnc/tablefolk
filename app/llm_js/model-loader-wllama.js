@@ -93,7 +93,7 @@ export async function loadModel(modelKey, onProgress) {
   try {
     wllama = new Wllama(CONFIG_PATHS, { allowOffline: false });
     await wllama.loadModelFromUrl(HF_BASE + cfg.file, {
-      n_ctx: 4096,
+      n_ctx: 8192,   // MiniCPM5-1B on the processor: its cache at 8k is small in system memory
       n_threads: wantThreads,
       progressCallback: ({ loaded, total }) => {
         const totalBytes = total || cfg.size;
@@ -113,7 +113,7 @@ export async function loadModel(modelKey, onProgress) {
     }
     currentModel = modelKey;
     loadedQuant = 'Q4_K_M';
-    loadedCtx = 4096;
+    loadedCtx = 8192;
     onProgress?.('MiniCPM5-1B ready (CPU / wllama)');
     return wllama;
   } catch (e) {

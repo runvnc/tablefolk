@@ -34,7 +34,22 @@ export const SIZES = {
 export const BONSAI2_FILE = SIZES['27B'].file;
 import { mirrorAllowed, local } from '../../models/index.js';
 const LOADED = '_bonsai2_loaded';   // the old flag (Bonsai 2 27B); per size: SIZES[size].flag, '1' cached from Hugging Face, 'r2' from the mirror
-const CONTEXT = 8192;   // tokens
+const CONTEXT = 8192;   // tokens: the window every measurement was made with (the least it gets)
+
+// The largest window that fits in `spareGB` of graphics memory beyond what the
+// model takes at CONTEXT (its memGB in agent-brain.js). GB per 1,024 tokens:
+// the 27B measured (9.3 GB at a 4096 window, 9.9 at 8192: 0.6 GB for 4,096
+// tokens; brains.md "Bonsai"); the 9B estimated from its shape (8 of its 32
+// layers keep a KV cache against 16 of the 27B's 64: half). Rounded down to a
+// multiple of 1,024, at least CONTEXT, at most `max`.
+const GB_PER_1K = { '27B': 0.15, '27B-v2': 0.15, '9B': 0.075 };
+export function contextFor(spareGB, size = '27B', { max = 32768, min = CONTEXT } = {}) {
+  const per = GB_PER_1K[size] || GB_PER_1K['27B'];
+  const extra = Number.isFinite(+spareGB) && spareGB > 0 ? Math.floor(spareGB / per) * 1024 : 0;
+  return Math.max(min, Math.min(max, CONTEXT + extra));
+}
+// graphics memory a window takes beyond CONTEXT's (what agent-brain adds to memGB)
+export const extraGBFor = (context, size = '27B') => Math.max(0, (context - CONTEXT) / 1024) * (GB_PER_1K[size] || GB_PER_1K['27B']);
 
 let modulePromise = null;
 export function bonsai2Module() {
@@ -83,9 +98,10 @@ const pageContext = () => {
   let v = null;
   try { v = new URLSearchParams(globalThis.location?.search || '').get('bonsaictx') || globalThis.localStorage?.getItem('tablefolk_bonsai2_context'); } catch {}
   const n = Math.round(Number(v));
-  return n >= 1024 && n <= 32768 ? n : null;
+  return n >= 1024 && n <= 131072 ? n : null;
 };
-export async function loadBonsai2(onStatus = () => {}, { context = pageContext() ?? CONTEXT, size = '27B', sessions = pageSessions() ?? 1 } = {}) {
+export async function loadBonsai2(onStatus = () => {}, { context = CONTEXT, size = '27B', sessions = pageSessions() ?? 1 } = {}) {
+  context = pageContext() ?? context;   // ?bonsaictx= wins over the caller's choice
   patchMirrorHead();
   const S = SIZES[size] || SIZES['27B'], key = S.flag;
   const E = await bonsai2Module();
@@ -116,7 +132,7 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
   // 2,000-token prompt on an RTX 4070). Each extra one holds a KV cache of the
   // window (about 0.6 GB at 8192).
   const first = model.create_session();
-  return { model, size, session: first, pool: new Map([['', first]]), maxSessions: Math.max(1, Math.min(6, sessions | 0)), queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
+  return { model, size, context, session: first, pool: new Map([['', first]]), maxSessions: Math.max(1, Math.min(6, sessions | 0)), queue: Promise.resolve(), unload() { try { model.dispose?.(); } catch {} } };
 }
 
 // The answer without its reasoning. When the reasoning comes inline (the

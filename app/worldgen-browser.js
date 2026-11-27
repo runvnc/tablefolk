@@ -71,8 +71,13 @@
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
     if (/^bonsai2-/.test(key)) {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
-      const b = await import(BONSAI2), engine = await b.loadBonsai2(status, { size: { 'bonsai2-9b': '9B', 'bonsai2-27b-v2': '27B-v2' }[key] || '27B', ...(context ? { context } : {}) });
-      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, enableThinking: !!opts.enableThinking, onToken }), clear: () => {}, context: context || 8192 };
+      const b = await import(BONSAI2), size = { 'bonsai2-9b': '9B', 'bonsai2-27b-v2': '27B-v2' }[key] || '27B';
+      // the builder's window: as large as the card holds beside the model (no game is drawn
+      // on this page; 0.8 GB kept free), up to 32768, never less than the caller asked for
+      let ctx = context || 0;
+      try { const dev = await import('/libs/device/index.js'), hw = await dev.detectHardware(); ctx = Math.max(ctx, b.contextFor((dev.usableGB(hw) || 0) - (size === '9B' ? 3.4 : 9.4) - .8, size, { max: 32768 })); } catch {}
+      const engine = await b.loadBonsai2(status, { size, ...(ctx ? { context: ctx } : {}) });
+      L = { generate: (messages, opts, onToken) => b.generateBonsai2(engine, '', { messages, maxTokens: opts.maxTokens || 2048, temperature: opts.temperature, enableThinking: !!opts.enableThinking, onToken }), clear: () => {}, context: engine.context || ctx || 8192, engine, bonsai: b };
     } else {
       const mod = await import(LOADER);
       const has = await mod.hasModelCached?.(key).catch(() => null);
@@ -503,7 +508,7 @@
   // server's model and "your own key" get: POST /api/worldgen/messages) and writes
   // the whole scenario JSON at once; the server checks it (POST /api/finish) and its
   // problems go back to the model, at most twice. For capable in-browser models
-  // (Bonsai 2 27B, loaded with a 12288-token window for this); ?oneanswer=1.
+  // (Bonsai 2 27B, loaded with at least a 12288-token window for this, more where the card has room); ?oneanswer=1.
   async function runOne(prompt, mode, emit) {
     const t0 = Date.now();
     try {
@@ -515,7 +520,9 @@
         const agentId = 'worldgen-one-' + round + '-' + Date.now();
         emit('progress', { stage: round ? 'repairing' : 'writing', label: round ? 'fixing the problems the checks found…' : 'writing the whole world…', chars: 0 });
         let last = 0;
-        const text = await L.generate(messages, { agentId, temperature: spec.temperature ?? 0.7, maxTokens: THINK ? 10240 : 4096, ...(THINK ? { enableThinking: true } : {}) }, t => {
+        // the answer may use what the window leaves after the prompt (about 3.2 characters a token)
+        const room = L.context ? L.context - Math.ceil(messages.reduce((n, m) => n + String(m.content).length, 0) / 3.2) - 256 : 0;
+        const text = await L.generate(messages, { agentId, temperature: spec.temperature ?? 0.7, maxTokens: Math.max(THINK ? 10240 : 4096, room), ...(THINK ? { enableThinking: true } : {}) }, t => {
           if (t.length - last > 120) { last = t.length; emit('progress', { stage: round ? 'repairing' : 'writing', chars: t.length, preview: t.slice(-200) }); }
         });
         L.clear(agentId);

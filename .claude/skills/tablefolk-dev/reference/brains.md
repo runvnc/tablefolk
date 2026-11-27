@@ -249,6 +249,32 @@ across hosts and written with an OPFS sync access handle (`createWritable`
 capped at 34 MB/s) to a `.part` file, renamed when complete; a stall
 watchdog resumes. Keep all four hostnames attached to the bucket.
 
+## Context windows and answer limits (audit 2026-11-27)
+
+Rule: no small window or answer cap where memory does not need it. A window
+costs graphics memory only where the engine allocates its KV cache up front
+(Bonsai, wllama, LiteRT-LM); endpoints get what their server reports.
+
+| where | limits | before | after | why |
+|---|---|---|---|---|
+| `bonsai2.js` `loadBonsai2` (characters, `agent-brain.js`) | window | 8192 | 8192, up to 16384 where the card has room beside the game (1.9 GB) and a voice (2 GB): `contextFor(usable - memGB - 3.9)` | 0.15 GB per 1,024 tokens (27B measured: 9.3 GB at 4096, 9.9 at 8192); the 9B 0.075 (estimated: half the KV layers). `memGB` in `getSupportedModels` grows by the extra (`extraGBFor`) so the voice sees less room |
+| `worldgen-browser.js` Bonsai (world builder) | window | 8192 (step by step), 12288 (one answer) | up to 32768: `contextFor(usable - memGB - 0.8)`, at least what the run asks (12288 for one answer); 16 GB card: 32768 (about 13 GB), 12 GB: 19456 (about 11.1 GB) | no game drawn on the builder page; computed, not measured beyond 8192 |
+| `worldgen-browser.js` runOne | answer | 4096 (10240 thinking) | what the window leaves after the prompt (at least the old values) | a whole world's JSON is 5-10k tokens |
+| `bonsai2.js` `?bonsaictx=` | override range | 1024-32768 | 1024-131072, and it now wins over the caller | |
+| `wllama.js` default `n_ctx` (`cfg.ctx` unset: MiniCPM5 GGUF, Qwen2.5 0.5B) | window | 4096 | 8192; `?wctx=N` overrides | small models: 8k of cache is well under 0.3 GB |
+| `wllama.js` Qwen1.5 0.5B | window | 4096 (default) | 4096, now explicit | no grouped KV heads: 96 KB a token (0.8 GB at 8192 against its 1 GB) |
+| `wllama.js` Inkling 2 Mini, SenseNova, Raon GGUFs | window | 8192 | 8192 (`?wctx=` to try more) | the measured memory (fitGB/memGB) is at 8192; llama.cpp shares it between 4 slots |
+| `model-loader-wllama.js` MiniCPM5-1B on the processor | window | 4096 | 8192 | system memory, small |
+| `model-loader.js` WebLLM MiniCPM5 | window | 4096 | 8192 | no picker entry uses WebLLM now |
+| `litert-worker.js` Gemma 4 (E2B/E4B/12B, web bundles) | window | 8192 | 8192 (unchanged) | `maxNumTokens` sizes the engine's KV cache; not measured beyond 8192 on these bundles: measure before raising |
+| `litert-worker.js` Raon-1 nano | window | 4096 | 4096 (unchanged) | the bundle's KV caches are built for 4,096 |
+| `lfm3-engine.js` (hidden) | window | 8192 | 8192 (unchanged) | |
+| `worldgen-own.js` (your own key: OpenRouter or a server) | context | assumed | `modelInfo()`: OpenRouter's models list (`context_length`, `top_provider.max_completion_tokens`, `supported_parameters` for tools), llama-server `/props` (`n_ctx`, `chat_template_caps`), else `/models` (`context_length`, `max_model_len`, `max_context_length`, `meta.n_ctx_train`); the setting `context` overrides; else 32768 | |
+| `worldgen-own.js` new world / change | answer | 17000 / `reviseRequest`'s 17000-24000 | the window less the prompt, within the model's own maximum; on OpenRouter's 402 ("fewer max_tokens", a key with little credit) again with the old size | |
+| `worldgen-own.js` review round | answer | 6000 | as above | reasoning models think inside it |
+| `server/generate.js`, `worldgen-core.js` (the server's own model) | answer | 17000, 17000-24000, 6000 | unchanged | the owner's configured endpoint; these are also the fallbacks above |
+| character turns (`agent-brain.js` 256, simple 70, thinking 512/1536/4096; vision 160; mind/jobs 80-120; menus 6) | answer | | unchanged | the shape of a turn (one command line), not memory; the endpoint's window is the server's |
+
 ## A character's turn
 
 `world-integration.js` `runAgentTurn(g)` (one decision at a time, behind a

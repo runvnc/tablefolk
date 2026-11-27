@@ -143,6 +143,9 @@ const MODEL_CONFIG = {
     size: 395 * 1024 * 1024,
     gpuLayers: 99,
     template: 'chatml',
+    // no grouped KV heads: 96 KB of cache a token (0.4 GB at 4096, 0.8 at 8192) against
+    // the 1 GB it is listed at; its simple-mode prompts are short
+    ctx: 4096,
   },
   'qwen2.5-0.5b-q2': {
     label: 'Qwen2.5 0.5B (WebGPU, GGUF Q2_K)',
@@ -261,7 +264,9 @@ export async function loadModel(modelKey, onProgress) {
       ...(cfg.loadOpts || {}),
       ...(q().get('wpar') ? { n_parallel: +q().get('wpar') } : {}),   // ?wpar=N: llama.cpp server slots (wllama 4 default 4)
       ...(q().get('wckpt') ? { n_ctx_checkpoints: +q().get('wckpt') } : {}),   // ?wckpt=N: checkpoints a slot
-      n_ctx: cfg.ctx || 4096,
+      // the window: the model's own (cfg.ctx), else 8192 (the small models here hold 8k in well
+      // under 0.3 GB); ?wctx=N tries another (llama.cpp shares it between its slots)
+      n_ctx: +q().get('wctx') || cfg.ctx || 8192,
       n_gpu_layers: layers,
       // ?threads=1 forces the single-threaded build. Emscripten's WebGPU and
       // pthreads do not always coexist (WebGPU objects cannot be shared across

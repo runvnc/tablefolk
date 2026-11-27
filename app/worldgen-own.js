@@ -6,7 +6,9 @@
  * the same checks, one repair round with its problems).
  *
  *   window.tfOwnModel = {
- *     get(), set(cfg)          { provider: 'openrouter'|'custom', baseURL, apiKey, model, useForPlay }
+ *     get(), set(cfg)          { provider: 'openrouter'|'custom', baseURL, apiKey, model, useForPlay, context }
+ *     modelInfo(cfg?)          { context, maxOutput, tools, source }: what the provider reports (answers get
+ *                              what the window leaves, within the model's limit; 32768 when nothing says)
  *                              (this browser's localStorage, 'tablefolk_own_model')
  *     signIn()                 OpenRouter's sign-in (OAuth PKCE): back here with a key of your own
  *     finishSignIn()           on return (?code=...): trades the code for the key; true when it did
@@ -29,11 +31,11 @@
   function get() {
     let c = {}; try { c = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
     const provider = c.provider === 'custom' ? 'custom' : 'openrouter';
-    return { provider, baseURL: provider === 'openrouter' ? OPENROUTER : String(c.baseURL || ''), apiKey: String(c.apiKey || ''), model: String(c.model || ''), useForPlay: !!c.useForPlay };
+    return { provider, baseURL: provider === 'openrouter' ? OPENROUTER : String(c.baseURL || ''), apiKey: String(c.apiKey || ''), model: String(c.model || ''), useForPlay: !!c.useForPlay, context: +c.context > 0 ? +c.context : null };
   }
   function set(cfg) {
     const c = { ...get(), ...cfg };
-    try { localStorage.setItem(KEY, JSON.stringify({ provider: c.provider, baseURL: c.provider === 'custom' ? c.baseURL : '', apiKey: c.apiKey, model: c.model, useForPlay: !!c.useForPlay })); } catch {}
+    try { localStorage.setItem(KEY, JSON.stringify({ provider: c.provider, baseURL: c.provider === 'custom' ? c.baseURL : '', apiKey: c.apiKey, model: c.model, useForPlay: !!c.useForPlay, context: +c.context > 0 ? +c.context : null })); } catch {}
     if (c.useForPlay && (c.apiKey || c.provider === 'custom')) {
       try {
         localStorage.setItem('tablefolk_llm_endpoint', JSON.stringify({ baseURL: c.baseURL, apiKey: c.apiKey, model: c.provider === 'openrouter' ? PLAY_MODEL : c.model }));
@@ -92,6 +94,57 @@
     }
     throw new Error('the JSON object is incomplete (reply cut off?)');
   }
+  // ---- what the provider says about the model: its window, its longest answer, tools ----
+  // OpenRouter: its public models list (context_length, top_provider.max_completion_tokens,
+  // supported_parameters). Another server: llama-server's /props (n_ctx, chat_template_caps),
+  // else its /models (context_length, vLLM's max_model_len, LM Studio's max_context_length,
+  // llama-server's meta.n_ctx_train). The setting "context" overrides; else 32768.
+  const infoCache = {};
+  async function modelInfo(cfg = get()) {
+    const k = [cfg.provider, cfg.baseURL, cfg.model, cfg.context].join('|');
+    if (infoCache[k]) return infoCache[k];
+    const info = { context: null, maxOutput: null, tools: null, source: '' };
+    const getJSON = (url, h = {}) => fetch(url, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (cfg.provider === 'openrouter' && cfg.model) {
+      const d = await getJSON(OPENROUTER + '/models');
+      const m = (d?.data || []).find(x => x.id === cfg.model || x.canonical_slug === cfg.model);
+      if (m) { info.context = m.context_length || m.top_provider?.context_length || null; info.maxOutput = m.top_provider?.max_completion_tokens || null; info.tools = (m.supported_parameters || []).includes('tools'); info.source = 'OpenRouter'; }
+    } else if (/^https?:/.test(cfg.baseURL)) {
+      const h = cfg.apiKey ? { Authorization: 'Bearer ' + cfg.apiKey } : {};
+      const p = await getJSON(cfg.baseURL.replace(/\/v1\/?$/, '') + '/props', h);
+      if (p) {
+        info.context = p.default_generation_settings?.n_ctx || p.n_ctx || null;
+        const caps = p.chat_template_caps;
+        info.tools = caps ? !!(caps.supports_tools ?? caps.supports_tool_calls) : typeof p.chat_template === 'string' ? /tool/.test(p.chat_template) : null;
+        info.source = 'the server (/props)';
+      }
+      if (!info.context) {
+        const d = await getJSON(cfg.baseURL + '/models', h), list = d?.data || [];
+        const m = list.find(x => x.id === cfg.model) || list[0];
+        const c = m && (m.context_length || m.max_model_len || m.max_context_length || m.meta?.n_ctx || m.meta?.n_ctx_train);
+        if (c) { info.context = +c; info.source = 'the server (/models)'; }
+      }
+    }
+    if (+cfg.context > 0) { info.context = +cfg.context; info.source = 'your setting'; }
+    if (!info.context) { info.context = 32768; info.source = 'the default (not reported by the server)'; }
+    return infoCache[k] = info;
+  }
+  // the longest answer: what the window leaves after the prompt (about 3.5 characters a
+  // token), within the model's own limit; never less than 2048
+  const promptTokens = messages => Math.ceil(JSON.stringify(messages).length / 3.5);
+  function outCap(info, messages) {
+    const room = Math.max(2048, info.context - promptTokens(messages) - 512);
+    return info.maxOutput ? Math.min(info.maxOutput, room) : room;
+  }
+  // a request; when OpenRouter refuses the size (a key with little credit is checked
+  // against max_tokens: 402 "fewer max_tokens"), again with the old fixed size
+  async function create(client, body, fallback) {
+    try { return await client.chat.completions.create(body); }
+    catch (e) {
+      if (fallback && body.max_tokens > fallback && (e?.status === 402 || /max_tokens|fewer/i.test(String(e?.message)))) return client.chat.completions.create({ ...body, max_tokens: fallback });
+      throw e;
+    }
+  }
   async function runWith(body, label, emit) {
     const cfg = get(), t0 = Date.now();
     try {
@@ -102,13 +155,13 @@
       const client = new OpenAI({ baseURL: cfg.baseURL, apiKey: cfg.apiKey, timeout: 600000,
         defaultHeaders: cfg.provider === 'openrouter' ? { 'HTTP-Referer': location.origin, 'X-Title': 'Tablefolk' } : {} });
       const spec = await post('/api/worldgen/messages', body);
-      const messages = spec.messages;
+      const messages = spec.messages, info = await modelInfo(cfg);
       for (let round = 0; round < 2; round++) {
         emit('progress', { stage: round ? 'repairing' : 'waiting', model: cfg.model });
         let last = 0, lastT = -1, chars = 0;
         let out;
         try {
-          out = await collect(await client.chat.completions.create({ model: cfg.model, messages, stream: true, temperature: spec.temperature ?? 0.7, max_tokens: spec.maxTokens || 17000 }), text => {
+          out = await collect(await create(client, { model: cfg.model, messages, stream: true, temperature: spec.temperature ?? 0.7, max_tokens: outCap(info, messages) }, spec.maxTokens || 17000), text => {
             chars = text.length;
             if (chars - last > 120) { last = chars; emit('progress', { stage: round ? 'repairing' : 'writing', chars, preview: text.slice(-160) }); }
           }, (thought, tail) => {
@@ -143,7 +196,7 @@
       const m = spec.messages, last = m[m.length - 1];
       if (withImage) last.content = [{ type: 'text', text: last.content }, { type: 'image_url', image_url: { url: image } }];
       let chars = 0;
-      const out = await collect(await client.chat.completions.create({ model: cfg.model, messages: m, stream: true, temperature: spec.temperature ?? 0.4, max_tokens: spec.maxTokens || 6000 }),
+      const out = await collect(await create(client, { model: cfg.model, messages: m, stream: true, temperature: spec.temperature ?? 0.4, max_tokens: outCap(await modelInfo(cfg), m) }, spec.maxTokens || 6000),
         t => { if (t.length - chars > 200) { chars = t.length; say(`reviewing… ${chars} characters`); } }, () => say('thinking…'));
       return out.text;
     };
@@ -155,5 +208,5 @@
   const run = (prompt, mode, emit) => runWith({ prompt, mode }, prompt, emit);
   const revise = (scenario, request, emit) => runWith({ scenario, request }, 'change: ' + request, emit);
 
-  window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, critique, parseJSON, PLAY_MODEL };
+  window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, critique, parseJSON, modelInfo, PLAY_MODEL };
 })();
