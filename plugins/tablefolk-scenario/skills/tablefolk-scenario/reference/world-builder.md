@@ -42,7 +42,7 @@ double-height.
 
 - *in this browser*: Gemma 4 E4B (about 3 GB), E2B (2 GB, quicker, simpler
   worlds), Bonsai 2 9B (1.9 GB, fast, a 6 GB+ graphics card), Gemma 4 12B
-  (5.6 GB) or Bonsai 2 27B (6 GB, the smartest; both 10 GB+ cards),
+  (5.6 GB) or Bonsai 2.5 27B (6 GB, the smartest; both 10 GB+ cards),
   downloaded the first time and kept (the game uses the same copy). **How**:
   *step by step* (the default, for every model) or *whole world at once*
   (`?oneanswer=1`: the generator's whole guide in one prompt and the world as

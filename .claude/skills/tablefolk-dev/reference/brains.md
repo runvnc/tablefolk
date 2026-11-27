@@ -43,19 +43,21 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
     `model.generate` call failed in GroupQueryAttention). Tested in the app
     on the RTX 2060: answers in character. **Hidden** since 2026-10-30:
     Bonsai 2 27B took its place in the picker.
-- **Bonsai 2 27B** (`bonsai2-27b`, engine `bonsai2`, `libs/brain/engines/bonsai2.js`):
-  `prism-ml/Ternary-Bonsai-2-27B-gguf`, the 5.95 GB `PTQ1_0` file, on the
-  webml-community WebGPU kernel engine. That engine exists only inside its
-  demo page (Space `webml-community/ternary-bonsai-2-webgpu-kernels`), so the
-  page is fetched at a pinned revision, its second module script cut at the
-  `export{... as TernaryBonsai2 ...}` statement and imported from a blob URL
-  (xen0bit/smolbox does the same at build time); nothing of it is in the
-  repo. API: `TernaryBonsai2.load(null, { file, maxLength, chatTemplateArgs:
-  { enable_thinking: false }, onProgress })`, then `for await (const c of
-  model.generate(messages, { maxNewTokens }))` (`c.delta`); turns are
-  queued (one cache). Weights stream from Hugging Face into IndexedDB; a
-  localStorage flag marks a finished load. Not run on the maintainer's 6 GB
-  card; untested in the app with real weights.
+- **Bonsai 2.5 27B** (`bonsai2-27b`, engine `bonsai2`, `libs/brain/engines/bonsai2.js`;
+  Bonsai 2 27B until 2026-11-27, same id so saved choices and scenarios follow):
+  `prism-ml/Ternary-Bonsai-2.5-27B-GGUF` at revision `28a7093c`, the 5.99 GB
+  `PTQ1_0` file, on webml-community's WebGPU kernel engine (the `qwen35-vision`
+  module of the Space `webml-community/ternary-bonsai-2-hermes-webgpu`, fetched
+  at a pinned revision and imported from a blob URL; nothing of it is in the
+  repo). `SIZES` in bonsai2.js: `27B` (2.5), `27B-v2` (Bonsai 2 27B,
+  `Ternary-Bonsai-2-27B-gguf` at `839bd570`, from the R2 mirror; hidden picker
+  entry `bonsai2-27b-v2`), `9B` (Bonsai 2 9B, unpinned: a pin changes the URL
+  and so the engine's cache key). Each size has its own localStorage flag for a
+  finished load (`_bonsai25_loaded`, `_bonsai2_loaded`, `_bonsai2_loaded_9B`),
+  so a cached Bonsai 2 does not pass for 2.5; after 2.5 loads, the engine's
+  IndexedDB (`gguf-cache-v1`) entry for the Bonsai 2 27B file is deleted
+  (`dropCached`). Weights stream into IndexedDB; turns are queued (one
+  cache). Measurements: "Bonsai 2.5 27B" below.
 - **Sampling** (`libs/brain/sampling.js`, 2026-10-30): a model with makers' recommended
   settings is always run with them, and a character's chaos counts from
   them (`withChaos`, 2026-11-06: 0 and 1 unchanged, then temperature, top-p and top-k open up on a curve): Gemma 4 temperature 1.0, top-p 0.95, top-k 64; MiniCPM5 1.0,
