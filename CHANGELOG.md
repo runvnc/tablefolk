@@ -7,6 +7,7 @@ skill (internals); `git log` has every commit.
 ## 2026-11-27
 
 - **A modular building kit, tried outside the game**: houses assembled from the map's own walls and doors (real wall panels, timber frames, roofs per room) with small detailed doors, windows, chimneys, dormers, signs and stairs made by Tripo; four test houses rendered beside the current inn and checked in the browser. Not wired into the game yet (`tools/kit/`, `work/kit/NOTES.md`).
+- **Bonsai 2.5 27B replaces Bonsai 2 27B**: Prism ML's new 27B (released 2026-11-24, built for tool use and agents) is now the big brain in the menu and the one picked for 10 GB+ graphics cards; a saved choice of Bonsai 2 27B moves to it. Same size (6 GB download), same speed and graphics memory; in the tests it passed all 36 conversation checks (Bonsai 2: 35) and ran hearthvale's day as well, with everyone fed. Players who had Bonsai 2 27B download the new one once, and the old copy is removed from the browser's storage. Bonsai 2 27B stays reachable for comparison as `?model=bonsai2-27b-v2`. The 9B is unchanged (Prism made no 2.5 of it).
 
 ## 2026-11-23
 

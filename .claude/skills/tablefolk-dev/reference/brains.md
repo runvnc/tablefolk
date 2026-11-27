@@ -1845,3 +1845,69 @@ node judge.mjs results/live-free-*.json        # OpenRouter, JUDGE_BUDGET 2 doll
 Read beside hearthvale: model calls a game hour per character, self-started
 interactions per pair, notes rewritten with plan(), hungry at the end, and
 the judge's purposefulness and surprise against the same brain at guided.
+
+## Bonsai 2.5 27B (2026-11-27)
+
+**What Prism ML released (2026-11-24)**: `prism-ml/Ternary-Bonsai-2.5-27B-GGUF`
+(revision `28a7093c`; also `Ternary-Bonsai-2.5-27B-mlx-2bit`), "the agentic
+release of the Ternary Bonsai 27B line". Only a 27B: the 2B/4B/9B stay
+Bonsai 2 (`Ternary-Bonsai-2-9B-gguf`, last changed 2026-11-04). Same
+Qwen3.8-27B hybrid architecture (64 blocks, 3 linear : 1 full attention), same
+ternary g128 format in the same Hadamard basis, 1.76 bits a weight. Files:
+`PTQ1_0` 5.99 GB (ours), `PQ2_0` 7.25, `Q2_0` 7.67 (stock llama.cpp from
+b11556), each also as `-mtp.gguf` with a multi-token-prediction draft head
+(+0.24 GB, inert unless a runtime drafts; our engine does not), and the
+`mmproj` vision files. Vendor claims (thinking at reasoning effort `xhigh`):
+tool calling at FP16 level (5-benchmark mean 77.2 vs 77.7; Bonsai 2 67.0,
+AppWorld 51.2 -> 90.5), agentic coding 90% of FP16 (SWE-bench Verified 60.8
+-> 75.6, DeepSWE 0 -> 27), general capability 82.1 vs 81.6 (instruction
+following down 82.6 -> 80.9), and 2.3-3x faster decode on NVIDIA in their
+llama.cpp fork (MTP plus new CUDA kernels: nothing that reaches WebGPU).
+Recommended sampling unchanged (instruct: 0.7 / 0.8 / top-k 20, presence
+1.5; thinking 1.0 / 0.95 / 20). Reasoning efforts `xhigh` (default) or
+`medium`. Sources: the model card, `PrismML-Eng/Bonsai-demo` (README,
+MODEL-FORMATS.md, `bonsai-2-5-27b-whitepaper.pdf`). Not on OpenRouter yet
+(only `prism-ml/ternary-bonsai-2-27b` and `-2-9b`), so the endpoint presets
+stay on Bonsai 2; no new webml-community Space.
+
+**The file against Bonsai 2's** (both GGUF headers read by range requests,
+`Ternary-Bonsai-2-27B-gguf` revision `839bd570`): the same 851 tensors, the
+same tokenizer (248,320 tokens), byte-identical chat template, identical
+Hadamard metadata (block 1024, the same 28,672 signs) and RoPE sections; new
+weights; the only format change is the 96 small `ssm_alpha`/`ssm_beta`
+tensors, BF16 -> F32 (the 47 MB difference). webml-community's engine loads
+F32, BF16 and F16 alike, so **it loads the new file unchanged**: only the
+repo, file and revision changed in bonsai2.js.
+
+**Measured** on one rented RTX 4080 16 GB (vast.ai, driver 595.99, Chrome
+158, the game at light graphics unless noted), old and new one after the
+other, a fresh Chrome for each:
+
+| | Bonsai 2 27B | Bonsai 2.5 27B |
+|---|---|---|
+| sanity (Paris, 17 x 23, 17 sheep with thinking, a goblin haggling, a 150-word story) | all right; its goblin called the customer a goblin | all right, in character |
+| first load (download + kernels) | 162 s (from R2) | 99 s (from Hugging Face, 66 s of it the download) |
+| load from the cache | not measured (each 2.5 load deleted it: 152-200 s from R2 each time); 35-38 s on a 4080 S (2026-11-22) | 40-46 s |
+| writing, the check's measure | 26.7 tokens/s | 26.3 tokens/s |
+| reading a prompt (llm-sweep: 1,000 / 2,000 / 4,000 tokens) | 6.4 / 12.2 / 25.7 s | 6.3 / 12.1 / 25.5 s |
+| graphics memory, model alone (8192 window) | 9.8-10.1 GB | 9.8-10.1 GB |
+| peak with the game (hearthvale's day) | 11.3 GB | 11.3 GB |
+| capability check v3 | 8/10 (missed steps, haggle) -> guided | 8/10 (missed sums, danger) -> guided, danger in code |
+| the 36 evals (run-evals, RUNS=2) | 35/36 (commission a dagger 1/2) | **36/36** |
+
+hearthvale's day at guided (12 real minutes, the player idle, one run each):
+
+| | Bonsai 2 27B | Bonsai 2.5 27B |
+|---|---|---|
+| model-chosen activities | 89% | 90% |
+| self-started interactions (pairs) | 19 (7) | 11 (4) |
+| plans / revised | 9 / 3 | 9 / 8 |
+| surprises | 23 | 22 |
+| reply depth | 0.36 | 0.20 |
+| wasted / safety nets | 7% / 10 | 6% / 9 |
+| ate / slept at night / hungry at the end | 7 / 7 / 1 | 8 / 7 / 1 |
+| sales between characters | 4 | 6 |
+| others indoors during the raid | 75% | 91% |
+| model calls (a game hour) | 94 (3.9) | 90 (3.7) |
+| a model turn, median | 13.8 s | 14.0 s |
+| judge: coherence / personality / purpose / surprise | 4.0 / 4.25 / 4.5 / 3.25 | 4.0 / 4.0 / 4.63 / 3.0 |
