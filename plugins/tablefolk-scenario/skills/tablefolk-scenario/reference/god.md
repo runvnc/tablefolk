@@ -143,7 +143,11 @@ done by code. With a brain and characters above rails (a scenario's or
 group's `"autonomy"`: the doubters are `"free"` in God of Ashford), prayers,
 speeches, omen readings and dream tellings are the characters' own words,
 and a council vote comes from what they said. Each such line is one short
-model call (`tablefolk-model-call` kind `god`).
+model call (`tablefolk-model-call` kind `god`). Measured with Gemma 4 E2B on
+an RTX 2060 (`tools/browser-test/god-words-eval.mjs`): prayers in 0.35-1 s,
+a council of five speeches in about 15 s of model time, and the votes read
+from the words matched what was said (a cautious "I will, but first..." as a
+bargain, a doubter's objection as no).
 
 ## For authors
 

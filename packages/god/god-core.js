@@ -127,7 +127,7 @@ export function parseDecree(text, ctx = {}) {
   }
   // work: build, raise, dig, clear, a wall, a fence, a statue (the plan language reads the rest)
   if (/\b(build|raise|erect|dig|clear|wall|fence|statue|tower|stockpile|farm)\b/.test(t) && !/\b(bring|offer)\b/.test(t)) {
-    const plan = raw.replace(/^(i (?:require|demand|want|command)|you (?:must|shall)|let them|they (?:must|shall))\s+/i, '').replace(/\s+(by|before|within|in)\s+.*$/i, '');
+    const plan = raw.replace(/^(i (?:require|demand|want|command)|you (?:must|shall)|let them|they (?:must|shall))\s+/i, '').replace(/\s+(by|before|within|in)\s+(.*)$/i, (m, w, rest) => parseWhen(w + ' ' + rest, now) != null || /\b(days?|hours?|moon|dawn|dusk|noon|evening|morning|tomorrow|tonight|week)\b/i.test(rest) ? '' : m);
     return { kind: 'work', plan, of, by, text: `${plan.replace(/^\w/, c => c.toUpperCase()).replace(/\.$/, '')}.` };
   }
   // worship: gather, pray, kneel, sing at the shrine

@@ -283,6 +283,16 @@ once).
 - `node tools/god-rules-test.mjs` (no browser): the God package's rules
   (`packages/god/god-core.js`): belief and sides, mana, prayers, powers,
   cruelty, omens, demands, the council's vote, decrees and deadlines.
+- `node tools/browser-test/god-words-eval.mjs` (a brain on :8000, never
+  downloads; `?autonomy=guided`): decree words read (code, then the menus'
+  matcher), prayers in the villagers' words, a council spoken by the model.
+  Gemma 4 E2B, RTX 2060, 2026-11-27: 8/8 decrees read as meant (6 by code, 2
+  by the matcher, 0.3-0.45 s); prayers 0.35-1.05 s each, in character; a
+  council of 5 model calls (39 s with 25 s waiting for a paused village to
+  gather): 3 for, 1 bargain ("I will take this duty, but I will seek guidance
+  first"), 1 against (finn: "I don't think a sheep would be the proper
+  sacrifice"), accepted, finn refused. A first run showed stage directions
+  ("(Ada takes a slow, deep breath...)"): brackets and asterisks are stripped.
 - `node tools/browser-test/plan-words-eval.mjs` (a brain on :8000, never
   downloads): words to plans with the loaded brain against code alone.
   Gemma 4 E2B, RTX 2060, 2026-11-27: 11/12 resolve (code alone 8/12),

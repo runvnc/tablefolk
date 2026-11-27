@@ -319,7 +319,8 @@ export default function (api) {
     try {
       W.dispatchEvent(new CustomEvent('tablefolk-model-call', { detail: { agentId: g.id, kind: 'god' } }));
       const out = await W.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: max, temperature: .7, agentId: g.id, thinking: false });
-      let t = String(out?.choices?.[0]?.message?.content || '').split('\n').map(s => s.trim()).filter(Boolean)[0] || '';
+      // (stage directions in brackets or asterisks go: a small model likes to narrate before it speaks)
+      let t = String(out?.choices?.[0]?.message?.content || '').replace(/\([^)]*\)|\*[^*]*\*/g, ' ').replace(/[(*][^)*]*$/, ' ').split('\n').map(s => s.trim()).filter(Boolean)[0] || '';
       t = t.replace(/^(\w+\s*:|say\(|")+/i, '').replace(/["')]+\s*$/, '').replace(/^["“]|["”]$/g, '').trim();
       return t.length > 3 ? t.slice(0, 200) : null;
     } catch (e) { console.warn('[god] brain', e); return null; }
@@ -772,7 +773,7 @@ html.god-game #tfPickBar{left:12px;transform:none;bottom:146px;justify-content:f
   W.tablefolkJobs?.addUrgent?.(hooks.urgent); W.tablefolkJobs?.addWork?.(hooks.work, true); W.tablefolkAgency?.addOptions?.(hooks.options);
   (W.tablefolkSaveHooks ||= {}).god = { save: () => ({ g: G.data(), sick: [...sick], drought: droughtUntil, dreams: [...dreams] }), restore: x => { if (!x) return; G.load(x.g); sick.clear(); for (const [id, v] of x.sick || []) { sick.set(id, v); const g = byId(id); if (g) sickMotes(g, true); } droughtUntil = x.drought || 0; dreams.clear(); for (const [k, v] of x.dreams || []) dreams.set(k, v); sync([]); } };
   // what tests and other packages may read
-  W.tablefolkGod = { rules: G, decree, readDecree, council: () => councilNow, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil };
+  W.tablefolkGod = { rules: G, decree, readDecree, prayerWords, council: () => councilNow, sick: () => [...sick.keys()], makeSick, cure, crops, withered: () => blightCount(), showPanel, intents, prayTick, shrine, runPower, quarter, drought: () => droughtUntil };
 
   return {
     resources: {
