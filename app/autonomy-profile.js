@@ -17,7 +17,8 @@
  *
  *   tablefolkProfile.normalize(value) -> a preset name, an object of valid keys, or null
  *   tablefolkProfile.resolve([...sources]) -> { preset, free, domains, label }  (sources highest first; each a value as above, or null)
- *   tablefolkProfile.choose({ character, world, setting, auto }) -> the above + { source, capped?, kept? }:
+ *   tablefolkProfile.choose({ character, group, world, setting, auto }) -> the above + { source, capped?, kept? }:
+ *     (group: the character's group's request, between its own and the world's; source 'group')
  *     the whole rule with a brain too weak for a world's request (below; living.md, "How much characters decide")
  *   tablefolkProfile.describe(profile) -> "guided" | "guided (danger and needs in code)"
  * A classic script with no game globals (Node imports it for tools/browser-test/profile-test.mjs).
@@ -63,15 +64,17 @@
   //    request names them ("kept"); a level the player chose in Settings adds no such domains.
   //   choose({ character, world, setting: 'auto'|preset, auto: Auto's value })
   //     -> { ...resolve(), source: 'character'|'world'|'setting'|'auto', capped?: { asked, by: 'brain'|'setting' }, kept?: [domains] }
-  function choose({ character, world, setting, auto } = {}) {
-    const c = normalize(character), w = normalize(world), s = setting && setting !== 'auto' ? normalize(setting) : null;
+  // group: the character's group's "autonomy" (orders.js groups), between the character's own and the world's
+  function choose({ character, group, world, setting, auto } = {}) {
+    const c = normalize(character), gr = normalize(group), w = normalize(world), s = setting && setting !== 'auto' ? normalize(setting) : null;
     const base = s || normalize(auto) || 'rails', brain = resolve([base]);
-    if (!c && !w) return { ...brain, source: s ? 'setting' : 'auto' };
-    const source = c ? 'character' : 'world';
-    let p = resolve([c, w, base]);
+    if (!c && !gr && !w) return { ...brain, source: s ? 'setting' : 'auto' };
+    const source = c ? 'character' : gr ? 'group' : 'world';
+    let p = resolve([c, gr, w, base]);
     if (p.domains.activity === 'model' && brain.domains.activity === 'code') return { ...resolve(['rails']), source, capped: { asked: p.label, by: s ? 'setting' : 'brain' } };
     if (s) return { ...p, source };
-    const used = typeof c === 'string' || c?.preset ? [c] : [c, w];   // the requests resolve() read
+    const full = x => typeof x === 'string' || x?.preset;
+    const used = full(c) ? [c] : full(gr) ? [c, gr] : [c, gr, w];   // the requests resolve() read
     const named = d => used.some(x => x && typeof x === 'object' && x[d]);
     const kept = ['talk', 'danger', 'needs', 'temper'].filter(d => brain.domains[d] === 'code' && p.domains[d] === 'model' && !named(d));
     if (!kept.length) return { ...p, source };
