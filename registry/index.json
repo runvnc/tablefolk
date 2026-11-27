@@ -100,6 +100,17 @@
     },
     {
       "kind": "package",
+      "ref": "hearth-spirit",
+      "name": "Hearth Spirit",
+      "description": "A tiny example of the God-play extension points: two designation kinds (shrine ground in data, an offering spot in code), two powers (a golden rain on a place, a gift of bread to a character), one resource (favour) and one demand template (an offering at the shrine). Not a game: a proof that a God package can be pure content.",
+      "version": "1.0.0",
+      "code": true,
+      "has": [
+        "modules"
+      ]
+    },
+    {
+      "kind": "package",
       "ref": "nightwatch",
       "name": "Night Watch",
       "description": "A small game as a package: a signal beacon to keep burning through the night, a keeper's job, a woodpile that runs down, dire wolves that circle while the fire burns and close in when it dies, a signal() command that calls the militia, and the captain's briefing.",

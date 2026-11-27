@@ -12,7 +12,7 @@
   "generate": { "kind": "village", "buildings": 4, "places": ["temple", "garden", "tavern"], "seed": 7 },
   "packages": ["hearth-spirit"],
   "player": { "name": "Spirit", "gold": 0, "items": [], "model": "wizard" },
-  "allowed": ["say", "walk", "face", "look", "emote", "give", "eat", "carry", "drop", "use", "take", "put", "close", "inventory"],
+  "allowed": ["say", "walk", "face", "look", "emote", "give", "sell", "eat", "carry", "drop", "use", "take", "put", "close", "inventory"],
   "food": ["bread", "apple", "wheat"],
   "groups": {
     "faithful": { "name": "the faithful", "members": ["wren", "bram", "tilly"], "description": "those who keep the temple" }

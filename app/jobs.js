@@ -1315,7 +1315,7 @@
   const sleepHours = j => j?.sleep || (j?.watch === 'night' ? [9, 16] : [21, 5]);
   // what the world asks for before a worker's own steps (on rails, in its hours): fn(g, s, j) -> { ms } | null
   const WORK = [], URGENT = [];
-  const addWork = fn => { if (typeof fn === 'function' && !WORK.includes(fn)) WORK.push(fn); };
+  const addWork = (fn, first = false) => { if (typeof fn === 'function' && !WORK.includes(fn)) first ? WORK.unshift(fn) : WORK.push(fn); };
   // before anything else but its own danger (orders.js: called to arms by a standing order, sent indoors): fn(g, s, j) -> { ms } | null
   const addUrgent = fn => { if (typeof fn === 'function' && !URGENT.includes(fn)) URGENT.push(fn); };
   async function tick(g) {

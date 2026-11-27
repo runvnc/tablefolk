@@ -285,7 +285,7 @@
       if (!mayDo(g, d, j)) continue;
       const p = board.progress(d), left = p.total - p.done; if (!left) continue;
       if (d.maxWorkers && p.working >= d.maxWorkers && board.claimOf(g.id)?.d !== d) continue;
-      out.push({ key: 'mark:' + d.id, kind: 'mark', cmd: `work on the ${d.label}`, label: `work on the ${d.text || d.label} (marked by ${d.by === 'player' ? 'the player' : d.by}; ${d.standing ? 'a standing post' : left + ' square' + (left > 1 ? 's' : '') + ' left'}${d.priority >= 4 ? ', urgent' : ''})`, doing: `working on the ${d.label}`,
+      out.push({ key: 'mark:' + d.id, kind: 'mark', cmd: `work on the ${d.label}`, label: `work on ${d.text ? d.text.replace(/\s*\(.*$/, '') : 'the ' + d.label} (marked by ${d.by === 'player' ? 'the player' : d.by}; ${d.standing ? 'a standing post' : left + ' square' + (left > 1 ? 's' : '') + ' left'}${d.priority >= 4 ? ', urgent' : ''})`, doing: `working on the ${d.label}`,
         run: async (g2, s2, j2, a) => { a.cap ||= 90; const r = await workFor(g2, s2, j2, { only: d.id }); if (!r) { board.release(g2.id); return { done: true, text: `the ${d.label}` }; } return { busy: true, ms: r.ms }; } });
       if (out.length >= 2) break;
     }
@@ -315,7 +315,7 @@
       const kind = KINDS.get(d.kind) || { color: '#cccccc' }, h = kind.h || .06;
       for (const c of d.cells) { if (c.st === 'done' && !d.standing) continue; push(c.st === 'blocked' ? '#d04040' : kind.color, c.gate ? .06 : h, c.st === 'claimed' ? .62 : .36, c.x, c.z); }
     }
-    if (preview) for (const c of preview.cells) push(preview.color, preview.h || .1, .55, c.x, c.z);
+    if (preview) for (const c of preview.cells) { const gate = preview.gate && c.x === preview.gate.x && c.z === preview.gate.z; push(gate ? '#f0d060' : preview.color, gate ? .06 : preview.h || .1, .55, c.x, c.z); }
     for (const [k, m] of meshes) if (!groups.has(k)) { m.thinInstanceCount = 0; m.isVisible = false; }
     for (const [, gr] of groups) {
       const m = meshFor(gr.color, gr.h, gr.alpha), buf = new Float32Array(gr.at.length * 16);
@@ -323,7 +323,7 @@
       m.thinInstanceSetBuffer('matrix', buf, 16, false); m.thinInstanceCount = gr.at.length; m.isVisible = gr.at.length > 0;
     }
   }
-  function ghost(cells, color = '#ffe08a', h = .1) { preview = cells && cells.length ? { cells, color, h } : null; draw(); }
+  function ghost(cells, color = '#ffe08a', h = .1, gate = null) { preview = cells && cells.length ? { cells, color, h, gate } : null; draw(); }
 
   // ---------------------------------------------------------------- words -> a plan (the brain when there is one, else code)
   const brainUsable = () => { try { return !!window.tablefolk?.brainReady?.() && window.tablefolkBrainInfo?.()?.engine !== 'none' && !new URLSearchParams(location.search).has('art') && !!window.tablefolkLLM; } catch { return false; } };
@@ -390,7 +390,7 @@
     const keep = v.cells.map(c => PC().toBoard(map, c)), warn = [...warnings, ...v.warnings];
     if (!keep.length) { toast(`Nothing to mark there: ${warn[0] || 'no open squares'}`, 'warn'); ghost(null); palette(); return; }
     pending = { kind, cells: keep, gate, plan, text };
-    ghost(keep, k.color, k.h || .12);
+    ghost(keep, k.color, k.h || .12, gate);
     B().pick(`<span style="color:${esc(k.color)}">■</span><span>${esc(text || k.label)}</span><small>${keep.length} square${keep.length > 1 ? 's' : ''}${warn.length ? ' · ' + esc(warn.join('; ')) : ''}</small>`
       + `<select data-change="prio" title="priority">${[1, 2, 3, 4, 5].map(p => `<option value="${p}"${p === priority ? ' selected' : ''}>priority ${p}${p === 5 ? ' (urgent)' : p === 1 ? ' (when idle)' : ''}</option>`).join('')}</select>`
       + `<button type="button" class="go" data-pick="ok">Mark it</button><button type="button" data-pick="no">cancel</button>`,

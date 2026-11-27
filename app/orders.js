@@ -226,8 +226,13 @@
     if (d.refused.some(r => r.who === g.id)) return null;
     const left = dv.n - deliveredOf(d); if (left <= 0) return null;
     const carrying = d.data.carry || (d.data.carry = {});
-    // not everyone at once: as many workers as loaves still wanted
-    const others = Object.entries(carrying).filter(([id, t]) => id !== g.id && gm() - t < 60).length; if (others >= left && !carrying[g.id]) return null;
+    // whoever carries the item goes first; the others fetch only what the carriers cannot cover (as many as are still wanted)
+    const mine = k.count(g, dv.item), members = memberIds(d).map(byId).filter(c => c && c !== g && !c.defeated && !d.refused.some(r => r.who === c.id));
+    if (!mine) {
+      const carried = members.reduce((a, c) => a + k.count(c, dv.item), 0);
+      const fetching = Object.entries(carrying).filter(([id, t]) => id !== g.id && gm() - t < 60 && !k.count(byId(id) || g, dv.item)).length;
+      if (carried + fetching >= left && !carrying[g.id]) return null;
+    }
     carrying[g.id] = gm();
     k.setDoing(g, s, `doing as demanded: ${d.text.replace(/\.$/, '').toLowerCase()}`);
     if (g.turnMove) return { ms: 700 };
@@ -269,9 +274,9 @@
       const line = status === 'met' ? `It is done: ${d.text.replace(/\.$/, '').toLowerCase()}` : `It was not done: ${d.text.replace(/\.$/, '').toLowerCase()}`;
       toast(`${status === 'met' ? 'Met' : 'Missed'}: ${d.text}`, status === 'met' ? 'success' : 'warn');
       try { window.tablefolkJobs?.addNews?.(d.via || 'player', line, 'news'); } catch {}
-      if (m && !m.defeated) try { await window.tablefolk.runAs(m.id, `say("${line.replace(/"/g, "'")}.")`); } catch {}
       for (const id of d.data.designations || []) if (status === 'missed') window.tablefolkDesignate?.cancel?.(id);
       await consequences(d, status);
+      if (m && !m.defeated) try { await window.tablefolk.runAs(m.id, `say("${line.replace(/"/g, "'")}.")`); } catch {}
     }
   }, 2000);
 
@@ -316,7 +321,7 @@
   });
   (window.tablefolkSaveHooks ||= {}).orders = { save: () => ({ orders: O.data(), demands: Q.data(), groups: G }), restore: x => { if (!x) return; if (x.groups) G = x.groups; O.load(x.orders); Q.load(x.demands); } };
   window.tablefolkJobs?.addUrgent?.(urgent);
-  window.tablefolkJobs?.addWork?.(railsWork);
+  window.tablefolkJobs?.addWork?.(railsWork, true);   // (a demand has a deadline: before marked work)
   window.tablefolkAgency?.addOptions?.(options);
   B()?.add({ id: 'orders', label: 'Orders', icon: '📜', title: 'Standing orders ("if more than two wolves come, wake the captain") and demands ("the faithful must bring 3 bread to the shrine by evening")', order: 20, run: () => tool('orders') });
   window.tablefolkGroups = { all: groups.all, get: groups.get, of: groups.of, members: groups.members, autonomyOf: groups.autonomyOf, add: groups.add, join: groups.join, leave: groups.leave };

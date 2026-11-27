@@ -38,9 +38,9 @@
 #resourceHud[hidden]{display:none}
 #resourceHud span{padding:3px 10px;border-radius:12px;background:rgba(20,24,30,.66);color:#f3ead7;font:600 12.5px/1.4 system-ui,sans-serif}
 #resourceHud span b{font-weight:700;margin-left:4px}
-#tfPickBar{position:fixed;left:50%;bottom:146px;transform:translateX(-50%);z-index:33;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;padding:6px 10px;border-radius:14px;background:rgba(20,24,30,.86);color:#f3ead7;font:600 12.5px/1.4 system-ui,sans-serif;max-width:94vw}
+#tfPickBar{position:fixed;left:50%;bottom:172px;transform:translateX(-50%);z-index:33;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;padding:6px 10px;border-radius:14px;background:rgba(20,24,30,.86);color:#f3ead7;font:600 12.5px/1.4 system-ui,sans-serif;max-width:94vw}
 #tfPickBar[hidden]{display:none}
-#tfPickBar button,#tfPickBar select{padding:3px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f3ead7;font:600 12px system-ui,sans-serif;cursor:pointer}
+#tfPickBar button,#tfPickBar select{white-space:nowrap;padding:3px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f3ead7;font:600 12px system-ui,sans-serif;cursor:pointer}
 #tfPickBar button.go{background:#3d8a4f;border-color:#7fd08f}#tfPickBar input{padding:3px 8px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:#fff;font:500 12.5px system-ui,sans-serif;min-width:220px}
 #tfPickBar small{font-weight:500;opacity:.8}
 html.tabletop #powerBar,html.tabletop #resourceHud{display:none}`;

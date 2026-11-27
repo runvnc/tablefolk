@@ -256,6 +256,28 @@ the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
 dialog stays in the page for a moment after a click (count each element
 once).
 
+## God play (`plan-test.mjs`, `orders-test.mjs`, `god-test.mjs`, 2026-11-27)
+
+- `node tools/plan-test.mjs` (no browser): the spatial benchmark's 29 gold
+  relation plans through `app/plan-core.js`, scored by
+  `tools/spatial-eval/geom.mjs` (29/29); validation; words to plans by code
+  (19/29 benchmark commands resolve and pass with no model); merge; a
+  scenario as a cell map.
+- `node tools/orders-test.mjs` (no browser): the designation board, demands,
+  groups and their autonomy precedence (with `autonomy-profile.js`),
+  standing orders from words, resources.
+- `node tools/browser-test/god-test.mjs --base=http://localhost:8002
+  [--shots=dir]` (no model: `?art=1` and
+  `tools/browser-test/scenarios/hearth-spirit-none.json`; live.js waits for a
+  brain under `?art=1`, so the test runs the job ticks itself): the bar and
+  HUD, the scenario's demand met on rails, the Mark tool by drag and by
+  words, the wall built by the workers, a standing order, the package's
+  powers, the core weather, the save hooks. `--shots` saves the canvas
+  (headless page screenshots leave it black) with the free camera over the
+  garden.
+- `node tools/browser-test/plan-words-eval.mjs` (a brain on :8000, never
+  downloads): words to plans with the loaded brain against code alone.
+
 ## Sections (`sections-test.mjs`, 2026-11-20)
 
 `node sections-test.mjs` (no model; `fixtures/sections/top.json` with

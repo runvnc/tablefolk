@@ -23,6 +23,9 @@ let fails = 0, n = 0; const errs = []; page.on('pageerror', e => errs.push(Strin
 const check = async (name, fn) => { n++; let r; try { r = await fn(); } catch (e) { r = [false, 'threw ' + e.message]; } const [ok, info] = Array.isArray(r) ? r : [r, '']; if (!ok) fails++; console.log(ok ? 'ok  ' : 'FAIL', name, info ? '- ' + String(info).slice(0, 300) : ''); return ok; };
 const ev = (fn, a) => page.evaluate(fn, a);
 const shot = async name => { if (!SHOTS) return; const url = await ev(() => document.getElementById('renderCanvas').toDataURL('image/png')); (await import('fs')).writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(url.split(',')[1], 'base64')); console.log('     shot', `${SHOTS}/${name}.png`); };
+// the free camera over a square (the follow camera keeps the player in view)
+const look = (x, z, radius = 18, beta = .8) => ev(({ x, z, radius, beta }) => { tablefolk.setCameraView('overview'); state.followAvatar = false; const c = state.camera; c.setTarget(new BABYLON.Vector3(x, 0, z)); c.radius = radius; c.beta = beta; }, { x, z, radius, beta }).then(() => page.waitForTimeout(700));
+const lookAt = async place => { const p = await ev(n => { const d = tablefolkJobs.places.placeNamed(n); return d ? [(d.x0 + d.x1) / 2, (d.z0 + d.z1) / 2] : [0, 0]; }, place); await look(p[0], p[1]); };
 const pageShot = async name => { if (SHOTS) { await page.screenshot({ path: `${SHOTS}/${name}.png` }); console.log('     shot', `${SHOTS}/${name}.png`); } };
 // run every character's job tick until cond() holds or the time is up (live.js waits for a brain under ?art=1)
 const drive = (cond, secs) => ev(async ({ cond, secs }) => {
@@ -51,14 +54,13 @@ await check('the elder delivered the demand in words', () => ev(() => { const h 
 await check('the faithful’s state cards carry it', () => ev(() => { const l = tablefolkMind.cardLines(state.characters.find(c => c.id === 'bram')); return [l.some(x => /Demanded of the faithful/.test(x)) && l.some(x => /belong to the faithful/.test(x)), l.filter(x => /faithful/.test(x)).join(' / ')]; }));
 await check('above rails the demand would be an activity (do it, or refuse)', () => ev(() => { const g = state.characters.find(c => c.id === 'wren'), k = tablefolkJobs.kit, o = tablefolkAgency.options(g, k.S(g), tablefolkJobs.jobOf(g)); return [o.some(x => x.kind === 'demand') && o.some(x => x.kind === 'refuse'), o.filter(x => /demand|refuse/.test(x.kind)).map(x => x.label).join(' / ')]; }));
 const t0 = Date.now(), fav0 = await ev(() => tablefolkResources.get('favour'));
-const met = await drive("tablefolkDemands.list()[0]?.status === 'met'", 150);
+const met = await drive("tablefolkDemands.list()[0]?.status === 'met' && tablefolkStory.get('offering_made') === true", 150);
 await check('on rails, code brought the bread and the demand was met', () => ev(() => { const d = tablefolkDemands.list()[0]; return [d.status === 'met' && tablefolkStory.get('offering_made') === true, `${d.status} ${Math.round(d.progress * 100)}% delivered ${tablefolkDemands.delivered(d)}; wren carries ${JSON.stringify(charInventory(state.characters.find(c => c.id === 'wren')).items)}`]; }));
 console.log(`     (${Math.round((Date.now() - t0) / 1000)} s)`);
 await check('its consequence: favour went up by 8 (beside its +2.5 an hour)', () => ev(f0 => [tablefolkResources.get('favour') >= f0 + 8, `${f0} -> ${tablefolkResources.get('favour')}`], fav0));
 
 // ---- the Mark tool by hand: a fence dragged on the ground
-await ev(() => { state.camera.target = new BABYLON.Vector3(0, 0, 0); state.camera.radius = 34; state.camera.beta = 0.5; state.camera.alpha = -Math.PI / 2; });
-await page.waitForTimeout(600);
+await look(0, 0, 34, .5);
 await page.click('#powerBar button:has-text("Mark")');
 await page.waitForTimeout(300);
 await page.click('#tfPickBar button:has-text("fence")');
@@ -78,8 +80,7 @@ await page.fill('#tfMarkWords', 'build a wall around the garden with a gate towa
 await page.click('#tfPickBar button:has-text("plan it")');
 await page.waitForFunction(() => !!document.querySelector('#tfPickBar button.go'), null, { timeout: 10000 });
 await check('words to a plan, shown for confirmation', () => ev(() => [/wall around the garden/.test(document.getElementById('tfPickBar').textContent), document.getElementById('tfPickBar').textContent.slice(0, 200)]));
-await ev(() => { const d = tablefolkJobs.places.placeNamed('garden'); state.camera.target = new BABYLON.Vector3((d.x0 + d.x1) / 2, 0, (d.z0 + d.z1) / 2); state.camera.radius = 18; state.camera.beta = 0.75; });
-await page.waitForTimeout(700);
+await lookAt('garden');
 await shot('03-wall-preview');
 await page.selectOption('#tfPickBar select', '5');
 await page.click('#tfPickBar button.go');
@@ -87,11 +88,11 @@ await check('marked: the wall, urgent, with its gate', () => ev(() => { const d 
 await check('above rails the wall would be an activity', () => ev(() => { const g = state.characters.find(c => c.id === 'bram'), k = tablefolkJobs.kit, o = tablefolkAgency.options(g, k.S(g), tablefolkJobs.jobOf(g)); return [o.some(x => x.kind === 'mark'), o.filter(x => x.kind === 'mark').map(x => x.label).join(' / ')]; }));
 const w0 = Date.now();
 await drive("(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'wall'); return !d || d.status !== 'open' || tablefolkDesignate.board.progress(d).done >= 8; })()", 120);
-await shot('04-wall-building');
+await lookAt('garden'); await shot('04-wall-building');
 await drive("(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'wall'); return !d || d.status !== 'open'; })()", 200);
 await check('characters built the wall by code (walls and a door in its squares)', () => ev(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'wall'), p = tablefolkDesignate.board.progress(d); const walls = d.cells.filter(c => state.blocks.some(b => !b.isDisposed?.() && ['wall', 'door'].includes(meta(b)?.type) && Math.round(b.position.x) === c.x && Math.round(b.position.z) === c.z)).length; return [d.status === 'done' && walls >= p.done - 1 && p.done >= d.cells.length * .8, `${d.status}: ${p.done}/${p.total} done, ${p.blocked} blocked, ${walls} stand; who: ${[...new Set(d.cells.map(c => c.by).filter(Boolean))]}`]; }));
 console.log(`     (${Math.round((Date.now() - w0) / 1000)} s)`);
-await shot('05-wall-done');
+await lookAt('garden'); await shot('05-wall-done');
 
 // ---- a standing order
 await check('a standing order from words, in plain text', () => ev(async () => { const r = await tablefolkOrders.fromWords('if any bandits come, wake bram and ring the bell'); return [r.when === 'raiders > 0' && r.do.wake === 'bram' && r.do.alarm && /When raiders come: /.test(tablefolkOrders.describe(r)), tablefolkOrders.describe(r)]; }));
@@ -100,9 +101,9 @@ await check('the scenario’s order fires with no model: bram answers the call',
 // ---- powers
 await check('gift of bread: favour paid, two loaves given', () => ev(async () => { const g = state.characters.find(c => c.id === 'tilly'), f0 = tablefolkResources.get('favour'), b0 = tablefolkJobs.kit.count(g, 'bread'); const r = await tablefolkPowers.use('bread_gift', { who: g }); return [tablefolkJobs.kit.count(g, 'bread') === b0 + 2 && Math.abs(tablefolkResources.get('favour') - (f0 - 3 + 1)) < .01, `${r}; favour ${f0} -> ${tablefolkResources.get('favour')}`]; }));
 await check('golden rain on a place: the package’s weather kind, particles, the flag', () => ev(async () => { const d = tablefolkJobs.places.placeNamed('garden'); const r = await tablefolkPowers.use('golden_rain', { x: Math.round((d.x0 + d.x1) / 2), z: Math.round((d.z0 + d.z1) / 2), place: 'garden' }); const w = tablefolkWeather.now(); return [w?.kind === 'golden_rain' && !!w.area && state.scene.particleSystems.some(p => p.name === 'weather') && tablefolkStory.get('weather') === 'golden_rain', `${r} / ${JSON.stringify(w)}`]; }));
-await page.waitForTimeout(2500);
+await lookAt('garden'); await page.waitForTimeout(2000);
 await shot('06-golden-rain');
-await check('a power the player cannot afford is refused, nothing paid', () => ev(async () => { tablefolkResources.set('favour', 1); const r = await tablefolkPowers.use('golden_rain', { x: 0, z: 0 }); return [!!r.fail && tablefolkResources.get('favour') === 1, JSON.stringify(r)]; }));
+await check('a power the player cannot afford is refused, nothing paid', () => ev(async () => { tablefolkResources.set('favour', 1); const g = state.characters.find(c => c.id === 'bram'), b0 = tablefolkJobs.kit.count(g, 'bread'), r = await tablefolkPowers.use('bread_gift', { who: g }); return [r.fail === 'cannot afford it' && tablefolkResources.get('favour') === 1 && tablefolkJobs.kit.count(g, 'bread') === b0, JSON.stringify(r)]; }));
 await check('core weather: storm, snow, fog, dark, then clear', () => ev(async () => { const out = []; for (const k of ['storm', 'snow', 'fog', 'dark']) { tablefolkWeather.set(k, { intensity: .8 }); out.push(tablefolkWeather.now()?.kind); } tablefolkWeather.set('storm', { intensity: 1 }); await new Promise(r => setTimeout(r, 1200)); return [out.join() === 'storm,snow,fog,dark', out.join()]; }));
 await shot('07-storm');
 await ev(() => tablefolkWeather.clear());
