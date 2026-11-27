@@ -3,6 +3,7 @@
 // then asks for one change in the same session, and saves both worlds as JSON
 // (for scenario-smoke.mjs). Uses a real model: OPENROUTER_API_KEY in the
 // environment (never printed), AGENT_MODEL (default deepseek/deepseek-v4.1-flash).
+// ENGINE_LOG=1 prints the in-browser engine's per-call timings.
 // WHERE=browser: a model in the test Chrome instead (AGENT_MODEL=bonsai2-27b; it is
 // downloaded if this profile has not got it: only on a rented GPU box).
 //
@@ -20,6 +21,8 @@ const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_P
 const page = await b.contexts()[0].newPage();
 const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 300))); page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errs.push(m.text().slice(0, 300)); });
 const t0 = Date.now(), say = s => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${s}`);
+// ENGINE_LOG=1: the in-browser engine's per-call lines (prefix reads, llama.cpp timings, elapsed), for step times
+if (process.env.ENGINE_LOG) page.on('console', m => { const t = m.text(); if (/\[tablefolk-wllama3\] (prefix read|llama\.cpp timings|RAW OUTPUT)|\[bonsai2\].*(tok\/s|prefill)/i.test(t)) say(t.replace(/\s+/g, ' ').slice(0, 260)); });
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.goto(base + '/world/?t=' + Date.now());
 if (WHERE === 'own') await page.evaluate(([k, m]) => localStorage.setItem('tablefolk_own_model', JSON.stringify({ provider: 'openrouter', apiKey: k, model: m })), [key, model]);
