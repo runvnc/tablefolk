@@ -5608,6 +5608,8 @@ function worldStateData() {
       globalHistory: state.globalHistory.slice(-50),
       turnIndex: state.turn.index,
       allowed: Array.from(state.allowed),
+      // designate.js, orders.js, powers.js, weather.js: { name: data } from window.tablefolkSaveHooks
+      ...(window.tablefolkSaveHooks ? { hooks: Object.fromEntries(Object.entries(window.tablefolkSaveHooks).map(([k,h])=>{ try{ return [k,h.save()]; }catch{ return [k,null]; } })) } : {}),
       ts: Date.now(),
     };
 }
@@ -5649,6 +5651,7 @@ async function restoreWorldState(input) {
   setPaint((data.paint||[]).map(([x,z,mat,tint])=>({x,z,mat,tint})),{replace:true});
   if(data.player) state.player={gold:Number(data.player.gold)||0,items:Array.isArray(data.player.items)?data.player.items:[]};
   if(data.flags && typeof data.flags==='object') state.flags={...data.flags};   // story.js
+  if(data.hooks && window.tablefolkSaveHooks) setTimeout(()=>{ for(const [k,v] of Object.entries(data.hooks)) try{ window.tablefolkSaveHooks[k]?.restore?.(v); }catch(e){ console.warn('restore',k,e); } },600);
   if(data.clock && Number.isFinite(+data.clock.min)){ state.clock={min:+data.clock.min,day:Math.max(1,+data.clock.day||1)}; state.clockRestored=true; }   // clock.js
   for(const p of (data.props||[])){
       let obj;

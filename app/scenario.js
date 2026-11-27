@@ -1048,6 +1048,15 @@
       encounterWorld: ['slow', 'pause', 'run'].includes(s.encounterWorld) ? s.encounterWorld : null,
       turnMoves: Number.isFinite(+s.turnMoves) && +s.turnMoves >= 1 ? Math.min(30, Math.round(+s.turnMoves)) : null,
       turnMinutes: Number.isFinite(+s.turnMinutes) && s.turnMinutes !== null && s.turnMinutes !== '' ? Math.max(0, Math.min(240, +s.turnMinutes)) : null,
+      // God / Dungeon Keeper play (orders.js, designate.js, powers.js, weather.js): named groups of characters
+      // ({ "faithful": { "name", "members", "autonomy", "demands" } }; agents' "group" joins them), squares marked for
+      // work at the start (plans by relation or cells), standing orders (rules or words), demands, resources' starts, the weather
+      groups: s.groups && typeof s.groups === 'object' ? s.groups : null,
+      designations: Array.isArray(s.designations) ? s.designations.filter(d => d && typeof d === 'object').slice(0, 64) : [],
+      orders: Array.isArray(s.orders) ? s.orders.filter(o => typeof o === 'string' || (o && o.when && o.do)).slice(0, 32) : [],
+      demands: Array.isArray(s.demands) ? s.demands.filter(d => d && typeof d === 'object' && (d.text || d.what)).slice(0, 32) : [], demandDelay: Number.isFinite(+s.demandDelay) && s.demandDelay !== null ? Math.max(0, +s.demandDelay) : null,
+      resources: s.resources && typeof s.resources === 'object' && !Array.isArray(s.resources) ? s.resources : {},
+      weather: typeof s.weather === 'string' || (s.weather && typeof s.weather === 'object' && s.weather.kind) ? s.weather : null,
       live: !!s.live, pace: ['calm', 'lively', 'busy'].includes(s.pace) ? s.pace : null, director: s.director === false ? false : Number.isFinite(+s.director) ? +s.director : null, events: Array.isArray(s.events) ? s.events.filter(e => e && (typeof e === 'string' || e.text)).slice(0, 40) : [],
       // subworlds: other maps (a building's inside, a dungeon level, a forest next door): sections the player walks into through links
       subworlds: s.subworlds && typeof s.subworlds === 'object' && !Array.isArray(s.subworlds) ? s.subworlds : {},

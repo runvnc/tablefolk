@@ -34,6 +34,8 @@
  *   effects:    { name(g, value, target, how) {} }                      (skills' effect lists)
  *   uses:       { name(thing, who, ctx) { return true } }               (an item's "use": "name")
  *   threats:    { kind(c, ctx) { return true } }                       (a threat kind's behaviour, threats.js)
+ *   designations, powers, resources, demands, weather: God / Dungeon Keeper play (designate.js, powers.js,
+ *               orders.js, weather.js); all but powers may also be data in tablefolk.json
  * reset() (scenario.js, before a scenario's packages load) forgets what the
  * last scenario's packages brought: items, jobs, uses, threat kinds,
  * workflows and module additions, so they do not leak into the next one.
@@ -130,7 +132,16 @@
       light: (x, z, { y = 1, color = [1, .7, .4], intensity = 2, range = 8 } = {}) => { const L = new BABYLON.PointLight('pkg_light', new BABYLON.Vector3(x, y, z), state.scene); L.diffuse = new BABYLON.Color3(...color); L.intensity = intensity; L.range = range; window.tablefolkScenery?.trackLight?.(L); return L; },
       // the nearest free, walkable cell to (x, z) within r cells, or null
       freeCell: (x, z, r = 4) => { for (let d = 0; d <= r; d++) for (let dx = -d; dx <= d; dx++) for (let dz = -d; dz <= d; dz++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== d) continue; const cx = Math.round(x) + dx, cz = Math.round(z) + dz; if (cellPassable(cx, cz) && !occupantAt(cx, cz, null)) return { x: cx, z: cz }; } return null; },
-      vec: (x, y, z) => new BABYLON.Vector3(x, y, z), scene: state.scene, BABYLON: window.BABYLON };
+      vec: (x, y, z) => new BABYLON.Vector3(x, y, z), scene: state.scene, BABYLON: window.BABYLON,
+      // God / Dungeon Keeper play (api.md "Powers, resources, designations, demands, weather"):
+      // a button on the power bar (removed with the scenario); a resource's value (and a change to it)
+      bar: { add: b => window.tablefolkBar?.add({ ...b, from: b.from || 'package' }), remove: id => window.tablefolkBar?.remove(id) },
+      resource: (name, delta) => delta == null ? window.tablefolkResources?.get(name) : window.tablefolkResources?.add(name, +delta || 0),
+      weather: (kind, opts) => kind === undefined ? window.tablefolkWeather?.now() : window.tablefolkWeather?.set(kind, opts || {}),
+      // squares marked for work: { kind, cells: [{x, z}] } or a plan by relation ({ verb: "wall", around: "shrine" }); -> the designation or { error }
+      designate: (spec, opts = {}) => spec?.cells ? window.tablefolkDesignate?.add({ by: 'package', ...spec }) : window.tablefolkDesignate?.addPlan(spec, { by: 'package', ...opts }),
+      demand: spec => window.tablefolkDemands?.create({ from: 'package', ...spec }),
+      groups: () => window.tablefolkGroups?.all?.() || {}, groupOf: id => window.tablefolkGroups?.of?.(typeof id === 'string' ? id : id?.id) || [] };
   }
   // what a module's listeners and timers are, so reset() stops them
   const listeners = [], timers = [], disposers = [];
@@ -161,7 +172,18 @@
       ...(cfg.hostile != null ? { hostile: !!cfg.hostile } : {}) });
     return g;
   }
+  // designations, resources, weather, demands (data or a module's), powers (a module's: they run code)
+  function dataExtensions(x, from, warnings = []) {
+    const each = (sec, fn) => { for (const [k, d] of Object.entries(x?.[sec] && typeof x[sec] === 'object' && !Array.isArray(x[sec]) ? x[sec] : {})) { try { fn(k, d); } catch (e) { warnings.push(`${from}: ${sec} ${k}: ${e.message}`); console.warn('[packages]', from, sec, k, e.message); } } };
+    each('designations', (k, d) => window.tablefolkDesignate?.registerKind(k, d, from));
+    each('resources', (k, d) => window.tablefolkResources?.declare(k, d, from));
+    each('weather', (k, d) => window.tablefolkWeather?.register(k, d, from));
+    each('demands', (k, d) => window.tablefolkDemands?.registerTemplate(k, d, from));
+    each('powers', (k, d) => window.tablefolkPowers?.register(k, d, from));
+    return warnings;
+  }
   function adopt(x, from) {
+    dataExtensions(x, from);
     for (const [name, b] of Object.entries(x?.behaviours || {})) { window.tablefolkRoles?.addBehaviour(name, b); added.behaviours.push(name); }
     Object.assign(window.tablefolkSkills?.cards || {}, x?.cards || {}); added.cards.push(...Object.keys(x?.cards || {}));
     Object.assign(window.tablefolkSkills?.effects || {}, x?.effects || {}); added.effects.push(...Object.keys(x?.effects || {}));
@@ -176,7 +198,7 @@
     for (const [name, fn] of Object.entries(x?.goals || {})) if (typeof fn === 'function') { goals[name] = fn; added.goals.push(name); }
     // job step kinds in code (jobs.js): { refuel(g, step, ctx) { return { done: true, ms: 3000 } } }
     for (const [name, fn] of Object.entries(x?.steps || {})) if (typeof fn === 'function') { window.tablefolkJobs?.registerStep?.(name, fn); added.steps.push(name); }
-    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps', 'goals'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
+    console.log(`[packages] code from ${from}: ${['behaviours', 'cards', 'effects', 'uses', 'threats', 'commands', 'steps', 'goals', 'designations', 'powers', 'resources', 'demands', 'weather'].map(k => Object.keys(x?.[k] || {}).length + ' ' + k).join(', ')}`);
   }
 
   // ---- loading ----
@@ -211,6 +233,8 @@
           catch (e) { warnings.push(`package ${m.id}: ${e.message}`); }
         }
       }
+      // God / Dungeon Keeper play, in data: designation kinds (designate.js), resources (powers.js), weather kinds (weather.js), demand templates (orders.js)
+      dataExtensions(m, m.id, warnings);
       // templated lines (chatter.js): { "sale": [...], "raid": { "gruff": [...] } }
       if (m.lines && typeof m.lines === 'object') window.tablefolkChatter?.add(m.lines, m.id);
       // threat kinds (threats.js), in data
@@ -325,6 +349,7 @@
     for (const t of timers.splice(0)) clearInterval(t);
     added.items.clear(); added.bodies.clear(); added.sounds.clear(); added.behaviours.length = 0; added.cards.length = 0; added.effects.length = 0; added.commands.length = 0; added.steps.length = 0;
     window.tablefolkUses?.resetRegistered?.();
+    window.tablefolkDesignate?.resetPackaged?.(); window.tablefolkPowers?.resetPackaged?.(); window.tablefolkWeather?.resetPackaged?.(); window.tablefolkDemands?.resetPackaged?.();
     window.tablefolkJobs?.resetPackaged?.();
     window.tablefolkThreats?.resetPackaged?.();
     window.tablefolkChatter?.reset?.();

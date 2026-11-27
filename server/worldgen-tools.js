@@ -23,6 +23,7 @@
 import { checkScenario, finishScenario, systemPrompt, MODELS, MINDLESS, ANIMALS, COMMANDS, PICKUPS } from './worldgen-core.js';
 import '../app/procgen.js';
 import '../app/autonomy-profile.js';
+import '../app/plan-core.js';
 const Procgen = globalThis.TablefolkProcgen;
 
 // ---- the catalog (fast-skill.md and the map editor's palette, app/map-editor.js OBJECT_GROUPS) ----
@@ -52,8 +53,9 @@ const PEOPLE = ['woodsman', 'huntress', 'peasant', 'peasant_woman', 'adventurer'
 const GOALS = 'survived_days 2 | stock_at_least ["wheat", 10] | threat_defeated "wolf" or ["goblin", 4] | agents_alive 3 or "all" | agent_defeated "id" | player_defeated true | player_has "item" | player_gold [">=", 10] | agent_has ["id", "item"] | agent_near ["id", "square", 2] | chest_has "item" | said ["id", "word"] | all/any/not [...]';
 // top-level fields set_meta may set (the map, characters, objects, events and sections have their own tools)
 const META = ['title', 'subtitle', 'intro', 'seed', 'lighting', 'dark', 'talk', 'live', 'time', 'dayMinutes', 'monsters', 'temper', 'harsh', 'prices', 'food', 'autonomy', 'allowed',
-  'player', 'goal', 'threats', 'director', 'skills', 'menus', 'flags', 'facts', 'triggers', 'locked', 'walls', 'view', 'showIntro', 'defaultModel', 'brain', 'simple', 'onlySpokenTo', 'bodies', 'packages', 'stores'];
-const AGENT_FIELDS = new Set(['id', 'model', 'job', 'home', 'workplace', 'in', 'at', 'style', 'personality', 'secret', 'agenda', 'knows', 'relations', 'quest', 'temper', 'hostile', 'hp', 'wield', 'inventory', 'allowed', 'ttsVoiceId', 'autonomy', 'skills', 'menu', 'thinking', 'facing', 'readsBooks', 'name', 'backstory', 'simple', 'chaos', 'faction', 'brain']);
+  'player', 'goal', 'threats', 'director', 'skills', 'menus', 'flags', 'facts', 'triggers', 'locked', 'walls', 'view', 'showIntro', 'defaultModel', 'brain', 'simple', 'onlySpokenTo', 'bodies', 'packages', 'stores',
+  'groups', 'orders', 'demands', 'demandDelay', 'resources', 'weather', 'designations'];
+const AGENT_FIELDS = new Set(['id', 'model', 'job', 'home', 'workplace', 'in', 'at', 'style', 'personality', 'secret', 'agenda', 'knows', 'relations', 'quest', 'temper', 'hostile', 'hp', 'wield', 'inventory', 'allowed', 'ttsVoiceId', 'autonomy', 'skills', 'menu', 'thinking', 'facing', 'readsBooks', 'name', 'backstory', 'simple', 'chaos', 'faction', 'brain', 'group']);
 
 const clone = v => JSON.parse(JSON.stringify(v ?? {}));
 const words = s => String(s).replace(/_/g, ' ');
@@ -87,6 +89,8 @@ export const TOOLS = [
     obj({ action: { type: 'string', enum: ['add', 'remove', 'clear'] }, event: { description: 'a sentence or an object' }, index: { type: 'integer' } }, ['action'])),
   fn('section', 'Worlds in several maps. add: key, title, generate ({kind, rooms...}) and agents (its characters, as for character add) make a new section (a subworld); link: a way between the top map and a section ({in: a place, to: the section key, kind: stairs_down|stairs_up|cave|gate|trapdoor|door, name}); remove: key.',
     obj({ action: { type: 'string', enum: ['add', 'link', 'remove'] }, key: { type: 'string' }, title: { type: 'string' }, generate: anyObj('the section\'s map'), agents: { type: 'array', items: anyObj('a character') }, link: anyObj('the link') }, ['action'])),
+  fn('plan', 'Mark work or put up walls by RELATION, never by squares: code finds the squares on the map as it will be built (plan-core.js). plan: {"verb": "wall" | "fence", "around": "<place>", "gate": "north" | {"toward": "road" | "<place>"} | "none"} or {"verb": "fence", "between": ["<place>", "<place>"]}; {"verb": "dig" | "stockpile" | "farm" | "clear", "near": "<place>", "side": "north" | "northwest" | "any", "w": 4, "h": 3}; {"verb": "dig", "under": "<place>", "w": 2, "h": 2}; {"verb": "clear", "cluster": "trees", "near": "<place>"}; {"verb": "guard", "at": "<place>", "n": 2, "side": "east" | "around"}; {"verb": "patrol", "from": "<place>", "via": ["<place>"], "to": "<place>"}. as: "designation" (default: marked for the characters to do in play; a living world with a clock), "objects" (walls or fences placed now) or "preview" (only the squares). who: a group, job or character id for the work; priority 1-5.',
+    obj({ plan: anyObj('the plan by relation, e.g. {"verb": "wall", "around": "garden", "gate": {"toward": "road"}}'), as: { type: 'string', enum: ['designation', 'objects', 'preview'] }, who: { type: 'string' }, priority: { type: 'integer' } }, ['plan'])),
   fn('validate', 'Check the whole world with the game\'s own checks; returns the problems to fix (an empty list when it is fine).', obj({})),
   fn('preview', 'The map as it will be built: its size, every place with who and what is in it, and warnings.', obj({})),
   fn('undo', 'Take back the last change.', obj({})),
@@ -331,6 +335,26 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         }
         if (args.action === 'remove') { if (!s.subworlds?.[key]) return no(`no section "${key}"`); delete s.subworlds[key]; if (!Object.keys(s.subworlds).length) delete s.subworlds; s.links = (s.links || []).filter(l => l.to !== key); if (!s.links.length) delete s.links; return ok({}, `removed the section ${key}`); }
         return no('action: add, link or remove');
+      }
+      case 'plan': {
+        const P = globalThis.TablefolkPlanCore;
+        let p = args.plan; if (typeof p === 'string' && /^\s*\{/.test(p)) { try { p = JSON.parse(p); } catch {} }
+        if (!p || typeof p !== 'object') return no('plan: an object, e.g. {"verb": "wall", "around": "garden"}');
+        if (!s.generate && !s.grid) return no('the map comes first (set_map)');
+        const map = P.mapFromScenario(clone(s), Procgen), r = P.plan(p, map);
+        if (r.error || !r.ok) return no(r.error || r.warnings?.[0] || 'no squares', { places: map.places.map(x => x.id) });
+        const cells = r.cells.map(c => P.toBoard(map, c)), gate = r.gate ? P.toBoard(map, r.gate) : null, text = P.describe(p, r), as = args.as || 'designation';
+        const info = { verb: r.verb, squares: cells.length, gate, text, warnings: r.warnings };
+        if (as === 'preview') return ok({ ...info, cells }, null, false);
+        if (as === 'objects') {
+          if (!['wall', 'fence'].includes(r.verb)) return no('as "objects" puts up walls or fences only; mark the rest as "designation"');
+          const isGate = c => gate && c.x === gate.x && c.z === gate.z, list = s.objects ||= [];
+          for (const c of cells) if (!isGate(c)) list.push({ type: r.verb, x: c.x, z: c.z });
+          if (gate && r.verb === 'wall') list.push({ type: 'door', x: gate.x, z: gate.z });
+          return ok(info, `put up ${text}`);
+        }
+        (s.designations ||= []).push({ ...p, ...(args.who ? { who: String(args.who) } : {}), ...(Number.isFinite(+args.priority) ? { priority: Math.max(1, Math.min(5, +args.priority)) } : {}) });
+        return ok({ ...info, note: 'marked: the characters do the work in play (needs "live" and the clock)' }, `marked ${text}`);
       }
       case 'validate': {
         const problems = checkScenario(clone(s), ctx.packVoices || [], { section: false });

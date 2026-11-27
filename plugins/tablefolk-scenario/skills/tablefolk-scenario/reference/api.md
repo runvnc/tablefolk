@@ -29,6 +29,12 @@ export default function (api) {
     effects:    { kindle(g, value, target, how, ctx) { return 'it flares up'; } },
     behaviours: { hammer: { on: 'tablefolk-player-turn', run(g) {} } },
     steps:      { refuel(g, step, ctx) { return { done: true, ms: 3000 }; } },
+    // God / Dungeon Keeper play (below, "Powers, resources, designations, demands, weather")
+    designations: { shrine_ground: { label: 'shrine ground', shape: 'rect', work: { paint: 'flagstone' } } },
+    powers:     { bread_gift: { label: 'Gift of bread', icon: '🍞', cost: { favour: 3 }, target: 'character', run(t, ctx) { api.give(t.who, 'bread', 2); return 'Two loaves appear.'; } } },
+    resources:  { favour: { label: 'Favour', icon: '✨', start: 10, max: 60, perHour: (v, ctx) => 1 + 0.5 * (ctx.groups.faithful || 0) } },
+    demands:    { offering: { label: 'an offering', keywords: ['offering'], parse(text, ctx) { return { text: 'Bring 2 bread to the temple.', met: { deliver: { item: 'bread', n: 2, to: 'temple' } } }; } } },
+    weather:    { golden_rain: { base: 'rain', color: [1, .86, .45] } },
     dispose() {},
   };
 }
@@ -45,6 +51,7 @@ export default function (api) {
 | `effects` | `(g, value, target, how, ctx)` | an effect any skill entry can list (`{"kindle": 3}`); return a string to add to the result line. `target`: `{ who, thing, kind, pos }`. |
 | `behaviours` | `{ on: '<event>', run(g) }` | a routine run on a game event for characters whose role or skill lists it. |
 | `steps` | `(g, step, ctx)` | a job step kind (`{"refuel": true}` in a job's `steps`). Return `{ busy, ms }` (still at it), `{ done, ms, worked }`, `{ skip }`, `{ fail: "why" }` or `{ need: { item, n } }` (out of something: the job's fallbacks). `ctx`: `{ state, job, setDoing(text), goTo(x, z, label), goDo(thing, line), runLine(line), things(kind), nearest(list), count(item) }`. |
+| `designations`, `powers`, `resources`, `demands`, `weather` | objects | God / Dungeon Keeper play: new mark kinds with their work, player-side actions with a cost and a target, named world variables on a HUD, demand templates, weather kinds ([below](#powers-resources-designations-demands-weather)). All but `powers` may also be data in `tablefolk.json`. |
 | `dispose` | `()` | the scenario that loaded the package has ended: remove what you made that is not part of the map (lights, particles). Listeners and timers made with `api.on` / `api.every` are removed for you. |
 
 A module is called once per scenario that loads its package (the file is
@@ -77,6 +84,12 @@ state inside the function, not at the top of the file.
 | `api.light(x, z, { y, color, intensity, range })` | a point light inside the scene's light budget; `dispose()` it |
 | `api.freeCell(x, z, r)` | the nearest free, walkable cell, or null |
 | `api.scene`, `api.BABYLON`, `api.vec(x, y, z)` | the Babylon.js scene and library for effects of your own |
+| `api.bar.add({ id, label, icon, title, run })`, `api.bar.remove(id)` | a button on the power bar (removed when the scenario ends) |
+| `api.resource(name)`, `api.resource(name, delta)` | a resource's value; add to it (clamped to its limits) |
+| `api.weather()`, `api.weather(kind, { intensity, duration, area, wind })` | the weather now; set it (a base kind or a package's) |
+| `api.designate(spec)` | mark squares for work: `{ kind, cells: [{ x, z }], priority, who }` or a plan by relation `{ verb: "wall", around: "shrine", gate: "north" }`; returns the designation (a plan: `{ d, warnings }` or `{ error }`) |
+| `api.demand(spec)` | make a demand (below); returns it, or `{ error }` |
+| `api.groups()`, `api.groupOf(who)` | the world's groups `{ id: { name, members, autonomy } }`; the group ids a character belongs to |
 
 ## `window.tablefolk` and the other globals
 
@@ -111,6 +124,15 @@ supported part (other members are internal and may change).
 | `tablefolkSkills.addCommand(name, def)`, `.commandLines(g)`, `.cardLines(g)`, `.run(g, name, args)` | commands and skills |
 | `tablefolkPackages.load(ref)`, `.refUrl(ref, kind)`, `.api()`, `.useThing(mesh, who)`, `.allowedList()`, `.untrust(scope)` | packages and code trust |
 | `tablefolkCombat.attack(g, target)`, `.hurt(g, n, by, how)`, `.heal(g, n)` | combat |
+| `tablefolkDesignate.add(spec)`, `.addPlan(plan, opts)`, `.cancel(id)`, `.list()`, `.setPriority(id, p)`, `.kinds()`, `.registerKind(id, def)`, `.planWords(text)`, `.gameMap()` | designations: squares marked for work, the kinds, the plan language on this map |
+| `tablefolkDemands.create(spec)`, `.cancel(id)`, `.refuse(id, who, why)`, `.list()`, `.open()`, `.templates()`, `.registerTemplate(name, def)`, `.forCharacter(g)` | demands |
+| `tablefolkOrders.add(rule)`, `.remove(id)`, `.list()`, `.fromWords(text)`, `.describe(rule)` | standing orders |
+| `tablefolkGroups.all()`, `.get(id)`, `.of(charId)`, `.members(id)`, `.autonomyOf(charId)`, `.join(id, charId)`, `.leave(id, charId)` | groups |
+| `tablefolkPowers.register(name, def)`, `.use(name, target)`, `.list()` | powers |
+| `tablefolkResources.declare(name, def)`, `.get(name)`, `.add(name, n)`, `.set(name, v)`, `.can(name, n)`, `.list()` | resources |
+| `tablefolkWeather.set(kind, opts)`, `.clear()`, `.now()`, `.kinds()`, `.register(kind, def)` | the weather |
+| `tablefolkBar.add(button)`, `.remove(id)`, `.list()` | the power bar |
+| `tablefolkJobs.addWork(fn)`, `.addUrgent(fn)`, `tablefolkAgency.addOptions(fn)` | work before a worker's own steps on rails, before everything but its danger, and activities offered above rails: `fn(g, s, j)` |
 | `tablefolkScenario.travel(link)`, `.section`, `.here()`, `.links()`, `.sections()` | a world in sections: follow a link (`{ to: "back" }` goes back), the id of the section the player is in, its scenario, its links, every section with its links (things.md) |
 | `tablefolkDark.mode()`, `.visible(x, z)`, `.save()`, `.restore(data)` | fog of war and reveal: the mode, whether the player sees a square, the explored state |
 
@@ -140,6 +162,11 @@ All on `window`, as `CustomEvent`s; read `e.detail`.
 | `tablefolk-agency` | `{ agentId, what, kind, detail }` | above rails: a pick and its answer, a nonsense answer, a safety net, a loop set aside, the turn budget |
 | `tablefolk-thinking` | `{ agentId, thinking }` | the model started or stopped thinking |
 | `tablefolk-load` | `{ key, label, state, ... }` | a download's progress (speech input) |
+| `tablefolk-designation` | `{ id, kind, status, done, total, by }` | squares were marked, worked, finished or cancelled |
+| `tablefolk-demand` | `{ id, status, text, of, by }` | a demand was made (`open`), `met`, `missed`, `refused` or `cancelled` |
+| `tablefolk-order` | `{ id, text, when }` | a standing order fired |
+| `tablefolk-power` | `{ name, target, from }` | the player used a power |
+| `tablefolk-weather` | `{ kind, intensity, area }` | the weather changed |
 
 ## The data schemas
 
@@ -295,12 +322,133 @@ and `sound`. Start one from the scenario: `"triggers": [{ "on": "start",
 "as": "brenna", "do": { "start": "briefing" } }]`. Fields:
 [workflows.md](workflows.md), [story.md](story.md).
 
+## Powers, resources, designations, demands, weather
+
+The foundations for God / Dungeon Keeper play are in the game; what a
+particular game adds (its powers, plagues, blights, weather, sacrifices,
+belief rules, lair rooms) is content in a package. `packages/hearth-spirit/`
+uses one of each below (its `README.md`); `scenarios/hearth-spirit.json`
+plays it. How players see them: [living.md](living.md#marks-orders-and-demands-the-players-say).
+
+### Designations (`designations`)
+
+New kinds of marks for the Mark tool (and `api.designate`), with their work.
+Characters whose job allows take the squares by code (on rails, in their
+working hours, before their own steps; above rails as an activity they may
+choose), one square each, nearest first, the highest priority first.
+
+```json
+"designations": { "shrine_ground": { "label": "shrine ground", "shape": "rect", "color": "#d9c27a", "jobs": ["*"], "maxWorkers": 2,
+  "needs": { "stone": 1 }, "work": { "paint": "flagstone", "crop": "flowers", "anim": "pickup", "time": 2, "verb": "lays a flagstone" } } }
+```
+
+`shape`: `ring` (around a place, a gate), `line`, `rect`, `posts`, `path`,
+`cells`; `like`: a core kind to start from (`wall`, `fence`, `dig`,
+`stockpile`, `farm`, `clear`, `guard`, `patrol`); `jobs` (`"*"`: anyone),
+`fighters: true` (any fighter too), `needs` (fetched per square: the job's
+fallbacks gather or buy it), `maxWorkers`, `standing` (never done: posts,
+routes). `work` in data: `build` (a thing's type, `gate` the type at the
+gate or null for a gap), `dig`, `clear`, `paint` (a floor material), `crop`
+(a type on every other square), `stand` (game minutes at a post), `anim`,
+`time` (seconds), `sound`, `verb`. In a module, `run(g, cell, ctx)` does
+the work instead (return a job step result; `ctx`: `{ d, cell, setDoing,
+goTo, runLine, build(type), paint(mat), remove(), api }`) and `done(d, ctx)`
+runs when every square is done.
+
+### Powers (`powers`, a module's)
+
+Player-side actions on the power bar, paid in a resource.
+
+```js
+powers: { golden_rain: { label: 'Golden rain', icon: '🌧', cost: { favour: 5 }, target: 'place', cooldown: 20,
+  run(t, ctx) { api.weather('golden_rain', { area: { x: t.x, z: t.z, r: 7 }, duration: 45 }); return 'A golden rain falls.'; } } }
+```
+
+`target`: `none`, `place` (`{ x, z, place }`: a square clicked), `area`
+(`{ cells, rect, x, z }`: dragged), `character` (`{ who, x, z }`), `group`
+(`{ group, members }`: chosen from a list). `cost`: `{ resource: n }` (or a
+number with `"resource"`); paid before `run`, refunded when it returns
+`false` or `{ fail: "why" }`; a string is the narrator's line. `when(ctx)`:
+show the button only while it returns true. `ctx`: `{ api, resources,
+weather, designate, demands, groups, say, toast }`. Other buttons:
+`api.bar.add({ id, label, icon, title, run })`.
+
+### Resources (`resources`)
+
+Named world variables on a small HUD (top left). Each is also the world flag
+of its name, so conditions (`world.favour >= 10`), triggers and saves see it.
+
+```json
+"resources": { "favour": { "label": "Favour", "icon": "✨", "start": 12, "min": 0, "max": 60, "perHour": 1, "color": "#e8c25a" } }
+```
+
+`perHour`: a number, or in a module `(value, ctx) => change` (`ctx`: `{ api,
+people, groups: { id: members }, flags }`), applied every game quarter hour.
+`show: false` keeps it off the HUD. A scenario's `"resources": { "favour":
+{ "start": 5 } }` sets the start. `api.resource(name, delta)` changes it.
+
+### Demands (`demands`)
+
+A world-state object any source can create (the player's Orders tool, a
+power, the director, a scenario's `"demands"`): what, of whom, by when, what
+counts as met, what follows. A character (`via`, else an elder, priest or
+chief) says it aloud; every member remembers it and sees it on the state
+card; on rails code does the obvious job (fetches the item and leaves it at
+the place; a work demand's designations are marked for the group); above
+rails "do as demanded" and "refuse" are among the activities.
+
+```js
+api.demand({ text: 'Bring 3 bread to the temple.', of: { group: 'faithful' }, by: { in: 360 }, via: 'elder_ada',
+  met: { deliver: { item: 'bread', n: 3, to: 'temple' } },
+  onMet: { resource: { favour: 10 }, set: { pleased: true } }, onMissed: { weather: { kind: 'storm', duration: 60 } } });
+```
+
+`of`: `"all"`, `{ group }`, `{ id }`. `by`: a game minute or `{ in: minutes }`.
+`met`: `{ flag }`, `{ if: "<condition>" }`, `{ deliver: { item, n, to: a
+place or a character } }`, `{ designation: true }` with `plan` (words or a
+plan by relation) or `designation` (plans), or `{ check: "<template>" }`.
+`onMet` / `onMissed`: script actions (`set`, `reply`...) plus `resource`,
+`weather`, `narrate`. A package's demand templates read the player's words:
+
+```js
+demands: { offering: { label: 'an offering at the shrine', keywords: ['offering', 'sacrifice'],
+  parse(text, ctx) { return { text: 'Bring 2 bread to the temple.', met: { deliver: { item: 'bread', n: 2, to: 'temple' } } }; },
+  check(d, api) { return false; }, onMet(d, api) {}, onMissed(d, api) {} } }
+```
+
+The words go to the template the menus' matcher picks (keywords, meaning,
+then the brain); `parse` gets `{ now, items, places, groups, people, api }`.
+
+### Weather (`weather`)
+
+Core draws and plays `rain`, `snow`, `fog`, `storm` (lightning, thunder),
+`wind` and `dark` (and `clear`); a package names kinds on top of them:
+
+```json
+"weather": { "golden_rain": { "base": "rain", "label": "golden rain", "color": [1.0, 0.86, 0.45], "intensity": 0.8 } }
+```
+
+In a module a kind may add `onStart(w, api)`, `onTick(w, api)` (each game
+quarter hour while it lasts) and `onEnd(w, api)`, and `sound` (a package
+sound, looped). `api.weather(kind, { intensity, duration (seconds), area: {
+x, z, r }, wind: [x, z] })` sets it; the flag `weather` holds the kind. A
+scenario's `"weather": "fog"` (or `{ "kind", "intensity" }`) is its start.
+
+### Groups, standing orders, the plan language
+
+Data in the scenario, not the package ([format.md](format.md),
+[living.md](living.md#marks-orders-and-demands-the-players-say)); a module
+reads them with `api.groups()` / `api.groupOf(who)`, adds standing orders
+with `tablefolkOrders.add({ when, do })` and turns relations into squares
+with `api.designate({ verb, around, near, side, ... })` (the plan language:
+`app/plan-core.js`).
+
 ## What a package cannot do yet
 
 - Change rendering: walls, floors, lighting, the camera (the `api.scene`
-  is there, but nothing is managed for you beyond `api.light`).
-- Add panes or buttons to the game's interface (a toast and the menus are
-  the ways to talk to the player).
+  is there, but nothing is managed for you beyond `api.light` and the weather).
+- Add panes to the game's interface (buttons on the power bar, a toast, the
+  menus and the pick strip of powers are the ways to talk to the player).
 - Replace the prompt's built-in parts or the reply parser; only add lines
   (cards, a skill's prompt, command help).
 - New map generators or base maps.

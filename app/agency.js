@@ -130,11 +130,12 @@
     const set = setting(), d = set === 'auto' ? brainDefault() : null;
     // (?autonomy=<level> in the link is for tests and measuring: it beats the world's and the characters' own)
     const forced = urlSet && urlSet !== 'auto';
-    const p = PF().choose({ character: forced ? null : cfg.autonomy, world: forced ? null : state?.autonomy, setting: set, auto: d?.value });
-    const who = p.source === 'character' ? 'set on the character' : 'set by this world';
+    const grp = forced ? null : window.tablefolkGroups?.autonomyOf?.(g?.id);   // orders.js: its group's (between its own and the world's)
+    const p = PF().choose({ character: forced ? null : cfg.autonomy, group: grp, world: forced ? null : state?.autonomy, setting: set, auto: d?.value });
+    const who = p.source === 'character' ? 'set on the character' : p.source === 'group' ? 'set for its group' : 'set by this world';
     const mine = urlSet ? 'set by the link (?autonomy=)' : 'your choice in Settings';
-    const why = p.capped ? `${p.source === 'character' ? 'this character asks' : 'this world asks'} for ${p.capped.asked}, but ${p.capped.by === 'setting' ? 'On rails is ' + mine : 'this brain runs on rails (' + d.why + ')'}: kept on rails`
-      : p.source === 'character' || p.source === 'world' ? who + (p.kept?.length ? `; ${p.kept.join(' and ')} kept in code for this brain (${d.why})` : '')
+    const why = p.capped ? `${p.source === 'character' ? 'this character asks' : p.source === 'group' ? 'its group asks' : 'this world asks'} for ${p.capped.asked}, but ${p.capped.by === 'setting' ? 'On rails is ' + mine : 'this brain runs on rails (' + d.why + ')'}: kept on rails`
+      : p.source === 'character' || p.source === 'group' || p.source === 'world' ? who + (p.kept?.length ? `; ${p.kept.join(' and ')} kept in code for this brain (${d.why})` : '')
       : p.source === 'setting' ? mine : 'auto: ' + d.why;
     return { ...p, level: p.domains.activity === 'code' ? 'rails' : p.free ? 'free' : 'guided', why };
   }
@@ -366,6 +367,9 @@
     if (['rest', 'wander', 'tidy', 'lookout', 'pace', 'read', 'chores', 'haul'].includes(kind)) return null;   // ways to keep busy: "take a break", "what the village needs"
     return { ...base, cmd: k.stepLabel(st), label: st.doing || k.stepLabel(st), doing: st.doing };   // a package's step kind
   }
+  // more activities from other parts of the game: fn(g, s, j) -> [{ key, kind, cmd, label, doing, run(g, s, j, a) -> { busy, ms } | { done, text } | { fail } }]
+  const EXTRA = [];
+  const addOptions = fn => { if (typeof fn === 'function' && !EXTRA.includes(fn)) EXTRA.push(fn); };
   function options(g, s, j) {
     const k = X(), A = ag(s), h = hour(), t = gm(), cfg = cfgOf(g), m = M()?.mindOf?.(g) || {};
     const out = [], bad = key => (A.badAct[key] || 0) > t;
@@ -417,6 +421,8 @@
     const ps = k.places().filter(x => x.x0 != null && x !== here && A.visited[x.id] !== dayNo() && !['pond'].includes(x.kind));
     for (let n = 0; n < 2 && ps.length; n++) { const x = ps.splice((Math.floor(h) * 7 + n * 3 + g.id.length) % ps.length, 1)[0]; add({ key: 'go:' + x.id, kind: 'go', cmd: 'go to the ' + x.id, label: `go and see the ${x.id}${x.kind && x.kind !== x.id ? ' (' + nice(x.kind) + ')' : ''}`, place: x, doing: `going to the ${x.id}`, run: runGo }); }
     if (s.home && !k.inPlace(s.home, p.x, p.z) && (h >= 19 || h < 8)) add({ key: 'home', kind: 'home', cmd: 'go home', label: 'go home', doing: 'going home', run: runHome });
+    // what the world asks of it: marked work (designate.js), demands of it or its group (orders.js), a package's (addOptions)
+    for (const fn of EXTRA) { try { for (const o of fn(g, s, j) || []) add(o); } catch (e) { console.warn('[agency] options', e); } }
     add({ key: 'rest', kind: 'rest', cmd: 'rest', label: 'take a break (sit a while)', doing: 'taking a break', run: runRest });
     add({ key: 'other', kind: 'other', cmd: '', label: 'something else (say what)', doing: 'about its own business', run: runOpen('choice') });
     return out;
@@ -914,5 +920,5 @@
     return out;
   }
 
-  window.tablefolkAgency = { level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, danger, stats, profile, domain, note, LEVELS, get turnSeconds() { return medianTurn(); } };
+  window.tablefolkAgency = { addOptions, level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, danger, stats, profile, domain, note, LEVELS, get turnSeconds() { return medianTurn(); } };
 })();

@@ -57,6 +57,9 @@ Every section is optional; paths are relative to the file.
   "bodies": { "dire_wolf": { "model": "models/dire_wolf.glb", "h": 0.95, "clips": { "idle": "Idle", "walk": "Walk" }, "emotes": ["howl"] } },
   "sounds": { "howl": "sounds/howl.ogg" },
   "lines": { "sale": ["Mind, it's hot from the forge, {name}."], "raid": { "gruff": ["{raiders}! Grab a hammer!"] } },
+  "designations": { "shrine_ground": { "label": "shrine ground", "shape": "rect", "work": { "paint": "flagstone" } } },
+  "resources": { "favour": { "label": "Favour", "icon": "✨", "start": 12, "max": 60, "perHour": 1 } },
+  "weather": { "golden_rain": { "base": "rain", "color": [1.0, 0.86, 0.45] } },
   "modules": ["smithy.js"]
 }
 ```
@@ -119,13 +122,20 @@ Every section is optional; paths are relative to the file.
   asking for and sharing food, an intruder told off), added to the shared
   pools ([living.md](living.md#spoken-life-templated-lines)); a job's own
   `lines` come first.
+- `designations`, `resources`, `weather`, `demands`: God / Dungeon Keeper
+  play in data: mark kinds with their work, named world variables on a
+  HUD, weather kinds on top of the core's, demand templates; a module adds
+  the same with code, and `powers` (player-side actions on the power bar)
+  ([api.md](api.md#powers-resources-designations-demands-weather);
+  `packages/hearth-spirit/` has one of each).
 - `modules`: code (below).
 
 The example `packages/smithy/` has one of each; `packages/orchard/` is a
 data-only package for living worlds: an `apple_tree` with stock that grows
 back, a `picker` job and a `crows` threat (used by `scenarios/hearthvale.json`);
 `packages/nightwatch/` is a small game (`scenarios/nightwatch.json`; its
-`README.md` walks through it).
+`README.md` walks through it); `packages/hearth-spirit/` is the God-play
+example (`scenarios/hearth-spirit.json`).
 
 A scenario's packages last only while it plays: when another scenario
 starts, what they brought (items, bodies, sounds, jobs, uses, threat kinds,

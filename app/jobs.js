@@ -45,7 +45,9 @@
  * three game hours, only with someone in earshot). Each call fires
  * 'tablefolk-model-call' ({ agentId, kind }).
  *
- *   window.tablefolkJobs = { load, register, jobOf, handles, tick, eventPick, cardLine, speechCause, doing, stats, news }
+ *   window.tablefolkJobs = { load, register, jobOf, handles, tick, eventPick, cardLine, speechCause, doing, stats, news,
+ *     addWork(fn), addUrgent(fn) }   other parts' work before a worker's own steps (designate.js marks, orders.js demands)
+ *                                     and before everything but its danger (orders.js: a standing order's call to arms)
  * Loaded after live.js and clock.js; uses app.js globals.
  */
 (function () {
@@ -1311,6 +1313,11 @@
   // ---------------------------------------------------------------- one tick (live.js)
   const inHours = (h, [a, b]) => a <= b ? h >= a && h < b : h >= a || h < b;
   const sleepHours = j => j?.sleep || (j?.watch === 'night' ? [9, 16] : [21, 5]);
+  // what the world asks for before a worker's own steps (on rails, in its hours): fn(g, s, j) -> { ms } | null
+  const WORK = [], URGENT = [];
+  const addWork = fn => { if (typeof fn === 'function' && !WORK.includes(fn)) WORK.push(fn); };
+  // before anything else but its own danger (orders.js: called to arms by a standing order, sent indoors): fn(g, s, j) -> { ms } | null
+  const addUrgent = fn => { if (typeof fn === 'function' && !URGENT.includes(fn)) URGENT.push(fn); };
   async function tick(g) {
     const j = jobOf(g); if (!j) return { ms: 5000 };
     const s = S(g); s.ticks++;
@@ -1329,6 +1336,7 @@
       }
       await modelTurn(g, 'danger'); return { ms: 1800 };
     }
+    for (const fn of URGENT) { try { const r = await fn(g, s, j); if (r) return r; } catch (e) { console.warn('[jobs] urgent hook', e); } }
     // agency.js: on rails (the default for small brains) code runs the day as below; guided and
     // free hand the choices to the model (agency.js tick), code keeping the safety nets
     const A = window.tablefolkAgency, lvl = A?.level?.(g) || 'rails';
@@ -1362,7 +1370,8 @@
     // an agenda from the scenario: an open turn now and then, so its story moves
     const a = agentOf(g), cfg = W().getBrainConfig(g.id);
     if ((cfg.agenda || cfg.quest || a.goal) && s.ticks % 3 === 0 && gm() - s.lastOpen >= 120) { s.lastOpen = gm(); await modelTurn(g, 'agenda'); return { ms: 5000 }; }
-    if (inHours(h, workH)) return work(g, s, j);
+    // marked work (designate.js) and demands (orders.js) come before its own steps in its working hours
+    if (inHours(h, workH)) { for (const fn of WORK) { try { const r = await fn(g, s, j); if (r) return r; } catch (e) { console.warn('[jobs] work hook', e); } } return work(g, s, j); }
     if (h >= 17 && h < 21 || (j.watch === 'night' && inHours(h, [17, 21]))) return evening(g, s);
     // before work: about the house
     setDoing(g, s, 'about the house');
@@ -1418,7 +1427,7 @@
     return `busy since ${since} (${s.busyWith || s.doing || 'working'}); had not reached food by ${hhmm(gm())}`;
   }
   function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, chores: g._job.choreDone || 0, did: g._job.did, doing: g._job.doing, step: g._job.at || '', stuck: g._job.stuck || '', hungerWhy: hungerWhy(g) }; return out; }
-  window.tablefolkJobs = { condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm,
+  window.tablefolkJobs = { addWork, addUrgent, condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm,
     // what agency.js (guided and free autonomy) builds on: the same steps, walks and helpers as the rails
     kit: { S, doStep, stepName, stepLabel, work, eat, bedtime, wake, chores, choreList, helpChore, fallback, idleActivity, goTo, goDo, approach, walkTo, setDoing, nearPeople, nameOf, todayLine, newsFor, stores, myStores, communal, has, contentsOf, count, gold, price, foodIn, edible, isFood, stationFor, sourcesOf, missingIn, altSets, inStores, places, placeNamed, spotIn, inPlace, placeAt, things, nice, jobOf, inHours, sleepHours, fighter, defended, offerOpts, rulesOf, check, runLine, fightRaiders, hideHome, addNews, gm, buyFrom } };
 })();

@@ -94,6 +94,11 @@ not listed there is dropped (agents and objects keep all their own fields).
 | `mode`, `modeWhen`, `modeRadius`, `encounterWorld`, `turnMoves`, `turnMinutes` | how the game runs: `living` (real time, the default), `adventure` (the world on rails; whoever the player talks to uses the model), `turns` (nothing moves until the player ends a turn); switches by situation; a section may have its own | [living.md](living.md#how-the-game-runs-mode) |
 | `time`, `dayMinutes`, `clock` | the time of day: start, real minutes a day (0: frozen), `false`: no clock | [living.md](living.md) |
 | `threats` | raids, rats, bandits (and package kinds) on the clock | [living.md](living.md), [combat.md](combat.md) |
+| `groups` | named groups of characters (`{"faithful": {"name": "the faithful", "members": ["wren"], "autonomy": "guided", "demands": [...]}}`; an agent's `"group"` joins one); a group's `autonomy` is between the character's own and the world's | [living.md](living.md#marks-orders-and-demands-the-players-say) |
+| `designations` | squares marked for work at the start: plans by relation (`{"verb": "wall", "around": "garden", "gate": {"toward": "road"}}`) or `{"kind", "cells": [{"x", "z"}]}`; `priority`, `who` | [living.md](living.md#marks-orders-and-demands-the-players-say) |
+| `orders` | standing orders: words (`"if more than two wolves come, wake bram"`) or rules (`{"when": "raiders > 2", "do": {"wake": "bram"}}`) | [living.md](living.md#marks-orders-and-demands-the-players-say) |
+| `demands`, `demandDelay` | demands at the start (`{"text", "of", "via", "in", "met", "onMet", "onMissed"}`), made `demandDelay` ms after it (3000) | [living.md](living.md#marks-orders-and-demands-the-players-say), [api.md](api.md#demands-demands) |
+| `resources`, `weather` | resources' starts (`{"favour": {"start": 5}}`, or a resource of the world's own); the weather at the start (`"fog"`, `{"kind": "rain", "intensity": 0.6}`) | [api.md](api.md#powers-resources-designations-demands-weather) |
 | `talk` | `true`: a talk-only scene; the world builder leaves it one place with no jobs or threats | [world-builder.md](world-builder.md) |
 | `harsh`, `prices` | starving drains health; the world's prices (`{"bread": 3}`) | [characters.md](characters.md) |
 | `monsters` | `"player"`: monsters go only for the player; `"everyone"`; unset: everyone in a living world, the player otherwise | [combat.md](combat.md) |
@@ -138,7 +143,8 @@ Without `at` the player starts at the south of the board.
   "secret": "Took the mayor's lamp.",               // kept from the player unless it trusts them a lot (characters.md)
   "agenda": "become the next mayor",               // what it is quietly after, on its card each turn
   "expect": "capable",             // basic | capable | ambitious: how much the game helps it (characters.md); else by brain
-  "autonomy": "free",              // rails | assisted | guided | free, or {"preset": "guided", "danger": "code"} (activity, plan, talk, danger, needs, temper: code | model): living.md; else the world's, the player's, the brain's
+  "group": "faithful",             // one or a list: the groups it belongs to (living.md, "Marks, orders and demands")
+  "autonomy": "free",              // rails | assisted | guided | free, or {"preset": "guided", "danger": "code"} (activity, plan, talk, danger, needs, temper: code | model): living.md; else its group's, the world's, the player's, the brain's
   "reflexes": false,               // no game-made moves for it in danger or hunger
   "hunts": "everyone",             // a monster that goes after characters too, not only the player
   "temperament": "brave",          // brave | timid | calm (how it takes being hurt or insulted); else guessed

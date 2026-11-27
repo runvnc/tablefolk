@@ -1023,6 +1023,8 @@
     // jobs.js: what it does for a living, what it is doing, what it did today
     out.push(...(window.tablefolkJobs?.cardLine?.(g) || []));
     const ask = window.tablefolkJobs?.askLine?.(g); if (ask) out.push(ask);
+    // orders.js: its groups, what is demanded of it, standing orders that name it
+    out.push(...(window.tablefolkOrders?.cardLines?.(g) || []));
     const w = want(g), urgent = /^(stay safe|get your wounds|get away|tell .* attacked|let .* stand for)/.test(w);
     if (w && (urgent || !cfg.goal)) out.push('You want: ' + w + '.');
     if (cfg.goal) { const n = m.turn - m.goalTurn; out.push(`Current goal: ${cfg.goal}` + (n >= 6 ? ` (${n} turns on it: what is the next step?)` : '')); }

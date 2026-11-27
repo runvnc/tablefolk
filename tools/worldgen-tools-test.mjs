@@ -37,6 +37,17 @@ t('object add/update/remove', () => {
   assert.ok(step('object', { action: 'update', index: 0, fields: { gold: 5 } }).result.ok); assert.equal(s.objects[0].gold, 5);
   assert.match(step('object', { action: 'remove', index: 9 }).result.error, /index/);
 });
+t('plan: relations to squares on the built map (plan-core)', () => {
+  const pre = step('plan', { plan: { verb: 'wall', around: 'tavern', gate: { toward: 'road' } }, as: 'preview' });
+  assert.ok(pre.result.ok && pre.result.squares > 10 && pre.result.gate, JSON.stringify(pre.result).slice(0, 200)); assert.equal(pre.changed, false);
+  const n0 = (s.objects || []).length, o = step('plan', { plan: { verb: 'fence', around: 'tavern', gate: 'none' }, as: 'objects' });
+  assert.ok(o.result.ok, JSON.stringify(o.result)); assert.ok(s.objects.length > n0 + 8 && s.objects.slice(n0).every(x => x.type === 'fence'));
+  const d = step('plan', { plan: { verb: 'stockpile', near: 'square', side: 'any', w: 3, h: 2 }, who: 'labourer', priority: 4 });
+  assert.ok(d.result.ok, JSON.stringify(d.result)); assert.equal(s.designations.at(-1).verb, 'stockpile'); assert.equal(s.designations.at(-1).priority, 4);
+  assert.match(step('plan', { plan: { verb: 'wall', around: 'castle' } }).result.error, /unknown place/);
+  assert.match(step('plan', { plan: { verb: 'dig', near: 'tavern' }, as: 'objects' }).result.error, /walls or fences/);
+  s.objects = s.objects.slice(0, n0); delete s.designations;
+});
 t('place add/style/remove', () => {
   assert.ok(step('place', { action: 'add', place: 'temple' }).result.ok); assert.ok(s.generate.places.includes('temple'));
   const r = step('place', { action: 'style', place: 'tavern', building: { style: 'stone_timber', roof: 'thatch', storeys: 2 } }); assert.ok(r.result.ok, JSON.stringify(r.result)); assert.equal(s.generate.houses.tavern.roof, 'thatch');

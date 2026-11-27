@@ -121,7 +121,9 @@
     const box = bbox(ids.flatMap(id => C.placeCells(need(id))));
     const bad = ([x, y]) => { const ch = C.at(x, y); return ch === null || BLOCKS.includes(ch); };
     let best = null;
-    for (let m = 1; m <= 3; m++) { const r = outline([box[0] - m, box[1] - m, box[2] + m, box[3] + m]); const n = r.filter(bad).length; if (!best || n < best.n) best = { r, n, m }; if (!n) break; }
+    // (a ring over a fence, trees or clutter costs half: it is left out or must be cleared first)
+    const soft = ([x, y]) => 'f%rx'.includes(C.at(x, y));
+    for (let m = 1; m <= 3; m++) { const r = outline([box[0] - m, box[1] - m, box[2] + m, box[3] + m]); const n = r.filter(bad).length + r.filter(soft).length * .5; if (!best || n < best.n) best = { r, n, m }; if (!n) break; }
     const cells = best.r, R = [box[0] - best.m, box[1] - best.m, box[2] + best.m, box[3] + best.m];
     let gate = null; const g = gateSpec;
     if (g === 'none' || g === false) return { cells, gate: null, rect: R };

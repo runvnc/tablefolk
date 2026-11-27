@@ -347,6 +347,84 @@ What it costs: guided asks the model about once per activity (a few seconds
 on a capable machine); free asks for whole turns. Measured: maintainer skill,
 brains.md, "Autonomy".
 
+## Marks, orders and demands: the player's say
+
+God and Dungeon Keeper style play on the same village: the player marks work
+on the map, gives standing orders and makes demands, and the characters carry
+them out by code (with no model at all) or, above rails, choose to. The power
+bar at the bottom holds **Mark** (M), **Orders** and the powers a package adds;
+resources such as a package's favour or mana show at the top left.
+
+**Marks** (`app/designate.js`). Mark, then a kind: `wall`, `fence` (drag a
+rectangle: its outline), `dig`, `stockpile`, `farm plot`, `clear` (drag an
+area), `guard post` (click each post), `patrol route` (click its turns), and
+a package's kinds. Or type it: "a wall around the garden with a gate toward
+the road", "dig a 2 by 2 cellar under the tavern", "three guards on the east
+side of the bridge", "a patrol from the guardhouse to the gate by the
+square". Code reads the words; with a brain loaded, the brain fills in the
+plan from the list of places (never the grid; a small brain names only the
+place and the numbers, and the words decide the sides; "behind the smithy"
+asks *Which side?*). The squares show as a ghost; squares on buildings,
+water, trees or out of reach are left out and said so; the player picks a
+priority (1, when idle, to 5, urgent) and **Mark it**. Each square is a job:
+
+- on rails, in their working hours, before their own work, characters whose
+  job allows take the highest-priority mark and the nearest square (three at
+  most on one mark; guard posts and patrols take fighters and guards), walk
+  there, fetch what the kind needs and do it: a wall (a door at the gate), a
+  fence (a gap at the gate), a pit or a way through rock, tilled earth with a
+  crop on every other square, cleared trees and rocks (firewood and stone to
+  the worker), a stockpile (a crate and a place `stockpile` once done), a
+  watch kept at the post served longest ago, a patrol walked turn by turn;
+- above rails the open marks are among the activities ("work on the wall
+  around the garden (12 squares left, urgent)"): a character takes them up,
+  or does something else;
+- a square that fails three times waits an hour; a mark can be cancelled from
+  the Mark strip; marks save with the world; a scenario's `"designations"`
+  start marked.
+
+**Standing orders** (`app/orders.js`): Orders, then words such as "if more
+than two wolves come, wake bram", "at night, send everyone inside", "if any
+bandits come, ring the bell and tell me". The game shows the rule in plain
+text ("When more than 2 raiders are about: wake bram and send them to the
+threat.") and keeps it when the player says so; it then runs with no model,
+each time its condition becomes true. Actions: wake someone (up, to the
+raiders or the player), the alarm, everyone indoors, send someone to a place,
+tell the player. Conditions: `raiders`, `raider_near`, `hour`, flags and
+resources. A scenario's `"orders"` are words or rules (`{"when": "raiders >
+2", "do": {"wake": "bram"}}`).
+
+**Demands** (decrees, quests): Orders, Demand, then words such as "the
+faithful must bring 3 bread to the temple by evening". A demand says what,
+of whom (everyone, a group, a character), by when, what counts as met (an
+item brought to a place or a person, a flag, marked work done) and what
+follows when it is met or missed (a flag, a resource, the weather, the
+narrator). A character delivers it: `"via"`, else an elder, priest or chief,
+else a member: it says it aloud, everyone it binds remembers it and sees it
+on the state card ("Demanded of the faithful (word from elder_ada): Bring 2
+bread to the temple by 18:00 (1 of 2 brought; you carry 1 bread)"). On rails
+the game does the obvious job (members fetch the item, from their own pack,
+the stores or a seller, and leave it at the place: in a chest or barrel there,
+else on the floor; a work demand's marks go to the group); above rails "do as
+demanded" and "refuse" are among the activities, and a refusal is news.
+Packages bring demand templates of their own (an offering, a sacrifice).
+
+**Groups** (`"groups"`, an agent's `"group"`): named sets of characters (a
+household, a faction, the faithful). A character's card says which it
+belongs to; a group's `"autonomy"` comes between the character's own and the
+world's; demands and marks can name a group.
+
+```json
+"groups": { "faithful": { "name": "the faithful", "members": ["wren", "bram"], "autonomy": "guided" } },
+"designations": [{ "verb": "wall", "around": "garden", "gate": { "toward": "road" }, "priority": 4 }],
+"orders": ["if more than two wolves come, wake bram"],
+"demands": [{ "text": "Bring 2 bread to the temple.", "of": "faithful", "via": "elder_ada", "in": 600,
+  "met": { "deliver": { "item": "bread", "n": 2, "to": "temple" } }, "onMet": { "set": { "offering_made": true } } }]
+```
+
+`scenarios/hearth-spirit.json` (with the `hearth-spirit` package: favour,
+golden rain, a gift of bread, an offering) plays all of it.
+
 ## What the player does
 
 The village notices the player. Helping drive off a raid, buying from

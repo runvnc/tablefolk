@@ -1,0 +1,27 @@
+{
+  "id": "hearth-spirit",
+  "name": "Hearth Spirit",
+  "version": "1.0.0",
+  "description": "A tiny example of the God-play extension points: two designation kinds (shrine ground in data, an offering spot in code), two powers (a golden rain on a place, a gift of bread to a character), one resource (favour) and one demand template (an offering at the shrine). Not a game: a proof that a God package can be pure content.",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "example", "god"],
+
+  "resources": {
+    "favour": { "label": "Favour", "icon": "✨", "start": 12, "min": 0, "max": 60, "perHour": 1, "color": "#e8c25a" }
+  },
+
+  "designations": {
+    "shrine_ground": {
+      "label": "shrine ground", "shape": "rect", "color": "#d9c27a", "jobs": ["*"], "maxWorkers": 2,
+      "description": "flagstones laid and flowers planted: holy ground",
+      "work": { "paint": "flagstone", "crop": "flowers", "anim": "pickup", "time": 2, "verb": "lays a flagstone on the shrine ground" }
+    }
+  },
+
+  "weather": {
+    "golden_rain": { "base": "rain", "label": "golden rain", "color": [1.0, 0.86, 0.45], "intensity": 0.8 }
+  },
+
+  "modules": ["hearth-spirit.js"]
+}

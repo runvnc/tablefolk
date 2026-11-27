@@ -1,0 +1,42 @@
+{
+  "v": 1,
+  "title": "Hearth Spirit",
+  "subtitle": "You are the spirit of the hearth. Mark work, give orders, make demands.",
+  "intro": "A small village keeps a temple to the spirit of the hearth: you. Mark squares for work with Mark (M), give standing orders and make demands with Orders, and spend your favour on golden rain and gifts of bread. The elder carries your word to the faithful.",
+  "live": true,
+  "pace": "busy",
+  "time": "08:00",
+  "dayMinutes": 12,
+  "seed": 7,
+  "showIntro": false,
+  "generate": { "kind": "village", "buildings": 4, "places": ["temple", "garden", "tavern"], "seed": 7 },
+  "packages": ["hearth-spirit"],
+  "player": { "name": "Spirit", "gold": 0, "items": [], "model": "wizard" },
+  "allowed": ["say", "walk", "face", "look", "emote", "give", "eat", "carry", "drop", "use", "take", "put", "close", "inventory"],
+  "food": ["bread", "apple", "wheat"],
+  "groups": {
+    "faithful": { "name": "the faithful", "members": ["wren", "bram", "tilly"], "description": "those who keep the temple" }
+  },
+  "resources": { "favour": { "start": 12 } },
+  "orders": ["if more than two wolves come, wake bram"],
+  "demands": [
+    { "text": "Bring 2 bread to the temple as an offering.", "of": "faithful", "via": "elder_ada", "in": 600,
+      "met": { "deliver": { "item": "bread", "n": 2, "to": "temple" } },
+      "onMet": { "resource": { "favour": 8 }, "set": { "offering_made": true }, "narrate": "The offering is made. The hearth burns brighter." },
+      "onMissed": { "resource": { "favour": -4 }, "narrate": "No offering came. The hearth smoulders." } }
+  ],
+  "demandDelay": 4000,
+  "agents": [
+    { "id": "elder_ada", "model": "priest", "job": "idler", "in": "temple", "style": "stooped elder with a staff",
+      "personality": "Ada, the village elder and keeper of the temple. You speak for the spirit of the hearth. You worry the young ones forget the old ways." },
+    { "id": "wren", "model": "peasant_woman", "job": "baker", "in": "tavern", "home": "tavern", "workplace": "tavern", "style": "floury baker",
+      "personality": "Wren, the baker. You bake before dawn and are proud of your loaves. You think Bram works too slowly.",
+      "inventory": { "gold": 5, "items": [{ "name": "bread", "qty": 3 }, { "name": "wheat", "qty": 4 }] } },
+    { "id": "bram", "model": "villager", "job": "labourer", "in": "square", "style": "broad-shouldered labourer",
+      "personality": "Bram, a labourer. You carry, dig and build for anyone who asks. You want a house of your own one day.",
+      "inventory": { "gold": 2, "items": [] } },
+    { "id": "tilly", "model": "farmer", "job": "farmer", "in": "garden", "style": "sunburnt farmer",
+      "personality": "Tilly, the farmer. You love your garden and talk to your plants. You think the elder fusses too much.",
+      "inventory": { "gold": 3, "items": [{ "name": "apple", "qty": 2 }] } }
+  ]
+}
