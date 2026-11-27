@@ -1,0 +1,536 @@
+[
+ {
+  "id": "v-wall-garden",
+  "map": "village23",
+  "say": "Build a wall around the garden, with a gate on the side toward the east road.",
+  "answer": "wall",
+  "check": {
+   "target": [
+    "garden"
+   ],
+   "gate": {
+    "toward": "east road"
+   }
+  },
+  "gold": {
+   "enclose": "garden",
+   "gate": {
+    "toward": "east road"
+   }
+  }
+ },
+ {
+  "id": "v-pile-smithy",
+  "map": "village23",
+  "say": "Mark out a 4 by 3 stockpile on open ground next to the smithy.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    4,
+    3
+   ],
+   "near": "smithy",
+   "maxGap": 3
+  },
+  "gold": {
+   "near": "smithy",
+   "side": "any",
+   "w": 4,
+   "h": 3
+  }
+ },
+ {
+  "id": "v-guards-north",
+  "map": "village23",
+  "say": "Post 3 guards along the north road.",
+  "answer": "posts",
+  "check": {
+   "n": 3,
+   "target": "north road",
+   "radius": 2
+  },
+  "gold": {
+   "guard": "north road",
+   "n": 3,
+   "side": "any"
+  }
+ },
+ {
+  "id": "v-patrol",
+  "map": "village23",
+  "say": "Give the watch a patrol route from the guardhouse to the alchemist by way of the square, keeping to the roads.",
+  "answer": "path",
+  "check": {
+   "from": "guardhouse",
+   "to": "alchemist",
+   "via": [
+    "square"
+   ],
+   "onRoad": 0.6
+  },
+  "gold": {
+   "from": "guardhouse",
+   "via": [
+    "square"
+   ],
+   "to": "alchemist",
+   "prefer": "road"
+  }
+ },
+ {
+  "id": "v-cellar-tavern",
+  "map": "village23",
+  "say": "Dig a 2 by 2 cellar under the tavern.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    2,
+    2
+   ],
+   "inside": "tavern"
+  },
+  "gold": {
+   "under": "tavern",
+   "w": 2,
+   "h": 2
+  }
+ },
+ {
+  "id": "v-house-square",
+  "map": "village23",
+  "say": "Find a spot for a new 5 by 4 house near the square, on open grass, not touching any road.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    5,
+    4
+   ],
+   "near": "square",
+   "maxGap": 6,
+   "roadClear": true
+  },
+  "gold": {
+   "near": "square",
+   "side": "any",
+   "w": 5,
+   "h": 4
+  }
+ },
+ {
+  "id": "v-referent-plot",
+  "map": "village23",
+  "say": "The shopkeeper says the goats got into 'the little fenced plot south of my shop'. Mark that area.",
+  "answer": "area",
+  "check": {
+   "place": "garden"
+  },
+  "gold": {
+   "place": "garden"
+  }
+ },
+ {
+  "id": "h-wall-temple",
+  "map": "hearthvale",
+  "say": "Wall in the temple, with a gate facing the road.",
+  "answer": "wall",
+  "check": {
+   "target": [
+    "temple"
+   ],
+   "gate": {
+    "toward": "road"
+   }
+  },
+  "gold": {
+   "enclose": "temple",
+   "gate": "north"
+  }
+ },
+ {
+  "id": "h-guards-west",
+  "map": "hearthvale",
+  "say": "Station 2 guards where the west road leaves the village at the map's west edge.",
+  "answer": "posts",
+  "check": {
+   "n": 2,
+   "target": "west road",
+   "radius": 2,
+   "westOf": 6
+  },
+  "gold": {
+   "guard": "west road",
+   "n": 2,
+   "end": "west"
+  }
+ },
+ {
+  "id": "h-woodpile-library",
+  "map": "hearthvale",
+  "say": "Mark a 4 by 2 woodpile just north of the library.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    4,
+    2
+   ],
+   "near": "library",
+   "side": "n",
+   "maxGap": 2
+  },
+  "gold": {
+   "near": "library",
+   "side": "north",
+   "w": 4,
+   "h": 2
+  }
+ },
+ {
+  "id": "h-route-tavern-temple",
+  "map": "hearthvale",
+  "say": "Show the route from the tavern to the temple along the roads.",
+  "answer": "path",
+  "check": {
+   "from": "tavern",
+   "to": "temple",
+   "onRoad": 0.6
+  },
+  "gold": {
+   "from": "tavern",
+   "to": "temple",
+   "prefer": "road"
+  }
+ },
+ {
+  "id": "h-pit-smithy",
+  "map": "hearthvale",
+  "say": "Dig a 2 by 2 rubbish pit behind the smithy, on the side away from its door.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    2,
+    2
+   ],
+   "near": "smithy",
+   "side": "e",
+   "maxGap": 3
+  },
+  "gold": {
+   "near": "smithy",
+   "side": "east",
+   "w": 2,
+   "h": 2
+  }
+ },
+ {
+  "id": "h-cellar-shop",
+  "map": "hearthvale",
+  "say": "Dig a 3 by 2 cellar under the shop.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    3,
+    2
+   ],
+   "inside": "shop"
+  },
+  "gold": {
+   "under": "shop",
+   "w": 3,
+   "h": 2
+  }
+ },
+ {
+  "id": "h-house-garden",
+  "map": "hearthvale",
+  "say": "Put a new 4 by 3 house on open grass next to the garden.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    4,
+    3
+   ],
+   "near": "garden",
+   "maxGap": 3
+  },
+  "gold": {
+   "near": "garden",
+   "side": "any",
+   "w": 4,
+   "h": 3
+  }
+ },
+ {
+  "id": "f-wall-orchard",
+  "map": "farm",
+  "say": "Wall in the orchard, with a gate facing the lane.",
+  "answer": "wall",
+  "check": {
+   "target": [
+    "orchard"
+   ],
+   "gate": {
+    "toward": "lane"
+   }
+  },
+  "gold": {
+   "enclose": "orchard",
+   "gate": {
+    "toward": "lane"
+   }
+  }
+ },
+ {
+  "id": "f-wall-yard",
+  "map": "farm",
+  "say": "Put a wall round the yard, with the gate on the farmhouse side.",
+  "answer": "wall",
+  "check": {
+   "target": [
+    "yard"
+   ],
+   "gate": {
+    "toward": "farmhouse"
+   }
+  },
+  "gold": {
+   "enclose": "yard",
+   "gate": {
+    "toward": "farmhouse"
+   }
+  }
+ },
+ {
+  "id": "f-field-barn",
+  "map": "farm",
+  "say": "Mark a new 6 by 4 field on open ground north of the barn building.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    6,
+    4
+   ],
+   "near": "barn building",
+   "side": "n",
+   "maxGap": 4
+  },
+  "gold": {
+   "near": "barn building",
+   "side": "north",
+   "w": 6,
+   "h": 4
+  }
+ },
+ {
+  "id": "f-guards-coop",
+  "map": "farm",
+  "say": "Place 4 guards around the chicken coop, one on each side, to keep the foxes off.",
+  "answer": "posts",
+  "check": {
+   "n": 4,
+   "target": "chicken coop",
+   "radius": 2,
+   "surround": true
+  },
+  "gold": {
+   "guard": "chicken coop",
+   "n": 4,
+   "side": "around"
+  }
+ },
+ {
+  "id": "f-path-orchard",
+  "map": "farm",
+  "say": "Clear a path from the farmhouse door to the orchard (trees on the way may be cut).",
+  "answer": "path",
+  "check": {
+   "from": "farmhouse",
+   "to": "orchard",
+   "trees": true
+  },
+  "gold": {
+   "from": "farmhouse",
+   "to": "orchard",
+   "prefer": "short"
+  }
+ },
+ {
+  "id": "f-cellar-farmhouse",
+  "map": "farm",
+  "say": "Dig a 3 by 3 root cellar under the farmhouse.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    3,
+    3
+   ],
+   "inside": "farmhouse"
+  },
+  "gold": {
+   "under": "farmhouse",
+   "w": 3,
+   "h": 3
+  }
+ },
+ {
+  "id": "f-referent-sheep",
+  "map": "farm",
+  "say": "Old Hale says 'drive them back into the sheep's field, the fenced one'. Mark the area he means.",
+  "answer": "area",
+  "check": {
+   "place": "pasture"
+  },
+  "gold": {
+   "place": "pasture"
+  }
+ },
+ {
+  "id": "r-guards-bridge",
+  "map": "riverford",
+  "say": "Put 3 guards where they cover the bridge.",
+  "answer": "posts",
+  "check": {
+   "n": 3,
+   "target": "bridge",
+   "radius": 3
+  },
+  "gold": {
+   "guard": "bridge",
+   "n": 3,
+   "side": "any"
+  }
+ },
+ {
+  "id": "r-guards-east",
+  "map": "riverford",
+  "say": "Put 2 guards on the east bank, covering the bridge from that side.",
+  "answer": "posts",
+  "check": {
+   "n": 2,
+   "target": "bridge",
+   "radius": 3,
+   "side": "e"
+  },
+  "gold": {
+   "guard": "bridge",
+   "n": 2,
+   "side": "east"
+  }
+ },
+ {
+  "id": "r-wall-field",
+  "map": "riverford",
+  "say": "Wall in the field, with a gate facing the road.",
+  "answer": "wall",
+  "check": {
+   "target": [
+    "field"
+   ],
+   "gate": {
+    "toward": "east road"
+   }
+  },
+  "gold": {
+   "enclose": "field",
+   "gate": "north"
+  }
+ },
+ {
+  "id": "r-referent-grove",
+  "map": "riverford",
+  "say": "The elder asks you to keep everyone out of 'the sacred grove'. Mark the area she means.",
+  "answer": "area",
+  "check": {
+   "hidden": "grove"
+  },
+  "gold": {
+   "cluster": "trees",
+   "near": "shrine",
+   "side": "west"
+  }
+ },
+ {
+  "id": "r-patrol-bridge",
+  "map": "riverford",
+  "say": "A patrol route from the inn to the shrine, over the bridge, keeping to the road and paths.",
+  "answer": "path",
+  "check": {
+   "from": "inn",
+   "to": "shrine",
+   "via": [
+    "bridge"
+   ],
+   "onRoad": 0.6
+  },
+  "gold": {
+   "from": "inn",
+   "via": [
+    "bridge"
+   ],
+   "to": "shrine",
+   "prefer": "road"
+  }
+ },
+ {
+  "id": "r-landing",
+  "map": "riverford",
+  "say": "Mark a 3 by 2 boat landing on the west bank, right at the water's edge, just north of the bridge.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    3,
+    2
+   ],
+   "near": "bridge",
+   "side": "n",
+   "maxGap": 4,
+   "water": true,
+   "westOf": 15
+  },
+  "gold": {
+   "near": "bridge",
+   "side": "northwest",
+   "w": 3,
+   "h": 2,
+   "touch": "water"
+  }
+ },
+ {
+  "id": "r-cellar-house",
+  "map": "riverford",
+  "say": "Dig a 2 by 2 cellar under the house.",
+  "answer": "rect",
+  "check": {
+   "size": [
+    2,
+    2
+   ],
+   "inside": "house"
+  },
+  "gold": {
+   "under": "house",
+   "w": 2,
+   "h": 2
+  }
+ },
+ {
+  "id": "r-house-east",
+  "map": "riverford",
+  "say": "Where can a 4 by 4 house go on the east bank near the bridge, on open grass?",
+  "answer": "rect",
+  "check": {
+   "size": [
+    4,
+    4
+   ],
+   "near": "bridge",
+   "maxGap": 6,
+   "eastOf": 18
+  },
+  "gold": {
+   "near": "bridge",
+   "side": "east",
+   "w": 4,
+   "h": 4
+  }
+ }
+]

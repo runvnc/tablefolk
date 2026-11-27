@@ -2090,3 +2090,145 @@ rented card (tools/cloud-gpu/README.md steps 1-3 first, tunnel on 9231):
     done
     # a living village as the player gets it (far characters on rails), scored as before
     node live-eval.mjs scenarios/hearthvale.json --minutes=6 --autonomy=guided --model=bonsai2-9b --mode-radius=12 --label=living12
+
+## Spatial commands: can a model pick the squares? (2026-11-27)
+
+The question: can a brain turn "wall in the farm with a gate facing the road",
+"put guards where they cover the bridge" or "dig a cellar under the inn" into
+squares on the map, so the player never selects squares by hand, and does a
+picture of the map help? Measured with `tools/spatial-eval/` (nothing in the
+game changed).
+
+**The benchmark**: four worlds as cell maps (`maps.mjs`): the village
+generator at seed 23 (`procgen.village` itself: `applyToScenario` turns a
+world without characters into unnamed walk-in models), hearthvale and
+millbrook-farm as `applyToScenario` builds them (closed buildings stamped from
+their footprints), and riverford, drawn by hand (a river, a bridge, an inn, a
+shrine with an unnamed grove). Coordinates are column/row from the north-west
+corner (`x_board = floor((W-1)/2) - x`, `z_board = y - floor((H-1)/2)`). 29 tasks
+(`tasks.json`): 5 walls with a gate on a given side, 5 marked rectangles (a
+stockpile, a woodpile north of the library, a field north of the barn, a pit
+behind the smithy, a boat landing at the water's edge), 3 new houses that
+fit, 4 cellars under buildings, 5 guard placements (along a road, at its far
+end, around the coop, covering the bridge, from the east bank), 4 routes and
+paths, 3 referents ("the little fenced plot south of my shop", "the sheep's
+field", "the sacred grove"). Inputs: **text** (the grid with numbered rows and
+columns, a legend, places with their rectangles and doors), **image** (a PNG
+drawn from the grid by `render.py`, 24 px a cell, every row and column
+numbered on all four edges, places outlined and labelled; not a game render)
+with only the place names, or **both**. Outputs: **squares** (`wall_rect` or
+a list of wall squares plus a gate, `rect`, `posts`, `path` waypoints) or
+**relations** (`{"enclose": "orchard", "gate": {"toward": "lane"}}`,
+`{"near": "library", "side": "north", "w": 4, "h": 2}`, `{"under": "shop"}`,
+`{"guard": "bridge", "n": 2, "side": "east"}`, `{"from", "via", "to",
+"prefer": "road"}`, `{"cluster": "trees", "near": "shrine"}`), which code
+resolves (`geom.mjs fromRelations`: rings with the gate on a side or toward a
+place, the nearest free rectangle on a side, A* along roads, tree clusters).
+Scoring by code: walls closed (8-way flood from the target never reaches the
+edge), buildable (not on buildings, water or road except the gate), tight,
+the gate on the side facing the target; rectangles the right size, on open
+grass, near and on the right side; posts standable, near, spread, around;
+routes start/end/via, walkable, 60% on road; referents IoU >= 0.4. `run.mjs
+--gold` checks that every task's reference relation passes (29/29).
+
+**Models**: OpenRouter (temperature 0): Gemini 3.8 Flash (its default
+thinking), Qwen3.6-27B (the open VLM nearest Bonsai's base; thinking off),
+DeepSeek V4.1 Flash (the cheap text model; thinking off). Natively with
+upstream llama.cpp (the `full-cuda` image of the day, CUDA, `-c 16384 -np 1`,
+mmproj loaded) on a rented RTX 4000 Ada 20 GB: Inkling 2 Mini AD-IQ2_M with
+its Q8_0 mmproj, thinking skipped by opening the answer message
+(`--inkling-nothink`: `/apply-template` with `reasoning_effort` 0, then a raw
+`/completion` with the picture as `multimodal_data`); Bonsai 2.5 27B and
+Bonsai 2 9B as Prism's `Q2_0` files (stock llama.cpp has no `PTQ1_0`; the
+same ternary weights) with their Q8_0 mmproj, `enable_thinking: false`. All
+three projectors loaded and read the map (Inkling: "the building in the top
+right corner is labeled shrine, the river covers columns 14-16 at row 0").
+
+| model | input | squares: pass / partial / s | relations: pass / partial / s |
+|---|---|---|---|
+| Gemini 3.8 Flash | text | 26/29 (90%) / 0.96 / 11.8 | **29/29** / 1.00 / 5.9 |
+| | image | 16/29 (55%) / 0.82 / 15.5 | 29/29 / 1.00 / 5.2 |
+| | both | 25/29 (86%) / 0.97 / 11.9 | 29/29 / 1.00 / 5.6 |
+| DeepSeek V4.1 Flash | text | 14/29 (48%) / 0.79 / 0.5 | 28/29 (97%) / 0.97 / 0.5 |
+| Qwen3.6-27B | text | 11/29 (38%) / 0.72 / 0.8 | 27/29 (93%) / 0.95 / 0.9 |
+| | image | 11/29 (38%) / 0.74 / 1.1 | 24/29 (83%) / 0.86 / 0.9 |
+| | both | 14/29 (48%) / 0.79 / 1.0 | 27/29 (93%) / 0.93 / 0.9 |
+| Inkling 2 Mini (native) | text | 13/29 (45%) / 0.72 / 1.4 | 22/29 (76%) / 0.82 / 1.4 |
+| | image | 9/29 (31%) / 0.63 / 5.2 | 24/29 (83%) / 0.89 / 4.6 |
+| | both | 10/29 (34%) / 0.64 / 1.9 | 24/29 (83%) / 0.89 / 1.8 |
+| Bonsai 2.5 27B (native) | text | 12/29 (41%) / 0.75 / 3.2 | 22/29 (76%) / 0.84 / 1.8 |
+| | image | 7/29 (24%) / 0.65 / 2.5 | 24/29 (83%) / 0.86 / 2.0 |
+| | both | 12/29 (41%) / 0.77 / 2.7 | 23/29 (79%) / 0.85 / 2.1 |
+| Bonsai 2 9B (native) | text | 1/29 (3%) / 0.39 / 2.1 | 19/29 (66%) / 0.82 / 0.8 |
+| | image | 2/29 (7%) / 0.33 / 2.5 | 20/29 (69%) / 0.86 / 1.1 |
+| | both | 2/29 (7%) / 0.41 / 2.4 | 19/29 (66%) / 0.82 / 1.0 |
+
+(Seconds are wall time a task: OpenRouter's round trip, or llama-server on the
+RTX 4000 Ada through an SSH tunnel; one run each, temperature 0.) By kind,
+squares: every open model fails nearly every wall (0-1/5), marked rectangle
+(0-1/5) and house (0/3), and gets the cellars (4/4) and most guards; Gemini
+alone gets walls (5/5) from text. Relations: walls 4-5/5 for Inkling, Bonsai
+2.5 and the external models, 0/5 for the 9B (gate on the wrong side every
+time); guards 5/5 for nearly all; rectangles are the weak spot of the
+in-browser models (Bonsai 2.5 2-3/5, Inkling 3/5).
+
+**Typical failures**: squares: the wall drawn on the target's own rectangle
+(`wall_rect` = the temple's walls, the orchard's trees), rectangles over a
+tree, a wall or the water by one square, posts on the bridge's water squares,
+a path cutting a building's corner; Bonsai 2 9B lists every square of a path
+until the token limit. Relations: the wrong compass side (the 9B's gates east
+or south when the road is north; "pit behind the smithy" written as `under`;
+the grove "north" of the shrine when it is west), optional fields added that
+cannot be met (`"touch": "water"` on a house), the wrong answer type (Inkling
+answered a route with `{"enclose": ...}`), and the 9B wrapping the answer in
+its type (`{"posts": {...}}`, unwrapped by the parser since).
+
+**Thinking**: worse here, not better. Inkling with its default thinking
+reached the 4,000-token limit on all 5 tasks tried (68 s each natively, no
+answer); with `reasoning_effort` 0 through the chat template it still wrote
+2,850-3,000 tokens (50 s) and passed 1 of 7. Bonsai 2.5 27B with
+`enable_thinking` ran 4,000 tokens (117 s) without an answer. Left off.
+
+**Vision**: no help. Image-only is worse than text in squares style for every
+model (Gemini 90% -> 55%, Bonsai 2.5 41% -> 24%) and level within noise in
+relations style (where the coordinates do not matter); text plus image is
+level with text. A labelled list of places is what does the work. In-browser
+image input is not wired for any of these engines today: Bonsai's engine
+(webml-community's `qwen35-vision` module) already takes an mmproj and images
+in a session (`mmproj: null` in bonsai2.js today), so wiring it is the mmproj
+file on R2 (0.63 GB Q8_0) plus image parts in the turn, about a day with the
+memory check; Inkling's wllama build has no `mtmd`: the vision encoder would
+need compiling into the WASM build, a JS image API and checking the CLIP
+graph's ops on ggml-webgpu, several days. Given the numbers, not worth it for
+this.
+
+**Recommendation** (how spoken commands should become areas):
+- **Every brain: relations, resolved by code**, never explicit squares. The
+  model names the verb's slots (target place, side or "toward", size, count,
+  from/via/to); code finds the squares, checks them and shows them for the
+  player to confirm. Relations beat squares on every model (the weakest by 60
+  points), are as fast or faster, and need no grid: send only the list of
+  places (with kinds), which also matters for speed in Chrome, where Bonsai
+  2.5 reads about 170 tokens a second (a 2,500-token grid is 12-15 s before
+  the first word; a place list is a few hundred tokens).
+- Constrain the answer to the verb's schema (a grammar or JSON schema per
+  verb: the wrong-type and wrapped answers go away) and drop unknown places
+  and impossible optional fields instead of failing.
+- **Bonsai 2 9B, Gemma 4 E2B/E4B** (not measured; below the 9B): let code
+  pick the sides (gate toward the nearest road, guards on the approach side)
+  and ask the model only for the target place and numbers; fall back to
+  asking the player "which side?".
+- **Bonsai 2.5 27B, Inkling 2 Mini**: the full relation vocabulary (76-83%);
+  always preview the squares; their misses are a wrong side or a confused
+  "behind/under", which the player corrects with one word.
+- **External models through a key** (Gemini Flash class): relations 100%;
+  explicit squares only for shapes the vocabulary cannot say, validated by the
+  same checks and repaired by code.
+- Vision: not for placing things.
+
+Spend: OpenRouter $1.08 (results $1.06 plus probes); vast.ai about $0.19
+(0.68 h of an RTX 4000 Ada at $0.193/h, about 21.7 GB downloaded at
+$0.0026/GB); the box (label spatial-eval) was destroyed and checked by API.
+Raw results: `work/spatial-eval/results/*.jsonl` (not committed); `node
+tools/spatial-eval/summary.mjs --kinds`, `--fails=<run>`; `run.mjs --rescore`
+scores saved answers again after a change to `geom.mjs`.
