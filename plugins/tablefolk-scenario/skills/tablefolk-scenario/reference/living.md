@@ -366,7 +366,10 @@ plan from the list of places (never the grid; a small brain names only the
 place and the numbers, and the words decide the sides; "behind the smithy"
 asks *Which side?*). The squares show as a ghost; squares on buildings,
 water, trees or out of reach are left out and said so; the player picks a
-priority (1, when idle, to 5, urgent) and **Mark it**. Each square is a job:
+priority (1, when idle, to 5, urgent) and **Mark it**. In the tabletop view
+(`?tabletop=1`) the toolbar's **▦ mark work** opens the same tool: drag on
+the board with the left button (the wheel and the middle or right button
+still zoom and pan). Each square is a job:
 
 - on rails, in their working hours, before their own work, characters whose
   job allows take the highest-priority mark and the nearest square (three at

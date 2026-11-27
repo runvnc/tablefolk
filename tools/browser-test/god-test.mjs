@@ -43,7 +43,7 @@ const drive = (cond, secs) => ev(async ({ cond, secs }) => {
   return f();
 }, { cond, secs });
 
-if (ONLY !== 'god') {
+if (ONLY !== 'god' && ONLY !== 'tabletop') {
 console.log('loading', BASE);
 await page.goto(`${BASE}/app/?art=1&pace=busy&t=${Date.now()}&scenario=../tools/browser-test/scenarios/hearth-spirit-none.json`);
 await page.waitForFunction(() => window.tablefolkScenario?.active && state.characters?.length >= 4 && window.tablefolkBrainInfo?.()?.key === 'none', null, { timeout: 90000 });
@@ -115,7 +115,26 @@ await ev(() => tablefolkWeather.clear());
 await check('saved and restored with the world (designations, demands, orders, resources, weather)', () => ev(() => { const d = tablefolk.worldStateData(); return [!!d.hooks?.designations?.all?.length && !!d.hooks?.orders?.demands?.all?.length && d.hooks?.resources?.favour != null, Object.keys(d.hooks || {}).join(', ')]; }));
 await check('no page errors', () => [!errs.length, errs.slice(0, 3).join(' | ')]);
 }
-if (ONLY !== 'hearth') { errs.length = 0; await godGameTest({ page, ev, check, shot, pageShot, look, drive, errs, BASE }); }
+// ---- the Mark tool in the tabletop view (?tabletop=1): the toolbar's "mark work", a wall dragged on the board
+if (ONLY !== 'god') {
+  errs.length = 0;
+  await page.goto(`${BASE}/app/?art=1&tabletop=1&t=${Date.now()}&scenario=../tools/browser-test/scenarios/hearth-spirit-none.json`);
+  await page.waitForFunction(() => window.tablefolkScenario?.active && window.tablefolkTabletop?.view && document.querySelector('#ttBar [data-tt="mark"]'), null, { timeout: 90000 });
+  await page.waitForTimeout(2500);
+  await page.click('#ttBar [data-tt="mark"]'); await page.waitForTimeout(300);
+  await check('tabletop: "mark work" opens the Mark tool (its strip shows over the board)', () => ev(() => { const el = document.getElementById('tfPickBar'); return [!!el && !el.hidden && getComputedStyle(el).display !== 'none' && /Mark:/.test(el.textContent), el ? getComputedStyle(el).display + ' ' + el.textContent.slice(0, 80) : 'no strip']; }));
+  await page.click('#tfPickBar button:has-text("wall")');
+  const tp = await ev(() => { const r = document.getElementById('ttOverlay')?.getBoundingClientRect() || document.getElementById('renderCanvas').getBoundingClientRect(), a = tablefolkTabletop.toPx(-12, 9), b = tablefolkTabletop.toPx(-15, 12); return [[r.left + a[0], r.top + a[1]], [r.left + b[0], r.top + b[1]]]; });
+  await page.mouse.move(tp[0][0], tp[0][1]); await page.mouse.down(); await page.mouse.move((tp[0][0] + tp[1][0]) / 2, (tp[0][1] + tp[1][1]) / 2, { steps: 4 }); await page.mouse.move(tp[1][0], tp[1][1], { steps: 4 }); await page.mouse.up();
+  await page.waitForTimeout(500);
+  await shot('08-tabletop-mark');
+  await check('tabletop: the drag marks the squares under the pointer (a ring from -12,9 to -15,12)', () => ev(() => { const t = document.getElementById('tfPickBar').textContent; return [/wall/.test(t) && !!document.querySelector('#tfPickBar button.go'), t.slice(0, 120)]; }));
+  await page.click('#tfPickBar button.go');
+  await check('tabletop: marked, the board unmoved (the tool, not a pan, had the drag)', () => ev(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'wall'), xs = d?.cells.map(c => c.x) || [], zs = d?.cells.map(c => c.z) || []; return [!!d && Math.min(...xs) >= -15 && Math.max(...xs) <= -12 && Math.min(...zs) >= 9 && Math.max(...zs) <= 12 && d.cells.length >= 6, d ? `${d.cells.length} squares x ${Math.min(...xs)}..${Math.max(...xs)} z ${Math.min(...zs)}..${Math.max(...zs)}` : 'none']; }));
+  await check('tabletop: with the tool off a drag pans again', () => ev(async () => { tablefolkTabletop.zoomAt(2); await new Promise(r => setTimeout(r, 100)); const v0 = { ...tablefolkTabletop.view }; const o = document.getElementById('ttOverlay') || document.getElementById('renderCanvas'), r = o.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, opt = (t, dx) => new PointerEvent(t, { clientX: x + dx, clientY: y, button: 0, buttons: t === 'pointerup' ? 0 : 1, bubbles: true, pointerType: 'mouse' }); o.dispatchEvent(opt('pointerdown', 0)); o.dispatchEvent(opt('pointermove', 40)); o.dispatchEvent(opt('pointerup', 40)); await new Promise(r => setTimeout(r, 100)); const v1 = tablefolkTabletop.view; return [Math.abs(v1.cx - v0.cx) > .1, `cx ${v0.cx.toFixed(2)} -> ${v1.cx.toFixed(2)}`]; }));
+  await check('tabletop: no page errors', () => [!errs.length, errs.slice(0, 3).join(' | ')]);
+}
+if (ONLY !== 'hearth' && ONLY !== 'tabletop') { errs.length = 0; await godGameTest({ page, ev, check, shot, pageShot, look, drive, errs, BASE }); }
 console.log(fails ? `${fails}/${n} FAILED` : `all ${n} passed`);
 await b.close().catch(() => {});
 process.exit(fails ? 1 : 0);

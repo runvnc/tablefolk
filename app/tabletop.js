@@ -15,6 +15,9 @@
  *   every position fixed (tablefolkScenario.freezeLayout) to the world
  *   builder that opened this page in a frame (postMessage
  *   {type:'tablefolk-layout', scenario}); opened on its own it downloads it.
+ * - Mark work (designate.js): "▦ mark work" opens the Mark tool; drag on the
+ *   board to mark (the left button is the tool's while it is on; the wheel and
+ *   the middle / right buttons still zoom and pan).
  * - Zoom and pan: the mouse wheel zooms about the pointer, dragging empty
  *   space pans (any square with the middle or right button), double-click or
  *   0 fits the board, + / - zoom, arrows pan; two fingers pinch and pan.
@@ -398,6 +401,7 @@
       <label>outside <select id="ttOutside">${[['paper', 'paper'], ['black', 'black'], ['sea', 'as rendered']].map(([k, t]) => `<option value="${k}"${opt.outside === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <details id="ttCharsBox"><summary>characters</summary><div id="ttChars"></div></details>
       <label><input type="checkbox" id="ttEdit"> move things</label>
+      ${window.tablefolkDesignate ? '<button type="button" data-tt="mark" title="mark squares for work: drag on the board (walls, digging, farms...), or say it">▦ mark work</button>' : ''}
       <span class="sep"></span>
       <select id="ttPpc" title="pixels per square"><option value="100">PNG 100 px/square</option><option value="150" selected>PNG 150 px/square</option><option value="300">PNG 300 px/square (print quality)</option></select>
       <button type="button" data-tt="png">save PNG</button>
@@ -426,6 +430,7 @@
       else if (a === 'full') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); }
       else if (a === 'use') useLayout();
       else if (a === 'fit') fitAll();
+      else if (a === 'mark') { if (opt.edit) { opt.edit = false; $('ttEdit').checked = false; document.documentElement.classList.remove('tt-edit'); } window.tablefolkDesignate?.openTool?.(); }
       else if (a === 'allOn') { opt.hidden.clear(); look(); buildList(); }
       else if (a === 'allOff') { for (const g of chars()) opt.hidden.add(g.id); look(); buildList(); }
       else if (a === 'monstersOff') { for (const g of chars()) if (isHostile(g)) opt.hidden.add(g.id); look(); buildList(); }
@@ -433,7 +438,10 @@
   }
 
   // Game input off: keys and clicks stop here unless they belong to the toolbar.
-  const mine = e => e.target?.closest?.('#ttBar, #modeLine');
+  const mine = e => e.target?.closest?.('#ttBar, #modeLine, #tfPickBar');
+  // the Mark tool (designate.js, powers.js useTool) takes the left button on the board while it is on; the wheel,
+  // the middle and right buttons still zoom and pan
+  const toolOn = (type, e) => !!window.tablefolkBar?.tool?.() && /^pointer|^click$/.test(type) && e.button !== 1 && e.button !== 2 && !(e.buttons & 6) && e.pointerType !== 'touch' || (!!window.tablefolkBar?.tool?.() && e.pointerType === 'touch' && touches.size < 2 && type !== 'pointercancel');
   addEventListener('keydown', e => {
     if (mine(e)) return;
     if (opt.edit && sel && (e.key === 'r' || e.key === 'R')) { const s = sel; turn(s); sel = thingAt(s.x, s.z); draw(); }
@@ -449,7 +457,7 @@
   addEventListener('keyup', e => { if (!mine(e)) e.stopImmediatePropagation(); }, true);
   for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'click', 'dblclick', 'wheel', 'contextmenu']) {
     addEventListener(type, e => {
-      if (mine(e)) return;
+      if (mine(e) || toolOn(type, e)) return;
       if (type === 'pointerdown') onDown(e); else if (type === 'pointermove') onMove(e); else if (type === 'pointerup' || type === 'pointercancel') onUp(e);
       else if (type === 'wheel') onWheel(e);
       else if (type === 'dblclick' && !opt.edit) fitAll();

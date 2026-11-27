@@ -76,7 +76,8 @@ html.tabletop #powerBar,html.tabletop #resourceHud{display:none}
   // ---------------------------------------------------------------- picking on the map (shared with designate.js)
   // a cell under the pointer: the board's ground plane (no mesh needed)
   function cellAt(ev) {
-    const sc = state.scene, cam = state.camera; if (!sc || !cam) return null;
+    // (the camera drawing the board: the game's, or the tabletop's straight-down one)
+    const sc = state.scene, cam = sc?.activeCamera || state.camera; if (!sc || !cam) return null;
     const r = canvas()?.getBoundingClientRect(), px = ev && r ? ev.clientX - r.left : sc.pointerX, py = ev && r ? ev.clientY - r.top : sc.pointerY;
     const ray = sc.createPickingRay(px, py, BABYLON.Matrix.Identity(), cam);
     const y = state.terrainTopY ?? 0; if (Math.abs(ray.direction.y) < 1e-6) return null;
@@ -102,7 +103,7 @@ html.tabletop #powerBar,html.tabletop #resourceHud{display:none}
     const cell = cellAt(ev);
     if (type === 'pointerdown') { tool._down = { x: ev.clientX, y: ev.clientY }; tool.down?.(cell, ev); }
     else if (type === 'pointermove') { if (!tool._down && !tool.hover) return; (tool._down ? tool.move : tool.hover)?.(cell, ev); if (!tool._down) return; }
-    else if (type === 'pointerup') { const d = tool._down; tool._down = null; if (d && Math.abs(ev.clientX - d.x) + Math.abs(ev.clientY - d.y) < 6) tool.click?.(cell, ev); else tool.up?.(cell, ev); }
+    else if (type === 'pointerup') { const d = tool._down; tool._down = null; if (!d) return; if (d && Math.abs(ev.clientX - d.x) + Math.abs(ev.clientY - d.y) < 6) tool.click?.(cell, ev); else tool.up?.(cell, ev); }
     ev.stopImmediatePropagation(); ev.preventDefault();
   }, { capture: true });
   addEventListener('keydown', e => { if (e.key === 'Escape' && tool) { e.stopImmediatePropagation(); const t = tool; useTool(null); t.cancel?.(); } }, true);

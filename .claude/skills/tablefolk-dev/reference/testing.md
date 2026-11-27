@@ -272,7 +272,9 @@ once).
   brain under `?art=1`, so the test runs the job ticks itself): the bar and
   HUD, the scenario's demand met on rails, the Mark tool by drag and by
   words, the wall built by the workers, a standing order, the package's
-  powers, the core weather, the save hooks. `--shots` saves the canvas
+  powers, the core weather, the save hooks; then the tabletop view
+  (`--only=tabletop`): "mark work", a wall dragged on the board, a drag with
+  the tool off still pans. `--shots` saves the canvas
   (headless page screenshots leave it black) with the free camera over the
   garden. Then the God game (`god-game-test.mjs`, `scenarios/god-village.json`
   with `?art=1&model=none`; `--only=god` or `--only=hearth` runs one half):

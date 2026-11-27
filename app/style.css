@@ -467,7 +467,8 @@ body.panel-open #toastStack { left:calc(var(--panel-w, 364px) + 78px); }
   background:rgba(16,20,25,.55); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
 #npcThinking.show { opacity:1; transform:translate(-50%,0); }
 /* ---- tabletop view (?tabletop=1, tabletop.js) ---- */
-html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toastStack):not(#ttTip) { display:none !important; }
+html.tabletop body > *:not(#renderCanvas):not(#ttBar):not(#ttOverlay):not(#toastStack):not(#ttTip):not(#tfPickBar) { display:none !important; }
+html.tabletop #tfPickBar { bottom:16px; z-index:25; }
 #ttTip { position:fixed; z-index:20; pointer-events:none; max-width:300px; background:rgba(20,18,16,.94); color:#f4eee4; border:1px solid #6b5b45; border-radius:8px; padding:6px 9px; font:12.5px/1.35 system-ui, sans-serif; box-shadow:0 4px 14px rgba(0,0,0,.4); }
 #ttTip[hidden] { display:none; } #ttTip hr { border:0; border-top:1px solid #5a4c3a; margin:5px 0; } #ttTip .muted { color:#b9ab95; }
 html.tabletop body { background:#1b1d1f; overflow:hidden; }
