@@ -1548,15 +1548,15 @@ danger, haggle; 8/10 on 2026-11-23: the check is sampled). The free day on
 `free-two-by-the-hearth` (`--day-minutes=24 --autonomy=free`, this build), beside
 Bonsai 2.5 27B's free day there (RTX 4080 Super, above):
 
-| | Inkling 2 Mini AD-IQ2_M, Chrome 4080 | Bonsai 2.5 27B |
-|---|---|---|
-| model turns, a turn median / p90 | 84, **23.5 s** / 32.2 s | 116, 10.3 s / 11.2 s |
-| prompt characters a turn (median) | 8,285 | 8,237 |
-| model-chosen activities | 71% | 91% |
-| self-started lines, plans written, surprises | 28, 0 (4 notes), 7 | 27, 8, 9 |
-| wasted / safety nets | 14% / 4 | 8% / 4 |
-| meals, hungry at the end | ada 3, bram 2; bram | 2 / 2, none |
-| judge: coherence / personality / purpose / surprise | 2.5 / 3.0 / 3.5 / 2.5 | **4.0 / 4.5 / 4.5 / 3.5** |
+| | Inkling 2 Mini AD-IQ2_M, Chrome 4080 | Inkling, final build (own checkpoints, replay off) | Bonsai 2.5 27B |
+|---|---|---|---|
+| model turns, a turn median / p90 | 84, **23.5 s** / 32.2 s | 97, 22.3 s / 30.8 s (a call: 12.8 / 16.1 s) | 116, 10.3 s / 11.2 s |
+| prompt characters a turn (median) | 8,285 | 8,776 | 8,237 |
+| model-chosen activities | 71% | 79% | 91% |
+| self-started lines, plans written, surprises | 28, 0 (4 notes), 7 | 21, 0 (3 notes), 9 | 27, 8, 9 |
+| wasted / safety nets | 14% / 4 | 23% / 4 | 8% / 4 |
+| meals, hungry at the end | ada 3, bram 2; bram | ada 3, bram 2; none | 2 / 2, none |
+| judge: coherence / personality / purpose / surprise | 2.5 / 3.0 / 3.5 / 2.5 | 3.0 / 3.0 / 3.5 / 3.0 | **4.0 / 4.5 / 4.5 / 3.5** |
 
 **The world builder's agent with Inkling** (`agent-world-test.mjs`, `WHERE=browser
 AGENT_MODEL=inkling2-mini-wllama ENGINE_LOG=1`, the river-village prompt and its tavern
@@ -1578,6 +1578,18 @@ system message, or saving that slot's state once (llama.cpp's slot save/restore,
 in wllama), would take most of the 74 s off. The agent's quality with Inkling varies:
 one of the two runs looped on `set_map` and gave up.
 
+**Where a free turn's time goes** (the final build's day above, `live-eval.mjs` now keeps the
+engine's lines as `engine`): 97 calls, a call 12.8 s median / 16.1 s p90; per call 2,690
+prompt tokens of which 826 come back from the rules checkpoint (96 of 97 prefix reads
+restored it) and 1,863 are read at 169 tok/s; 45 tokens written at 28.5 tok/s. Of the
+model's 1,281 s, reading was 1,076 s (84%), writing 153 s. The model was busy 89% of the
+day, and the game's queue serves one call at a time, so a turn as the game sees it (22.3 s)
+is its own call plus waiting for the other character's. Peak graphics memory with the game
+drawn (`gfx=light`): 11.5 of 16.4 GB. So for free play the levers are, in order: fewer prompt
+tokens past the shared rules (the per-character part is ~1,860 tokens: identity, history,
+perception, the free-mode options), two characters' calls at once (1.43x measured above),
+and reading speed (compute-bound kernels).
+
 **Verdict**: the prefix checkpoints are a real gain (a hearthvale turn 12.7 -> 10.3 s,
 p90 13.8 -> 10.8 s) and the crash is understood (checkpoint size, not the restore), but Inkling in Chrome
 stays far behind Bonsai 2.5 27B on 16 GB cards: a free turn on the small world takes
@@ -1590,6 +1602,15 @@ stays the 10 GB+ pick. Inkling's speed limits in Chrome are now reading
 two characters' calls at once (1.43x measured above), and putting the
 per-call part of the agency prompts after a shared opening so they get a
 prefix too (two-thirds of the calls share only ~110 tokens now).
+
+**Verdict after the follow-up work (2026-11-27)**: kept the prefix checkpoints (and a
+prompt that carries one on makes its own: the builder's agent), shipped the wasm with
+replay off (5-7% faster writing). In the game nothing changed in kind: a free call is 84%
+prompt reading and a free turn stays ~22 s against Bonsai 2.5 27B's 10.3 s, and the judge
+still scores Bonsai's free day higher on every axis. Inkling is not made a default on any
+card class; Bonsai 2.5 27B stays the 10 GB+ pick. In the world builder's agent mode Inkling
+works (two of three builds passed, 22-23 steps in ~5 minutes after a 75 s first step) but
+is no reason to change the builder's default either.
 
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
