@@ -32,8 +32,9 @@
  *     build(cell, top, rooms)   walls.js build0: draws the kit buildings, returns the wall and door
  *                               squares it drew (walls.js skips them) or null
  *     group(rooms)              rooms -> buildings ([{key, rooms}]), the rule roofs.js uses too
- *     roofParts(key)            the building's roof meshes (near and far), for roofs.js's fade
- *     setRoofEnabled(key, on)   roofs.js: whole roof on or off (its alpha)
+ *     setAlpha(key, a)          roofs.js: the building's roof faded (0..1; dithered per pixel: every roof is
+ *                               merged village-wide, a building's index per vertex / per instance picks its alpha)
+ *     roofBox(key)              its roof's box ({lo, hi}), for roofs.js's camera ray
  *     clip(key | 'all' | null)  the storey above the ground floor clipped (the player is inside)
  *     list(), stats()           for tests
  *   }
@@ -51,12 +52,13 @@
   const PIECES = ['door', 'door_leaf', 'window', 'window_shut', 'chimney', 'dormer', 'porch', 'sign', 'corbel', 'stair'];
   const PMETA = { dormer: { box: [1.104, 1.167, 1.25] }, stair: { box: [2.7, .8, 2.2] } };
 
-  function enabled() {
+  function kitOn() {
     if (Q.get('kit') === '0' || window.TABLEFOLK_TABLETOP) return false;
     const s = state.envScn || window.tablefolkScenario?.active?.scn || {};
-    if (s.kit === false) return false;
-    return wallH() >= 1.9;   // a storey must take the kit's door (1.62) and windows; low toy walls keep the old look
+    return s.kit !== false;
   }
+  // walk-in houses: a storey must take the kit's door (1.62) and windows; low toy walls keep the old look
+  function enabled() { return kitOn() && wallH() >= 1.9; }
 
   // ---------------------------------------------------------------- small maths
   const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -257,7 +259,7 @@
 
     // ---- pieces placed: [name, origin, normal (outward), scale, part] ----
     const placed = [];
-    const place = (name, loc, nr, scale = [1, 1, 1], part = null) => placed.push({ name, loc, ang: Math.atan2(nr[1], nr[0]) + Math.PI / 2, scale, part });
+    const place = (name, loc, nr, scale = [1, 1, 1], part = null, off = null) => placed.push({ name, loc, ang: Math.atan2(nr[1], nr[0]) + Math.PI / 2, scale, part, off });
 
     // ---- rectangles of the footprint (main roof, wings) ----
     function rects(cells) {
@@ -382,6 +384,7 @@
           const loc = at(O, A, o.s, UPZ, z0 + o.zb);
           if (o.kind === 'door') {
             place('door', loc, N); doorOps.push({ loc, N, A, run, o, k });
+            if (SP.closedDoor) place('door_leaf', loc, N, [1, 1, 1], null, [-.3, .045, 0]);   // a closed building's door: the leaf shut, on its hinge (pieces.json offset)
             if (run.kind === 'outer') DOORS.push({ loc, N, A, k, o });
             if (k === 0 && run.kind === 'outer' && SP.porch && !o.upper) place('porch', at(O, A, o.s, N, T / 2 + BT, UPZ, z0 + DH + .55), N);
           } else {
@@ -675,10 +678,14 @@
       if (run) { const [f] = jettied(run, 0), [O, A, N] = frameOf(run, f); place('stair', at(O, A, sOf(run, rc) - .5 - PMETA.stair.box[0], N, T / 2 + .01), N); }
     }
     // the far roof: slabs instead of courses, coarse thatch; its own random streams (the near one is untouched)
-    RNG = rng(SP.seed + 4099); CRNG = rng(SP.seed * 7919 + 1);
-    const ri2 = roofInfo.map(r => ({ x0: r.x0, x1: r.x1, y0: r.y0, y1: r.y1, along: r.along, ext: r.ext }));
-    for (const ri of ri2) roof(ri, RFF, true, false);
-    leanRoof(RFF, true);
+    // (not built in the game: the roof's courses are 2-6k triangles a house, drawn whatever the distance; the
+    // pieces' LOD is what counts. SP.farRoof builds it, as build_house.py --far)
+    if (SP.farRoof) {
+      RNG = rng(SP.seed + 4099); CRNG = rng(SP.seed * 7919 + 1);
+      const ri2 = roofInfo.map(r => ({ x0: r.x0, x1: r.x1, y0: r.y0, y1: r.y1, along: r.along, ext: r.ext }));
+      for (const ri of ri2) roof(ri, RFF, true, false);
+      leanRoof(RFF, true);
+    }
     return { S, RF, RFF, placed, doorOps, ZT, H, STOREYS, zr: Math.max(...roofInfo.map(r => r.zr)), bbox: [XMIN - 1, YMIN - 1, XMAX + 1, YMAX + 1] };
   }
 
@@ -692,14 +699,16 @@
     return null;
   }
   const STYLES = ['plaster_timber', 'stone_timber', 'plank_barn', 'stone_cottage'], ROOFS = ['shingle', 'tile', 'thatch'];
-  function specFor(b, seed) {
-    const p = placeOf(b.rooms) || {}, role = ROLE(p.kind || p.id), R = rng(seed), o = {};
+  function specFor(b, seed, roleOverride) {
+    const p = roleOverride ? {} : (placeOf(b.rooms) || {}), role = roleOverride || ROLE(p.kind || p.id), R = rng(seed), o = {};
     const pick = arr => { let t = R() * arr.reduce((n, a) => n + a[0], 0); for (const a of arr) if ((t -= a[0]) <= 0) return a[1]; return arr[0][1]; };
     if (/tavern|inn/.test(role)) Object.assign(o, { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 44, chimney: 'right', sign: true, braces: 'herringbone', dormers: 1 });
     else if (/smith|forge/.test(role)) Object.assign(o, { style: 'stone_cottage', storeys: 1, roof: 'shingle', pitch: 40, chimney: R() < .5 ? 'left' : 'right' });
     else if (/stable|barn|mill/.test(role)) Object.assign(o, { style: 'plank_barn', storeys: 1, roof: 'shingle', pitch: 45 });
     else if (/temple|library|guard|barrack|hall|keep/.test(role)) Object.assign(o, { style: 'stone_timber', storeys: 2, roof: R() < .5 ? 'tile' : 'shingle', pitch: 46, braces: 'cross', chimney: R() < .5 ? 'left' : false });
     else if (/shop|bak|alchem|store|market|tailor|apothec/.test(role)) Object.assign(o, { style: 'plaster_timber', storeys: 2, roof: R() < .5 ? 'shingle' : 'tile', pitch: 48, jetty: { d: .3 }, sign: true, chimney: R() < .6 ? 'left' : 'right', braces: 'chevron' });
+    else if (role === 'tallhouse') Object.assign(o, { style: 'plaster_timber', storeys: 2, roof: R() < .6 ? 'shingle' : 'tile', pitch: 52, jetty: { d: .3 }, chimney: R() < .5 ? 'left' : 'right', braces: R() < .5 ? 'chevron' : 'cross' });
+    else if (role === 'stonehouse') Object.assign(o, R() < .55 ? { style: 'stone_cottage', storeys: 1, roof: R() < .5 ? 'thatch' : 'shingle', pitch: 50, chimney: 'left' } : { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 46, chimney: 'right', braces: 'herringbone' });
     else Object.assign(o, pick([
       [.35, { style: 'plaster_timber', storeys: 2, roof: 'shingle', pitch: 48, jetty: { d: .3 }, chimney: 'right', braces: 'corner' }],
       [.15, { style: 'plaster_timber', storeys: 1, roof: 'thatch', pitch: 50, chimney: 'left', braces: 'chevron' }],
@@ -762,6 +771,7 @@
     m.environmentIntensity = .45; m.maxSimultaneousLights = 8; m._tfMatte = true;
     m.backFaceCulling = false;   // the cutaway draws a back face seen through a cut as a dark section
     if (!roofSet) { storeyPlugin(m); window.tablefolkCutaway?.attach?.(m, false, true); }
+    else { fadePlugin(m); window.tablefolkCutaway?.seeThrough?.(m); }   // (see-through: a closed building's roof between the follow camera and the player)
     state.sharedAssetMats ||= new Set(); state.sharedAssetMats.add(m);
     return m;
   }
@@ -806,6 +816,55 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     } catch (e) { console.warn('[buildings] storey plugin', e); }
   }
 
+  // ---- the roof fade: a building's index (vertex or instance attribute tfRid, 0 = never fades) looks up its alpha
+  // in a 256 x 1 texture; below it the fragment is dithered away (screen-door: no blending, no sorting)
+  const fadeData = new Uint8Array(256 * 4).fill(255);
+  let fadeTex = null, fadeDirty = true;
+  function fadeTexture() {
+    if (fadeTex && fadeTex.getScene() === state.scene && !fadeTex.isDisposed?.()) return fadeTex;
+    fadeTex = new BABYLON.RawTexture(fadeData, 256, 1, BABYLON.Engine.TEXTUREFORMAT_RGBA, state.scene, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
+    fadeTex.wrapU = fadeTex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; fadeDirty = false;
+    return fadeTex;
+  }
+  const hasRid = mesh => !!mesh?.isVerticesDataPresent?.('tfRid');
+  let Fade = null;
+  function fadePlugin(m) {
+    try {
+      const WGSL = BABYLON.ShaderLanguage?.WGSL;
+      Fade ||= class extends BABYLON.MaterialPluginBase {
+        constructor(mat) { super(mat, 'TfRoofFade', 306, { TFROOF: false }); this._enable(true); }
+        getClassName() { return 'TfRoofFadePlugin'; }
+        isCompatible() { return true; }
+        prepareDefines(d, scene, mesh) { d.TFROOF = hasRid(mesh); }
+        getAttributes(attrs, scene, mesh) { if (hasRid(mesh)) attrs.push('tfRid'); }
+        getSamplers(s) { s.push('tfRoofSampler'); }
+        getUniforms(lang) { return lang === WGSL ? { ubo: [] } : { ubo: [], fragment: '' }; }
+        bindForSubMesh(ubo) { ubo.setTexture('tfRoofSampler', fadeTexture()); }
+        getCustomCode(type, lang) {
+          if (lang === WGSL) {
+            if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: '#ifdef TFROOF\nattribute tfRid: f32;\nvarying vTfRid: f32;\n#endif\n', CUSTOM_VERTEX_MAIN_END: '#ifdef TFROOF\nvertexOutputs.vTfRid = vertexInputs.tfRid;\n#endif\n' };
+            return { CUSTOM_FRAGMENT_DEFINITIONS: 'var tfRoofSamplerSampler: sampler; var tfRoofSampler: texture_2d<f32>;\n#ifdef TFROOF\nvarying vTfRid: f32;\n#endif\n', CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFROOF
+{ let ra = textureSample(tfRoofSampler, tfRoofSamplerSampler, vec2f((floor(fragmentInputs.vTfRid + 0.5) + 0.5) / 256.0, 0.5)).r;
+  let rn = fract(52.9829189 * fract(dot(fragmentInputs.position.xy, vec2f(0.06711056, 0.00583715))));
+  if (ra < 0.998 && ra < rn) { discard; } }
+#endif
+` };
+          }
+          if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: '#ifdef TFROOF\nattribute float tfRid;\nvarying float vTfRid;\n#endif\n', CUSTOM_VERTEX_MAIN_END: '#ifdef TFROOF\nvTfRid = tfRid;\n#endif\n' };
+          return { CUSTOM_FRAGMENT_DEFINITIONS: 'uniform sampler2D tfRoofSampler;\n#ifdef TFROOF\nvarying float vTfRid;\n#endif\n', CUSTOM_FRAGMENT_MAIN_BEGIN: `
+#ifdef TFROOF
+{ float ra = texture(tfRoofSampler, vec2((floor(vTfRid + 0.5) + 0.5) / 256.0, 0.5)).r;
+  float rn = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  if (ra < 0.998 && ra < rn) discard; }
+#endif
+` };
+        }
+      };
+      new Fade(m);
+    } catch (e) { console.warn('[buildings] fade plugin', e); }
+  }
+
   // ---------------------------------------------------------------- pieces (loaded once, thin instances)
   let pieces = null;   // Promise<{ name: { near: [{mesh, mat}], far: [...] } }>
   function pieceFile(name, far) { return name + (far ? '_lod' : (lite() && /^(door|door_leaf|window)$/.test(name) ? '_512' : '')) + '.glb'; }
@@ -835,6 +894,7 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
         const mat = m.material; if (mat) { mat.sideOrientation = null; mat.backFaceCulling = false; mat.maxSimultaneousLights = 8; mat.environmentIntensity = .5; mat.transparencyMode = null; window.TABLEFOLK_LOOK?.matte?.(mat); }
         tpl.material = mat; tpl.isPickable = false; tpl.receiveShadows = true; tpl.isVisible = false;
         const inst = tpl.clone('wall_kitpiece_' + name + (far ? '_far' : '')); inst.makeGeometryUnique(); inst.isVisible = false; inst.isPickable = false;
+        tpl.setVerticesData('tfRid', new Float32Array(p.length / 3), false, 1);   // (after the twin took its own geometry: its tfRid is per instance)
         outp.push({ tpl, inst, material: mat });
       }
       // the materials and textures stay (in the scene: tablefolkGfxGB counts them); the loaded nodes go
@@ -847,7 +907,7 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
       const o = {}; PIECES.forEach((n, i) => { o[n] = { near: list[2 * i], far: list[2 * i + 1] }; });
       // glass glows warm at night (roofs.js windowGlow: dark, cool texels on upright faces)
       for (const n of ['window', 'window_shut', 'dormer']) for (const m of [...o[n].near, ...o[n].far]) window.tablefolkRoofs?.windowGlow?.(m.material);
-      for (const n of PIECES) for (const m of [...o[n].near, ...o[n].far]) { window.tablefolkCutaway?.attach?.(m.material, false, true); if (m.material && !m.material._tfStorey) { m.material._tfStorey = true; storeyPlugin(m.material); } }
+      for (const n of PIECES) for (const m of [...o[n].near, ...o[n].far]) { window.tablefolkCutaway?.attach?.(m.material, false, true); if (m.material && !m.material._tfStorey) { m.material._tfStorey = true; storeyPlugin(m.material); fadePlugin(m.material); } }
       o.alive = () => !o.window.near[0].tpl.isDisposed();
       return o;
     });
@@ -873,24 +933,78 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     // Babylon-local basis -> reference-local (-a, -c, b) -> scale -> rotate about Z -> Babylon (X, Z, Y)
     const img = v => { const x = v[0] * sx, y = v[1] * sy, z = v[2] * sz, X = c * x - s * y, Y = s * x + c * y; return [X, z, Y]; };
     const ex = img([-1, 0, 0]), ey = img([0, 0, 1]), ez = img([0, -1, 0]);
-    return BABYLON.Matrix.FromValues(ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, ez[0], ez[1], ez[2], 0, pl.loc[0], pl.loc[2] + top, pl.loc[1], 1);
+    let t = [pl.loc[0], pl.loc[2] + top, pl.loc[1]];
+    if (pl.off) { const o = img(pl.off); t = [t[0] + o[0], t[1] + o[1], t[2] + o[2]]; }
+    return BABYLON.Matrix.FromValues(ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, ez[0], ez[1], ez[2], 0, t[0], t[1], t[2], 1);
   }
 
   // ---------------------------------------------------------------- the scene side
   let list = [];               // the built buildings
   const byKey = new Map();
-  let builtTok = 0, lastStats = null;
-  function meshOf(name, bk, mat, top) {
+  let builtTok = 0, lastStats = null, claimedCells = new Set();
+  function meshOf(name, bk, mat, top, rid = null) {
     if (!bk || !bk.I.length) return null;
     const m = new BABYLON.Mesh(name, state.scene), vd = new BABYLON.VertexData(), P = bk.P, N = bk.N, n = P.length;
     const pos = new Float32Array(n), nor = new Float32Array(n);
     for (let i = 0; i < n; i += 3) { pos[i] = P[i]; pos[i + 1] = P[i + 2] + top; pos[i + 2] = P[i + 1]; nor[i] = N[i]; nor[i + 1] = N[i + 2]; nor[i + 2] = N[i + 1]; }
     vd.positions = pos; vd.normals = nor; vd.uvs = bk.U; vd.colors = bk.C; vd.indices = orient(pos, nor, bk.I); vd.applyToMesh(m);
+    if (rid) m.setVerticesData('tfRid', rid instanceof Float32Array ? rid : new Float32Array(n / 3).fill(rid), false, 1);   // the roof fade's building index
     m.material = mat; m.isPickable = false; m.receiveShadows = true; addShadow(m);
     return m;
   }
+  // structure: walls (cut by the cutaway, clipped above the ground storey; a walk-in building's go with the
+  // walls, state.wallVisuals), roofs (fade), near and far roofs
+  // Draw calls (measured 2026-11-27, hearthvale: one mesh per material per building nearly doubled the scene's):
+  // the structure of every walk-in building is merged village-wide per material (the storey clip is per pixel, by
+  // box, so nothing needs a mesh of its own); a walk-in building keeps its own roof meshes (they fade one by one);
+  // closed buildings are merged whole, roofs too (they never fade: the see-through dither is per pixel).
+  function mergeInto(acc, B, rid = 0) {
+    for (const [mn, b] of Object.entries(B)) {
+      const t = acc[mn] || (acc[mn] = { P: [], N: [], U: [], C: [], I: [], R: [] }), o = t.P.length / 3;
+      for (let i = 0; i < b.P.length / 3; i++) t.R.push(rid);
+      for (let i = 0; i < b.P.length; i++) { t.P.push(b.P[i]); t.N.push(b.N[i]); }
+      for (let i = 0; i < b.U.length; i++) t.U.push(b.U[i]);
+      for (let i = 0; i < b.C.length; i++) t.C.push(b.C[i]);
+      for (let i = 0; i < b.I.length; i++) t.I.push(b.I[i] + o);
+    }
+    return acc;
+  }
+  function makeBuilding(b, A, top, walkIn) {
+    const M = materials();
+    Object.assign(b, { A, top, far: false, center: [(A.bbox[0] + A.bbox[2]) / 2, (A.bbox[1] + A.bbox[3]) / 2], rid: walkIn ? list.length + 1 : 0 });
+    // the roof's box (the camera ray test in roofs.js): the footprint with its overhang, from the eaves to the ridge
+    const [x0, z0, x1, z1] = A.bbox;
+    b.roofBox = { lo: new BABYLON.Vector3(x0 + .3, top + A.ZT - .5, z0 + .3), hi: new BABYLON.Vector3(x1 - .3, top + A.zr + .5, z1 - .3) };
+    return b;
+  }
+  let walkStruct = [], walkRoof = [];
+  function mergeWalkIn(top) {
+    const M = materials(), acc = {}, racc = {};
+    for (const b of list) { mergeInto(acc, b.A.S); mergeInto(racc, b.A.RF, b.rid); }
+    walkStruct = [];
+    for (const [mn, bk] of Object.entries(acc)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) { walkStruct.push(m); state.wallVisuals.push(m); } }
+    for (const m of walkRoof) try { m.dispose(false, false); } catch {}
+    walkRoof = [];
+    for (const [mn, bk] of Object.entries(racc)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top, new Float32Array(bk.R)); if (m) { m.metadata = { roof: true }; walkRoof.push(m); } }
+  }
+  let closedMeshes = [], closedQueued = false;
+  function mergeClosed() {
+    if (closedQueued) return; closedQueued = true;
+    queueMicrotask(() => {
+      closedQueued = false;
+      for (const m of closedMeshes) try { m.dispose(false, false); } catch {}
+      closedMeshes = [];
+      if (!closedList.length || !state.scene) return;
+      const M = materials(), S = {}, R = {}, top = closedList[0].top;
+      for (const b of closedList) { mergeInto(S, b.A.S); mergeInto(R, b.A.RF); }
+      for (const [mn, bk] of Object.entries(S)) { const m = meshOf('wall_kit_closed_' + mn, bk, M.wall[mn], top); if (m) closedMeshes.push(m); }
+      for (const [mn, bk] of Object.entries(R)) { const m = meshOf('roof_kit_closed_' + mn, bk, M.roof[mn], top, 0); if (m) closedMeshes.push(m); }
+    });
+  }
   function disposeAll() {
-    for (const b of list) { for (const m of [...b.roofNear, ...b.roofFar, ...b.roofPieces]) try { m.dispose(false, false); } catch {} try { b.roofRoot.dispose(false, false); } catch {} }
+    for (const m of walkRoof) try { m.dispose(false, false); } catch {}
+    claimedCells = new Set(); walkStruct = []; walkRoof = [];   // (the structure is in state.wallVisuals: disposed with the walls)
+    fadeData.fill(255); fadeDirty = true;
     list = []; byKey.clear();
     if (instanced.length) refreshInstances();
   }
@@ -933,12 +1047,7 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
       SP.room4lean = freeBeyond(SP);
       let A;
       try { A = assemble(SP); } catch (e) { console.warn('[buildings] assemble', g.key, e); continue; }
-      // structure: walls (cut by the cutaway, clipped above the ground storey), roofs (fade), near and far roofs
-      const b = { key: g.key, rooms: g.rooms, spec: o, sp: SP, A, top, struct: [], roofNear: [], roofFar: [], roofPieces: [], far: false, alpha: 1, enabled: true,
-        center: [(A.bbox[0] + A.bbox[2]) / 2, (A.bbox[1] + A.bbox[3]) / 2], roofRoot: new BABYLON.TransformNode('roof_kit_' + list.length, state.scene) };
-      for (const [mn, bk] of Object.entries(A.S)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) { b.struct.push(m); state.wallVisuals.push(m); } }
-      for (const [mn, bk] of Object.entries(A.RF)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top); if (m) { m.parent = b.roofRoot; m.metadata = { roof: true }; b.roofNear.push(m); } }
-      for (const [mn, bk] of Object.entries(A.RFF)) { const m = meshOf('roof_kit_far_' + mn, bk, M.roof[mn], top); if (m) { m.parent = b.roofRoot; m.metadata = { roof: true }; m.setEnabled(false); b.roofFar.push(m); } }
+      const b = makeBuilding({ key: g.key, rooms: g.rooms, spec: o, sp: SP }, A, top, true);
       for (const k of walls) claimed.add(k);
       // a door square the kit did not open (at a run's end) keeps walls.js's door
       for (const k of doors) if (!A.doorOps.some(d => d.o.rc[0] + ',' + d.o.rc[1] === k)) claimed.delete(k);
@@ -946,11 +1055,13 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
       timing.push(+(performance.now() - t1).toFixed(1));
     }
     if (!list.length) return null;
+    mergeWalkIn(top);
     // the pieces: now if loaded, else when they are (under the loading cover)
     const place = P => { if (tok !== builtTok) return; placePieces(P, cell, top); };
     const loaded = loadPieces();
     if (pieces?.ready) place(pieces.ready);
     else { const done = window.tablefolkLoading?.begin('buildings', { step: 'Raising the houses' }); loaded.then(P => { pieces.ready = P; place(P); }).catch(() => {}).finally(() => done?.()); }
+    claimedCells = claimed;
     lastStats = { buildings: list.length, ms: +(performance.now() - t0).toFixed(1), perBuilding: timing };
     window.tfMark?.('buildings.build', t0);
     return { cells: claimed };
@@ -958,23 +1069,29 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
   // wall pieces: thin instances village-wide (near and far sets); roof pieces: clones (they fade); door leaves on hinges
   let instanced = [];   // [{ mesh, near: bool, name }]
   function placePieces(P, cell, top) {
-    for (const b of list) {
+    for (const b of list) placeBuilding(P, b, cell, top);
+    ensureDoorAnimator();
+    setInstanced(P);
+    refreshInstances();
+    lod(true);
+  }
+  function setInstanced(P) {
+    if (instanced.length && instanced[0].mesh === P[PIECES[0]].near[0]?.inst && !instanced[0].mesh.isDisposed()) return;
+    instanced = [];
+    for (const n of PIECES) for (const far of [false, true]) for (const src of P[n][far ? 'far' : 'near']) instanced.push({ mesh: src.inst, name: n, far });
+  }
+  function placeBuilding(P, b, cell, top) {
+    {
       b.pl = { wall: [], roof: [] };
-      for (const pl of b.A.placed) { const M = pieceMatrix(pl, top); (pl.part === 'roof' ? b.pl.roof : b.pl.wall).push({ name: pl.name, M }); }
-      for (const pr of b.pl.roof) for (const far of [false, true]) for (const src of P[pr.name][far ? 'far' : 'near']) {
-        // clones share geometry; a roof piece fades with its roof (mesh visibility)
-        const m = src.tpl.clone('roof_kit_piece_' + pr.name, null, true, false); m.isVisible = true; m.parent = b.roofRoot;
-        const d = new BABYLON.Vector3(), r = new BABYLON.Quaternion(), s = new BABYLON.Vector3(); pr.M.decompose(s, r, d);
-        m.position.copyFrom(d); m.rotationQuaternion = r; m.scaling.copyFrom(s); m.metadata = { roof: true, far };
-        m.setEnabled(far === b.far); addShadow(m); b.roofPieces.push(m);
-      }
+      // roof pieces (chimney top, dormer, gable windows) are thin instances like the rest, carrying the building's
+      // index so they fade with its roof
+      for (const pl of b.A.placed) b.pl.wall.push({ name: pl.name, M: pieceMatrix(pl, top), rid: pl.part === 'roof' ? b.rid : 0 });
       // door leaves: the game's hinge and animator (app.js ensureDoorAnimator), the kit's leaf
-      for (const d of b.A.doorOps) {
-        const [x, z] = d.o.rc, w = cell.get(x + ',' + z); if (!w) continue;
+      if (cell) for (const d of b.A.doorOps) {
+        const [x, z] = d.o.rc, w = cell.get(x + ',' + z); if (!w || d.o.upper) continue;
         const alongX = doorAxisOf(cell, x, z), W = .6;
         const pivot = new BABYLON.TransformNode('door_pivot', state.scene), base = alongX ? 0 : -Math.PI / 2;
-        pivot.position.set(alongX ? x - W / 2 : x, top + (d.k || 0) * b.A.H, alongX ? z : z - W / 2); pivot.rotation.y = base;
-        if (d.o.upper) continue;
+        pivot.position.set(alongX ? x - W / 2 : x, top, alongX ? z : z - W / 2); pivot.rotation.y = base;
         for (const src of P.door_leaf.near) {
           const m = src.tpl.clone('door_leaf_kit', pivot, true, false); m.isVisible = true;
           // the leaf baked with its hinge at the origin running -x: turned to run +x from the hinge
@@ -984,20 +1101,15 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
         (state.doorLeaves = state.doorLeaves || []).push({ pivot, x, z, alongX, base, angle: 0, door: w });
       }
     }
-    ensureDoorAnimator();
-    instanced = [];
-    for (const n of PIECES) for (const far of [false, true]) for (const src of P[n][far ? 'far' : 'near']) instanced.push({ mesh: src.inst, name: n, far });
-    refreshInstances();
-    lod(true);
   }
   function refreshInstances() {
     for (const it of instanced) {
-      const mats = [];
-      for (const b of list) if (b.pl && b.far === it.far) for (const w of b.pl.wall) if (w.name === it.name) mats.push(w.M);
-      if (it.name === 'door_leaf') { it.mesh.isVisible = false; continue; }
+      const mats = [], rids = [];
+      for (const b of all()) if (b.pl && b.far === it.far) for (const w of b.pl.wall) if (w.name === it.name) { mats.push(w.M); rids.push(w.rid || 0); }
       if (!mats.length) { it.mesh.thinInstanceCount = 0; it.mesh.isVisible = false; continue; }
       const buf = new Float32Array(mats.length * 16); mats.forEach((M, i) => M.copyToArray(buf, i * 16));
-      it.mesh.thinInstanceSetBuffer('matrix', buf, 16, true); it.mesh.thinInstanceRefreshBoundingInfo(false); it.mesh.isVisible = true;
+      it.mesh.thinInstanceSetBuffer('matrix', buf, 16, true); it.mesh.thinInstanceSetBuffer('tfRid', new Float32Array(rids), 1, true);
+      it.mesh.thinInstanceRefreshBoundingInfo(false); it.mesh.isVisible = true;
       if (!it.shadow) { it.shadow = true; addShadow(it.mesh); }
     }
   }
@@ -1005,23 +1117,57 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
   let lodAt = 0;
   function lod(force) {
     const now = performance.now(); if (!force && now - lodAt < 250) return; lodAt = now;
-    const cam = state.scene?.activeCamera; if (!cam || !list.length) return;
+    const cam = state.scene?.activeCamera; if (!cam || !(list.length + closedList.length)) return;
     const e = cam.globalPosition || cam.position; let changed = false;
-    for (const b of list) {
+    for (const b of all()) {
       const d = Math.hypot(b.center[0] - e.x, b.center[1] - e.z, (b.top + b.A.ZT / 2) - e.y);
       const far = b.far ? d > LOD_FAR - LOD_HYST : d > LOD_FAR + LOD_HYST;
       if (far === b.far && !force) continue;
       b.far = far; changed = true;
-      for (const m of b.roofNear) m.setEnabled(!far);
-      for (const m of b.roofFar) m.setEnabled(far);
-      for (const m of b.roofPieces) m.setEnabled(m.metadata.far === far);
     }
     if (changed || force) refreshInstances();
   }
-  function frame() { if (list.length) lod(false); }
+  function frame() {
+    if (fadeDirty && fadeTex && !fadeTex.isDisposed?.()) { fadeTex.update(fadeData); fadeDirty = false; }
+    if (list.length || closedList.length) lod(false);
+  }
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });
 
+  // ---- closed buildings (2026-11-27): the env building models placed as things (a village's inn, stone and tall
+  // houses, mill, barracks...: app.js makeCatalogItem) are kit houses too on the default path. Their footprint is
+  // the model's (env manifest, odd squares, at least 5), the door in the middle of the front (+z at ry 0), shut;
+  // the thing's own collider is unchanged. Not on the wall grid: storeys 2.2 whatever the walls.
+  const CLOSED = { inn: ['tavern', [6.67, 8]], blacksmith: ['smithy', [6.95, 6]], barracks: ['guardhouse', [7.5, 4.92]], stable: ['stable', [7, 4.58]], barn: ['barn', [6.5, 9]],
+    mill_house: ['mill', [4.7, 5]], sawmill: ['mill', [5, 5]], stone_house: ['stonehouse', [3.78, 5.5]], tall_house: ['tallhouse', [3.68, 6]], house: ['house', [4.68, 5]], fantasy_house: ['house', [5.44, 5.18]] };
+  let closedList = [];
+  const all = () => closedList.length ? list.concat(closedList) : list;
+  function closedWanted(type) { return kitOn() && !!CLOSED[type] && Q.get('kitclosed') !== '0'; }
+  function closed(proxy, type) {
+    const [role, f] = CLOSED[type], odd = v => Math.max(5, 2 * Math.round((v - .8) / 2) + 1), W = odd(f[0]), D = odd(f[1]);
+    const cx = Math.round(proxy.position.x), cz = Math.round(proxy.position.z), q = ((Math.round((proxy.rotation.y || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+    const [wx, wz] = q % 2 ? [D, W] : [W, D], hx = (wx - 1) / 2, hz = (wz - 1) / 2, walls = new Set(), inside = new Set(), doors = new Set();
+    for (let i = -hx; i <= hx; i++) for (let j = -hz; j <= hz; j++) (Math.abs(i) === hx || Math.abs(j) === hz ? walls : inside).add((cx + i) + ',' + (cz + j));
+    const door = [[cx, cz + hz], [cx + hx, cz], [cx, cz - hz], [cx - hx, cz]][q]; doors.add(door.join(','));
+    const front = ['+y', '+x', '-y', '-x'][q], scnSeed = (state.envScn || window.tablefolkScenario?.active?.scn || {}).seed | 0;
+    const seed = (Math.imul(cx * 92821 ^ cz * 68917 ^ type.length * 7, 2654435761) ^ scnSeed * 7919) >>> 0 & 0x7fffffff;
+    const o = specFor({ rooms: [] }, seed, role), along = front.endsWith('y') ? [1, 0] : [0, 1];
+    const sign = o.sign ? [door[0] + along[0], door[1] + along[1]] : null;
+    const SP = { ...o, H: 2.2, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign, seed: o.seed, closedDoor: true, blocked: () => true, room4lean: () => false };
+    const top = state.terrainTopY ?? 0, A = assemble(SP);
+    const b = makeBuilding({ key: 'closed:' + type + ':' + cx + ',' + cz, rooms: [], spec: { ...o, role }, sp: SP, closed: true }, A, top, false);
+    closedList.push(b); mergeClosed();
+    const pm = meta(proxy);
+    if (pm) { const prev = pm.cleanup; pm.cleanup = () => { try { prev?.(); } catch {} disposeBuilding(b); closedList = closedList.filter(x => x !== b); mergeClosed(); refreshInstances(); }; }
+    const go = P => { if (!closedList.includes(b)) return; placeBuilding(P, b, null, top); setInstanced(P); refreshInstances(); lod(true); };
+    const loaded = loadPieces();
+    if (pieces?.ready) go(pieces.ready);
+    else { const done = window.tablefolkLoading?.begin('buildings', { step: 'Raising the houses' }); loaded.then(P => { pieces.ready = P; go(P); }).catch(() => {}).finally(() => done?.()); }
+    return b;
+  }
+  function disposeBuilding(b) {
+    b.pl = null;
+  }
   function roomBuilding(room) { const k = roomKey(room); return list.find(b => b.rooms.some(r => roomKey(r) === k)) || null; }
   function clip(key) {
     if (!key) { clipU.on = 0; return; }
@@ -1033,13 +1179,14 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
   function stats() {
     const tris = ms => ms.reduce((n, m) => n + (m.isDisposed?.() ? 0 : (m.getTotalIndices?.() || 0) / 3), 0);
     let inst = 0; for (const it of instanced) if (it.mesh.isVisible) inst += (it.mesh.getTotalIndices() / 3) * (it.mesh.thinInstanceCount || 0);
-    return { ...lastStats, struct: tris(list.flatMap(b => b.struct)), roofNear: tris(list.flatMap(b => b.roofNear)), roofFar: tris(list.flatMap(b => b.roofFar)),
+    return { ...lastStats, closed: closedList.length, struct: tris(walkStruct), closedTris: tris(closedMeshes), roof: tris(walkRoof), meshes: walkStruct.length + walkRoof.length + closedMeshes.length,
       pieceTris: inst, far: list.filter(b => b.far).length, list: list.map(b => ({ key: b.key, role: b.spec.role, style: b.spec.style, storeys: b.spec.storeys, roof: b.spec.roof, far: b.far, center: b.center })) };
   }
   window.tablefolkBuildings = {
-    enabled, build, group, assemble, specFor,
-    roofParts: key => { const b = byKey.get(key); return b ? [...b.roofNear, ...b.roofFar, ...b.roofPieces] : []; },
-    setRoofEnabled: (key, on) => { const b = byKey.get(key); if (b && b.roofRoot.isEnabled() !== on) b.roofRoot.setEnabled(on); },
+    enabled, kitOn, build, group, assemble, specFor, closedWanted, closed, closedList: () => closedList,
+    setAlpha: (key, a) => { const b = byKey.get(key); if (!b || !b.rid || b.rid > 255) return; const v = Math.round(Math.max(0, Math.min(1, a)) * 255); if (fadeData[b.rid * 4] !== v) { fadeData[b.rid * 4] = v; fadeDirty = true; } },
+    roofBox: key => byKey.get(key)?.roofBox || null,
+    claims: (x, z) => claimedCells.has(x + ',' + z),
     has: key => byKey.has(key), roomBuilding, clip, list: () => list, stats, lod: () => lod(true), get clipState() { return { ...clipU }; },
   };
 })();

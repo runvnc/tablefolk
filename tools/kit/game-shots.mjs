@@ -15,6 +15,7 @@ const ctx = b.contexts()[0]; const p = await ctx.newPage();
 await p.setViewportSize({ width: +(process.env.SHOT_W || 1100), height: +(process.env.SHOT_H || 700) });
 p.on('console', m => { const t = m.text(); if (m.type() === 'error' || /\[buildings\]|\[walls\]|\[roofs\]/.test(t)) console.log('console:', m.type(), t.slice(0, 300)); });
 p.on('pageerror', e => console.log('pageerror:', String(e).slice(0, 400)));
+p.on('response', r => { if (r.status() >= 400) console.log('http', r.status(), r.url().slice(0, 160)); });
 const q = scn.includes('=') ? scn : 'scenario=' + scn;
 const t0 = Date.now();
 await p.goto(`${base}/app/?art=1&intro=0&model=none&${q}${extra ? '&' + extra : ''}&t=${Date.now()}`, { timeout: 60000 });
@@ -28,7 +29,7 @@ const measure = () => p.evaluate(async () => {
   const act = sc.getActiveMeshes(); let tris = 0, kitTris = 0;
   for (let i = 0; i < act.length; i++) { const m = act.data[i]; const n = (m.getTotalIndices?.() || 0) / 3 * (m.thinInstanceCount || 1) * (m.isVisible ? 1 : 0); tris += n; if (/kit/.test(m.name)) kitTris += n; }
   const ws = window.tablefolkLoading?.log?.find?.(l => /world-ready|revealed/.test(l.what || ''));
-  return { buildings: window.tablefolkBuildings?.stats?.(), activeMeshes: act.length, drawCalls: e._drawCalls?.current ?? null, trisDrawn: Math.round(tris), kitTris: Math.round(kitTris),
+  return { buildings: window.tablefolkBuildings?.stats?.(), activeMeshes: act.length, drawCalls: e._drawCalls ? Math.round(e._drawCalls.lastSecAverage || e._drawCalls.current) : null, trisDrawn: Math.round(tris), kitTris: Math.round(kitTris),
     gfxGB: +window.tablefolkGfxGB?.().toFixed(3), textures: sc.textures.length, frameMs: +ins.frameTimeCounter.lastSecAverage.toFixed(2), fps: +e.getFps().toFixed(1),
     quality: window.TABLEFOLK_GFX?.quality, shells: window.tablefolkRoofs?.shells?.().length, roofs: window.tablefolkRoofs?.roofed?.().length };
 });
@@ -36,14 +37,14 @@ const shot = async name => { await p.waitForTimeout(+(process.env.SHOT_WAIT || 1
 const st = await measure();
 console.log('STATS ' + JSON.stringify({ prefix, readyMs, ...st }));
 // a building to look at: the KIT_PICK-th (default the one nearest the player)
-const info = await p.evaluate(pick => {
+const info = await p.evaluate(([pick, key]) => {
   const L = window.tablefolkBuildings?.list?.() || [], s = TABLEFOLK_STATE, pp = s.playerAvatar.logicalPos || s.playerAvatar.root.position;
   const rooms = L.length ? L : (window.tablefolkRoofs?.roofed?.() || []).map(r => ({ rooms: [r], center: [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2], A: { ZT: 2.2 } }));
   const sorted = rooms.slice().sort((a, b) => Math.hypot(a.center[0] - pp.x, a.center[1] - pp.z) - Math.hypot(b.center[0] - pp.x, b.center[1] - pp.z));
-  const bb = sorted[Math.min(sorted.length - 1, pick | 0)]; if (!bb) return null;
+  const bb = (key && sorted.find(b => (b.key || '').includes(key) || b.spec?.role === key)) || sorted[Math.min(sorted.length - 1, pick | 0)]; if (!bb) return null;
   const r = bb.rooms[0], d = r.doors?.[0] || [r.x0, r.z1 + 1, 0, 1];
   return { center: bb.center, ZT: bb.A?.ZT || 2.2, door: d, room: { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1 }, spec: bb.spec ? { style: bb.spec.style, storeys: bb.spec.storeys, roof: bb.spec.roof, role: bb.spec.role } : null, top: s.terrainTopY ?? 0 };
-}, +(process.env.KIT_PICK || 0));
+}, [+(process.env.KIT_PICK || 0), process.env.KIT_KEY || '']);
 console.log('BUILDING ' + JSON.stringify(info));
 if (!info) { await p.close(); process.exit(0); }
 const free = (tx, ty, tz, alpha, beta, radius) => p.evaluate(([tx, ty, tz, alpha, beta, radius]) => {

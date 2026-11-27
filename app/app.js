@@ -3043,6 +3043,13 @@ function makeCatalogItem(scene,type,x,z,opts={}){
     try{ buildModernItem(scene,type,proxy,base.h); }catch(e){ console.warn('modern item failed',type,e); proxy.isVisible=true; }
     return proxy;
   }
+  // a building model placed as a thing (a village's inn, stone house, mill...): a kit house (buildings.js) on the
+  // default path, the Meshy model with ?kit=0 or "kit": false; the collider is the thing's either way
+  if(ENV_BUILDINGS.test(type) && window.tablefolkBuildings?.closedWanted?.(type)){
+    const proxy=makePropProxy(scene,type,{...base,type,x,z,ry:opts.ry||0,y:(state.terrainTopY??0)+floorLiftAt(x,z)+base.h/2});
+    try{ window.tablefolkBuildings.closed(proxy,type); }catch(e){ console.warn('[buildings] closed',type,e); proxy.isVisible=true; }
+    return proxy;
+  }
   // importPropAsset() is async (GLB load) but registers its physics proxy
   // synchronously, so callers get a usable object right away.
   let proxy=null, url=file;

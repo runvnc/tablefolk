@@ -504,8 +504,7 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     for (const r of g.rooms) { for (const c of r.cells) cells.add(c); for (const c of r.here) here.add(c); dr.push(...(r.doors || [])); }
     const room = { x0: Math.min(...g.rooms.map(r => r.x0)), x1: Math.max(...g.rooms.map(r => r.x1)), z0: Math.min(...g.rooms.map(r => r.z0)), z1: Math.max(...g.rooms.map(r => r.z1)), cells, here, doors: dr, rooms: g.rooms };
     const K = window.tablefolkBuildings, key = g.key;
-    return { room, kit: key, alpha: 1, target: 1, mats: [], get parts() { return K.roofParts(key); },
-      root: { setEnabled: on => K.setRoofEnabled(key, on), dispose() {}, isDisposed: () => false } };
+    return { room, kit: key, alpha: 1, target: 1, mats: [], parts: [], root: { setEnabled() {}, dispose() {}, isDisposed: () => false } };
   }
 
   // ---- seeing in ----
@@ -524,16 +523,17 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     for (const r of roofs) {
       // a shell goes only once you are through its door (in the room); a roof also in its doorway
       const inside = myCell && (r.shell ? r.room.cells.has(myCell) : r.room.here.has(myCell));
-      const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.parts.some(m => (!r.kit || m.isEnabled(false)) && ray.intersectsMesh(m, false).hit));
+      const kb = r.kit && window.tablefolkBuildings?.roofBox(r.kit);
+      const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.kit ? (kb && ray.intersectsBoxMinMax(kb.lo, kb.hi)) : r.parts.some(m => ray.intersectsMesh(m, false).hit));
       // in first person the roof overhead stays: it is the ceiling (a shell goes: its walls would hide the room)
       // "reveal": "rooms" (darkness.js): a room not yet seen into keeps its roof on, even in the camera's way
       const hidden = !inside && window.tablefolkDark?.roomRevealed && !window.tablefolkDark.roomRevealed(r.room);
       r.target = lifted || (inside && (!state.firstPerson || r.shell)) ? 0 : blocks && !hidden ? .22 : 1;
       if (r.kit) {
-        // kit: every frame (its meshes may be new after a wall rebuild); the storey above goes while inside
+        // kit: dithered per pixel by the building's index (every frame: a wall rebuild resets it); the storey above
+        // goes while inside
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7); if (Math.abs(r.alpha - r.target) < .005) r.alpha = r.target;
-        for (const m of r.parts) m.visibility = r.alpha > .99 ? 1 : r.alpha;
-        r.root.setEnabled(r.alpha > .02);
+        window.tablefolkBuildings?.setAlpha(r.kit, r.alpha);
         if (inside && !state.firstPerson && r.target === 0) clipKey = r.kit;
         continue;
       }

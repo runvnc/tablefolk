@@ -153,7 +153,8 @@ if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec
         const mm = meta(b); if (mm?.type !== 'wall' && mm?.type !== 'door') continue;
         const p = b.getAbsolutePosition?.() || b.position, x = Math.round(p.x), z = Math.round(p.z);
         walls.add(x + ',' + z);
-        if (mm.type === 'wall' && cut.on === 1 && inArea(x, z) && (!fog || D.known(x, z))) stone.push([x, z]);
+        // (a kit house's walls are solid: no lid; it was wider than them, buildings.js)
+        if (mm.type === 'wall' && cut.on === 1 && inArea(x, z) && (!fog || D.known(x, z)) && !window.tablefolkBuildings?.claims?.(x, z)) stone.push([x, z]);
       }
       if (fog && cut.on === 1) for (let dz = 1; dz <= DEPTH; dz++) for (let dx = -Math.ceil(W0 + (dz - 1) * SLOPE); dx <= W0 + (dz - 1) * SLOPE; dx++) {
         const x = cut.x + dx, z = cut.z + dz;

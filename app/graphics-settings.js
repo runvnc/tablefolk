@@ -99,12 +99,14 @@
     if (sc && performance.now() - gfxAt > 5000) {
       gfxAt = performance.now(); let bytes = 0;
       try {
-        for (const t of sc.textures || []) {
-          const z = t.getSize?.(); if (!z?.width) continue;
-          const bpp = t.textureType === 1 || t.textureType === 2 ? 16 : 4;   // float / half float targets
-          bytes += z.width * z.height * bpp * (t.isCube ? 6 : 1) * (t.noMipmap ? 1 : 1.33);
-        }
-        const e = sc.getEngine(); bytes += e.getRenderWidth() * e.getRenderHeight() * 4 * 6;   // the frame, depth, post-process targets
+        // every texture on the GPU once (2026-11-27): the engine's cache of internal textures, so textures held by
+        // model containers, instanced models and the building kit count too (scene.textures missed them), and a
+        // texture shared by several materials counts once
+        const seen = new Set(), list = sc.getEngine().getLoadedTexturesCache?.() || [];
+        const add = (w, h, type, cube, mips) => { const bpp = type === 1 ? 16 : type === 2 ? 8 : 4; bytes += w * h * bpp * (cube ? 6 : 1) * (mips ? 1.33 : 1); };
+        for (const it of list) { if (!it?.width || seen.has(it)) continue; seen.add(it); add(it.width, it.height, it.type, it.isCube, it.generateMipMaps); }
+        if (!list.length) for (const t of sc.textures || []) { const z = t.getSize?.(); if (z?.width) add(z.width, z.height, t.textureType, t.isCube, !t.noMipmap); }
+        const e = sc.getEngine(); bytes += e.getRenderWidth() * e.getRenderHeight() * 4 * (list.length ? 2 : 6);   // the swap chain and depth (render targets are in the cache)
         gfxMeasured = bytes / 2 ** 30 + .3;
       } catch { gfxMeasured = null; }
     }
