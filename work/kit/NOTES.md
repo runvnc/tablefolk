@@ -237,3 +237,17 @@ from the reference on the way:
   draws a zero-size copy until 4 s after world-ready.
 - Closed buildings (the env models placed as things) are kit houses with the door shut, from the model's
   footprint; their collider is the thing's as before.
+
+Numbers (RTX 2060, headless Chrome 1100x700 on :8001, tools/kit/game-shots.mjs; medians of 3 s of frames; the laptop
+was in use, CPU times vary by 1-2 ms between runs). kit / ?kit=0 (Meshy shells and closed building models):
+| world, quality, view | draw calls | triangles | kit triangles | graphics GB | CPU frame ms | world ready s |
+|---|---|---|---|---|---|---|
+| hearthvale light, far | 260 / 210 (max) | 1.13M / 1.20M | 140k | 1.13 / 1.21 | 10.8 / 10.5 | 11.9 / 14.8 |
+| hearthvale high, far | 441 / 369 | 4.28M / 4.34M | 140k | 2.48 / 3.12 | 15.1 / 12.1 | 17.8 / 21.3 |
+| village 23 light, far | 191 / 105 (max) | 0.96M / 1.00M | 88k | 0.87 / 0.95 | 6.9 / 4.7 | 9.4 / 8.7 |
+| village 23 high, far | 344 / 213 | 3.99M / 4.03M | 88k | 1.92 / 2.52 | 13.6 / 7.6 | 16.4 / 17.3 |
+Kit build (assemble + merge): hearthvale 11 walk-in + 2 closed in 130-200 ms, village 23 6 + 4 in 85-110 ms.
+Startup (startup-time.mjs, hearthvale --art): reveal 23.5 s high (kit) vs 24.4 s (shells); after the shader warm-up
+the largest frame after the reveal is 139-165 ms (shells 144). The kit costs more draw calls (60-130) and 1-6 ms of
+CPU a frame on this laptop; it saves 0.07-0.65 GB of graphics memory and loads faster. Left: door leaves are one
+mesh each; a world's merged set is drawn whole (no culling per house); pieces near and far are two meshes each.

@@ -533,7 +533,7 @@ loading cover, with the walls).
   building at `LOD_FAR` (20 units camera distance, 1.5 hysteresis, checked 4
   times a second; `refreshInstances` rebuilds the buffers). Light quality
   loads `<name>_512.glb` for the door, leaf and window. Only pieces that stand
-  out (chimney, dormer, porch, stair, sign) cast shadows. Until 4 s after
+  out (chimney, dormer, porch, stair, sign) cast shadows (door leaves none). Until 4 s after
   `tablefolk-world-ready` every piece mesh draws (a zero-size copy if unused)
   so its shaders compile under the cover (a far piece's first use hitched a
   frame by 0.7 s at high).
@@ -566,6 +566,10 @@ loading cover, with the walls).
   squares, at least 5) round the proxy, door in the middle of its front (ry),
   no lean-to; disposed with the thing (`meta.cleanup`). `?kitclosed=0` keeps
   the models for those only.
+- Measured (2026-11-27, RTX 2060, headless 1100x700, `tools/kit/game-shots.mjs`, medians over 3 s; kit /
+  `?kit=0` shells): hearthvale far view, high: 441 / 369 draw calls, 4.28M / 4.34M triangles, 2.48 / 3.12 GB
+  graphics memory (tablefolkGfxGB), CPU frame 15 / 12 ms; light: 1.13 / 1.21 GB; a generated village (seed 23)
+  high: 344 / 213 draw calls, 1.92 / 2.52 GB. Kit build 90-170 ms a village (+ the pieces' load under the cover).
 - Not done: impostors or a merged far version of a whole village; KTX2 (no
   encoder here); door leaves are still one mesh each (they swing); the shadow
   map draws the merged sets in every cascade.

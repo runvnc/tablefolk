@@ -1124,7 +1124,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
         for (const src of P.door_leaf.near) {
           const m = src.tpl.clone('door_leaf_kit', pivot, true, false); m.isVisible = true;
           // the leaf baked with its hinge at the origin running -x: turned to run +x from the hinge
-          m.rotation.y = Math.PI; m.metadata = { proxy: w }; m.isPickable = true; addShadow(m); state.wallVisuals.push(m);
+          // (no shadow: one mesh per door, and the frame and wall shade the doorway anyway)
+          m.rotation.y = Math.PI; m.metadata = { proxy: w }; m.isPickable = true; state.wallVisuals.push(m);
         }
         state.wallVisuals.push(pivot);
         (state.doorLeaves = state.doorLeaves || []).push({ pivot, x, z, alongX, base, angle: 0, door: w });
