@@ -2,6 +2,7 @@
 // length one after another, then two calls at once, each timed and given up
 // after a limit; console errors (device lost, out of memory) are printed.
 //   node llm-sweep.mjs --model=bonsai2-27b [--noqueue=1: calls overlap, as before the queue] [--base=http://localhost:8000] [--sizes=500,1000,2000,4000,6000] [--limit=180]
+//   [--gfx=high --scenario=scenarios/hearthvale.json: the game drawn behind it, a world living] (prints the window the brain chose)
 // APPROVE_DOWNLOAD=1 approves a download (a rented machine only).
 import { chromium } from 'playwright-core';
 const args = process.argv.slice(2), flag = n => { const a = args.find(x => x.startsWith('--' + n + '=')); return a ? a.split('=').slice(1).join('=') : null; };
@@ -12,7 +13,7 @@ for (const p of ctx.pages()) if (p !== page) await p.close().catch(() => {});
 page.on('console', m => { const t = m.text(); if (m.type() === 'error' || /lost|out of memory|OOM|uncaptured|GPUValidation|Device/i.test(t)) console.log('  console:', t.slice(0, 200)); });
 page.on('pageerror', e => console.log('  pageerror:', String(e).slice(0, 200)));
 await page.addInitScript(() => { try { localStorage.setItem('tablefolkTtsEnabled', '0'); } catch {} });
-await page.goto(`${base}/app/?play=1&intro=0&gfx=light&fps=10&probe=0${flag('noqueue') ? '&llmqueue=0' : ''}&model=${flag('model')}&t=${Date.now()}`);
+await page.goto(`${base}/app/?play=1&intro=0&gfx=${flag('gfx') || 'light'}&fps=${flag('gfx') === 'high' ? 30 : 10}&probe=0${flag('scenario') ? '&scenario=/' + flag('scenario').replace(/^\/+/, '') : ''}${flag('noqueue') ? '&llmqueue=0' : ''}&model=${flag('model')}&t=${Date.now()}`);
 const t0 = Date.now();
 for (;;) {
   const s = await page.evaluate(() => ({ consent: !document.getElementById('modelConsent')?.hidden, ready: !!window.tablefolk?.brainReady?.(), st: document.getElementById('brainStatus')?.textContent })).catch(() => ({}));
@@ -21,6 +22,7 @@ for (;;) {
   if (Date.now() - t0 > 1200e3) { console.log('never ready', JSON.stringify(s)); process.exit(3); }
   await page.waitForTimeout(3000);
 }
+console.log('notes:', JSON.stringify(await page.evaluate(() => (window.tablefolkDiag?.notes?.() || []).filter(n => /window|cache/i.test(JSON.stringify(n))).slice(-4))));
 const call = (n, tag) => page.evaluate(async ([n, tag, limit]) => {
   const filler = Array.from({ length: Math.ceil(n / 12) }, (_, i) => `Line ${i}: the baker sold ${i % 7} loaves to the smith at the square.`).join('\n');
   const t = performance.now();
