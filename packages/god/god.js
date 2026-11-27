@@ -641,8 +641,9 @@ export default function (api) {
       let stance = null, line = null;
       if (words(g)) {
         line = await say1(g, who(g), `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}". Do you agree, refuse, or want to bargain? Say it in one or two sentences, in your own words, nothing else.`, 60);
-        // by code first (yes / no / a condition: a bargain); unclear words go to the decider, else the matcher
-        if (line) { stance = stanceOf(line); councilNow.read[g.id] = stance ? 'code' : null; if (!stance) { stance = await choose(`${g.id} answers: "${line}"`, STANCE, `Does ${g.id} agree to the demand, refuse it, or bargain for more time or less?`, `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}"`, .6);   // (the decider leans to yes on a hedged speech: below .6 the matcher reads it) councilNow.read[g.id] = stance ? (lastRead?.by || 'matcher') : 'none'; } }
+        // by code first (yes / no / a condition: a bargain); unclear words go to the decider (kept at 0.6+: it leans
+        // to yes on a hedged speech), else the matcher
+        if (line) { stance = stanceOf(line); councilNow.read[g.id] = stance ? 'code' : null; if (!stance) { stance = await choose(`${g.id} answers: "${line}"`, STANCE, `Does ${g.id} agree to the demand, refuse it, or bargain for more time or less?`, `At a council at the ${sh.id}, ${priest.id} says the god demands: "${d.text}"`, .6); councilNow.read[g.id] = stance ? (lastRead?.by || 'matcher') : 'none'; } }
       }
       const v = vote([{ id: g.id, belief: G.belief(g.id), side: sideOf(g.id), stance }]).votes[0];
       line ||= pick(COUNCIL[v.vote]);
