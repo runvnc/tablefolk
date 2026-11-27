@@ -167,7 +167,7 @@
   },
   {
    "id": "jory",
-   "model": "villager",
+   "model": "villager", "gender": "male",
    "job": "woodcutter",
    "home": "alchemist",
    "in": "alchemist",

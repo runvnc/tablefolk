@@ -28,7 +28,7 @@
     { "id": "wren", "model": "peasant_woman", "job": "baker", "in": "tavern", "home": "tavern", "workplace": "tavern", "skills": ["faith"], "belief": 68, "style": "floury baker",
       "personality": "Wren, the baker. Devout and practical. You leave a loaf at the temple when you can, and you worry about your brother Bram's loose tongue.",
       "inventory": { "gold": 5, "items": [{ "name": "bread", "qty": 3 }, { "name": "wheat", "qty": 4 }] } },
-    { "id": "tilly", "model": "farmer", "job": "farmer", "in": "garden", "skills": ["faith"], "belief": 62, "style": "sunburnt farmer",
+    { "id": "tilly", "model": "peasant_woman_classic", "job": "farmer", "in": "garden", "skills": ["faith"], "belief": 62, "style": "sunburnt farmer",
       "personality": "Tilly, the farmer. You talk to your plants and to the god in the same breath. Your husband Finn's doubts hurt you.",
       "inventory": { "gold": 3, "items": [{ "name": "apple", "qty": 2 }] } },
     { "id": "bram", "model": "villager", "job": "labourer", "in": "square", "skills": ["faith"], "belief": 30, "style": "broad-shouldered labourer",

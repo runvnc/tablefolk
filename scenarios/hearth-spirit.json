@@ -32,7 +32,7 @@
     { "id": "wren", "model": "peasant_woman", "job": "baker", "in": "tavern", "home": "tavern", "workplace": "tavern", "style": "floury baker",
       "personality": "Wren, the baker. You bake before dawn and are proud of your loaves. You think Bram works too slowly.",
       "inventory": { "gold": 5, "items": [{ "name": "bread", "qty": 3 }, { "name": "wheat", "qty": 4 }] } },
-    { "id": "bram", "model": "villager", "job": "labourer", "in": "square", "style": "broad-shouldered labourer",
+    { "id": "bram", "model": "villager", "gender": "male", "job": "labourer", "in": "square", "style": "broad-shouldered labourer",
       "personality": "Bram, a labourer. You carry, dig and build for anyone who asks. You want a house of your own one day.",
       "inventory": { "gold": 2, "items": [] } },
     { "id": "tilly", "model": "farmer", "job": "farmer", "in": "garden", "style": "sunburnt farmer",

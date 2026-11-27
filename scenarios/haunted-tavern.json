@@ -95,7 +95,7 @@
   },
   {
    "id": "barnaby",
-   "model": "villager",
+   "model": "villager", "gender": "male",
    "style": "cheerful innkeeper in denial",
    "ttsVoiceId": "builtin:jean",
    "hostile": false,

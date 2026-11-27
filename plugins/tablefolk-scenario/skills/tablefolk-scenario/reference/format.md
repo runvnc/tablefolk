@@ -180,7 +180,9 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   art (`swordswoman sorceress huntress villager_woman swordsman wanderer`);
   the older names point at them (`adventurer_woman` is the swordswoman, `witch`
   the sorceress, `peasant_woman` and `villager` the village woman,
-  `adventurer` the swordsman, `woodsman` the wanderer) and the earlier
+  `adventurer` the swordsman, `woodsman` the wanderer; `villager` is the
+  generic body: a man gets a man's body and villagers of one world differ,
+  see below) and the earlier
   Quaternius bodies stay as `adventurer_classic`, `adventurer_woman_classic`,
   `woodsman_classic`, `huntress_classic`, `peasant_woman_classic`,
   `villager_classic`, `witch_classic`. Also `hooded king farmer wizard peasant`
@@ -191,6 +193,16 @@ the generator's `MODELS` in `server/generate.js`); each body's 2D tile is in
   `knight_classic mage_classic rogue_classic ranger_classic barbarian_classic
   woman_classic`. The clay `critter` is the default for a character with no
   `model` (and the blank sandbox world's first character).
+- **`"model": "villager"`** (the world builder's and the generators' default)
+  picks a body for the character: a man's when its `"gender"` says so
+  (`"male"` / `"female"`), or its `style`, or the first words of its
+  personality ("Finn, Tilly's husband, a woodcutter"), or what the others'
+  personalities say of it ("your brother Bram"): by its job the wanderer
+  (wood, hunting), the farmer (fields, herds) or the peasant; a woman's
+  otherwise (the village woman, then `peasant_woman_classic`,
+  `villager_classic`), each one not yet used in the world while there is one.
+  With no sign either way it is the village woman, as before. Any other
+  model is kept as written.
 - **Monsters**: `skeleton skeleton_warrior zombie goblin kobold orc troll
   skeleton_farmer rat spider wolf bat ghost slime demon giant dragon`.
   `orc goblin skeleton skeleton_warrior troll skeleton_farmer` are the

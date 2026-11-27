@@ -1147,6 +1147,42 @@
   const MONSTER_HP = { rat: 3, bat: 3, slime: 4, spider: 4, kobold: 5, skeleton: 6, goblin: 6, wolf: 6, ghost: 6, zombie: 7, skeleton_warrior: 8, skeleton_warrior_classic: 8, skeleton_farmer: 6, skeleton_classic: 6, goblin_classic: 6, troll: 16, orc: 10, orc_classic: 10, demon: 14, giant: 18, dragon: 24, red_dragon: 30, wyrmling: 9, imp: 7, mushroom_warrior: 8, bunny: 5, minotaur: 18, lizardman: 9, werewolf: 12, mummy: 9, snake: 4, wasp: 3, frog: 2, bull: 12, stag: 9, horse: 10, white_horse: 10, cow: 9, deer: 6, fox: 4, dog: 5, husky: 5, alpaca: 7, donkey: 8, pig: 6, sheep: 5, ogre: 16, gnoll: 9, lich: 16, vampire: 14, cultist: 7, bandit: 7, bear: 12, zombie_classic: 7, kobold_classic: 5, demon_classic: 14, giant_classic: 18, imp_classic: 7, gargoyle: 12, dark_knight: 14 };
   // The loading cover (loading.js) is up while a world or a section is built: its title
   // here, and the build itself is one of the stages it waits for.
+  // "villager" is the generic body, and it is the village woman's: the world builder's new character, the
+  // generators' fallback and many scenarios use it for anyone, so men came out in a woman's body and a village of
+  // villagers all alike (God of Ashford: bram and finn as wren). A generic villager gets a body by its own words
+  // (the personality's first sentence, its style, role, or "gender"): a man's (by his job: woodsman for wood and
+  // hunting, farmer for fields and herds, else peasant) or a woman's, and one not yet used in this world while there
+  // is one (2026-11-27). Any other model is kept as the author wrote it.
+  const BODY_ALIAS = { villager: 'villager_woman', peasant_woman: 'villager_woman', woman: 'villager_woman', woodsman: 'wanderer', rogue: 'wanderer', adventurer: 'swordsman', barbarian: 'swordsman', adventurer_woman: 'swordswoman', witch: 'sorceress', ranger: 'huntress', knight: 'guard', mage: 'wizard' };
+  const bodyKey = m => BODY_ALIAS[m] || m;
+  const MALE_W = /\b(he|him|his|himself|man|husband|brother|father|son|boy|lad|grandfather|uncle|king|lord|sir|monk|fellow)\b/i;
+  const FEMALE_W = /\b(she|her|hers|herself|woman|wife|sister|mother|daughter|girl|lass|grandmother|aunt|queen|lady|nun|priestess|widow|maid)\b/i;
+  // a man, a woman, or unknown (null): "gender"; the look ("style"); the name's own clauses ("Finn, Tilly's
+  // husband, a woodcutter"); else what the others say of them ("your brother Bram", "Mira ... she")
+  function genderOf(a, scn = null) {
+    if (a.gender) return /^(m|male|man|boy)\b/i.test(String(a.gender)) ? 'm' : 'f';
+    const say = t => { t = String(t || ''); const m = MALE_W.test(t), f = FEMALE_W.test(t); return m && !f ? 'm' : f && !m ? 'f' : null; };
+    const own = say(a.style) || say(String(a.personality || '').split(/[.!?]/)[0].split(',').slice(0, 2).join(','));
+    if (own) return own;
+    const name = String(a.name || a.id || '').replace(/_/g, ' ').split(' ').pop(); if (name.length < 3) return null;
+    const N = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const text = [scn?.intro, ...(scn?.agents || []).filter(x => x !== a).map(x => x.personality)].filter(Boolean).join(' . ');
+    let m = 0, f = 0;
+    for (const r of [new RegExp(`\\b(brother|husband|son|father|uncle|grandfather|nephew|man)\\s+${N}\\b`, 'gi'), new RegExp(`\\b${N}\\b[^.!?;]{0,40}?\\b(he|his|him)\\b`, 'gi')]) m += (text.match(r) || []).length;
+    for (const r of [new RegExp(`\\b(sister|wife|daughter|mother|aunt|grandmother|niece|woman)\\s+${N}\\b`, 'gi'), new RegExp(`\\b${N}\\b[^.!?;]{0,40}?\\b(she|her|hers)\\b`, 'gi')]) f += (text.match(r) || []).length;
+    return m > f ? 'm' : f > m ? 'f' : null;
+  }
+  function genericBody(a, used = new Set(), scn = null) {
+    if (!a || a.model !== 'villager') return a?.model;
+    const g = genderOf(a, scn);
+    if (!g) { used.add(bodyKey('villager')); return 'villager'; }   // (unknown: the village woman, as before)
+    const male = g === 'm';
+    const job = [a.job, a.role, a.style].filter(Boolean).join(' ');
+    const first = /wood|hunt|forest|axe|trapper/i.test(job) ? 'woodsman' : /farm|field|herd|shepherd|plough/i.test(job) ? 'farmer' : 'peasant';
+    const pool = male ? [first, 'peasant', 'woodsman', 'farmer', 'hooded'] : ['villager', 'peasant_woman_classic', 'villager_classic'];
+    const m = pool.find(x => !used.has(bodyKey(x))) || pool[0];
+    used.add(bodyKey(m)); return m;
+  }
   async function playScenarioNow(input, opts = {}) {
     const L = !opts.testing && window.tablefolkLoading;
     if (L && !opts.sub) L.show({ title: input?.title || 'Untitled scenario', subtitle: input?.subtitle || '' });
@@ -1250,9 +1286,10 @@
     const withRole = a => window.tablefolkRoles ? window.tablefolkRoles.withRole(a) : a;
     const skillWarnings = window.tablefolkSkills ? await window.tablefolkSkills.load({ ...scn, agents: withCarried(parentAgents || scn.agents).map(withRole) }) : [];
     let first = null;
+    const bodiesUsed = new Set(scn.agents.filter(a => a.model && a.model !== 'villager').map(a => bodyKey(a.model)));
     for (const a of scn.agents) {
       const pos = Array.isArray(a.at) ? { x: +a.at[0], z: +a.at[1], facing: a.facing || 's' } : (plan.agents[a.id] || { x: 0, z: 0, facing: 's' });
-      const g = await w.spawnAgent(a.id, pos.x, pos.z, a.facing || pos.facing, a.model);
+      const g = await w.spawnAgent(a.id, pos.x, pos.z, a.facing || pos.facing, genericBody(a, bodiesUsed, scn));
       // "scale": bigger or smaller than its model's usual height (0.5-2)
       const sz = Math.max(.5, Math.min(2, +a.scale || 1));
       if (g?.root && sz !== 1) { g.root.scaling.scaleInPlace(sz); if (g.height) g.height *= sz; }
@@ -2521,5 +2558,5 @@ turns: 6`;
   function onReady() { refreshThings(); initPane(); hookEdges(); openFromUrl(); }
   if (window.TABLEFOLK_SCENE_READY) onReady(); else window.addEventListener('tablefolk-scene-ready', onReady, { once: true });
 
-  window.tablefolkScenario = { travel, here, agentDef, sections: sectionsMap, links: () => world.links.slice(), get section() { return world.id; }, get journey() { return journey; }, saveJourney, resetJourney, normLink, revealOf, parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, freezeLayout, generateMapLines, EXAMPLES, get active() { return active; } };
+  window.tablefolkScenario = { travel, here, agentDef, genericBody, genderOf, sections: sectionsMap, links: () => world.links.slice(), get section() { return world.id; }, get journey() { return journey; }, saveJourney, resetJourney, normLink, revealOf, parseTactics, runTactics, parseMapLine, layout, evalCond, encodeScenario, decodeScenario, playScenario, expandGrid: s => expandGrid(normalizeScenario(s)), toAscii, exitScenario, exportCurrentWorld, freezeLayout, generateMapLines, EXAMPLES, get active() { return active; } };
 })();
