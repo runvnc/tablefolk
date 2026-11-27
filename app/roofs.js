@@ -535,6 +535,7 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7); if (Math.abs(r.alpha - r.target) < .005) r.alpha = r.target;
         window.tablefolkBuildings?.setAlpha(r.kit, r.alpha);
         if (inside && !state.firstPerson && r.target === 0) clipKey = r.kit;
+        kitHide(r, p);
         continue;
       }
       if (Math.abs(r.alpha - r.target) > .005) {
@@ -580,6 +581,24 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     hole.k += (want - hole.k) * Math.min(1, dt * 9); if (hole.k < .005 && !want) { hole.k = 0; hole.r = null; } if (hole.k > .995) hole.k = 1;
     hole.yTop = (state.terrainTopY ?? 0) + wallH() + .06;
     return hole.k > 0 ? hole.r : null;
+  }
+  // a kit house under its whole roof (2026-11-27): its floors, things and the folk inside are hidden (nothing shows
+  // through the kit's walls and windows; in a village they were 60-90 draw calls a frame with their shadows), unless
+  // a door of it is open or the player is within KIT_NEAR of one (it opens at 1.7 m: the room is there to see in)
+  const KIT_NEAR = 3.2;
+  function kitHide(r, p) {
+    let hide = r.alpha > .98 && r.target > .98 && !lifted;
+    if (hide) for (const [x, z] of r.room.doors || []) {
+      if (p && Math.hypot(p.x - x, p.z - z) < KIT_NEAR) { hide = false; break; }
+      const lf = (state.doorLeaves || []).find(l => l.x === x && l.z === z && !l.pivot?.isDisposed?.());
+      if (lf && Math.abs(lf.angle || 0) > .02) { hide = false; break; }
+    }
+    if (r._kitHide !== hide) for (const rm of r.room.rooms || []) for (const m of window.tablefolkWalls?.roomMeshes?.(rm) || []) {
+      if (m.isDisposed?.() || !/^tt_floor_room/.test(m.name)) continue;
+      if (m.isEnabled() === hide) m.setEnabled(!hide);
+    }
+    r._kitHide = hide;
+    shellHide(r, hide, !hide);
   }
   // characters inside a standing shell are indoors: hidden (and shown again when it lifts)
   function shellHide(r, hide, open = false) {

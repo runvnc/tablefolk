@@ -524,6 +524,23 @@ loading cover, with the walls).
   roofs.js) and dithers the fragment away below it (screen door: no blending
   or sorting). Roof pieces (chimney top, dormer, gable windows) are thin
   instances with `tfRid` per instance.
+- **Draw calls, round 2** (2026-11-27; `KIT_BREAKDOWN=1 tools/kit/game-shots.mjs`
+  counts engine draws per mesh name, main pass and render targets): every
+  mesh was drawn three times (main, the sun's shadow map, the glow layer's
+  occlusion pass), and a house's inside drew under its roof. Now
+  (a) one shadow caster for the whole kit (`buildCaster`: structure and roofs,
+  positions only, plus the far versions of chimney, dormer, porch, stair and
+  sign baked in place) on `CAST_LAYER` (0x10000000: no camera draws it, the
+  shadow map does), the merged sets and pieces cast nothing themselves;
+  (b) only the wall and roof surfaces (plaster, fieldstone, siding, shingle,
+  tile, thatch) occlude in the glow layer (`noGlow`); (c) door leaves are
+  instances of the leaf template (`createInstance`, parented to the pivot:
+  one draw for all); (d) roofs.js `kitHide`: under a whole roof (alpha 1)
+  a kit house's floors, things and folk are hidden (as under a shell), unless
+  one of its doors is open or the player is within 3.2 of one; (e) room
+  floors (walls.js, both paths) cast no shadow; (f) merged meshes and piece
+  meshes have frozen world matrices. Materials are not frozen (the cutaway,
+  storey, fade and glow plugins update uniforms every frame).
 - **Hero pieces** (`assets/models/kit`, `loadPieces`): each GLB's meshes baked
   into a template mesh in Babylon space (the loader's mirror applied, front
   faces by the normals) and a thin-instance twin with its own geometry

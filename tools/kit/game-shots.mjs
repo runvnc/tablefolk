@@ -41,6 +41,24 @@ const measure = () => p.evaluate(async () => {
 const shot = async name => { await p.waitForTimeout(+(process.env.SHOT_WAIT || 1400)); const url = await p.evaluate(() => document.getElementById('renderCanvas').toDataURL('image/jpeg', .86)); writeFileSync(`${dir}/${prefix}_${name}.jpg`, Buffer.from(url.split(',')[1], 'base64')); console.log('shot', `${dir}/${prefix}_${name}.jpg`); };
 const st = await measure();
 console.log('STATS ' + JSON.stringify({ prefix, readyMs, ...st }));
+// KIT_BREAKDOWN=1: render calls by mesh name over 20 frames (main pass / render targets: shadow maps), the top ones
+const breakdown = () => p.evaluate(async () => {
+  const sc = TABLEFOLK_STATE.scene, e = sc.getEngine(), by = {}, P = BABYLON.Mesh.prototype, R = BABYLON.RenderTargetTexture.prototype;
+  const oProc = P._processRendering, oRT = R.render, oDE = e.drawElementsType, oDA = e.drawArraysType;
+  let cur = '?', inRT = 0;
+  P._processRendering = function (...a) { const was = cur; cur = this.name.replace(/[_ ]?\d+$/, '').replace(/#.*/, ''); try { return oProc.apply(this, a); } finally { cur = was; } };
+  R.render = function (...a) { inRT++; try { return oRT.apply(this, a); } finally { inRT--; } };
+  const count = () => { const o = by[cur] || (by[cur] = { main: 0, rt: 0 }); o[inRT ? 'rt' : 'main']++; };
+  e.drawElementsType = function (...a) { count(); return oDE.apply(this, a); };
+  e.drawArraysType = function (...a) { count(); return oDA.apply(this, a); };
+  let n = 0; await new Promise(r => { const ob = sc.onAfterRenderObservable.add(() => { if (++n >= 20) { sc.onAfterRenderObservable.remove(ob); r(); } }); });
+  P._processRendering = oProc; R.render = oRT; delete e.drawElementsType; delete e.drawArraysType;
+  if (e.drawElementsType !== oDE) e.drawElementsType = oDE; if (e.drawArraysType !== oDA) e.drawArraysType = oDA;
+  const rows = Object.entries(by).map(([k, v]) => [k, +(v.main / 20).toFixed(1), +(v.rt / 20).toFixed(1)]).sort((a, b) => (b[1] + b[2]) - (a[1] + a[2]));
+  const sum = rs => rs.reduce((t, r) => [t[0] + r[1], t[1] + r[2]], [0, 0]).map(v => +v.toFixed(1));
+  return { total: sum(rows), kit: sum(rows.filter(r => /kit|door_leaf|door_pivot/.test(r[0]))), top: rows.slice(0, +(window.KIT_TOP || 45)) };
+});
+if (process.env.KIT_BREAKDOWN) console.log('BREAKDOWN ' + JSON.stringify(await breakdown()));
 // a building to look at: the KIT_PICK-th (default the one nearest the player)
 const info = await p.evaluate(([pick, key]) => {
   const L = window.tablefolkBuildings?.list?.() || [], s = TABLEFOLK_STATE, pp = s.playerAvatar.logicalPos || s.playerAvatar.root.position;
@@ -101,5 +119,6 @@ for (const v of views.split(',')) {
   await shot(v);
   if (v === 'fp' || v === 'fpout') await p.evaluate(() => { if (TABLEFOLK_STATE.firstPerson) tablefolk.setFirstPerson(false); });
   if (v === 'far' && process.env.KIT_MEASURE_FAR) console.log('STATS_FAR ' + JSON.stringify(await measure()));
+  if (v === 'far' && process.env.KIT_BREAKDOWN) console.log('BREAKDOWN_FAR ' + JSON.stringify(await breakdown()));
 }
 await p.close(); process.exit(0);

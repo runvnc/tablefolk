@@ -932,6 +932,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
         const mat = m.material; if (mat) { mat.sideOrientation = null; mat.backFaceCulling = false; mat.maxSimultaneousLights = 8; mat.environmentIntensity = .5; mat.transparencyMode = null; window.TABLEFOLK_LOOK?.matte?.(mat); }
         tpl.material = mat; tpl.isPickable = false; tpl.receiveShadows = true; tpl.isVisible = false;
         const inst = tpl.clone('wall_kitpiece_' + name + (far ? '_far' : '')); inst.makeGeometryUnique(); inst.isVisible = false; inst.isPickable = false;
+        noGlow(tpl); noGlow(inst);
         tpl.setVerticesData('tfRid', new Float32Array(p.length / 3), false, 1);   // (after the twin took its own geometry: its tfRid is per instance)
         outp.push({ tpl, inst, material: mat });
       }
@@ -988,7 +989,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     for (let i = 0; i < n; i += 3) { pos[i] = P[i]; pos[i + 1] = P[i + 2] + top; pos[i + 2] = P[i + 1]; nor[i] = N[i]; nor[i + 1] = N[i + 2]; nor[i + 2] = N[i + 1]; }
     vd.positions = pos; vd.normals = nor; vd.uvs = bk.U; vd.colors = bk.C; vd.indices = orient(pos, nor, bk.I); vd.applyToMesh(m);
     if (rid) m.setVerticesData('tfRid', rid instanceof Float32Array ? rid : new Float32Array(n / 3).fill(rid), false, 1);   // the roof fade's building index
-    m.material = mat; m.isPickable = false; m.receiveShadows = true; addShadow(m);
+    // (no shadow of its own: shadowProxy() casts every kit building's in one draw)
+    m.material = mat; m.isPickable = false; m.receiveShadows = true; m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true;
     return m;
   }
   // structure: walls (cut by the cutaway, clipped above the ground storey; a walk-in building's go with the
@@ -1022,12 +1024,65 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
   function remerge() {
     for (const m of merged) try { m.dispose(false, false); } catch {}
     merged = [];
+    shadowProxy();
     if (!state.scene || !(list.length + closedList.length)) return;
     const M = materials(), S = {}, R = {}, top = (list[0] || closedList[0]).top;
     for (const b of all()) { mergeInto(S, b.A.S); mergeInto(R, b.A.RF, b.rid || 0); }
-    for (const [mn, bk] of Object.entries(S)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) merged.push(m); }
-    for (const [mn, bk] of Object.entries(R)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top, new Float32Array(bk.R)); if (m) { m.metadata = { roof: true }; merged.push(m); } }
+    for (const [mn, bk] of Object.entries(S)) { const m = meshOf('wall_kit_' + mn, bk, M.wall[mn], top); if (m) { merged.push(m); noGlow(m, mn); } }
+    for (const [mn, bk] of Object.entries(R)) { const m = meshOf('roof_kit_' + mn, bk, M.roof[mn], top, new Float32Array(bk.R)); if (m) { m.metadata = { roof: true }; merged.push(m); noGlow(m, mn); } }
   }
+  // ---- shadows: one mesh casts for every kit building of the world (2026-11-27) ----
+  // The merged sets and the pieces cast no shadow of their own: the sun's shadow map drew each of them again (and the
+  // glow layer once more), 40-50 draw calls a frame in a village. This mesh holds the structure and roofs (positions
+  // only) and the far versions of the pieces that stand out (chimney, dormer, porch, stair, sign) baked where they
+  // stand; it is on a layer no camera draws (CAST_LAYER), so it is one draw in the shadow pass and none elsewhere.
+  // (As before, the shadow pass has no material plugins: a faded roof or a cut wall still casts.)
+  const CAST_LAYER = 0x10000000, CASTS = /^(chimney|dormer|porch|stair|sign)$/;
+  let caster = null, casterQueued = false, casterMat = null;
+  function shadowProxy() {
+    if (casterQueued) return; casterQueued = true;
+    queueMicrotask(() => { casterQueued = false; buildCaster(); });
+  }
+  function buildCaster() {
+    if (caster) { try { caster.dispose(false, false); } catch {} caster = null; }
+    const sc = state.scene; if (!sc || !(list.length + closedList.length) || (!state.shadow && !state.extraShadows?.length)) return;
+    const parts = [], P = pieces?.ready && pieces.ready.alive?.() ? pieces.ready : null;
+    let nv = 0, ni = 0;
+    for (const b of all()) {
+      for (const B of [b.A.S, b.A.RF]) for (const bk of Object.values(B)) { parts.push({ bk, top: b.top }); nv += bk.P.length / 3; ni += bk.I.length; }
+      if (P && b.pl) for (const w of b.pl.wall) if (CASTS.test(w.name)) for (const src of P[w.name].far) {
+        const g = src.geo || (src.geo = { p: src.tpl.getVerticesData('position'), i: src.tpl.getIndices() });
+        parts.push({ g, M: w.M }); nv += g.p.length / 3; ni += g.i.length;
+      }
+    }
+    if (!nv) return;
+    const pos = new Float32Array(nv * 3), idx = new Uint32Array(ni), v = BABYLON.Vector3.Zero();
+    let o = 0, k = 0;
+    for (const t of parts) {
+      if (t.bk) {
+        const Pp = t.bk.P, I = t.bk.I;
+        for (let i = 0; i < Pp.length; i += 3) { pos[o * 3 + i] = Pp[i]; pos[o * 3 + i + 1] = Pp[i + 2] + t.top; pos[o * 3 + i + 2] = Pp[i + 1]; }
+        for (let i = 0; i < I.length; i++) idx[k++] = I[i] + o;
+        o += Pp.length / 3;
+      } else {
+        const Pp = t.g.p, I = t.g.i;
+        for (let i = 0; i < Pp.length; i += 3) { BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(Pp[i], Pp[i + 1], Pp[i + 2], t.M, v); pos[o * 3 + i] = v.x; pos[o * 3 + i + 1] = v.y; pos[o * 3 + i + 2] = v.z; }
+        for (let i = 0; i < I.length; i++) idx[k++] = I[i] + o;
+        o += Pp.length / 3;
+      }
+    }
+    const m = new BABYLON.Mesh('kit_shadow_caster', sc), vd = new BABYLON.VertexData();
+    vd.positions = pos; vd.indices = idx; vd.applyToMesh(m);
+    if (!casterMat || casterMat.getScene() !== sc || casterMat.isDisposed?.()) { casterMat = new BABYLON.StandardMaterial('kit_shadow_caster', sc); casterMat.backFaceCulling = false; casterMat.disableLighting = true; }
+    m.material = casterMat; m.layerMask = CAST_LAYER; m.isPickable = false; m.receiveShadows = false;
+    m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true;
+    addShadow(m); m.receiveShadows = false;
+    caster = m;
+  }
+  // the glow layer draws every mesh again (black, to hide a lamp's glow behind it): only the kit's wall and roof
+  // surfaces stay in it (they cover the rest); timber, quoins, floors and the pieces sit on or in them
+  const OCCLUDE = /^(plaster|fieldstone|siding|shingle|tile|thatch)$/;
+  function noGlow(m, mn) { if (mn && OCCLUDE.test(mn)) return; try { state.glowLayer?.addExcludedMesh(m); } catch {} }
   function mergeClosed() {
     if (mergeQueued) return; mergeQueued = true;
     queueMicrotask(() => { mergeQueued = false; remerge(); });
@@ -1103,6 +1158,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     setInstanced(P);
     refreshInstances();
     lod(true);
+    shadowProxy();
   }
   function setInstanced(P) {
     if (instanced.length && instanced[0].mesh === P[PIECES[0]].near[0]?.inst && !instanced[0].mesh.isDisposed()) return;
@@ -1122,9 +1178,10 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
         const pivot = new BABYLON.TransformNode('door_pivot', state.scene), base = alongX ? 0 : -Math.PI / 2;
         pivot.position.set(alongX ? x - W / 2 : x, top, alongX ? z : z - W / 2); pivot.rotation.y = base;
         for (const src of P.door_leaf.near) {
-          const m = src.tpl.clone('door_leaf_kit', pivot, true, false); m.isVisible = true;
+          // an instance of the leaf's template (every leaf of the world one draw call; it swings on its own pivot)
+          const m = src.tpl.createInstance('door_leaf_kit'); m.parent = pivot;
           // the leaf baked with its hinge at the origin running -x: turned to run +x from the hinge
-          // (no shadow: one mesh per door, and the frame and wall shade the doorway anyway)
+          // (no shadow: the frame and wall shade the doorway anyway)
           m.rotation.y = Math.PI; m.metadata = { proxy: w }; m.isPickable = true; state.wallVisuals.push(m);
         }
         state.wallVisuals.push(pivot);
@@ -1143,8 +1200,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
       const buf = new Float32Array(mats.length * 16); mats.forEach((M, i) => M.copyToArray(buf, i * 16));
       it.mesh.thinInstanceSetBuffer('matrix', buf, 16, true); it.mesh.thinInstanceSetBuffer('tfRid', new Float32Array(rids), 1, true);
       it.mesh.thinInstanceRefreshBoundingInfo(false); it.mesh.isVisible = true;
-      // (flush pieces, windows, corbels, door frames, cast nothing worth a shadow pass)
-      if (!it.shadow && /^(chimney|dormer|porch|stair|sign)$/.test(it.name)) { it.shadow = true; addShadow(it.mesh); }
+      if (!it.mesh.isWorldMatrixFrozen) it.mesh.freezeWorldMatrix();
+      // (shadows: the caster mesh has the pieces that stand out, buildCaster)
     }
   }
   // near / far by camera distance (checked four times a second)
@@ -1195,7 +1252,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     closedList.push(b); mergeClosed();
     const pm = meta(proxy);
     if (pm) { const prev = pm.cleanup; pm.cleanup = () => { try { prev?.(); } catch {} disposeBuilding(b); closedList = closedList.filter(x => x !== b); mergeClosed(); refreshInstances(); }; }
-    const go = P => { if (!closedList.includes(b)) return; placeBuilding(P, b, null, top); setInstanced(P); refreshInstances(); lod(true); };
+    const go = P => { if (!closedList.includes(b)) return; placeBuilding(P, b, null, top); setInstanced(P); refreshInstances(); lod(true); shadowProxy(); };
     const loaded = loadPieces();
     if (pieces?.ready) go(pieces.ready);
     else { const done = window.tablefolkLoading?.begin('buildings', { step: 'Raising the houses' }); loaded.then(P => { pieces.ready = P; go(P); }).catch(() => {}).finally(() => done?.()); }

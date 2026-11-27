@@ -141,11 +141,11 @@
       },
       // axis-aligned: centre, size
       add(x, y, z, sx, sy, sz, col) { this.box([x, y, z], [1, 0, 0], [0, 1, 0], [0, 0, 1], sx / 2, sy / 2, sz / 2, col); },
-      mesh(name, mat) {
+      mesh(name, mat, cast = true) {
         if (!P.length) return null;
         const m = new BABYLON.Mesh(name, state.scene), vd = new BABYLON.VertexData();
         vd.positions = P; vd.normals = N; vd.uvs = U; vd.colors = C; vd.indices = I; vd.applyToMesh(m);
-        m.material = typeof mat === 'function' ? mat() : mat; m.isPickable = false; m.receiveShadows = true; window.addShadow?.(m) ?? addShadow(m);
+        m.material = typeof mat === 'function' ? mat() : mat; m.isPickable = false; m.receiveShadows = true; if (cast) window.addShadow?.(m) ?? addShadow(m);
         return m;
       },
     };
@@ -287,7 +287,7 @@
         const x0 = x - e(-1, 0), x1 = x + e(1, 0), z0 = z - e(0, -1), z1 = z + e(0, 1), top = state.terrainTopY ?? 0;
         b.add((x0 + x1) / 2, top + FLOOR_UP / 2 - .01, (z0 + z1) / 2, x1 - x0, FLOOR_UP + .02, z1 - z0, [1, 1, 1]);
       }
-      for (const [env, b] of byMat) { const m = b.mesh('tt_floor_room', () => floorMat(env)); if (m) { m.metadata = { room: rk }; out.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); if (typeof floorCollider === 'function') floorCollider(m); } }
+      for (const [env, b] of byMat) { const m = b.mesh('tt_floor_room', () => floorMat(env), false /* a 3 cm slab on the ground: no shadow pass */); if (m) { m.metadata = { room: rk }; out.push(m); (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); if (typeof floorCollider === 'function') floorCollider(m); } }
     }
     relevel(was, cells);
   }
