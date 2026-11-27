@@ -1419,6 +1419,115 @@ guided day leaves 3 hungry and the free day does little (half the
 activities picked by code, no plans). Guided is playable on 16 GB; free is
 not, until reading gets faster.
 
+### Inkling 2 Mini: where a call's time goes, prefix checkpoints, record and replay (2026-11-27)
+
+Measured on a rented RTX 4080 16 GB (Ryzen 5 5600X, Chrome 158, driver 595.99),
+hearthvale at guided for 7 minutes with every prompt and llama.cpp's timings
+captured (`?wdump=1` prints whole prompts; the runner logs `cache_n`; the
+capture script and the analysis were one-offs: per call the prompt, tokens
+read / reused / written, and the slot model below).
+
+**Where the ~5-13 s of a call went** (the shipped build, 51 calls): reading
+the prompt was 72% of call time, at 163 tok/s, and **nothing was ever reused**
+(`cache_n` 0 on every call). Turn prompts (the character's full turn: rules,
+identity, history, perception) were ~6,400 characters, 1,900 tokens read, 12.7 s
+median; the other calls (agency.js day plans and choices, ~1,700 characters, 460
+tokens) 5.4 s; writing ~35 tokens at 16-18 tok/s (the game draws on the same card).
+Why no reuse: Inkling is hybrid (convolution state) with a 1,024-token sliding
+window on 40 of its 48 layer visits, so the cache rolls back only to a context
+checkpoint, and llama.cpp's checkpoints (made near every prompt's end) were
+off after the wasm heap crash. A checkpoint holds the window's KV for the
+sequence: ~160 KB a token, up to ~245 MB; llama.cpp's 32 (or 3) a slot in the
+4 GB wasm heap is what aborted the day (`std::bad_alloc`), not a bug in the restore.
+
+**Prefix checkpoints** (shipped): the runner (`wllama-runner.js`,
+`sharedPrefixEnd`) finds the part a prompt shares with recent prompts (cut at a
+line break; a part read this way before wins, so all characters' turns share
+one: the rules, ~2,750 characters, ~800 tokens), reads it with a request of its
+own that leaves one checkpoint at its end, and sends the prompt with
+`checkpoints: false` (a field added by `server-checkpoints.patch`: the request
+makes none), so a slot keeps one checkpoint (`n_ctx_checkpoints: 1`, ~130 MB;
+4 slots ~0.5 GB of heap). A prompt that carries a recent one on (the world
+builder's agent, which keeps the model's own words) has the whole earlier prompt
+as its prefix: the slot holds that prompt plus the answer as sampled, which the
+next prompt's rendering does not match token for token, so it rolls back to the
+checkpoint the step before left and reads only the two steps' new parts. Replaying the day's prompts through a model of
+the server's slots: 77% of the characters read (rules only: 75%; the longest
+shared part every time: 87%, as it keeps moving the one checkpoint). In
+Chrome (`replay-test.html ?prefix=1`): a turn prompt read in full 9.7 s;
+with the rules restored, 0.4-0.8 s for the prefix request (restore, 4 tokens,
+a new checkpoint copied out) plus 5.0-5.4 s for the rest, also for another
+character's turn in the same slot.
+
+**Record and replay** (`webgpu-03-replay.patch`, shipped on, measured): a big
+graph whose signature (every node's op, flags, type, shape, strides, buffer,
+offset, op parameters, and the same for its sources) comes twice in a row is
+recorded (pipelines, bind groups, workgroup counts, its parameters in a buffer
+of its own, 8 recordings kept, dropped when any buffer is freed) and later
+graphs with that signature are replayed: no graph walk, parameter building or
+bind-group lookups, only SetPipeline/SetBindGroup/Dispatch and the submits.
+Correct: the same greedy text natively and in Chrome as without it, llama-perplexity
+KL divergence against the CPU 0.00263 / 98.04% same top token with and
+without it. But **no faster**: in Chrome the encode went from 8.1 to 2.0 ms a token
+(signature 0.6 ms, replay 1.4 ms) while the wait for the GPU grew from 31.5 to
+38.7 ms: 22.4-22.5 tok/s against 22.8-24.0. Natively (Dawn) 31.5 against 34.2
+tok/s, and fewer, bigger submits made it worse (256 kernels: 31.0, 1,024: 27.4, all
+3,855 in one: 22.7). A token's critical path is the GPU side of its 3,855
+dispatches (Chrome's GPU process decoding and recording them, barriers between
+them), ~39 ms, not the 8 ms of encoding in the worker, which already overlapped it.
+What it buys: 6 ms less work a token in the model's worker. What would make
+writing faster: fewer dispatches (more fusion) or two characters at once (below).
+
+**Other measurements** (Chrome, the same box): batch size for reading: 256 tokens
+128-154 tok/s, 512 163-177, 1,024 157-171 (and 1.1 GB more graphics memory):
+512 stays. **Two characters at once** (two requests in flight; wllama's server
+batches them in one graph): 47 + 46 tokens written in 3.6 s against 5.2 s one after
+the other (17 tok/s each, 1.43x together), since a step costs the same dispatches
+for one sequence or two. The game's model queue runs one call at a time
+(world-integration.js); letting two characters' calls overlap would be the next
+step for writing, not tried in the game.
+
+In the game (hearthvale, guided, 7 minutes; the prompts of the two runs were not
+identical: a later village day has longer "other" prompts):
+
+| | shipped build | prefix checkpoints + replay |
+|---|---|---|
+| calls | 51 | 57 |
+| a call, median / p90 | 6.7 / 13.8 s | 6.7 / 10.8 s |
+| a turn call, median (prompt characters) | 12.7 s (6,390) | **10.3 s** (6,560) |
+| tokens read a turn call | 1,919 | 1,207 |
+| tokens read a call (mean), seconds per 1,000 prompt characters | 940, 2.46 | 759, **2.09** |
+| reading, writing | 163, 16.4 tok/s | 151, 18.1 tok/s |
+| crashes | none | none |
+
+Capability check v3 (fresh profile): **7/10**, 16 tok/s, guided (missed mind,
+danger, haggle; 8/10 on 2026-11-23: the check is sampled). The free day on
+`free-two-by-the-hearth` (`--day-minutes=24 --autonomy=free`, this build), beside
+Bonsai 2.5 27B's free day there (RTX 4080 Super, above):
+
+| | Inkling 2 Mini AD-IQ2_M, Chrome 4080 | Bonsai 2.5 27B |
+|---|---|---|
+| model turns, a turn median / p90 | 84, **23.5 s** / 32.2 s | 116, 10.3 s / 11.2 s |
+| prompt characters a turn (median) | 8,285 | 8,237 |
+| model-chosen activities | 71% | 91% |
+| self-started lines, plans written, surprises | 28, 0 (4 notes), 7 | 27, 8, 9 |
+| wasted / safety nets | 14% / 4 | 8% / 4 |
+| meals, hungry at the end | ada 3, bram 2; bram | 2 / 2, none |
+| judge: coherence / personality / purpose / surprise | 2.5 / 3.0 / 3.5 / 2.5 | **4.0 / 4.5 / 4.5 / 3.5** |
+
+**Verdict**: the prefix checkpoints are a real gain (a hearthvale turn 12.7 -> 10.3 s,
+p90 13.8 -> 10.8 s) and the crash is understood (checkpoint size, not the restore), but Inkling in Chrome
+stays far behind Bonsai 2.5 27B on 16 GB cards: a free turn on the small world takes
+23.5 s against 10.3 s (its 2,500-token prompts read at ~150-170 tok/s; Bonsai's
+engine reads several times faster), and the judge scored its free day a full
+point lower on every axis. Not the default on any card class: Bonsai 2.5 27B
+stays the 10 GB+ pick. Inkling's speed limits in Chrome are now reading
+(compute-bound tiled MoE kernels without subgroup matrices) and the GPU side of
+~3,900 dispatches a token (writing); the next steps there are fewer dispatches,
+two characters' calls at once (1.43x measured above), and putting the
+per-call part of the agency prompts after a shared opening so they get a
+prefix too (two-thirds of the calls share only ~110 tokens now).
+
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
 SenseTime's `sensenova/SenseNova-Loop-9B` (released 2026-11-17; the Preview

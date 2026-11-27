@@ -87,14 +87,15 @@ const fast = cfg => ({
   gpuLayers: 99,
   ctx: 8192,
   // what the speed was measured with: 512-token batches, flash attention
-  // no context checkpoints: restoring one aborted the wasm 2-3 minutes into a village day (in
-  // llama_io_read_host -> ggml_backend_tensor_set_n, with 32 or 3 a slot; brains.md, "Inkling 2 Mini in the game,
-  // in Chrome"). Without them each slot still extends its own cached prompt; ?wckpt=N to try again.
-  loadOpts: { n_batch: 512, n_ubatch: 512, flash_attn: true, n_ctx_checkpoints: 0 },
-  // stop strings handled by llama.cpp (no cancelled streams). Priming the shared prefix first (prime: true)
-  // only helps with checkpoints: measured 5.8 s against 5.2 s a turn without them (?wprime=1 to force it)
+  // one context checkpoint a slot, made only where the runner asks (prefixCkpt: the part a prompt shares with recent
+  // ones, read by a request of its own; the rest make none: server-checkpoints.patch). A checkpoint of Inkling holds
+  // its sliding-window KV (~160 KB a token): llama.cpp's default (32 a slot, near every prompt's end, kept in the
+  // 4 GB wasm heap) filled the heap and aborted 2-3 minutes into a village day (brains.md, "Inkling 2 Mini in the game,
+  // in Chrome"); ?wckpt=N, ?wprime=0 (no prefix reads, no checkpoints asked for)
+  loadOpts: { n_batch: 512, n_ubatch: 512, flash_attn: true, n_ctx_checkpoints: 1 },
+  // stop strings handled by llama.cpp (no cancelled streams)
   serverStops: true,
-  prime: false,
+  prefixCkpt: true,
   get wasm() { return FAST_WASM(); },
   get js() { return FAST_JS(); },
   ...cfg,
@@ -321,7 +322,7 @@ export async function loadModel(modelKey, onProgress, opts = {}) {
     currentModel = modelKey;
     note('brain', `${cfg.label} loaded on the ${usedLayers > 0 ? 'graphics card' : 'processor'} (${usedLayers > 0 ? usedLayers + ' layers on the GPU' : 'no WebGPU for it here'})`);
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
-    wllama.tablefolkPrime = !!cfg.prime || q().get('wprime') === '1';
+    wllama.tablefolkPrefixCkpt = !!cfg.prefixCkpt;
     wllama.tablefolkServerStops = !!cfg.serverStops;
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);

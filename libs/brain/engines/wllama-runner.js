@@ -25,10 +25,33 @@ function inklingPrompt(messages) {
   }
   return p + '<|message_model|><|content_text|>';
 }
-// where the part of a prompt shared between turns ends: before the last user message
-function primeEnd(prompt, template) {
-  const i = prompt.lastIndexOf(template === 'inkling' ? '<|message_user|>' : '<|im_start|>user');
-  return i > 0 ? i : -1;
+// Where the part a prompt shares with recent prompts ends (at a line break, so its tokens match the whole prompt's up to
+// the last one or two), or -1 when that part is short (under MIN_SHARED characters: not worth a request of its own).
+// A part read this way before wins (its checkpoint may still be in a slot): the rules all characters' turns start with
+// stay one part instead of each turn moving the checkpoint along (a day's prompts replayed through a model of the
+// server's slots: 77% of the characters read, against 87% for the longest shared part every time)
+const MIN_SHARED = 1200;
+function sharedPrefixEnd(prompt, recent, primed = []) {
+  // a prompt that carries a recent one on (the world builder's agent: the last prompt, the model's answer as the
+  // prompt renders it, the tool's result): the slot holds that prompt plus the answer as it was sampled, which the
+  // rendering does not match token for token, so it cannot simply extend: read up to the end of the earlier prompt
+  // (from the checkpoint the step before left) and keep a checkpoint there (measured without this: every step
+  // re-read all ~9,000 tokens, 70 s)
+  if (recent.includes(prompt)) return -1;   // the same prompt again: the slot has it
+  const carried = recent.filter(r => r.length >= MIN_SHARED && prompt.length > r.length && prompt.startsWith(r)).reduce((m, r) => Math.max(m, r.length), 0);
+  if (carried) return carried;
+  const known = primed.filter(x => prompt.startsWith(x) && x.length < prompt.length).reduce((m, x) => Math.max(m, x.length), 0);
+  if (known) return known;
+  let best = 0;
+  for (const r of recent) {
+    const n = Math.min(r.length, prompt.length);
+    let i = 0;
+    while (i < n && r.charCodeAt(i) === prompt.charCodeAt(i)) i++;
+    if (i > best) best = i;
+  }
+  if (best >= prompt.length - 8) return -1;   // the same prompt again: the slot has it
+  const cut = prompt.lastIndexOf('\n', best - 1) + 1;
+  return cut >= MIN_SHARED ? cut : -1;
 }
 // stop strings: the end of the answer; for Inkling also 1-2% of answers that run on into reasoning ("The user wants me to...")
 function stopsFor(template) {
@@ -77,15 +100,27 @@ export function createWllama3Engine(wllamaInstance) {
           const prompt = config.rawPrompt || buildPrompt(messages, enableThinking, wllamaInstance.tablefolkTemplate);
           const stops = config.stops || stopsFor(wllamaInstance.tablefolkTemplate);
           const t0 = performance.now();
-          // hybrid models: read the shared prefix on its own when it changed, so a cache checkpoint sits at its end
-          if (wllamaInstance.tablefolkPrime && new URLSearchParams(globalThis.location?.search || '').get('wprime') !== '0') {
-            const end = primeEnd(prompt, wllamaInstance.tablefolkTemplate);
-            const prefix = end > 0 ? prompt.slice(0, end) : null;
-            if (prefix && prefix !== wllamaInstance.tablefolkPrimed) {
+          // hybrid models (Inkling, SenseNova: a recurrent state, so the cache rolls back only to a checkpoint): the part
+          // this prompt shares with recent ones (the rules every character's turn starts with, or this character's own
+          // earlier turn) is read on its own first, by a request that leaves one checkpoint at its end; the prompt itself
+          // then makes none (checkpoints: false; a patched llama.cpp server, server-checkpoints.patch) and goes to the
+          // same slot, so the next prompt that shares the part rolls back to it instead of reading everything again.
+          // ?wprime=0 turns it off.
+          let slot = null;
+          const ckptEngine = !!wllamaInstance.tablefolkPrefixCkpt;
+          const prefixCkpt = ckptEngine && new URLSearchParams(globalThis.location?.search || '').get('wprime') !== '0';
+          if (prefixCkpt) {
+            const recent = wllamaInstance.tablefolkRecent || (wllamaInstance.tablefolkRecent = []);
+            const primed = wllamaInstance.tablefolkPrimedParts || (wllamaInstance.tablefolkPrimedParts = []);
+            const cut = sharedPrefixEnd(prompt, recent, primed);
+            recent.push(prompt); if (recent.length > 16) recent.shift();
+            if (cut > 0 && !primed.includes(prompt.slice(0, cut))) { primed.push(prompt.slice(0, cut)); if (primed.length > 16) primed.shift(); }
+            if (cut > 0) {
               try {
-                await wllamaInstance.createCompletion({ prompt: prefix, max_tokens: 1, temperature: 0, cache_prompt: true });
-                wllamaInstance.tablefolkPrimed = prefix;
-              } catch (e) { console.warn('[tablefolk-wllama3] priming failed:', e?.message); }
+                const r = await wllamaInstance.createCompletion({ prompt: prompt.slice(0, cut), max_tokens: 1, temperature: 0, cache_prompt: true, checkpoints: true });
+                slot = Number.isInteger(r?.id_slot) ? r.id_slot : null;
+                console.log('[tablefolk-wllama3] prefix read:', cut, 'chars, prompt_n=', r?.timings?.prompt_n, 'cache_n=', r?.timings?.cache_n, 'slot', slot);
+              } catch (e) { console.warn('[tablefolk-wllama3] prefix read failed:', e?.message); }
             }
           }
           console.log('[tablefolk-wllama3] SENDING TO MODEL at', new Date().toISOString(),
@@ -108,6 +143,8 @@ export function createWllama3Engine(wllamaInstance) {
               prompt,
               stream: true,
               cache_prompt: true,
+              ...(ckptEngine ? { checkpoints: false } : {}),
+              ...(slot !== null ? { id_slot: slot } : {}),
               // llama.cpp stops at these itself: cancelling a stream from here (the abort below) crashed the
               // wllama 4 build a few turns later (table index out of bounds; brains.md, "Inkling 2 Mini in the game")
               ...(wllamaInstance.tablefolkServerStops ? { stop: stops } : {}),
