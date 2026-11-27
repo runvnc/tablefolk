@@ -28,7 +28,8 @@
  * runs"), and ?mode= in the link (tests). modes-core.js resolve() has the order.
  *
  *   window.tablefolkModes = { mode(), source, set(mode, why), setting(), setSetting(v), mayThink(g),
- *     whyNot(g), inEncounter(g), encounter: { open, members, end(reason) }, engage(id, why), clockRate(),
+ *     whyNot(g), inEncounter(g), encounter: { open, members, end(reason) }, engage(id, why), clockRate(), speed, setSpeed(k) (1, 2, 4: the
+ *     clock that much faster, turns that much sooner; a God game's fast-forward),
  *     holdLive(), holdReplies(), mayAct(c), paceFactor(c), blockStep(), stepTaken(), endTurn(),
  *     turn: { round, busy, actor, left }, options, diagRow(), noteEarly(g, used) }
  * Events: tablefolk-mode { mode, was, source }; tablefolk-encounter { phase: open|end, members, why,
@@ -168,9 +169,12 @@
   }
   function whyNot(g) { return current === 'adventure' ? 'adventure: on rails until the player talks with it' : `${current === 'turns' ? 'turn by turn' : 'living'}: more than ${O.radius} squares from the player, on rails until it comes near`; }
   const encSlow = () => current === 'adventure' && enc.open;
-  function clockRate() { if (current === 'turns') return 0; if (encSlow()) return O.encounterWorld === 'pause' ? 0 : O.encounterWorld === 'run' ? 1 : O.slowRate; return 1; }
+  // the world's speed (a god's time controls: 1, 2, 4): the clock runs that much faster and turns come that much sooner
+  let speed = 1;
+  const setSpeed = k => { speed = Math.max(.25, Math.min(8, +k || 1)); try { window.tablefolkDiag?.note?.('mode', `speed x${speed}`); } catch {} return speed; };
+  function clockRate() { if (current === 'turns') return 0; if (encSlow()) return (O.encounterWorld === 'pause' ? 0 : O.encounterWorld === 'run' ? 1 : O.slowRate) * speed; return speed; }
   const mayAct = c => !(encSlow() && O.encounterWorld === 'pause' && !enc.has(c.id));
-  const paceFactor = c => encSlow() && O.encounterWorld === 'slow' && !enc.has(c.id) ? 1 / O.slowRate : 1;
+  const paceFactor = c => (encSlow() && O.encounterWorld === 'slow' && !enc.has(c.id) ? 1 / O.slowRate : 1) / speed;
 
   // ---------------------------------------------------------------- turn by turn
   const budget = C.createBudget(6);
@@ -325,7 +329,7 @@ html.tf-modeline:not(.tabletop) #narration,html.tf-modeline:not(.tabletop) #npcT
   window.tablefolkModes = {
     mode: () => current, get source() { return source; }, set, setting, setSetting, mayThink, whyNot,
     inEncounter: g => !!g && enc.has(g.id), engage, encounter: { get open() { return enc.open; }, get members() { return enc.members; }, end: endEncounter },
-    clockRate, holdLive: () => current === 'turns', holdReplies: () => current === 'turns', mayAct, paceFactor,
+    clockRate, holdLive: () => current === 'turns', holdReplies: () => current === 'turns', mayAct, paceFactor, get speed() { return speed; }, setSpeed,
     blockStep, stepTaken, endTurn, noteEarly, diagRow, get options() { return { ...O }; },
     turn: { get round() { return roundNo; }, get busy() { return roundBusy; }, get actor() { return actor?.id || null; }, get left() { return budget.left; }, get early() { return { ...early }; } },
   };

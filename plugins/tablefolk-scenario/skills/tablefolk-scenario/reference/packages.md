@@ -135,7 +135,8 @@ data-only package for living worlds: an `apple_tree` with stock that grows
 back, a `picker` job and a `crows` threat (used by `scenarios/hearthvale.json`);
 `packages/nightwatch/` is a small game (`scenarios/nightwatch.json`; its
 `README.md` walks through it); `packages/hearth-spirit/` is the God-play
-example (`scenarios/hearth-spirit.json`).
+example (`scenarios/hearth-spirit.json`); `packages/god/` is a whole God game
+(`scenarios/god-village.json`, [god.md](god.md)).
 
 A scenario's packages last only while it plays: when another scenario
 starts, what they brought (items, bodies, sounds, jobs, uses, threat kinds,

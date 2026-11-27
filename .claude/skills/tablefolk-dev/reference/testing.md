@@ -256,7 +256,7 @@ the start (wait for `tablefolkBrainInfo().key === 'none'`); a confirm
 dialog stays in the page for a moment after a click (count each element
 once).
 
-## God play (`plan-test.mjs`, `orders-test.mjs`, `god-test.mjs`, 2026-11-27)
+## God play (`plan-test.mjs`, `orders-test.mjs`, `god-test.mjs`, `god-rules-test.mjs`, 2026-11-27)
 
 - `node tools/plan-test.mjs` (no browser): the spatial benchmark's 29 gold
   relation plans through `app/plan-core.js`, scored by
@@ -274,7 +274,15 @@ once).
   words, the wall built by the workers, a standing order, the package's
   powers, the core weather, the save hooks. `--shots` saves the canvas
   (headless page screenshots leave it black) with the free camera over the
-  garden.
+  garden. Then the God game (`god-game-test.mjs`, `scenarios/god-village.json`
+  with `?art=1&model=none`; `--only=god` or `--only=hearth` runs one half):
+  no avatar and the camera, the bar and HUD, speed, two prayers walked to the
+  temple (one answered from the Prayers list, one met with silence), every
+  power and its effects and belief, a dream, an omen kept, a decree met after
+  the council and one missed (its anger), the village tab, the save hook.
+- `node tools/god-rules-test.mjs` (no browser): the God package's rules
+  (`packages/god/god-core.js`): belief and sides, mana, prayers, powers,
+  cruelty, omens, demands, the council's vote, decrees and deadlines.
 - `node tools/browser-test/plan-words-eval.mjs` (a brain on :8000, never
   downloads): words to plans with the loaded brain against code alone.
   Gemma 4 E2B, RTX 2060, 2026-11-27: 11/12 resolve (code alone 8/12),

@@ -46,7 +46,7 @@
  * 'tablefolk-model-call' ({ agentId, kind }).
  *
  *   window.tablefolkJobs = { load, register, jobOf, handles, tick, eventPick, cardLine, speechCause, doing, stats, news,
- *     addWork(fn), addUrgent(fn) }   other parts' work before a worker's own steps (designate.js marks, orders.js demands)
+ *     addWork(fn), addUrgent(fn), removeWork(fn), removeUrgent(fn) }   other parts' work before a worker's own steps (designate.js marks, orders.js demands)
  *                                     and before everything but its danger (orders.js: a standing order's call to arms)
  * Loaded after live.js and clock.js; uses app.js globals.
  */
@@ -1318,6 +1318,8 @@
   const addWork = (fn, first = false) => { if (typeof fn === 'function' && !WORK.includes(fn)) first ? WORK.unshift(fn) : WORK.push(fn); };
   // before anything else but its own danger (orders.js: called to arms by a standing order, sent indoors): fn(g, s, j) -> { ms } | null
   const addUrgent = fn => { if (typeof fn === 'function' && !URGENT.includes(fn)) URGENT.push(fn); };
+  // (a package's hooks go when its scenario ends: god.js dispose)
+  const removeWork = fn => { const i = WORK.indexOf(fn); if (i >= 0) WORK.splice(i, 1); }, removeUrgent = fn => { const i = URGENT.indexOf(fn); if (i >= 0) URGENT.splice(i, 1); };
   async function tick(g) {
     const j = jobOf(g); if (!j) return { ms: 5000 };
     const s = S(g); s.ticks++;
@@ -1427,7 +1429,7 @@
     return `busy since ${since} (${s.busyWith || s.doing || 'working'}); had not reached food by ${hhmm(gm())}`;
   }
   function stats() { const out = {}; for (const g of state.characters) if (g._job) out[g.id] = { job: jobOf(g)?.id, cycles: g._job.cycles, chores: g._job.choreDone || 0, did: g._job.did, doing: g._job.doing, step: g._job.at || '', stuck: g._job.stuck || '', hungerWhy: hungerWhy(g) }; return out; }
-  window.tablefolkJobs = { addWork, addUrgent, condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm,
+  window.tablefolkJobs = { addWork, addUrgent, removeWork, removeUrgent, condVars, offers: offerOpts, defended, registerStep, removeStep, STEPS, load, register, resetPackaged, jobOf, handles, tick, eventPick, cardLine, askLine, speechCause, doing: g => g?._job?.doing || '', stats, news: () => NEWS.slice(), addNews, price, registry: REG, places: { placeAt, placeNamed, inPlace, spotIn }, walkTo, gm,
     // what agency.js (guided and free autonomy) builds on: the same steps, walks and helpers as the rails
     kit: { S, doStep, stepName, stepLabel, work, eat, bedtime, wake, chores, choreList, helpChore, fallback, idleActivity, goTo, goDo, approach, walkTo, setDoing, nearPeople, nameOf, todayLine, newsFor, stores, myStores, communal, has, contentsOf, count, gold, price, foodIn, edible, isFood, stationFor, sourcesOf, missingIn, altSets, inStores, places, placeNamed, spotIn, inPlace, placeAt, things, nice, jobOf, inHours, sleepHours, fighter, defended, offerOpts, rulesOf, check, runLine, fightRaiders, hideHome, addNews, gm, buyFrom } };
 })();

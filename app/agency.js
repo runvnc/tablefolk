@@ -370,6 +370,7 @@
   // more activities from other parts of the game: fn(g, s, j) -> [{ key, kind, cmd, label, doing, run(g, s, j, a) -> { busy, ms } | { done, text } | { fail } }]
   const EXTRA = [];
   const addOptions = fn => { if (typeof fn === 'function' && !EXTRA.includes(fn)) EXTRA.push(fn); };
+  const removeOptions = fn => { const i = EXTRA.indexOf(fn); if (i >= 0) EXTRA.splice(i, 1); };
   function options(g, s, j) {
     const k = X(), A = ag(s), h = hour(), t = gm(), cfg = cfgOf(g), m = M()?.mindOf?.(g) || {};
     const out = [], bad = key => (A.badAct[key] || 0) > t;
@@ -920,5 +921,5 @@
     return out;
   }
 
-  window.tablefolkAgency = { addOptions, level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, danger, stats, profile, domain, note, LEVELS, get turnSeconds() { return medianTurn(); } };
+  window.tablefolkAgency = { addOptions, removeOptions, level, why, resolve, setting, setSetting, describe, brainDefault, probe, levelFrom, diagRow, systemLines, promptLines, cardLines, commandsFor, options, tick, eventPick, threat, danger, stats, profile, domain, note, LEVELS, get turnSeconds() { return medianTurn(); } };
 })();

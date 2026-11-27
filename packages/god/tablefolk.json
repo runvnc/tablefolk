@@ -1,0 +1,27 @@
+{
+  "id": "god",
+  "name": "God",
+  "version": "1.0.0",
+  "description": "A God game: you have no body, only the village's belief and the mana it gives. Answer prayers (or not), send rain, drought, storms, fog, blessings, healing, food, lightning, plague, blight, beasts, dreams and omens, and make decrees the priest receives in a vision and the village debates at a council. Belief rises with answered prayers, kept prophecies and rewarded obedience, and falls with silence, cruelty and broken promises; villagers move between the faithful and the doubters. Runs with no model; with a brain, villagers pray, argue and read signs in their own words.",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "god", "game"],
+
+  "skills": {
+    "faith": {
+      "prompt": "You live in a village whose god is real and watches. It answers prayers (or does not), sends weather, blessings and punishments, and speaks through the priest's visions and in dreams. How you speak of it follows how much you believe.",
+      "card": ["faith"]
+    }
+  },
+
+  "resources": {
+    "mana": { "label": "Mana", "icon": "🔮", "start": 25, "min": 0, "max": 150, "color": "#9a7cf0" },
+    "belief": { "label": "Belief", "icon": "🙏", "start": 50, "min": 0, "max": 100, "color": "#e8c25a" }
+  },
+
+  "weather": {
+    "drought": { "base": "wind", "label": "drought", "color": [0.86, 0.68, 0.36], "intensity": 0.5 }
+  },
+
+  "modules": ["god.js"]
+}

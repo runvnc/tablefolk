@@ -35,7 +35,7 @@
  * sound effects (sfx.js enabled).
  *
  *   window.tablefolkSpells = { cast(g, spell, target), spawn(g, thing, n),
- *     fireballVfx(from, to), resolveThing(name), prewarm() (once, under the
+ *     fireballVfx(from, to), strike(x, z) (a bolt from the sky on a square: a god's smite), resolveThing(name), prewarm() (once, under the
  *     loading cover before the first reveal, or 1.5 s after a world starts
  *     without one: draws every glow and particle kind once, invisibly, so
  *     the first spell doesn't stall on GPU pipelines; returns a promise), sound, audio: { source,
@@ -883,5 +883,5 @@
   const fallback = () => setTimeout(prewarm, 8000);
   if (window.TABLEFOLK_SCENE_READY) fallback(); else window.addEventListener('tablefolk-scene-ready', fallback, { once: true });
 
-  window.tablefolkSpells = { cast, spawn, fireballVfx, resolveThing, prewarm, sound: SOUND, audio: { source, noise, tone, listen: updateListener, place: setPos } };
+  window.tablefolkSpells = { cast, spawn, fireballVfx, strike: (x, z, o = {}) => strike(V3(x, groundY(), z), o), resolveThing, prewarm, sound: SOUND, audio: { source, noise, tone, listen: updateListener, place: setPos } };
 })();

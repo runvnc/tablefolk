@@ -34,6 +34,8 @@ const COMMANDS = ['say','walk','face','look','touch','push','pull','carry','drop
 const MIND_COMMANDS = ['goal','remember','eat','drink','use','put','take','close'];
 const state = {
   scene:null, engine:null, camera:null, shadow:null, materials:{}, characters:[], selected:null, target:null,
+  // null, never undefined, in a world with no avatar ("player": {"avatar": false}): many checks compare x===state.playerAvatar
+  playerAvatar:null,
   blocks:[], props:[], tiles:[], bubbles:[], badges:[], meta:new WeakMap(), held:new Map(), allowed:new Set(['walk','face']), zoomFocus:null, animSources:null,
   turn:{index:0, phase:'ready', command:null, resolveMs:200, lastEndedAt:0, mode:true}, globalHistory:[], nextAgentId:null,
   brainConfigs:new Map(), player:{gold:100,items:[]}, saveKey:'tablefolkState', nextSpawnId:1, spawnMode:{enabled:false, type:'critter'}
@@ -3204,7 +3206,8 @@ function beginTurnForAgent(agentId,cmd,source='agent'){
     const actionDesc=`${who}${cmd.kind==='skill'&&cmd.name?cmd.name:cmd.kind}${cmd.spell?' '+cmd.spell:''}${cmd.dir?' '+cmd.dir:''}${cmd.text?' "'+cmd.text+'"':''}`;
     log(`turn ${state.turn.index}: ${source} → ${actionDesc}`);
     state.globalHistory=(state.globalHistory||[]).concat([`T${state.turn.index} ${actor?actor.id:'?'}: ${actionDesc}`]).slice(-20);
-    executeGameCommandImmediate(cmd,actor);
+    // a command that throws must still end its turn: a turn left "resolving" stops every runAs for good
+    try{ executeGameCommandImmediate(cmd,actor); }catch(e){ console.warn('[turn] command failed',actionDesc,e); setTimeout(()=>{ settleWorld('the command failed'); resolve(false); },state.turn.resolveMs); return; }
     // A destination walk may span several tiles. Keep the turn open until its
     // animation finishes instead of freezing it after the old one-tile delay.
     const walkMs=actor?.turnMove ? actor.turnMove.dur*1000+80 : 0;
@@ -3392,7 +3395,7 @@ const ACT_NEAR=6, ACT_GAP=5000;
 const NOTEWORTHY=/\b(steal|steals|stole|snatch\w*|rob|robs|robbed|thie[fv]\w*|attack\w*|strikes?|stabs?|kills?|killed|defeat\w*|raid\w*|fights?)\b/i;
 function activityMode(){ try{ const v=localStorage.getItem('tablefolkActivityBubbles'); return v==='all'||v==='off'?v:'nearby'; }catch{ return 'nearby'; } }
 function aboutPlayer(text){ const n=String(document.getElementById('chatName')?.value||state.player?.name||'').trim(); return /\bthe player\b/i.test(text) || (n.length>1 && new RegExp('\\b'+n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(text)); }
-function focusedOn(g){ return !!g && (g===state.selected || (g._spoke?.to==='player' && performance.now()-g._spoke.at<20000) || (g._heard?.who===state.playerAvatar && performance.now()-g._heard.at<20000)); }
+function focusedOn(g){ return !!g && (g===state.selected || (g._spoke?.to==='player' && performance.now()-g._spoke.at<20000) || (!!state.playerAvatar && g._heard?.who===state.playerAvatar && performance.now()-g._heard.at<20000)); }
 function nearOnScreen(g){
   const me=state.playerAvatar, p=me?(me.logicalPos||me.root.position):state.camera?.target, q=g.logicalPos||g.root?.position;
   if(!p||!q||Math.hypot(q.x-p.x,q.z-p.z)>ACT_NEAR) return false;

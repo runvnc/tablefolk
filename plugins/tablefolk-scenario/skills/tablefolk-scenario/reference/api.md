@@ -112,7 +112,9 @@ supported part (other members are internal and may change).
 | `tablefolkWorkflows.start(id, name, input)`, `.drive(id)`, `.active(id)` | workflows |
 | `tablefolkMenu.open(menu, { agentId })`, `.offer(words)` | menus; answer the open one with words |
 | `tablefolkClock.now()`, `.set(min, day)`, `.isNight()` | the time of day |
-| `tablefolkThreats.now(kind)`, `.active()`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats |
+| `tablefolkThreats.now(kind)`, `.active()`, `.retreat(why)`, `.registerKind(kind, def)`, `.registerBehaviour(kind, fn)` | threats (`retreat`: every group about turns for the edge) |
+| `tablefolkSpells.strike(x, z)` | a bolt of lightning from the sky on a square (sound and light; the damage is yours to do) |
+| `tablefolkModes.speed`, `.setSpeed(k)` | the world's speed (1, 2, 4: the clock and everyone's turns that much faster), for time controls; `tablefolkLive.start()`, `.stop()`, `.toggle()`, `.on` pause it |
 | `tablefolkJobs.jobOf(g)`, `.register(manifest)`, `.registerStep(name, fn)`, `.tick(g)` | jobs |
 | `tablefolkProfile.normalize(v)`, `.resolve(sources)`, `.describe(p)`, `.PRESETS`, `.DOMAINS` | autonomy profiles: a preset or an object to a profile of six domains, `code` or `model` |
 | `tablefolkAgency.profile(g)`, `.domain(g, name)`, `.level(g)`, `.why(g)`, `.setting()`, `.setSetting(v)`, `.options(g, state, job)`, `.stats()`, `.probe.run()`, `.probe.result()` | autonomy: `rails`, `guided` or `free` for a character and why; the player's setting (`auto` or a level); the activities it could start now; plans and results; the capability check (living.md, "How much characters decide") |
@@ -132,7 +134,7 @@ supported part (other members are internal and may change).
 | `tablefolkResources.declare(name, def)`, `.get(name)`, `.add(name, n)`, `.set(name, v)`, `.can(name, n)`, `.list()` | resources |
 | `tablefolkWeather.set(kind, opts)`, `.clear()`, `.now()`, `.kinds()`, `.register(kind, def)` | the weather |
 | `tablefolkBar.add(button)`, `.remove(id)`, `.list()` | the power bar |
-| `tablefolkJobs.addWork(fn)`, `.addUrgent(fn)`, `tablefolkAgency.addOptions(fn)` | work before a worker's own steps on rails, before everything but its danger, and activities offered above rails: `fn(g, s, j)` |
+| `tablefolkJobs.addWork(fn)`, `.addUrgent(fn)`, `tablefolkAgency.addOptions(fn)` | work before a worker's own steps on rails, before everything but its danger, and activities offered above rails: `fn(g, s, j)`; `.removeWork(fn)`, `.removeUrgent(fn)`, `.removeOptions(fn)` take them off again (a package's `dispose()`) |
 | `tablefolkScenario.travel(link)`, `.section`, `.here()`, `.links()`, `.sections()` | a world in sections: follow a link (`{ to: "back" }` goes back), the id of the section the player is in, its scenario, its links, every section with its links (things.md) |
 | `tablefolkDark.mode()`, `.visible(x, z)`, `.save()`, `.restore(data)` | fog of war and reveal: the mode, whether the player sees a square, the explored state |
 
@@ -328,7 +330,7 @@ The foundations for God / Dungeon Keeper play are in the game; what a
 particular game adds (its powers, plagues, blights, weather, sacrifices,
 belief rules, lair rooms) is content in a package. `packages/hearth-spirit/`
 uses one of each below (its `README.md`); `scenarios/hearth-spirit.json`
-plays it. How players see them: [living.md](living.md#marks-orders-and-demands-the-players-say).
+plays it. `packages/god/` is a whole God game made of them ([god.md](god.md)). How players see them: [living.md](living.md#marks-orders-and-demands-the-players-say).
 
 ### Designations (`designations`)
 

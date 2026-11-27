@@ -112,7 +112,7 @@ not listed there is dropped (agents and objects keep all their own fields).
   "items": ["rope", { "name": "healing potion", "qty": 2 }],
   "at": [0, 3], "facing": "n",     // or Y / @ in a grid, "in" on generated maps
   "model": "swordswoman",          // any body below (default swordswoman)
-  "avatar": false,                 // no walking avatar: chat only
+  "avatar": false,                 // no walking avatar: chat only (a god: the power bar, the free camera; god.md)
   "hp": 20, "wield": "iron sword", // combat.md
   "skills": ["magic"], "skillParams": {}
 }

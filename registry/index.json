@@ -100,6 +100,18 @@
     },
     {
       "kind": "package",
+      "ref": "god",
+      "name": "God",
+      "description": "A God game: you have no body, only the village's belief and the mana it gives. Answer prayers (or not), send rain, drought, storms, fog, blessings, healing, food, lightning, plague, blight, beasts, dreams and omens, and make decrees the priest receives in a vision and the village debates at a council. Belief rises with answered prayers, kept prophecies and rewarded obedience, and falls with silence, cruelty and broken promises; villagers move between the faithful and the doubters. Runs with no model; with a brain, villagers pray, argue and read signs in their own words.",
+      "version": "1.0.0",
+      "code": true,
+      "has": [
+        "skills",
+        "modules"
+      ]
+    },
+    {
+      "kind": "package",
       "ref": "hearth-spirit",
       "name": "Hearth Spirit",
       "description": "A tiny example of the God-play extension points: two designation kinds (shrine ground in data, an offering spot in code), two powers (a golden rain on a place, a gift of bread to a character), one resource (favour) and one demand template (an offering at the shrine). Not a game: a proof that a God package can be pure content.",

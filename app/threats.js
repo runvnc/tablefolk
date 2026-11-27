@@ -27,7 +27,7 @@
  * down. Afterwards everyone remembers it as news, and thinks better of those
  * who fought (the player included).
  *
- *   window.tablefolkThreats = { active(), label(c), scares(c), turn(c), registerKind, registerBehaviour, now(kind), KINDS }
+ *   window.tablefolkThreats = { active(), label(c), scares(c), turn(c), registerKind, registerBehaviour, now(kind), retreat(why), KINDS }
  * live.js runs a raider's turn through turn(c); jobs.js sends fighters and
  * hides the rest. Loaded after jobs.js; uses app.js globals.
  */
@@ -240,5 +240,7 @@
   addEventListener('tablefolk-scenario-started', e => { if (e.detail?.sub) return; groups = []; lastSpawn.clear(); });
   // now(kind): a threat at once (tests, dev)
   const now = (kind = 'raid', over = {}) => spawn({ kind, ...over });
-  window.tablefolkThreats = { active, label, scares, turn, registerKind, registerBehaviour, resetPackaged, now, KINDS, get groups() { return groups; } };
+  // retreat(why): every group about now turns for the edge (a god's fog, a package's power)
+  const retreatAll = (why = 'driven off') => { let n = 0; for (const gr of groups) if (!gr.retreating && gr.ids.some(id => state.characters.some(c => c.id === id && !c.defeated))) { retreat(gr, why); n++; } return n; };
+  window.tablefolkThreats = { active, label, scares, turn, registerKind, registerBehaviour, resetPackaged, now, retreat: retreatAll, KINDS, get groups() { return groups; } };
 })();

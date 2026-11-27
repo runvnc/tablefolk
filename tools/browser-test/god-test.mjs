@@ -11,10 +11,14 @@
 //   a standing order from words, fired: bram answers the call;
 //   the powers: a gift of bread (favour paid, bread given), golden rain (the package's
 //   weather kind, particles); above-rails options offer the marked work and the demand.
-//   HEADLESS=1 ./launch-chrome.sh "about:blank"; node god-test.mjs [--base=http://localhost:8002] [--shots=dir]
+// Then the God game (packages/god, scenarios/god-village.json): no avatar,
+// the bar and the HUD, time controls, a prayer answered and one met with silence, every power, a decree
+// met after a council and one missed (its anger), a dream and an omen kept (in god-game-test.mjs); --only=god or --only=hearth.
+//   HEADLESS=1 ./launch-chrome.sh "about:blank"; node god-test.mjs [--base=http://localhost:8002] [--shots=dir] [--only=god]
 import { chromium } from 'playwright-core';
+import { godGameTest } from './god-game-test.mjs';
 const arg = (k, d) => { const a = process.argv.find(s => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
-const BASE = arg('base', process.env.BASE || 'http://localhost:8000'), SHOTS = arg('shots', '');
+const BASE = arg('base', process.env.BASE || 'http://localhost:8000'), SHOTS = arg('shots', ''), ONLY = arg('only', '');
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = b.contexts()[0].pages()[0];
 const cdp = await page.context().newCDPSession(page);
@@ -39,6 +43,7 @@ const drive = (cond, secs) => ev(async ({ cond, secs }) => {
   return f();
 }, { cond, secs });
 
+if (ONLY !== 'god') {
 console.log('loading', BASE);
 await page.goto(`${BASE}/app/?art=1&pace=busy&t=${Date.now()}&scenario=../tools/browser-test/scenarios/hearth-spirit-none.json`);
 await page.waitForFunction(() => window.tablefolkScenario?.active && state.characters?.length >= 4 && window.tablefolkBrainInfo?.()?.key === 'none', null, { timeout: 90000 });
@@ -109,6 +114,8 @@ await shot('07-storm');
 await ev(() => tablefolkWeather.clear());
 await check('saved and restored with the world (designations, demands, orders, resources, weather)', () => ev(() => { const d = tablefolk.worldStateData(); return [!!d.hooks?.designations?.all?.length && !!d.hooks?.orders?.demands?.all?.length && d.hooks?.resources?.favour != null, Object.keys(d.hooks || {}).join(', ')]; }));
 await check('no page errors', () => [!errs.length, errs.slice(0, 3).join(' | ')]);
+}
+if (ONLY !== 'hearth') { errs.length = 0; await godGameTest({ page, ev, check, shot, pageShot, look, drive, errs, BASE }); }
 console.log(fails ? `${fails}/${n} FAILED` : `all ${n} passed`);
 await b.close().catch(() => {});
 process.exit(fails ? 1 : 0);

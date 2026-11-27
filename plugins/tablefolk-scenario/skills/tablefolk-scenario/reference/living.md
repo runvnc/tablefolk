@@ -423,7 +423,9 @@ world's; demands and marks can name a group.
 ```
 
 `scenarios/hearth-spirit.json` (with the `hearth-spirit` package: favour,
-golden rain, a gift of bread, an offering) plays all of it.
+golden rain, a gift of bread, an offering) plays all of it. A whole God game
+on them: the `god` package and `scenarios/god-village.json` ([god.md](god.md):
+no avatar, belief and mana, prayers, 14 powers, decrees with a council).
 
 ## What the player does
 

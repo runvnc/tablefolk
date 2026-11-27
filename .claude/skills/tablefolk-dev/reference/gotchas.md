@@ -30,6 +30,12 @@ in the code.
 - Notes have one paper shape at three sizes; every other object keeps one
   size (the maintainer rejected shrinking carried things).
 
+- **No avatar: `state.playerAvatar` is `null`** (2026-11-27, the God game). It
+  was `undefined` in a world that never spawned one, so `x === state.playerAvatar`
+  held for any missing `x` (`g._heard?.who`) and `say()` threw inside a turn; the
+  turn stayed "resolving" and every `runAs` (jobs, demands, orders) waited for
+  ever. `beginTurnForAgent` now ends a turn whose command throws.
+
 ## Small models (Gemma 4 E2B)
 
 - They ignore negative instructions ("don't start with 'It sounds like'"):

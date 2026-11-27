@@ -12,7 +12,7 @@
  * building (the bakery, the tavern) or underground (dark, a dungeon) gets
  * none. A scenario's "roofs": false or true overrides that.
  *
- * Seeing in: only by going in. The roof of the room the player is in (or
+ * Seeing in: only by going in (with no avatar, a god's world: by zooming the camera in on the room). The roof of the room the player is in (or
  * whose doorway it stands in) fades away (except in first person, where it is
  * the ceiling); with the follow camera, a roof
  * between the camera and the player goes see-through so the player is never
@@ -516,7 +516,9 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
   function frame() {
     if (!roofs.length) { if (window.tablefolkBuildings?.clipState?.on) window.tablefolkBuildings.clip(null); return; }
     const sc = state.scene, cam = sc.activeCamera, me = state.playerAvatar, dt = Math.min(.1, (sc.getEngine().getDeltaTime() || 16) / 1000);
-    const p = me && posOf(me), myCell = p && cellKey(Math.round(p.x), Math.round(p.z));
+    // no avatar (a god: "player": {"avatar": false}): the roof of the room the camera looks at, zoomed in, fades
+    const peek = !me && cam && state.camera?.target && (state.camera.radius ?? 99) < 22 ? state.camera.target : null;
+    const p = (me && posOf(me)) || peek, myCell = p && cellKey(Math.round(p.x), Math.round(p.z));
     let ray = null;
     if (me && cam && !state.firstPerson && state.cameraMode === 'follow') {
       const head = new BABYLON.Vector3(p.x, (state.terrainTopY ?? 0) + .9, p.z), from = cam.globalPosition || cam.position, dir = head.subtract(from), len = dir.length();

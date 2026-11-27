@@ -108,7 +108,8 @@
   const rand = ([a, b]) => a + Math.random() * (b - a);
   function schedule(c, first = false, ms = null) {
     // jobs.js: a busy character's next step comes when this one is done, whatever the pace (no model call)
-    if (ms != null && Number.isFinite(ms)) { nextAt.set(c, performance.now() + Math.max(500, ms)); return; }
+    // (modes.js speed: fast-forward brings it sooner)
+    if (ms != null && Number.isFinite(ms)) { nextAt.set(c, performance.now() + Math.max(500 / (window.tablefolkModes?.speed || 1), ms / (window.tablefolkModes?.speed || 1))); return; }
     // a follower (animals.js) keeps up: a turn every second or two
     if (window.tablefolkAnimals?.following(c)) { nextAt.set(c, performance.now() + 900 + Math.random() * 700); return; }
     // a fight goes at its own speed, whatever the pace: a blow every 1.5-2.5 s
