@@ -20,6 +20,8 @@
 # (nrun.sh, mrun.sh, kld.sh, prof.sh with a -DGGML_WEBGPU_GPU_PROFILE build).
 #   build-fast.sh [native] [wasm NAME "CXXFLAGS"]...
 #   e.g. build-fast.sh native wasm fast "-DGGML_WEBGPU_MMVQ=0" wasm stats "-DGGML_WEBGPU_STATS=16 -DGGML_WEBGPU_MMVQ=0"
+# The shipped wasm (libs/brain/engines/wllama-fast/wllama.wasm, 2026-11-27): wasm fast "-DGGML_WEBGPU_MMVQ=0 -DGGML_WEBGPU_REPLAY=0"
+#   (replay off: 5-7% faster writing in Chrome; brains.md, "record and replay")
 # Switches (env natively, -D in the browser): GGML_WEBGPU_STATS=N (print every N graphs), GGML_WEBGPU_BIND_GROUP_CACHE=0,
 # GGML_WEBGPU_PARAM_BATCH_WRITE=0 (the old per-dispatch path), GGML_WEBGPU_SUBMIT_BATCH, GGML_WEBGPU_FUSE=0,
 # GGML_WEBGPU_FUSE_MASK=bits (wf_type), GGML_WEBGPU_MMVQ=0 (no q8 activation pre-pass: fewer dispatches),

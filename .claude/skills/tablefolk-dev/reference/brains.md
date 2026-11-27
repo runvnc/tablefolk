@@ -1465,7 +1465,7 @@ with the rules restored, 0.4-0.8 s for the prefix request (restore, 4 tokens,
 a new checkpoint copied out) plus 5.0-5.4 s for the rest, also for another
 character's turn in the same slot.
 
-**Record and replay** (`webgpu-03-replay.patch`, shipped on, measured): a big
+**Record and replay** (`webgpu-03-replay.patch`, measured, shipped off): a big
 graph whose signature (every node's op, flags, type, shape, strides, buffer,
 offset, op parameters, and the same for its sources) comes twice in a row is
 recorded (pipelines, bind groups, workgroup counts, its parameters in a buffer
@@ -1483,6 +1483,13 @@ dispatches (Chrome's GPU process decoding and recording them, barriers between
 them), ~39 ms, not the 8 ms of encoding in the worker, which already overlapped it.
 What it buys: 6 ms less work a token in the model's worker. What would make
 writing faster: fewer dispatches (more fusion) or two characters at once (below).
+**Shipped off** (2026-11-27, same box, `replay-test.html`, no game drawn, two rounds of
+two greedy answers each): the shipped wasm built with `-DGGML_WEBGPU_REPLAY=0` writes
+32.7-33.1 tok/s against 30.4-32.0 for the same tree with replay on (and the earlier
+wasm), reading the same (185-198 tok/s), the same text every time. In the browser the
+switch is a build flag (no environment there): `build-fast.sh wasm fast
+"-DGGML_WEBGPU_MMVQ=0 -DGGML_WEBGPU_REPLAY=0"`. The code stays in the patch for the
+next attempt (fewer dispatches first).
 
 **Other measurements** (Chrome, the same box): batch size for reading: 256 tokens
 128-154 tok/s, 512 163-177, 1,024 157-171 (and 1.1 GB more graphics memory):

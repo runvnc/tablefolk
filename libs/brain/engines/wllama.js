@@ -78,7 +78,8 @@ const raon = (quant, parts, gb) => ({
 
 // Inkling 2 Mini and SenseNova-Loop-9B need a newer llama.cpp than wllama 3.8.1 (inkling2_loop, the SenseNova Loop
 // PR) and are only fast with our ggml-webgpu patches (cached bind groups, fused kernels): wllama 4.0.0 built against
-// llama.cpp 5bacb7c + PR #32588 + tools/wllama-inkling/*.patch (build-fast.sh; brains.md, "Faster in Chrome").
+// llama.cpp 5bacb7c + PR #32588 + tools/wllama-inkling/*.patch (build-fast.sh; brains.md, "Faster in Chrome"), built with
+// -DGGML_WEBGPU_MMVQ=0 -DGGML_WEBGPU_REPLAY=0 (record and replay off: slower writing in Chrome).
 // ?fastwasm= / ?fastjs= override its files. The GGUFs come from the R2 mirror (copied 2026-11-27 with
 // tools/r2-copy/wllama-fast.json, SHA-256 checked) with Hugging Face at the same pinned revisions as the fallback.
 const FAST_WASM = () => q().get('fastwasm') || new URL('./wllama-fast/wllama.wasm', import.meta.url).href;
