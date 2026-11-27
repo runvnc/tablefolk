@@ -1,0 +1,88 @@
+// Kit buildings in the game (2026-11-27): screenshots and numbers in the headless test Chrome.
+//   node tools/kit/game-shots.mjs <base url> <scenario path|url params> <outdir> <prefix> [views] [extra query]
+//   views (default far,door,corner,inside,fp,upper,night): comma list; "stats" alone only measures
+// Needs the test Chrome (HEADLESS=1 tools/browser-test/launch-chrome.sh; CDP on 9223 or CDP_PORT) and a server.
+// Prints STATS {...}: buildings, build ms, draw calls, active meshes, triangles drawn, textures (GB), frame ms.
+// The scenario: a path under the server ("/scenarios/hearthvale.json") or raw query ("generate=..."), with ?art=1.
+import { createRequire } from 'module';
+import { writeFileSync, mkdirSync } from 'fs';
+const require = createRequire(new URL('../browser-test/package.json', import.meta.url));
+const { chromium } = require('playwright-core');
+const [base, scn, dir, prefix, views = 'far,door,corner,inside,fp,upper,night', extra = ''] = process.argv.slice(2);
+mkdirSync(dir, { recursive: true });
+const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
+const ctx = b.contexts()[0]; const p = await ctx.newPage();
+await p.setViewportSize({ width: +(process.env.SHOT_W || 1100), height: +(process.env.SHOT_H || 700) });
+p.on('console', m => { const t = m.text(); if (m.type() === 'error' || /\[buildings\]|\[walls\]|\[roofs\]/.test(t)) console.log('console:', m.type(), t.slice(0, 300)); });
+p.on('pageerror', e => console.log('pageerror:', String(e).slice(0, 400)));
+const q = scn.includes('=') ? scn : 'scenario=' + scn;
+const t0 = Date.now();
+await p.goto(`${base}/app/?art=1&intro=0&model=none&${q}${extra ? '&' + extra : ''}&t=${Date.now()}`, { timeout: 60000 });
+await p.waitForFunction(() => window.tablefolkLoading?.revealed && window.TABLEFOLK_STATE?.playerAvatar, null, { timeout: 120000 });
+const readyMs = Date.now() - t0;
+await p.waitForTimeout(2500);
+const measure = () => p.evaluate(async () => {
+  const s = TABLEFOLK_STATE, sc = s.scene, e = sc.getEngine();
+  const ins = window._tfIns || (window._tfIns = new BABYLON.SceneInstrumentation(sc)); ins.captureFrameTime = true; ins.captureActiveMeshesEvaluationTime = true;
+  await new Promise(r => setTimeout(r, 1500));
+  const act = sc.getActiveMeshes(); let tris = 0, kitTris = 0;
+  for (let i = 0; i < act.length; i++) { const m = act.data[i]; const n = (m.getTotalIndices?.() || 0) / 3 * (m.thinInstanceCount || 1) * (m.isVisible ? 1 : 0); tris += n; if (/kit/.test(m.name)) kitTris += n; }
+  const ws = window.tablefolkLoading?.log?.find?.(l => /world-ready|revealed/.test(l.what || ''));
+  return { buildings: window.tablefolkBuildings?.stats?.(), activeMeshes: act.length, drawCalls: e._drawCalls?.current ?? null, trisDrawn: Math.round(tris), kitTris: Math.round(kitTris),
+    gfxGB: +window.tablefolkGfxGB?.().toFixed(3), textures: sc.textures.length, frameMs: +ins.frameTimeCounter.lastSecAverage.toFixed(2), fps: +e.getFps().toFixed(1),
+    quality: window.TABLEFOLK_GFX?.quality, shells: window.tablefolkRoofs?.shells?.().length, roofs: window.tablefolkRoofs?.roofed?.().length };
+});
+const shot = async name => { await p.waitForTimeout(+(process.env.SHOT_WAIT || 1400)); const url = await p.evaluate(() => document.getElementById('renderCanvas').toDataURL('image/jpeg', .86)); writeFileSync(`${dir}/${prefix}_${name}.jpg`, Buffer.from(url.split(',')[1], 'base64')); console.log('shot', `${dir}/${prefix}_${name}.jpg`); };
+const st = await measure();
+console.log('STATS ' + JSON.stringify({ prefix, readyMs, ...st }));
+// a building to look at: the KIT_PICK-th (default the one nearest the player)
+const info = await p.evaluate(pick => {
+  const L = window.tablefolkBuildings?.list?.() || [], s = TABLEFOLK_STATE, pp = s.playerAvatar.logicalPos || s.playerAvatar.root.position;
+  const rooms = L.length ? L : (window.tablefolkRoofs?.roofed?.() || []).map(r => ({ rooms: [r], center: [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2], A: { ZT: 2.2 } }));
+  const sorted = rooms.slice().sort((a, b) => Math.hypot(a.center[0] - pp.x, a.center[1] - pp.z) - Math.hypot(b.center[0] - pp.x, b.center[1] - pp.z));
+  const bb = sorted[Math.min(sorted.length - 1, pick | 0)]; if (!bb) return null;
+  const r = bb.rooms[0], d = r.doors?.[0] || [r.x0, r.z1 + 1, 0, 1];
+  return { center: bb.center, ZT: bb.A?.ZT || 2.2, door: d, room: { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1 }, spec: bb.spec ? { style: bb.spec.style, storeys: bb.spec.storeys, roof: bb.spec.roof, role: bb.spec.role } : null, top: s.terrainTopY ?? 0 };
+}, +(process.env.KIT_PICK || 0));
+console.log('BUILDING ' + JSON.stringify(info));
+if (!info) { await p.close(); process.exit(0); }
+const free = (tx, ty, tz, alpha, beta, radius) => p.evaluate(([tx, ty, tz, alpha, beta, radius]) => {
+  const s = TABLEFOLK_STATE, c = s.camera; if (s.firstPerson) tablefolk.setFirstPerson(false); window.tablefolk?.setCameraView?.('overview');
+  s.cameraMode = 'overview'; s.followAvatar = false; c.lowerRadiusLimit = .5; c.upperRadiusLimit = 200; c.lowerBetaLimit = .05; c.upperBetaLimit = 1.55;
+  c.setTarget(new BABYLON.Vector3(tx, ty, tz)); c.alpha = alpha; c.beta = beta; c.radius = radius; c.minZ = .05;
+}, [tx, ty, tz, alpha, beta, radius]);
+const player = (x, z) => p.evaluate(([x, z]) => { const s = TABLEFOLK_STATE; tablefolk.setCharacterLogicalPosition(s.playerAvatar, { x, z }); }, [x, z]);
+const [cx, cz] = info.center, [dx, dz, nx, nz] = info.door, top = info.top, aOut = Math.atan2(nz, nx);
+for (const v of views.split(',')) {
+  if (v === 'stats') continue;
+  if (v === 'far') { await player(dx + nx * 6, dz + nz * 6); await free(cx, top + 2, cz, aOut + .6, 1.0, 30); }
+  if (v === 'mid') { await player(dx + nx * 6, dz + nz * 6); await free(cx, top + 2, cz, aOut + .5, 1.05, 16); }
+  if (v === 'door') { await player(dx + nx * 3, dz + nz * 3); await free(dx, top + 1.3, dz, aOut + .25, 1.42, 5.5); }
+  if (v === 'corner') { const ex = nz ? info.room.x1 + 1 : dx, ez = nx ? info.room.z1 + 1 : dz; await free(ex, top + 1.6, ez, aOut + .9, 1.38, 4.2); }
+  if (v === 'close') { await free(dx + (nz ? .9 : 0), top + 1.2, dz + (nx ? .9 : 0), aOut + .3, 1.5, 1.9); }
+  if (v === 'inside') {   // the player in the room, the follow camera (roof away, the storey above clipped)
+    await player(Math.round((info.room.x0 + info.room.x1) / 2), Math.round((info.room.z0 + info.room.z1) / 2));
+    await p.evaluate(() => { window.tablefolk?.setCameraView?.('follow'); });
+    await p.waitForTimeout(1200);
+  }
+  if (v === 'upper') {   // the player inside, a free camera from higher: the clipped storey and the room below
+    await player(Math.round((info.room.x0 + info.room.x1) / 2), Math.round((info.room.z0 + info.room.z1) / 2));
+    await free(cx, top + 1, cz, aOut + .7, .75, 13);
+  }
+  if (v === 'fp') {   // first person in the room, looking at the door (the roof is the ceiling)
+    await p.evaluate(([x, z, yaw]) => { const s = TABLEFOLK_STATE; tablefolk.setCharacterLogicalPosition(s.playerAvatar, { x, z });
+      tablefolk.setCameraView('first'); s.fpYaw = yaw; s.fpPitch = .12; },
+      [dx - nx * 2, dz - nz * 2, Math.atan2(nx, nz)]);
+  }
+  if (v === 'fpout') {   // first person outside, at the door looking in
+    await p.evaluate(([x, z, yaw]) => { const s = TABLEFOLK_STATE; tablefolk.setCharacterLogicalPosition(s.playerAvatar, { x, z });
+      tablefolk.setCameraView('first'); s.fpYaw = yaw; s.fpPitch = -.05; },
+      [dx + nx * 2.2, dz + nz * 2.2, Math.atan2(-nx, -nz)]);
+  }
+  if (v === 'night') { await player(dx + nx * 6, dz + nz * 6); await p.evaluate(() => window.tablefolk?.setTimeOfDay?.(22)); await free(cx, top + 2, cz, aOut + .5, 1.12, 18); }
+  if (process.env.KIT_JS) console.log('KIT_JS', JSON.stringify(await p.evaluate(process.env.KIT_JS)));
+  await shot(v);
+  if (v === 'fp' || v === 'fpout') await p.evaluate(() => { if (TABLEFOLK_STATE.firstPerson) tablefolk.setFirstPerson(false); });
+  if (v === 'far' && process.env.KIT_MEASURE_FAR) console.log('STATS_FAR ' + JSON.stringify(await measure()));
+}
+await p.close(); process.exit(0);

@@ -20,6 +20,8 @@
  *   window.tablefolkCutaway.half()         every wall at half height (free camera)
  *   window.tablefolkCutaway.clear()        walls back to full height
  *   window.tablefolkCutaway.attach(mat)    cut this material too (darkness.js's fog)
+ *   window.tablefolkCutaway.attach(mat, false, true)  cut ahead of the player but never in the free
+ *       camera's half mode (buildings.js: kit houses keep their walls under their roofs)
  *   window.tablefolkCutaway.seeThrough(mat) scenery (trees, tall props): fades where it
  *       stands between the follow camera and the player (see the second part below)
  * Loaded after app.js; uses its globals (state, meta).
@@ -37,7 +39,7 @@
     if (Plugin) return Plugin;
     const WGSL = BABYLON.ShaderLanguage?.WGSL;
     Plugin = class extends BABYLON.MaterialPluginBase {
-      constructor(mat, fog) { super(mat, 'TablefolkCut', 300, { TFCUT: false }); this._fog = fog; this._enable(true); }
+      constructor(mat, fog, noHalf) { super(mat, 'TablefolkCut', 300, { TFCUT: false }); this._fog = fog; this._noHalf = noHalf; this._enable(true); }
       getClassName() { return 'TablefolkCutPlugin'; }
       isCompatible() { return true; }
       prepareDefines(defines) { defines.TFCUT = true; }
@@ -46,7 +48,7 @@
         return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFCUT\nuniform vec4 tfCut;\nuniform vec4 tfCutArea;\nuniform vec4 tfClip;\nuniform vec4 tfClipB;\n#endif\n' };
       }
       bindForSubMesh(ubo) {
-        ubo.updateFloat4('tfCut', cut.x, cut.z, this._fog && cut.on === 2 ? 0 : cut.on, cut.y);
+        ubo.updateFloat4('tfCut', cut.x, cut.z, (this._fog || this._noHalf) && cut.on === 2 ? 0 : cut.on, cut.y);
         ubo.updateFloat4('tfCutArea', W0, DEPTH, SLOPE, this._fog ? 0 : 1);
         // roofs.js: a shelled room whose doorway is open: its walls' outer halves go, but round the doorway
         const c = !this._fog && window.TABLEFOLK_ROOM_CLIP;
@@ -117,11 +119,11 @@ if (tfCut.z > 0.5 && tfCutArea.w > 0.5 && !gl_FrontFacing) { surfaceAlbedo = vec
     return Plugin;
   }
   const attached = new WeakSet();
-  function attach(mat, fog = false) {
+  function attach(mat, fog = false, noHalf = false) {
     if (!mat || attached.has(mat)) return;
-    if (mat.subMaterials) { attached.add(mat); for (const m of mat.subMaterials) attach(m, fog); return; }
+    if (mat.subMaterials) { attached.add(mat); for (const m of mat.subMaterials) attach(m, fog, noHalf); return; }
     attached.add(mat);
-    try { new (pluginClass())(mat, fog); } catch (e) { console.warn('[cutaway] plugin', mat.name, e); }
+    try { new (pluginClass())(mat, fog, noHalf); } catch (e) { console.warn('[cutaway] plugin', mat.name, e); }
   }
 
   // Lids at the stub height: stone over cut wall squares, black over the

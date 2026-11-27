@@ -24,6 +24,14 @@
  * (darkness.js roomRevealed), even between the camera and the player.
  * Off in the tabletop view (a map from above wants the rooms).
  *
+ * Kit buildings (2026-11-27, buildings.js): with the building kit on, the
+ * roofed rooms are drawn as kit houses (walls, frame, pieces and their own
+ * roofs) and this file only fades their roofs: one entry per building (rooms
+ * sharing a wall), same rule as below, the storey above clipped while the
+ * player is inside (not in first person: the upper floor is the ceiling).
+ * No shell, no swap. ?kit=0 or "kit": false brings back the shells and code
+ * roofs below.
+ *
  *   window.tablefolkRoofs.rebuild()  .toggle() (lift all, for tests)  .rooms
  * Loaded after app.js; uses its globals (state, meta, wallH, hasGroundAt).
  */
@@ -473,6 +481,13 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     const todo = rooms.filter(room => { const w = room.x1 - room.x0 + 1, h = room.z1 - room.z0 + 1; return !(room.fill < .8 || w * h < 4 || w > 20 || h > 20); })
       .sort((a, b) => Math.hypot((a.x0 + a.x1) / 2 - p.x, (a.z0 + a.z1) / 2 - p.z) - Math.hypot((b.x0 + b.x1) / 2 - p.x, (b.z0 + b.z1) / 2 - p.z));
     const D = doors(), useShells = shellsWanted(); lastShell = null;
+    // the building kit (buildings.js) draws these rooms' houses and roofs: one entry per building, its roof fades
+    const Kit = window.tablefolkBuildings;
+    if (Kit?.enabled()) {
+      for (const g of Kit.group(todo)) roofs.push(kitEntry(g));
+      sig = signature(W);
+      return;
+    }
     let finished; const all = new Promise(r => { finished = r; });
     const step = () => { if (my !== buildToken || !todo.length) return finished(); const room = todo.shift(); try { const plan = useShells && planShell(room, D); roofs.push(plan ? buildShell(room, plan, state.scene) : build(room, state.scene)); } catch (e) { console.warn('[roofs]', e); } next(); };
     // the rest wait while the model loads or answers (app.js tablefolkDressGate)
@@ -482,11 +497,21 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
     return all;
   }
   const signature = W => W.size + '|' + [...W].slice(0, 400).join(';').length;
+  // a kit building's roof entry: its rooms as one (inside = any of them or their doorways); the meshes are
+  // looked up each frame (walls rebuilt later make new ones)
+  function kitEntry(g) {
+    const cells = new Set(), here = new Set(), dr = [];
+    for (const r of g.rooms) { for (const c of r.cells) cells.add(c); for (const c of r.here) here.add(c); dr.push(...(r.doors || [])); }
+    const room = { x0: Math.min(...g.rooms.map(r => r.x0)), x1: Math.max(...g.rooms.map(r => r.x1)), z0: Math.min(...g.rooms.map(r => r.z0)), z1: Math.max(...g.rooms.map(r => r.z1)), cells, here, doors: dr, rooms: g.rooms };
+    const K = window.tablefolkBuildings, key = g.key;
+    return { room, kit: key, alpha: 1, target: 1, mats: [], get parts() { return K.roofParts(key); },
+      root: { setEnabled: on => K.setRoofEnabled(key, on), dispose() {}, isDisposed: () => false } };
+  }
 
   // ---- seeing in ----
   const posOf = g => g.logicalPos || g.root.position;
   function frame() {
-    if (!roofs.length) return;
+    if (!roofs.length) { if (window.tablefolkBuildings?.clipState?.on) window.tablefolkBuildings.clip(null); return; }
     const sc = state.scene, cam = sc.activeCamera, me = state.playerAvatar, dt = Math.min(.1, (sc.getEngine().getDeltaTime() || 16) / 1000);
     const p = me && posOf(me), myCell = p && cellKey(Math.round(p.x), Math.round(p.z));
     let ray = null;
@@ -495,14 +520,23 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
       ray = new BABYLON.Ray(from, dir.normalize(), len);
     }
     const dw = doorway(p, dt);
+    let clipKey = null;
     for (const r of roofs) {
       // a shell goes only once you are through its door (in the room); a roof also in its doorway
       const inside = myCell && (r.shell ? r.room.cells.has(myCell) : r.room.here.has(myCell));
-      const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.parts.some(m => ray.intersectsMesh(m, false).hit));
+      const blocks = ray && (r.shell ? (r.box && ray.intersectsBoxMinMax(r.box.lo, r.box.hi)) : r.parts.some(m => (!r.kit || m.isEnabled(false)) && ray.intersectsMesh(m, false).hit));
       // in first person the roof overhead stays: it is the ceiling (a shell goes: its walls would hide the room)
       // "reveal": "rooms" (darkness.js): a room not yet seen into keeps its roof on, even in the camera's way
       const hidden = !inside && window.tablefolkDark?.roomRevealed && !window.tablefolkDark.roomRevealed(r.room);
       r.target = lifted || (inside && (!state.firstPerson || r.shell)) ? 0 : blocks && !hidden ? .22 : 1;
+      if (r.kit) {
+        // kit: every frame (its meshes may be new after a wall rebuild); the storey above goes while inside
+        r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7); if (Math.abs(r.alpha - r.target) < .005) r.alpha = r.target;
+        for (const m of r.parts) m.visibility = r.alpha > .99 ? 1 : r.alpha;
+        r.root.setEnabled(r.alpha > .02);
+        if (inside && !state.firstPerson && r.target === 0) clipKey = r.kit;
+        continue;
+      }
       if (Math.abs(r.alpha - r.target) > .005) {
         r.alpha += (r.target - r.alpha) * Math.min(1, dt * 7);
         // per roof (the materials are shared between roofs): the meshes' visibility
@@ -513,6 +547,7 @@ if (tfNight.x > 0.01 && abs(normalW.y) < 0.45) {
       // doorway is open (dw) or the shell is fading (cross-fade, nothing pops)
       if (r.shell) shellHide(r, r.alpha > .98 && r.target > .5 && !(dw === r && hole.k > .01), dw === r);
     }
+    window.tablefolkBuildings?.clip(lifted ? 'all' : clipKey);
     // the room walls' outer halves are clipped while its shell stands round an open doorway (cutaway.js)
     const clip = dw && dw.alpha > .02 && hole.k > .01;
     window.TABLEFOLK_ROOM_CLIP = clip ? { on: 1, x0: dw.room.x0 - 1, z0: dw.room.z0 - 1, x1: dw.room.x1 + 1, z1: dw.room.z1 + 1, hx: hole.x, hz: hole.z, alongX: hole.alongX, w: HOLE_W, d: HOLE_D } : null;

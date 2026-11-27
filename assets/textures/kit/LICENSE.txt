@@ -1,0 +1,10 @@
+Building kit textures for Tablefolk (2026-11-27), graded to one palette by tools/kit/make_textures.py
+and written here by tools/kit/export_game.py (WebP; <name>_512 the half-size copies for light quality).
+
+Generated for the project with fal.ai's fal-ai/patina/material (paid generations owned by the project,
+like the other fal.ai outputs in this repository; released under the repo's asset licence, README.md
+"Licence"): fieldstone, quoin, thatch, shingle, floor, siding, timber.
+
+CC0 (Poly Haven, https://polyhaven.com/license), graded warm:
+  plaster  <- polyhaven.com plastered_wall_03 (as assets/textures/env plaster_aged)
+  tile     <- polyhaven.com clay_roof_tiles_02 (as assets/textures/env clay_roof_tiles)

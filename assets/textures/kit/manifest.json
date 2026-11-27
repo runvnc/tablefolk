@@ -1,0 +1,41 @@
+{
+ "tileMeters": {
+  "plaster": [
+   3.0,
+   3.0
+  ],
+  "fieldstone": [
+   1.5,
+   1.5
+  ],
+  "quoin": [
+   2.4,
+   2.4
+  ],
+  "timber": [
+   2.0,
+   0.5
+  ],
+  "siding": [
+   2.0,
+   2.0
+  ],
+  "floor": [
+   2.0,
+   2.0
+  ],
+  "shingle": [
+   1.6,
+   1.6
+  ],
+  "thatch": [
+   2.0,
+   2.0
+  ],
+  "tile": [
+   2.5,
+   2.5
+  ]
+ },
+ "note": "tools/kit/export_game.py from work/kit/tex (make_textures.py)"
+}

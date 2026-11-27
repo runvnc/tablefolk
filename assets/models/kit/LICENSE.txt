@@ -1,0 +1,10 @@
+Building kit hero pieces for Tablefolk (2026-11-27): door (frame and leaf), window, window_shut,
+chimney (top), dormer, porch, sign, corbel, stair; <name>_lod.glb the far versions (tools/kit/lod_piece.py),
+<name>_512.glb half-size textures for light quality.
+
+Generated with Tripo h3.1 image-to-3D through fal.ai from reference images made for the project with
+nano-banana-pro (fal.ai); paid generations owned by the project, like assets/models/props/env and the
+Meshy characters; released with the project under the repo's asset licence (README.md, "Licence").
+Processed by tools/env-assets/proc.py (weld, decimate, normal map baked from the raw), tools/kit/kit_piece.py (fit, anchor, yaw, the door's leaf cut out) and
+tools/compress-glb.sh (AVIF textures, meshopt). pieces.json: each piece's box, scale and anchor.
+Notes and the service comparison: work/kit/NOTES.md.

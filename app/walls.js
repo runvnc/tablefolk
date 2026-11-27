@@ -17,6 +17,11 @@
  *            outside runs longer than 3 cells (glowing warm at dusk and night;
  *            only a picture: sight and paths are unchanged); and its own floor,
  *            a slab 3 cm above the ground in the room's floor texture (floors())
+ * Kit buildings (2026-11-27): with the building kit on (buildings.js, the
+ * default outdoors at wallHeight >= ~1.7), the house rooms' wall and door
+ * squares are drawn by buildings.js instead (walls with both faces, frame,
+ * pieces, roof); build() skips the squares it claims. The "house" look here
+ * stays for ?kit=0, "kit": false, low walls and the tabletop view.
  * Cracked walls lose their cap and get a broken, uneven top; burned ones are
  * dark (vertex colours). Doors: app.js's plank leaf (now wood_planks_dark,
  * iron straps) in a timber frame (house) or a stone one. "modern" and "block"
@@ -174,12 +179,16 @@
   function build0(cell, top) {
     const M = materials(), H = wallH(), DH = doorHeight(), dark = underground(), houses = dark ? { walls: new Set(), inside: new Set() } : houseCells();
     lastSig = looksSig(dark, houses);
+    // the building kit draws the house rooms' walls and doors (and their roofs): those squares are skipped here
+    let kit = null;
+    try { kit = window.tablefolkBuildings?.build(cell, top, dark ? [] : houses.rooms || []) || null; } catch (e) { console.warn('[walls] kit', e); }
     const B0 = { rubble: batch(), blocks: batch(), cap: batch(), plaster: batch(), timber: batch(), glass: batch() };
     const perRoom = new Map(); let B = B0;
     const out = []; roomMeshes = new Map();
     const isDoor = k => meta(cell.get(k))?.type === 'door';
     const shade = (st, x, z) => { const r = .95 + hash(x, z, 5) * .1; return st === 'burned' ? [.3, .28, .27] : st === 'cracked' ? [.86 * r, .84 * r, .82 * r] : [r, r, r]; };
     for (const [k, w] of cell) {
+      if (kit?.cells.has(k)) continue;
       const [x, z] = k.split(',').map(Number), st = meta(w).state, col = shade(st, x, z);
       const style = houses.walls.has(k) ? 'house' : dark ? 'blocks' : 'rubble';
       const rk = style === 'house' && houses.room?.get(k);
@@ -243,7 +252,7 @@
       const m = Bq[name].mesh('tt_walls_' + name + '_room', () => M[name]); if (m) { out.push(m); m.metadata = { ...(m.metadata || {}), room: rk }; (roomMeshes.get(rk) || roomMeshes.set(rk, []).get(rk)).push(m); }
     }
     state.wallVisuals.push(...out);
-    buildDoors(cell, top, houses);
+    buildDoors(cell, top, houses, kit);
   }
   // A house room's own floor (2026-11-22; the owner: "the floor of buildings was merging
   // into the ground"): the terrain painted the room's floor at the ground's height and
@@ -334,8 +343,8 @@
     else { const b = style === 'blocks' ? B.blocks : B.rubble; put(b, c - .5, c + .5, y0, top + H - .09, T); put(B.cap, c - .5, c + .5, top + H - .09, top + H + .02, T + .08); }
   }
   // frames and leaves (the leaf is app.js buildDoorLeaf, restyled)
-  function buildDoors(cell, top, houses) {
-    const doors = [...cell.entries()].filter(([, w]) => meta(w).type === 'door');
+  function buildDoors(cell, top, houses, kit) {
+    const doors = [...cell.entries()].filter(([k, w]) => meta(w).type === 'door' && !kit?.cells.has(k));
     if (!doors.length) return;
     const M = materials(), DH = doorHeight(), timber0 = batch(), stone0 = batch(), rooms = new Map();
     for (const [k, w] of doors) {
