@@ -27,9 +27,9 @@ const ENGINE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai
 // Bonsai 2 copy in the cache does not pass for 2.5. The 9B stays unpinned: pinning
 // would change its URL and so the engine's cache key (a fresh download for everyone).
 export const SIZES = {
-  '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: null, flag: '_bonsai25_loaded', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // not on R2 yet: it would go at bonsai-2.5-27b/
-  '27B-v2': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', revision: '839bd57023c1558945afea70a74fa83c054f35f9', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf', flag: '_bonsai2_loaded' },
-  '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: null, flag: '_bonsai2_loaded_9B' },   // not mirrored on R2 yet
+  '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: null, flag: '_bonsai25_loaded', name: 'Bonsai 2.5 27B', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // not on R2 yet: it would go at bonsai-2.5-27b/
+  '27B-v2': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', revision: '839bd57023c1558945afea70a74fa83c054f35f9', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf', flag: '_bonsai2_loaded', name: 'Bonsai 2 27B' },
+  '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: null, flag: '_bonsai2_loaded_9B', name: 'Bonsai 2 9B' },   // not mirrored on R2 yet
 };
 export const BONSAI2_FILE = SIZES['27B'].file;
 import { mirrorAllowed, local } from '../../models/index.js';
@@ -102,9 +102,9 @@ export async function loadBonsai2(onStatus = () => {}, { context = pageContext()
   const model = await E.Qwen3_5ForConditionalGeneration.from_pretrained(source, {
     file: S.file, mmproj: null, maxLength: context, ...(S.revision && source === S.repo ? { revision: S.revision } : {}),
     onProgress: e => {
-      if (e.kind === 'bytes' && e.total > 0) onStatus(`${e.fromCache ? 'reading cached' : 'downloading'} Bonsai 2 ${size} ${Math.floor(100 * e.loaded / e.total)}% (${gb(e.loaded)} / ${gb(e.total)} GB)`);
-      else if (e.kind === 'tensors') onStatus('preparing Bonsai 2 ' + size + '…');
-      else onStatus(e.message || e.status || 'loading Bonsai 2 ' + size);
+      if (e.kind === 'bytes' && e.total > 0) onStatus(`${e.fromCache ? 'reading cached' : 'downloading'} ${S.name} ${Math.floor(100 * e.loaded / e.total)}% (${gb(e.loaded)} / ${gb(e.total)} GB)`);
+      else if (e.kind === 'tensors') onStatus('preparing ' + S.name + '…');
+      else onStatus(e.message || e.status || 'loading ' + S.name);
     },
   });
   local.set(key, source === S.mirror ? 'r2' : '1');
