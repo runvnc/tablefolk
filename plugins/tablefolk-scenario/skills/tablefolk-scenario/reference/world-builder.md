@@ -43,6 +43,8 @@ double-height.
 - *in this browser*: Gemma 4 E4B (about 3 GB), E2B (2 GB, quicker, simpler
   worlds), Bonsai 2 9B (1.9 GB, fast, a 6 GB+ graphics card), Gemma 4 12B
   (5.6 GB) or Bonsai 2.5 27B (6 GB, the smartest; both 10 GB+ cards),
+  SenseNova-Loop-9B (6 GB, 10 GB+) and Inkling 2 Mini (6.6 or 8.7 GB, 12 or
+  16 GB cards; these two in agent mode),
   downloaded the first time and kept (the game uses the same copy). **How**:
   *step by step* (the default, for every model) or *whole world at once*
   (`?oneanswer=1`: the generator's whole guide in one prompt and the world as
@@ -85,6 +87,38 @@ double-height.
 - *cloud*: the generator endpoint (OpenRouter by default, model
   `deepseek/deepseek-v4.1-flash-1017`; `gpt-6-luna` on OpenAI takes 6-14 s).
   Replies may run to 17000 tokens for models that think at length.
+
+**Agent mode** (the form's *Agent mode* box; `?agent=1|0`): the model
+builds the world with tools instead of writing it as one answer. It sets the
+map (a generated village, dungeon, forest, farm or cave, a drawn room, or
+layout lines), the title, intro, time and threats, adds each character, the
+things, events and building styles, looks at the map as it will be built,
+checks the world with the game's own checks, fixes what they find, and calls
+*finish* with a short summary; the progress card lists each step ("added
+character mara, the baker"), and **■ Stop** ends it (what was built is shown
+if it passes the checks). After that, *Ask the AI for changes* goes to the
+same session: "make the tavern bigger" changes only that, with the same
+model and what it did before (old steps are summarised when its memory
+fills). On by default for models that can call tools: with your own key
+when the provider says the model takes tools (OpenRouter's list; a server's
+`/props`), and in this browser for Bonsai 2.5 27B, Bonsai 2 9B, Inkling 2
+Mini and SenseNova-Loop-9B (each writes calls in its own format). Off for
+Gemma 4 and Raon (the box is greyed with the reason): they build step by
+step. The choice is remembered per model in this browser. A model the
+provider refuses tools for falls back to one answer by itself (the progress
+line says so). Measured 2026-11-27 with DeepSeek V4.1 Flash on OpenRouter: a
+river village with five people in 18 steps, 22 s, $0.014; "make the tavern
+bigger..." in 5 steps, 5 s, $0.002.
+
+The tools (`server/worldgen-tools.js`): `get_scenario`, `get_catalog`
+(bodies, objects, jobs, places, building fields, commands, goals),
+`set_meta`, `set_map`, `place` (add, remove, style a building), `character`,
+`object`, `event`, `section` (worlds in several maps), `validate`, `preview`,
+`undo`, `finish`. Each change is checked as it is made (ids, bodies, jobs,
+object types, places); a refused change goes back to the model with the
+reason. Your own key: the answer may use what the model's window leaves
+(the provider reports the window and the longest answer; a server that
+does not say gets 32,768 tokens, or the context you set).
 
 An admin can use all of them and type any model; guests get what the admin
 page allows, and the server refuses the rest. A server run with "visitors

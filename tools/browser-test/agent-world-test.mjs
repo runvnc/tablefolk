@@ -3,6 +3,8 @@
 // then asks for one change in the same session, and saves both worlds as JSON
 // (for scenario-smoke.mjs). Uses a real model: OPENROUTER_API_KEY in the
 // environment (never printed), AGENT_MODEL (default deepseek/deepseek-v4.1-flash).
+// WHERE=browser: a model in the test Chrome instead (AGENT_MODEL=bonsai2-27b; it is
+// downloaded if this profile has not got it: only on a rented GPU box).
 //
 //   OPENROUTER_API_KEY=... node agent-world-test.mjs [base] [outdir] ["prompt"] ["follow-up"]
 import { chromium } from 'playwright-core';
@@ -10,8 +12,9 @@ import { writeFileSync } from 'node:fs';
 const base = process.argv[2] || 'http://localhost:8001', out = process.argv[3] || '.';
 const prompt = process.argv[4] || 'a small river village where the miller and the baker quarrel over flour, wolves at night';
 const follow = process.argv[5] || 'make the tavern bigger and busier: give it a stone and timber look with a sign, and add an innkeeper who sells ale';
-const model = process.env.AGENT_MODEL || 'deepseek/deepseek-v4.1-flash';
-const key = process.env.OPENROUTER_API_KEY; if (!key) { console.log('OPENROUTER_API_KEY is not set'); process.exit(2); }
+const WHERE = process.env.WHERE || 'own';
+const model = process.env.AGENT_MODEL || (WHERE === 'browser' ? 'bonsai2-27b' : 'deepseek/deepseek-v4.1-flash');
+const key = process.env.OPENROUTER_API_KEY; if (!key && WHERE === 'own') { console.log('OPENROUTER_API_KEY is not set'); process.exit(2); }
 const LIMIT = +(process.env.AGENT_TIMEOUT || 420) * 1000;
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const page = await b.contexts()[0].newPage();
@@ -19,8 +22,8 @@ const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 300))); 
 const t0 = Date.now(), say = s => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${s}`);
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.goto(base + '/world/?t=' + Date.now());
-await page.evaluate(([k, m]) => localStorage.setItem('tablefolk_own_model', JSON.stringify({ provider: 'openrouter', apiKey: k, model: m })), [key, model]);
-await page.goto(`${base}/world/${encodeURIComponent(prompt).replace(/%20/g, '+')}?where=own&agent=1&model=${encodeURIComponent(model)}`);
+if (WHERE === 'own') await page.evaluate(([k, m]) => localStorage.setItem('tablefolk_own_model', JSON.stringify({ provider: 'openrouter', apiKey: k, model: m })), [key, model]);
+await page.goto(`${base}/world/${encodeURIComponent(prompt).replace(/%20/g, '+')}?where=${WHERE}&agent=1&model=${encodeURIComponent(model)}`);
 // the form's toggle: on for this model by default
 await page.waitForTimeout(1500);
 say('agent toggle: ' + JSON.stringify(await page.evaluate(() => ({ checked: document.forms.f?.agent?.checked, disabled: document.forms.f?.agent?.disabled, note: document.getElementById('agentNote')?.textContent }))));

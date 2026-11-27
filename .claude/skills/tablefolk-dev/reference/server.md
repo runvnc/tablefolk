@@ -116,6 +116,47 @@ is the scenario skill's `server.md`; this is how it works inside.
   settings (`tablefolk_llm_endpoint`, `tablefolk_model` = `endpoint`) with
   Gemma 4 26B. Tested against a mock server (repair round, revision, a
   CORS refusal's message) and with intercepted OpenRouter requests.
+- **Agent mode** (`app/worldgen-agent.js`, `server/worldgen-tools.js`,
+  2026-11-27): the page runs the model; the tools run on the server (`POST
+  /api/worldgen/agent {prompt} | {request, system?}` gives the system message,
+  `TOOLS` and the user turn; `POST /api/worldgen/tool {scenario, name, args,
+  prompt, fresh}` gives `runTool`'s `{scenario, result, log, changed, done}`;
+  the Bun server (`handleWorldgenAgent` in `generate.js`) and the Worker
+  alike). `runTool` is pure (a copy in, a copy out); `validate` is
+  `checkScenario` and `finish` is `finishScenario` (with the request for a new
+  world, so the living-world repairs run), so an agent's world passes the
+  same checks as a one-answer world. The system message is fast-skill.md
+  (`systemPrompt`) behind a short "how to work" with its one-JSON-answer
+  line replaced (`agentSystem`). The loop (`loop()`): each step one model
+  call; each call's result goes back as a `tool` message (errors included);
+  `undo` is the page's own history; at most 60 steps and 2M tokens a request
+  (`?agentTokens=`); at 60% of the window the oldest turns are replaced by
+  the step log (`compact`); stop, the step cap or a model that stops calling
+  tools ends in a `finish` attempt. Backends: `openaiBackend` (OpenAI
+  `tools`/`tool_calls`, streamed; `collect()` in `libs/brain/engines/openai.js`
+  gathers the call deltas; OpenRouter `usage: {include: true}` for the cost;
+  a model that writes calls as text is parsed too) and `localBackend` (in
+  the browser, `worldgen-browser.js agentBackend`: Bonsai 2 / 2.5 through
+  `generateBonsai2` with the Qwen 3.5 template's tool text and
+  `<tool_call><function=...><parameter=...>` calls, results as user
+  `<tool_response>` blocks (`renderMessages`); SenseNova the same through
+  the wllama runner's messages; Inkling as a raw prompt in its own template
+  (`inklingPrompt`: `tool_declare`, `<|message_model|>NAME<|content_invoke_tool_json|>{"name","args"}`,
+  `<|message_tool|>NAME`; the runner's `rawPrompt`/`stops`), a thinking block
+  kept and the answer asked for again). `parseToolCalls` reads XML calls,
+  JSON in `<tool_call>`, Inkling's blocks and bare `{"name","arguments"}`,
+  forgiving cut-off ends and trailing commas. Windows: Bonsai as large as
+  the card allows (at least 16384), wllama-fast 32768 (`loadModel(key, cb,
+  {ctx})`). Follow-ups: `builder.js reviseAI` sends Ask to
+  `tfOwnModel.revise(..., {agent: true})` or `tfWorldAgent.change` (revise
+  `{where: 'own', agent: true}` / `{where: 'agent'}` from the page's onDone);
+  the world may have been edited by hand, so the session's scenario is
+  replaced by the builder's. The form's toggle (`agentShow` in the page
+  script): `canAgent(model, info)`, remembered per model in
+  `tablefolk.worldgen.agent`. Tests: `node tools/worldgen-tools-test.mjs`
+  (the tools, the parsers with recorded call texts, the renderers,
+  compaction); `tools/browser-test/agent-world-test.mjs` (a real model via
+  OpenRouter: build, one follow-up, both saved for `scenario-smoke.mjs`).
 - Every result is saved in `generated/` (`recent` feeds the admin page).
 - **Sections in the builder** (`app/builder.js`, `app/map-editor.js`): the
   section being edited is `secPath` (subworlds keys down from the top);
