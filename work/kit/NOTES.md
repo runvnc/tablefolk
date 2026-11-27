@@ -29,3 +29,19 @@ Hero piece references: door, window (leaded + open shutters), chimney at 1K one 
 (the comparison pieces), and two 2K 2x2 sheets cropped into dormer, porch, sign, corbel,
 window_shut, stair, corner_post, finial (work/kit/img/pieces/; shots/pieces_a.jpg, pieces_b.jpg).
 All clean, isolated, consistent. Spent after phase 1: $1.35.
+
+## Phase 2: materials (Patina)
+`fal-ai/patina/material`, 1024 px, maps basecolor/normal/roughness/height, seed 7, ~$0.073 a set
+($0.03 the 1024x256 trim strip); 8 sets, $0.59 in all. Raw in work/kit/mat/<name>/ (50 MB).
+- Normal maps are OpenGL (+Y): measured against the height maps (R ~ -dh/dx, G ~ +dh/dy down,
+  correlation .5-.8), the same convention as assets/textures/env, so the same Babylon flags.
+- 2x2 tiling (shots/mat_tiles_a.jpg, _b.jpg): no seams in colour on any set; fieldstone, quoin,
+  shingle, floor, thatch and the timber strip are good. siding's normal map has a strong plank
+  edge exactly on the tile border (reads as one more board joint, acceptable). plaster came out
+  flat buttery yellow with a repeating ochre stain: rejected, the CC0 plaster_aged (already in the
+  game) graded warm is used instead.
+- Patina vs the CC0 set: thatch is far better (real straw courses; the CC0 thatch is a blur),
+  wood shingle and the cut-stone quoin set have no CC0 equivalent; timber is about equal.
+- tools/kit/make_textures.py grades all to one warm palette (mean colour target per set, periodic
+  low-frequency flattening) -> work/kit/tex/ (shots/tex_graded.jpg).
+Spent after phase 2: $1.94.
