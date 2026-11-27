@@ -550,6 +550,49 @@ TRELLIS.2 seed and its other settings (`remesh_project`, shape guidance),
 the Step1X-3D label model (symmetry and sharp-edge controls; 8.8 GB more),
 textured Hunyuan3D.
 
+### Modular building kit, a trial (2026-11-27)
+
+Not in the game yet. Buildings assembled by code from the description the world already has (the
+wall/door grid, rooms by flood fill) instead of one image-to-3D model per house: the whole-house
+models spread their triangles and one texture over the building, and the shell-to-room swap looked
+wrong. Scripts in `tools/kit/` (headers say how to run each); scratch, raw files and the running
+notes in `work/kit/` (`NOTES.md` is in git: every number and decision; sheets in `work/kit/shots/`).
+- **Three layers.** Structure (procedural, exact): wall panels .18 thick through the wall cells'
+  centres, both faces finished, cut for doors and windows; stone plinth; floors, joists; gable roofs
+  per room rectangle with overhang, eave thickness and pitch; an L gets a main roof and a wing roof
+  running into it to the main ridge; gable walls. Frame (procedural): sill and top plates, corner,
+  bay and jamb posts, rails round openings, seeded braces (corner, chevron, cross, herringbone), a
+  jetty's joist ends and corbels, king post and collar in the gables, bargeboards; quoins and timber
+  lintels on stone. Hero pieces (image-to-3D): door frame + hinged leaf, two windows, chimney,
+  dormer, porch, sign, corbel, outside stair, each fitted to a box in game units.
+- `build_house.py` (Blender) builds a house from `tools/kit/houses/<name>.json` (the game's grid
+  letters plus style, storeys, jetty, roof, pitch, bay, braces, chimney, porch, sign, dormers,
+  upperDoors, stair, seed). Output: one object per material for the structure, one per material
+  for the roof (`<name>_roof_<mat>`, chimney and dormer with them, so the roof fades alone), pieces
+  as linked duplicates (glTF instances), the leaf on its hinge. Vertex colours carry dirt at the
+  base and the per-building tint, so every house shares the same materials.
+- **Materials**: `fal-ai/patina/material` (~$0.07 a 1K set; normal maps OpenGL like the env set):
+  fieldstone, quoin, thatch, wood shingle, floor boards, plank siding, a timber strip; Patina's
+  plaster was flat yellow, so plaster is the CC0 `plaster_aged`. `make_textures.py` grades them to one
+  palette (`work/kit/tex/`).
+- **Hero pieces, compared** (door, window, chimney; one call each; every raw through proc.py at
+  12k with the bake): Tripo h3.1 ($0.40 with HD texture) won: watertight, the sharpest textures with
+  Meshy's, the closest to the reference, sensible back sides (a window is seen from inside too).
+  Hunyuan3D v3 ($0.525) a close second; Rodin 2.5 ($0.40) clean geometry, wrong colours; Meshy 7.1
+  ($1.20 textured) open edges and a blank board behind its window. Table: `work/kit/NOTES.md`,
+  sheets `work/kit/shots/cmp_*.jpg`. `kit_piece.py` fits each piece (yaw, box, anchor, texture size)
+  and cuts the door's leaf out of the fused door (bisect at the frame's opening, the front sheet with
+  a mirrored back, origin on the hinge).
+- **Four houses** (half-timber with a jetty, an L with a stone ground floor and an outside stair, a
+  thatched stone cottage, a plank barn): 1.2-4.7k structure triangles, 22-89k with the pieces
+  (windows are most of it), 13-17 draw calls (instanced), 0.6-1.5 MB of geometry; the kit's
+  textures are shared. Side by side with the shipped Meshy inn at its render cameras:
+  `work/kit/shots/side_by_side.jpg`. In Babylon (WebGPU, `tools/kit/viewer.html`, `shots.mjs`):
+  `work/kit/shots/babylon_sheet.jpg`; the roof fades by visibility (set `transparencyMode` null:
+  the glTF loader pins OPAQUE) and the storey above is clipped by a plane, with no shell swap.
+- Open: piece LODs (windows), a chimney that reaches a hearth, thatch with real body, merging
+  across houses, KTX2 textures. $11.62 of fal in all (ledger `work/kit/ledger.jsonl`).
+
 ### Procedural trees, plants and the environment texture set (2026-11-20)
 
 - `assets/models/props/env-nature/` (manifest.json: type, files `<type>.gltf`
@@ -603,7 +646,7 @@ from the four hostnames. The speech model is under `underdog-bark-3.0/`
 Mirrored from Hugging Face with the same bytes (SHA-256 checked), each loader
 trying R2 first and Hugging Face as the fallback: `qwen1_5-0_5b-chat-q4_0.gguf`
 (the Oracle's Qwen1.5), `gemma-4-E2B-it.litertlm` (Gemma E2B with sight) and
-`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B), and Raon-1
+`bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (Bonsai 2 27B: since 2026-11-27 only the hidden `bonsai2-27b-v2` uses it; **Bonsai 2.5 27B is not mirrored yet**: it loads from Hugging Face. To mirror, with the maintainer's OK: `prism-ml/Ternary-Bonsai-2.5-27B-GGUF` revision `28a7093cc25bc151cc2b284c5570f12ce343fdcf`, `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf`, 5,993,834,848 bytes, to `bonsai-2.5-27b/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` with `tools/r2-copy/`, then set `mirror` for `27B` in `SIZES` (bonsai2.js); the old object can go once nobody needs the hidden entry. Bonsai 2 9B is not mirrored either), and Raon-1
 nano's 4-bit LiteRT-LM bundle (2026-11-21, `tools/r2-copy/`, 1.82 GB in 78 s,
 sha256 8f8ab92b...) at
 `litert/hf/KRAFTON/Raon-1-nano-litert-lm/resolve/54312d339f6ed417257a166055fcb130a6dbf80e/model.litertlm`

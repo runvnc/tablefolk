@@ -1,0 +1,9 @@
+{"name": "half_timber", "seed": 11, "style": "plaster_timber", "storeys": 2,
+ "grid": ["#######",
+          "#.....#",
+          "#.....#",
+          "#.....#",
+          "#.....#",
+          "###+###"],
+ "jetty": {"sides": ["front"], "d": 0.32}, "roof": "shingle", "pitch": 46, "bay": 2, "braces": "corner",
+ "chimney": "right", "porch": true, "leaded": 0.5}

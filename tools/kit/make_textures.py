@@ -15,7 +15,7 @@ MAT, OUT, ENV = (os.path.join(ROOT, p) for p in ('work/kit/mat', 'work/kit/tex',
 # name: (source, target mean sRGB, tileMeters [u, v], flatten 0..1)
 SETS = {
     'plaster':    ('env:plaster_aged', (206, 190, 158), [3.0, 3.0], .5),
-    'fieldstone': ('fieldstone', (128, 121, 110), [2.2, 2.2], .2),
+    'fieldstone': ('fieldstone', (128, 121, 110), [1.5, 1.5], .2),
     'quoin':      ('quoin', (150, 143, 130), [2.4, 2.4], .2),
     'thatch':     ('thatch', (160, 126, 66), [2.0, 2.0], .3),
     'shingle':    ('shingle', (98, 88, 78), [1.6, 1.6], .3),

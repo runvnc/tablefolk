@@ -1,0 +1,8 @@
+{"name": "barn", "seed": 8, "style": "plank_barn", "storeys": 1, "storeyH": 2.6,
+ "grid": ["##########",
+          "#........#",
+          "#........#",
+          "#........#",
+          "#........#",
+          "###+###+##"],
+ "roof": "shingle", "pitch": 42, "braces": "corner", "chimney": "right", "porch": true, "gableWindow": true}

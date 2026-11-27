@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- Building kit check (2026-11-27): one assembled house (work/kit/houses/<house>.glb) in Babylon on WebGPU,
+     not the game. ?house=half_timber&view=far|door|inside|cut1|cut2&storeyH=2.2
+     window.kit: { ready, stats(), view(name), roof(alpha), upper(hide) } for tools/kit/shots.mjs.
+     Cutaway as the game would do it, with no shell swap: the roof meshes (<name>_roof_*) fade through
+     visibility; the storeys above the player's are clipped by a plane per mesh (onBeforeRender sets
+     scene.clipPlane), so walls show their cut section at the floor line. -->
+<html><head><meta charset="utf-8"><title>Kit house check</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9fb0c4}canvas{width:100%;height:100%}#i{position:fixed;left:8px;top:6px;font:13px monospace;color:#fff;text-shadow:0 1px 2px #000;white-space:pre}</style>
+<script src="/app/vendor/babylon.js"></script><script src="/app/vendor/babylonjs.loaders.min.js"></script></head>
+<body><canvas id="c"></canvas><div id="i"></div><script>
+(async () => {
+  const q = new URLSearchParams(location.search), HOUSE = q.get('house') || 'half_timber', SH = +(q.get('storeyH') || 2.2);
+  const canvas = document.getElementById('c');
+  let engine;
+  if (navigator.gpu && q.get('gl') !== '1') { engine = new BABYLON.WebGPUEngine(canvas, { antialias: true }); await engine.initAsync(); }
+  else engine = new BABYLON.Engine(canvas, true);
+  const scene = new BABYLON.Scene(engine); scene.clearColor = new BABYLON.Color4(.62, .70, .80, 1);
+  const hemi = new BABYLON.HemisphericLight('h', new BABYLON.Vector3(0, 1, 0), scene); hemi.intensity = .55; hemi.groundColor = new BABYLON.Color3(.35, .32, .28);
+  const sun = new BABYLON.DirectionalLight('s', new BABYLON.Vector3(-.5, -1, .6), scene); sun.intensity = 2.6; sun.position = new BABYLON.Vector3(20, 30, -20);
+  const sg = new BABYLON.ShadowGenerator(2048, sun); sg.usePercentageCloserFiltering = true; sg.bias = .002;
+  const ground = BABYLON.MeshBuilder.CreateGround('g', { width: 80, height: 80 }, scene);
+  const gm = new BABYLON.PBRMaterial('gm', scene); gm.albedoColor = new BABYLON.Color3(.3, .3, .25); gm.metallic = 0; gm.roughness = 1; ground.material = gm; ground.receiveShadows = true;
+  const cam = new BABYLON.ArcRotateCamera('c', -2.1, 1.05, 22, new BABYLON.Vector3(0, 2, 0), scene); cam.attachControl(canvas, true); cam.minZ = .05; cam.fov = .8;
+  const t0 = performance.now();
+  const res = await BABYLON.SceneLoader.ImportMeshAsync('', '/work/kit/houses/', HOUSE + '.glb', scene);
+  const loadMs = performance.now() - t0;
+  const meshes = res.meshes.filter(m => m.getTotalVertices?.() > 0);
+  // glTF is right-handed: the loader's __root__ maps glTF (x, z) to Babylon (-x, z): the front (glTF +Z) faces +Z,
+  // and the house's front-left corner (Blender -x, -y) is Babylon (+x, +z)
+  for (const m of meshes) {
+    sg.addShadowCaster(m); m.receiveShadows = true;
+    const mat = m.material; if (mat) { mat.backFaceCulling = false; mat.transparencyMode = null;   // the loader pins OPAQUE; null lets mesh.visibility blend
+      if (mat.albedoTexture) mat.albedoTexture.anisotropicFilteringLevel = 8; }
+  }
+  const roofs = meshes.filter(m => /_roof_/.test(m.name));
+  const bb = res.meshes[0].getHierarchyBoundingVectors(true), H = bb.max.y;
+  const fig = BABYLON.MeshBuilder.CreateCylinder('fig', { diameter: .3, height: 1.3 }, scene); fig.position.set(-1, .65, bb.max.z + .8);
+  const fm = new BABYLON.PBRMaterial('fm', scene); fm.albedoColor = new BABYLON.Color3(.55, .2, .15); fm.metallic = 0; fm.roughness = .8; fig.material = fm; sg.addShadowCaster(fig);
+  let clipY = null; const plane = new BABYLON.Plane(0, 1, 0, 0);
+  for (const m of meshes) {
+    if (!m.onBeforeRenderObservable) continue;   // instances render with their source mesh
+    m.onBeforeRenderObservable.add(() => { if (clipY != null) { plane.d = -clipY; scene.clipPlane = plane; } });
+    m.onAfterRenderObservable.add(() => { scene.clipPlane = null; });
+  }
+  const roof = a => roofs.forEach(m => { m.visibility = a; m.isVisible = a > .01; });
+  const upper = hide => { clipY = hide ? SH - .2 : null; };   // below the floor joists: the room under it opens
+  const V = {
+    far: () => { cam.setTarget(new BABYLON.Vector3(0, H * .4, 0)); cam.alpha = 1.1; cam.beta = 1.05; cam.radius = 24; roof(1); upper(false); },
+    door: () => { cam.setTarget(new BABYLON.Vector3(0, 1.4, bb.max.z)); cam.alpha = 1.4; cam.beta = 1.45; cam.radius = 4.2; roof(1); upper(false); },
+    inside: () => { cam.setTarget(new BABYLON.Vector3(bb.max.x - 1, 1.0, bb.max.z - 1)); cam.alpha = -2.3; cam.beta = 1.42; cam.radius = 3.4; roof(1); upper(false); },
+    cut1: () => { cam.setTarget(new BABYLON.Vector3(0, 1.5, 0)); cam.alpha = 1.1; cam.beta = .85; cam.radius = 18; roof(0); upper(false); },
+    cut2: () => { cam.setTarget(new BABYLON.Vector3(0, 1.0, 0)); cam.alpha = 1.1; cam.beta = .85; cam.radius = 18; roof(0); upper(true); },
+    fade: () => { cam.setTarget(new BABYLON.Vector3(0, 1.5, 0)); cam.alpha = 1.1; cam.beta = .95; cam.radius = 20; roof(.22); upper(false); },
+  };
+  const instr = new BABYLON.SceneInstrumentation(scene); instr.captureFrameTime = true;
+  function stats() {
+    const act = scene.getActiveMeshes().data.slice(0, scene.getActiveMeshes().length);
+    const groups = new Set(); let subs = 0, inst = 0;
+    for (const m of act) { const src = m.sourceMesh || m; if (m.sourceMesh) inst++; for (const s of src.subMeshes || []) groups.add(src.uniqueId + ':' + (s.getMaterial()?.uniqueId)); subs += (m.subMeshes || src.subMeshes || []).length; }
+    const tex = new Set(); scene.textures.forEach(t => t.getSize && tex.add(t));
+    let texBytes = 0; for (const t of tex) { const s = t.getSize(); texBytes += s.width * s.height * 4 * 1.33; }
+    return { engine: engine.isWebGPU ? 'webgpu' : 'webgl', loadMs: Math.round(loadMs), meshes: meshes.length, roofs: roofs.length,
+      activeMeshes: act.length, instances: inst, drawGroups: groups.size, drawCallsEngine: engine._drawCalls?.current ?? null,
+      frameMs: +instr.frameTimeCounter.lastSecAverage.toFixed(2), textures: tex.size, texMB: +(texBytes / 1048576).toFixed(1),
+      tris: meshes.reduce((n, m) => n + (m.getTotalIndices?.() || 0) / 3, 0) };
+  }
+  const far = () => meshes.map(m => [m.name, m.getBoundingInfo().boundingBox.centerWorld.length()]).filter(x => x[1] > 6);
+  window.kit = { ready: true, far, stats, view: v => V[v](), roof, upper, scene };
+  (V[q.get('view') || 'far'])();
+  engine.runRenderLoop(() => { scene.render(); });
+  setInterval(() => { document.getElementById('i').textContent = HOUSE + ' ' + JSON.stringify(stats()); }, 1000);
+  addEventListener('resize', () => engine.resize());
+})();
+</script></body></html>

@@ -1,0 +1,11 @@
+{"name": "l_house", "seed": 5, "style": "stone_timber", "storeys": 2,
+ "grid": ["#######     ",
+          "#.....#     ",
+          "#.....#     ",
+          "#.....######",
+          "#..........#",
+          "#..........#",
+          "#..........#",
+          "###+########"],
+ "roof": "shingle", "pitch": 47, "bay": 2, "braces": "herringbone",
+ "chimney": "left", "dormers": 1, "sign": [7, 1], "upperDoors": [[7, 9]], "stair": {"cell": [7, 9]}}

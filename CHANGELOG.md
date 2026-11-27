@@ -4,6 +4,10 @@ What changed, newest first. Dates are commit dates. Details of each feature
 are in the scenario skill's chapters (users and authors) and the maintainer
 skill (internals); `git log` has every commit.
 
+## 2026-11-27
+
+- **A modular building kit, tried outside the game**: houses assembled from the map's own walls and doors (real wall panels, timber frames, roofs per room) with small detailed doors, windows, chimneys, dormers, signs and stairs made by Tripo; four test houses rendered beside the current inn and checked in the browser. Not wired into the game yet (`tools/kit/`, `work/kit/NOTES.md`).
+
 ## 2026-11-23
 
 - **Inkling 2 Mini in the brain menu, on 16 GB cards**: Inkling 2 Mini (and a smaller copy for 12 GB cards, and SenseNova-Loop-9B for 10 GB) can now be picked as the characters' brain where the graphics card has room; never chosen for you. On a 16 GB RTX 4080 Super it passes 8 of the 10 capability tasks (as it does through a server), takes 12.8 GB with the game, loads in 35-40 s once downloaded (4.5 minutes the first time) and answers in about 5 seconds: a good guided village, but too slow yet for characters deciding everything themselves.
