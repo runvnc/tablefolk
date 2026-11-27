@@ -114,6 +114,26 @@ for (const v of views.split(',')) {
       tablefolk.setCameraView('first'); s.fpYaw = yaw; s.fpPitch = -.02; }, [dx + nx * 1.1, dz + nz * 1.1, Math.atan2(-nx, -nz)]);
     await p.waitForTimeout(1200);
   }
+  // piece-<name>[-<n>][-night]: close on the n-th placed piece of that name (window, window_shut, dormer, sign, stair...)
+  if (v.startsWith('piece-')) {
+    const [, name, n, night] = v.split('-'), r = await p.evaluate(([name, n]) => {
+      const all = [...window.tablefolkBuildings.list(), ...window.tablefolkBuildings.closedList()].flatMap(b => (b.pl?.wall || []).filter(w => w.name === name));
+      const w = all[Math.min(all.length - 1, +n || 0)]; if (!w) return null; const m = w.M.m;
+      const ez = new BABYLON.Vector3(m[8], m[9], m[10]).normalize();
+      return { t: [m[12], m[13], m[14]], ez: [ez.x, ez.y, ez.z], count: all.length };
+    }, [name, n || 0]);
+    console.log('PIECE ' + JSON.stringify(r));
+    if (r) {
+      if (night === 'night' || n === 'night') await p.evaluate(() => window.tablefolk?.setTimeOfDay?.(22));
+      const V = { dormer: [4, .6, 0, 1.1], stair: [9, 1.2, .25, 1.3], chimney: [4, .5, 0, 1.2], sign: [5, -.5, .55, 1.4], porch: [5, -.4, .3, 1.35] }[name] || [2.4, .45, 0, 1.45];
+      // ArcRotate: position = target + r (cos a sin b, cos b, sin a sin b)
+      await free(r.t[0], r.t[1] + V[1], r.t[2], Math.atan2(r.ez[2], r.ez[0]) + V[2], V[3], V[0]);
+    }
+  }
+  if (v === 'nmid' || v === 'ndoor') {   // at 22:00, from the mid distance or at the door
+    await player(dx + nx * 6, dz + nz * 6); await p.evaluate(() => window.tablefolk?.setTimeOfDay?.(22));
+    if (v === 'nmid') await free(cx, top + 2, cz, aOut + .5, 1.1, 13); else await free(dx, top + 1.8, dz, aOut + .25, 1.35, 6.5);
+  }
   if (v === 'night') { await player(dx + nx * 6, dz + nz * 6); await p.evaluate(() => window.tablefolk?.setTimeOfDay?.(22)); await free(cx, top + 2, cz, aOut + .5, 1.12, 18); }
   if (process.env.KIT_JS) console.log('KIT_JS', JSON.stringify(await p.evaluate(process.env.KIT_JS)));
   await shot(v);

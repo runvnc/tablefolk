@@ -512,7 +512,38 @@ loading cover, with the walls).
   values). Seed: the first room's corner and the scenario's seed. The door
   side is the front (jetty, sign); a near-square house with its door on a
   gable gets its ridge turned; the chimney and lean-to keep off a gable with a
-  door (tested against the footprint: a jetty moves the roof's edge).
+  door (tested against the footprint: a jetty moves the roof's edge). Thatch
+  on two storeys only for plaster_timber and stone_cottage (seeded: 30% of the
+  two-storey timber homes, 25% of stone cottages get a second storey); other
+  two-storey styles get shingle unless the place says `roof`.
+- **Signs** (2026-11-27): `assemble` hangs the sign itself (`SP.sign` true):
+  candidates every 1/8 square along each outer run's ground storey, clear of
+  the door frame (.53) or porch (.75 + .3), windows with their shutters open
+  (.65; shut .4), corbels, the stair and an outside chimney, by .12 plus the
+  sign's half thickness; nearest the front door on its wall, else the middle
+  of another outer wall; none if nothing is clear.
+- **Outside stairs** (2026-11-27): the game has one floor (characters stand on
+  `terrainTopY` + the room floor's lift; paths are one grid), so upper floors
+  are not walkable; the stair and upper door are decoration on 40% of
+  two-storey walk-in houses (`STAIR_P`, seeded; not plank barns): on an eave
+  side with no door and no jetty, 6+ squares long, where the three squares
+  it stands on and the three beyond are free ground (`SP.blocked`: walls,
+  rooms, no ground, app.js `isBlocked`) and two or more from a door. The
+  upper door's leaf is shut (the door_leaf piece). The flight's origin is its
+  top step (anchor x max), it runs down along the piece's local -x, which is
+  +A or -A by the wall's side (`sg`); stretched to H / 1.40 (its top step is
+  1.40 up). Its three squares are solid: `tablefolkBuildings.solidAt` in
+  app.js `isBlocked`, so characters walk round it.
+- **Gable windows**: the gable is built in four convex parts round the
+  window's opening (it stood inside the solid gable, only its shutters
+  showed); the king post starts above it, the collar clears it.
+- **Lean-to**: structure (`S`), not roof: it neither fades nor clips, below
+  `H - .25` on two-storey houses (the storey clip); before, its posts and eave
+  beam stood alone when the roof faded.
+- **Pieces on cut walls**: porch, sign, corbels and stair carry the wall square
+  they hang on (`place(..., cell)`, 0.45 back along the normal); while the
+  cutaway cuts that square (`tablefolkCutaway.cutAt`, `cutKey`) they are left
+  out of the instance buffers (`cutPieces`), so nothing floats beside a stub.
 - **Draw calls**: every kit building of the world (walk-in and closed) is one
   set: per material one structure mesh and one roof mesh (`remerge`, again on
   every wall rebuild and closed building added). Per building meshes nearly
@@ -573,10 +604,18 @@ loading cover, with the walls).
   (not in first person: the upper floor is the ceiling); fragments above
   `H - .2` inside its box are discarded, so the upper storey, its floor and
   the stack go and the room shows. `clip('all')` with `tablefolkRoofs.toggle()`.
-- **Windows at night**: `TfKitGlow` on the window piece: neutral mid-grey
-  texels (the Tripo glass; timber is warm, lead dark) glow warm by
-  `TABLEFOLK_NIGHT` (roofs.js `windowGlow` keyed on dark cool texels and
-  missed it; the dormer's slate is neutral too, so not on the dormer).
+- **Windows at night** (2026-11-27): `TfKitGlow` on the window, shut window
+  and dormer pieces, by a per-vertex class (`tfGlow`, `glowClasses` at load:
+  the albedo read back with `readPixels`, each triangle sampled at four
+  points, glowing triangles unwelded): 1 glass: where glass can be (the
+  window's panes face +z at z -.15, behind the open shutters; the dormer's
+  front at z .8-1, below y .75) and not warm (timber is), lit by
+  `TABLEFOLK_NIGHT` where the texel is not lead; 2 a shut window: a thin
+  crack of light between its leaves (a strip 4 cm in front, its UVs on the
+  texture's darkest texel, so it is a dark gap by day; the seams and iron
+  straps are both near black, no texel rule tells them apart). The texel rule
+  alone (neutral mid grey) took the dormer's slate for glass and missed the
+  shutters.
 - **Closed buildings**: app.js `makeCatalogItem` gives an env building model
   type (`ENV_BUILDINGS`) a kit house when `closedWanted(type)`: the thing's
   proxy and collider as before, the house from the model's footprint (odd

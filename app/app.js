@@ -3587,6 +3587,7 @@ const BLOCKING_TYPES=new Set(['wall','rock','boulder','tree','house','campfire',
 function isBlocked(x, z) {
   // painted water/lava can't be walked through
   const pt = paintAt(x, z); if (pt && PAINT_MATERIALS[pt.mat]?.blocks) return true;
+  if (window.tablefolkBuildings?.solidAt?.(x, z)) return true;   // a kit house's outside stair (buildings.js)
   const held = new Set(state.held.values());
   for (const m of state.blocks.concat(state.props)) {
     if (!m || m.isDisposed?.() || held.has(m)) continue;

@@ -148,7 +148,8 @@ generated the first time the player goes in ([things.md](things.md#sections-worl
 `normalizeScenario` keeps `places` (id, kind, centre, bounds, who is there) on
 the result for tools and prompts; characters' prompts say which place they are
 in and which they can walk to (`app/senses.js`). A place may also say what its building looks
-like (`style`, `storeys`, `roof`, `jetty`, ...: [board.md](board.md#houses-and-roofs)).
+like (`style`, `storeys`, `roof`, `jetty`, ...: [board.md](board.md#houses-and-roofs)); in a
+generated world, `"generate": {"houses": {"tavern": {"roof": "thatch"}}}` sets them by place id or kind.
 
 ## Fixed layouts (`freezeLayout`)
 

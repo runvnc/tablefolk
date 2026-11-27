@@ -7,6 +7,7 @@ skill (internals); `git log` has every commit.
 ## 2026-11-27
 
 - **Bigger context windows where memory allows**: Bonsai gets a larger window when the graphics card has room (up to 16k tokens for characters, 32k for the world builder), small llama.cpp models 8k instead of 4k, and building with your own key asks the provider for the model's real window and longest answer instead of fixed limits (brains.md, "Context windows and answer limits").
+- **Kit houses, round 3**: shuttered windows show a crack of light at night and a dormer's window glows (its slate no longer does); gable windows have glass; some two-storey cottages are thatched; signs hang clear of porches, doors and windows; some two-storey houses have an outside stair up to a shut upper door (characters walk round it); porches, signs and brackets go with the wall when the camera cuts it, and a lean-to stays whole when the roof fades. A generated village can say how its houses look: `"generate": {"houses": {"tavern": {"roof": "thatch"}}}`.
 - **Kit houses draw faster**: one shadow for all of them, door leaves drawn together, and the inside of a house is not drawn while its roof is on and its doors are shut (a generated village at high: 241 draw calls instead of 338).
 - 2026-11-27: Bonsai 2.5 27B and Bonsai 2 9B load from the R2 mirror (tablefolk.world and localhost), Hugging Face as fallback.
 - 2026-11-27: Inkling 2 Mini (both files) and SenseNova-Loop-9B load from the R2 mirror too (tablefolk.world and localhost), Hugging Face at the same pinned revisions as fallback.

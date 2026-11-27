@@ -287,5 +287,7 @@ if (tfSeeCam.w > 0.01) {
   function seeStart() { state.scene.onBeforeRenderObservable.add(seeFrame); }
   if (window.TABLEFOLK_SCENE_READY) seeStart(); else addEventListener('tablefolk-scene-ready', seeStart, { once: true });
 
-  window.tablefolkCutaway = { update, half, clear, attach, suspend, seeThrough, get see() { return { on: see.on, cam: see.cam.slice(), head: see.head.slice() }; } };
+  // (buildings.js: a kit piece standing out from a cut wall square goes with it)
+  const cutAt = (x, z) => cut.on === 1 && inArea(x, z);
+  window.tablefolkCutaway = { update, half, clear, attach, suspend, seeThrough, cutAt, get cutKey() { return cut.on === 1 ? cut.x + ',' + cut.z : ''; }, get see() { return { on: see.on, cam: see.cam.slice(), head: see.head.slice() }; } };
 })();

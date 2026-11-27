@@ -149,6 +149,8 @@
     const doors = [...SP.doors].map(k => k.split(',').map(Number));
     const isDoor = c => SP.doors.has(K(c[0], c[1]));
     const updoors = (SP.upperDoors || []).map(c => [c[0], c[1]]);
+    let STAIR = null;   // the outside stair: { run, s } (an upper door one square in from the run's end)
+    const SOLID = [];   // squares the stair stands on (buildings.js solidAt: characters walk round it)
     const isUp = c => updoors.some(u => same(u, c));
     let CHIM = null;
     function openings(run, k) {
@@ -166,6 +168,7 @@
       for (const c of cand) {
         const s = sOf(run, c);
         if (CHIM && run.axis === CHIM[0] && Math.abs(run.fixed - CHIM[1]) < .6 && Math.abs(s - CHIM[2]) < 1.1) continue;
+        if (STAIR && run === STAIR.run && k === 0 && (s - STAIR.s) * STAIR.sg > .2 && (s - STAIR.s) * STAIR.sg < 3.5) continue;
         if (taken.every(t => Math.abs(s - t) >= step - 1e-6) && ops.filter(o => o.kind === 'door').every(o => Math.abs(s - o.s) > 1.2)) { taken.push(s); ops.push({ kind: 'window', s, w: WW, zb: WSILL, zt: WSILL + WH, rc: c }); }
       }
       return ops;
@@ -259,7 +262,10 @@
 
     // ---- pieces placed: [name, origin, normal (outward), scale, part] ----
     const placed = [];
-    const place = (name, loc, nr, scale = [1, 1, 1], part = null, off = null) => placed.push({ name, loc, ang: Math.atan2(nr[1], nr[0]) + Math.PI / 2, scale, part, off });
+    // (cell: the wall square it hangs on, 0.45 back from its origin along the normal; the cutaway hides a piece that
+    // stands out from the wall while that square is cut, buildings.js cutPieces)
+    const place = (name, loc, nr, scale = [1, 1, 1], part = null, off = null, cell = null) => placed.push({ name, loc, ang: Math.atan2(nr[1], nr[0]) + Math.PI / 2, scale, part, off,
+      cell: cell || [Math.round(loc[0] - nr[0] * .45), Math.round(loc[1] - nr[1] * .45)] });
 
     // ---- rectangles of the footprint (main roof, wings) ----
     function rects(cells) {
@@ -344,6 +350,24 @@
       CHIM = ri.along === 'x' ? ['y', (sg > 0 ? ri.x1 : ri.x0) - sg * T / 2, (ri.y0 + ri.y1) / 2] : ['x', (sg > 0 ? ri.y1 : ri.y0) - sg * T / 2, (ri.x0 + ri.x1) / 2];
     }
     const WINS = [], DOORS = [], doorOps = [];
+    // ---- an outside stair to an upper door (2026-11-27): decoration on some two-storey houses (the game has one
+    // floor; the upper door stays shut). On an eave side with no door, not jettied, where the three squares it
+    // stands on and the three beyond are free ground away from doors; it rises along +A to the door
+    if (SP.stairAuto && STOREYS > 1 && SP.blocked && STYLE !== 'plank_barn') {
+      const al = roofInfo[0].along, nearDoor = ([x, z]) => doors.some(([dx, dz]) => Math.abs(dx - x) + Math.abs(dz - z) <= 2);
+      const cands = runs.filter(r => r.kind === 'outer' && r.axis === al && r.cells.length >= 6 && !r.cells.some(isDoor) && jettied(r, 1)[0] === r.fixed)
+        .sort((a, b) => b.cells.length - a.cells.length);
+      for (const run of cands) {
+        // the flight runs down along the piece's local -x, which is rot90(N) turned back: +A or -A by the wall's side
+        const N = frameOf(run, run.fixed)[2], sg = Math.sign(N[1] * (run.axis === 'x' ? 1 : 0) - N[0] * (run.axis === 'y' ? 1 : 0)) || 1;
+        const rc = sg > 0 ? run.cells[1] : run.cells[run.cells.length - 2], s = sOf(run, rc), o = run.sgn;
+        const at_ = (ss, d) => run.axis === 'x' ? [ss, run.fixed + o * d] : [run.fixed + o * d, ss];
+        const sq = [1, 2, 3].map(t => at_(s + sg * t, 1)), beyond = [1, 2, 3].map(t => at_(s + sg * t, 2));
+        if ([...sq, ...beyond].some(([x, z]) => SP.blocked(x, z)) || sq.some(nearDoor)) continue;
+        STAIR = { run, s, rc, sg }; updoors.push(rc); SOLID.push(...sq); break;
+      }
+    }
+    const runOps0 = new Map(), porches = [], corbels = [];   // (the sign keeps clear of these)
 
     // ---- walls by storey (structure and frame) ----
     const PANEL = STYLE === 'plaster_timber' || STYLE === 'stone_timber'
@@ -354,6 +378,7 @@
         const [f, s0, s1] = jettied(run, k), [O, A, N] = frameOf(run, f);
         const e0 = s0 - T / 2, e1 = s1 + T / 2;
         const ops = openings(run, k).sort((a, b) => a.s - b.s);
+        if (k === 0) runOps0.set(run, ops);
         const mo = run.kind === 'outer' ? outer : inner;
         const matf = n => run.kind === 'inner' ? inner : (dot(n, N) > -.5 ? mo : inner);
         const plaster = mo === 'plaster' || inner === 'plaster';
@@ -390,13 +415,14 @@
           const loc = at(O, A, o.s, UPZ, z0 + o.zb);
           if (o.kind === 'door') {
             place('door', loc, N); doorOps.push({ loc, N, A, run, o, k });
-            if (SP.closedDoor) place('door_leaf', loc, N, [1, 1, 1], null, [-.3, .045, 0]);   // a closed building's door: the leaf shut, on its hinge (pieces.json offset)
-            if (run.kind === 'outer') DOORS.push({ loc, N, A, k, o });
-            if (k === 0 && run.kind === 'outer' && SP.porch && !o.upper) place('porch', at(O, A, o.s, N, T / 2 + BT, UPZ, z0 + DH + .55), N);
+            // a closed building's door, and an upper door: the leaf shut, on its hinge (pieces.json offset)
+            if (SP.closedDoor || o.upper) place('door_leaf', loc, N, [1, 1, 1], null, [-.3, .045, 0]);
+            if (run.kind === 'outer') DOORS.push({ loc, N, A, k, o, run });
+            if (k === 0 && run.kind === 'outer' && SP.porch && !o.upper) { place('porch', at(O, A, o.s, N, T / 2 + BT, UPZ, z0 + DH + .55), N); porches.push({ run, s: o.s }); }
           } else {
             let kind = (RNG() < (SP.leaded ?? .6) || k > 0) ? 'window' : 'window_shut';
             if (k === 0 && (STYLE === 'stone_cottage' || STYLE === 'plank_barn')) kind = 'window_shut';
-            place(kind, at(loc, UPZ, -.06), N); WINS.push({ loc, N, A, k, kind });
+            place(kind, at(loc, UPZ, -.06), N); WINS.push({ loc, N, A, k, kind }); o.piece = kind;
           }
         }
         if (framed) {
@@ -447,7 +473,7 @@
             beam(S, at(Ol, A, e0, N, JD + T / 2 + .06, UPZ, z0 - .07), at(Ol, A, e1, N, JD + T / 2 + .06, UPZ, z0 - .07), N, .14, .1);
             const cps = [s0 + .1, s1 - .1];
             for (let i = 0; i < Math.floor(s1 - s0); i++) { const x = Math.round(s0) + .5 + i; if (((x - Math.round(s0) - .5) % 2) < 1e-6 && s0 + .5 < x && x < s1 - .5) cps.push(x); }
-            for (const p of cps) place('corbel', at(Ol, A, p, N, T / 2, UPZ, z0 - .13), N);
+            for (const p of cps) { place('corbel', at(Ol, A, p, N, T / 2, UPZ, z0 - .13), N); corbels.push({ run, s: p }); }
           }
         }
         if (outer === 'fieldstone' && run.kind === 'outer') {   // stone: timber lintels, quoins at the corners
@@ -565,16 +591,32 @@
         if (key in ri.ext) continue;
         const uw = uu - sg * T / 2, o = W(uw, 0, 0);
         const alongV = al === 'x' ? [0, 1, 0] : [1, 0, 0], nG = al === 'x' ? [sg, 0, 0] : [0, sg, 0];
-        prism(B, [[v0, ZT], [v1, ZT], [vc, zr]], o, alongV, nG, T, n => dot(n, nG) > 0 ? GABLE : (GABLE !== 'siding' ? 'plaster' : 'siding'), GABLE);
-        if (look(STOREYS - 1)[2] || STYLE === 'stone_timber') {
+        const gmf = n => dot(n, nG) > 0 ? GABLE : (GABLE !== 'siding' ? 'plaster' : 'siding');
+        const framedG = look(STOREYS - 1)[2] || STYLE === 'stone_timber';
+        const gwin = framedG && first && half > 1.6 && SP.gableWindow !== false && !(SP.chimney && (sg > 0) === (SP.chimney === 'right'));
+        if (!gwin) prism(B, [[v0, ZT], [v1, ZT], [vc, zr]], o, alongV, nG, T, gmf, GABLE);
+        else {
+          // the gable window's opening (2026-11-27: the window stood inside the solid gable, only its shutters showed):
+          // the gable in four convex parts round it (below, left, right, above); the window piece at .85 scale
+          const hw = WW * .85 / 2, h0 = ZT + .3 + .06 * .85, h1 = h0 + WH * .85;
+          const lv = z => v0 + (vc - v0) * (z - ZT) / (zr - ZT), rv = z => v1 - (v1 - vc) * (z - ZT) / (zr - ZT);
+          for (const pts of [[[v0, ZT], [v1, ZT], [rv(h0), h0], [lv(h0), h0]], [[lv(h0), h0], [vc - hw, h0], [vc - hw, h1], [lv(h1), h1]],
+            [[vc + hw, h0], [rv(h0), h0], [rv(h1), h1], [vc + hw, h1]], [[lv(h1), h1], [rv(h1), h1], [vc, zr]]]) prism(B, pts, o, alongV, nG, T, gmf, GABLE);
+        }
+        if (framedG) {
           const dpt = T + 2 * BT, P = (v, z) => at(o, alongV, v, UPZ, z);
           beam(B, P(v0, ZT + .07), P(v1, ZT + .07), nG, .14, dpt);
-          beam(B, P(vc, ZT + .14), P(vc, zr - .05), nG, .16, dpt);
-          const zcol = ZT + (zr - ZT) * .55, hw = half * .45;
+          // with a gable window the king post starts above it, the collar clears it and the struts go (their random
+          // draws kept, so the rest of the house comes out as before)
+          const wtop = ZT + .35 + WH * .85 + .1;
+          beam(B, P(vc, gwin ? wtop : ZT + .14), P(vc, zr - .05), nG, .16, dpt);
+          const zcol = gwin ? Math.max(ZT + (zr - ZT) * .55, wtop + .08) : ZT + (zr - ZT) * .55, hw = Math.min(half * .45, half * (1 - (zcol - ZT) / (zr - ZT)) - .03);
           beam(B, P(vc - hw, zcol), P(vc + hw, zcol), nG, .12, dpt);
-          if (STYLE !== 'plank_barn') { beam(B, P(vc - .08, ZT + (zcol - ZT) * .25), P(vc - hw * .8, ZT + .14), nG, .1, dpt); beam(B, P(vc + .08, ZT + (zcol - ZT) * .25), P(vc + hw * .8, ZT + .14), nG, .1, dpt); }
-          if (first && half > 1.6 && SP.gableWindow !== false && !(SP.chimney && (sg > 0) === (SP.chimney === 'right')))
-            place(STYLE === 'plank_barn' ? 'window_shut' : 'window', P(vc, ZT + .3), nG, [.85, 1, .85], 'roof');
+          if (STYLE !== 'plank_barn') {
+            if (gwin) for (let i = 0; i < 2; i++) { RNG.uniform(0, 1); RNG(); RNG(); }
+            else { beam(B, P(vc - .08, ZT + (zcol - ZT) * .25), P(vc - hw * .8, ZT + .14), nG, .1, dpt); beam(B, P(vc + .08, ZT + (zcol - ZT) * .25), P(vc + hw * .8, ZT + .14), nG, .1, dpt); }
+          }
+          if (gwin) place(STYLE === 'plank_barn' ? 'window_shut' : 'window', P(vc, ZT + .3), nG, [.85, 1, .85], 'roof');
         }
       }
       Object.assign(ri, { zr, vc, U, V, u0, u1, v0, v1, ul, uh });
@@ -627,7 +669,7 @@
     const LIFE = SP.life || {}, want = (k, p) => k in LIFE ? !!LIFE[k] : RNG() < p;
     if (DOORS.length) {
       const { loc: dloc, N: dN, A: dA } = DOORS[0];
-      if (want('porch', .5) && !SP.porch && STYLE !== 'stone_cottage') place('porch', at(dloc, dN, T / 2 + BT, UPZ, DH + .55), dN);
+      if (want('porch', .5) && !SP.porch && STYLE !== 'stone_cottage') { place('porch', at(dloc, dN, T / 2 + BT, UPZ, DH + .55), dN); porches.push({ run: DOORS[0].run, s: DOORS[0].o.s }); }
       if (want('bench', .6)) {
         const sd = RNG.choice([-1, 1]), bc = at(dloc, dA, sd * 1.05, dN, T / 2 + .2);
         box(S, at(bc, UPZ, .42), dA, dN, UPZ, .45, .14, .03, () => 'timber', 'local', .9);
@@ -649,7 +691,9 @@
     if (leanOn && !doorGable(SP.chimney === 'right' ? -1 : 1) && SP.room4lean?.(SP.chimney === 'right' ? -1 : 1, m0)) {
       const sg = SP.chimney === 'right' ? -1 : 1, { U, V, vc: vcen } = m0, uo = sg > 0 ? m0.u1 : m0.u0;
       const WP = (u, v, z) => [U[0] * u + V[0] * v, U[1] * u + V[1] * v, z];
-      const span = Math.min(3.2, (m0.v1 - m0.v0) * .7), dep = 1.5, zh = Math.min(ZT - .15, 2.15), zl = zh - .55;
+      // (below the storey clip of a two-storey house, H - .2: the lean-to is structure, not roof, so it neither fades
+      // nor leaves its posts and eave beam standing alone when the roof fades)
+      const span = Math.min(3.2, (m0.v1 - m0.v0) * .7), dep = 1.5, zh = STOREYS > 1 ? Math.min(2.15, H - .25) : Math.min(ZT - .15, 2.15), zl = zh - .55;
       for (const sv of [-1, 1]) beam(S, WP(uo + sg * dep, vcen + sv * span / 2, 0), WP(uo + sg * dep, vcen + sv * span / 2, zl), U, .14, .14);
       beam(S, WP(uo + sg * dep, vcen - span / 2 - .1, zl - .07), WP(uo + sg * dep, vcen + span / 2 + .1, zl - .07), mul(U, sg), .14, .14);
       const pe = WP(uo + sg * (dep + .25), vcen, zl - .02 - .25 * (zh - zl) / dep), top = WP(uo, vcen, zh);
@@ -669,19 +713,40 @@
       box(B, at(pe, up, L / 2, nr, .025), V, neg(up), nr, span / 2 + .2, L / 2, .025, n => FAR && dot(n, nr) > .3 ? lm : 'floor', 'local');
       if (!FAR) courses(B, pe, up, V, nr, vcen - span / 2 - .2, vcen + span / 2 + .2, L, lm);
     };
-    leanRoof(RF, false);
+    leanRoof(S, false);
     for (let i = 0; i < (SP.dormers || 0); i++) {
       const { U, V } = m0, L = m0.u1 - m0.u0, uu = m0.u0 + L * (i + 1) / (SP.dormers + 1), tn = Math.tan(PITCH);
       const dd = PMETA.dormer.box[1], vv = m0.v0 + .05 + dd, zz = ZT + .05 * tn - .05;
       place('dormer', [U[0] * uu + V[0] * vv, U[1] * uu + V[1] * vv, zz], neg(V), [1, 1, 1], 'roof');
     }
+    // the hanging sign (2026-11-27): on the ground storey of the door's wall (else another outer wall), as near the
+    // door as it can hang clear of the door frame or porch, windows (shutters open), corbels, the stair and the
+    // corners; none if nothing is clear (it hangs .86 out, H - 1.2 .. H - .25 high: level with the windows)
     if (SP.sign) {
-      const run = runs.find(r => r.kind === 'outer' && r.cells.some(c => same(c, SP.sign)));
-      if (run) { const [f] = jettied(run, 0), [O, A, N] = frameOf(run, f); place('sign', at(O, A, sOf(run, SP.sign), N, T / 2 + BT, UPZ, H - .25), N); }
+      const SW = .06, GAP = .12, PGAP = .3, d0 = DOORS.find(d => d.k === 0 && !d.o.upper), best = { sc: 1e9 };
+      for (const run of runs) {
+        if (run.kind !== 'outer') continue;
+        const obs = [];
+        for (const o of runOps0.get(run) || []) obs.push([o.s, o.kind === "door" ? (porches.some(p => p.run === run && Math.abs(p.s - o.s) < .01) ? .75 + PGAP - GAP : .53) : o.piece === 'window' ? .65 : .4]);
+        for (const c of corbels) if (c.run === run) obs.push([c.s, .06]);
+        if (STAIR && STAIR.run === run) obs.push([STAIR.s + STAIR.sg * 1.85, 1.4]);
+        if (CHIM && run.axis === CHIM[0] && Math.abs(run.fixed - CHIM[1]) < .6) obs.push([CHIM[2], .7]);
+        const e0 = run.s0 - T / 2 + .45, e1 = run.s1 + T / 2 - .45, onDoor = d0 && d0.run === run, mid = (run.s0 + run.s1) / 2;
+        for (let s = e0; s <= e1 + 1e-6; s += .125) {
+          if (!obs.every(([os, h]) => Math.abs(s - os) >= h + SW + GAP)) continue;
+          const sc = onDoor ? Math.abs(s - d0.o.s) : 100 + Math.abs(s - mid);
+          if (sc < best.sc) Object.assign(best, { sc, run, s });
+        }
+      }
+      if (best.run) { const [f] = jettied(best.run, 0), [O, A, N] = frameOf(best.run, f); place('sign', at(O, A, best.s, N, T / 2 + BT, UPZ, H - .25), N); }
     }
-    if (SP.stair) {
-      const rc = SP.stair.cell, run = runs.find(r => r.kind === 'outer' && r.cells.some(c => same(c, rc)));
-      if (run) { const [f] = jettied(run, 0), [O, A, N] = frameOf(run, f); place('stair', at(O, A, sOf(run, rc) - .5 - PMETA.stair.box[0], N, T / 2 + .01), N); }
+    if (STAIR) {
+      const [f] = jettied(STAIR.run, 0), [O, A, N] = frameOf(STAIR.run, f);
+      const mid = at(O, A, STAIR.s + STAIR.sg * 1.85);
+      // (the flight's origin is its top end, the anchor's x max: it runs down from beside the door, along local -x;
+      // build_house.py placed the origin a flight's length on, and the stair never met its door. Its top step is
+      // 1.40 up in a 2.2 box: stretched up to the upper floor, H)
+      place('stair', at(O, A, STAIR.s + STAIR.sg * .5, N, T / 2 + .01), N, [1, 1, H / 1.4], null, null, [Math.round(mid[0]), Math.round(mid[1])]);
     }
     // the far roof: slabs instead of courses, coarse thatch; its own random streams (the near one is untouched)
     // (not built in the game: the roof's courses are 2-6k triangles a house, drawn whatever the distance; the
@@ -692,7 +757,7 @@
       for (const ri of ri2) roof(ri, RFF, true, false);
       leanRoof(RFF, true);
     }
-    return { S, RF, RFF, placed, doorOps, ZT, H, STOREYS, zr: Math.max(...roofInfo.map(r => r.zr)), bbox: [XMIN - 1, YMIN - 1, XMAX + 1, YMAX + 1] };
+    return { S, RF, RFF, placed, doorOps, ZT, H, STOREYS, solid: SOLID, zr: Math.max(...roofInfo.map(r => r.zr)), bbox: [XMIN - 1, YMIN - 1, XMAX + 1, YMAX + 1] };
   }
 
   // ---------------------------------------------------------------- what each building is (defaults by its role)
@@ -714,12 +779,16 @@
     else if (/temple|library|guard|barrack|hall|keep/.test(role)) Object.assign(o, { style: 'stone_timber', storeys: 2, roof: R() < .5 ? 'tile' : 'shingle', pitch: 46, braces: 'cross', chimney: R() < .5 ? 'left' : false });
     else if (/shop|bak|alchem|store|market|tailor|apothec/.test(role)) Object.assign(o, { style: 'plaster_timber', storeys: 2, roof: R() < .5 ? 'shingle' : 'tile', pitch: 48, jetty: { d: .3 }, sign: true, chimney: R() < .6 ? 'left' : 'right', braces: 'chevron' });
     else if (role === 'tallhouse') Object.assign(o, { style: 'plaster_timber', storeys: 2, roof: R() < .6 ? 'shingle' : 'tile', pitch: 52, jetty: { d: .3 }, chimney: R() < .5 ? 'left' : 'right', braces: R() < .5 ? 'chevron' : 'cross' });
-    else if (role === 'stonehouse') Object.assign(o, R() < .55 ? { style: 'stone_cottage', storeys: 1, roof: R() < .5 ? 'thatch' : 'shingle', pitch: 50, chimney: 'left' } : { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 46, chimney: 'right', braces: 'herringbone' });
-    else Object.assign(o, pick([
-      [.35, { style: 'plaster_timber', storeys: 2, roof: 'shingle', pitch: 48, jetty: { d: .3 }, chimney: 'right', braces: 'corner' }],
-      [.15, { style: 'plaster_timber', storeys: 1, roof: 'thatch', pitch: 50, chimney: 'left', braces: 'chevron' }],
-      [.3, { style: 'stone_cottage', storeys: 1, roof: 'thatch', pitch: 52, chimney: R() < .5 ? 'left' : 'right' }],
-      [.2, { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 46, chimney: 'left', braces: 'herringbone' }]]));
+    else if (role === 'stonehouse') Object.assign(o, R() < .55 ? { style: 'stone_cottage', storeys: R() < .3 ? 2 : 1, roof: R() < .5 ? 'thatch' : 'shingle', pitch: 50, chimney: 'left' } : { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 46, chimney: 'right', braces: 'herringbone' });
+    else {
+      // (two-storey thatch, 2026-11-27: a timbered or stone cottage with a thatched upper storey; seeded)
+      const thatch2 = R() < .3, stone2 = R() < .25;
+      Object.assign(o, pick([
+        [.35, { style: 'plaster_timber', storeys: 2, roof: thatch2 ? 'thatch' : 'shingle', pitch: thatch2 ? 52 : 48, jetty: { d: .3 }, chimney: 'right', braces: 'corner' }],
+        [.15, { style: 'plaster_timber', storeys: 1, roof: 'thatch', pitch: 50, chimney: 'left', braces: 'chevron' }],
+        [.3, { style: 'stone_cottage', storeys: stone2 ? 2 : 1, roof: 'thatch', pitch: 52, chimney: R() < .5 ? 'left' : 'right' }],
+        [.2, { style: 'stone_timber', storeys: 2, roof: 'tile', pitch: 46, chimney: 'left', braces: 'herringbone' }]]));
+    }
     // the place's own fields (scenario places: style, storeys, jetty, roof, pitch, chimney, porch, sign, dormers, seed)
     if (STYLES.includes(p.style)) o.style = p.style;
     if (p.storeys === 1 || p.storeys === 2) o.storeys = p.storeys;
@@ -731,7 +800,8 @@
     if (typeof p.sign === 'boolean') o.sign = p.sign;
     if (Number.isFinite(+p.dormers)) o.dormers = Math.max(0, Math.min(3, +p.dormers | 0));
     if (o.style === 'stone_cottage' || o.style === 'plank_barn') o.storeys = Math.min(o.storeys || 1, o.style === 'plank_barn' ? 1 : 2);
-    if (o.roof === 'thatch' && o.storeys > 1 && !p.roof) o.roof = 'shingle';
+    // thatch on two storeys suits the cottage styles; a stone-and-timber or plank house of two storeys gets shingles
+    if (o.roof === 'thatch' && o.storeys > 1 && !p.roof && !/^(plaster_timber|stone_cottage)$/.test(o.style)) o.roof = 'shingle';
     if (o.storeys < 2) o.jetty = null;
     if (o.dormers && o.storeys < 2) o.dormers = 0;
     o.seed = Number.isFinite(+p.seed) ? +p.seed | 0 : seed;
@@ -871,9 +941,72 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
     } catch (e) { console.warn('[buildings] fade plugin', e); }
   }
 
-  // ---- windows at dusk and night: the glass (neutral mid-grey texels: timber is warm, lead and iron dark) glows warm by
-  // TABLEFOLK_NIGHT (walls.js setNight, from sky.js)
+  // ---- windows at dusk and night (2026-11-27): each window piece's triangles carry a glow class (vertex attribute
+  // tfGlow, glowClasses at load): 1 glass (window panes, the dormer's window): warm where the texel is not lead;
+  // 2 shutters shut over a lit room: warm in the near-black seams between the boards and round the leaves. By
+  // TABLEFOLK_NIGHT (walls.js setNight, from sky.js). The texel colour alone took the dormer's slate for glass and
+  // missed the shutters.
+  const GLOWS = { window: 1, window_shut: 2, dormer: 1 };
+  async function glowClasses(name, tex, p, n, UV, idx) {
+    await new Promise(r => tex.isReady() ? r() : tex.onLoadObservable.addOnce(() => r()));
+    const { width: TW, height: TH } = tex.getSize(), px = await tex.readPixels();
+    const lin = c => Math.pow(c / 255, 2.2);
+    const texel = (u, v) => { const x = Math.min(TW - 1, Math.max(0, Math.floor((u - Math.floor(u)) * TW))), y = Math.min(TH - 1, Math.max(0, Math.floor((v - Math.floor(v)) * TH))), i = (y * TW + x) * 4; return [lin(px[i]), lin(px[i + 1]), lin(px[i + 2])]; };
+    const nt = idx.length / 3, cls = new Uint8Array(nt);
+    let nglow = 0;
+    for (let t = 0; t < nt; t++) {
+      const a = idx[t * 3], b = idx[t * 3 + 1], c = idx[t * 3 + 2];
+      const cx = (p[a * 3] + p[b * 3] + p[c * 3]) / 3, cy = (p[a * 3 + 1] + p[b * 3 + 1] + p[c * 3 + 1]) / 3, cz = (p[a * 3 + 2] + p[b * 3 + 2] + p[c * 3 + 2]) / 3;
+      const nz = (n[a * 3 + 2] + n[b * 3 + 2] + n[c * 3 + 2]) / 3, ny = (n[a * 3 + 1] + n[b * 3 + 1] + n[c * 3 + 1]) / 3;
+      // where glass can be: the window's opening in its middle plane; the dormer's front, below its roof
+      let where;
+      // (measured on the pieces: the window's panes face +z at z -.15, behind its open shutters; the dormer's face its
+      // front at z .8-1, below y .75; the shutters' outer face is at z 0-.03, their iron straps at y .08-.28 and .72-.9)
+      if (name === 'window') where = Math.abs(cx) < .33 && cz < -.09 && nz > .5 && cy > .03 && cy < .82;
+      else if (name === 'window_shut') where = false;   // (a lit crack is added below instead)
+      else where = nz > .5 && Math.abs(ny) < .5 && cz > .75 && cz < 1.05 && Math.abs(cx) < .32 && cy > .08 && cy < .75;
+      if (!where) continue;
+      // the texel: glass and lead are not warm (timber is); a few samples over the triangle
+      let r = 0, g = 0, bb = 0;
+      for (const [wa, wb, wc] of [[1 / 3, 1 / 3, 1 / 3], [.6, .2, .2], [.2, .6, .2], [.2, .2, .6]]) {
+        const [tr, tg, tb] = texel(UV[a * 2] * wa + UV[b * 2] * wb + UV[c * 2] * wc, UV[a * 2 + 1] * wa + UV[b * 2 + 1] * wb + UV[c * 2 + 1] * wc);
+        r += tr / 4; g += tg / 4; bb += tb / 4;
+      }
+      const L = (r + g + bb) / 3;
+      if (r - bb < (name === 'dormer' ? .055 : .03) && L > .015) { cls[t] = 1; nglow++; }   // glass and lead (timber is warmer)
+    }
+    // shutters shut over a lit room (class 2): a thin crack of light between the two leaves, a strip just in front of
+    // them (the texture's seams and iron straps are both near black, so no texel rule tells them apart); its UVs on
+    // the texture's darkest texel, so by day it is a dark gap
+    const crack = [];
+    if (name === 'window_shut') {
+      let bi = 0, bl = 1e9; for (let i = 0; i < TW * TH * 4; i += 16) { const l = px[i] + px[i + 1] + px[i + 2]; if (l < bl) { bl = l; bi = i / 4; } }
+      const du = ((bi % TW) + .5) / TW, dv = (Math.floor(bi / TW) + .5) / TH, w = .008, z = .04;
+      for (const [x0, x1, y0, y1] of [[-w, w, .12, .8]]) crack.push([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]].map(v => ({ v, uv: [du, dv] })));
+    }
+    // glowing triangles get their own vertices (a frame triangle beside one would take its glow along an edge)
+    const nv = p.length / 3, nx = nglow * 3 + crack.length * 4, P2 = new Float32Array((nv + nx) * 3), N2 = new Float32Array(P2.length), U2 = new Float32Array((nv + nx) * 2), G = new Float32Array(nv + nx);
+    P2.set(p); N2.set(n); U2.set(UV);
+    const I2 = new Uint32Array(idx.length + crack.length * 6);
+    let k = nv;
+    for (let t = 0; t < nt; t++) for (let j = 0; j < 3; j++) {
+      const v = idx[t * 3 + j];
+      if (!cls[t]) { I2[t * 3 + j] = v; continue; }
+      P2.set(p.subarray(v * 3, v * 3 + 3), k * 3); N2.set(n.subarray(v * 3, v * 3 + 3), k * 3); U2.set(UV.subarray(v * 2, v * 2 + 2), k * 2);
+      G[k] = cls[t]; I2[t * 3 + j] = k++;
+    }
+    let ii = idx.length;
+    for (const q of crack) {
+      const k0 = k;
+      for (const { v, uv } of q) { P2.set(v, k * 3); N2.set([0, 0, 1], k * 3); U2.set(uv, k * 2); G[k] = 2; k++; }
+      // (front when ((b - a) x (c - a)) . n < 0, orient's rule: the quad's normal is +z)
+      I2.set([k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2], ii); ii += 6;
+    }
+    (window._tfKitGlow ||= {})[name + ':' + TW] = nglow;   // (tests)
+    return { p: P2, n: N2, uv: U2, idx: I2, glow: G };
+  }
   let Glow = null;
+  const hasGlow = mesh => !!mesh?.isVerticesDataPresent?.('tfGlow');
   function glowPlugin(m) {
     if (!m || m._tfKitGlow) return; m._tfKitGlow = true;
     try {
@@ -882,20 +1015,30 @@ if (tfStoreyY.y > 0.5) { vec3 sp = vPositionW;
         constructor(mat) { super(mat, 'TfKitGlow', 221, { TFKITGLOW: false }); this._enable(true); }
         getClassName() { return 'TfKitGlowPlugin'; }
         isCompatible() { return true; }
-        prepareDefines(d) { d.TFKITGLOW = true; }
-        getUniforms(lang) { const ubo = [{ name: 'tfKitNight', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: 'uniform vec4 tfKitNight;\n' }; }
+        prepareDefines(d, scene, mesh) { d.TFKITGLOW = hasGlow(mesh); }
+        getAttributes(attrs, scene, mesh) { if (hasGlow(mesh)) attrs.push('tfGlow'); }
+        getUniforms(lang) { const ubo = [{ name: 'tfKitNight', size: 4, type: 'vec4' }]; return lang === WGSL ? { ubo } : { ubo, fragment: '#ifdef TFKITGLOW\nuniform vec4 tfKitNight;\n#endif\n' }; }
         bindForSubMesh(ubo) { ubo.updateFloat4('tfKitNight', window.TABLEFOLK_NIGHT || 0, 0, 0, 0); }
         getCustomCode(type, lang) {
-          if (type !== 'fragment') return null;
-          if (lang === WGSL) return { CUSTOM_FRAGMENT_BEFORE_FOG: `
-if (uniforms.tfKitNight.x > 0.01) { let ga = surfaceAlbedo; let gl = dot(ga, vec3f(0.3, 0.59, 0.11));
-  let gk = (1.0 - smoothstep(0.004, 0.02, ga.r - ga.b)) * smoothstep(0.05, 0.1, gl);
+          if (lang === WGSL) {
+            if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: '#ifdef TFKITGLOW\nattribute tfGlow: f32;\nvarying vTfGlow: f32;\n#endif\n', CUSTOM_VERTEX_MAIN_END: '#ifdef TFKITGLOW\nvertexOutputs.vTfGlow = vertexInputs.tfGlow;\n#endif\n' };
+            return { CUSTOM_FRAGMENT_DEFINITIONS: '#ifdef TFKITGLOW\nvarying vTfGlow: f32;\n#endif\n', CUSTOM_FRAGMENT_BEFORE_FOG: `
+#ifdef TFKITGLOW
+if (uniforms.tfKitNight.x > 0.01 && fragmentInputs.vTfGlow > 0.5) { let gl = dot(surfaceAlbedo, vec3f(0.3, 0.59, 0.11));
+  var gk = smoothstep(0.05, 0.1, gl);
+  if (fragmentInputs.vTfGlow > 1.5) { gk = 0.5; }
   finalColor = vec4f(finalColor.rgb + vec3f(1.0, 0.6, 0.27) * gk * uniforms.tfKitNight.x * 1.8, finalColor.a); }
+#endif
 ` };
-          return { CUSTOM_FRAGMENT_BEFORE_FOG: `
-if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3, 0.59, 0.11));
-  float gk = (1.0 - smoothstep(0.004, 0.02, ga.r - ga.b)) * smoothstep(0.05, 0.1, gl);
+          }
+          if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: '#ifdef TFKITGLOW\nattribute float tfGlow;\nvarying float vTfGlow;\n#endif\n', CUSTOM_VERTEX_MAIN_END: '#ifdef TFKITGLOW\nvTfGlow = tfGlow;\n#endif\n' };
+          return { CUSTOM_FRAGMENT_DEFINITIONS: '#ifdef TFKITGLOW\nvarying float vTfGlow;\n#endif\n', CUSTOM_FRAGMENT_BEFORE_FOG: `
+#ifdef TFKITGLOW
+if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0.3, 0.59, 0.11));
+  float gk = smoothstep(0.05, 0.1, gl);
+  if (vTfGlow > 1.5) gk = 0.5;
   finalColor.rgb += vec3(1.0, 0.6, 0.27) * gk * tfKitNight.x * 1.8; }
+#endif
 ` };
         }
       };
@@ -923,17 +1066,23 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
           BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(P[i], P[i + 1], P[i + 2], W, v); p[i] = v.x; p[i + 1] = v.y; p[i + 2] = v.z;
           BABYLON.Vector3.TransformNormalFromFloatsToRef(Nn[i], Nn[i + 1], Nn[i + 2], W, w); w.normalize(); n[i] = w.x; n[i + 1] = w.y; n[i + 2] = w.z;
         }
-        const idx = orient(p, n, I);
+        let idx = orient(p, n, I), pp = p, nn = n, uv = UV, glow = null;
+        // lit windows (2026-11-27): which triangles glow at night, from the texture and where they are in the piece
+        if (GLOWS[name] && m.material?.albedoTexture) {
+          try { ({ p: pp, n: nn, uv, idx, glow } = await glowClasses(name, m.material.albedoTexture, p, n, UV, idx)); }
+          catch (e) { console.warn('[buildings] glow classes', name, e); }
+        }
         // the template (cloned for roof pieces and door leaves) and its thin-instance twin (own geometry: a
         // shared one leaks instance buffers between meshes, rendering.md "Instances and lights")
         const tpl = new BABYLON.Mesh('wall_kitpiece_tpl_' + name + (far ? '_far' : ''), sc), vd = new BABYLON.VertexData();
-        vd.positions = p; vd.normals = n; vd.uvs = UV; vd.indices = idx; vd.applyToMesh(tpl);
+        vd.positions = pp; vd.normals = nn; vd.uvs = uv; vd.indices = idx; vd.applyToMesh(tpl);
+        if (glow) tpl.setVerticesData('tfGlow', glow, false, 1);   // (before the twin copies the geometry)
         // shared by wall and roof pieces; transparencyMode null so a fading roof's chimney blends (the loader pins OPAQUE)
         const mat = m.material; if (mat) { mat.sideOrientation = null; mat.backFaceCulling = false; mat.maxSimultaneousLights = 8; mat.environmentIntensity = .5; mat.transparencyMode = null; window.TABLEFOLK_LOOK?.matte?.(mat); }
         tpl.material = mat; tpl.isPickable = false; tpl.receiveShadows = true; tpl.isVisible = false;
         const inst = tpl.clone('wall_kitpiece_' + name + (far ? '_far' : '')); inst.makeGeometryUnique(); inst.isVisible = false; inst.isPickable = false;
         noGlow(tpl); noGlow(inst);
-        tpl.setVerticesData('tfRid', new Float32Array(p.length / 3), false, 1);   // (after the twin took its own geometry: its tfRid is per instance)
+        tpl.setVerticesData('tfRid', new Float32Array(pp.length / 3), false, 1);   // (after the twin took its own geometry: its tfRid is per instance)
         outp.push({ tpl, inst, material: mat });
       }
       // the materials and textures stay (in the scene: tablefolkGfxGB counts them); the loaded nodes go
@@ -944,9 +1093,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     };
     const p = Promise.all(PIECES.flatMap(n => [one(n, false), one(n, true)])).then(list => {
       const o = {}; PIECES.forEach((n, i) => { o[n] = { near: list[2 * i], far: list[2 * i + 1] }; });
-      // glass glows warm at night (glowPlugin: the Tripo glass is neutral mid grey, not the shells' dark panes; the
-      // dormer's slate is too, so only the window piece)
-      for (const m of [...o.window.near, ...o.window.far]) glowPlugin(m.material);
+      // lit windows glow warm at night (glowPlugin: the triangles glowClasses marked)
+      for (const n of Object.keys(GLOWS)) for (const m of [...o[n].near, ...o[n].far]) glowPlugin(m.material);
       for (const n of PIECES) for (const m of [...o[n].near, ...o[n].far]) { window.tablefolkCutaway?.attach?.(m.material, false, true); if (m.material && !m.material._tfStorey) { m.material._tfStorey = true; storeyPlugin(m.material); fadePlugin(m.material); } }
       o.alive = () => !o.window.near[0].tpl.isDisposed();
       return o;
@@ -982,6 +1130,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
   let list = [];               // the built buildings
   const byKey = new Map();
   let builtTok = 0, lastStats = null, claimedCells = new Set();
+  const solidCells = new Set();   // squares an outside stair stands on (app.js isBlocked asks solidAt)
+  const STAIR_P = .4;             // the share of two-storey walk-in houses with an outside stair
   function meshOf(name, bk, mat, top, rid = null) {
     if (!bk || !bk.I.length) return null;
     const m = new BABYLON.Mesh(name, state.scene), vd = new BABYLON.VertexData(), P = bk.P, N = bk.N, n = P.length;
@@ -1088,7 +1238,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     queueMicrotask(() => { mergeQueued = false; remerge(); });
   }
   function disposeAll() {
-    claimedCells = new Set();
+    claimedCells = new Set(); solidCells.clear();
     fadeData.fill(255); fadeDirty = true;
     list = []; byKey.clear();
   }
@@ -1124,15 +1274,16 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
       const d0 = [...doors].map(k => k.split(',').map(Number))[0];
       let front = '-y';
       if (d0) { const [x, z] = d0; front = !inside.has(x + ',' + (z + 1)) && inside.has(x + ',' + (z - 1)) ? '+y' : !inside.has(x + ',' + (z - 1)) && inside.has(x + ',' + (z + 1)) ? '-y' : !inside.has((x + 1) + ',' + z) && inside.has((x - 1) + ',' + z) ? '+x' : '-x'; }
-      let sign = null;
-      if (o.sign && d0) { const along = front.endsWith('y') ? [1, 0] : [0, 1]; for (const s of [1, -1]) { const c = [d0[0] + along[0] * s, d0[1] + along[1] * s]; if (walls.has(c.join(',')) && !doors.has(c.join(',')) && walls.has([c[0] + along[0] * s, c[1] + along[1] * s].join(','))) { sign = c; break; } } }
-      const blocked = (x, z) => { const k = x + ',' + z; return isW(k) || allInside.has(k) || !window.tablefolk?.hasGroundAt?.(x, z); };
-      const SP = { ...o, H, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign, seed: o.seed, blocked };
+      const blocked = (x, z) => { const k = x + ',' + z; return isW(k) || allInside.has(k) || !window.tablefolk?.hasGroundAt?.(x, z) || (typeof isBlocked === 'function' && isBlocked(x, z)); };
+      // (the sign finds its own place, assemble; some two-storey houses get an outside stair to a shut upper door)
+      const SP = { ...o, H, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, blocked,
+        stairAuto: o.storeys > 1 && rng(o.seed + 101)() < STAIR_P };
       SP.room4lean = freeBeyond(SP);
       let A;
       try { A = assemble(SP); } catch (e) { console.warn('[buildings] assemble', g.key, e); continue; }
       const b = makeBuilding({ key: g.key, rooms: g.rooms, spec: o, sp: SP }, A, top, true);
       for (const k of walls) claimed.add(k);
+      for (const [x, z] of A.solid || []) solidCells.add(x + ',' + z);
       // a door square the kit did not open (at a run's end) keeps walls.js's door
       for (const k of doors) if (!A.doorOps.some(d => d.o.rc[0] + ',' + d.o.rc[1] === k)) claimed.delete(k);
       list.push(b); byKey.set(b.key, b);
@@ -1170,7 +1321,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
       b.pl = { wall: [], roof: [] };
       // roof pieces (chimney top, dormer, gable windows) are thin instances like the rest, carrying the building's
       // index so they fade with its roof
-      for (const pl of b.A.placed) b.pl.wall.push({ name: pl.name, M: pieceMatrix(pl, top), rid: pl.part === 'roof' ? b.rid : 0 });
+      for (const pl of b.A.placed) b.pl.wall.push({ name: pl.name, M: pieceMatrix(pl, top), rid: pl.part === 'roof' ? b.rid : 0, cell: pl.cell && STANDS_OUT.test(pl.name) ? pl.cell[0] + ',' + pl.cell[1] : null });
       // door leaves: the game's hinge and animator (app.js ensureDoorAnimator), the kit's leaf
       if (cell) for (const d of b.A.doorOps) {
         const [x, z] = d.o.rc, w = cell.get(x + ',' + z); if (!w || d.o.upper) continue;
@@ -1192,7 +1343,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
   function refreshInstances() {
     for (const it of instanced) {
       const mats = [], rids = [];
-      for (const b of all()) if (b.pl && b.far === it.far) for (const w of b.pl.wall) if (w.name === it.name) { mats.push(w.M); rids.push(w.rid || 0); }
+      for (const b of all()) if (b.pl && b.far === it.far) for (const w of b.pl.wall) if (w.name === it.name && !(w.cell && cutCells.has(w.cell))) { mats.push(w.M); rids.push(w.rid || 0); }
       // until the world is shown, every piece mesh draws (a zero-size copy in the village if it has none), so its
       // shaders compile under the loading cover (a far piece's first use hitched a frame by ~0.7 s at high)
       if (!mats.length && warm && list.length + closedList.length) { const c = all()[0].center; mats.push(BABYLON.Matrix.Scaling(0, 0, 0).multiply(BABYLON.Matrix.Translation(c[0], all()[0].top + 1, c[1]))); rids.push(0); }
@@ -1220,9 +1371,23 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     }
     if (changed || force) refreshInstances();
   }
+  // pieces that stand out from a wall (porch, sign, corbels, stair) go while the cutaway cuts the square they hang on
+  // (2026-11-27: they floated beside a wall cut to its stub; the cut is per pixel by square, and they reach into the
+  // next one). Checked when the cut moves.
+  const STANDS_OUT = /^(porch|sign|corbel|stair)$/;
+  let cutCells = new Set(), cutSig = '';
+  function cutPieces() {
+    const C = window.tablefolkCutaway, k = C?.cutKey || '';
+    if (k === cutSig) return; cutSig = k;
+    const next = new Set();
+    if (C?.cutAt) for (const b of all()) if (b.pl) for (const w of b.pl.wall) if (w.cell) { const [x, z] = w.cell.split(',').map(Number); if (C.cutAt(x, z)) next.add(w.cell); }
+    const same = next.size === cutCells.size && [...next].every(c => cutCells.has(c));
+    cutCells = next;
+    if (!same) refreshInstances();
+  }
   function frame() {
     if (fadeDirty && fadeTex && !fadeTex.isDisposed?.()) { fadeTex.update(fadeData); fadeDirty = false; }
-    if (list.length || closedList.length) lod(false);
+    if (list.length || closedList.length) { lod(false); if (instanced.length) cutPieces(); }
   }
   function start() { state.scene.onBeforeRenderObservable.add(frame); }
   if (window.TABLEFOLK_SCENE_READY) start(); else addEventListener('tablefolk-scene-ready', start, { once: true });
@@ -1244,9 +1409,8 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     const door = [[cx, cz + hz], [cx + hx, cz], [cx, cz - hz], [cx - hx, cz]][q]; doors.add(door.join(','));
     const front = ['+y', '+x', '-y', '-x'][q], scnSeed = (state.envScn || window.tablefolkScenario?.active?.scn || {}).seed | 0;
     const seed = (Math.imul(cx * 92821 ^ cz * 68917 ^ type.length * 7, 2654435761) ^ scnSeed * 7919) >>> 0 & 0x7fffffff;
-    const o = specFor({ rooms: [] }, seed, role), along = front.endsWith('y') ? [1, 0] : [0, 1];
-    const sign = o.sign ? [door[0] + along[0], door[1] + along[1]] : null;
-    const SP = { ...o, H: 2.2, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign, seed: o.seed, closedDoor: true, blocked: () => true, room4lean: () => false };
+    const o = specFor({ rooms: [] }, seed, role);
+    const SP = { ...o, H: 2.2, walls, doors, inside, jetty: o.jetty ? { d: o.jetty.d, sides: [front] } : null, sign: !!o.sign, seed: o.seed, closedDoor: true, blocked: () => true, room4lean: () => false };
     const top = state.terrainTopY ?? 0, A = assemble(SP);
     const b = makeBuilding({ key: 'closed:' + type + ':' + cx + ',' + cz, rooms: [], spec: { ...o, role }, sp: SP, closed: true }, A, top, false);
     closedList.push(b); mergeClosed();
@@ -1280,6 +1444,7 @@ if (tfKitNight.x > 0.01) { vec3 ga = surfaceAlbedo; float gl = dot(ga, vec3(0.3,
     setAlpha: (key, a) => { const b = byKey.get(key); if (!b || !b.rid || b.rid > 255) return; const v = Math.round(Math.max(0, Math.min(1, a)) * 255); if (fadeData[b.rid * 4] !== v) { fadeData[b.rid * 4] = v; fadeDirty = true; } },
     roofBox: key => byKey.get(key)?.roofBox || null,
     claims: (x, z) => claimedCells.has(x + ',' + z),
+    solidAt: (x, z) => solidCells.size > 0 && solidCells.has(Math.round(x) + ',' + Math.round(z)),
     has: key => byKey.has(key), roomBuilding, clip, list: () => list, stats, lod: () => lod(true), get clipState() { return { ...clipU }; },
   };
 })();

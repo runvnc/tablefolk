@@ -65,6 +65,11 @@ game picks for the player's brain) unless the request asks for it: "rails"
 (the game runs their day), "assisted", "guided" (they pick each activity),
 "free" (they act on their own), or {"preset": "free", "needs": "code"}; a
 character may have its own.
+"mode" (how the game runs): leave it out (living: real time) unless the
+request asks: "adventure" (the world runs by itself; whoever the player
+talks to thinks for themselves until the player walks away) or "turns"
+(nothing moves until the player ends a turn); "modeWhen": {"fight":
+"turns"} switches while the player fights (also "talk", "indoors").
 "threats": [{"kind": "raid" (attacks people) | "rats" (eat the stores) |
 "bandits" (steal gold), "who": body, "count": 2, "when": "night" | "day" |
 "any" | [from, to] hours, "every": days, "from": "edge" or a place id (a
@@ -152,6 +157,14 @@ A. "generate" (every living world): {"kind": "village", "buildings": 6} (3-14;
 [...] makes sure those exist. Put agents, objects and the player in places
 with "in". Village places: square (start), tavern, smithy, shop, temple,
 alchemist, guardhouse, library, stable, house (any; "house 2"), pond, garden.
+Houses (village, farm): "houses": {"tavern": {"roof": "thatch"}, "house 2":
+{"style": "stone_cottage", "storeys": 2}} in "generate" sets how a place's
+building looks (key: a place id or kind; "house" = every house): "style"
+plaster_timber | stone_timber | stone_cottage | plank_barn, "storeys" 1 | 2,
+"roof" shingle | tile | thatch, "pitch" 30-60, "jetty" true | false (upper
+storey over the street), "chimney" "left" | "right" | false, "porch" and
+"sign" true | false, "dormers" 0-3, "seed" (another look). Leave it out to
+let each place's kind choose (a tavern: stone and timber, tiles, a sign).
 Dungeon: entrance (start), throne, lair, treasure, library, shrine, barracks,
 storage, kitchen, prison, crypt, alchemy. Forest: clearing (start), camp,
 ruins, grove, shrine, pond, hut, cave, meadow. Farm: yard (start),

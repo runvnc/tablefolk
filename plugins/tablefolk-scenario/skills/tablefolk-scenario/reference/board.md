@@ -236,8 +236,12 @@ one only seen from outside: the ground floor is where everyone lives), some
 with the upper storey jutting out over the street on carved brackets; a
 chimney stack from a fireplace inside, dormers, a porch over the door, a
 bench, window boxes, a lean-to with a log pile or a workbench, a hanging sign
-on shops and taverns. No two houses come out alike (seeded by where they
-stand). At dusk and night their windows glow warm. A building placed as a
+on shops and taverns (clear of the porch and windows); some timbered and
+stone cottages are thatched over two storeys, and some two-storey houses have
+an outside stair up to an upper door (it stays shut: characters walk round
+the stair). No two houses come out alike (seeded by where they stand). At
+dusk and night their windows glow warm, and shuttered ones show a crack of
+light. A building placed as a
 thing (a village's inn, stone or tall house, mill, barracks) is built the
 same way, with its door shut. Not in dark worlds, dungeons, or a world that
 is all one building (the roof would be the whole sky). `"roofs": false` turns
@@ -265,6 +269,16 @@ per place: a scenario's `places` entry (with its bounds `x0`, `x1`, `z0`,
 ```json
 "places": [{ "id": "bakery", "kind": "shop", "x0": 3, "x1": 6, "z0": -4, "z1": -2,
              "style": "plaster_timber", "storeys": 2, "roof": "tile", "jetty": true, "sign": true }]
+```
+
+A generated world (`"generate"`, [generated.md](generated.md)) has no bounds to
+write: give the same fields under `"houses"` in `"generate"`, keyed by a
+place's id or kind (`"house"` is every house, `"house 2"` one of them):
+
+```json
+"generate": { "kind": "village", "places": ["tavern", "shop"],
+              "houses": { "tavern": { "roof": "thatch", "storeys": 1 },
+                          "house": { "style": "stone_cottage" } } }
 ```
 
 The roof of the house the player is in (or whose doorway it stands in)

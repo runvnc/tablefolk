@@ -845,6 +845,13 @@
       objects: [...gen.objects.filter(o => !(o.type === 'light' && centres.includes([o.x, o.z] + ''))), ...out] };
   }
 
+  // a generated place's house (buildings.js): "houses" by the place's id ("house 2"), else its kind ("house": every one)
+  const KIT_FIELDS = ['style', 'storeys', 'roof', 'pitch', 'jetty', 'chimney', 'porch', 'sign', 'dormers', 'seed'];
+  function houseOf(houses, p) {
+    if (!houses || typeof houses !== 'object') return {};
+    const h = houses[p.id] || houses[p.kind];
+    return h && typeof h === 'object' ? h : {};
+  }
   function applyToScenario(scn) {
     const opts = scn.generate || {};
     const kindName = String(opts.kind || opts.type || 'dungeon').toLowerCase();
@@ -922,8 +929,9 @@
     return {
       scenario: { ...scn, grid: scn.grid?.length ? scn.grid : gen.grid, legend: { ...gen.legend, ...(scn.legend || {}) }, size: scn.size || gen.size,
         objects: [...gen.objects, ...objects], agents, player, lighting: scn.lighting ?? gen.lighting, dark: scn.dark ?? gen.dark, walls: scn.walls ?? (make === forest || make === cave ? 'stone' : 'stone'), wallHeight: scn.wallHeight ?? 2, base: scn.base ?? 'plain' },
-      // (a place's building for the kit, buildings.js: kept when a generator or a frozen layout set it)
-      places: gen.places.map(p => ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, ...(p.shell ? { shell: p.shell } : {}), ...Object.fromEntries(['style', 'storeys', 'roof', 'pitch', 'jetty', 'chimney', 'porch', 'sign', 'dormers', 'seed'].filter(k => p[k] != null).map(k => [k, p[k]])), who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) })),
+      // (a place's building for the kit, buildings.js: kept when a generator or a frozen layout set it, else from
+      // "generate": {"houses": {"<place id or kind>": {style, roof, ...}}}; scenario.js kitPlace drops bad values)
+      places: gen.places.map(p => { const h = houseOf(opts.houses, p); return ({ id: p.id, kind: p.kind, center: p.center, x0: p.x0, x1: p.x1, z0: p.z0, z1: p.z1, ...(p.shell ? { shell: p.shell } : {}), ...Object.fromEntries(KIT_FIELDS.filter(k => (p[k] ?? h[k]) != null).map(k => [k, p[k] ?? h[k]])), who: agents.filter(a => placed[a.id] === p.id).map(a => a.id) }); }),
       warnings,
     };
   }

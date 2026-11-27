@@ -271,13 +271,16 @@ def rects(cells):
     rem = set(cells)
     while rem:
         best = None
-        for (r, c) in rem:
+        # through the cells still to cover (2026-11-27, as app/buildings.js): scanning the whole footprint, a wing on
+        # the -x / -z side of the main block grew into it, found no rectangle and got no roof
+        for (r, c) in sorted(rem):
             for r1 in range(r, R):
-                if (r1, c) not in cells: break
+                if (r1, c) not in rem: break
                 c1 = c
-                while all((rr, c1 + 1) in cells for rr in range(r, r1 + 1)): c1 += 1
+                while all((rr, c1 + 1) in rem for rr in range(r, r1 + 1)): c1 += 1
                 a_ = (r1 - r + 1) * (c1 - c + 1)
                 if all((rr, cc) in rem for rr in range(r, r1 + 1) for cc in (c, c1)) and (not best or a_ > best[0]): best = (a_, r, c, r1, c1)
+        if not best: break
         _, r0, c0, r1, c1 = best
         # grow by one cell into neighbours (the shared wall line) where the whole edge is in the footprint
         if res:
@@ -733,8 +736,9 @@ if SPEC.get('stair'):
     f, s0, s1 = jettied(run, 0); O, A, N = frame_of(run, f)
     sgn = st_.get('dir', -1)
     # the top step at the upper door, the flight running along the wall
-    L = PMETA.get('stair', {}).get('box', [2.7])[0]   # the flight spans +x from its origin, the top step at +x
-    place('stair', O + A * (s_of(run, rc) - .5 - L) + N * (T / 2 + .01), N)
+    # the flight's origin (kit_piece.py anchor "stair": x max) is its top step; it runs down along -x from there
+    # (2026-11-27, as app/buildings.js: placed a flight's length further on, the stair never met its door)
+    place('stair', O + A * (s_of(run, rc) - .5) + N * (T / 2 + .01), N)
 
 # ---- objects per material ----
 def make_mat(m):
