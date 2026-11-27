@@ -98,6 +98,11 @@ t('rendering: inkling raw prompt', () => {
   assert.ok(p.startsWith('<|message_system|>tool_declare<|content_xml|>[')); assert.match(p, /<\|message_model\|>preview<\|content_invoke_tool_json\|>\{"name":"preview","args":\{\}\}<\|end_message\|><\|content_model_end_sampling\|>/);
   assert.match(p, /<\|message_tool\|>preview<\|content_text\|>R<\|end_message\|>/); assert.ok(p.endsWith('<|message_model|>'));
 });
+t('rendering: inkling keeps the model own words (prefix cache)', () => {
+  const raw = 'preview<|content_invoke_tool_json|>{"name": "preview", "args": {}}';
+  const p = A.inklingPrompt([{ role: 'user', content: 'build' }, { role: 'assistant', content: '', raw, tool_calls: [{ id: 'c1', function: { name: 'preview', arguments: '{}' } }] }, { role: 'tool', tool_call_id: 'c1', content: 'R' }], TOOLS);
+  assert.ok(p.includes('<|message_model|>' + raw + '<|end_message|><|content_model_end_sampling|><|message_tool|>preview<|content_text|>R'));
+});
 t('mode defaults per model', () => {
   assert.equal(A.canAgent('bonsai2-27b').ok, true); assert.equal(A.canAgent('inkling2-mini-wllama').ok, true); assert.equal(A.canAgent('sensenova-loop-9b-wllama').ok, true);
   assert.equal(A.canAgent('gemma4-e2b-litert').ok, false); assert.equal(A.canAgent('raon1-nano-litert').ok, false);

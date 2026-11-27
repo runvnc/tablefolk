@@ -161,6 +161,14 @@
       if (m.role === 'system') { p += '<|message_system|><|content_text|>' + m.content + '<|end_message|>'; continue; }
       if (m.role === 'user') { p += '<|message_user|><|content_text|>' + m.content + '<|end_message|>'; continue; }
       if (m.role === 'tool') { p += '<|message_tool|>' + (names[m.tool_call_id] || '') + '<|content_text|>' + m.content + '<|end_message|>'; continue; }
+      // the model's own words as it wrote them (raw): the prompt then starts with what llama.cpp
+      // has cached, so the next step reads only what is new (Inkling's recurrent layers keep no
+      // checkpoints here: a prompt that differs anywhere is read again whole, about 70 s)
+      if (m.role === 'assistant' && m.raw != null && (m.tool_calls || []).length <= 1) {
+        (m.tool_calls || []).forEach(tc => { names[tc.id] = tc.function.name; });
+        p += '<|message_model|>' + m.raw + '<|end_message|><|content_model_end_sampling|>';
+        continue;
+      }
       if (m.role === 'assistant') {
         if ((m.content || '').trim()) p += '<|message_model|><|content_text|>' + m.content.trim() + '<|end_message|>';
         for (const tc of m.tool_calls || []) {
@@ -274,7 +282,7 @@
         throw e;
       }
       S.tokens += (r.usage?.prompt_tokens || 0) + (r.usage?.completion_tokens || 0); if (r.cost) S.cost += +r.cost || 0;
-      S.messages.push({ role: 'assistant', content: r.text || '', ...(r.calls.length ? { tool_calls: r.calls.map(c => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })) } : {}) });
+      S.messages.push({ role: 'assistant', content: r.text || '', ...(B.format === 'inkling' && r.raw != null ? { raw: r.raw } : {}), ...(r.calls.length ? { tool_calls: r.calls.map(c => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })) } : {}) });
       if (!r.calls.length) {
         if (++nudges > 2) { S.log.push('the model stopped calling tools'); break; }
         if (r.text) S.log.push('the model: ' + r.text.slice(0, 160));

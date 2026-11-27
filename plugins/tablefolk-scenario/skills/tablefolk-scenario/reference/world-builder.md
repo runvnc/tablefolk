@@ -108,7 +108,10 @@ step. The choice is remembered per model in this browser. A model the
 provider refuses tools for falls back to one answer by itself (the progress
 line says so). Measured 2026-11-27 with DeepSeek V4.1 Flash on OpenRouter: a
 river village with five people in 18 steps, 22 s, $0.014; "make the tavern
-bigger..." in 5 steps, 5 s, $0.002.
+bigger..." in 5 steps, 5 s, $0.002. Bonsai 2.5 27B in Chrome on a rented RTX
+4080 Super: the same village in 15 steps, 78 s after the model loaded; the
+same change in 7 steps, 23 s. Both worlds load and play. Inkling 2 Mini
+works but is slow in agent mode for now (over a minute a step).
 
 The tools (`server/worldgen-tools.js`): `get_scenario`, `get_catalog`
 (bodies, objects, jobs, places, building fields, commands, goals),

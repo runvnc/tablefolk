@@ -156,7 +156,24 @@ is the scenario skill's `server.md`; this is how it works inside.
   `tablefolk.worldgen.agent`. Tests: `node tools/worldgen-tools-test.mjs`
   (the tools, the parsers with recorded call texts, the renderers,
   compaction); `tools/browser-test/agent-world-test.mjs` (a real model via
-  OpenRouter: build, one follow-up, both saved for `scenario-smoke.mjs`).
+  OpenRouter: build, one follow-up, both saved for `scenario-smoke.mjs`;
+  `WHERE=browser AGENT_MODEL=bonsai2-27b` for a model in the test Chrome).
+  Bonsai's engine (webml-community's) reads Qwen's `<tool_call>` blocks
+  itself and sends them as `tool_call` events, not text: `generateBonsai2`
+  writes them back as the template's text (found on the first run: empty
+  answers). Measured 2026-11-27, rented RTX 4080 Super (Chrome 158): Bonsai
+  2.5 27B built the river village in 15 steps, 78 s after loading (about 58
+  tokens/s writing, 6 s to read a 2,000-token prompt); the tavern change in 7
+  steps, 23 s; DeepSeek V4.1 Flash via OpenRouter: 18 steps, 22 s, $0.014;
+  5 steps, $0.002. All four worlds pass `scenario-smoke.mjs`. Inkling 2 Mini
+  (the smaller file) on the same box: its calls parse and work (a village
+  map by step 3), but every step read the whole prompt again (about 70 s
+  a step: its recurrent layers keep no cache checkpoints, and the re-rendered
+  turn differed from what it wrote); stopped after 4 steps. Since then the
+  model's own words are kept in the history (`raw`, `inklingPrompt`) so the
+  prompt extends the cached one: not measured yet. SenseNova-Loop-9B was not
+  run (same engine and likely the same cost per step). The box: about 45
+  minutes, under $0.20, destroyed and checked by API.
 - Every result is saved in `generated/` (`recent` feeds the admin page).
 - **Sections in the builder** (`app/builder.js`, `app/map-editor.js`): the
   section being edited is `secPath` (subworlds keys down from the top);
