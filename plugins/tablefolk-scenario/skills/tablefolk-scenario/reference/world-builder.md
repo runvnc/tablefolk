@@ -54,15 +54,17 @@ double-height.
   **Size** (every way of building; `?size=large|huge`): a generated map
   made bigger (large 51 by 39, huge 63 by 49; normal leaves it to the
   model). The map editor's generate panel takes any `[cols, rows]`.
-  **World** (`?sections=2..5&shape=levels|region|auto`; on this server
-  and in the browser): one map, or a world **in sections**: several maps
+  **World** (`?sections=2..5&shape=levels|region|auto`; on this server,
+  in the browser, and with your own key in agent mode): one map, or a world **in sections**: several maps
   joined by links ([things.md](things.md#sections-worlds-bigger-than-one-map-subworlds-links)).
   **Shape**: *levels* (dungeon levels joined by stairs), *a region* (a hub
   such as a village with the forest, farmland or cave around it, joined by
   edges) or *let the builder decide*. The model plans the whole world
   first, then each section is built as its own map; progress names the
   section being built, and **■ Stop** on the progress card ends the build.
-  With your own key the builder makes one map for now (a note says so).
+  In agent mode the agent plans the sections with its `plan_sections` tool
+  and builds each in turn (below); with your own key and agent mode off the
+  builder makes one map (a note says so).
   Step by step writes it in small steps
   (`app/worldgen-browser.js`): a plan (text), the map (a little JSON; code
   builds it with `procgen.js`, or layout lines outdoors), a review of the map
@@ -88,7 +90,8 @@ double-height.
   `deepseek/deepseek-v4.1-flash-1017`; `gpt-6-luna` on OpenAI takes 6-14 s).
   Replies may run to 17000 tokens for models that think at length.
 
-**Agent mode** (the form's *Agent mode* box; `?agent=1|0`): the model
+**Agent mode** (the form's *Agent mode* box; `?agent=1|0`; with your own
+key, a model in this browser, or this server's own model, cloud or local): the model
 builds the world with tools instead of writing it as one answer. It sets the
 map (a generated village, dungeon, forest, farm or cave, a drawn room, or
 layout lines), the title, intro, time and threats, adds each character, the
@@ -101,7 +104,9 @@ same session: "make the tavern bigger" changes only that, with the same
 model and what it did before (old steps are summarised when its memory
 fills). On by default for models that can call tools: with your own key
 when the provider says the model takes tools (OpenRouter's list; a server's
-`/props`), and in this browser for Bonsai 2.5 27B, Bonsai 2 9B, Inkling 2
+`/props`), for this server's cloud model when OpenRouter's list says so
+(OpenAI's models always; the local model server does not say, so the box is
+there but off), and in this browser for Bonsai 2.5 27B, Bonsai 2 9B, Inkling 2
 Mini and SenseNova-Loop-9B (each writes calls in its own format). Off for
 Gemma 4 and Raon (the box is greyed with the reason): they build step by
 step. The choice is remembered per model in this browser. A model the
@@ -113,11 +118,49 @@ bigger..." in 5 steps, 5 s, $0.002. Bonsai 2.5 27B in Chrome on a rented RTX
 same change in 7 steps, 23 s. Both worlds load and play. Inkling 2 Mini
 works but is slow in agent mode for now (over a minute a step).
 
+**Worlds in sections in agent mode**: when the request has distinct areas
+(a village, the forest beyond it, a cave under the hill; dungeon levels; "a
+big world"), or the form asks for sections, the agent first calls
+`plan_sections`: 2-5 sections, the first the top map where the player
+starts, each with its kind (village, forest, farm, cave, mine, dungeon,
+castle, crypt), who lives there and how the sections connect. The planner's
+own rules (the same as the server's multi-section build) set each map and
+place the ways between them: a road off an edge between open maps, a cave
+mouth or stairs down to what lies underground, a far place for a door; an
+edge into a map with no walkable rim on that side becomes a cave mouth. The
+agent then builds each section in turn with the usual tools and a
+`"section"` (the key, or `"top"`). Character ids are unique in the whole
+world; the goal, intro, time and threats belong to the top. *validate*,
+*preview* and *finish* look at the whole world: every section's own checks,
+each way's ends, every section reachable from the start, and what the goal
+needs (a character, a thing) in a reachable section; the way back through
+each link is made by the game. Measured 2026-11-27 with DeepSeek V4.1 Flash
+as this server's cloud model: a river village, the old wood and a wolf cave
+(3 sections, 10 characters, 2 ways) in 75 s and $0.012; "add a hunter in
+the old wood who trades pelts, and a chest with a silver key in the wolf
+cave" in 7 steps, $0.002; one review round in 7 steps, $0.003.
+
+**When the model goes round in circles**: the same call with the same
+arguments three times, a change repeated on a world that has not changed
+(answered "already done" without running), the map set four times running,
+one tool failing three times running, or six steps without a change: the
+agent is told what it is doing, what the world looks like now and what to
+do next. The third time, or when the model stops calling tools, fails
+mid-run, or reaches the step or token cap, the run ends and what was built
+is finished: code completes what is missing (a map from the request's
+words, a title, a plain personality, a keeper for an empty world, a way to
+an unreachable section) and drops what cannot work (an unknown command, a
+goal nothing can reach, a lock with no key), and the progress line and the
+summary say so. A model that built nothing ends with a plain message (or,
+when its tools were refused, writes the world as one answer).
+
 The tools (`server/worldgen-tools.js`): `get_scenario`, `get_catalog`
 (bodies, objects, jobs, places, building fields, commands, goals),
 `set_meta`, `set_map`, `place` (add, remove, style a building), `character`,
-`object`, `event`, `section` (worlds in several maps), `validate`, `preview`,
-`undo`, `finish`. Each change is checked as it is made (ids, bodies, jobs,
+`object`, `event`, `plan_sections` (a world in sections, planned at once),
+`section` (one section: add, link from any section, remove), `plan` (walls
+and marked work by relation), `validate`, `preview`, `undo`, `finish`; the
+map tools take `"section"` in a world of sections. Each change is checked as it is made (ids, bodies, jobs,
 object types, places); a refused change goes back to the model with the
 reason. Your own key: the answer may use what the model's window leaves
 (the provider reports the window and the longest answer; a server that
@@ -187,10 +230,17 @@ When a world is ready the builder stays on the page (`app/builder.js`):
   section shown: it gets that map (without the sections inside it) and a
   few lines about the whole world, and its answer goes back in that place;
   the other sections are never sent. **Look it over** works the same way,
-  on the section shown.
+  on the section shown. In agent mode the agent gets the whole world and
+  reaches any section with its tools.
 - **Look it over and improve** (beside Ask; on the build form, **Look it
-  over**: 2, 3 or 5 rounds, `?improve=N`, for every way of building except
-  in this browser): an agent. Each round the map editor draws the whole map
+  over**: 2, 3 or 5 rounds, `?improve=N`, for every way of building; in
+  this browser in agent mode only): an agent. In agent mode each round is
+  the building agent's own: it calls *preview* and *validate* on the whole
+  world, looks for empty buildings, characters with no reason to be there,
+  a goal nothing points to, a pressure that never reaches anyone, a section
+  nobody needs, fixes what it finds with its tools and finishes with
+  "GOOD:" (the rounds stop) or "CHANGED:" and what it changed; the log
+  shows the summary and the changes. Otherwise: Each round the map editor draws the whole map
   at once (2D tiles, coordinates along the edges) and writes it out as text
   (a glyph map, the rooms, who and what stands where); the model reviews it
   with the scenario (the picture goes along to models that can see; others

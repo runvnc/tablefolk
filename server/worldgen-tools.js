@@ -345,6 +345,9 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
           const kind = String(args.kind || '').toLowerCase();
           if (!PLACES[kind]) return no(`kind: one of ${Object.keys(PLACES).join(', ')}`);
           const g = { kind };
+          // the same kind again without places: the places and building styles asked for so far stay
+          const prev = kindOf(scenario) === kind ? scenario.generate : null, keep = prev && !args.places && (prev.places || prev.houses);
+          if (keep) { if (prev.places) g.places = [...prev.places]; if (prev.houses && !args.houses) g.houses = clone(prev.houses); }
           if (args.buildings != null) { if (!(args.buildings >= 3 && args.buildings <= 14)) return no('buildings: 3-14'); g.buildings = +args.buildings; }
           if (args.rooms != null) { if (!(args.rooms >= 3 && args.rooms <= 16)) return no('rooms: 3-16'); g.rooms = +args.rooms; }
           if (args.style) { if (!MAP_STYLES[kind].includes(args.style)) return no(`style for a ${kind}: ${MAP_STYLES[kind].join(', ') || 'none'}`); g.style = args.style; }
@@ -355,7 +358,7 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
           s.generate = g; delete s.size;
           if (s.legend && !args.legend) delete s.legend;
           const b = built(s); if (b?.error) return no('the map could not be made: ' + b.error);
-          return ok({ places: b.places.map(p => p.id), warnings: b.warnings, ...(kind === 'village' ? { note: 'a building nobody lives or works in, and with nothing put in it, stays a closed building: give places to characters (in, home, workplace) and things (in) to open them' } : {}) }, `made a ${kind} map${g.buildings ? ' with ' + g.buildings + ' buildings' : g.rooms ? ' with ' + g.rooms + ' rooms' : ''}: ${b.places.map(p => p.id).join(', ')}`);
+          return ok({ places: b.places.map(p => p.id), warnings: b.warnings, ...(keep ? { kept: 'the places and building styles asked for before (same kind of map)' } : {}), ...(kind === 'village' ? { note: 'a building nobody lives or works in, and with nothing put in it, stays a closed building: give places to characters (in, home, workplace) and things (in) to open them' } : {}) }, `made a ${kind} map${g.buildings ? ' with ' + g.buildings + ' buildings' : g.rooms ? ' with ' + g.rooms + ' rooms' : ''}: ${b.places.map(p => p.id).join(', ')}`);
         }
         if (m === 'grid') {
           const g = args.grid;

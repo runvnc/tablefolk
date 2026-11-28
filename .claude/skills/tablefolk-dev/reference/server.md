@@ -174,6 +174,71 @@ is the scenario skill's `server.md`; this is how it works inside.
   prompt extends the cached one: not measured yet. SenseNova-Loop-9B was not
   run (same engine and likely the same cost per step). The box: about 45
   minutes, under $0.20, destroyed and checked by API.
+- **Agent mode, 2026-11-27 later** (sections, the server's own model, review,
+  circles):
+  - *Worlds in sections*: `plan_sections` (worldgen-tools.js) runs the
+    multi-section planner's own code (`app/worldgen-plan.js`: `readPlan`
+    for keys, kinds, ids and the missing links, `GEN` for each map,
+    `assemble` for where each way goes, `checkWorld` for its repairs), on
+    the session's scenario: the top keeps a map it already has, sections
+    that exist are kept, links to planned sections are replaced. The map
+    tools take `section`: `runTool` runs the same tool on that subworld
+    (`ctx.section`, `ctx.world`) and puts it back (`sectionKey` reads a
+    key, a title, "top" or the first section's kind); `set_meta` refuses
+    `WORLD_FIELDS` there; `character add` checks ids across the world
+    (`idsElsewhere`). `section link` takes `from` (any section) and runs
+    `checkWorld` with the link added: a new problem refuses it, a repair
+    (an edge into a cave becomes a cave mouth) is reported. With subworlds,
+    `validate`, `preview` and `finish` go through `worldCheck`: ids across
+    sections, `checkScenario` on the top (`otherIds`: goal ids in other
+    sections count; `world`: the player_has-in-a-chest check is
+    `checkWorld`'s) with the living-world rules for a new world, each
+    section with `{section: true}` (no living rules: the game runs them on
+    the top's clock), then `checkWorld`; the link code is the whole world.
+    `agentUser(prompt, {sections, shape})` asks for `plan_sections` when the
+    form asks for sections; the system message says when to use it.
+  - *The server's own model* (`where` cloud or server): the loop still runs
+    in the page; `serverBackend` posts each step to `POST
+    /api/worldgen/step?where=&model=` (`handleWorldgenStep` in generate.js),
+    which drops the page's system messages, puts `agentSystem` and `TOOLS`
+    in front (no general proxy: only user, assistant and tool turns pass),
+    streams `progress {text, thought, calls}` then `done {text, tool_calls,
+    usage}` as server-sent events; 300 steps an hour for a visitor
+    (`overLimit 'agentstep'`), the same guest rules as `/api/generate`
+    (`pickEndpoint`). Bun only: the Worker runs no AI. `/api/worldgen/options`
+    gives each cloud model `tools` and `context` (`cloudInfo`: OpenRouter's
+    public list, kept an hour; OpenAI true; the local server null), and
+    `canAgent('cloud'|'server', info)` returns `dflt` (on by default only
+    when tools is true). A first step refused for its tools, or a model that
+    never calls one (`failed {noTools}`), falls back to the one-answer
+    EventSource run (the page's `runJSON`).
+  - *Review rounds in agent mode* (`builder.js reviewRound`): `reviseAI(''
+    , say, {review: {round, rounds, history}})` goes to the same session as
+    a `review` request (`reviewUser`: preview, validate, what to look for,
+    fix, finish with GOOD:/CHANGED:); the round is good when the summary
+    says GOOD or the world did not change. In agent mode `reviseAI` sends
+    the whole world (sections included) and takes the whole answer back.
+  - *Circles* (worldgen-agent.js `watch`, `recovery`, `nextStep`): per call
+    `{sig, name, ok}`; a change call identical to the last one on an
+    unchanged world (`S.version`) is answered "already done" without
+    running; the patterns listed in world-builder.md add a user message with
+    the reason, `worldNow` and `nextStep`; the third ends the run. Every end
+    but a finish (stop, caps, circles, no calls, a model error after
+    something was built) posts `finish` with `auto: true`: `autoComplete`
+    (map from `kindFrom(prompt)`, title, ids, bodies, jobs, personalities,
+    a keeper) and up to four rounds of `autoFix` by the problems' own words;
+    `done.auto` lists what code did, `emit('done', {ended})` says why. A run
+    that built nothing fails with the model's last words. `set_map` with the
+    same kind and no places keeps the places and styles asked for before
+    (DeepSeek added places, then set the map again and lost them).
+  - Tests: `node tools/worldgen-tools-test.mjs` (52: sections, links both
+    ways, world finish and auto, the loop with a scripted model through the
+    real handlers: set_map over and over, a tool failing, no calls, a model
+    error, a world in sections, a review round); `node
+    tools/agent-node-e2e.mjs <base> <outdir>` runs the page's loop in node
+    against a server (`WHERE=cloud|server MODEL= SECTIONS=3 SHAPE=region`):
+    build, one change, one review round, the worlds saved for
+    `scenario-smoke.mjs`.
 - Every result is saved in `generated/` (`recent` feeds the admin page).
 - **Sections in the builder** (`app/builder.js`, `app/map-editor.js`): the
   section being edited is `secPath` (subworlds keys down from the top);
