@@ -69,7 +69,10 @@
   }
   function compute() {
     const h = here(), w = scn();
-    return C.resolve({ url: urlMode, setting: setting() === 'world' ? null : setting(), when: h?.modeWhen || w?.modeWhen, situation, switched, section: h && h !== w ? h.mode : null, world: w?.mode });
+    return C.resolve({ url: urlMode, setting: setting() === 'world' ? null : setting(), when: h?.modeWhen || w?.modeWhen, situation, switched, section: h && h !== w ? h.mode : null, world: w?.mode,
+      // a world with no mode on Bonsai 2.5 27B on a ~12 GB card: adventure (its replies take 8 s there against 16-26 s
+      // in living, where the village's calls queue ahead: brains.md "Rented-card checks"); living elsewhere
+      brain: window.tablefolkTightCard?.() ? 'adventure' : null });
   }
   function refresh(quiet = false) {
     const r = compute(), was = current;

@@ -1,7 +1,7 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127e';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127f';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261127d';
+import { installDevConsole } from './dev-console.js?v=20261127e';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -758,6 +758,12 @@ async function main() {
   // freeGB: graphics memory left beside the chat model (the Breeze voice wants about 4)
   // (a getter: the brain may change after this, a world's own model or the player's pick)
   if (device) { Object.defineProperty(device, 'freeGB', { configurable: true, enumerable: true, get: () => { const m = manager.getSupportedModels().find(m => m.key === manager.getModelKey()); return (usableGB(device.hw) || 0) - (m?.memGB ?? m?.needGB ?? 3); } }); window.tablefolkDiag?.note('device', describeHardware(device.hw) + (device.hw?.memWhy ? ' (memory: ' + device.hw.memWhy + ')' : '') + '; ' + Math.round(device.freeGB * 10) / 10 + ' GB left beside the characters\' model' + (device.hw?.choiceWhy ? '; model choice: ' + device.hw.choiceWhy : '')); appendLog('device: ' + describeHardware(device.hw) + ' -> ' + device.key + ', ' + device.freeGB + ' GB free beside it'); window.tablefolkDevice = device; }
+  // a brain that only just fits this card (tightGB, the 27B on 12 GB): Settings' picker, graphics (high -> medium on the
+  // next load: graphics-settings.js reads tablefolkTightNow), the voice (no Breeze) and the game mode (adventure) follow it
+  const tightOn = m => !!(m?.tightGB && usableGB(device?.hw) > 0 && usableGB(device.hw) < m.tightGB);
+  window.tablefolkTightCard = () => tightOn(manager.getSupportedModels().find(m => m.key === manager.getModelKey()));
+  try { const tm = manager.getSupportedModels().filter(tightOn).map(m => m.key); if (tm.length) localStorage.setItem('tablefolkTightModels', JSON.stringify(tm)); else localStorage.removeItem('tablefolkTightModels'); if (window.tablefolkTightCard()) localStorage.setItem('tablefolkTightNow', '1'); else localStorage.removeItem('tablefolkTightNow'); } catch {}
+  if (window.tablefolkTightCard() && window.TABLEFOLK_GFX?.tightCapped) window.tablefolkDiag?.note('graphics', 'high graphics asked; medium with this brain on this card (it peaks within 0.3 GB of a 12 GB card at high)');
   if (modelSelect) {
     modelSelect.textContent = '';
     if (device?.hw) modelSelect.title = 'Brain model. This device: ' + describeHardware(device.hw);
@@ -768,7 +774,7 @@ async function main() {
       if (m.fitGB && m.key !== manager.getModelKey() && !(usableGB(device?.hw) >= m.fitGB)) continue;
       const opt = document.createElement('option');
       opt.value = m.key;
-      opt.textContent = m.label + (device?.key === m.key && m.needGB ? ' ✓ best fit for this device' : '');
+      opt.textContent = m.label + (tightOn(m) ? ' (' + m.tightNote + ')' : '') + (device?.key === m.key && m.needGB ? ' ✓ best fit for this device' : '');
       modelSelect.appendChild(opt);
     }
     modelSelect.value = manager.getModelKey();

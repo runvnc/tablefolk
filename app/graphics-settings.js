@@ -26,7 +26,7 @@
     try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
     catch { return { ...DEFAULTS }; }
   }
-  function save() { if (window.TABLEFOLK_GFX_NOSAVE) return; try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {} }
+  function save() { if (window.TABLEFOLK_GFX_NOSAVE) return; try { const out = { ...settings }; if (out.tightCapped) Object.assign(out, { quality: 'high', lite: false }); delete out.tightCapped; localStorage.setItem(KEY, JSON.stringify(out)); } catch {} }
   function clampEvery(v) { v = parseInt(v, 10); if (!Number.isFinite(v) || v < 1) v = 1; return Math.min(10, v); }
 
   // Read synchronously at script-load time (this file loads before
@@ -53,6 +53,13 @@
     Object.assign(settings, { quality: gfxParam, lite: gfxParam === 'light' });
     if (gfxParam !== 'high') Object.assign(settings, { campfireShadowEnabled: false, seaWaveEnabled: false, seaFoamEnabled: false });
     window.TABLEFOLK_GFX_NOSAVE = true;
+  }
+  // High with a brain that only just fits the card (Bonsai 2.5 27B on 12 GB: world-integration.js tightGB) runs at
+  // medium (not saved): the 27B peaks within 0.3 GB of a 12 GB card at high (brains.md "Rented-card checks")
+  if (settings.quality === 'high' && !['high'].includes(gfxParam)) {
+    let tight = false;
+    try { const m = new URLSearchParams(location.search).get('model'); tight = m ? JSON.parse(localStorage.getItem('tablefolkTightModels') || '[]').includes(m) : localStorage.getItem('tablefolkTightNow') === '1'; } catch {}
+    if (tight) { settings.quality = 'medium'; settings.lite = false; settings.tightCapped = true; }
   }
   window.TABLEFOLK_GFX = settings;
   // Light quality: at most 6 lights per material. Every light is computed for
@@ -103,8 +110,10 @@
         // model containers, instanced models and the building kit count too (scene.textures missed them), and a
         // texture shared by several materials counts once
         const seen = new Set(), list = sc.getEngine().getLoadedTexturesCache?.() || [];
-        const add = (w, h, type, cube, mips) => { const bpp = type === 1 ? 16 : type === 2 ? 8 : 4; bytes += w * h * bpp * (cube ? 6 : 1) * (mips ? 1.33 : 1); };
-        for (const it of list) { if (!it?.width || seen.has(it)) continue; seen.add(it); add(it.width, it.height, it.type, it.isCube, it.generateMipMaps); }
+        // (compressed formats, the kit's KTX2: BC1 / ETC1-2 RGB half a byte a texel, BC3 / BC7 / ASTC 4x4 / ETC2 RGBA one)
+        const HALF = new Set([33776, 33777, 35916, 35917, 36196, 37492, 37493]), ONE = new Set([33778, 33779, 35918, 35919, 36492, 36493, 37808, 37840, 37496, 37497]);
+        const add = (w, h, type, cube, mips, fmt) => { const bpp = HALF.has(fmt) ? .5 : ONE.has(fmt) ? 1 : type === 1 ? 16 : type === 2 ? 8 : 4; bytes += w * h * bpp * (cube ? 6 : 1) * (mips ? 1.33 : 1); };
+        for (const it of list) { if (!it?.width || seen.has(it)) continue; seen.add(it); add(it.width, it.height, it.type, it.isCube, it.generateMipMaps || HALF.has(it.format) || ONE.has(it.format), it.format); }
         if (!list.length) for (const t of sc.textures || []) { const z = t.getSize?.(); if (z?.width) add(z.width, z.height, t.textureType, t.isCube, !t.noMipmap); }
         const e = sc.getEngine(); bytes += e.getRenderWidth() * e.getRenderHeight() * 4 * (list.length ? 2 : 6);   // the swap chain and depth (render targets are in the cache)
         gfxMeasured = bytes / 2 ** 30 + .3;
@@ -145,7 +154,7 @@
     const qualitySel = el('gfxQuality');
     if (qualitySel) {
       qualitySel.value = settings.quality;
-      qualitySel.addEventListener('change', () => { settings.quality = qualitySel.value; settings.lite = settings.quality === 'light'; save(); location.reload(); });
+      qualitySel.addEventListener('change', () => { settings.quality = qualitySel.value; delete settings.tightCapped; settings.lite = settings.quality === 'light'; save(); location.reload(); });
     }
     if (!keyEn) return; // markup not present in this build; skip silently
 

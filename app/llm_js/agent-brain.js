@@ -65,7 +65,8 @@ const SUPPORTED_MODELS = {
   'bonsai-1.7b-onnx': { label: 'Bonsai 1-bit 1.7B (Transformers.js, tiny; experimental)', engine: 'transformers.js', size: '~0.3 GB', hidden: true },
   // Prism ML's Ternary Bonsai 2.5 27B on the webml-community WebGPU kernels
   // (libs/brain/engines/bonsai2.js): far smarter, for cards with 10 GB or more
-  'bonsai2-27b': { label: 'Bonsai 2.5 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~6 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1 },   // Bonsai 2.5 since 2026-11-27 (same id, so saved choices and scenarios follow; brains.md "Bonsai 2.5"). The pick for 10-12 GB+ cards: 2.5 and 2 alike: 10.45 GB peak with the game at high quality, 11.3 in hearthvale's day, on a 4080 (2026-11-27); memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
+  'bonsai2-27b': { label: 'Bonsai 2.5 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~6 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1, tightGB: 14, tightNote: 'on this card: light or medium graphics, no Breeze voice' },   // tightGB: on a card under 14 GB (12 GB) it peaks within 0.3 GB of the card with the game at high: the picker says so, high drops to medium (graphics-settings.js), no Breeze voice, adventure by default (modes.js)
+    // Bonsai 2.5 since 2026-11-27 (same id, so saved choices and scenarios follow; brains.md "Bonsai 2.5"). The pick for 10-12 GB+ cards: 2.5 and 2 alike: 10.45 GB peak with the game at high quality, 11.3 in hearthvale's day, on a 4080 (2026-11-27); memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
   // Inkling 2 Mini and SenseNova-Loop-9B on our faster wllama build (libs/brain/engines/wllama-fast; brains.md,
   // "Faster in Chrome"). fitGB: listed in the picker only where the card has that much (with the game beside
   // it); never picked for a device by itself (no needGB). Measured in the game in Chrome on an RTX 4080 Super
@@ -424,7 +425,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB != null ? +(cfg.memGB + (ctxExtraGB[key] || 0)).toFixed(2) : cfg.memGB, readGB: cfg.readGB, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB != null ? +(cfg.memGB + (ctxExtraGB[key] || 0)).toFixed(2) : cfg.memGB, readGB: cfg.readGB, tightGB: cfg.tightGB, tightNote: cfg.tightNote, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

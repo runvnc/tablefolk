@@ -17,6 +17,9 @@ t('options clamped', M.options({ modeRadius: 0, encounterWorld: 'pause', turnMov
 // which mode runs
 t('nothing set: living', M.resolve({}).mode, 'living');
 t('the world', M.resolve({ world: 'adventure' }), { mode: 'adventure', source: 'world' });
+t('no world mode, the brain\'s default (the 27B on 12 GB): adventure', M.resolve({ brain: 'adventure' }), { mode: 'adventure', source: 'brain' });
+t('... the world\'s own mode wins', M.resolve({ world: 'living', brain: 'adventure' }).mode, 'living');
+t('... and the player\'s setting', M.resolve({ setting: 'turns', brain: 'adventure' }).mode, 'turns');
 t('a section over the world', M.resolve({ world: 'adventure', section: 'turns' }).mode, 'turns');
 t('a switch over the section', M.resolve({ world: 'adventure', section: 'turns', switched: 'living' }).mode, 'living');
 t('a fight (modeWhen) over a switch', M.resolve({ world: 'living', switched: 'adventure', when: { fight: 'turns' }, situation: { fight: true } }), { mode: 'turns', source: 'when fight' });

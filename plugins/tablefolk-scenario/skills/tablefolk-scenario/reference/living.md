@@ -180,6 +180,11 @@ time and the model are shared (`app/modes.js`):
   `"modeRadius"` squares of the player (default 12; `0`: everyone) use the
   model; those farther away run on rails without it (their day goes on in
   code, what is said to them waits in their history) until they come near.
+  (A world that sets no mode runs in adventure instead with Bonsai 2.5 27B
+  on a 12 GB card: there a reply takes about 8 s in adventure against 16-26 s
+  in living, where the village's calls queue ahead of it. On that card the
+  brain picker also says it wants light or medium graphics and no Breeze
+  voice: high graphics runs at medium with it, and Breeze is not offered.)
 - **`"adventure"`**: the world runs on rails, all in code, while the player
   explores: no model at all. Engaging a character (talking to it, giving it
   something, opening its menu, or being spoken to by it: code still has

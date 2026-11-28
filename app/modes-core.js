@@ -43,13 +43,15 @@
     return null;
   }
   // highest first: the link, the player's setting, the situation, a switch (trigger, event), the section, the world
-  function resolve({ url, setting, when, situation, switched, section, world } = {}) {
+  // brain: the brain's own default when the world sets none (modes.js: adventure for Bonsai 2.5 27B on a ~12 GB card)
+  function resolve({ url, setting, when, situation, switched, section, world, brain } = {}) {
     if (normalize(url)) return { mode: url, source: 'link' };
     if (normalize(setting)) return { mode: setting, source: 'setting' };
     const s = situational(when, situation); if (s) return { mode: s.mode, source: 'when ' + s.why };
     if (normalize(switched)) return { mode: switched, source: 'switched' };
     if (normalize(section)) return { mode: section, source: 'section' };
     if (normalize(world)) return { mode: world, source: 'world' };
+    if (normalize(brain)) return { mode: brain, source: 'brain' };
     return { mode: 'living', source: 'default' };
   }
   // may a character use the model now? d: its distance from the player (Infinity: no player)

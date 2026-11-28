@@ -116,11 +116,18 @@
     const why = [];
     if (level === 'free' && (tokS < CHECK.FREE_TOKS || (turnS != null && turnS > CHECK.FREE_TURN_S))) { level = 'guided'; why.push(`free wants ${CHECK.FREE_TOKS} tokens/s and a turn in ${CHECK.FREE_TURN_S} s`); }
     if ((level === 'guided' || level === 'assisted') && tokS < CHECK.GUIDED_TOKS) { level = 'rails'; why.push('too slow'); }
+    // The check is sampled and noisy across cards (rented 2026-11-27, the same day: Bonsai 2 9B 6/10 on a 4070, 5/10
+    // on a 4080 S; Bonsai 2.5 27B 9/10 and 7/10, 27.8 and 42.2 tokens/s). So: free needs the busy turn measured (its
+    // time is reading, steadier than the 150-token speed), and a score one item above guided's band keeps what the
+    // band below keeps in code (danger and needs): 5/10 and 6/10 then differ only in talk and temper.
+    if (level === 'free' && turnS == null) { level = 'guided'; why.push('free needs a measured turn'); }
+    const edge = level === 'guided' && (r.score - 1) / r.of < CHECK.GUIDED_MIN;
     const domains = {};
     for (const d of ['talk', 'danger', 'needs', 'temper']) {
       const its = Object.keys(tasks).filter(k => ITEM_DOMAIN[k] === d);
       if (its.length && its.filter(k => !tasks[k].ok).length / its.length >= .5) domains[d] = 'code';
     }
+    if (edge) { domains.danger = 'code'; domains.needs = 'code'; why.push('one item above guided: danger and needs in code'); }
     const slow = tokS < CHECK.NEEDS_TOKS || (turnS != null && turnS > CHECK.NEEDS_TURN_S);
     if (slow && !domains.needs && (level === 'guided' || level === 'free')) { domains.needs = 'code'; why.push('slow turns: needs in code'); }
     return { level, domains, comfortable: f >= CHECK.COMFORT, slow, turnS, why: why.join('; ') };

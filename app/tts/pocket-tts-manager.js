@@ -89,6 +89,7 @@
     const d=window.tablefolkDevice, free=d?.freeGB==null?null:d.freeGB-gfxExtraGB();
     if(free==null||Number.isNaN(free)) return 'the graphics card\'s memory is not known';
     // Breeze wants ~3.5 GB, or ~2.6 with its text encoder on the processor (breezeTeCpu)
+    if(window.tablefolkTightCard?.()) return 'the characters\' model only just fits this graphics card (Bonsai 2.5 27B on 12 GB): no room for Breeze';
     if(free<2.6) return `${Math.round(free*10)/10} GB of graphics memory left beside the characters' model; Breeze wants 2.6 (3.5 for its fastest start)`;
     if((speeds()['breeze-web-2']??1)<.9) return 'measured slower than speech on this machine before';
     return '';

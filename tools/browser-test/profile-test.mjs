@@ -66,7 +66,9 @@ const RECORDED = [
   ['Bonsai 2 9B, 4090', rec(5, 10, 145.2, ['sums', 'plan', 'mind', 'danger', 'haggle']), 'assisted (temper in code)', 'assisted/Auto: everyone fed, judge 3.63-3.88/4.0-4.13'],
   ['Bonsai 2 9B, 4070 (2026-11-21)', rec(5, 10, 75.6, ['steps', 'sums', 'mind', 'danger', 'haggle']), 'assisted (temper in code)', 'Auto (assisted): everyone fed, judge 3.88/4.13/4.5'],
   ['Spark-X2.6-4B, endpoint, 4070', rec(5, 10, 123.1, ['steps', 'sums', 'mind', 'haggle', 'shelter']), 'assisted (temper in code)', 'guided: the village barely worked, 2 hungry'],
-  ['Bonsai 2 27B, 4090 (v2)', rec(5, 8, 53, ['sums', 'danger', 'haggle']), 'guided (danger in code)', 'guided and free both good, nobody hungry'],
+  ['Bonsai 2 27B, 4090 (v2)', rec(5, 8, 53, ['sums', 'danger', 'haggle']), 'guided (danger and needs in code)', 'guided and free both good, nobody hungry (5/8: one item above guided)'],
+  ['Bonsai 2 9B, 4070 (2026-11-27)', rec(6, 10, 30.4, ['character', 'mind', 'danger', 'haggle']), 'guided (talk and danger and needs and temper in code)', 'the same day 5/10 on a 4080 S: assisted (temper); a working village either way'],
+  ['Bonsai 2.5 27B, 4080 S (2026-11-27, items not kept)', { score: 7, of: 10, tokS: 42.2 }, 'guided', 'guided: 7/10 here, 9/10 on a 4070 the same day'],
   ['Gemma 4 12B, 3090 (v2)', rec(6, 8, 29.4, ['track', 'haggle']), 'guided (talk and needs in code)', 'guided: 5-7 hungry (picks 2-30 s); free unusable'],
   ['Gemma 4 E4B, 3090 (v2)', rec(6, 8, 34.3, ['track', 'haggle']), 'guided (talk and needs in code)', 'guided: works, 2 hungry'],
   ['Raon-1 nano, 4090 (v2)', rec(4, 8, 58.2, ['steps', 'sums', 'track', 'danger']), 'rails', 'guided wasted 14%, flattest'],
@@ -82,5 +84,7 @@ t('v4: the same with the turn in 7 s: guided', autoLabel(v4r(9, 53, { ok: true, 
 t('v4: the same with the turn in 10 s: guided, needs in code', autoLabel(v4r(9, 53, { ok: true, ms: 10000 })), 'guided (needs in code)');
 t('v4: 10/10 but 24 tokens/s: guided, needs in code', autoLabel(v4r(10, 24, { ok: true, ms: 9000 })), 'guided (needs in code)');
 t('v4: fast but ate nothing while busy: free, needs in code', autoLabel(v4r(9, 60, { ok: false, ms: 3000 })), 'free (needs in code)');
+t('noise: 9/10 at 42 tokens/s with no busy turn measured is not free', autoLabel({ score: 9, of: 10, tokS: 42.2 }), 'guided');
+t('noise: the 9B at 5/10 and 6/10 both keep danger, needs and temper in code', [autoLabel(rec(5, 10, 98.5, ['sums', 'plan', 'mind', 'danger', 'haggle'])), autoLabel(rec(6, 10, 30.4, ['character', 'mind', 'danger', 'haggle']))].map(l => ['danger', 'needs', 'temper'].every(d => l === 'assisted (temper in code)' || l.includes(d))), [true, true]);
 t('v4: the turn time is reported', P.fromCheck(v4r(9, 60, { ok: true, ms: 3040 })).turnS, 3);
 console.log(`${ok}/${n} passed`); process.exit(ok === n ? 0 : 1);

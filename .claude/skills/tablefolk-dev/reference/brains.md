@@ -2102,6 +2102,20 @@ Auto per recorded result, v3 rule -> v4 (each test in `profile-test.mjs`):
 | Gemma 4 E4B, 3090 (v2) | 6/8, 34.3 | guided (talk) | guided (talk, needs) | guided 2 hungry |
 | Raon-1 nano, Gemma 4 E2B (v2) | 4/8 | rails | rails | rails |
 
+**Noise across cards** (the rented checks the same day: Bonsai 2 9B 6/10 on a 4070, 5/10 on a 4080 S; Bonsai
+2.5 27B 9/10 at 27.8 tokens/s on the 4070, 7/10 at 42.2 on the 4080 S): free also needs the busy turn
+measured (no v3 result, nor a noisy speed alone, reaches free), and a score one item above guided's band
+(6/10; 5/8) keeps danger and needs in code as the band below would, so the 9B's two results differ only in
+talk (and the 27B on a 4070 is unchanged: guided, danger and needs in code).
+
+**Bonsai 2.5 27B on a ~12 GB card** (`tightGB: 14` in agent-brain.js; `window.tablefolkTightCard()`): it
+peaks within 0.3 GB of a 12 GB card with the game at high graphics, so the picker adds "on this card: light
+or medium graphics, no Breeze voice"; high runs at medium with it (graphics-settings.js reads
+`tablefolkTightNow`, written when the brain is set up; the player's saved choice stays high and returns on a
+bigger card); pocket-tts-manager.js offers no Breeze; and a world with no `"mode"` runs in adventure (modes.js
+passes `brain: 'adventure'` to modes-core.js resolve, below the world's and the player's choice; living
+elsewhere): its replies take ~8 s there against 16-26 s in living. Tests: `modes-test.mjs` (the order).
+
 Not changed, though they predict little: sums, haggle, mind and danger stay in the score (dropping them
 would move Bonsai 2 9B from assisted to guided, against its measured days). Noticed: Gemma 4 E2B's speed
 reads 0 tokens/s (v2 on the 3090 and v4 here: its 150-token answer comes back empty); harmless while it
