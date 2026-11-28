@@ -15,7 +15,7 @@ const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_P
 const page = b.contexts()[0].pages()[0] || await b.contexts()[0].newPage();
 const cdp = await page.context().newCDPSession(page);
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-let fails = 0, n = 0; const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 300)));
+let fails = 0, n = 0; const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 300))); page.on('crash', () => { console.log('PAGE CRASHED'); process.exit(2); });
 page.on('console', m => { if (m.type() === 'warning' && /\[keeper\]/.test(m.text())) console.log('     page:', m.text().slice(0, 200)); });
 const check = async (name, fn) => { n++; let r; try { r = await fn(); } catch (e) { r = [false, 'threw ' + e.message]; } const [ok, info] = Array.isArray(r) ? r : [r, '']; if (!ok) fails++; console.log(ok ? 'ok  ' : 'FAIL', name, info ? '- ' + String(info).slice(0, 400) : ''); return ok; };
 const ev = (fn, a) => page.evaluate(fn, a);
@@ -66,13 +66,13 @@ await page.waitForTimeout(500);
 await check('the dig tool shows the rock squares to confirm (the floor left out)', () => ev(() => { const t = document.getElementById('tfPickBar').textContent; return [/dig/.test(t) && /not rock/.test(t) && !!document.querySelector('#tfPickBar button.go'), t.slice(0, 200)]; }));
 await pageShot('k02-dig-confirm');
 await page.click('#tfPickBar button.go');
-await check('marked: a dig designation of the 9 rock squares', () => ev(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'dig'); return [!!d && d.cells.length === 9 && d.cells.every(c => tablefolkKeeper.isRock(c.x, c.z)), d ? d.cells.map(c => c.x + ',' + c.z).join(' ') : 'none']; }));
+await check('marked: a dig designation of the 10 rock squares', () => ev(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'dig'); return [!!d && d.cells.length === 10 && d.cells.every(c => tablefolkKeeper.isRock(c.x, c.z)), d ? d.cells.map(c => c.x + ',' + c.z).join(' ') : 'none']; }));
 const g0 = await ev(() => tablefolkResources.get('gold'));
 let t0 = Date.now();
 await drive("tablefolkDesignate.list().filter(d => d.kind === 'dig').every(d => d.status === 'done') && tablefolkDesignate.list().find(d => d.kind === 'treasury')?.status === 'done' && state.characters.filter(c => c.charModel === 'imp').every(c => !(charInventory(c).gold > 0))", 240);
 console.log(`     (${Math.round((Date.now() - t0) / 1000)} s)`);
 await check('the imps dug it out: no rock left there, the tunnel floor', () => ev(() => { const d = tablefolkDesignate.list().find(x => x.kind === 'dig'); return [d.status === 'done' && d.cells.every(c => !tablefolkKeeper.isRock(c.x, c.z) && cellPassable(c.x, c.z)), d.status + ' ' + tablefolkDesignate.board.progress(d).done + '/' + d.cells.length]; }));
-await check('the treasury was claimed and is a place with gold piles', () => ev(() => { const p = tablefolkJobs.places.placeNamed('treasury'); return [!!p && tablefolkKeeper.rules.cells('treasury') === 12 && tablefolkKeeper.capacity() === 60 + 12 * 40, `place ${!!p}, ${tablefolkKeeper.rules.cells('treasury')} squares, capacity ${tablefolkKeeper.capacity()}`]; }));
+await check('the treasury was claimed and is a place with gold piles', () => ev(() => { const p = tablefolkJobs.places.placeNamed('treasury'); return [!!p && tablefolkKeeper.rules.cells('treasury') === 12 && tablefolkKeeper.capacity() === 100 + 12 * 40, `place ${!!p}, ${tablefolkKeeper.rules.cells('treasury')} squares, capacity ${tablefolkKeeper.capacity()}`]; }));
 await check('gold from the 5 vein squares (150) carried to the treasury', () => ev(g0 => [tablefolkResources.get('gold') === g0 + 150 && __k.filter(e => e.what === 'dug' && e.gold).length === 5, `${g0} -> ${tablefolkResources.get('gold')}; dug ${__k.filter(e => e.what === 'dug').length} (${__k.filter(e => e.what === 'dug' && e.gold).length} gold)`], g0));
 await look(-3, -6, 16, .6); await shot('k03-dug');
 

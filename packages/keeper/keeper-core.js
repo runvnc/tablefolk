@@ -29,7 +29,7 @@ export const RULES = {
   xpLevels: [0, 4, 10, 18, 30],                 // xp for levels 1-5 (a training session is 1 xp)
   wageStep: .25, hpStep: 3,                     // each level: +25% wage, +3 health
   researchFor: { lightning: 20, possession: 60 }, trapEvery: 6,
-  goldPerVein: 30, heartGold: 60, treasuryPerCell: 40,
+  goldPerVein: 30, heartGold: 100, treasuryPerCell: 40,
   heartHp: 100,
 };
 // creature kinds: the body, the room that draws them (and how big it must be), wage, health, their work

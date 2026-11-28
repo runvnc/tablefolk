@@ -38,7 +38,7 @@ rock (the Mark tool leaves out what is not rock and the edge); the imps take
 the squares nearest first, but only ones with an open side to stand on (the
 kind's `ready`), so a deep tunnel is dug from the mouth in. Rock takes three
 blows, a vein four; a vein gives the imp 30 gold, which it carries to the
-nearest treasury square, else to the heart. The heart holds 60 gold, every
+nearest treasury square, else to the heart. The heart holds 100 gold, every
 treasury square 40 more; gold that does not fit is lost (a toast says so).
 
 ## Rooms

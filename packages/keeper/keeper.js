@@ -97,12 +97,13 @@ export default function (api) {
   }
   function drawRock() {
     if (!api.scene) return;
-    const scn = W.tablefolkScenario?.active?.scn || {};
-    wallH = +scn.wallHeight || 1.5;
+    // over the walls the game draws for the rock (walls.js: 1.1 x the scenario's wallHeight, and a cap course)
+    wallH = 1.1 * (api.state.wallHeightScale || 1) + .1;
+    try { const k = W.tablefolkDesignate?.kinds?.().find(k => k.id === 'dig'); if (k) k.h = wallH + .2; } catch {}
     rockMesh ||= blockMesh('keeper_rock', noiseTex('keeper_rock_tex', '#4b3f36', [['#2e2722', 5], ['#6a5a4c', 3], ['#3b322b', 8]]), [1, 1, 1]);
     goldMesh ||= blockMesh('keeper_gold', noiseTex('keeper_gold_tex', '#4a3d30', [['#f2c84b', 4], ['#ffe9a0', 2], ['#2e2620', 6]], 700), [1, 1, 1], [.22, .16, .03]);
     edgeMesh ||= blockMesh('keeper_edge', noiseTex('keeper_edge_tex', '#24201d', [['#141210', 6], ['#33302c', 4]]), [1, 1, 1]);
-    const top = api.state.terrainTopY ?? 0, h = wallH + .14, groups = { r: [], g: [], e: [] };
+    const top = api.state.terrainTopY ?? 0, h = wallH + .06, groups = { r: [], g: [], e: [] };
     for (const k of rock) { const [x, z] = k.split(',').map(Number); (edge.has(k) ? groups.e : veins.has(k) ? groups.g : groups.r).push([x, z]); }
     for (const [m, list] of [[rockMesh, groups.r], [goldMesh, groups.g], [edgeMesh, groups.e]]) {
       const buf = new Float32Array(Math.max(1, list.length) * 16);
@@ -165,7 +166,7 @@ export default function (api) {
     const id = roomName(kind), spec = ROOM[kind];
     (api.state.places ||= []).push({ id, kind, x0, x1, z0, z1, center: [(x0 + x1) / 2, (z0 + z1) / 2], keeper: true });
     W.setPaint?.(cells.map(c => ({ x: c.x, z: c.z, mat: spec.floor, tint: spec.tint })));
-    const meshes = [], put = (type, x, z, opts = {}) => { if (W.occupantAt?.(x, z, null)) return null; const m = W.tablefolk?.makeObject?.(type, x, z, opts); if (m) { meshes.push(m); if (meta(m)) meta(m).keeperRoom = id; } return m; };
+    const meshes = [], put = (type, x, z, opts = {}) => { const who = W.occupantAt?.(x, z, null); if (who) { const f = api.freeCell(x + 1, z, 2); if (f) teleport(who, f.x, f.z); } const m = W.tablefolk?.makeObject?.(type, x, z, opts); if (m) { meshes.push(m); if (meta(m)) meta(m).keeperRoom = id; } return m; };
     const has = (x, z) => cells.some(c => c.x === x && c.z === z);
     let beds = 0;
     // furniture on every other square (odd offsets: the paths between stay open)
@@ -357,7 +358,7 @@ export default function (api) {
         const busy = st.filter(o => !creatures().some(o2 => o2 !== g && dist(posOf(o2), o) < 1.3));
         const o = busy[0] || st[0];
         if (o) {
-          k.setDoing(g, s, `${w.doing} in the ${rooms[0].id}`);
+          k.setDoing(g, s, `${w.doing} in the ${ROOM[w.room].label}`);
           if (dist(posOf(g), o) > 1.6) { const r = await k.goDo(g, s, o, null); if (r.fail) return { ms: 2500 }; if (!r.done) return { ms: r.ms || 1500 }; }
           try { W.setCharacterFacing?.(g, new (BAB().Vector3)(Math.sign(o.x - posOf(g).x), 0, Math.sign(o.z - posOf(g).z))); } catch {}
           clip(g, w.clip);
@@ -417,7 +418,7 @@ export default function (api) {
     if (!on || isImp(g)) return [];
     const c = creature(g); if (!c) return [];
     const out = [], kind = KINDS[c.kind], w = WORK[kind.work];
-    if (w && roomsOf(w.room).length) out.push({ key: 'keeper:work', kind: 'work', cmd: w.doing, label: `${w.doing} in the ${roomsOf(w.room)[0].id}`, doing: w.doing, run: async (g2, s2, j2, a) => { a.cap ||= 120; const r = await work(g2, s2, c); return { busy: true, ms: r.ms }; } });
+    if (w && roomsOf(w.room).length) out.push({ key: 'keeper:work', kind: 'work', cmd: w.doing, label: `${w.doing} in the ${ROOM[w.room].label}`, doing: w.doing, run: async (g2, s2, j2, a) => { a.cap ||= 120; const r = await work(g2, s2, c); return { busy: true, ms: r.ms }; } });
     if ((m0(g)?.hunger ?? 0) > .35 && roomsOf('hatchery').length) out.push({ key: 'keeper:eat', kind: 'eat', cmd: 'eat', label: 'eat in the hatchery', doing: 'going to eat', run: async (g2, s2) => { const r = await eat(g2, s2); return r && (m0(g2)?.hunger ?? 0) > .1 ? { busy: true, ms: r.ms } : { done: true, text: 'ate' }; } });
     if ((m0(g)?.tired ?? 0) > .4 && roomsOf('lair').length) out.push({ key: 'keeper:sleep', kind: 'sleep', cmd: 'sleep', label: 'sleep in the lair', doing: 'going to sleep', run: async (g2, s2) => { const r = await rest(g2, s2); return r && (m0(g2)?.tired ?? 0) > .05 ? { busy: true, ms: r.ms } : { done: true, text: 'slept' }; } });
     if (R.happy(g.id) < 60) out.push({ key: 'keeper:grumble', kind: 'talk', cmd: 'complain', label: `complain about ${grievance(c)}`, doing: 'complaining', run: async g2 => { await grumble(g2); return { done: true, text: 'complained' }; } });
@@ -544,15 +545,18 @@ export default function (api) {
   };
   const WEAPON = { goblin: 'dagger', orc: 'axe', warlock: 'staff', kobold: 'dagger', skeleton: 'sword' };
   let arrivalSoon = false, lastArrival = -1e9;
-  async function arrive(kind, at = null) {
+  // one at a time (two spawns at once took the same name: two characters with one id)
+  let arriving = Promise.resolve();
+  function arrive(kind, at = null) { const r = arriving.then(() => arriveNow(kind, at)); arriving = r.catch(() => null); return r; }
+  async function arriveNow(kind, at) {
     const K0 = KINDS[kind], p = at || portal(), c = api.freeCell(p.x, p.z, 2) || p;
-    const name = (NAMES[kind] || [kind]).find(n => !byId(n)) || kind;
+    const name = (NAMES[kind] || []).find(n => !byId(n) && !R.get(n)) || kind;
     const g = await api.spawn(name, K0.body, c.x, c.z, { hostile: false, job: 'keeper_creature', hp: K0.hp, style: K0.label, personality: `${name.replace(/^\w/, x => x.toUpperCase())}, ${PERSON[kind]}`, items: WEAPON[kind] ? [WEAPON[kind]] : [] });
     if (!g) return null;
     R.add(g.id, kind);
     try { api.setBrainConfig(g.id, { skills: ['keeper_creature'] }); } catch {}
     try { W.tablefolkGroups?.join?.('creatures', g.id); } catch {}
-    try { if (WEAPON[kind]) await api.combat.wield(g, WEAPON[kind]); } catch {}
+    try { if (WEAPON[kind]) api.combat.wield(g, WEAPON[kind]); } catch {}
     const m = m0(g); if (m) { m.hunger = .1; m.tired = .1; }
     burst(c.x, c.z, [.7, .4, 1], 160, 1200); api.sound('pickup', g);
     lastArrival = gm();
@@ -565,12 +569,12 @@ export default function (api) {
   function arrivals() {
     if (!(arrivalSoon || gm() - lastArrival >= 60)) return;
     arrivalSoon = false;
-    const kind = R.attract(); if (kind) arrive(kind).catch(e => console.warn('[keeper] arrive', e));
+    arriving = arriving.then(() => { const kind = R.attract(); return kind ? arriveNow(kind) : null; }).catch(e => { console.warn('[keeper] arrive', e); return null; });
   }
 
   // ---------------------------------------------------------------- heroes
   async function heroTurn(c, ctx) {
-    if (!c._keeperArmed) { c._keeperArmed = true; const w = /mage|wizard/.test(c.charModel) ? 'staff' : 'sword'; try { api.give(c, w, 1); await api.combat.wield(c, w); } catch {} }
+    if (!c._keeperArmed) { c._keeperArmed = true; const w = /mage|wizard/.test(c.charModel) ? 'staff' : 'sword'; try { api.give(c, w, 1); api.combat.wield(c, w); } catch {} }
     // creatures or imps near: fight them (the core's raid)
     const prey = api.state.characters.filter(o => !o.defeated && !o._threat && (R.get(o.id) || isImp(o)) && !held.includes(o) && dist(posOf(o), posOf(c)) < 6.5);
     if (prey.length) return false;
@@ -800,6 +804,8 @@ html.keeper-game #tfPickBar{left:12px;transform:none;bottom:96px;justify-content
     const scn = W.tablefolkScenario?.active?.scn || {};
     R.clear(); held.length = 0; rally = null; council = null; lastCouncil = null; payDemand = null; traps.length = 0; prisoners.clear(); hatch.clear(); lights.clear(); furniture.clear(); goldPiles = []; slapped.clear(); digging.clear();
     startHour = Math.floor(gm() / 60); lastPaydayHour = startHour; lastArrival = -1e9;
+    // the scenario's starting gold (its "resources"), and a whole heart
+    try { const st = scn.resources?.gold; W.tablefolkResources?.set?.('gold', typeof st === 'number' ? st : st?.start ?? 60); W.tablefolkResources?.set?.('heart', R.rules.heartHp); } catch {}
     readMap(); drawRock(); drawHeartAndPortal();
     for (const g of api.state.characters) if (/^imp/.test(g.charModel || '') || /^keeper_imp$/.test(J()?.jobOf?.(g)?.id || '')) g._keeperImp = true;
     // rooms the scenario starts with: "flags": { "keeper_rooms": [{ "kind": "lair", "x0": .., "x1": .., "z0": .., "z1": .. }] }

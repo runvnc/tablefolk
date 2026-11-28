@@ -262,9 +262,9 @@
     }
     return best || new Set();
   }
-  // ground (a designation kind's "ground", designate.js): 'rock' takes walls and rocks (digging into rock: no
-  // reach needed, the kind's ready() says when a square can be worked), 'floor' any walkable floor (roads, paved,
-  // painted, inside walled rooms), else the verb's own rule
+  // ground (a designation kind's "ground", designate.js): 'rock' takes walls and rocks (digging into rock), 'floor'
+  // any walkable floor (roads, paved, painted, inside walled rooms); neither asks that a square be reachable now
+  // (the kind's ready() says when one can be worked), else the verb's own rule
   const GROUND = { rock: '#r', floor: '.:=*o' };
   function validate(res, map, { kind, ground } = {}) {
     if (!res || res.error) return { ok: false, cells: [], dropped: [], warnings: [res?.error || 'nothing to check'] };
@@ -276,7 +276,7 @@
       if (ch === null) { dropped.push({ cell: c, why: 'off the map' }); continue; }
       if (!allowed.includes(ch) && key(...c) !== gateK) { dropped.push({ cell: c, why: ground === 'rock' ? 'not rock' : WHY[ch] || (ch === ':' || ch === '=' ? 'a road' : 'not open ground') }); continue; }
       const reach = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => land.has(key(c[0] + dx, c[1] + dy)));
-      if (!reach && !(verb === 'dig' && res.plan?.under) && ground !== 'rock') { dropped.push({ cell: c, why: 'nobody can get there' }); continue; }
+      if (!reach && !(verb === 'dig' && res.plan?.under) && !GROUND[ground]) { dropped.push({ cell: c, why: 'nobody can get there' }); continue; }
       out.push(c);
     }
     const warnings = [];

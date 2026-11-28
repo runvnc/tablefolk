@@ -19,7 +19,7 @@
  *           anim, time (seconds), say } | run(g, cell, ctx) (code: a job step result),
  *   done(d, ctx) (all squares done), standing,
  *   ground: 'rock' (walls and rocks can be marked, none need be reachable) | 'floor' (any walkable floor:
- *     roads, paved and painted squares, inside walled rooms) | default (open ground, as the core kinds),
+ *     roads, paved and painted squares, inside walled rooms; neither needs reaching yet) | default (open ground, as the core kinds),
  *   accept(x, z) -> true | 'why not' (the Mark tool's test of each square), ready(cell, d) -> bool (workers
  *     pass over a square until it is: rock with no open side yet) }.
  * A designation: orders-core board entries plus "section" (the map it belongs to).

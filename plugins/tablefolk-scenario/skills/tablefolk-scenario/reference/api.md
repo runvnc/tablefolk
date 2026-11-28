@@ -363,8 +363,8 @@ runs when every square is done.
 Three more fields steer where a kind can be marked and when a square can be
 worked: `ground` (`"rock"`: walls and rocks may be marked and need not be
 reachable, digging into rock; `"floor"`: any walkable floor, roads, paved and
-painted squares and the insides of walled rooms; default: open ground as the
-core kinds), `accept(x, z)` in a module (`true`, or the reason a square is
+painted squares and the insides of walled rooms; neither needs a square to be
+reachable yet; default: open ground as the core kinds), `accept(x, z)` in a module (`true`, or the reason a square is
 left out, shown by the Mark tool) and `ready(cell, d)` (workers pass a square
 over until it returns true: rock with no open side yet). `packages/keeper/`
 uses all three.
