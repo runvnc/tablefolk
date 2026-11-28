@@ -109,19 +109,26 @@
   }
   // One model call at a time; the highest priority first, then in order of arrival. A call
   // already running is never stopped. push(fn, prio) -> fn's promise; prio(job) may be raised.
-  function createQueue() {
-    const waiting = []; let running = null, seq = 0;
+  // slots: how many jobs may run at once (a number, or a function read each time: the brain's parallel calls,
+  // world-integration.js); with more than one, a job of priority 2 or more (the player's conversation) runs beside
+  // nothing new: no background job starts while one is running, so the player's answer shares the model with at
+  // most the one call that was already running
+  function createQueue({ slots = 1 } = {}) {
+    const waiting = [], running = new Set(); let seq = 0;
+    const max = () => Math.max(1, Math.floor(+(typeof slots === 'function' ? slots() : slots)) || 1);
     function pump() {
-      if (running || !waiting.length) return;
-      let best = 0; for (let i = 1; i < waiting.length; i++) { const a = waiting[i], b = waiting[best]; if (a.prio > b.prio || (a.prio === b.prio && a.seq < b.seq)) best = i; }
-      const job = running = waiting.splice(best, 1)[0];
-      Promise.resolve().then(job.fn).then(job.resolve, job.reject).finally(() => { running = null; pump(); });
+      while (waiting.length && running.size < max()) {
+        let best = 0; for (let i = 1; i < waiting.length; i++) { const a = waiting[i], b = waiting[best]; if (a.prio > b.prio || (a.prio === b.prio && a.seq < b.seq)) best = i; }
+        if (running.size && waiting[best].prio < 2 && [...running].some(j => j.prio >= 2)) return;
+        const job = waiting.splice(best, 1)[0]; running.add(job);
+        Promise.resolve().then(job.fn).then(job.resolve, job.reject).finally(() => { running.delete(job); pump(); });
+      }
     }
     return {
       push(fn, prio = 0, tag = null) { return new Promise((resolve, reject) => { waiting.push({ fn, prio, seq: seq++, tag, resolve, reject }); pump(); }); },
       // raise the queued calls whose tag passes (a turn the player is waiting on)
       raise(test, prio) { for (const j of waiting) if (test(j.tag) && j.prio < prio) j.prio = prio; },
-      get waiting() { return waiting.length; }, get busy() { return !!running; },
+      get waiting() { return waiting.length; }, get busy() { return running.size > 0; }, get running() { return running.size; },
       get order() { return waiting.slice().sort((a, b) => b.prio - a.prio || a.seq - b.seq).map(j => j.tag); },
     };
   }

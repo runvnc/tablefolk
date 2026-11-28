@@ -325,6 +325,7 @@ export async function loadModel(modelKey, onProgress, opts = {}) {
     wllama.tablefolkTemplate = cfg.template || 'minicpm';   // on the instance: the runner may import another copy of this module
     wllama.tablefolkPrefixCkpt = !!cfg.prefixCkpt;
     wllama.tablefolkServerStops = !!cfg.serverStops;
+    wllama.tablefolkSlots = +q().get('wpar') || cfg.loadOpts?.n_parallel || 4;   // llama.cpp's slots (wllama 4: 4), for the runner's per-character slots
     console.log('[tablefolk-wllama3] load complete');
     onProgress?.(`${cfg.label} ready (GPU layers: ${usedLayers})`);
     return wllama;

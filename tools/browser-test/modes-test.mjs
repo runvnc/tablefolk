@@ -101,6 +101,21 @@ t('no distance: not', M.independent({ d: NaN }), false);
   await E2.push(() => { throw new Error('boom'); }).catch(e => { err = e.message; });
   t('an error reaches the caller and the queue goes on', [err, await E2.push(() => 'next')], ['boom', 'next']);
 }
+// two calls at once (a llama.cpp brain's parallel slots): background calls pair up; the player's call starts beside a
+// running background one at once, and no new background call starts beside the player's
+{
+  const Q = M.createQueue({ slots: () => 2 }), log = [];
+  const job = (name, ms) => () => { log.push('+' + name); return sleep(ms).then(() => { log.push('-' + name); }); };
+  const a = Q.push(job('bg1', 40), 0, 'bg1'), b = Q.push(job('bg2', 10), 0, 'bg2');
+  t('two background calls run together', [Q.running, Q.waiting], [2, 0]);
+  const c = Q.push(job('bg3', 10), 0, 'bg3'), p = Q.push(job('player', 30), 2, 'player');
+  await sleep(15);
+  t('the player\'s call took the slot bg2 left, ahead of bg3', log.slice(0, 4), ['+bg1', '+bg2', '-bg2', '+player']);
+  await Promise.all([a, b, c, p]);
+  t('bg3 waited for the player\'s call, not only for a free slot', log.indexOf('+bg3') > log.indexOf('-player'), true);
+  const one = M.createQueue({ slots: 1 }); one.push(() => sleep(10)); one.push(() => sleep(10));
+  t('one slot: one at a time', [one.running, one.waiting], [1, 1]);
+}
 // the turn lock: a waiting reply to the player goes before waiting background turns
 {
   const L = M.createLock(), got = [];

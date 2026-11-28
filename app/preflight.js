@@ -52,7 +52,7 @@
     ['perf-monitor.js?v=20261018a'],
     ['graphics-settings.js?v=20261127c'],
     ['terrain-hd.js?v=20261019c'],
-    ['app.js?v=20261127h'],
+    ['app.js?v=20261127i'],
     ['bodies.js?v=20261120c'],
     ['scenery.js?v=20261121a'],
     ['combat.js?v=20261120b'],
@@ -86,7 +86,7 @@
     ['chatter.js?v=20261121b'],
     ['autonomy-profile.js?v=20261127c'],
     ['agency.js?v=20261127e'],
-    ['modes-core.js?v=20261127c'],
+    ['modes-core.js?v=20261127d'],
     ['modes.js?v=20261127h'],
     ['plan-core.js?v=20261127e'],
     ['orders-core.js?v=20261127c'],
@@ -109,7 +109,7 @@
     ['tabletop.js?v=20261127d'],
     ['welcome.js?v=20261106a'],
     ['tile-render.js?v=20261025d'],
-    ['llm_js/world-integration.js?v=20261127j', 'module'],
+    ['llm_js/world-integration.js?v=20261127l', 'module'],
   ];
 
   function browserSummary() {

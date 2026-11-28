@@ -4477,7 +4477,17 @@ function shortList(details){
   }
   return out;
 }
-function buildVisiblePerception(agentId=null,radius=7){
+// A lean turn prompt (characters above rails at guided or free: the strong brains; ?lean=0 turns it off): no
+// "Nearby visible objects" list (the "Around you" lines already name every thing with its steps and square), a one-line
+// header, no use(...) help at the end (its take/put part is in the command list, the stable prefix) and no "Your last
+// few turns" (the history has them). On Inkling 2 Mini's free day these were ~300 of the ~1,860 tokens read past the
+// shared rules each call (brains.md, "Fewer prompt tokens").
+function leanPrompt(g){
+  try { const v=new URLSearchParams(location.search).get('lean'); if(v==='0') return false; if(v==='1') return true; } catch {}
+  const lv=window.tablefolkAgency?.level?.(g);
+  return lv==='guided' || lv==='free';
+}
+function buildVisiblePerception(agentId=null,radius=7,lean=false){
   const g=agentId ? state.characters.find(x=>x.id===agentId) : (state.selected||state.characters[0]);
   if(!g) return 'No agent selected.';
   radius=clamp(Number(radius)||5,2,8);
@@ -4586,6 +4596,11 @@ function buildVisiblePerception(agentId=null,radius=7){
   if (legendParts.length) legend.push('Legend: ' + legendParts.join(', ') + '.');
   if (markParts.length) legend.push('Marks: ' + markParts.join(', ') + '.');
   const showMap = document.getElementById('showAsciiMap')?.checked !== false;
+  if (lean && window.tablefolkSenses) return [
+    `You are at (${cx},${cz}), holding ${held ? (heldMeta?.type||held.name) : 'nothing'}.${target ? ' Target: '+(targetMeta?.type||target.name)+' at ('+Math.round(target.position.x)+','+Math.round(target.position.z)+').' : ''}`,
+    ...window.tablefolkSenses.placeLine(g), ...window.tablefolkSenses.aroundLines(g),
+    ...(showMap ? ['', `North-up ${mapCols}x${mapRows} map (left=W, right=E; N=-Z, E=-X). Each row shows absolute z:`, ...compassRows, '', ...legend] : []),
+  ].join('\n');
   return [
     `Agent perception for ${g.id}`,
     `Center: (${cx},${cz})  Facing: ${facingName} (${Math.round(g.dir.x)},${Math.round(g.dir.z)})  ${sight?'View: what you can see from here':FULL_MAP_VISION?(mapCropped()?'View: the area around you':'View: whole map'):'Radius: '+radius}`,
@@ -4629,7 +4644,7 @@ function buildCommandExamples(g=null){
   // the same every turn (this is the cached prompt prefix): what it carries and
   // what is near it go at the end (commandReminder), not here
   if(allowed.has('eat') && g) ex.push('eat(food) e.g. eat(bread) - eat food you carry, or drink a potion you carry');
-  if(allowed.has('use') && g) ex.push('use(thing) e.g. use(chest) - use something near you: open a chest, sit on a seat, lie on a bed, work at an anvil');
+  if(allowed.has('use') && g) ex.push('use(thing) e.g. use(chest) - use something near you: open a chest, sit on a seat, lie on a bed, work at an anvil'+(leanPrompt(g)?' (walks over to it first); take(item, chest) and put(item, chest) take from or store in a chest':''));
   if(allowed.has('note')) ex.push('note(html) e.g. note(<h2>Warning</h2><p>the bridge is out</p>) - inscribe an HTML note on the ground; carrying it reads its text aloud');
   if(allowed.has('give_quest')) ex.push('give_quest(text) e.g. give_quest(find the magic sword)');
   if(allowed.has('inventory')) ex.push('inventory() - check the gold and items you are carrying');
@@ -4708,7 +4723,8 @@ function buildAgentPrompt(g, cfg) {
   if (!g || !cfg) return { systemMessage: '', commandReminder: '' };
   if (isSimpleBrain(g, cfg)) return buildSimplePrompt(g, cfg);
   const r=document.getElementById('visionRadius')?.value || 5;
-  const perception = buildVisiblePerception(g.id, r);
+  const lean = leanPrompt(g);
+  const perception = buildVisiblePerception(g.id, r, lean);
   const style = (cfg.style ?? 'goofy little creature').replace(/\s+/g, ' ').trim();
   const backstory = (cfg.backstory || '').replace(/\s+/g, ' ').trim();
   const mind = window.tablefolkMind && state.mind !== false;
@@ -4765,12 +4781,12 @@ function buildAgentPrompt(g, cfg) {
   // and gets re-prefilled every time, so duplicating ~20 command lines here cost
   // real seconds per turn. Re-add if the model starts forgetting the syntax.
   const commandReminder = [
-    'SYSTEM: ' + String(perception).slice(0, 2400),
+    (lean ? '' : 'SYSTEM: ') + String(perception).slice(0, 2400),
     // senses.js: a short menu of things it could do right here
     ...(window.tablefolkSenses?.hereLine ? [window.tablefolkSenses.hereLine(g)].filter(Boolean) : []),
     // a concrete use(...) for the thing nearest (it used to sit in the prefix,
     // which then changed whenever the character moved: no cache reuse)
-    ...(allowedFor(g).has('use') || commandsFor(g).has('use') ? [window.tablefolkUses?.exampleLine(g)].filter(Boolean) : []),
+    ...(!lean && (allowedFor(g).has('use') || commandsFor(g).has('use')) ? [window.tablefolkUses?.exampleLine(g)].filter(Boolean) : []),
     '',
     // Who it is, near the end where a small model looks hardest: its
     // personality sits at the top of the system prompt, and without this
@@ -4786,7 +4802,7 @@ function buildAgentPrompt(g, cfg) {
     ...(mind ? window.tablefolkMind.cardLines(g) : (goal ? ['Current goal: ' + goal] : [])),
     // skills' state-card lines (trade: wares and prices, and what the customer's offer means)
     ...(window.tablefolkSkills ? window.tablefolkSkills.cardLines(g) : []),
-    ...(recentActs.length ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
+    ...(recentActs.length && !lean ? ['Your last few turns: ' + recentActs.join(' | ')] : []),
     // agency.js (guided, free): the time, the activities it may start with do(...), what it set out to do this turn
     ...(window.tablefolkAgency?.promptLines?.(g) || []),
     // a turn the game chose to think on (mind.js thinkNow): at the end, so the
@@ -5759,7 +5775,7 @@ function installWorldAPI(){
     isTurnReady:()=>state.turn.phase==='ready',
     canSeeEachOther, disposeWorldObject, setCharacterLogicalPosition,
     defaultVoiceFor,
-    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, isSimpleBrain, onlySpokenTo, heardSpeech, saveWorldState, worldStateData, restoreWorldState,
+    spawnCharacter, spawnProp, spawnAt, clearWorld, clearConversationHistory, buildAgentPrompt, leanPrompt, isSimpleBrain, onlySpokenTo, heardSpeech, saveWorldState, worldStateData, restoreWorldState,
   };
 }
 

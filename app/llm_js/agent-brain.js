@@ -68,12 +68,12 @@ const SUPPORTED_MODELS = {
   'bonsai2-27b': { label: 'Bonsai 2.5 27B (WebGPU kernels; needs a 10 GB+ graphics card)', engine: 'bonsai2', size: '~6 GB', needGB: 10, readGB: 5.9, memGB: 9.4, prefer: 1, tightGB: 14, tightNote: 'on this card: light or medium graphics, no Breeze voice' },   // tightGB: on a card under 14 GB (12 GB) it peaks within 0.3 GB of the card with the game at high: the picker says so, high drops to medium (graphics-settings.js), no Breeze voice, adventure by default (modes.js)
     // Bonsai 2.5 since 2026-11-27 (same id, so saved choices and scenarios follow; brains.md "Bonsai 2.5"). The pick for 10-12 GB+ cards: 2.5 and 2 alike: 10.45 GB peak with the game at high quality, 11.3 in hearthvale's day, on a 4080 (2026-11-27); memGB: measured with an 8192 window (RTX 4070, 2026-11-13)
   // Inkling 2 Mini and SenseNova-Loop-9B on our faster wllama build (libs/brain/engines/wllama-fast; brains.md,
-  // "Faster in Chrome"). fitGB: listed in the picker only where the card has that much (with the game beside
+  // "Faster in Chrome"). parallel: model calls at once (llama.cpp slots batched in one graph; world-integration.js). fitGB: listed in the picker only where the card has that much (with the game beside
   // it); never picked for a device by itself (no needGB). Measured in the game in Chrome on an RTX 4080 Super
   // (game at medium): 12.8 / 10.9 / 8.9 GB peak; capability check 8, 7 and 10 of 10 (brains.md).
-  'inkling2-mini-wllama': { label: 'Inkling 2 Mini (llama.cpp WebGPU; needs a 16 GB graphics card)', engine: 'wllama3', size: '~8.7 GB', fitGB: 14, memGB: 11, readGB: 2.1, autoLoad: true },
-  'inkling2-mini-small-wllama': { label: 'Inkling 2 Mini, smaller file (llama.cpp WebGPU; needs a 12 GB graphics card)', engine: 'wllama3', size: '~6.6 GB', fitGB: 11, memGB: 9.2, readGB: 1.9, autoLoad: true },
-  'sensenova-loop-9b-wllama': { label: 'SenseNova-Loop-9B (llama.cpp WebGPU; needs a 10 GB graphics card)', engine: 'wllama3', size: '~6 GB', fitGB: 10, memGB: 7.2, readGB: 5.4, autoLoad: true },
+  'inkling2-mini-wllama': { label: 'Inkling 2 Mini (llama.cpp WebGPU; needs a 16 GB graphics card)', engine: 'wllama3', size: '~8.7 GB', fitGB: 14, memGB: 11, readGB: 2.1, autoLoad: true, parallel: 2 },
+  'inkling2-mini-small-wllama': { label: 'Inkling 2 Mini, smaller file (llama.cpp WebGPU; needs a 12 GB graphics card)', engine: 'wllama3', size: '~6.6 GB', fitGB: 11, memGB: 9.2, readGB: 1.9, autoLoad: true, parallel: 2 },
+  'sensenova-loop-9b-wllama': { label: 'SenseNova-Loop-9B (llama.cpp WebGPU; needs a 10 GB graphics card)', engine: 'wllama3', size: '~6 GB', fitGB: 10, memGB: 7.2, readGB: 5.4, autoLoad: true, parallel: 2 },
   // Ternary Bonsai 2 9B on the same WebGPU kernel engine (bonsai2.js): 1.86 GB
   // download, ~3.4 GB on the card at an 8192 window, ~107 tokens/s on an RTX 4070
   'bonsai2-9b': { label: 'Bonsai 2 9B (WebGPU kernels; needs a 6 GB graphics card)', engine: 'bonsai2', bonsaiSize: '9B', size: '~1.9 GB', needGB: 6, readGB: 1.9, memGB: 3.4 },
@@ -425,7 +425,7 @@ export function createAgentBrainManager(config = {}) {
     setModel,
     getModelKey,
     pickForDevice,
-    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB != null ? +(cfg.memGB + (ctxExtraGB[key] || 0)).toFixed(2) : cfg.memGB, readGB: cfg.readGB, tightGB: cfg.tightGB, tightNote: cfg.tightNote, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
+    getSupportedModels: () => Object.entries(SUPPORTED_MODELS).map(([key, cfg]) => ({ key, label: cfg.label, engine: cfg.engine, size: cfg.size, needGB: cfg.needGB, fitGB: cfg.fitGB, memGB: cfg.memGB != null ? +(cfg.memGB + (ctxExtraGB[key] || 0)).toFixed(2) : cfg.memGB, readGB: cfg.readGB, parallel: cfg.parallel || 1, tightGB: cfg.tightGB, tightNote: cfg.tightNote, hidden: !!cfg.hidden, simple: !!cfg.simple, autoLoad: !!cfg.autoLoad })),
     clearConversations: (agentId = null) => { if (getEngineType() === 'litert-lm') clearLiteRTConversations(agentId); },
   };
 }

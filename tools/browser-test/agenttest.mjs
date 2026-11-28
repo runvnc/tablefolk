@@ -43,7 +43,8 @@ if (render) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulati
 // ones too); --llm=<url> with --llm-model=<name> points the endpoint brain at
 // an OpenAI-compatible server (llama-server, Ollama ...).
 const pick = [flag('model') && 'model=' + flag('model').split('=')[1], flag('llm=') && 'llm=' + encodeURIComponent(flag('llm=').slice(6)), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model').split('=')[1])].filter(Boolean).join('&');
-await page.goto(base + '/app/' + (render ? `?gfx=${render}&fps=${fps}` : '?norender=1') + (pick ? '&' + pick : ''));
+// PAGE_QUERY: more URL parameters for the page (a before/after switch: lean=0&wpin=0&llmpar=1)
+await page.goto(base + '/app/' + (render ? `?gfx=${render}&fps=${fps}` : '?norender=1') + (pick ? '&' + pick : '') + (process.env.PAGE_QUERY ? '&' + process.env.PAGE_QUERY : ''));
 const shotDir = render ? `results/shots-${path.basename(scnFile, '.json')}-${Date.now()}` : null;
 if (shotDir) fs.mkdirSync(shotDir, { recursive: true });
 let shotN = 0;

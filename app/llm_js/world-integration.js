@@ -1,7 +1,7 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127f';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127g';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261127e';
+import { installDevConsole } from './dev-console.js?v=20261127f';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -620,7 +620,21 @@ function buildAgentMessages(world, g, cfg) {
   // turn changed the prompt right after the system message, so the engine's
   // cached prefix (LiteRT, Bonsai) was lost each turn and the whole prompt
   // was read again (Bonsai 2 27B on an RTX 3060: 9-14 s a turn).
-  const from = hist.length <= keep ? 0 : Math.floor((hist.length - keep) / 8) * 8;
+  let from = hist.length <= keep ? 0 : Math.floor((hist.length - keep) / 8) * 8;
+  // Lean prompts (guided, free: app.js leanPrompt) anchor the window on a message instead: the stored history is cut
+  // from the front in several places (slice(-40) on each line heard), so a window counted from the array's start moved
+  // nearly every other turn (Inkling's free day: 39 of 84 turns could not reuse the character's own history). The
+  // window starts at the anchor until it holds keep + 16 messages, then moves to the last `keep`: so a character's
+  // turn repeats its previous prompt up to the last message about 7 turns in 8, and the engine that keeps it
+  // (wllama-runner.js per-character slots; Bonsai's sessions) reads only what is new.
+  if (world.leanPrompt?.(g) && new URLSearchParams(location.search).get('anchor') !== '0') {
+    const a = cfg.histAnchor, same = m => a && m && m.role === a.role && m.content === a.content;
+    let i = a ? hist.findIndex(same) : -1;
+    if (i < 0 || hist.length - i > keep + 16) i = Math.max(0, hist.length - keep);
+    from = i;
+    const m = hist[from];
+    if (!same(m)) { cfg.histAnchor = m ? { role: m.role, content: m.content } : null; world.setBrainConfig(g.id, { histAnchor: cfg.histAnchor }); }
+  }
   for (const m of hist.slice(from)) {
     const last = messages[messages.length - 1];
     if (last && last.role === m.role) {
@@ -702,7 +716,11 @@ async function main() {
   // (modes-core.js createQueue: the highest "priority" first, then in order: the player's conversation (2) goes
   // before queued background calls, an adventure encounter's turns (1) before the rest; a call already running
   // is never stopped; a turn started early in turn mode (-1) last)
-  { const decide = manager.decide.bind(manager), Q = window.tablefolkModesCore?.createQueue?.();
+  // Two at once for llama.cpp brains with parallel slots (agent-brain.js `parallel`: Inkling 2 Mini, SenseNova on the
+  // wllama-fast build): its server reads and writes both in one graph (1.43x the tokens a second; brains.md "Two
+  // characters' calls at once"); the player's call still goes first (modes-core.js). ?llmpar=N overrides.
+  const parallelCalls = () => { const v = +new URLSearchParams(location.search).get('llmpar'); return v >= 1 ? v : manager.getSupportedModels().find(m => m.key === manager.getModelKey())?.parallel || 1; };
+  { const decide = manager.decide.bind(manager), Q = window.tablefolkModesCore?.createQueue?.({ slots: parallelCalls });
     // (window.tablefolkDecideSecs: the model's own seconds per call, without the wait: agency.js budgets turns by it)
     // (a call that never comes back, Gemma 4 12B on LiteRT with an above-rails prompt, is given up after
     // two minutes: the caller gets an error and the world goes on instead of stopping for good)

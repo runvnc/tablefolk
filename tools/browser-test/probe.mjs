@@ -5,7 +5,7 @@
 import { chromium } from 'playwright-core';
 const args = process.argv.slice(2), flag = n => { const a = args.find(x => x.startsWith('--' + n + '=')); return a ? a.split('=').slice(1).join('=') : null; };
 const base = flag('base') || 'http://localhost:8000';
-const q = ['probe=1', 'intro=0', 'gfx=light', 'fps=10', flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model'))].filter(Boolean).join('&');
+const q = ['probe=1', 'intro=0', 'gfx=light', 'fps=10', flag('model') && 'model=' + flag('model'), flag('llm') && 'llm=' + encodeURIComponent(flag('llm')), flag('llm-model') && 'llmModel=' + encodeURIComponent(flag('llm-model')), process.env.PAGE_QUERY].filter(Boolean).join('&');   // PAGE_QUERY: more URL parameters
 const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.CDP_PORT || 9223));
 const ctx = b.contexts()[0], page = await ctx.newPage();
 for (const p of ctx.pages()) if (p !== page) await p.close().catch(() => {});

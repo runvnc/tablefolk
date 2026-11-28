@@ -61,6 +61,35 @@ function stopsFor(template) {
   if (/^(chatml|raon|qwen-nothink)$/.test(template)) return ['<|im_end|>', '<|im_start|>'];
   return [MINICPM_END];
 }
+// Per-character slots (prefixCkpt engines): with no more characters than slots (less one for side calls), each character
+// keeps a llama.cpp slot of its own (id_slot), and the part of its prompt before the last message (the shared rules,
+// who it is, its history so far) is read with the request that leaves the slot's one checkpoint. Its next turn starts
+// with all of that (the history only grows until its window moves: world-integration.js anchors it), so it rolls back
+// to that checkpoint and reads only the new history and the last message (what it sees, its card, the news), instead of
+// everything past the shared rules. Characters go to the last slots: when the shared KV cache is full llama.cpp purges
+// idle slots from slot 0 up, so side calls (agency.js picks, day plans: slot 0) go first. ?wpin=0 turns it off.
+const SIDE = id => !id || /~|^(menu|api|agency|probe|tf-|default$)/.test(String(id));
+function slotFor(inst, agentId) {
+  const n = inst.tablefolkSlots || 4;
+  if (n < 2 || new URLSearchParams(globalThis.location?.search || '').get('wpin') === '0') return null;
+  const key = SIDE(agentId) ? '~side' : String(agentId);
+  const seen = inst.tablefolkSpeakers || (inst.tablefolkSpeakers = []);   // the last 24 characters' calls
+  if (key !== '~side') { seen.push(key); if (seen.length > 24) seen.shift(); }
+  const chars = new Set(seen);
+  if (chars.size > n - 1) return null;   // more characters than slots: the shared rules' checkpoint serves them better
+  if (key === '~side') return 0;
+  const pins = inst.tablefolkPins || (inst.tablefolkPins = new Map());
+  for (const k of [...pins.keys()]) if (!chars.has(k)) pins.delete(k);
+  if (!pins.has(key)) { const used = new Set(pins.values()); for (let s = n - 1; s >= 1; s--) if (!used.has(s)) { pins.set(key, s); break; } }
+  return pins.has(key) ? pins.get(key) : null;
+}
+// where the last message starts (its role marker): the part before it is what this character's next prompt repeats
+function lastMessageStart(prompt, messages, template) {
+  const last = messages[messages.length - 1];
+  if (!last || messages.length < 3 || !last.content) return -1;
+  const i = prompt.lastIndexOf(last.content); if (i < 0) return -1;
+  return prompt.lastIndexOf(template === 'inkling' ? '<|message_' : '<|im_start|>', i);
+}
 const cutAt = (text, stops) => stops.reduce((t, s) => { const i = t.indexOf(s); return i >= 0 ? t.slice(0, i) : t; }, text);
 
 function buildPrompt(messages, think, template) {
@@ -114,15 +143,23 @@ export function createWllama3Engine(wllamaInstance) {
           if (prefixCkpt) {
             const recent = wllamaInstance.tablefolkRecent || (wllamaInstance.tablefolkRecent = []);
             const primed = wllamaInstance.tablefolkPrimedParts || (wllamaInstance.tablefolkPrimedParts = []);
-            const plan = prefixPlan(prompt, recent, primed), cut = plan.cut;
+            const plan = prefixPlan(prompt, recent, primed);
+            let cut = plan.cut;
             ownCkpt = plan.own;
+            // a character with a slot of its own: the checkpoint goes before its last message (above)
+            const pin = config.rawPrompt ? null : slotFor(wllamaInstance, config.agentId);
+            if (pin !== null) {
+              slot = pin;
+              const h = pin > 0 ? lastMessageStart(prompt, messages, wllamaInstance.tablefolkTemplate) : -1;
+              if (h >= MIN_SHARED) { cut = h; ownCkpt = false; }
+            }
             recent.push(prompt); if (recent.length > 16) recent.shift();
-            if (cut > 0 && !primed.includes(prompt.slice(0, cut))) { primed.push(prompt.slice(0, cut)); if (primed.length > 16) primed.shift(); }
+            if (cut > 0 && (pin === null || pin === 0) && !primed.includes(prompt.slice(0, cut))) { primed.push(prompt.slice(0, cut)); if (primed.length > 16) primed.shift(); }
             if (cut > 0) {
               try {
-                const r = await wllamaInstance.createCompletion({ prompt: prompt.slice(0, cut), max_tokens: 1, temperature: 0, cache_prompt: true, checkpoints: true });
-                slot = Number.isInteger(r?.id_slot) ? r.id_slot : null;
-                console.log('[tablefolk-wllama3] prefix read:', cut, 'chars, prompt_n=', r?.timings?.prompt_n, 'cache_n=', r?.timings?.cache_n, 'slot', slot);
+                const r = await wllamaInstance.createCompletion({ prompt: prompt.slice(0, cut), max_tokens: 1, temperature: 0, cache_prompt: true, checkpoints: true, ...(slot !== null ? { id_slot: slot } : {}) });
+                if (slot === null) slot = Number.isInteger(r?.id_slot) ? r.id_slot : null;
+                console.log('[tablefolk-wllama3] prefix read:', cut, 'chars, prompt_n=', r?.timings?.prompt_n, 'cache_n=', r?.timings?.cache_n, 'slot', slot, pin !== null ? 'pinned ' + (config.agentId || '') : '');
               } catch (e) { console.warn('[tablefolk-wllama3] prefix read failed:', e?.message); }
             }
           }
@@ -206,7 +243,7 @@ export function createWllama3Engine(wllamaInstance) {
               'prompt_n=', timings.prompt_n, 'prompt_ms=', Math.round(timings.prompt_ms ?? 0),
               'PREFILL=', timings.prompt_per_second?.toFixed?.(1), 'tok/s',
               '| predicted_n=', timings.predicted_n,
-              'DECODE=', timings.predicted_per_second?.toFixed?.(1), 'tok/s', '| cache_n=', timings.cache_n);
+              'DECODE=', timings.predicted_per_second?.toFixed?.(1), 'tok/s', '| cache_n=', timings.cache_n, '| slot', slot, config.agentId || '');
           }
           console.log('[tablefolk-wllama3] RAW OUTPUT at', new Date().toISOString(),
             'elapsed ms:', Math.round(totalMs), 'chars:', text.length,
@@ -237,6 +274,7 @@ export async function generate(engine, prompt, opts = {}) {
     shouldAbort: opts.shouldAbort ?? null,
     ...(opts.rawPrompt ? { rawPrompt: opts.rawPrompt } : {}),
     ...(opts.stops ? { stops: opts.stops } : {}),
+    agentId: opts.agentId || null,
   };
 
   opts.debugLog?.('wllama3 request config', {
