@@ -2284,6 +2284,91 @@ rented card (tools/cloud-gpu/README.md steps 1-3 first, tunnel on 9231):
     # a living village as the player gets it (far characters on rails), scored as before
     node live-eval.mjs scenarios/hearthvale.json --minutes=6 --autonomy=guided --model=bonsai2-9b --mode-radius=12 --label=living12
 
+## Rented-card checks: modes, decider, windows (2026-11-27)
+
+What the game modes, the decider and the larger Bonsai windows do on cards the
+owner's laptop cannot stand in for. One rented **RTX 4070 12 GB** (vast.ai,
+driver 615.71, Chrome 158) for the 12 GB rows, one **RTX 4080 SUPER 16 GB**
+(driver 595.99) for the 16 GB ones; everything ran ON the box
+(`tools/cloud-gpu/gpu-checks.sh`: a fresh Chrome per step, graphics memory
+sampled each second). Models from the R2 mirror. One run each.
+
+**Capability check** (probe.mjs, 4070): Bonsai 2 9B 6/10 (missed character,
+mind, danger, haggle), 30.4 tokens/s -> guided with talk, danger and temper in
+code; Bonsai 2.5 27B 9/10, 27.8 tokens/s -> **free**.
+
+### A. Game modes on 12 GB (hearthvale, guided unless said)
+
+| | Bonsai 2 9B | Bonsai 2.5 27B |
+|---|---|---|
+| living: the player's 4 lines, a reply after the send | 1.9-5.1 s (first words 1.7-4.3 s) | 16-26 s (first words 15-25 s) |
+| living: calls queued at each send | 0-1 | 3-5 |
+| living: calls by characters beyond modeRadius 12 | 0 of 14 | 0 of 13 |
+| adventure: exploring 40 s | 0 model calls | 0 |
+| adventure: a line answered | 2.8-4.8 s (first words 2.4-4.6) | 8.4 s (first words 7.4-7.6) |
+| adventure: after walking away (30 s) | 0 calls, memory kept | 1 (the last line's call finishing), memory kept |
+| turns, guided: rounds 1-4 | 5.4 / 0.8 / 0.7 / 0.6 s | 9.6 / 43.3 / 0.7 / 0.0 s |
+| turns, free: rounds 1-3 | 5.8 / 0.7 / 1.8 s (2 model calls in all) | 12.6 / 1.3 / 1.4 s (1 call) |
+| early turns used / dropped | 0 / 0 (the first in order always near the player) | 0 / 0 |
+| peak graphics memory (the game at light) | 5.6-5.7 GB | 10.9 GB |
+
+- **The player's line in living mode** goes first (the reply trace shows the
+  lock taken at 0 ms, the call ahead of the 3-5 waiting): what it waits for is
+  the call already running and its own. With the 9B both are 1-4 s; with the
+  27B on a 4070 a call reading a 2,000-token turn prompt takes 15-26 s, so a
+  conversation in living mode is slow there. Adventure halves it (nothing else
+  queued: 8 s). modes-eval's living pairing is one line off when the character
+  had a line of its own under way (the 9B's first "1.5 s" was Brann's own
+  line); the trace has the true order.
+- **Turn rounds** cost what the characters' model calls cost; at guided and
+  free most turns continue an activity in code (1-2 calls in 3-4 rounds of
+  five). The 27B's guided round 2 took 43 s with no model output logged in it
+  (tam's turn): re-run on the 16 GB card with every call recorded (below).
+- **modeWhen** (`modes-eval.mjs --mode=when`, the 9B): 7/7. A line to tam ->
+  adventure in 0.1 s; the encounter ended -> living 0.4 s; a villager turned
+  on the player beside it -> turns 0.7 s, living again 6.0 s after (the hold);
+  the player put inside a room -> turns 0.4 s; outside -> living 0.2 s.
+- **Living as played** (`live-eval --mode-radius=12`, the 9B, 6 minutes, the
+  player idle): 31 model calls (2.6 a game hour), 27% of activities chosen by
+  the model, 6 of 22 lines by the model, wasted 10%, peak 8.3 GB.
+
+### B. The decider beside the brain on 12 GB (`god-words-eval.mjs`, god-village)
+
+| | 9B, decider off | 9B, on (downloads it) | 9B, auto (cached) | 27B, auto | 27B, on |
+|---|---|---|---|---|---|
+| loaded | - | 31.5 s (2 GB from Hugging Face) | 11.6 s | stays off: 2.6 GB left, wants 3.1 | failed (ABORT) after 17 s; the brain went on working |
+| peak graphics memory | 5.6 GB | 8.2 GB | 8.2 GB | 10.7 GB | 10.9 GB |
+| a question | - | 0.5-0.87 s | 0.5-1.4 s | - | - |
+| 8 hard council lines (stance) | matcher (the brain) 5/8 | decider 4/8 | decider 4/8 (matcher 4/8) | the 27B's own pick 3/8 (5 "none of these") | 3/8 |
+| 8 decrees | 8/8 (6 code, 2 matcher 1-541 ms) | 8/8 (2 by the decider, 0.45 s each) | 8/8 | 8/8 (one by the 27B: 22 s) | 8/8 |
+
+- Auto does what it says: on when cached and the card has room (the 9B on 12
+  GB), off for the 27B on 12 GB. Forced on beside the 27B it fails cleanly.
+- Its stances are the same 4/8 as on the RTX 2060 (it is deterministic); the
+  brain's own pick is no better (9B 5/8, 4/8 on a second run; 27B 3/8, as it
+  answers "none of these" to lines it finds ambiguous). The decider's worth is
+  time: 0.5-1.4 s against a 27B call of 6-22 s, a 9B call of 1-3 s.
+- Council speeches from these bigger models give reasons, and code's
+  `stanceOf` read 7 of 16 as bargains ("I refuse, for if the god demands...",
+  "I agree, for ... Finn may doubt, but ...", "half my week's rations ... I
+  refuse"): **fixed** (god-core.js: the first sentence that takes a side
+  decides, read up to its reason; god-rules-test 31/31 stances).
+
+### C. The enlarged windows on 12 GB
+
+| | window chosen | peak graphics memory |
+|---|---|---|
+| 9B characters (`contextFor(12 - 3.4 - 3.9)`) | 16384 (diagnostics note) | 9.85 GB: hearthvale living at high graphics, prompts of 2k, 14k tokens (14k read in 48 s) and calls two and three at once; roles evals at high 7.7 GB |
+| 27B characters (`12 - 9.4 - 3.9` < 0) | 8192 | **11.96 GB of 12.28**: the same with a 7.7k prompt (81 s); roles evals at high 10.4 GB |
+| 9B world builder (`12 - 3.4 - 0.8`) | 32768 (computed) | 5.0 GB; the one-answer world failed its checks three times (place names), so the window was not filled |
+| 27B world builder (`12 - 9.4 - 0.8`) | 20480 (computed) | 10.5 GB, a world in one answer in 147 s |
+
+Nothing ran out of memory; a prompt past the window is refused cleanly
+("needs 26432 tokens ... the context holds 16384"). The 27B on 12 GB is 0.3
+GB from the card's end with the game at high graphics and no voice; the 9B's
+16k window leaves 2.4 GB at its peak, not the 2 GB a voice is budgeted
+(where the peak comes from: 16 GB rows below, per-second samples).
+
 ## Spatial commands: can a model pick the squares? (2026-11-27)
 
 The question: can a brain turn "wall in the farm with a gate facing the road",
