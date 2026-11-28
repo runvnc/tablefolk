@@ -2388,8 +2388,13 @@ code; Bonsai 2.5 27B 9/10, 27.8 tokens/s -> **free**.
   line); the trace has the true order.
 - **Turn rounds** cost what the characters' model calls cost; at guided and
   free most turns continue an activity in code (1-2 calls in 3-4 rounds of
-  five). The 27B's guided round 2 took 43 s with no model output logged in it
-  (tam's turn): re-run on the 16 GB card with every call recorded (below).
+  five). The 27B's guided round 2 took 43 s with no answer of its own: re-run
+  on the 16 GB card with every call recorded (modes-eval now saves them), it
+  was four characters' day plans (agency.js `planDay`, asked as the first
+  round ended) ahead of maren's reaction in the queue, 35.5 s. **Fixed**: in
+  turn mode a day plan asks at priority -1 (after turns and reactions; not in
+  real time, where a busy queue could starve it). Re-run: guided rounds 8.8 /
+  0.6 / 0.6 / 0.6 s, free 8.2 / 0.1 / 0.0 s, the plans answered between rounds.
 - **modeWhen** (`modes-eval.mjs --mode=when`, the 9B): 7/7. A line to tam ->
   adventure in 0.1 s; the encounter ended -> living 0.4 s; a villager turned
   on the player beside it -> turns 0.7 s, living again 6.0 s after (the hold);
@@ -2434,6 +2439,74 @@ Nothing ran out of memory; a prompt past the window is refused cleanly
 GB from the card's end with the game at high graphics and no voice; the 9B's
 16k window leaves 2.4 GB at its peak, not the 2 GB a voice is budgeted
 (where the peak comes from: 16 GB rows below, per-second samples).
+
+### D. 16 GB: the windows with Bonsai 2.5 27B, and a God of Ashford session
+
+RTX 4080 SUPER 16 GB. Capability check this time: 27B 7/10, 42.2 tokens/s ->
+guided; 9B 5/10, 98.5 tokens/s -> assisted (the check is sampled: 9/10 and
+6/10 on the 4070 the same day).
+
+| | window chosen | peak graphics memory |
+|---|---|---|
+| 27B characters (`16 - 9.4 - 3.9` = 2.7 GB spare: capped) | 16384 | 13.5 GB: hearthvale at high graphics, a 14k-token prompt read in 79-97 s, two and three calls at once (13-54 s); roles evals at high 11.3 GB (4/4 won, the 9B 2/4 on 12 GB) |
+| 27B with the decider (on, then auto: loaded in 7.7 s when cached) | 16384 | 14.3 GB; a question 0.46-0.72 s; 8/8 decrees, the same 4/8 hard stances |
+| 27B world builder (`16 - 9.4 - 0.8`) | 32768 (computed) | 12.2 GB, a world in one answer in 117 s |
+| 9B characters, for the timeline | 16384 | 9.8 GB |
+
+Per-second samples: the peak is reached at the first model call after loading
+(27B: 9.6 GB loaded, 13.3 GB five seconds into the first call; 9B: 7.3 ->
+9.8 GB) and stays flat through the 14k-token prompts: the window's cache and
+the first call's buffers, not the prompt's length. In the game the 9B at 16384
+peaked lower (5.7 GB at light graphics in living mode, 7.7 GB with roles at
+high); in llm-sweep the first call takes 2.5 GB more, not explained yet (a
+second session for the sweep's own agent id?). For the 27B the window
+estimate holds: 16384 against 8192 costs 1.5 GB (estimated 1.2).
+
+**God of Ashford, Bonsai 2.5 27B at guided** (`live-eval.mjs
+scenarios/god-village.json --minutes=13 --autonomy=guided
+--query=dayMinutes=24` with `god-player.mjs --hours=10` on the same page):
+the scripted god blessed the field (h0.6), decreed an offering of three bread
+(h1.5), sent an omen "rain will come to the fields" (h4) and the rain (h5), a
+dream to the least devout (Finn, h9.5: the script waited 3 game hours on the
+dream's words box, fixed in god-player) and a decree to pray at dusk (h9.6).
+
+| | |
+|---|---|
+| model calls | 123 (9.5 a game hour): plan 10, reaction 15, react 13, god 15, choose 12, talk 14, reply 11, pick 3 |
+| a turn, median | 13.0 s |
+| activities chosen by the model | 100%; 13 self-started lines, 29 surprises, reply depth 0.47 |
+| wasted / safety nets / starving | 3% / 0 / none |
+| councils | 33 s and 41 s, 5-6 model calls each; both accepted 3-2 (Ada, Wren, Tilly for; Bram, Finn against), every vote matching its speech, all 10 read by code |
+| decrees | the offering met (the bread brought); prayer at dusk still open at the end |
+| prayers | 2 in 10 game hours, both thanks (Ada, Tilly), let lapse |
+| belief (average) | 54.4 -> 56.7 (offering met, h3) -> 57.6 (omen, h4.6) -> 60.5 (rain fulfilled it, h5.6) -> 58.9 (h10); Finn 22 -> 29, Bram 30 -> 35 |
+| mana | 21-34 (25 at the end) |
+| peak graphics memory | 11.9 GB |
+| judge (deepseek-v4.1-flash, 5 villagers) | coherence 4.0, personality 4.6, purpose 4.4, surprise 3.2 |
+
+Reading: the 27B runs the God game well on 16 GB: councils in character
+("Three loaves? That's more than half my pantry... I refuse"), the faithful
+giving reasons of their own, the dream told aloud ("the god told me in my
+sleep that doubt is no sin"). Prayers are rare at this belief and pace (two,
+both thanks): a god player has little to answer in the first day.
+
+### Recommendations
+
+- **Picker windows**: keep `contextFor` as it is. On 12 GB the 9B gets 16384
+  and the 27B 8192, nothing ran out of memory; on 16 GB the 27B's 16384 peaks
+  at 13.5 GB with the game at high (14.3 with the decider), which leaves a
+  voice its 2 GB. The 27B on a 12 GB card is 0.3 GB from the end at high
+  graphics: offer it there only at light or medium graphics and without a
+  Breeze voice (its `needGB` 10 stands, but the picker should say so).
+- **Decider auto rule**: right as it is: it loaded beside the 9B on 12 GB and
+  the 27B on 16 GB once cached (8-12 s), and stayed off beside the 27B on 12
+  GB (forced on it failed cleanly). Its stance accuracy is no better than the
+  brain's (4/8 against 3-5/8); keep it for speed beside slow brains (0.5-0.7
+  s against a 27B call of 6-22 s), and keep code's `stanceOf` first.
+- **Mode defaults**: with the 27B on a 12 GB card make adventure the default
+  (a reply in 8 s against 16-26 s in a living village, where 3-5 calls wait);
+  with the 9B living is fine (2-5 s). Turn mode: day plans no longer hold a
+  round (fixed: priority -1 in turn mode).
 
 ## Spatial commands: can a model pick the squares? (2026-11-27)
 
