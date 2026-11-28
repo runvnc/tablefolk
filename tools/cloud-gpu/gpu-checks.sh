@@ -10,7 +10,7 @@ step() { # step <name> <timeout> <cmd...>
   local n=$1 to=$2; shift 2; fresh; echo "== $(date +%T) $n" >> "$L/queue.log"
   rm -f /root/mem-$n.txt; ( while true; do nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits >> /root/mem-$n.txt; sleep 1; done ) & local sp=$!
   timeout "$to" "$@" > "$L/$n.log" 2>&1; local rc=$?
-  kill $sp 2>/dev/null; echo "$n rc=$rc peakMiB=$(sort -n /root/mem-$n.txt | tail -1) baseMiB=$(head -1 /root/mem-$n.txt)" >> "$L/peaks.txt"
+  kill $sp 2>/dev/null; cp /root/mem-$n.txt "$L/mem-$n.txt"; echo "$n rc=$rc peakMiB=$(sort -n /root/mem-$n.txt | tail -1) baseMiB=$(head -1 /root/mem-$n.txt)" >> "$L/peaks.txt"
 }
 for s in "$@"; do
   m=${s#*:}; k=${s%%:*}
