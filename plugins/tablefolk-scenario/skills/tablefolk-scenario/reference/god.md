@@ -192,7 +192,7 @@ votes matched the speeches: the faithful agreed with reasons of their own
 character ("Three loaves? That's more than half my pantry... I refuse"), and
 all 10 speeches were read by code. The offering was carried out and met. Only
 two prayers came in 10 hours, both thanks (nothing to answer). Finn told his
-dream aloud the next morning. Belief went from 54 to 60.5 after the omen came
+dream aloud ("the god told me in my sleep that doubt is no sin"). Belief went from 54 to 60.5 after the omen came
 true, then settled at 59; mana stayed between 21 and 34. An LLM judge
 (`judge.mjs`) gave the villagers 4.0 coherence, 4.6 personality, 4.4
 purpose, 3.2 surprise. Tools: `tools/browser-test/god-player.mjs` beside
