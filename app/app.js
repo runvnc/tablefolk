@@ -77,7 +77,8 @@ async function createEngine(){
   if(!navigator.gpu) throw new Error('WebGPU unavailable in this browser');
   // Light quality renders one pixel per screen point on high-DPI screens (2x
   // the pixels there cost 4x the fill and render-target memory).
-  const engine = new BABYLON.WebGPUEngine(canvas,{antialias:true,adaptToDeviceRatio:!window.TABLEFOLK_GFX?.lite});
+  // (the compressed texture formats the card has: the kit's KTX2 textures transcode to them; Babylon asks for none by default)
+  const engine = new BABYLON.WebGPUEngine(canvas,{antialias:true,adaptToDeviceRatio:!window.TABLEFOLK_GFX?.lite,deviceDescriptor:{requiredFeatures:['texture-compression-bc','texture-compression-etc2','texture-compression-astc']}});
   await engine.initAsync(); return engine;
 }
 function mat(scene,name,texture,opts={}){
@@ -4481,9 +4482,10 @@ function shortList(details){
 // "Nearby visible objects" list (the "Around you" lines already name every thing with its steps and square), a one-line
 // header, no use(...) help at the end (its take/put part is in the command list, the stable prefix) and no "Your last
 // few turns" (the history has them). On Inkling 2 Mini's free day these were ~300 of the ~1,860 tokens read past the
-// shared rules each call (brains.md, "Fewer prompt tokens").
+// shared rules each call (brains.md, "Fewer prompt tokens"). Off by default until full days and the evals show it costs
+// no quality (2026-11-27): ?lean=1 turns it on for characters above rails.
 function leanPrompt(g){
-  try { const v=new URLSearchParams(location.search).get('lean'); if(v==='0') return false; if(v==='1') return true; } catch {}
+  try { const v=new URLSearchParams(location.search).get('lean'); if(v!=='1') return false; } catch { return false; }
   const lv=window.tablefolkAgency?.level?.(g);
   return !!lv && lv!=='rails';
 }
