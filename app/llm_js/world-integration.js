@@ -1,7 +1,7 @@
 import { cleanReply, wordCount } from './reply-clean.js?v=20261121b';
-import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127d';
+import { createAgentBrainManager, getEndpointConfig, setEndpointConfig } from './agent-brain.js?v=20261127e';
 import { localClient } from '../../libs/brain/engines/openai.js';
-import { installDevConsole } from './dev-console.js?v=20261127c';
+import { installDevConsole } from './dev-console.js?v=20261127d';
 import { clearModelCache as clearLiteRTCache, hasModelCached as hasLiteRTCached, litertClient } from '../../libs/brain/engines/litert.js';
 import { clearModelCache as clearTJSCache, hasModelCached as hasTJSCached } from './model-loader-tjs-v2.js?v=20261030g';
 import { hasBonsai2Cached, clearBonsai2Cache } from '../../libs/brain/engines/bonsai2.js';
@@ -312,7 +312,7 @@ async function clearActiveModelCache(manager) {
 async function hasActiveModelCached(manager) {
   const engine = getActiveEngine(manager);
   if (engine === 'openai' || engine === 'none') return true; // nothing to download
-  if (engine === 'bonsai2') return hasBonsai2Cached({ 'bonsai2-9b': '9B', 'bonsai2-27b-v2': '27B-v2' }[manager.getModelKey()] || '27B');
+  if (engine === 'bonsai2') return hasBonsai2Cached({ 'bonsai2-9b': '9B' }[manager.getModelKey()] || '27B');
   if (engine === 'lfm3') return hasLfm3Cached();
   if (engine === 'litert-lm') return hasLiteRTCached(manager.getModelKey());
   if (engine === 'wllama') return hasWllamaCached(manager.getModelKey());

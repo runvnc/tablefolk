@@ -72,7 +72,7 @@
     const status = p => emit('progress', { stage: 'loading', label: typeof p === 'string' ? p : p?.text || 'loading…' });
     if (/^bonsai2-/.test(key)) {
       if (!navigator.gpu) throw new Error('Bonsai 2 needs WebGPU (Chrome or Edge on a recent graphics card)');
-      const b = await import(BONSAI2), size = { 'bonsai2-9b': '9B', 'bonsai2-27b-v2': '27B-v2' }[key] || '27B';
+      const b = await import(BONSAI2), size = { 'bonsai2-9b': '9B' }[key] || '27B';
       // the builder's window: as large as the card holds beside the model (no game is drawn
       // on this page; 0.8 GB kept free), up to 32768, never less than the caller asked for
       let ctx = context || 0;

@@ -49,9 +49,7 @@ and history: [minds.md](minds.md) and [vision-speech.md](vision-speech.md).
   `PTQ1_0` file, on webml-community's WebGPU kernel engine (the `qwen35-vision`
   module of the Space `webml-community/ternary-bonsai-2-hermes-webgpu`, fetched
   at a pinned revision and imported from a blob URL; nothing of it is in the
-  repo). `SIZES` in bonsai2.js: `27B` (2.5), `27B-v2` (Bonsai 2 27B,
-  `Ternary-Bonsai-2-27B-gguf` at `839bd570`, from the R2 mirror; hidden picker
-  entry `bonsai2-27b-v2`), `9B` (Bonsai 2 9B, unpinned: a pin changes the URL
+  repo). `SIZES` in bonsai2.js: `27B` (2.5; Bonsai 2 27B, which it replaced, was removed 2026-11-27), `9B` (Bonsai 2 9B, unpinned: a pin changes the URL
   and so the engine's cache key). Each size has its own localStorage flag for a
   finished load (`_bonsai25_loaded`, `_bonsai2_loaded`, `_bonsai2_loaded_9B`),
   so a cached Bonsai 2 does not pass for 2.5; after 2.5 loads, the engine's

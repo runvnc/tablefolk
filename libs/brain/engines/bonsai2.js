@@ -22,13 +22,11 @@ const ENGINE_URL = `https://huggingface.co/spaces/webml-community/ternary-bonsai
 // '27B' is Ternary Bonsai 2.5 27B (2026-11-24: the same Qwen3.8-27B architecture,
 // tokenizer, chat template and Hadamard rotation as Bonsai 2, new weights; only
 // the 96 small ssm_alpha/ssm_beta tensors went from BF16 to F32, 47 MB more), pinned
-// to a revision. '27B-v2' is the Bonsai 2 27B it replaced (hidden picker entry
-// bonsai2-27b-v2). flag: the localStorage key that marks a finished load, so a
+// to a revision (Bonsai 2 27B, which it replaced, was removed 2026-11-27). flag: the localStorage key that marks a finished load, so a
 // Bonsai 2 copy in the cache does not pass for 2.5. The 9B stays unpinned: pinning
 // would change its URL and so the engine's cache key (a fresh download for everyone).
 export const SIZES = {
   '27B': { repo: 'prism-ml/Ternary-Bonsai-2.5-27B-GGUF', revision: '28a7093cc25bc151cc2b284c5570f12ce343fdcf', file: 'Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai/hf/prism-ml/Ternary-Bonsai-2.5-27B-GGUF/resolve/28a7093cc25bc151cc2b284c5570f12ce343fdcf/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf', flag: '_bonsai25_loaded', name: 'Bonsai 2.5 27B', replaces: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf' },   // mirrored on R2 2026-11-27 (SHA-256 checked)
-  '27B-v2': { repo: 'prism-ml/Ternary-Bonsai-2-27B-gguf', revision: '839bd57023c1558945afea70a74fa83c054f35f9', file: 'Ternary-Bonsai-2-27B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai-2-27b/Ternary-Bonsai-2-27B-PTQ1_0.gguf', flag: '_bonsai2_loaded', name: 'Bonsai 2 27B' },
   '9B': { repo: 'prism-ml/Ternary-Bonsai-2-9B-gguf', file: 'Ternary-Bonsai-2-9B-PTQ1_0.gguf', mirror: 'https://geebr-models.mindroot.io/bonsai/hf/prism-ml/Ternary-Bonsai-2-9B-gguf/resolve/82265ccc78ddaac4700286a35e9badcc32376dd9/Ternary-Bonsai-2-9B-PTQ1_0.gguf', flag: '_bonsai2_loaded_9B', name: 'Bonsai 2 9B' },   // mirrored on R2 2026-11-27 at Hugging Face revision 82265cc (SHA-256 checked); the fallback stays unpinned
 };
 export const BONSAI2_FILE = SIZES['27B'].file;
@@ -42,7 +40,7 @@ const CONTEXT = 8192;   // tokens: the window every measurement was made with (t
 // tokens; brains.md "Bonsai"); the 9B estimated from its shape (8 of its 32
 // layers keep a KV cache against 16 of the 27B's 64: half). Rounded down to a
 // multiple of 1,024, at least CONTEXT, at most `max`.
-const GB_PER_1K = { '27B': 0.15, '27B-v2': 0.15, '9B': 0.075 };
+const GB_PER_1K = { '27B': 0.15, '9B': 0.075 };
 export function contextFor(spareGB, size = '27B', { max = 32768, min = CONTEXT } = {}) {
   const per = GB_PER_1K[size] || GB_PER_1K['27B'];
   const extra = Number.isFinite(+spareGB) && spareGB > 0 ? Math.floor(spareGB / per) * 1024 : 0;

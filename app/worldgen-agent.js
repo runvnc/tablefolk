@@ -42,7 +42,7 @@
   // qwen-xml: Qwen 3.5's template (Bonsai 2/2.5 are Qwen 3.5 based; SenseNova-Loop-9B's own template):
   //   <tool_call>\n<function=NAME>\n<parameter=KEY>\nVALUE\n</parameter>\n</function>\n</tool_call>
   // inkling: Inkling 2's template: <|message_model|>NAME<|content_invoke_tool_json|>{"name":NAME,"args":{...}}<|end_message|>
-  const AGENT_MODELS = { 'bonsai2-27b': 'qwen-xml', 'bonsai2-27b-v2': 'qwen-xml', 'bonsai2-9b': 'qwen-xml', 'sensenova-loop-9b-wllama': 'qwen-xml', 'inkling2-mini-wllama': 'inkling', 'inkling2-mini-small-wllama': 'inkling' };
+  const AGENT_MODELS = { 'bonsai2-27b': 'qwen-xml', 'bonsai2-9b': 'qwen-xml', 'sensenova-loop-9b-wllama': 'qwen-xml', 'inkling2-mini-wllama': 'inkling', 'inkling2-mini-small-wllama': 'inkling' };
   function canAgent(modelKey, info = null) {
     if (modelKey === 'endpoint' || modelKey === 'own') {
       if (info?.tools === false) return { ok: false, format: 'openai', why: 'the provider says this model does not take tools' };

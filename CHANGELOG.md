@@ -6,6 +6,7 @@ skill (internals); `git log` has every commit.
 
 ## 2026-11-27
 
+- 2026-11-27: Bonsai 2 27B (the September release) removed: the hidden picker entry `bonsai2-27b-v2`, its engine size and its R2 copy; Bonsai 2.5 27B replaces it.
 - **God game councils read bigger models' speeches right**: Bonsai 2 9B and 2.5 27B give reasons ("I refuse, for if the god demands a sacrifice...", "I agree, for ... Finn may doubt, but ..."), and code read 7 of 16 such speeches as bargains; now the first sentence that takes a side decides, read up to its reason, and "half" is a deal only as "half now" or "half of it".
 - Measured on rented 12 GB and 16 GB cards (maintainer skill, brains.md "Rented-card checks"): the game modes with Bonsai 9B and 27B, the decider beside them (auto loads it beside the 9B on 12 GB, stays off beside the 27B), the larger Bonsai windows (nothing ran out of memory), and a God of Ashford session with Bonsai 2.5 at guided. Test tools: `modes-eval.mjs --mode=when`, `god-player.mjs`, `god-words-eval.mjs --local=0`, `llm-sweep.mjs --gfx --scenario`, `tools/cloud-gpu/gpu-checks.sh`; on a rented box Chrome is now let exit before the next test (killed at once it lost the note that a model was downloaded).
 - Phones: the world's name chip stops short of the compass (it ran under it, top right).
