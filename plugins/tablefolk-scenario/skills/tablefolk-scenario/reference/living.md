@@ -232,8 +232,17 @@ themselves. `"autonomy"` on a character or the scenario (`rails`,
 `assisted`, `guided`, `free`, or an object: below), else the player's choice
 in Settings ("How much do characters decide for themselves?"), else **Auto**:
 a short capability check the first time a brain runs on this device (ten
-small tasks and its speed, about 20-60 s, kept in the browser) picks the
-level; a slow machine gets a lower one. Settings' "Running now" says which
+tasks and its speed, about 20-60 s, kept in the browser) picks the
+level; a slow machine gets a lower one. Its last task is a whole turn as the
+game writes it (a starving woodcutter with a deadline: does he eat first?),
+and the time that turn takes counts as much as the score: Auto chooses
+**free** only for a brain that also writes 40 tokens a second
+and answers that turn within about 6 s, and a slower brain (under 35 tokens
+a second, or that turn over 8 s) keeps **needs** in code, so its villagers
+are fed even when their turns come slowly. (Measured: every brain at 17-28
+tokens a second, the 27B on 12-16 GB cards, Inkling, SenseNova, ended its
+free days with 2-4 villagers hungry and below its own guided day, whatever
+its score.) Settings' "Running now" says which
 level runs and why. The world builder sets the scenario's level on the Story
 tab (the same five choices, Auto by default) and a character's own in its
 box on the Characters tab ("decides for itself"); the AI that builds worlds
@@ -309,8 +318,9 @@ guided and free are all model (free with open turns). `"autonomy"` may be
 an object that changes some of them: `{"preset": "guided", "danger":
 "code"}` (domains it does not name come from the preset; with no
 `"preset"`, from the player's setting or the brain's). On Auto the
-capability check marks each decision it failed for code, so a brain may come
-out as "guided (danger and needs in code)"; Settings and Running now say so.
+capability check marks each decision it failed for code (and needs for a
+slow brain, above), so a brain may come out as "guided (danger and needs in
+code)"; Settings and Running now say so.
 A need a character keeps failing to meet (two failed tries to eat, or to get
 to bed) is handled by the game for three game hours, then handed back.
 Brains below the check's comfortable band see a short menu (needs, their

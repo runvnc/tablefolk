@@ -21,6 +21,8 @@
  *     (group: the character's group's request, between its own and the world's; source 'group')
  *     the whole rule with a brain too weak for a world's request (below; living.md, "How much characters decide")
  *   tablefolkProfile.describe(profile) -> "guided" | "guided (danger and needs in code)"
+ *   tablefolkProfile.fromCheck(result) -> { level, domains, comfortable, slow, turnS, why }: Auto's level from
+ *     the capability check (agency.js runs it; v4 rule below, brains.md "Calibrating the check against the days")
  * A classic script with no game globals (Node imports it for tools/browser-test/profile-test.mjs).
  */
 (function (window) {
@@ -88,5 +90,46 @@
     const parts = [by('code').length ? by('code').join(' and ') + ' in code' : '', by('model').length ? by('model').join(' and ') + ' by the model' : ''].filter(Boolean);
     return `${p.preset} (${parts.join('; ')})`;
   }
-  window.tablefolkProfile = { DOMAINS, PRESETS, NAMES, normalize, resolve, choose, describe };
+  // ---------------------------------------------------------------- Auto from the capability check
+  // Calibrated (v4, 2026-11-27) on every recorded check beside the measured hearthvale days (brains.md,
+  // "Calibrating the check against the days"): the score's items did not predict a free day (SenseNova-Loop-9B
+  // 10/10 in Chrome left 4 hungry; every brain at 17-28 tokens/s, 27B on 12-16 GB, Inkling, SenseNova, ended
+  // its free days with 2-4 hungry and below its own guided day); what did was speed. So:
+  //  - the share of items gives the preset as before (free .85, guided .6, assisted .5);
+  //  - free also needs 40 tokens/s written and, when measured, a turn-sized prompt (the busy item, ~1,400
+  //    tokens read) answered within 6 s; else guided (the only free day as good as guided: Bonsai 2 27B on a
+  //    4090, 53 tokens/s, 5 s turns);
+  //  - a slow brain (under 35 tokens/s, or the busy turn over 8 s) keeps needs in code: every such brain's
+  //    guided day left 1-7 hungry (12B 5-7, Inkling 3, 27B on a 4070 2, E4B 2), and needs in code cost the 9B
+  //    nothing (assisted against guided: same judge, everyone fed);
+  //  - talk, danger, needs, temper whose items it failed (half or more) stay in code (not activity, the main
+  //    loop, nor plan: with plans in code the 9B's villagers talked all day and made nothing).
+  const CHECK = { FREE_MIN: .85, GUIDED_MIN: .6, ASSISTED_MIN: .5, FREE_TOKS: 40, FREE_TURN_S: 6, GUIDED_TOKS: 6, NEEDS_TOKS: 35, NEEDS_TURN_S: 8, COMFORT: .7 };
+  // each item's decision domain (v1-v3 items included, so recorded results still read)
+  const ITEM_DOMAIN = { steps: 'activity', sums: 'activity', haggle: 'activity', character: 'talk', track: 'talk', plan: 'plan', mind: 'temper', danger: 'danger', shelter: 'danger', hunger: 'needs', busy: 'needs' };
+  function fromCheck(r) {
+    if (!r || !(r.of > 0)) return null;
+    const f = r.score / r.of, tokS = +r.tokS || 0, tasks = r.tasks || {};
+    const turnS = tasks.busy && tasks.busy.ms > 0 ? +(tasks.busy.ms / 1000).toFixed(1) : null;
+    // (assisted came with v3's ten items, at 5/10 the 9B's band; an eight-item v1/v2 result had none: 4/8 was rails)
+    let level = f >= CHECK.FREE_MIN ? 'free' : f >= CHECK.GUIDED_MIN ? 'guided' : f >= CHECK.ASSISTED_MIN && r.of >= 10 ? 'assisted' : 'rails';
+    const why = [];
+    if (level === 'free' && (tokS < CHECK.FREE_TOKS || (turnS != null && turnS > CHECK.FREE_TURN_S))) { level = 'guided'; why.push(`free wants ${CHECK.FREE_TOKS} tokens/s and a turn in ${CHECK.FREE_TURN_S} s`); }
+    if ((level === 'guided' || level === 'assisted') && tokS < CHECK.GUIDED_TOKS) { level = 'rails'; why.push('too slow'); }
+    const domains = {};
+    for (const d of ['talk', 'danger', 'needs', 'temper']) {
+      const its = Object.keys(tasks).filter(k => ITEM_DOMAIN[k] === d);
+      if (its.length && its.filter(k => !tasks[k].ok).length / its.length >= .5) domains[d] = 'code';
+    }
+    const slow = tokS < CHECK.NEEDS_TOKS || (turnS != null && turnS > CHECK.NEEDS_TURN_S);
+    if (slow && !domains.needs && (level === 'guided' || level === 'free')) { domains.needs = 'code'; why.push('slow turns: needs in code'); }
+    return { level, domains, comfortable: f >= CHECK.COMFORT, slow, turnS, why: why.join('; ') };
+  }
+  // the value Auto hands choose(): a preset, or { preset, <domain>: 'code' ... }
+  function autoValue(c) {
+    if (!c) return null;
+    const code = Object.keys(c.domains).filter(d => c.domains[d] === 'code' && PRESETS[c.level][d] !== 'code');
+    return code.length && c.level !== 'rails' ? { preset: c.level, ...Object.fromEntries(code.map(d => [d, 'code'])) } : c.level;
+  }
+  window.tablefolkProfile = { DOMAINS, PRESETS, NAMES, CHECK, ITEM_DOMAIN, normalize, resolve, choose, describe, fromCheck, autoValue };
 })(typeof window !== 'undefined' ? window : globalThis);

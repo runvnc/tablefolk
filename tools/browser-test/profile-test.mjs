@@ -47,4 +47,40 @@ t('the 12 GB form on an assisted brain', C({ world: { preset: 'free', needs: 'co
 t('a chosen level adds no kept domains', C({ world: 'free', setting: 'assisted' }).label, 'free');
 t('a character asks on a rails brain: capped, by the character', C({ character: 'guided', world: null, setting: 'auto', auto: 'rails' }).source, 'character');
 t('a world override without a preset on a rails brain: rails', C({ world: { danger: 'model' }, setting: 'auto', auto: 'rails' }).preset, 'rails');
+// Auto from the capability check (fromCheck, v4 rule): every recorded check (brains.md, "Calibrating the
+// check against the days") with the level its measured hearthvale days support. v3 items: the v4 check
+// swaps hunger for busy; v2 results have the first eight. [label, score/of, tokens/s, missed, want, the days]
+const V3 = ['steps', 'sums', 'character', 'track', 'plan', 'mind', 'danger', 'haggle', 'shelter', 'hunger'];
+const rec = (score, of, tokS, miss, extra = {}) => { const tasks = {}; for (const k of V3.slice(0, of)) tasks[k] = { ok: !miss.includes(k) }; for (const [k, v] of Object.entries(extra)) tasks[k] = v; return { score, of, tokS, tasks }; };
+const RECORDED = [
+  ['SenseNova-Loop-9B, Chrome, 4080 S', rec(10, 10, 24.2, []), 'guided (needs in code)', 'free day: 50 calls, 21% model-chosen, 4 hungry, judge 3.75/3.63/3.5'],
+  ['SenseNova-Loop-9B, endpoint, 4090', rec(7, 10, 27.4, ['sums', 'character', 'plan']), 'guided (talk and needs in code)', 'guided: everyone fed, judge 3.5/3.88/4.13'],
+  ['Inkling 2 Mini AD-IQ2_M, Chrome, 4080 S', rec(8, 10, 21, ['mind', 'danger']), 'guided (danger and needs and temper in code)', 'guided 3 hungry; free 3 hungry, half the activities by code'],
+  ['Inkling 2 Mini, Chrome, 4080 (fresh)', rec(7, 10, 16, ['mind', 'danger', 'haggle']), 'guided (danger and needs and temper in code)', 'as above'],
+  ['Inkling 8GB-64K, Chrome, 4080 S', rec(7, 10, 17.8, ['mind', 'danger', 'haggle']), 'guided (danger and needs and temper in code)', 'guided: 1 hungry, judge 3.88/3.63/4.38'],
+  ['Inkling 2 Mini, endpoint, 4070 Ti S', rec(8, 10, 46, ['mind', 'haggle']), 'guided (temper in code)', 'guided judge 4.0/3.88/4.63, 1 hungry; free below it, 2 hungry'],
+  ['Bonsai 2 27B, 4070', rec(6, 10, 25.7, ['sums', 'danger', 'haggle', 'shelter']), 'guided (danger and needs in code)', 'guided: 2 hungry, 2.7 calls a game hour'],
+  ['Bonsai 2 27B, 4080', rec(8, 10, 26.7, ['steps', 'haggle']), 'guided (needs in code)', 'guided 1 hungry; free (4080 S) 2-3 hungry, judged below guided'],
+  ['Bonsai 2.5 27B, 4080', rec(8, 10, 26.3, ['sums', 'danger']), 'guided (danger and needs in code)', 'guided: 1 hungry, judge 4.0/4.0/4.63'],
+  ['Bonsai 2.5 27B, 4070 (items not kept)', { score: 9, of: 10, tokS: 27.8 }, 'guided (needs in code)', 'the 27B on a 4070: guided left 2 hungry; living-mode replies 16-26 s'],
+  ['Bonsai 2 9B, 4090', rec(5, 10, 145.2, ['sums', 'plan', 'mind', 'danger', 'haggle']), 'assisted (temper in code)', 'assisted/Auto: everyone fed, judge 3.63-3.88/4.0-4.13'],
+  ['Bonsai 2 9B, 4070 (2026-11-21)', rec(5, 10, 75.6, ['steps', 'sums', 'mind', 'danger', 'haggle']), 'assisted (temper in code)', 'Auto (assisted): everyone fed, judge 3.88/4.13/4.5'],
+  ['Spark-X2.6-4B, endpoint, 4070', rec(5, 10, 123.1, ['steps', 'sums', 'mind', 'haggle', 'shelter']), 'assisted (temper in code)', 'guided: the village barely worked, 2 hungry'],
+  ['Bonsai 2 27B, 4090 (v2)', rec(5, 8, 53, ['sums', 'danger', 'haggle']), 'guided (danger in code)', 'guided and free both good, nobody hungry'],
+  ['Gemma 4 12B, 3090 (v2)', rec(6, 8, 29.4, ['track', 'haggle']), 'guided (talk and needs in code)', 'guided: 5-7 hungry (picks 2-30 s); free unusable'],
+  ['Gemma 4 E4B, 3090 (v2)', rec(6, 8, 34.3, ['track', 'haggle']), 'guided (talk and needs in code)', 'guided: works, 2 hungry'],
+  ['Raon-1 nano, 4090 (v2)', rec(4, 8, 58.2, ['steps', 'sums', 'track', 'danger']), 'rails', 'guided wasted 14%, flattest'],
+  ['Gemma 4 E2B, 3090 (v2)', rec(4, 8, 60, ['track', 'mind', 'danger', 'haggle']), 'rails', 'the rails design'],
+];
+const autoLabel = r => { const c = P.fromCheck(r); return P.resolve([P.autoValue(c)]).label; };
+for (const [name, r, want] of RECORDED) t('Auto: ' + name, autoLabel(r), want);
+// the v4 busy item (a turn-sized prompt): free wants it answered in 6 s; over 8 s, needs in code; failed, needs in code
+const v4 = (score, tokS, busy) => rec(score, 10, tokS, [], { hunger: undefined, busy }) ;
+const v4r = (score, tokS, busy) => { const r = v4(score, tokS, busy); delete r.tasks.hunger; return r; };
+t('v4: 9/10, 53 tokens/s, a turn in 3.5 s: free', autoLabel(v4r(9, 53, { ok: true, ms: 3500 })), 'free');
+t('v4: the same with the turn in 7 s: guided', autoLabel(v4r(9, 53, { ok: true, ms: 7000 })), 'guided');
+t('v4: the same with the turn in 10 s: guided, needs in code', autoLabel(v4r(9, 53, { ok: true, ms: 10000 })), 'guided (needs in code)');
+t('v4: 10/10 but 24 tokens/s: guided, needs in code', autoLabel(v4r(10, 24, { ok: true, ms: 9000 })), 'guided (needs in code)');
+t('v4: fast but ate nothing while busy: free, needs in code', autoLabel(v4r(9, 60, { ok: false, ms: 3000 })), 'free (needs in code)');
+t('v4: the turn time is reported', P.fromCheck(v4r(9, 60, { ok: true, ms: 3040 })).turnS, 3);
 console.log(`${ok}/${n} passed`); process.exit(ok === n ? 0 : 1);

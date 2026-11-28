@@ -2039,6 +2039,74 @@ puts both free days below the guided day on the same card (coherence 3.5-3.88
 vs 4.0, surprise 2.75 vs 3.38) and below the 4090's free day. Playable, as in
 nothing breaks; not the recommended level: guided stays the 16 GB pick.
 
+### Calibrating the check against the days: v4 (2026-11-27)
+
+Why: SenseNova-Loop-9B in Chrome scored 10/10 on v3 (24 tokens/s) and Auto put it on free; its free day left
+4 hungry, 21% of activities chosen by the model, judge 3.75 / 3.63 / 3.5. Bonsai 2.5 27B on a 4070 scored 9/10
+(27.8 tokens/s) -> free, where the 27B's guided day already left 2 hungry. Every recorded check (the
+`summary.autonomy.probe` of each `results/live-*.json`, the `probe-*.log`s under `work/`) beside the
+measured days (no new GPU runs):
+
+| item (domain) | who failed it | did failing predict the day? |
+|---|---|---|
+| sums (activity) | Bonsai 2 / 2.5 27B (nearly always), 9B, SenseNova by URL, Spark, Raon | no: the 27B is the best guided and free brain |
+| haggle (activity) | 27B, 9B, 12B, E4B, Inkling, Spark | no (the evals' haggles measure it better) |
+| mind, false belief (temper) | Inkling (best guided purposefulness), 9B, Spark | no |
+| danger (danger) | 27B, 9B, Inkling, Raon | not of the raid: the 27B failing it kept 88-92% indoors, SenseNova passing it 58% |
+| shelter (danger) | 27B on a 4070, Spark | weakly (Spark 61% indoors) |
+| hunger, eat when faint (needs) | **nobody**, SenseNova (4 hungry) included | no: too easy to tell anything apart |
+| plan (plan) | 9B, SenseNova by URL | no (a format test; both plan fine in the game) |
+| steps, character, track | scattered | no pattern |
+
+What did predict a free day is **pace**: the free days with 2-4 hungry and judged below the same brain's
+guided day are all brains writing 17-28 tokens/s (Bonsai 2 27B on 4080 S: 7.4 s turns, 3-4 calls a game
+hour; Inkling in Chrome; SenseNova in Chrome, 2.1 calls a game hour); the one free day as good as guided is
+Bonsai 2 27B on a 4090 (53 tokens/s, 5.1 s turns, 4.9 calls a game hour, nobody hungry). Hunger at
+guided follows pace too: 12B 5-7 hungry (picks 2-30 s), Inkling in Chrome 3, the 27B on a 4070 2 (19 s
+turns), E4B 2; the brains at 38+ tokens/s 0-1. And needs in code cost nothing measurable (Bonsai 2 9B,
+assisted against guided: the same judge, everyone fed, more indoors in the raid).
+
+**v4** (`PROBE_V` 4, so v3 results are re-run; the rule moved to `autonomy-profile.js` `fromCheck`, which
+`profile-test.mjs` runs on every recorded result):
+- the easy hunger item is replaced by **busy**: a whole free turn as the game writes it (5,640
+  characters, ~1,400 tokens: commands and rules, Jory's card, what he sees, his notes, a deadline from
+  Brann, "Body: starving and faint", the do() list); passed when the first `do(...)` is `do(eat ...)`.
+  Its time is a turn's time, read fresh as a village call is (`turnS` in the result, Running now and the
+  This device line). Gemma 4 E2B on the RTX 2060: failed it (`do(gather firewood, for Brann's order)`),
+  1.3 s; 4/10 -> rails, 133 s for the whole check (LiteRT, beside nothing else).
+- **free** needs, besides 85% of the items, 40 tokens/s and the busy turn within 6 s; else guided.
+- **slow** (under 35 tokens/s, or the busy turn over 8 s): needs stay in code at guided and free.
+- unchanged: the share bands (free .85, guided .6, assisted .5, the last only for ten-item results),
+  talk / danger / needs / temper whose items it failed go to code, never activity or plan.
+- Thresholds for the busy turn are estimates from reading speeds (llm-sweep: the 27B reads ~1,400 tokens
+  in ~9 s on a 4080, ~3 s on a 4090; Inkling ~8 s, SenseNova ~11 s in Chrome); the next rented run should
+  record `turnS` beside a day and move them if needed.
+
+Auto per recorded result, v3 rule -> v4 (each test in `profile-test.mjs`):
+
+| brain, card | check | v3 Auto | v4 Auto | the measured days |
+|---|---|---|---|---|
+| SenseNova-Loop-9B, Chrome, 4080 S | 10/10, 24.2 | **free** | guided (needs in code) | free: 4 hungry, judge 3.75 / 3.63 / 3.5 |
+| SenseNova-Loop-9B, endpoint | 7/10, 27.4 | guided (talk) | guided (talk, needs) | guided: everyone fed |
+| Bonsai 2.5 27B, 4070 | 9/10, 27.8 | **free** | guided (needs) | the 27B on a 4070: guided 2 hungry, 19 s turns |
+| Bonsai 2.5 27B, 4080 | 8/10, 26.3 | guided (danger) | guided (danger, needs) | guided 1 hungry |
+| Bonsai 2 27B, 4080 | 8/10, 26.7 | guided | guided (needs) | guided 1 hungry; free (4080 S) 2-3 hungry, below guided |
+| Bonsai 2 27B, 4070 | 6/10, 25.7 | guided (danger) | guided (danger, needs) | guided 2 hungry |
+| Inkling 2 Mini, Chrome | 8/10, 21 (7/10, 16) | guided (danger, temper) | guided (danger, needs, temper) | guided 3 hungry; free 3 hungry |
+| Inkling 8GB-64K, Chrome | 7/10, 17.8 | guided (danger, temper) | guided (danger, needs, temper) | guided 1 hungry |
+| Inkling 2 Mini, endpoint | 8/10, 46 | guided (temper) | guided (temper) | guided judge 4.0 / 3.88 / 4.63; free below it |
+| Bonsai 2 9B, 4090 / 4070 | 5/10, 145 / 76 | assisted (temper) | assisted (temper) | assisted and Auto: everyone fed |
+| Spark-X2.6-4B, endpoint | 5/10, 123 | assisted (temper) | assisted (temper) | guided: the village barely worked |
+| Bonsai 2 27B, 4090 (v2) | 5/8, 53 | guided (danger) | guided (danger) | guided and free both good |
+| Gemma 4 12B, 3090 (v2) | 6/8, 29.4 | guided (talk) | guided (talk, needs) | guided 5-7 hungry |
+| Gemma 4 E4B, 3090 (v2) | 6/8, 34.3 | guided (talk) | guided (talk, needs) | guided 2 hungry |
+| Raon-1 nano, Gemma 4 E2B (v2) | 4/8 | rails | rails | rails |
+
+Not changed, though they predict little: sums, haggle, mind and danger stay in the score (dropping them
+would move Bonsai 2 9B from assisted to guided, against its measured days). Noticed: Gemma 4 E2B's speed
+reads 0 tokens/s (v2 on the 3090 and v4 here: its 150-token answer comes back empty); harmless while it
+scores rails, not chased.
+
 ### Scenarios suited to free (2026-11-22, not measured yet)
 
 Free's losses above are mostly scale and pace: eight villagers sharing one
