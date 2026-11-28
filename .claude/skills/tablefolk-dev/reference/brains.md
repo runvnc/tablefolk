@@ -1615,6 +1615,60 @@ card class; Bonsai 2.5 27B stays the 10 GB+ pick. In the world builder's agent m
 works (two of three builds passed, 22-23 steps in ~5 minutes after a 75 s first step) but
 is no reason to change the builder's default either.
 
+### Fewer prompt tokens, two calls at once (2026-11-27, later; partly measured)
+
+**What a free call read** (Inkling's free day on `free-two-by-the-hearth`, 86 prompts, ~3.1 characters a
+token): rules 908 tokens (the shared checkpoint), identity 113, history 449, and the last message ~1,200:
+"Around you" 160, the **"Nearby visible objects" list 131 (the same things again)**, the use(...) help 82
+(already in the command list), "Your last few turns" 59 (already in the history), the perception header
+43, the state card ~400, the free-mode activity menu ~190, results and speech ~75. And the history was
+not a stable prefix: `cfg.messages` is cut from the front in several places (`slice(-40)` on each line
+heard), so the window counted from the array's start moved on 39 of 84 turns.
+
+**Changed** (all above rails; `?lean=0`, `?anchor=0`, `?wpin=0`, `?llmpar=1` turn each off):
+- `leanPrompt(g)` (app.js): no objects list, a one-line header ("You are at (x,z), holding ..."), no
+  use(...) help (take/put moved into the command list's use line), no "Your last few turns".
+  Replayed on the old day's prompts: 1,770 -> 1,430 tokens past the rules (-19%).
+- History anchored on a message (`cfg.histAnchor`, world-integration.js): the window starts there until
+  it holds keep + 16 messages, then moves to the last 12.
+- Per-character llama.cpp slots (wllama-runner.js `slotFor`): with no more characters than slots less
+  one, each character gets its own `id_slot` (from the last slot down; side calls on slot 0, which
+  llama.cpp purges first when the shared KV cache is full) and its one checkpoint is made just before
+  its prompt's last message, so its next turn restores it and reads only the new history and the last
+  message. More characters than that: the shared-rules checkpoint as before. Same heap (one checkpoint a slot).
+- Two model calls at once for `parallel: 2` brains (Inkling, SenseNova): `createQueue({ slots })`; the
+  player's call takes the next slot and no background call starts beside it.
+- Replies: commands on one line (`say("...")do(...)`) split before parsing (they rode inside the spoken
+  words); Inkling stops at ")Let me think" / a line starting "Let me think" (answers that ran to the
+  256-token cap), the closing parenthesis put back.
+- Bonsai: its engine runs **one generation at a time across sessions** (`acquireLease`: "one turn runs
+  at a time"; `createGenerationState` batch size 1), so two calls at once do not exist there. What applies:
+  the lean prompt, and per-speaker sessions (`?bonsaisessions=N`) for the per-character prefix (now with
+  agency/probe calls as side calls); a `[bonsai2] call:` console line per call (prompt tokens, time to
+  first token) kept by live-eval.
+
+**Measured** (rented RTX 4080 SUPER 16 GB, Chrome 158, driver 610.57; box destroyed before the queue
+finished, so only part of it): capability check v4 7/10, 19.5 tok/s, guided (slow turns: needs in code).
+
+| Inkling, free day (24 min) / smoke | before (`lean=0&wpin=0&llmpar=1`) | after, 6-minute smoke (all on, 2 at once) |
+|---|---|---|
+| prompt tokens a call (mean) | 2,804 | 2,605 |
+| read a call (mean / median) | 1,985 / 1,951 | 1,169 / 970 (prefix reads 30-120 tokens, cache_n 1,000-2,300) |
+| reading, writing | 171, 26.5 tok/s | 121, 16.1 tok/s (two at once share the GPU) |
+| a call median / p90 | 13.8 / 18.2 s | 19.9 / 30.6 s (two at once) |
+| a turn median | 23.6 s | 21.8 s |
+| turns | 100 | (6 minutes) |
+| judge c / p / u / s | 3.0 / 3.5 / 3.0 / 2.5 | not run |
+
+Reading: the per-character checkpoint works (the prefix request reads only the new history), and the
+tokens read a call fell ~50%. Two calls at once do not pay for read-heavy calls: reading is compute-bound,
+so a batch of one prompt chunk and another call's token makes both slower (writing fell to 2-7 tok/s
+while the other read); the 1.43x measured earlier was two calls writing. Not measured yet: the full
+after day, after with one call at a time (`llmpar=1`), the evals, Bonsai (before, after,
+`bonsaisessions=3`). Steps: `tools/cloud-gpu/levers-queue.sh` (kind:model:tag:query). Until the
+day with `llmpar=1` is measured, `parallel: 2` is the shipped default only on that one smoke run's
+evidence: set it to 1 if the after-par1 day turns out faster.
+
 ## SenseNova-Loop-9B (SenseTime, 2026-11-22): best check score yet, too slow in Chrome as shipped
 
 SenseTime's `sensenova/SenseNova-Loop-9B` (released 2026-11-17; the Preview
