@@ -95,8 +95,8 @@ const T0 = Date.now(), ts = () => +((Date.now() - T0) / 1000).toFixed(1);
 const raws = [], errors = [], engine = [];
 page.on('console', m => {
   const t = m.text();
-  // the llama.cpp engines' own lines (prefix reads, timings: tokens read / reused / written and their speeds), saved as "engine"
-  if (/\[tablefolk-wllama3\] (prefix read|llama\.cpp timings|RAW OUTPUT)/.test(t)) engine.push(ts() + ' ' + t.replace(/\s+/g, ' ').slice(0, 300));
+  // the llama.cpp engines' own lines (prefix reads, timings: tokens read / reused / written and their speeds), and Bonsai's per-call line, saved as "engine"
+  if (/\[tablefolk-wllama3\] (prefix read|llama\.cpp timings|RAW OUTPUT)|\[bonsai2\] call:/.test(t)) engine.push(ts() + ' ' + t.replace(/\s+/g, ' ').slice(0, 300));
   const r = t.match(/RAW LLM OUTPUT for agent (\S+) at \S+ elapsed ms: (\d+) : ([\s\S]*)$/);
   if (r && !r[1].includes('~')) raws.push({ t: ts(), agent: r[1], ms: +r[2], raw: r[3] });
   if (m.type() === 'error' && !/Failed to load resource|favicon/.test(t)) errors.push(ts() + ' ' + t.slice(0, 300));

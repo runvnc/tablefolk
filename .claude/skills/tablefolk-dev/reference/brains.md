@@ -342,7 +342,9 @@ parses the answer:
    menu. `senses.js` adds `tablefolkUses.menu`: concrete `put(<own item>,
    chest)` and `take(<item>, chest)` lines before the `use(...)` ones (Gemma
    never called `put` from the bare command list).
-2. **What it perceives** (`app/senses.js`): its place and the places it can
+2. **What it perceives** (`app/senses.js`; at guided and free the lean form,
+   `leanPrompt` in app.js: a one-line "You are at (x,z), holding ..." header and
+   no "Nearby visible objects" list): its place and the places it can
    walk to, "Around you" by direction with steps, nearest first, filtered by
    `tablefolkDark.sightFor(g)`; at most 3 of a kind, 16 things.
 3. **The "Stay yourself" line** (one random trait sentence of the
@@ -350,7 +352,10 @@ parses the answer:
    (`tablefolkMind.cardLines`), role and skill cards. Order matters: the
    feelings eval fell from 3/3 to 0/2 with the stay line at the end. Card
    lines starting with `!` (an offer to accept now) go at the very end.
-4. **History**: the last 12 messages (`HISTORY_KEEP`); new input split into
+4. **History**: the last 12 messages (`HISTORY_KEEP`; the window moves 8 at a
+   time, or at guided and free (`leanPrompt`) starts at an anchor message,
+   `cfg.histAnchor`, until it holds 28, so a character's next prompt repeats
+   this one up to its last message); new input split into
    "WHAT JUST HAPPENED:" (events) and "NEW SPEECH ADDRESSED TO YOU:". The
    seed exchange is a neutral "(You look around.)" / `look()` (the old 'God
    says: Are you ready my son?' / `say("Yes I am ready")` leaked into speech;
@@ -2288,6 +2293,10 @@ model is slow and shared. What changed underneath:
   (pendingChat starts with "<player name> says"), 1 for an adventure
   encounter's member, 0 for the rest, -1 for an early turn. A call already
   running is never stopped. `window.tablefolkModelQueue` shows the waiting.
+  Brains with `parallel: 2` (agent-brain.js: Inkling 2 Mini, SenseNova on the
+  wllama-fast build) run two calls at once (`createQueue({ slots })`, modes-core.js;
+  `?llmpar=N` overrides); the player's call takes the next free slot, and no new
+  background call starts beside it ("Fewer prompt tokens, two calls at once" below).
 - **The turn lock has the same order and is let go during the model call**
   (`createLock`; `runOneAgentTurn(g, { lock })` yields before `decide` and takes
   it back, in its order, before acting). Before, `replying` was held for a

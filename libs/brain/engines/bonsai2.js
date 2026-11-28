@@ -173,8 +173,15 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
     const t = opts.temperature ?? 0.7;
     const sampling = t > 0 ? { do_sample: true, temperature: t, top_p: opts.topP ?? 0.95, top_k: Math.min(64, opts.topK ?? 20), ...(opts.minP ? { min_p: opts.minP } : {}) } : {};
     let text = '';
-    const g = sessionFor(engine, opts.agentId).generate(messages, { max_new_tokens: opts.maxTokens || 256, enable_thinking: !!opts.enableThinking, ...sampling });
+    const sess = sessionFor(engine, opts.agentId), t0 = performance.now();
+    // for measuring (brains.md "Fewer prompt tokens"): the prompt's tokens, the time to the first token (reading what
+    // the session's cache did not hold), the answer's tokens and time
+    let promptTok = null, first = null, nTok = 0;
+    try { promptTok = sess.count_tokens?.(messages, { enable_thinking: !!opts.enableThinking })?.prompt_tokens ?? null; } catch {}
+    const g = sess.generate(messages, { max_new_tokens: opts.maxTokens || 256, enable_thinking: !!opts.enableThinking, ...sampling });
     for await (const e of g) {
+      if ((e.type === 'text' || e.type === 'reasoning') && first === null) first = performance.now();
+      if (e.type === 'text' || e.type === 'reasoning') nTok++;
       // the engine reads Qwen's <tool_call> blocks itself and sends them as events (the text
       // has none): written back as the template's text, for a caller that reads calls
       // (the world builder's agent mode, app/worldgen-agent.js parseToolCalls)
@@ -189,6 +196,8 @@ export function generateBonsai2(engine, _prompt, opts = {}) {
       opts.onToken?.(answerOf(text, false));
     }
     await g.result?.catch?.(() => {});
+    const end = performance.now();
+    console.log('[bonsai2] call:', 'prompt_n=', promptTok, 'first_ms=', Math.round((first ?? end) - t0), 'gen_n=', nTok, 'gen_ms=', Math.round(end - (first ?? end)), 'sessions', engine.pool?.size || 1, opts.agentId || '');
     return answerOf(text, false);
   };
   const p = engine.queue.then(run, run); engine.queue = p.catch(() => {});
