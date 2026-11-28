@@ -48,12 +48,15 @@
  * when its condition has held half an hour and the model has not run it.
  *
  * The capability check (probe): once per brain and graphics card, cached in
- * localStorage (tablefolkProbe:v1:<brain>:<card>), eight small scored tasks
- * (three commands in order, a sensible choice that needs sums, staying in
- * character when told to break it, a fact changed and asked after six
- * turns, a three-step plan and its second step, a gift from what someone
- * said, a choice in danger, a haggle at the floor price) and the speed of a
- * 150-token answer. Its score and speed give auto's level (Settings,
+ * localStorage (tablefolkProbe:v4:<brain>:<card>), ten scored tasks, each
+ * tagged with a decision domain (commands in order round a locked chest,
+ * sums, staying in character, a fact moved twice, a plan and its second
+ * step, a false belief, a choice in danger, a bundle under the floor price,
+ * shelter in a raid, and (v4) a whole free turn, ~1,400 tokens, starving
+ * while pursuing a deadline: does it eat first; its time is a turn's) and
+ * the speed of a 150-token answer. Score, speed and the turn's time give
+ * auto's level and the domains kept in code (autonomy-profile.js fromCheck;
+ * brains.md, "Calibrating the check against the days") (Settings,
  * "Running now"; the This device pane). It runs on auto when a brain with no
  * result is ready; ?probe=1 forces it, ?probe=0 skips it.
  *
@@ -112,7 +115,7 @@
     const k = brainKey();
     if (!k || /^none/.test(k)) return { level: 'rails', value: 'rails', why: 'no model' };
     const pr = probe.result();
-    if (pr) { const codeDoms = Object.entries(pr.domains || {}).filter(([, v]) => v === 'code').map(([d]) => d); return { level: pr.level, value: codeDoms.length && pr.level !== 'rails' ? { preset: pr.level, ...Object.fromEntries(codeDoms.map(d => [d, 'code'])) } : pr.level, why: `capability check ${pr.score}/${pr.of}, ${pr.tokS} tokens/s` }; }
+    if (pr) return { level: pr.level, value: PF().autoValue(pr), why: `capability check ${pr.score}/${pr.of}, ${pr.tokS} tokens/s${pr.turnS != null ? ', a turn ' + pr.turnS + ' s' : ''}${pr.why ? ' (' + pr.why + ')' : ''}` };
     const t = M()?.tier?.(null) || 'basic', cps = measuredCharsS(), slow = cps != null && cps < 15;
     const lv = t === 'ambitious' ? (slow ? 'guided' : 'free') : t === 'capable' ? (slow ? 'rails' : 'guided') : 'rails';
     return { level: lv, value: lv, why: `by the brain's size (${t})${slow ? '; slow on this machine' : ''}${probe.running ? '; checking it now' : ''}` };
@@ -168,16 +171,98 @@
     const r = profile(null), pr = probe.result();
     const what = { rails: 'the game runs their day; the model talks', guided: 'they pick each next activity and plan their day; the game carries it out', free: 'they act on their own (do, plan, talk); the game carries out each activity' }[r.level] + (r.preset === 'assisted' || r.label !== r.preset ? '; ' + PF().DOMAINS.filter(d => r.domains[d] === 'code').join(', ') + ' in code' : '');
     if (pr?.garbled) return ['Characters decide', 'rails', 'the model\'s answers came back garbled on this graphics card: its results are wrong here', 'bad', 'capability check: garbled output; try another model, browser or graphics driver'];
-    return ['Characters decide', r.label, what, probe.running ? 'busy' : 'ok', r.why + (pr ? ` · check: ${pr.score}/${pr.of} (${Object.entries(pr.tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ') || 'all passed'}), ${pr.tokS} tok/s, ${pr.seconds} s` : '')];
+    return ['Characters decide', r.label, what, probe.running ? 'busy' : 'ok', r.why + (pr ? ` · check: ${pr.score}/${pr.of} (${Object.entries(pr.tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ') || 'all passed'}), ${pr.tokS} tok/s${pr.turnS != null ? ', a turn ' + pr.turnS + ' s' : ''}, ${pr.seconds} s` : '')];
   }
 
   // ---------------------------------------------------------------- the capability check
-  const PROBE_V = 3;
+  const PROBE_V = 4;
   const sys = c => ({ role: 'system', content: c }), user = c => ({ role: 'user', content: c }), asst = c => ({ role: 'assistant', content: c });
   const lines = t => String(t).split('\n').map(l => l.trim()).filter(Boolean);
   const firstNum = t => +((String(t).match(/\d+/) || [])[0] || 0);
   const wordset = t => new Set(String(t).toLowerCase().match(/[a-z']{3,}/g) || []);
   const overlap = (a, b) => { if (!a.size || !b.size) return 0; let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.min(a.size, b.size); };
+  // the busy item's turn: the free-mode prompt's shape (live-eval prompts, 2026-11-23), Jory with a deadline
+  const BUSY_SYS = [
+    'Available commands (examples only, use appropriate arguments):',
+    'walk(destination): a coordinate pair, or the name of a person, thing or place, e.g. walk("3,5"), walk(bram), walk(chest), walk(tavern); repeat on later turns until arrived',
+    'say(text) e.g. say("hello there")',
+    'look() - look around carefully: describes everyone and everything in sight',
+    'carry(thing) e.g. carry(log) - pick up a thing next to you; drop() puts it down',
+    'face(direction) e.g. face(n) - rotate without moving (n/s/e/w)',
+    'emote(name) e.g. emote(wave) - dance, laugh, sit, wave, clap, cheer, sleep, bow',
+    'remember(text) e.g. remember(Ana owes me 5 gold) - note something important to remember later',
+    'feel(mood) e.g. feel(angry) - show how you feel',
+    'eat(food) e.g. eat(bread) - eat food you carry, or drink a potion you carry',
+    'use(thing) e.g. use(chest) - use something near you: open a chest, sit on a seat, lie on a bed, work at an anvil, chop a tree',
+    'inventory() - check the gold and items you are carrying',
+    'sell(item, price) e.g. sell(firewood, 3) - sell an item from your inventory to the person you are chatting with; sell(item, price, name) to someone else',
+    'give(item) e.g. give(firewood) - hand an item to the player; give(item, name) to another character; give(10 gold, name) for money',
+    'do(activity, why) - start one of the activities listed for you, and say why in a few words; it runs until done e.g. do(talk with tam, to ask about the flour he owes me)',
+    'plan("...") - rewrite your notes: goals, next steps, who owes you what, what you are hiding e.g. plan("Sell the bread by noon. Odo owes me 2 gold.")',
+    '',
+    'Things only happen through commands: saying "here it is" hands nothing over. To hand something over, use give(item) or sell(item, price) in the same reply.',
+    'Reply with commands only, one per line.',
+    'When someone speaks to you (NEW SPEECH ADDRESSED TO YOU), answer them with say(...) in your own words; if you also act, put the action on the next line.',
+    'Talk you only overhear needs no answer. When nobody has spoken to you, get on with what you are doing: act rather than talk.',
+    'Talk like a real person: one or two short sentences at a time.',
+    'How this world works: the day has a clock. People work, eat, sleep at night and gather in the evening. Goods are made from materials (grain, flour, ore, firewood) that run out and grow back; stores and chests hold them; gold buys what you lack. Raiders come now and then. Everyone remembers what you do to them, and news travels.',
+    'You decide what you do and say, as yourself: your own plans, your own reasons, your own words. The game carries out your commands and tells you how they went (FAILED means it did not work: try something else).',
+    '',
+    'Character: jory',
+    'Style: lanky woodcutter',
+    'Personality: Jory, the woodcutter. Hard-working and proud of keeping his word. He wants to buy a proper axe one day. He likes Wren, who once shared her meat with him, and owes Brann for mending his old axe.',
+  ].join('\n');
+  const BUSY_USER = [
+    'SYSTEM: Agent perception for jory',
+    'Center: (21,6)  Facing: west (-1,0)  View: what you can see from here',
+    'Holding: firewood  Target: none',
+    '',
+    'You are out in the open: the woods edge.',
+    'Places (walk(name) goes there): woodpile 3 steps south, smithy 9 steps southwest, tavern 12 steps west, square 14 steps southwest, house 2 15 steps west, mill 19 steps south.',
+    'Around you (you face west):',
+    '- north (right): oak tree next to you at (21,5); oak tree 2 steps at (22,4)',
+    '- south (left): log pile 2 steps at (21,8); stump next to you at (21,7)',
+    '- west (ahead): path 2 steps at (19,6); pine tree 4 steps at (17,5)',
+    '- east (behind): oak tree 3 steps at (24,6)',
+    '',
+    'Nearby visible objects:',
+    'T1 oak tree at (21,5)',
+    'T2 oak tree at (22,4)',
+    'L3 log pile at (21,8)',
+    'S4 stump at (21,7)',
+    'T5 pine tree at (17,5)',
+    'T6 oak tree at (24,6)',
+    '',
+    'You could, right here: use(oak tree) (next to you: chop), use(stump) (next to you: sit), carry(log) (2 steps south).',
+    '',
+    'Recent:',
+    '09:40 brann (to you): "Six bundles of firewood by noon, Jory. The forge goes cold without it, and I pay six gold."',
+    '09:41 you: say("By noon. You have my word.")',
+    '10:15 you: do(gather firewood, for Brann\'s order) - done: 2 bundles',
+    '10:50 you: do(gather firewood, Brann needs six) - done: 2 bundles',
+    '11:05 wren (passing): "You look grey, Jory. Have you eaten anything?"',
+    '11:06 you: say("After the order, Wren.")',
+    '11:20 you: do(gather firewood, two more for Brann) - done: 1 bundle; your hands shook and you dropped the axe twice',
+    '',
+    'Your notes: "Brann: 6 bundles of firewood by noon, he pays 6 gold. Then save for the axe. 4 of 6 done."',
+    'Stay yourself: you are jory, lanky woodcutter. You keep your word.',
+    'Body: starving and faint: you have not eaten since yesterday morning. You carry no food; 3 gold.',
+    'You are a woodcutter. Right now: gathering firewood for Brann (5 of 6 bundles). Today: deliver Brann\'s firewood by noon.',
+    'You want: keep your word to Brann; buy a proper axe.',
+    'You know: Rosa at the tavern sells stew for 2 gold. Brann is at the smithy and grumbles when work is late.',
+    'It is 11:35 on day 2.',
+    'What you can start now with do(...) (each runs until it is done; then you choose again):',
+    '- do(gather firewood) from the oak tree (1 more bundle for Brann; 6 left there)',
+    '- do(deliver firewood) take your 5 bundles to Brann at the smithy',
+    '- do(eat) get something to eat (you are starving)',
+    '- do(work) get on with your usual work for an hour',
+    '- do(talk with wren) (the hunter, 6 steps west)',
+    '- do(chores) do what the village needs most (hauling goods)',
+    '- do(sell firewood) sell a bundle at the square',
+    '- do(go to the tavern) go and see the tavern',
+    '- do(rest) take a break (sit a while)',
+    'Your choice: start one thing with do(activity, why). Speak with say(...) only when you have something to say to someone here. plan("...") rewrites your notes.',
+  ].join('\n');
   // (v2: v1's eight were passed alike by E2B, E4B and Bonsai 2 27B: 6, 7 and 6 of 8 on an RTX 3090)
   const TASKS = [
     // (v3: each item tests one decision domain; a domain whose items it fails stays in code on Auto)
@@ -196,36 +281,26 @@
   ];
   TASKS.push(
     { id: 'shelter', dom: 'danger', max: 8, msgs: [sys('You are Odo, the village baker. You carry no weapon.'), user('Raiders with clubs are at the gate, twenty steps away, and coming in. What do you do?\n1. keep baking\n2. go indoors and bar the door\n3. go out and fight them with your bare hands\nAnswer with the number only.')], score: t => firstNum(t) === 2 },
-    { id: 'hunger', dom: 'needs', max: 8, msgs: [sys('You are Jory, the woodcutter.'), user('You have not eaten since yesterday morning and feel faint. It is noon. You have 3 gold; Rosa at the tavern sells stew for 2. What do you do now?\n1. chop wood until evening, then see\n2. buy a stew from Rosa and eat it\n3. go to bed\nAnswer with the number only.')], score: t => firstNum(t) === 2 },
+    // (v4: replaces v3's "eat when faint", a three-line question every brain passed, SenseNova-Loop-9B too,
+    // whose free day then left 4 hungry) a whole free turn as the game writes it (~5,500 characters, ~1,400
+    // tokens: the rules, the card, what it sees, its notes and a deadline): starving and faint while
+    // pursuing its plan, does it eat first? Its time is a turn's time (read fresh, as a village call is),
+    // which Auto's free and slow rules use (autonomy-profile.js fromCheck).
+    { id: 'busy', dom: 'needs', max: 90, msgs: [sys(BUSY_SYS), user(BUSY_USER)],
+      score: t => { const d = lines(t).find(l => /^do\s*\(/i.test(l)); return !!d && /^do\s*\(\s*"?(eat|get something to eat)\b/i.test(d); } },
   );
   const SPEED = { max: 150, msgs: [sys('Answer briefly.'), user('Write the numbers from one to forty as words, separated by commas.')] };
-  // the level from the score and the speed (calibrated on the in-browser brains: brains.md, "Autonomy")
-  // (shares of the items, so adding items keeps the bands: v2's 7/8 free, 5/8 guided)
-  const FREE_MIN = .85, GUIDED_MIN = .6, ASSISTED_MIN = .5, FREE_TOKS = 15, GUIDED_TOKS = 6, COMFORT = .7;
-  function levelFrom(score, tokS, of = TASKS.length) {
-    const f = score / of;
-    let lv = f >= FREE_MIN ? 'free' : f >= GUIDED_MIN ? 'guided' : f >= ASSISTED_MIN ? 'assisted' : 'rails';
-    if (lv === 'free' && tokS < FREE_TOKS) lv = 'guided';
-    if ((lv === 'guided' || lv === 'assisted') && tokS < GUIDED_TOKS) lv = 'rails';
-    return lv;
-  }
-  // a domain whose items it failed (half or more) stays in code
-  function domainsFrom(tasks) {
-    const out = {};
-    // (not activity: that is the main loop, and the score's preset already decides it; the 9B failed the sums
-    // and the bundle haggle, tagged activity, and went back to rails)
-    // (nor plan: Bonsai 2 9B failed the plan item, a format test, and with plans in code its villagers
-    // talked all day and made nothing: judge coherence 2.6 against 3.6 with its own plans)
-    for (const d of ['talk', 'danger', 'needs', 'temper']) { const its = TASKS.filter(t => t.dom === d && tasks?.[t.id]); if (its.length && its.filter(t => !tasks[t.id].ok).length / its.length >= .5) out[d] = 'code'; }
-    return out;
-  }
+  // the level and the domains kept in code from the score, the speed and the busy item's turn time:
+  // autonomy-profile.js fromCheck (calibrated on the recorded checks and days: brains.md, "Calibrating the check")
+  const fromCheck = r => PF().fromCheck(r);
+  const levelFrom = (score, tokS, of = TASKS.length) => fromCheck({ score, tokS, of })?.level || 'rails';
   function probeKey() {
     const hw = window.tablefolkDevice?.hw || {}, card = String(hw.gpu || hw.renderer || hw.name || hw.vendor || '').replace(/\s+/g, ' ').slice(0, 60);
     return `tablefolkProbe:v${PROBE_V}:${brainKey()}:${card}`;
   }
   const probe = {
     running: false,
-    result() { try { const r = JSON.parse(localStorage.getItem(probeKey()) || 'null'); return r && r.v === PROBE_V ? { ...r, level: levelFrom(r.score, r.tokS, r.of), domains: domainsFrom(r.tasks), comfortable: r.score / r.of >= COMFORT } : null; } catch { return null; } },
+    result() { try { const r = JSON.parse(localStorage.getItem(probeKey()) || 'null'); return r && r.v === PROBE_V ? { ...r, ...fromCheck(r) } : null; } catch { return null; } },
     async run({ force = false } = {}) {
       if (!force) { const c = probe.result(); if (c) return c; }
       if (probe.running || !window.tablefolkLLM) return null;
@@ -250,11 +325,11 @@
         if (garbled) window.tablefolkDiag?.note('brain', `the model's answers are garbled on this graphics card (${clip(Object.values(tasks)[0]?.out || '', 30)}): its results are wrong here; try another model, browser or driver`);
         const res = { v: PROBE_V, garbled, brain: brainKey(), card: probeKey().split(':').slice(3).join(':'), score, of: TASKS.length, tokS, seconds: +((performance.now() - t0) / 1000).toFixed(1), tasks, at: new Date().toISOString() };
         try { localStorage.setItem(probeKey(), JSON.stringify(res)); } catch {}
-        const lv = levelFrom(score, tokS), doms = domainsFrom(tasks);
-        window.tablefolkDiag?.note('brain', `capability check: ${score}/${TASKS.length}, ${tokS} tokens/s in ${res.seconds} s: ${lv}${Object.keys(doms).length && lv !== 'rails' ? ' (' + Object.keys(doms).join(' and ') + ' in code)' : ''}` + (Object.entries(tasks).some(([, t]) => !t.ok) ? ` (missed: ${Object.entries(tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ')})` : ''));
+        const fc = fromCheck(res), lv = fc.level, doms = fc.domains;
+        window.tablefolkDiag?.note('brain', `capability check: ${score}/${TASKS.length}, ${tokS} tokens/s, a turn ${fc.turnS ?? '?'} s, in ${res.seconds} s: ${lv}${Object.keys(doms).length && lv !== 'rails' ? ' (' + Object.keys(doms).join(' and ') + ' in code)' : ''}` + (Object.entries(tasks).some(([, t]) => !t.ok) ? ` (missed: ${Object.entries(tasks).filter(([, t]) => !t.ok).map(([k]) => k).join(', ')})` : ''));
         console.info('[agency] probe', JSON.stringify(res));
         render(true);
-        return { ...res, level: lv, domains: doms };
+        return { ...res, ...fc };
       } finally { probe.running = false; }
     },
   };
@@ -628,12 +703,12 @@
     })();
   }
   // one short question to the model, as the character (picks, plans, reactions)
-  async function ask(g, userText, { max = 50, kind = 'choose', think = false } = {}) {
+  async function ask(g, userText, { max = 50, kind = 'choose', think = false, priority = 0 } = {}) {
     const cfg = cfgOf(g), j = X()?.jobOf?.(g);
     const system = `You are ${g.id}${cfg.style ? ', ' + clip(cfg.style, 60) : ''}${j && j.id !== 'idler' ? ', the ' + (j.name || j.id).toLowerCase() : ''}. ${clip(cfg.personality, 420)}${cfg.backstory ? ' ' + clip(cfg.backstory, 200) : ''}\nYou decide for yourself what you do next, as yourself. The game carries out what you choose.`;
     emit('tablefolk-model-call', { agentId: g.id, kind });
     const thinking = think && thinks();
-    const call = th => window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: system }, { role: 'user', content: userText }], max_tokens: max + (th ? THINK_BUDGET : 0), agentId: 'agency', thinking: th });
+    const call = th => window.tablefolkLLM.chat.completions.create({ messages: [{ role: 'system', content: system }, { role: 'user', content: userText }], max_tokens: max + (th ? THINK_BUDGET : 0), agentId: 'agency', thinking: th, priority });
     let text = ''; const t0 = performance.now();
     try { text = clean((await call(thinking))?.choices?.[0]?.message?.content); if (thinking && !text) text = clean((await call(false))?.choices?.[0]?.message?.content); }
     catch (e) { console.warn('[agency] ask', g.id, e); }
@@ -669,13 +744,17 @@
     for (const i of A.plan.items) { if (i.done) continue; const o = opts.find(x => x.key === i.key); if (o) return o; }
     return null;
   }
+  // a day plan waits behind the turns and reactions in turn mode (the model queue's -1, as an early turn):
+  // four plans asked as a round began held the next character's turn 35-43 s with Bonsai 2.5 27B (rented
+  // RTX 4070 and 4080, 2026-11-27). Not in real time: there a busy queue could leave a plan waiting for good
+  const planPriority = () => window.tablefolkModes?.mode?.() === 'turns' ? -1 : 0;
   async function planDay(g, s, j, replan) {
     const A = ag(s), opts = shortMenu(options(g, s, j)), list = opts.filter(o => o.key !== 'other' && o.key !== 'rest');
     if (!list.length) return;
     const head = replan
       ? `Your plan for today was: ${A.plan.items.map(i => i.label + (i.done ? ' (done)' : '')).join(', ')}. But "${replan.label}" did not work: ${replan.reason || 'it failed'}.\nMake a new plan for the rest of today: choose up to 4 of these, in the order you mean to do them.`
       : `A new day. Plan it: choose up to 5 of these, in the order you mean to do them.`;
-    const text = await ask(g, `${situation(g, s, j)}\n\n${head}\n${list.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}\n\nAnswer with the numbers in order, separated by commas, then a dash and one short line on what you want to get done today.`, { max: 60, kind: 'plan', think: true });
+    const text = await ask(g, `${situation(g, s, j)}\n\n${head}\n${list.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}\n\nAnswer with the numbers in order, separated by commas, then a dash and one short line on what you want to get done today.`, { max: 60, priority: planPriority(), kind: 'plan', think: true });
     const nums = (String(text).split(/\s[-–—]\s|\n/)[0].match(/\d+/g) || []).map(Number).filter(n => n >= 1 && n <= list.length);
     const why = clip((String(text).match(/[-–—]\s*([^\n]+)/) || [])[1] || '', 160);
     if (!nums.length) { note(g, 'nonsense', 'plan: ' + clip(text, 100)); A.plan = { day: dayNo(), items: [], why: '' }; return; }
