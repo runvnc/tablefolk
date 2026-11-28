@@ -35,6 +35,7 @@ await page.goto(`${base}/app/?play=1&gfx=light&fps=15&intro=0&probe=0${mode === 
 await page.waitForFunction(() => window.tablefolkModes && window.TABLEFOLK_STATE?.playerAvatar, null, { timeout: 120000 });
 for (let i = 0; ; i++) {
   const st = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.(), consent: !!document.getElementById('approveModelDownload')?.offsetParent, status: document.getElementById('brainStatus')?.textContent || '' }));
+  if (st.consent && process.env.APPROVE_DOWNLOAD === '1') { await page.evaluate(() => document.getElementById('approveModelDownload')?.click()); await page.waitForTimeout(2000); continue; }   // a rented test machine (tools/cloud-gpu)
   if (st.consent) { say('the model is not cached here (download consent showing): stopping'); process.exit(2); }
   if (st.ready) { say('brain ready: ' + st.status); out.brain = st.status; break; }
   if (i > 450) { say('the brain did not load in 15 minutes'); process.exit(3); }

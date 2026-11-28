@@ -27,6 +27,7 @@ await page.goto(`${BASE}/app/?model=${MODEL}&autonomy=guided&gfx=light&fps=10&in
 const t0 = Date.now();
 for (;;) {
   const s = await page.evaluate(() => ({ ready: !!window.tablefolk?.brainReady?.() && !!window.tablefolkGod, consent: !document.getElementById('modelConsent')?.hidden, text: document.getElementById('modelLoadText')?.textContent || '' })).catch(() => ({}));
+  if (s.consent && process.env.APPROVE_DOWNLOAD === '1') { await page.evaluate(() => document.getElementById('approveModelDownload')?.click()); await page.waitForTimeout(2000); continue; }   // a rented test machine (tools/cloud-gpu)
   if (s.consent) { console.log('the page asks to download the model: not approved; stopping'); await b.close(); process.exit(2); }
   if (s.ready) break;
   if (Date.now() - t0 > WAIT * 1000) { console.log('no brain after', WAIT, 's:', s.text); await b.close(); process.exit(3); }
