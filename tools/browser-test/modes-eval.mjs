@@ -135,6 +135,7 @@ if (mode === 'when') {
   if (room) await look('the player outdoors again', 'living', 15000);
   say(`modeWhen: ${out.when.filter(r => r.ok).length}/${out.when.length}`);
 }
+out.modelCalls = await page.evaluate(() => __calls.map(c => ({ t: +(c.t / 1000).toFixed(1), agentId: c.agentId, kind: c.kind || null, d: c.d }))).catch(() => []);
 out.replyTrace = trace; if (trace.length) say('reply trace:\n    ' + trace.join('\n    '));
 for (const r of raws) say(`  model ${r.agent} ${r.ms} ms at ${r.t.toFixed(1)}s`);
 out.modelOutputs = raws; out.errors = errs;
