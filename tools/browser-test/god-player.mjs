@@ -43,7 +43,7 @@ const power = async (name, target, why) => {
   const r = await page.evaluate(async ([n, t]) => {
     const pos = g => g.logicalPos || g.root.position, garden = () => { const d = tablefolkJobs.places.placeNamed('garden') || tablefolkJobs.places.placeNamed('field'); return d ? { x: Math.round((d.x0 + d.x1) / 2), z: Math.round((d.z0 + d.z1) / 2), place: d.id || 'garden' } : { x: 0, z: 0 }; };
     let tg = t;
-    if (t?.who) { const g = state.characters.find(c => c.id === t.who); tg = g ? { who: g, x: Math.round(pos(g).x), z: Math.round(pos(g).z) } : null; }
+    if (t?.who) { const g = state.characters.find(c => c.id === t.who); tg = g ? { who: g, x: Math.round(pos(g).x), z: Math.round(pos(g).z), ...(t.words ? { words: t.words } : {}) } : null; }
     else if (t?.place === 'garden') tg = garden();
     const r = await tablefolkPowers.use(n, tg); return typeof r === 'string' ? r : JSON.stringify(r);
   }, [name, target]).catch(e => 'error ' + e.message);
@@ -54,7 +54,7 @@ const answerPrayers = async () => {
   const open = await page.evaluate(() => tablefolkGod.rules.open().map(p => ({ id: p.id, who: p.who, need: p.need, text: p.text })));
   for (const p of open) {
     const n = FIT[p.need]; if (!n) continue;
-    await power(n, ['rain', 'bless_field'].includes(n) ? { place: 'garden' } : n === 'fog' ? {} : { who: p.who }, `${p.who} prayed for ${p.need}: ${p.text.slice(0, 80)}`);
+    await power(n, ['rain', 'bless_field'].includes(n) ? { place: 'garden' } : n === 'fog' ? {} : n === 'dream' ? { who: p.who, words: 'I hear you. Be patient, and watch the fields.' } : { who: p.who }, `${p.who} prayed for ${p.need}: ${p.text.slice(0, 80)}`);
   }
 };
 const decree = async words => {
@@ -74,7 +74,7 @@ const PLAN = [
   [1.5, () => decree('the faithful must bring three bread to the temple by evening')],
   [4, () => power('omen', { words: 'rain will come to the fields' }, 'a prophecy')],
   [5, () => power('rain', { place: 'garden' }, 'the prophecy fulfilled')],
-  [6, async () => { const id = await page.evaluate(() => { const G = tablefolkGod.rules; return G.ids().sort((a, b) => G.belief(a) - G.belief(b))[0]; }); await power('dream', { who: id }, 'a dream to the least devout'); }],
+  [6, async () => { const id = await page.evaluate(() => { const G = tablefolkGod.rules; return G.ids().sort((a, b) => G.belief(a) - G.belief(b))[0]; }); await power('dream', { who: id, words: 'Doubt is not a sin. Watch the fields, and you will see me.' }, 'a dream to the least devout'); /* words: else the power asks the player and waits */ }],
   [7, () => decree('everyone shall gather and pray at the temple at dusk')],
 ];
 let nextSample = 0, step = 0;
