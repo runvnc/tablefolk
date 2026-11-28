@@ -181,10 +181,23 @@ function oneLine(s) {
   return String(s || '').replace(/\s+/g, ' ').trim();
 }
 
+// Commands written on one line, `say("...")do(talk with bram, ...)` (Inkling 2 Mini, often): a new line after a
+// command's closing parenthesis (outside quotes, at depth 0) when another name( follows. Before this the second command
+// stayed inside the first: the words heard were `I don't know yet.")do(talk with ada, to ask ...` (free day, 2026-11-27).
+function splitJoined(line) {
+  let out = '', depth = 0, q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]; out += c;
+    if (c === '"' && line[i - 1] !== '\\') q = !q;
+    else if (!q && c === '(') depth++;
+    else if (!q && c === ')' && depth > 0 && --depth === 0 && /^\s*[a-z_]+\(/i.test(line.slice(i + 1))) out += '\n';
+  }
+  return out;
+}
 function commandLines(text) {
   // Keep every plausible command line (multi-command plans); the downstream
   // parser (parseLLMCommandLine) decides what is actually a command.
-  return String(text || '')
+  return String(text || '').split('\n').map(splitJoined).join('\n')
     // Strip markdown code fences
     .replace(/```[a-z]*\n?/gi, '\n')
     .replace(/```/g, '\n')
