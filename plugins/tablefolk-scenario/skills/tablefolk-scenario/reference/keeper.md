@@ -54,9 +54,9 @@ open:
 | lair | beds (two squares long) down every other column | a bed for each creature; no free bed, no newcomers | goblins (9) |
 | hatchery | sacks, apple barrels | a meal for every 2 squares, one back an hour for every 3 squares | (needed by all) |
 | treasury | gold piles as it fills | 40 gold a square | kobolds (9) |
-| training room | dummies | training: 1 gold and 1 xp a session; levels 2-5 at 4, 10, 18, 30 xp (+3 health, +25% wage each) | orc warriors (9) |
-| library | bookcases, lecterns | research: 2 points a session per level; 20 unlocks ⚡ Lightning | warlocks (9) |
-| workshop | anvils, workbenches | crafting: 1 point a session per level; a trap every 6 | a troll (9) |
+| training room | dummies | training: a session every game hour at a dummy, 1 gold and 1 xp; levels 2-5 at 4, 10, 18, 30 xp (+3 health, +25% wage each) | orc warriors (9) |
+| library | bookcases, lecterns | research: a session every 45 game minutes, 2 points per level; 20 unlocks ⚡ Lightning | warlocks (9) |
+| workshop | anvils, workbenches | crafting: a session every game hour, 1 point per level; a trap every 6 | a troll (9) |
 | prison | cages, chains | a hero struck down is dragged here (one per square) and rises as a skeleton in your service two game hours later | spiders (6) |
 
 ## Creatures
@@ -120,8 +120,8 @@ said so go).
 
 ## Heroes
 
-The `heroes` threat kind (a knight, an adventurer and a mage, 10 health each,
-armed by the package) comes from the place `hero_gate` at 21:00 every night
+The `heroes` threat kind (a knight with a sword, an adventurer with a dagger and a mage with
+bare hands, 6 health each) comes from the place `hero_gate` at 21:00 every night
 (`"threats": [{ "kind": "heroes" }]`; `tablefolkThreats.now('heroes')` at
 once). A hero goes for the creatures and imps within 6.5 squares (the core's
 raid), else for the heart, striking it for 4. They retreat when half are down.

@@ -39,10 +39,10 @@ export const KINDS = {
   warlock:  { body: 'cultist',  label: 'warlock',     wants: 'library',  minSize: 9, limit: 2, wage: 10, hp: 9,  work: 'research', temper: 'plain' },
   troll:    { body: 'troll',    label: 'troll',       wants: 'workshop', minSize: 9, limit: 1, wage: 7,  hp: 18, work: 'craft',    temper: 'gruff' },
   kobold:   { body: 'kobold',   label: 'kobold',      wants: 'treasury', minSize: 9, limit: 2, wage: 6,  hp: 8,  work: 'guard',    temper: 'timid' },
-  spider:   { body: 'spider',   label: 'spider',      wants: 'prison',   minSize: 6, limit: 2, wage: 3,  hp: 8,  work: 'guard',    temper: 'plain' },
+  spider:   { body: 'spider',   label: 'spider',      wants: 'prison',   minSize: 9, limit: 2, wage: 3,  hp: 8,  work: 'guard',    temper: 'plain' },
   skeleton: { body: 'skeleton', label: 'skeleton',    wants: null,       minSize: 0, limit: 9, wage: 2,  hp: 10, work: 'train',    temper: 'plain' },
 };
-// who comes first when several rooms would draw someone: the specialists, then goblins
+// who comes first when several rooms would draw someone (after a first goblin): the specialists, then goblins
 export const ARRIVAL_ORDER = ['orc', 'warlock', 'troll', 'kobold', 'spider', 'goblin'];
 export const ROOM_KINDS = ['lair', 'hatchery', 'treasury', 'training', 'library', 'workshop', 'prison'];
 
@@ -97,7 +97,9 @@ export function createKeeper({ now = () => 0, rules = {} } = {}) {
   // (one per minSize squares of its room), with a bed free and a hatchery to eat from
   function attract() {
     if (freeBeds() <= 0 || !cells('hatchery')) return null;
-    for (const k of ARRIVAL_ORDER) {
+    // the first comer to a new dungeon is a goblin (a lair is all it wants); then the specialists, then more goblins
+    const order = count('goblin') ? ARRIVAL_ORDER : ['goblin', ...ARRIVAL_ORDER];
+    for (const k of order) {
       const K = KINDS[k]; if (!K.wants) continue;
       const have = cells(K.wants); if (have < K.minSize) continue;
       if (count(k) < Math.min(K.limit, Math.floor(have / K.minSize))) return k;

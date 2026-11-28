@@ -170,7 +170,10 @@ export default function (api) {
     const has = (x, z) => cells.some(c => c.x === x && c.z === z);
     let beds = 0;
     // furniture on every other square (odd offsets: the paths between stay open)
-    const odd = cells.filter(c => (c.x - x0) % 2 === 1 && (c.z - z0) % 2 === 1);
+    // (never on a square a corridor opens onto: a room across a passage would close it)
+    const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], open = (x, z) => !isRock(x, z) && W.cellPassable?.(x, z);
+    const doorway = c => N4.some(([dx, dz]) => { const x = c.x + dx, z = c.z + dz; return !has(x, z) && open(x, z) && N4.filter(([ex, ez]) => open(x + ex, z + ez)).length <= 2; });
+    const odd = cells.filter(c => (c.x - x0) % 2 === 1 && (c.z - z0) % 2 === 1 && !doorway(c));
     if (kind === 'lair') {
       // beds (two squares long) down every other column, the row between free
       for (let x = x0; x <= x1; x += 2) for (let z = z0 + 1; z <= z1 - 1; z += 3) if (has(x, z - 1) && has(x, z) && has(x, z + 1) && put('bed', x, z, {})) beds++;
@@ -340,13 +343,14 @@ export default function (api) {
     if (r.fail) { try { W.tablefolkUses?.lieOnFloor?.(g); } catch {} }
     return { ms: r.ms || 3000 };
   }
-  // its work, by kind: training at a dummy, study at a bookcase, crafting at an anvil, guarding its room
+  // its work, by kind: training at a dummy, study at a bookcase, crafting at an anvil (a session every "every" game
+  // minutes there, half that when slapped), guarding its room
   const WORK = {
-    train: { room: 'training', at: /^(dummy|target)$/, clip: 'attack', doing: 'training', every: 4500,
+    train: { room: 'training', at: /^(dummy|target)$/, clip: 'attack', doing: 'training', every: 60,
       done(g) { if (api.resource('gold') < 1) return 'no gold to train with'; api.resource('gold', -1); const r = R.train(g.id); if (r.up) { narrate(`${g.id} has grown stronger: level ${r.level}. Its wage rises to ${R.wageOf(g.id)} gold.`); const hp = maxHpOf(g) + R.rules.hpStep; api.setBrainConfig(g.id, { maxHp: hp, hp }); badge(g, `level ${r.level}!`); burst(posOf(g).x, posOf(g).z, [1, .9, .4]); } else badge(g, '+1 xp'); return null; } },
-    research: { room: 'library', at: /^(bookcase|lectern)$/, clip: 'cast', doing: 'studying', every: 5000,
+    research: { room: 'library', at: /^(bookcase|lectern)$/, clip: 'cast', doing: 'studying', every: 45,
       done(g) { const r = R.research(g.id); badge(g, `research ${r.points}`); for (const u of r.unlocked) { narrate(`The warlocks have mastered ${u}! A new power: ${u === 'lightning' ? '⚡ Lightning' : u}.`); B()?.render?.(); W.dispatchEvent(new CustomEvent('tablefolk-keeper', { detail: { what: 'research', unlocked: u } })); } return null; } },
-    craft: { room: 'workshop', at: /^(anvil|workbench)$/, clip: 'hammer', doing: 'crafting', every: 5000,
+    craft: { room: 'workshop', at: /^(anvil|workbench)$/, clip: 'hammer', doing: 'crafting', every: 60,
       done(g) { const r = R.craft(g.id); api.sound('hit', g); if (r.made) { narrate(`The workshop has made a trap. Mark where it goes (Mark, trap).`); badge(g, 'a trap!'); } else badge(g, 'hammers'); return null; } },
   };
   async function work(g, s, c) {
@@ -363,7 +367,7 @@ export default function (api) {
           try { W.setCharacterFacing?.(g, new (BAB().Vector3)(Math.sign(o.x - posOf(g).x), 0, Math.sign(o.z - posOf(g).z))); } catch {}
           clip(g, w.clip);
           const st2 = (s.keeper ||= {});
-          if ((st2.workAt || 0) + quick(g, w.every) < performance.now()) { st2.workAt = performance.now(); const why = w.done(g); if (why) { k.setDoing(g, s, why); return { ms: 6000 }; } }
+          st2.workAt ??= gm(); if (gm() - st2.workAt >= quick(g, w.every)) { st2.workAt = gm(); const why = w.done(g); if (why) { k.setDoing(g, s, why); return { ms: 6000 }; } }
           return { ms: quick(g, 2200) };
         }
       }
@@ -397,13 +401,21 @@ export default function (api) {
     if (council?.members.includes(g.id)) { k.setDoing(g, s, 'at the council'); const h = heart(); if (dist(posOf(g), h) > 2.6) { const r = await k.goTo(g, s, h.x, h.z + 2, 'the heart'); return { ms: r.ms || 2000 }; } return { ms: 2000 }; }
     // a call to arms: to the spot, and fight what comes near it
     if (rally && rally.until > gm()) {
-      if (raid.some(h => dist(posOf(h), posOf(g)) < 8)) return null;
+      const near = raid.filter(h => dist(posOf(h), posOf(g)) < 8).sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
+      if (near) { k.setDoing(g, s, `fighting ${near.id}`); return { ms: await closeAndStrike(g, near, (x, z) => J().walkTo(g, x, z)) }; }
       k.setDoing(g, s, 'answering the call to arms');
       if (g.pose?.mode === 'lie') k.wake(g, s);
-      if (dist(posOf(g), rally) > 2) { const r = await k.goTo(g, s, rally.x, rally.z, 'the call to arms'); return { ms: Math.min(2500, r.ms || 2000) }; }
+      const kk = (s.keeper ||= {}); if (!kk.rallyAt || kk.rallyFor !== rally) { kk.rallyFor = rally; kk.rallyAt = api.freeCell(rally.x + Math.round(Math.random() * 2 - 1), rally.z + Math.round(Math.random() * 2 - 1), 2) || rally; }
+      if (dist(posOf(g), kk.rallyAt) > 1.2) { const r = await k.goTo(g, s, kk.rallyAt.x, kk.rallyAt.z, 'the call to arms'); if (r.fail) kk.rallyAt = null; return { ms: Math.min(2500, r.ms || 2000) }; }
       return { ms: 2000 };
     }
-    if (raid.length) return null;   // the core sends fighters at the heroes
+    // heroes in the dungeon: at the nearest (the core's fighters wait for a line of sight a tunnel's corner hides)
+    if (raid.length) {
+      const foe = raid.slice().sort((a, b) => dist(posOf(a), posOf(g)) - dist(posOf(b), posOf(g)))[0];
+      if (g.pose?.mode === 'lie') k.wake(g, s);
+      k.setDoing(g, s, `fighting ${foe.id}`);
+      return { ms: await closeAndStrike(g, foe, (x, z) => J().walkTo(g, x, z)) };
+    }
     const m = m0(g), above = words(g);
     if (R.striking(g.id)) { k.setDoing(g, s, 'on strike'); if (Math.random() < .15) grumble(g, 'strike'); const lair = roomsOf('lair')[0]; if (lair) { const w = await goRoom(g, s, lair, 'the lair'); if (w) return w; } return { ms: 5000 }; }
     if (g.pose?.mode === 'lie' && (m?.tired ?? 0) > .05) return rest(g, s);
@@ -498,7 +510,7 @@ export default function (api) {
   }
 
   // ---------------------------------------------------------------- pay day: a demand made of the keeper
-  let payDemand = null, lastPaydayHour = null, startHour = 0;
+  let payDemand = null, lastPaydayHour = null, startHour = null, lastSeenHour = null;
   async function payday() {
     const p = R.payday(); if (!p) return null;
     const spokes = creatures().sort((a, b) => R.get(b.id).level - R.get(a.id).level || R.get(b.id).arrived - R.get(a.id).arrived)[0];
@@ -573,11 +585,23 @@ export default function (api) {
   }
 
   // ---------------------------------------------------------------- heroes
+  // close in on a foe and strike (both sides: the core's fighters wait for a line of sight a tunnel's corner hides)
+  const lastBlow = new Map();
+  async function closeAndStrike(g, foe, walk) {
+    const p = posOf(foe);
+    if (dist(posOf(g), p) > 1.45) {
+      if (!g.turnMove) { const c = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].map(([dx, dz]) => ({ x: Math.round(p.x) + dx, z: Math.round(p.z) + dz })).filter(q => !isRock(q.x, q.z) && W.cellPassable?.(q.x, q.z) && !W.occupantAt?.(q.x, q.z, g)).sort((a, b) => dist(a, posOf(g)) - dist(b, posOf(g)))[0]; if (c) walk(c.x, c.z); else walk(Math.round(p.x), Math.round(p.z)); }
+      return 900;
+    }
+    try { W.setCharacterFacing?.(g, new (BAB().Vector3)(Math.sign(p.x - posOf(g).x), 0, Math.sign(p.z - posOf(g).z))); } catch {}
+    if (performance.now() - (lastBlow.get(g.id) || 0) > 1500 / (W.tablefolkModes?.speed || 1)) { lastBlow.set(g.id, performance.now()); try { api.combat.attack(g, foe.id); } catch (e) { console.warn('[keeper] attack', e); } }
+    return 1300;
+  }
   async function heroTurn(c, ctx) {
-    if (!c._keeperArmed) { c._keeperArmed = true; const w = /mage|wizard/.test(c.charModel) ? 'staff' : 'sword'; try { api.give(c, w, 1); api.combat.wield(c, w); } catch {} }
+    if (!c._keeperArmed) { c._keeperArmed = true; const w = /knight|guard/.test(c.charModel) ? 'sword' : /mage|wizard/.test(c.charModel) ? null : 'dagger'; if (w) try { api.give(c, w, 1); api.combat.wield(c, w); } catch {} }
     // creatures or imps near: fight them (the core's raid)
-    const prey = api.state.characters.filter(o => !o.defeated && !o._threat && (R.get(o.id) || isImp(o)) && !held.includes(o) && dist(posOf(o), posOf(c)) < 6.5);
-    if (prey.length) return false;
+    const prey = api.state.characters.filter(o => !o.defeated && !o._threat && (R.get(o.id) || isImp(o)) && !held.includes(o) && dist(posOf(o), posOf(c)) < 6.5).sort((a, b) => dist(posOf(a), posOf(c)) - dist(posOf(b), posOf(c)));
+    if (prey.length) { const ms = await closeAndStrike(c, prey[0], (x, z) => ctx.walkTo(x, z)); await new Promise(r => setTimeout(r, Math.min(ms, 900))); return true; }
     // else for the heart
     const h = heart();
     if (dist(posOf(c), h) > 1.9) { if (!c.turnMove) ctx.walkTo(h.x + (Math.random() - .5), h.z + 1.5); return true; }
@@ -734,7 +758,7 @@ export default function (api) {
     B().pick(`<div class="keeperPanel"><div class="ktabs"><b>Creatures</b><span style="flex:1"></span><button type="button" data-pick="close">close</button></div>${sum}${rows || '<div class="kp"><small>No creatures yet. Build a lair and a hatchery: goblins come through the portal.</small></div>'}</div>`, on2);
   }
   function look(g) { if (!g) return; const c = api.state.camera; if (!c) return; api.state.followAvatar = false; c.setTarget(new (BAB().Vector3)(posOf(g).x, 0, posOf(g).z)); c.radius = Math.min(c.radius, 14); badge(g, '👁'); }
-  const nextPayday = () => { const h = Math.floor(gm() / 60), N = R.rules.paydayHours; let k = h + 1; while ((k - startHour) % N) k++; return k * 60; };
+  const nextPayday = () => { const h = Math.floor(gm() / 60), N = R.rules.paydayHours, s0 = startHour ?? h; let k = h + 1; while ((k - s0) % N) k++; return k * 60; };
 
   // ---------------------------------------------------------------- the card (the "keeper_creature" skill)
   const cards = {
@@ -756,6 +780,9 @@ export default function (api) {
   function quarter() {
     if (!on) return;
     const t = gm(), h = Math.floor(t / 60);
+    // (the first count starts from the first quarter hour, and again if the clock jumps: it is set after the world starts)
+    if (startHour == null || lastSeenHour == null || h < lastSeenHour || h - lastSeenHour > 2) { startHour = h; lastPaydayHour = h; }
+    lastSeenHour = h;
     // the hatchery breeds: a meal back an hour for every 3 squares
     if (Math.floor(t / 60) !== Math.floor((t - 15) / 60)) {
       for (const r of roomsOf('hatchery')) { const x = hatch.get(r.id); if (!x) continue; x.grow += r.size / 3; const add = Math.floor(x.grow); x.grow -= add; x.food = Math.min(x.max, x.food + add); }
@@ -803,7 +830,7 @@ html.keeper-game #tfPickBar{left:12px;transform:none;bottom:96px;justify-content
     on = true;
     const scn = W.tablefolkScenario?.active?.scn || {};
     R.clear(); held.length = 0; rally = null; council = null; lastCouncil = null; payDemand = null; traps.length = 0; prisoners.clear(); hatch.clear(); lights.clear(); furniture.clear(); goldPiles = []; slapped.clear(); digging.clear();
-    startHour = Math.floor(gm() / 60); lastPaydayHour = startHour; lastArrival = -1e9;
+    startHour = null; lastPaydayHour = null; lastSeenHour = null; lastArrival = -1e9;   // (set at the first quarter hour: the clock is not yet the scenario's here)
     // the scenario's starting gold (its "resources"), and a whole heart
     try { const st = scn.resources?.gold; W.tablefolkResources?.set?.('gold', typeof st === 'number' ? st : st?.start ?? 60); W.tablefolkResources?.set?.('heart', R.rules.heartHp); } catch {}
     readMap(); drawRock(); drawHeartAndPortal();

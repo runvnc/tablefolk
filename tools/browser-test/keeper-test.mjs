@@ -18,7 +18,11 @@ await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800,
 let fails = 0, n = 0; const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 300))); page.on('crash', () => { console.log('PAGE CRASHED'); process.exit(2); });
 page.on('console', m => { if (m.type() === 'warning' && /\[keeper\]/.test(m.text())) console.log('     page:', m.text().slice(0, 200)); });
 const check = async (name, fn) => { n++; let r; try { r = await fn(); } catch (e) { r = [false, 'threw ' + e.message]; } const [ok, info] = Array.isArray(r) ? r : [r, '']; if (!ok) fails++; console.log(ok ? 'ok  ' : 'FAIL', name, info ? '- ' + String(info).slice(0, 400) : ''); return ok; };
-const ev = (fn, a) => page.evaluate(fn, a);
+await cdp.send('Debugger.enable');
+// a page that stops answering: pause it and print where it is stuck
+const ev = (fn, a, ms = 400000) => { let timer; return Promise.race([page.evaluate(fn, a).finally(() => clearTimeout(timer)), new Promise((_, rej) => { timer = setTimeout(async () => {
+  try { const p = new Promise(r => cdp.once('Debugger.paused', r)); await cdp.send('Debugger.pause'); const e = await Promise.race([p, new Promise(r => setTimeout(() => r(null), 8000))]); console.log('STUCK at:\n' + (e ? e.callFrames.slice(0, 16).map(f => `  ${f.functionName || '(anon)'} ${f.url.split('/').pop().split('?')[0]}:${f.location.lineNumber + 1}`).join('\n') : '  (no pause)')); } catch (err) { console.log('STUCK', err.message); }
+  rej(new Error('page stuck')); process.exit(3); }, ms); })]); };
 const shot = async name => { if (!SHOTS) return; const url = await ev(() => document.getElementById('renderCanvas').toDataURL('image/jpeg', .85)); (await import('fs')).writeFileSync(`${SHOTS}/${name}.jpg`, Buffer.from(url.split(',')[1], 'base64')); console.log('     shot', `${SHOTS}/${name}.jpg`); };
 const pageShot = async name => { if (SHOTS) { await page.screenshot({ path: `${SHOTS}/${name}.png` }); console.log('     shot', `${SHOTS}/${name}.png`); } };
 const look = (x, z, radius = 18, beta = .75) => ev(({ x, z, radius, beta }) => { state.followAvatar = false; const c = state.camera; c.setTarget(new BABYLON.Vector3(x, 0, z)); c.radius = radius; c.beta = beta; c.alpha = -Math.PI / 2; }, { x, z, radius, beta }).then(() => page.waitForTimeout(700));
@@ -90,9 +94,16 @@ await ev(() => { tablefolkKeeper.quarter(); });
 await drive("state.characters.some(c => tablefolkKeeper.rules.get(c.id))", 20);
 await check('a creature came through the portal, drawn by a room', () => ev(() => { const c = tablefolkKeeper.rules.list(); return [c.length >= 1 && __k.some(e => e.what === 'arrived') && __narr.some(t => /comes through the portal/.test(t)), c.map(x => x.id + ' ' + x.kind).join(', ') + ' | ' + __narr.filter(t => /portal/.test(t)).join(' / ')]; }));
 // the rest, as each arrival makes room for the next (an arrival every game hour)
-for (let i = 0; i < 8; i++) { const k = await ev(() => tablefolkKeeper.attract()); if (!k) break; await ev(k => tablefolkKeeper.arrive(k), k); await page.waitForTimeout(400); }
+for (let i = 0; i < 8; i++) { const k = await ev(() => tablefolkKeeper.attract(), null, 8000); if (!k) break; console.log('     arriving:', k, await ev(async k => (await tablefolkKeeper.arrive(k))?.id, k, 10000)); await page.waitForTimeout(400); }
+// a full lair: an unhappy goblin leaves (through the portal), and its bed draws whoever is still wanted
+if (await ev(() => tablefolkKeeper.rules.freeBeds() <= 0 && !tablefolkKeeper.rules.list().some(c => c.kind === "spider"))) {
+  const leaver = await ev(() => { const c = tablefolkKeeper.rules.list().filter(c => c.kind === 'goblin').slice(-1)[0] || tablefolkKeeper.rules.list().slice(-1)[0]; c.happy = 5; c.leaving = true; return c.id; });
+  await drive(`!state.characters.some(c => c.id === '${leaver}')`, 60);
+  await check('a creature set on leaving walked out through the portal, and was gone', () => ev(id => [!state.characters.some(c => c.id === id) && !tablefolkKeeper.rules.get(id) && __k.some(e => e.what === 'left' && e.id === id), id + ' ' + __narr.filter(t => /left the dungeon/.test(t)).join(' / ')], leaver));
+  for (let i = 0; i < 3; i++) { const k = await ev(() => tablefolkKeeper.attract(), null, 8000); if (!k) break; console.log('     arriving:', k, await ev(async k => (await tablefolkKeeper.arrive(k))?.id, k, 10000)); }
+}
 await check('each room drew its kind: goblin (lair), orc (training), warlock (library), troll (workshop), kobold (treasury), spider (prison)', () => ev(() => { const kinds = new Set(tablefolkKeeper.rules.list().map(c => c.kind)); return [['goblin', 'orc', 'warlock', 'troll', 'kobold', 'spider'].every(k => kinds.has(k)), [...kinds].join(', ') + `; ${tablefolkKeeper.rules.count()} creatures, ${tablefolkKeeper.rules.beds()} beds`]; }));
-await check('they are characters with the creature job, a weapon, the card', () => ev(() => { const g = state.characters.find(c => tablefolkKeeper.rules.get(c.id)?.kind === 'orc'); const l = tablefolkMind.cardLines(g); return [tablefolkJobs.jobOf(g)?.id === 'keeper_creature' && l.some(x => /orc warrior/.test(x) && /wage/.test(x)), g.id + ': ' + l.filter(x => /wage|keeper/.test(x)).join(' / ')]; }));
+await check('they are characters with the creature job, a weapon, the card', () => ev(() => { const g = state.characters.find(c => tablefolkKeeper.rules.get(c.id)?.kind === 'orc'); const l = [...tablefolkMind.cardLines(g), ...tablefolkSkills.cardLines(g)]; return [tablefolkJobs.jobOf(g)?.id === 'keeper_creature' && !!tablefolk.getBrainConfig(g.id).wielding && l.some(x => /orc warrior/.test(x) && /wage/.test(x)), g.id + ': ' + l.filter(x => /wage|keeper/.test(x)).join(' / ')]; }));
 await drive('false', 25);
 await look(-7, -3, 15, .6); await shot('k05-creatures');
 
@@ -115,7 +126,7 @@ await look(-9, 0, 11, .6); await shot('k07-working');
 await ev(() => tablefolkKeeper.payday());
 await page.waitForTimeout(1500);
 await check('pay day: a demand made of the keeper, said by a creature; the Pay wages button', () => ev(() => { const d = tablefolkDemands.list().slice(-1)[0], t = [...document.querySelectorAll('#powerBar button')].map(b => b.textContent).join(' | '); return [d?.of === 'player' && d.status === 'open' && /wages/.test(d.text) && __says.some(l => /Pay day/.test(l)) && /Pay wages/.test(t), `${d?.text} (of ${JSON.stringify(d?.of)}, via ${d?.via}); bar: ${t.slice(0, 160)}`]; }));
-await check('the creatures’ cards carry it', () => ev(() => { const g = state.characters.find(c => tablefolkKeeper.rules.get(c.id)); return [tablefolkMind.cardLines(g).some(x => /pay day/i.test(x)), tablefolkMind.cardLines(g).filter(x => /pay/i.test(x)).join(' / ')]; }));
+await check('the creatures’ cards carry it', () => ev(() => { const g = state.characters.find(c => tablefolkKeeper.rules.get(c.id)), l = [...tablefolkMind.cardLines(g), ...tablefolkSkills.cardLines(g)]; return [l.some(x => /pay day/i.test(x)), l.filter(x => /pay/i.test(x)).join(' / ')]; }));
 const pay0 = await ev(() => ({ gold: tablefolkResources.get('gold'), owed: tablefolkKeeper.rules.pending().owed, happy: tablefolkKeeper.rules.list().map(c => c.happy) }));
 await page.click('#powerBar button:has-text("Pay wages")');
 await page.waitForTimeout(2600);
@@ -175,7 +186,7 @@ await page.click('#powerBar button:has-text("Creatures")'); await page.waitForTi
 await check('the creatures panel: mood, level, wage, rooms, research', () => ev(() => { const t = document.getElementById('tfPickBar').textContent; return [/level/.test(t) && /wage/.test(t) && /treasury/.test(t) && /research/.test(t) && /imp/.test(t), t.slice(0, 300)]; }));
 await pageShot('k11-panel');
 await page.click('#tfPickBar button:has-text("close")');
-await ev(() => { tablefolkKeeper.rules.data(); for (let i = 0; i < 12 && tablefolkKeeper.rules.traps() < 1; i++) tablefolkKeeper.rules.craft(state.characters.find(c => tablefolkKeeper.rules.get(c.id)?.kind === 'troll').id); tablefolkDesignate.add({ kind: 'trap', cells: [{ x: 0, z: 4 }], by: 'test' }); });
+await ev(() => { tablefolkKeeper.rules.data(); for (let i = 0; i < 12 && tablefolkKeeper.rules.traps() < 1; i++) tablefolkKeeper.rules.craft((tablefolkKeeper.rules.list().find(c => c.kind === 'troll') || tablefolkKeeper.rules.list()[0]).id); tablefolkDesignate.add({ kind: 'trap', cells: [{ x: 0, z: 4 }], by: 'test' }); });
 await drive("tablefolkKeeper.traps().length > 0", 60);
 await check('a trap made in the workshop set by an imp', () => ev(() => [tablefolkKeeper.traps().length === 1 && getObjects().some(o => o.type === 'bear_trap'), JSON.stringify(tablefolkKeeper.traps().map(t => [t.x, t.z]))]));
 await check('save keeps the keeper’s state', () => ev(() => { const s = tablefolkSaveHooks.keeper.save(); return [s.r.C.length === tablefolkKeeper.rules.count() + tablefolkKeeper.rules.list().filter(c => c.leaving).length && s.r.rooms.length === 7, `${s.r.C.length} creatures, ${s.r.rooms.length} rooms`]; }));

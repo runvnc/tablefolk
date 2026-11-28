@@ -23,7 +23,7 @@
 
   "threats": {
     "heroes": { "who": ["knight", "adventurer", "mage"], "name": "adventurer", "count": 3, "when": [21, 23], "every": 1, "from": "hero_gate",
-      "behaviour": "raid", "retreat": "half", "scares": false, "hp": 10,
+      "behaviour": "raid", "retreat": "half", "scares": false, "hp": 6,
       "announce": "Heroes have broken into the dungeon from the south gate! They march on the heart." }
   },
 
