@@ -98,13 +98,27 @@ export function vote(voters = []) {
 const ST_NO = /\b(no|nay|never|refuse[sd]?|will not|won'?t|shall not|cannot|can'?t|must not|should not|shouldn'?t|not (?:do|give|bring|kill|go|lead|build|pray|kneel|bow|let|going|doing|part|sacrifice|spare)\w*|not (?:right|proper|wise|fair)|don'?t think|do not think|madness|nonsense|foolish(?:ness)?|absurd|over my dead body|i say no|not a chance|leave me out|without me)\b/;
 const ST_YES = /\b(yes|aye|we must|we shall|we will|i will|i shall|obey|agree[ds]?|gladly|of course|so be it|it shall be done|as the god wills|praise|i am ready|count me|let us do|let's do|we do as|i'?ll (?:do|bring|go|help|lead|fetch)|willingly|happily|blessed be)\b/;
 const ST_IF = /\b(but|if|unless|only if|provided|as long as|first|later|after the|wait|until)\b/;
-const ST_DEAL = /\b(half|more time|in return|in exchange|on one condition|bargain|give us (?:more|until|time)|the rest (?:when|after|later))\b/;
+const ST_DEAL = /\b(half (?:now|today|of (?:it|them|that)|as (?:many|much))|more time|in return|in exchange|on one condition|bargain|give us (?:more|until|time)|the rest (?:when|after|later))\b/;
 export function stanceOf(text) {
   const t = ' ' + String(text || '').toLowerCase().replace(/[’']/g, "'").replace(/[^a-z' ,.!?;:-]+/g, ' ') + ' ';
   // "no one", "no doubt", "not only" are not refusals; "i will not", "we must not" are not a yes
   const clean = t.replace(/\bno (?:one|doubt|longer|matter|more than|other)\b|\bnot only\b/g, ' ');
-  const no = ST_NO.test(clean), yes = ST_YES.test(clean.replace(/\b(i|we) (will|shall|must) not\b|\b(i|we) (won'?t|cannot|can'?t)\b/g, ' ')), cond = ST_IF.test(clean);
-  if (ST_DEAL.test(clean) || ((yes || no) && cond)) return 'bargain';
+  const yesIn = x => ST_YES.test(x.replace(/\b(i|we) (will|shall|must) not\b|\b(i|we) (won'?t|cannot|can'?t)\b/g, ' '));
+  if (ST_DEAL.test(clean)) return 'bargain';
+  // the first sentence that takes a side decides, read up to its reason ("I refuse, for if the god...",
+  // "I agree, for ... but ..." are a no and a yes: bigger models give reasons): a condition in that part is a
+  // bargain, and so is a next sentence that starts with "but" ("Fine. I will do it. But I do not like it.")
+  const parts = clean.split(/[.!?;:]+/).map(x => ' ' + x.trim() + ' ');
+  for (let i = 0; i < parts.length; i++) {
+    const lead = parts[i].split(/,? (?:for|because|since|though|although) |, as /)[0] + ' ', n = ST_NO.test(lead), y = yesIn(lead);
+    if (!n && !y) continue;
+    if (ST_IF.test(lead) || (/^ but (?!if\b)/.test(parts[i + 1] || '') && !(n && !y))) return 'bargain';
+    if (y && !n) return 'yes';
+    if (n && !y) return 'no';
+    break;
+  }
+  const no = ST_NO.test(clean), yes = yesIn(clean), cond = ST_IF.test(clean);
+  if ((yes || no) && cond) return 'bargain';
   if (yes && !no) return 'yes';
   if (no && !yes) return 'no';
   if (/\b(perhaps|maybe)\b/.test(clean) && /\bif\b/.test(clean)) return 'bargain';

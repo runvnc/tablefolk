@@ -106,7 +106,15 @@ ok('council: their own words (stance) win over belief', v.outcome === 'accept');
  ['We must not give our only sheep to the fire.', 'no'], ['No one should doubt the god. We will bring the bread.', 'yes'], ['I know we must, and I will.', 'yes'],
  ['Never! Let Ada bring her own bread.', 'no'], ['Aye, it shall be done before the moon is full.', 'yes'], ['I will not, unless the god shows itself to me.', 'bargain'],
  ["I'll fetch the sheep myself.", 'yes'], ['Perhaps, if the harvest is good.', 'bargain'], ['Praise be. Let us do it tonight.', 'yes'],
- ['I refuse to kill a beast for a ring of light in the sky.', 'no'], ['Fine. I will do it. But I do not like it.', 'bargain'],
+ ['I refuse to kill a beast for a ring of light in the sky.', 'no'],
+ // Bonsai 2 9B / 2.5 27B speeches on a rented RTX 4070 (2026-11-27): reasons with "if", "but", "half" in them
+ ['I refuse to lead a sheep to the temple, for if the god demands a sacrifice, then surely a storm could have destroyed it without asking for one.', 'no'],
+ ['I will bring the bread, for the Lord’s voice is clear in the temple. But if the offering feels heavy, I shall whisper to the green leaves.', 'yes'],
+ ["I refuse; if the temple eats our bread, then the gods must be hungry for flesh, not grain. I won't feed a god I don't believe in.", 'no'],
+ ['I refuse to lead a sheep to the altar, for the God’s will is not so crude. I stand with the faithful, but I will not trade my livelihood for a doubt.', 'no'],
+ ['I agree, for the bread is the fruit of my hands, and I will bring it with a grateful heart. Finn may doubt, but I know the truth in my soul.', 'yes'],
+ ['Three loaves? That’s half my week’s rations, and I’ve seen enough storms to know this god is just wind and noise. I refuse.', 'no'],
+ ['I will bring the three loaves, for the elder speaks with authority. However, I will ask for a fresh crust of bread in return.', 'bargain'], ['Fine. I will do it. But I do not like it.', 'bargain'],
  ["I won't be part of this.", 'no'], ['The god provides; we owe it this much.', null],
 ];
   const miss = L.filter(([l, w]) => stanceOf(l) !== w);
