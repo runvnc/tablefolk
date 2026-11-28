@@ -213,16 +213,9 @@ purpose, 3.2 surprise. Tools: `tools/browser-test/god-player.mjs` beside
   { council, anger })`, `readDecree`, `council()`, `sick()`, `makeSick(g)`,
   `cure(g)`, `runPower(name, target)`, `shrine()`, `showPanel(tab)`.
 
-## Not built yet: a Dungeon Keeper variant
+## A Dungeon Keeper variant
 
-The same foundations would carry a keeper of a lair: what it needs on top of
-this package is content again: designation kinds for rooms (lair, hatchery,
-treasury, training room: `designations` with `work.paint` and a `build`),
-a resource for gold dug from marked rock (`dig` marks already give stone),
-creatures that come when the rooms are big enough (a module's `api.spawn` on
-`tablefolk-designation` done), their pay day and their mood (a resource and
-a demand of the keeper's own: "pay us by nightfall"), heroes as a threat kind
-from the edge (`threats` with `from`), and the hand of the keeper (a power
-with `target: 'character'` that lifts and drops). A dungeon map
-(`"generate": { "kind": "dungeon" }`) with the camera overhead, and the
-creatures' own autonomy (a group `"autonomy": "free"` for the proud ones).
+Built on the same foundations: the `keeper` package and
+`scenarios/keeper-lair.json` ([keeper.md](keeper.md)): rock dug for gold,
+rooms as designation kinds, creatures drawn by them, wages as a demand made
+of the keeper, a creature council, heroes as a threat kind, and the hand.

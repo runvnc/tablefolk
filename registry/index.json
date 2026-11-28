@@ -123,6 +123,20 @@
     },
     {
       "kind": "package",
+      "ref": "keeper",
+      "name": "Keeper",
+      "description": "A Dungeon Keeper game: you are the dungeon's keeper, with no body, only a hand and your gold. Mark rock for your imps to dig (gold from the veins), claim rooms (lair, hatchery, treasury, training room, library, workshop, prison), and creatures come through the portal for them: goblins, orc warriors, warlocks, a troll, kobolds, spiders. They eat, sleep, train, study and craft by code, want their wages every pay day and argue at a council when they are not paid; heroes break in to smash the heart. Powers: the hand (pick up and drop), slap, heal, call to arms, lightning. Runs with no model; with a brain, creatures complain, scheme and argue in their own words.",
+      "version": "1.0.0",
+      "code": true,
+      "has": [
+        "skills",
+        "jobs",
+        "threats",
+        "modules"
+      ]
+    },
+    {
+      "kind": "package",
       "ref": "nightwatch",
       "name": "Night Watch",
       "description": "A small game as a package: a signal beacon to keep burning through the night, a keeper's job, a woodpile that runs down, dire wolves that circle while the fire burns and close in when it dies, a signal() command that calls the militia, and the captain's briefing.",

@@ -91,7 +91,8 @@ lines (`map`, quick natural scenes), explicit `objects` / `paint`, and
 | [characters.md](reference/characters.md) | commands (`allowed`), menus (choices the player clicks, types or says; scripted replies and actions; worlds with no model), earshot and whisper, what characters see, sight, trading and prices, minds (mood, needs, memory, lore), voices |
 | [combat.md](reference/combat.md) | hit points, weapons, hostile monsters and talking enemies, looting bodies |
 | [living.md](reference/living.md) | worlds that live on their own: `live`, `pace`, the director and `events`, writing personalities for it, showcase worlds |
-| [god.md](reference/god.md) | the God game (`packages/god`, `scenarios/god-village.json`): no avatar, belief and mana, prayers, 14 powers, decrees with a vision and a council; the rules and numbers; what a Dungeon Keeper variant needs |
+| [god.md](reference/god.md) | the God game (`packages/god`, `scenarios/god-village.json`): no avatar, belief and mana, prayers, 14 powers, decrees with a vision and a council; the rules and numbers |
+| [keeper.md](reference/keeper.md) | the Keeper game (`packages/keeper`, `scenarios/keeper-lair.json`): a Dungeon Keeper: digging rock and gold, seven rooms, creatures drawn by them, wages and pay day, the creature council, heroes, the hand and four powers |
 | [goals.md](reference/goals.md) | win / lose predicates and scores |
 | [workflows.md](reference/workflows.md) | step-by-step routines that keep small models on track, or run with no model at all |
 | [story.md](reference/story.md) | world flags, facts characters know once a flag is set, conditions on flags, inventory and gold |

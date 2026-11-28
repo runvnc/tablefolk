@@ -823,7 +823,7 @@ html.keeper-game #tfPickBar{left:12px;transform:none;bottom:96px;justify-content
   };
   // what tests and other packages may read
   W.tablefolkKeeper = { rules: R, rock: () => rock, veins: () => veins, isRock, dug, makeRoom, roomOf, payday, payWages, missedPay, holdCouncil, council: () => council, lastCouncil: () => lastCouncil, arrive, attract: () => R.attract(),
-    drop, held: () => held.slice(), rally: () => rally, callOff, heart, portal, hatch: () => hatch, capacity, deposit, traps: () => traps, prisoners: () => prisoners, showPanel, quarter, drawRock, grumble, nextPayday };
+    drop, held: () => held.slice(), rally: () => rally, callOff, heart, portal, hatch: () => hatch, capacity, deposit, traps: () => traps, prisoners: () => prisoners, showPanel, quarter, prisonTick, drawRock, grumble, nextPayday };
 
   return {
     resources: {

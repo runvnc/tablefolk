@@ -360,6 +360,15 @@ the work instead (return a job step result; `ctx`: `{ d, cell, setDoing,
 goTo, runLine, build(type), paint(mat), remove(), api }`) and `done(d, ctx)`
 runs when every square is done.
 
+Three more fields steer where a kind can be marked and when a square can be
+worked: `ground` (`"rock"`: walls and rocks may be marked and need not be
+reachable, digging into rock; `"floor"`: any walkable floor, roads, paved and
+painted squares and the insides of walled rooms; default: open ground as the
+core kinds), `accept(x, z)` in a module (`true`, or the reason a square is
+left out, shown by the Mark tool) and `ready(cell, d)` (workers pass a square
+over until it returns true: rock with no open side yet). `packages/keeper/`
+uses all three.
+
 ### Powers (`powers`, a module's)
 
 Player-side actions on the power bar, paid in a resource.
@@ -412,6 +421,10 @@ api.demand({ text: 'Bring 3 bread to the temple.', of: { group: 'faithful' }, by
 `met`: `{ flag }`, `{ if: "<condition>" }`, `{ deliver: { item, n, to: a
 place or a character } }`, `{ designation: true }` with `plan` (words or a
 plan by relation) or `designation` (plans), or `{ check: "<template>" }`.
+`"of": "player"` is a demand made of the player (a keeper's creatures want
+their wages): it binds no character, the messenger (`via`) says it, and the
+player sees it in the Orders tool and a toast; `met: { flag }` with a flag the
+package sets is the usual way to meet it.
 `onMet` / `onMissed`: script actions (`set`, `reply`...) plus `resource`,
 `weather`, `narrate`. A package's demand templates read the player's words:
 
