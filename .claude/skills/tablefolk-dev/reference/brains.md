@@ -342,7 +342,7 @@ parses the answer:
    menu. `senses.js` adds `tablefolkUses.menu`: concrete `put(<own item>,
    chest)` and `take(<item>, chest)` lines before the `use(...)` ones (Gemma
    never called `put` from the bare command list).
-2. **What it perceives** (`app/senses.js`; at guided and free the lean form,
+2. **What it perceives** (`app/senses.js`; above rails the lean form,
    `leanPrompt` in app.js: a one-line "You are at (x,z), holding ..." header and
    no "Nearby visible objects" list): its place and the places it can
    walk to, "Around you" by direction with steps, nearest first, filtered by
@@ -353,7 +353,7 @@ parses the answer:
    feelings eval fell from 3/3 to 0/2 with the stay line at the end. Card
    lines starting with `!` (an offer to accept now) go at the very end.
 4. **History**: the last 12 messages (`HISTORY_KEEP`; the window moves 8 at a
-   time, or at guided and free (`leanPrompt`) starts at an anchor message,
+   time, or above rails (`leanPrompt`) starts at an anchor message,
    `cfg.histAnchor`, until it holds 28, so a character's next prompt repeats
    this one up to its last message); new input split into
    "WHAT JUST HAPPENED:" (events) and "NEW SPEECH ADDRESSED TO YOU:". The

@@ -4477,7 +4477,7 @@ function shortList(details){
   }
   return out;
 }
-// A lean turn prompt (characters above rails at guided or free: the strong brains; ?lean=0 turns it off): no
+// A lean turn prompt (characters above rails: assisted, guided, free; ?lean=0 turns it off): no
 // "Nearby visible objects" list (the "Around you" lines already name every thing with its steps and square), a one-line
 // header, no use(...) help at the end (its take/put part is in the command list, the stable prefix) and no "Your last
 // few turns" (the history has them). On Inkling 2 Mini's free day these were ~300 of the ~1,860 tokens read past the
@@ -4485,7 +4485,7 @@ function shortList(details){
 function leanPrompt(g){
   try { const v=new URLSearchParams(location.search).get('lean'); if(v==='0') return false; if(v==='1') return true; } catch {}
   const lv=window.tablefolkAgency?.level?.(g);
-  return lv==='guided' || lv==='free';
+  return !!lv && lv!=='rails';
 }
 function buildVisiblePerception(agentId=null,radius=7,lean=false){
   const g=agentId ? state.characters.find(x=>x.id===agentId) : (state.selected||state.characters[0]);
