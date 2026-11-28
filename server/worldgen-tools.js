@@ -13,18 +13,30 @@
 //          done:     finish passed the checks: { scenario, code } as POST /api/finish gives
 //       ctx: { packVoices, prompt (the request: finish runs the living-world checks for a
 //              new world), fresh (a new world, not a change) }
+//          ctx.auto (the page's last resort when the model ended without a world that passes):
+//          finish completes and repairs what code can (autoComplete) before it checks
 //   agentSystem(skill, voices)    the agent's system message (the generator's guide as reference)
-//   agentUser(prompt)             the first request; followUser(request) a later one
+//   agentUser(prompt, {sections, shape})  the first request; followUser(request) a later one;
+//                                 reviewUser(round, rounds, history) a review round ("Look it over")
+//
+// Worlds in sections: plan_sections lays out 2-5 sections from a plan (app/worldgen-plan.js
+// readPlan, the same rules as the server's multi-section planner: the first section is the
+// top map, the others subworlds, the ways between them placed by assemble and checked by
+// checkWorld); every map tool then takes "section" (a subworld key, or "top"), character
+// ids stay unique across the world, and validate / preview / finish check the whole world
+// (each section, the links' ends, edges walkable on both sides, every section reachable,
+// what the goal needs reachable).
 //
 // Each change is checked as it is made (ids, bodies, jobs, object types, places,
 // map methods); the whole world is checked by "validate" and "finish" with the
 // server's own checkScenario / finishScenario (worldgen-core.js), so an agent's
 // world passes exactly what a one-answer world passes.
-import { checkScenario, finishScenario, systemPrompt, MODELS, MINDLESS, ANIMALS, COMMANDS, PICKUPS } from './worldgen-core.js';
+import { checkScenario, finishScenario, encodeScenario, systemPrompt, MODELS, MINDLESS, ANIMALS, COMMANDS, PICKUPS } from './worldgen-core.js';
 import '../app/procgen.js';
 import '../app/autonomy-profile.js';
 import '../app/plan-core.js';
-const Procgen = globalThis.TablefolkProcgen;
+import '../app/worldgen-plan.js';
+const Procgen = globalThis.TablefolkProcgen, Plan = globalThis.TablefolkWorldPlan;
 
 // ---- the catalog (fast-skill.md and the map editor's palette, app/map-editor.js OBJECT_GROUPS) ----
 export const JOBS = ['farmer', 'baker', 'innkeeper', 'cook', 'smith', 'woodcutter', 'miner', 'hunter', 'fisher', 'herder', 'merchant', 'guard', 'healer', 'ratcatcher', 'scholar', 'child', 'labourer', 'idler'];
@@ -68,31 +80,37 @@ const bodyOk = (s, m) => MODELS.has(m) || (Array.isArray(s.bodies) && s.bodies.m
 const obj = (properties, required = []) => ({ type: 'object', properties, required, additionalProperties: false });
 const anyObj = d => ({ type: 'object', description: d, additionalProperties: true });
 const fn = (name, description, parameters) => ({ type: 'function', function: { name, description, parameters } });
+// the section a map tool works on (worlds in sections): a subworld key, or "top" (the default)
+const SEC = { section: { type: 'string', description: 'worlds in sections: the section key ("top" or left out: the first, top map)' } };
+const withSec = p => ({ ...p, properties: { ...p.properties, ...SEC } });
 export const TOOLS = [
   fn('get_scenario', 'Read the world as it is now. part: "summary" (default: counts, ids, places), "all" (the whole JSON; long object lists cut), or one of "meta", "map", "agents", "objects", "events", "goal", "threats", "sections", or a character id.',
-    obj({ part: { type: 'string' } })),
+    withSec(obj({ part: { type: 'string' } }))),
   fn('get_catalog', 'Look up what exists: "bodies" (people, monsters, animals), "objects" (types by group), "jobs", "places" (place kinds per map kind), "houses" (building style fields), "commands", "goals" (win/lose predicates), or "all".',
     obj({ what: { type: 'string' } })),
   fn('set_meta', 'Set top-level fields: title, subtitle, intro, lighting ("bright"|"night"), dark, talk, live, time, dayMinutes, monsters, temper, harsh, prices, food, autonomy ("rails"|"assisted"|"guided"|"free" or an object), allowed, player, goal ({text, win, lose, winText, loseText}), threats (a list), director, skills, menus, flags, facts, triggers, locked. A field set to null is removed.',
-    obj({ fields: anyObj('the fields to set, e.g. {"title": "Ashford Hollow", "dayMinutes": 12}') }, ['fields'])),
+    withSec(obj({ fields: anyObj('the fields to set, e.g. {"title": "Ashford Hollow", "dayMinutes": 12}') }, ['fields']))),
   fn('set_map', 'Choose how the map is made (replaces the current map method). method "generate": kind village|dungeon|forest|farm|cave, buildings (village 3-14) or rooms (dungeon 3-16, cave), style, places (place kinds that must exist), houses, seed, size [cols, rows]. method "grid": rows of glyphs (talk-only rooms) with legend. method "map": layout lines with floor.',
     obj({ method: { type: 'string', enum: ['generate', 'grid', 'map'] }, kind: { type: 'string' }, buildings: { type: 'integer' }, rooms: { type: 'integer' }, style: { type: 'string' }, places: { type: 'array', items: { type: 'string' } },
       houses: anyObj('per place id or kind: {style, storeys, roof, pitch, jetty, chimney, porch, sign, dormers, seed}'), seed: { type: 'integer' }, size: { type: 'array', items: { type: 'integer' } },
-      grid: { type: 'array', items: { type: 'string' } }, legend: anyObj('extra glyphs: {"x": "chest on stone"}'), map: { type: 'array', items: { type: 'string' } }, floor: { type: 'string' } }, ['method'])),
+      grid: { type: 'array', items: { type: 'string' } }, legend: anyObj('extra glyphs: {"x": "chest on stone"}'), map: { type: 'array', items: { type: 'string' } }, floor: { type: 'string' }, ...SEC }, ['method'])),
   fn('place', 'Add, remove or style a place of a generated map. action "add" makes sure a place kind exists ("tavern", "house"); "remove" drops it from the places asked for; "style" sets how its building looks (villages and farms): building {style: plaster_timber|stone_timber|stone_cottage|plank_barn, storeys 1|2, roof shingle|tile|thatch, pitch 30-60, jetty, chimney left|right|false, porch, sign, dormers 0-3, seed}.',
-    obj({ action: { type: 'string', enum: ['add', 'remove', 'style'] }, place: { type: 'string' }, building: anyObj('style fields') }, ['action', 'place'])),
+    withSec(obj({ action: { type: 'string', enum: ['add', 'remove', 'style'] }, place: { type: 'string' }, building: anyObj('style fields') }, ['action', 'place']))),
   fn('character', 'Add, change or remove a character. add: fields with id (1-24 letters, digits, _ or -), model (a body), job, home, workplace, in (a place), style, personality (2-4 sentences: who, one want, one opinion of a neighbour), secret, agenda, relations, temper, hostile, hp, wield, inventory {gold, items}, allowed, ttsVoiceId, autonomy. update: id and only the fields to change (null removes one). remove: id.',
-    obj({ action: { type: 'string', enum: ['add', 'update', 'remove'] }, id: { type: 'string' }, fields: anyObj('the character\'s fields') }, ['action', 'id'])),
+    withSec(obj({ action: { type: 'string', enum: ['add', 'update', 'remove'] }, id: { type: 'string' }, fields: anyObj('the character\'s fields') }, ['action', 'id']))),
   fn('object', 'Add, change or remove a thing on the map. add: fields {type, in (a place) or x and z, items, gold, text, ...}. update/remove: index (from get_scenario "objects"). Use get_catalog "objects" for the types.',
-    obj({ action: { type: 'string', enum: ['add', 'update', 'remove'] }, index: { type: 'integer' }, fields: anyObj('the object\'s fields') }, ['action'])),
+    withSec(obj({ action: { type: 'string', enum: ['add', 'update', 'remove'] }, index: { type: 'integer' }, fields: anyObj('the object\'s fields') }, ['action']))),
   fn('event', 'Things that happen next to a character now and then. add: event (a sentence, "{who} finds a note.", or an object {text, round, to, spawn, note}); remove: index; clear: all.',
-    obj({ action: { type: 'string', enum: ['add', 'remove', 'clear'] }, event: { description: 'a sentence or an object' }, index: { type: 'integer' } }, ['action'])),
-  fn('section', 'Worlds in several maps. add: key, title, generate ({kind, rooms...}) and agents (its characters, as for character add) make a new section (a subworld); link: a way between the top map and a section ({in: a place, to: the section key, kind: stairs_down|stairs_up|cave|gate|trapdoor|door, name}); remove: key.',
-    obj({ action: { type: 'string', enum: ['add', 'link', 'remove'] }, key: { type: 'string' }, title: { type: 'string' }, generate: anyObj('the section\'s map'), agents: { type: 'array', items: anyObj('a character') }, link: anyObj('the link') }, ['action'])),
+    withSec(obj({ action: { type: 'string', enum: ['add', 'remove', 'clear'] }, event: { description: 'a sentence or an object' }, index: { type: 'integer' } }, ['action']))),
+  fn('plan_sections', 'A world in several maps (sections): call this FIRST when the request has distinct areas (a village, the forest beyond it, a cave; dungeon levels) or asks for a big world. Lays out 2-5 sections and the ways between them; then build each section with the other tools and their "section" argument. sections: [{key, title, kind: village|forest|farm|cave|mine|dungeon|castle|crypt, about, light: bright|night, who: [{id, model, job, role, hostile}], links: [{to: a key, way: edge|stairs|cave|gate|door, name}]}], the first is the top map where the player starts; shape: levels (a surface and levels down by stairs) | region (a hub and the places around it by roads off its edges) | auto.',
+    obj({ shape: { type: 'string', enum: ['levels', 'region', 'auto'] }, title: { type: 'string' }, subtitle: { type: 'string' }, intro: { type: 'string' }, goal: anyObj('the world\'s goal {text, win, lose, winText}; ids from any section'),
+      sections: { type: 'array', items: anyObj('a section: {key, title, kind, about, light, who, links}') } }, ['sections'])),
+  fn('section', 'Worlds in several maps, one at a time (plan_sections lays out several at once). add: key, title, kind or generate ({kind, rooms...}), agents (as for character add) make a new section; link: a way from a section ("from", default the top) to another ({in: a place, or edge: north|south|east|west; to: the section key; kind: stairs_down|stairs_up|cave|gate|trapdoor|door; name}); the way back is made by the game; remove: key.',
+    obj({ action: { type: 'string', enum: ['add', 'link', 'remove'] }, key: { type: 'string' }, title: { type: 'string' }, kind: { type: 'string' }, generate: anyObj('the section\'s map'), agents: { type: 'array', items: anyObj('a character') }, from: { type: 'string' }, link: anyObj('the link') }, ['action'])),
   fn('plan', 'Mark work or put up walls by RELATION, never by squares: code finds the squares on the map as it will be built (plan-core.js). plan: {"verb": "wall" | "fence", "around": "<place>", "gate": "north" | {"toward": "road" | "<place>"} | "none"} or {"verb": "fence", "between": ["<place>", "<place>"]}; {"verb": "dig" | "stockpile" | "farm" | "clear", "near": "<place>", "side": "north" | "northwest" | "any", "w": 4, "h": 3}; {"verb": "dig", "under": "<place>", "w": 2, "h": 2}; {"verb": "clear", "cluster": "trees", "near": "<place>"}; {"verb": "guard", "at": "<place>", "n": 2, "side": "east" | "around"}; {"verb": "patrol", "from": "<place>", "via": ["<place>"], "to": "<place>"}. as: "designation" (default: marked for the characters to do in play; a living world with a clock), "objects" (walls or fences placed now) or "preview" (only the squares). who: a group, job or character id for the work; priority 1-5.',
-    obj({ plan: anyObj('the plan by relation, e.g. {"verb": "wall", "around": "garden", "gate": {"toward": "road"}}'), as: { type: 'string', enum: ['designation', 'objects', 'preview'] }, who: { type: 'string' }, priority: { type: 'integer' } }, ['plan'])),
-  fn('validate', 'Check the whole world with the game\'s own checks; returns the problems to fix (an empty list when it is fine).', obj({})),
-  fn('preview', 'The map as it will be built: its size, every place with who and what is in it, and warnings.', obj({})),
+    withSec(obj({ plan: anyObj('the plan by relation, e.g. {"verb": "wall", "around": "garden", "gate": {"toward": "road"}}'), as: { type: 'string', enum: ['designation', 'objects', 'preview'] }, who: { type: 'string' }, priority: { type: 'integer' } }, ['plan']))),
+  fn('validate', 'Check the whole world with the game\'s own checks (for a world in sections: every section, the ways between them, what the goal needs); returns the problems to fix (an empty list when it is fine). With section: that section only.', obj({ ...SEC })),
+  fn('preview', 'The map as it will be built: its size, every place with who and what is in it, and warnings. A world in sections: every section, its places and people, and the ways between them; with section: that section\'s map in full.', obj({ ...SEC })),
   fn('undo', 'Take back the last change.', obj({})),
   fn('finish', 'The world is done: runs the checks; if they pass the player sees it, else the problems come back to fix. summary: two or three sentences for the player on what you built or changed.',
     obj({ summary: { type: 'string' } }, ['summary'])),
@@ -117,7 +135,8 @@ function summary(s) {
   return {
     title: s.title || null, map: s.generate ? { method: 'generate', ...s.generate } : s.grid ? { method: 'grid', rows: (s.grid || []).length } : s.map ? { method: 'map', lines: s.map.length } : null,
     places: b?.places?.map(p => p.id), characters: (s.agents || []).map(a => `${a.id} (${[a.model, a.job, a.in || a.workplace].filter(Boolean).join(', ')})`),
-    objects: (s.objects || []).length, events: (s.events || []).length, threats: (s.threats || []).length, goal: s.goal?.text || null, sections: Object.keys(s.subworlds || {}),
+    objects: (s.objects || []).length, events: (s.events || []).length, threats: (s.threats || []).length, goal: s.goal?.text || null,
+    sections: subsOf(s).map(([k, v]) => `${k} ("${v.title || k}", ${v.generate?.kind || 'no map'}): ${(v.agents || []).map(a => a.id).join(', ') || 'nobody yet'}`),
   };
 }
 function preview(s) {
@@ -181,10 +200,112 @@ function checkMeta(s, f) {
   return out;
 }
 
+// ---- worlds in sections ----
+const subsOf = w => Object.entries(w?.subworlds && typeof w.subworlds === 'object' ? w.subworlds : {}).filter(([, v]) => v && typeof v === 'object');
+const multi = w => subsOf(w).length > 0;
+const slugOf = v => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+// "top", a subworld key (or its title), or the top's own name: '' for the top, the key, or null
+function sectionKey(w, name) {
+  const k = String(name ?? '').trim(), subs = w?.subworlds || {};
+  if (!k) return '';
+  if (subs[k]) return k;
+  const hit = Object.keys(subs).find(x => x.toLowerCase() === k.toLowerCase() || slugOf(subs[x]?.title) === slugOf(k)); if (hit) return hit;
+  if (/^(top|main|start|first|hub|surface|root|world|top_map)$/i.test(k) || slugOf(w?.title) === slugOf(k) || !multi(w)) return '';
+  if (slugOf(k) === kindOf(w) && !Object.values(subs).some(v => String(v?.generate?.kind || '') === slugOf(k))) return '';   // the first section named by its kind ("village")
+  return null;
+}
+const sectionList = w => ['top' + (w.title ? ` ("${w.title}")` : ''), ...subsOf(w).map(([k, v]) => `${k}${v.title ? ` ("${v.title}")` : ''}`)].join(', ');
+// character ids in every section but one ('' the top)
+function idsElsewhere(w, but) {
+  const out = new Map();
+  if (but !== '') for (const a of w.agents || []) if (a?.id) out.set(a.id, 'the top map');
+  for (const [k, v] of subsOf(w)) if (k !== but) for (const a of v.agents || []) if (a?.id) out.set(a.id, `section "${k}"`);
+  return out;
+}
+const linkText = (from, l) => `${from}: ${l.edge ? 'the ' + l.edge + ' edge' : l.in ? 'in the ' + l.in : 'at [' + l.at + ']'}${l.kind ? ' (' + l.kind + ')' : ''} -> ${typeof l.to === 'string' ? l.to : 'a generated place'}${l.name ? ' "' + l.name + '"' : ''}`;
+const allLinks = w => [...(w.links || []).map(l => linkText('top', l)), ...subsOf(w).flatMap(([k, v]) => (v.links || []).map(l => linkText(k, l)))];
+// the whole world checked: the top (the living-world rules for a new world), each section,
+// ids across sections, and the ways between them (worldgen-plan.js checkWorld: links' ends,
+// edges walkable on both sides, every section reachable, what the goal needs reachable)
+function worldCheck(s0, ctx = {}, fresh = false) {
+  const w = clone(s0), repairs = [], problems = [], subs = subsOf(w), seen = new Map();
+  for (const [where, list] of [['the top map', w.agents], ...subs.map(([k, v]) => [`section "${k}"`, v.agents])]) for (const a of Array.isArray(list) ? list : []) {
+    if (!a?.id) continue;
+    if (seen.has(a.id) && seen.get(a.id) !== where) problems.push(`character id "${a.id}" is in ${seen.get(a.id)} and in ${where}: ids are unique in the whole world (character update or remove)`); else seen.set(a.id, where);
+  }
+  const otherIds = subs.flatMap(([, v]) => (v.agents || []).map(a => a?.id).filter(Boolean));
+  problems.push(...checkScenario(w, ctx.packVoices || [], { prompt: fresh ? (ctx.prompt || '') : '', fresh, notes: repairs, otherIds, world: true }));
+  for (const [k, v] of subs) { const notes = []; problems.push(...checkScenario(v, ctx.packVoices || [], { section: true, notes }).map(p => `section "${k}": ${p}`)); repairs.push(...notes.map(n => `section "${k}": ${n}`)); }
+  let report = [];
+  try { const chk = Plan.checkWorld(w); problems.push(...chk.problems); repairs.push(...chk.repairs); report = chk.report; } catch (e) { problems.push('the ways between the sections could not be checked: ' + e.message); }
+  return { scenario: w, problems, repairs, report };
+}
+function worldPreview(s) {
+  const sec = (k, v) => { const b = built(v); return { section: k || 'top', title: v.title || null, map: v.generate ? v.generate.kind : v.grid ? 'grid' : v.map ? 'layout lines' : 'none yet', places: b?.places?.map(p => p.id) || [], characters: (v.agents || []).map(a => `${a.id} (${[a.model, a.job, a.in || a.workplace].filter(Boolean).join(', ')})`), objects: (v.objects || []).length, ways: (v.links || []).map(l => linkText(k || 'top', l)) }; };
+  let chk = null; try { chk = Plan.checkWorld(clone(s)); } catch {}
+  return { sections: [sec('', s), ...subsOf(s).map(([k, v]) => sec(k, v))], report: chk?.report || [], problems: chk?.problems || [], note: 'the way back through each link is made by the game; preview with section for one map in full' };
+}
+// the first section's kind, from the request's words
+const KIND_WORDS = [['cave', /\b(cave|cavern|mine|grotto|tunnel)/i], ['dungeon', /\b(dungeon|castle|keep|crypt|tomb|vault|prison|fortress)/i], ['forest', /\b(forest|wood|woods|grove|camp|clearing)/i], ['farm', /\b(farm|farmstead|ranch|orchard)/i], ['village', /./]];
+const kindFrom = text => KIND_WORDS.find(([, re]) => re.test(String(text || '')))[0];
+// the page's last resort (ctx.auto): what code can complete and repair so the world passes
+function autoComplete(s, ctx, notes) {
+  if (!s.generate && !(Array.isArray(s.grid) && s.grid.length) && !(Array.isArray(s.map) && s.map.length)) { s.generate = { kind: kindFrom(ctx.prompt) }; notes.push(`a ${s.generate.kind} map (none was set)`); }
+  if (!s.title) { s.title = String(ctx.prompt || 'A small world').replace(/^\s*(a|an|the)\s+/i, '').slice(0, 40).replace(/^\w/, c => c.toUpperCase()); notes.push('a title'); }
+  const fixAgents = (v, where) => {
+    const seen = new Set();
+    v.agents = (Array.isArray(v.agents) ? v.agents : []).filter(a => a && typeof a === 'object').map(a => ({ ...a, id: String(a.id || a.name || 'someone').replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 24) || 'someone' }))
+      .filter(a => !seen.has(a.id) && seen.add(a.id));
+    for (const a of v.agents) {
+      if (a.model && !bodyOk(s, a.model)) { a.model = 'villager'; notes.push(`${where}${a.id}: body villager`); }
+      if (a.job && !JOBS.includes(a.job)) { delete a.job; notes.push(`${where}${a.id}: no job`); }
+      if (!a.personality && !a.hostile && !MINDLESS.has(a.model) && !ANIMALS.has(a.model)) { a.personality = `${a.id.replace(/^\w/, c => c.toUpperCase())}, who lives in ${v.title || s.title || 'this place'}. You want it kept safe. Say it plain.`; notes.push(`${where}${a.id}: a plain personality`); }
+      if (Array.isArray(a.allowed)) a.allowed = a.allowed.filter(c => COMMANDS.has(c));
+    }
+  };
+  fixAgents(s, '');
+  for (const [k, v] of subsOf(s)) fixAgents(v, `section "${k}": `);
+  if (!s.agents.length) { s.agents.push({ id: 'keeper', model: 'villager', personality: `The keeper of ${s.title}. You want strangers to mind their step. Say it plain.` }); notes.push('a keeper (there were no characters)'); }
+}
+// one round of repairs by the problems' own words; true when anything changed
+function autoFix(s, problems, notes) {
+  let did = false;
+  const at = p => { const m = p.match(/^section "([^"]+)": (.*)$/); return m && s.subworlds?.[m[1]] ? [s.subworlds[m[1]], m[2], `section "${m[1]}": `] : [s, p, '']; };
+  for (const p0 of problems) {
+    const [v, p, where] = at(p0); let m;
+    const say = t => { notes.push(where + t); did = true; };
+    if ((m = p.match(/^agent (\S+) "allowed": unknown command (\S+)/))) { const a = (v.agents || []).find(x => x.id === m[1]); if (a) { a.allowed = (a.allowed || []).filter(c => c !== m[2]); say(`${m[1]}: dropped the command ${m[2]}`); } }
+    else if (/^"allowed": unknown command/.test(p)) { v.allowed = (v.allowed || []).filter(c => COMMANDS.has(c)); say('dropped unknown commands'); }
+    else if (/^goal |player_has goal|^the goal/.test(p) && s.goal) { delete s.goal; say('dropped a goal the world cannot reach (a plain one is made)'); }
+    else if (/^"locked"/.test(p) && v.locked) { delete v.locked; say('dropped the locks (no key anywhere)'); }
+    else if (/use one map method/.test(p)) { delete v.grid; delete v.map; say('kept the generated map only'); }
+    else if ((m = p.match(/^(\S+?): its (home|workplace) "/))) { const a = (v.agents || []).find(x => x.id === m[1]); if (a) { delete a[m[2]]; say(`${m[1]}: no ${m[2]} (it could not be reached)`); } }
+    else if ((m = p.match(/^(menus|workflows|triggers|flags|facts|orders|demands)\b/))) { delete v[m[1]]; say(`dropped "${m[1]}" (${p.slice(0, 80)})`); }
+    else if ((m = p.match(/a link goes to "([^"]+)", which is not a section/))) { for (const x of [s, ...Object.values(s.subworlds || {})]) if (x.links) x.links = x.links.filter(l => l.to !== m[1]); say(`dropped the way to "${m[1]}"`); }
+    else if ((m = p.match(/^(.+): no way leads there from the start$/))) { const e = subsOf(s).find(([k, x]) => (x.title || k) === m[1]); if (e) { const b = built(s), pl = b?.places?.find(q => !['square', 'pond', 'entrance'].includes(q.kind)) || b?.places?.[0]; (s.links ||= []).push(pl ? { in: pl.id, to: e[0], kind: /cave|dungeon/.test(e[1].generate?.kind || '') ? 'stairs_down' : 'door', name: e[1].title || e[0] } : { at: [0, 0], to: e[0], kind: 'door', name: e[1].title || e[0] }); say(`a way to ${m[1]}`); } }
+    else if ((m = p.match(/^character id "([^"]+)" is in .* and in section "([^"]+)"/))) { const a = (s.subworlds?.[m[2]]?.agents || []).find(x => x.id === m[1]); if (a) { a.id = (m[1] + '_2').slice(-24); say(`renamed the second ${m[1]}`); } }
+  }
+  return did;
+}
+
+const worldLinkProblems = w => { try { return Plan.checkWorld(clone(w)).problems; } catch { return []; } };
+
 // ---- running one tool ----
+const SECTION_TOOLS = new Set(['get_scenario', 'set_meta', 'set_map', 'place', 'character', 'object', 'event', 'plan', 'validate', 'preview']);
 export function runTool(scenario, name, args = {}, ctx = {}) {
-  const s = clone(scenario);
   args = args && typeof args === 'object' ? args : {};
+  // a map tool on one section of a world in sections: the same tool on that subworld
+  if (SECTION_TOOLS.has(name) && !ctx.section && args.section != null && String(args.section).trim()) {
+    const { section, ...rest } = args, key = sectionKey(scenario, section);
+    if (key === null) return { scenario, result: fail(`no section "${section}" (sections: ${sectionList(scenario)})`), log: `${name}: no section "${String(section).slice(0, 40)}"`, changed: false, failed: true };
+    if (key) {
+      const sub = scenario.subworlds[key], r = runTool(sub, name, rest, { ...ctx, section: key, world: scenario });
+      let out = scenario; if (r.changed) { out = clone(scenario); out.subworlds[key] = r.scenario; }
+      return { ...r, scenario: out, log: r.log ? `[${sub.title || key}] ${r.log}` : r.log };
+    }
+    args = rest;
+  }
+  const s = clone(scenario);
   const ok = (result, log, changed = true) => ({ scenario: changed ? s : scenario, result: { ok: true, ...result }, log, changed });
   const no = (error, extra) => ({ scenario, result: fail(error, extra), log: `${name}: ${String(error).slice(0, 140)}`, changed: false, failed: true });
   try {
@@ -212,6 +333,7 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         const f = args.fields && typeof args.fields === 'object' ? args.fields : null;
         if (!f || !Object.keys(f).length) return no('fields: an object of top-level fields');
         const bad = checkMeta(s, Object.fromEntries(Object.entries(f).filter(([, v]) => v !== null)));
+        if (ctx.section) { const world = Object.keys(f).filter(k => Plan.WORLD_FIELDS.includes(k) || ['player', 'goal'].includes(k)); if (world.length) bad.push(`${world.join(', ')}: the whole world's, set on the top (leave "section" out)`); }
         if (bad.length) return no(bad.join('; '));
         for (const [k, v] of Object.entries(f)) { if (v === null) delete s[k]; else s[k] = v; }
         return ok({ set: Object.keys(f) }, 'set ' + Object.keys(f).map(k => k === 'title' ? `the title "${f.title}"` : k).join(', '));
@@ -274,6 +396,7 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         const unknown = Object.keys(f).filter(k => !AGENT_FIELDS.has(k));
         if (args.action === 'add') {
           if (i >= 0) return no(`there is already a character "${id}": use update`);
+          const elsewhere = idsElsewhere(ctx.world || s, ctx.section || ''); if (elsewhere.has(id)) return no(`"${id}" is already a character in ${elsewhere.get(id)}: ids are unique in the whole world (choose another id, or change that one with its section)`);
           const a = { ...f, id }; for (const k of Object.keys(a)) if (a[k] === null) delete a[k];
           const bad = checkAgent(s, a, true); if (bad.length) return no(bad.join('; '));
           list.push(a);
@@ -322,19 +445,73 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         if (args.action === 'add') {
           if (!/^[a-z0-9_-]{1,24}$/i.test(key)) return no('key: 1-24 letters, digits, _ or -');
           if (s.subworlds?.[key]) return no(`there is already a section "${key}"`);
-          const g = args.generate || {}; if (!PLACES[String(g.kind || '').toLowerCase()]) return no(`generate.kind: one of ${Object.keys(PLACES).join(', ')}`);
+          let g = args.generate && typeof args.generate === 'object' ? { ...args.generate } : {};
+          const named = String(g.kind || args.kind || '').toLowerCase();
+          if (!PLACES[named] && Plan.GEN[named]) g = { ...clone(Plan.GEN[named]), ...g, kind: Plan.GEN[named].kind }; else if (!g.kind && named) g.kind = named;
+          if (!PLACES[String(g.kind || '').toLowerCase()]) return no(`kind: one of ${Object.keys(PLACES).join(', ')} (or ${Plan.KINDS.filter(k => !PLACES[k]).join(', ')})`);
           const sec = { title: args.title || key, generate: g, agents: Array.isArray(args.agents) ? args.agents : [] };
           const bad = sec.agents.flatMap(a => checkAgent(sec, a || {}, true).map(x => `${a?.id}: ${x}`)); if (bad.length) return no(bad.join('; '));
+          const elsewhere = idsElsewhere(s, key), dup = sec.agents.filter(a => elsewhere.has(a?.id)).map(a => a.id); if (dup.length) return no(`ids already used in the world: ${dup.join(', ')}`);
           (s.subworlds ||= {})[key] = sec;
-          return ok({ key, note: 'link it from the top map with section action "link"' }, `added the section ${args.title || key}${sec.agents.length ? ' with ' + sec.agents.map(a => a.id).join(', ') : ''}`);
+          return ok({ key, note: 'link it with section action "link" (from the top or another section)' }, `added the section ${args.title || key}${sec.agents.length ? ' with ' + sec.agents.map(a => a.id).join(', ') : ''}`);
         }
         if (args.action === 'link') {
-          const l = args.link || {}; if (!l.to || (l.to !== 'back' && !s.subworlds?.[l.to])) return no(`link.to: a section key (${Object.keys(s.subworlds || {}).join(', ') || 'none yet'})`);
-          if (!l.in && !l.edge) return no('link: "in" (a place) or "edge" (north, south, east, west)');
-          (s.links ||= []).push(l); return ok({}, `linked ${l.in || l.edge} to ${l.to}`);
+          const l = { ...(args.link && typeof args.link === 'object' ? args.link : {}) }, fromName = args.from ?? l.from; delete l.from;
+          const from = sectionKey(s, fromName); if (from === null) return no(`from: a section (${sectionList(s)})`);
+          if (l.to != null && l.to !== 'back' && !s.subworlds?.[l.to]) { const k = sectionKey(s, l.to); if (k) l.to = k; }
+          if (!l.to || (l.to !== 'back' && !s.subworlds?.[l.to])) return no(`link.to: a section key (${Object.keys(s.subworlds || {}).join(', ') || 'none yet'})`);
+          if (l.to === from) return no('a link goes to another section');
+          if (!l.in && !l.edge && !l.at) return no('link: "in" (a place) or "edge" (north, south, east, west)');
+          if (l.edge && !['north', 'south', 'east', 'west'].includes(l.edge)) return no('link.edge: north, south, east or west');
+          const host = from ? s.subworlds[from] : s;
+          if (l.in && host.generate) { const p = placeKnown(host, l.in); if (p) return no('link.in: ' + p); }
+          const before = new Set(worldLinkProblems(scenario));
+          (host.links ||= []).push(l);
+          // both ways: its end in this map, and (an edge) a walkable rim to arrive on in the other
+          let chk; try { chk = Plan.checkWorld(s); } catch (e) { chk = { problems: [], repairs: [] }; }
+          const fresh = chk.problems.filter(p => !before.has(p) && !/no way leads there/.test(p));
+          if (fresh.length) return no(fresh.join('; ') + ' (the link was not added)');
+          return ok({ repairs: chk.repairs.length ? chk.repairs : undefined, ways: allLinks(s) }, `linked ${from || 'the top'} (${l.in || l.edge || l.at}) to ${l.to}`);
         }
         if (args.action === 'remove') { if (!s.subworlds?.[key]) return no(`no section "${key}"`); delete s.subworlds[key]; if (!Object.keys(s.subworlds).length) delete s.subworlds; s.links = (s.links || []).filter(l => l.to !== key); if (!s.links.length) delete s.links; return ok({}, `removed the section ${key}`); }
         return no('action: add, link or remove');
+      }
+      case 'plan_sections': {
+        if (ctx.section) return no('plan_sections works on the whole world: leave "section" out');
+        let list = args.sections; if (typeof list === 'string') { try { list = JSON.parse(list); } catch {} }
+        if (!Array.isArray(list) || list.length < 2 || list.length > 5) return no('sections: a list of 2-5 sections, the first the top map where the player starts: [{"key": "ashford", "title": "Ashford", "kind": "village", "about": "...", "who": [{"id": "mara", "model": "peasant_woman", "job": "baker"}], "links": [{"to": "wood", "way": "edge"}]}, {"key": "wood", "title": "The Old Wood", "kind": "forest", ...}]');
+        const shape = ['levels', 'region'].includes(args.shape) ? args.shape : 'auto';
+        let goal = args.goal; if (typeof goal === 'string') { try { goal = JSON.parse(goal); } catch { goal = null; } }
+        const plan = Plan.readPlan({ title: args.title || s.title, subtitle: args.subtitle, intro: args.intro, goal, sections: list }, list.length, shape, ctx.prompt || '');
+        const [first, ...rest] = plan.sections, notes = [];
+        // the top is the first section: its map unless one is set
+        const g0 = clone(Plan.GEN[first.kind] || { kind: 'village' });
+        if (!s.generate && !(s.grid || []).length && !(s.map || []).length) s.generate = g0;
+        else if (s.generate && g0.kind !== kindOf(s)) notes.push(`the top map stays a ${kindOf(s)} (set_map with no section to change it)`);
+        if (!s.title) s.title = plan.title;
+        if (!s.subtitle && plan.subtitle) s.subtitle = plan.subtitle;
+        if (!s.intro && plan.intro) s.intro = plan.intro;
+        if (!s.goal && plan.goal) s.goal = plan.goal;
+        if (first.light === 'night' && !s.lighting) s.lighting = 'night';
+        s.subworlds = s.subworlds && typeof s.subworlds === 'object' ? s.subworlds : {};
+        for (const sec of rest) {
+          if (s.subworlds[sec.key]) { notes.push(`section "${sec.key}" was there already: kept`); continue; }
+          s.subworlds[sec.key] = { title: sec.title, ...(sec.about ? { subtitle: sec.about.slice(0, 120) } : {}), generate: clone(Plan.GEN[sec.kind] || { kind: 'dungeon' }), agents: [], ...(sec.light === 'night' ? { lighting: 'night' } : {}) };
+        }
+        // the ways between them, as the server's multi-section planner places them (assemble:
+        // roads off the edges between open maps, stairs or a cave mouth to what lies under, a far place)
+        const planned = new Set(rest.map(x => x.key)), asm = Plan.assemble(plan, [s, ...rest.map(x => s.subworlds[x.key])]);
+        s.links = [...(s.links || []).filter(l => !planned.has(l.to)), ...(asm.links || [])];
+        for (const x of rest) { const v = s.subworlds[x.key]; v.links = [...(v.links || []).filter(l => !planned.has(l.to)), ...(asm.subworlds[x.key]?.links || [])]; if (!v.links.length) delete v.links; }
+        if (!s.links.length) delete s.links;
+        let chk = { problems: [], repairs: [], report: [] }; try { chk = Plan.checkWorld(s); } catch (e) { notes.push('the ways could not be checked: ' + e.message); }
+        const sections = plan.sections.map((x, i) => {
+          const v = i ? s.subworlds[x.key] : s, b = built(v);
+          return { section: i ? x.key : 'top', title: v.title, kind: x.kind, places: b?.places?.map(p => p.id) || [], add: x.who.map(a => ({ id: a.id, model: a.model, ...(a.job ? { job: a.job } : {}), ...(a.role ? { role: a.role } : {}), ...(a.hostile ? { hostile: true } : {}) })) };
+        });
+        return ok({ sections, ways: allLinks(s), report: chk.report, problems: chk.problems.length ? chk.problems : undefined, repairs: chk.repairs.length ? chk.repairs : undefined, notes: notes.length ? notes : undefined,
+          next: 'Now build each section in turn, the top first: its characters (character add with "section": the key, "top" for the first; give each a personality; ids unique in the whole world), things (object add with "section"), building styles (place style with "section"). The maps and the ways between them are set. Then preview and validate the whole world, and finish.' },
+          `planned ${plan.sections.length} sections: ${plan.sections.map((x, i) => `${i ? x.title : s.title} (${x.kind})`).join(', ')}; ${allLinks(s).length} way${allLinks(s).length === 1 ? '' : 's'} between them`);
       }
       case 'plan': {
         const P = globalThis.TablefolkPlanCore;
@@ -357,15 +534,36 @@ export function runTool(scenario, name, args = {}, ctx = {}) {
         return ok({ ...info, note: 'marked: the characters do the work in play (needs "live" and the clock)' }, `marked ${text}`);
       }
       case 'validate': {
-        const problems = checkScenario(clone(s), ctx.packVoices || [], { section: false });
-        return ok({ problems }, problems.length ? `checked: ${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'checked: no problems', false);
+        const w = !ctx.section && multi(s) ? worldCheck(s, ctx, false) : null;
+        const problems = w ? w.problems : checkScenario(clone(s), ctx.packVoices || [], { section: !!ctx.section, otherIds: ctx.world ? [...idsElsewhere(ctx.world, ctx.section).keys()] : [] });
+        return ok({ problems, ...(w ? { report: w.report } : {}) }, problems.length ? `checked: ${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'checked: no problems', false);
       }
-      case 'preview': return ok({ preview: preview(s) }, 'looked at the map', false);
+      case 'preview': {
+        if (!ctx.section && multi(s)) return ok({ preview: worldPreview(s) }, 'looked at the whole world', false);
+        return ok({ preview: { ...preview(s), ...(s.links?.length ? { ways: s.links.map(l => linkText(ctx.section || 'top', l)) } : {}) } }, 'looked at the map', false);
+      }
       case 'undo': return { scenario, result: { ok: true, undo: true }, log: 'took back the last change', changed: false, undo: true };   // the caller keeps the history
       case 'finish': {
+        if (ctx.section) return no('finish works on the whole world: leave "section" out');
+        // the page's last resort: complete and repair what code can, then check
+        const autoNotes = [];
+        if (ctx.auto) {
+          autoComplete(s, ctx, autoNotes);
+          for (let round = 0; round < 4; round++) {
+            const probs = multi(s) ? worldCheck(s, ctx, !!ctx.fresh).problems : (finishScenario({ scenario: clone(s), prompt: ctx.fresh ? (ctx.prompt || '') : '' }, ctx.packVoices || []).problems || []);
+            if (!probs.length || !autoFix(s, probs, autoNotes)) break;
+          }
+        }
+        if (multi(s)) {
+          const w = worldCheck(s, ctx, !!ctx.fresh);
+          if (w.problems.length) return { scenario, result: { ok: false, problems: w.problems, note: 'fix these, then call finish again' }, log: `finish: ${w.problems.length} problem${w.problems.length > 1 ? 's' : ''} to fix first`, changed: false, problems: w.problems };
+          const repairs = [...autoNotes.map(n => 'completed by code: ' + n), ...w.repairs];
+          return { scenario: w.scenario, result: { ok: true, finished: true, repairs, report: w.report }, log: 'finished: ' + String(args.summary || '').slice(0, 200), changed: true, done: { scenario: w.scenario, code: encodeScenario(w.scenario), repairs, report: w.report, summary: String(args.summary || ''), auto: autoNotes } };
+        }
         const r = finishScenario({ scenario: clone(s), prompt: ctx.fresh ? (ctx.prompt || '') : '' }, ctx.packVoices || []);
-        if (r.problems?.length) return { scenario, result: { ok: false, problems: r.problems, note: 'fix these, then call finish again' }, log: `finish: ${r.problems.length} problem${r.problems.length > 1 ? 's' : ''} to fix first`, changed: false };
-        return { scenario: r.scenario, result: { ok: true, finished: true, repairs: r.repairs }, log: 'finished: ' + String(args.summary || '').slice(0, 200), changed: true, done: { scenario: r.scenario, code: r.code, repairs: r.repairs, summary: String(args.summary || '') } };
+        if (r.repairs && autoNotes.length) r.repairs = [...autoNotes.map(n => 'completed by code: ' + n), ...r.repairs];
+        if (r.problems?.length) return { scenario, result: { ok: false, problems: r.problems, note: 'fix these, then call finish again' }, log: `finish: ${r.problems.length} problem${r.problems.length > 1 ? 's' : ''} to fix first`, changed: false, problems: r.problems };
+        return { scenario: r.scenario, result: { ok: true, finished: true, repairs: r.repairs }, log: 'finished: ' + String(args.summary || '').slice(0, 200), changed: true, done: { scenario: r.scenario, code: r.code, repairs: r.repairs, summary: String(args.summary || ''), auto: autoNotes } };
       }
       default: return no(`no tool "${name}" (${TOOL_NAMES.join(', ')})`);
     }
@@ -383,25 +581,36 @@ How to work:
 - Use get_catalog when unsure of a body, job, object type, place or building field; use preview to see where everything lands; validate to see the problems.
 - A tool that fails tells you why: fix the arguments and call it again. Do not repeat a call that worked.
 - Keep each call small: one character, one object. Several calls in one turn are fine.
+- A world with several distinct areas (a village and the forest beyond it and a cave; the levels of a dungeon; "a big world", "a region") is built in SECTIONS: call plan_sections first (2-5 sections, the first is the top map where the player starts; who lives where; how they connect), then build each section in turn by passing "section" (its key; "top" for the first) to character, object, place, set_map, preview and validate. Ids are unique in the whole world; the world's goal, intro, time and threats are set on the top. The way back through each link is made by the game.
+- Make progress every turn: never repeat a call that worked, and do not set the map again once it is made. When unsure what is left, call validate and fix the first problem it lists.
 - When the world is complete and validate shows no problems, call finish with a short summary. For a later change, make only what was asked, then finish again.
 
 # The scenario guide (reference)
 
 ${guide}`;
 }
-export const agentUser = prompt => `Build this world: ${String(prompt || '').trim()}\n\nThe scenario is empty now. Call the tools to build it, then finish.`;
+export const agentUser = (prompt, { sections = 0, shape = 'auto' } = {}) => `Build this world: ${String(prompt || '').trim()}\n\n${+sections > 1 ? `Build it in ${Math.min(5, +sections)} sections (${shape === 'levels' ? 'levels: a surface and levels down, joined by stairs' : shape === 'region' ? 'a region: a hub and the places around it, joined by roads off its edges' : 'the shape that fits'}): call plan_sections first.\n\n` : ''}The scenario is empty now. Call the tools to build it, then finish.`;
+// a review round of the builder's "Look it over and improve" in agent mode: the agent checks its
+// own world with preview and validate, fixes what is wrong or weak, and says GOOD or CHANGED
+export const reviewUser = (round = 1, rounds = 1, history = []) => `Review round ${round} of ${rounds}: look the whole world over as a player would before they play it (the world may have been edited by hand since your last turn).
+1. Call preview (for a world in sections also each section's preview) and validate.
+2. Look for: problems validate lists; empty or closed buildings nobody uses; characters without a reason to be where they are, or without a want and an opinion of a neighbour; a goal the player cannot reach or that nothing in the world points to; a pressure (threats, a monster, scarcity) that never reaches the people; for sections: a section nobody needs to visit, ways that lead nowhere useful.
+3. Fix what is wrong or weak with the tools: small, concrete changes; keep what works and do not rebuild the map.
+4. Call finish. Start its summary with "GOOD:" when nothing needed changing, else "CHANGED:" and what you changed.${(history || []).length ? '\n\nEarlier rounds: ' + history.slice(-4).map(h => String(h).slice(0, 300)).join(' | ') : ''}`;
 export const followUser = request => `Change the world: ${String(request || '').trim()}\n\nThe world may have been edited by hand since your last turn: read it with get_scenario if you need to. Make the change with the tools, then finish.`;
 
 // POST /api/worldgen/agent and /api/worldgen/tool, for the Bun server and the Worker alike:
-//   agent {prompt} or {request}  -> { system, tools, user, maxSteps }   (system only for a new session: {prompt} or {system: true})
-//   tool  {scenario, name, args, prompt, fresh} -> runTool's { scenario (when changed), result, log, changed, undo, done }
+//   agent {prompt, sections?, shape?} | {request} | {review: {round, rounds, history}}
+//         -> { system, tools, user, maxSteps }   (system only for a new session: {prompt} or {system: true})
+//   tool  {scenario, name, args, prompt, fresh, auto} -> runTool's { scenario (when changed), result, log, changed, undo, done, problems }
 export function agentRequest(b, { skill, voices }) {
-  const prompt = String(b?.prompt || '').trim().slice(0, 4000), request = String(b?.request || '').trim().slice(0, 4000);
-  if (!prompt && !request) return { error: 'prompt or request required', status: 400 };
-  return { ...(prompt || b.system ? { system: agentSystem(skill, voices) } : {}), tools: TOOLS, user: prompt ? agentUser(prompt) : followUser(request), maxSteps: 60 };
+  const prompt = String(b?.prompt || '').trim().slice(0, 4000), request = String(b?.request || '').trim().slice(0, 4000), rv = b?.review && typeof b.review === 'object' ? b.review : null;
+  if (!prompt && !request && !rv) return { error: 'prompt, request or review required', status: 400 };
+  const user = prompt ? agentUser(prompt, { sections: +b.sections || 0, shape: String(b.shape || 'auto') }) : rv ? reviewUser(+rv.round || 1, +rv.rounds || 1, Array.isArray(rv.history) ? rv.history : []) : followUser(request);
+  return { ...(prompt || b.system ? { system: agentSystem(skill, voices) } : {}), tools: TOOLS, user, maxSteps: 60 };
 }
 export function toolRequest(b, { packVoices }) {
   if (!b || typeof b.name !== 'string') return { error: 'POST {scenario, name, args}', status: 400 };
-  const r = runTool(b.scenario && typeof b.scenario === 'object' ? b.scenario : {}, b.name, b.args, { packVoices, prompt: String(b.prompt || '').slice(0, 4000), fresh: !!b.fresh });
-  return { ...(r.changed ? { scenario: r.scenario } : {}), result: r.result, log: r.log, changed: r.changed, ...(r.undo ? { undo: true } : {}), ...(r.done ? { done: { ...r.done, link: '/app/#s=' + r.done.code } } : {}) };
+  const r = runTool(b.scenario && typeof b.scenario === 'object' ? b.scenario : {}, b.name, b.args, { packVoices, prompt: String(b.prompt || '').slice(0, 4000), fresh: !!b.fresh, auto: !!b.auto });
+  return { ...(r.changed ? { scenario: r.scenario } : {}), result: r.result, log: r.log, changed: r.changed, ...(r.undo ? { undo: true } : {}), ...(r.problems ? { problems: r.problems } : {}), ...(r.done ? { done: { ...r.done, link: '/app/#s=' + r.done.code } } : {}) };
 }

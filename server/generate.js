@@ -26,7 +26,7 @@ import { isAdmin, overLimit } from './admin.js';
 import { voicesText, packVoices, guestMay } from './settings.js';
 import { checkScenario as checkCore, parseJSON, encodeScenario, systemPrompt as systemCore, generateUser, reviseRequest, critiqueRequest, parseCritique, mergeKept, finishScenario, worldPage, BROWSER_MODELS, OWN_MODELS } from './worldgen-core.js';
 import '../app/worldgen-plan.js';
-import { agentRequest, toolRequest } from './worldgen-tools.js';
+import { agentRequest, toolRequest, agentSystem, TOOLS } from './worldgen-tools.js';
 export { encodeScenario };
 const Plan = globalThis.TablefolkWorldPlan;
 export const checkScenario = (s, opts) => checkCore(s, packVoices(), opts);
@@ -49,13 +49,27 @@ export async function worldgenOptions(req) {
   const where = [], may = id => admin || guestMay.build(id);
   if (may('browser')) where.push({ id: 'browser', label: 'In this browser', note: 'free and private: the model runs on your own graphics card (downloaded once, then kept)', models: BROWSER_MODELS.map(([id, label]) => ({ id, label })) });
   if (may('own')) where.push({ id: 'own', label: 'Your own key', note: 'your OpenRouter key, or any OpenAI-compatible server (a local one too); your browser calls it directly, the key never reaches this server', models: OWN_MODELS.map(id => ({ id, label: id })) });
-  if (may('server') && (local?.length || admin)) where.push({ id: 'server', label: 'On this server', note: local ? 'the local model server' : 'the local model server is not running', models: (local?.length ? local : [endpoint('local', '', '', '').model]).map(id => ({ id, label: id })), down: !local });
+  // tools: whether the provider says the model takes tools (agent mode is on by default where it does)
+  if (may('server') && (local?.length || admin)) where.push({ id: 'server', label: 'On this server', note: local ? 'the local model server' : 'the local model server is not running', models: (local?.length ? local : [endpoint('local', '', '', '').model]).map(id => ({ id, label: id, tools: null })), down: !local });
   if (may('cloud')) {
     const models = admin ? cloudAll : g.cloudModels.length ? g.cloudModels : [config.generator.model];
-    where.push({ id: 'cloud', label: config.generator.provider === 'openrouter' ? 'Cloud (OpenRouter)' : config.generator.provider === 'openai' ? 'Cloud (OpenAI)' : 'Cloud', note: 'fast, thinks longest', models: models.map(id => ({ id, label: id.replace(/^[\w-]+\//, '') + (id === config.generator.model ? ' (default)' : '') })) });
+    const info = await cloudInfo(config.generator.provider);
+    where.push({ id: 'cloud', label: config.generator.provider === 'openrouter' ? 'Cloud (OpenRouter)' : config.generator.provider === 'openai' ? 'Cloud (OpenAI)' : 'Cloud', note: 'fast, thinks longest', models: models.map(id => ({ id, label: id.replace(/^[\w-]+\//, '') + (id === config.generator.model ? ' (default)' : ''), ...info(id) })) });
   }
   return { admin, byo: !!config.byoModel, where, default: where.find(w => w.id === 'cloud') ? 'cloud' : where.find(w => w.id === 'own') && config.byoModel ? 'own' : where[0]?.id || null, custom: admin };
 }
+// What the cloud provider says about its models: { tools, context } by id (OpenRouter's public
+// list, kept an hour; OpenAI's chat models all take tools; anything else: not known)
+let orModels = null, orAt = 0;
+async function cloudInfo(provider) {
+  if (provider === 'openai') return () => ({ tools: true });
+  if (provider !== 'openrouter') return () => ({ tools: null });
+  if (!orModels || Date.now() - orAt > 3600e3) {
+    try { const r = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(4000) }); const d = await r.json(); orModels = new Map((d.data || []).flatMap(m => [[m.id, m], [m.canonical_slug, m]])); orAt = Date.now(); } catch { orModels ||= null; }
+  }
+  return id => { const m = orModels?.get(id); return m ? { tools: (m.supported_parameters || []).includes('tools'), context: m.context_length || m.top_provider?.context_length || null } : { tools: null }; };
+}
+
 // The endpoint for ?where=server|cloud&model= (older links: ?endpoint=local),
 // or an error when this visitor may not use it.
 function pickEndpoint(url, req) {
@@ -308,11 +322,49 @@ export async function handleWorldgenAgent(req, kind) {
   if (req.method !== 'POST') return Response.json({ error: 'POST' }, { status: 405, headers: cors });
   const text = await req.text().catch(() => '');
   if (text.length > 600000) return Response.json({ error: 'scenario too large' }, { status: 413, headers: cors });
-  if (!isAdmin(req) && !guestMay.build('own') && !guestMay.build('browser')) return Response.json({ error: 'building worlds is not open here' }, { status: 403, headers: cors });
+  if (!isAdmin(req) && !['own', 'browser', 'cloud', 'server'].some(w => guestMay.build(w))) return Response.json({ error: 'building worlds is not open here' }, { status: 403, headers: cors });
   if (kind === 'agent' && overLimit(req, 'agent', 60, 3600e3)) return Response.json({ error: 'too many builds this hour' }, { status: 429, headers: cors });
   let b = {}; try { b = JSON.parse(text) || {}; } catch {}
   const r = kind === 'agent' ? agentRequest(b, { skill: SKILL, voices: voicesText() }) : toolRequest(b, { packVoices: packVoices() });
   return Response.json(r, { status: r.status || 200, headers: cors });
+}
+
+// POST /api/worldgen/step?where=cloud|server&model= {messages}: one step of the builder's agent
+// mode on this server's own model (app/worldgen-agent.js serverBackend: the loop runs in the page,
+// the tools at /api/worldgen/tool). The server puts its own system message and tool list in front
+// (the page's are ignored, so this is no general model proxy) and streams server-sent events:
+// progress {text: chars, thought, calls: [{name, chars}]}, then done {text, tool_calls, usage} or
+// failed {error, status}. A visitor makes at most 300 steps an hour.
+export async function handleWorldgenStep(req, url) {
+  if (req.method !== 'POST') return Response.json({ error: 'POST {messages}' }, { status: 405 });
+  const text = await req.text().catch(() => '');
+  if (text.length > 1500000) return Response.json({ error: 'too large' }, { status: 413 });
+  let ep = pickEndpoint(url, req);
+  if (!ep.error && overLimit(req, 'agentstep', 300, 3600e3)) ep = { error: 'too many agent steps this hour: try again later' };
+  if (ep.error) return Response.json({ error: ep.error }, { status: 403 });
+  let b = {}; try { b = JSON.parse(text) || {}; } catch { return Response.json({ error: 'bad JSON' }, { status: 400 }); }
+  const msgs = (Array.isArray(b.messages) ? b.messages : []).filter(m => m && ['user', 'assistant', 'tool'].includes(m.role)).map(m => ({
+    role: m.role, content: String(m.content ?? ''),
+    ...(m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length ? { tool_calls: m.tool_calls.map(c => ({ id: String(c.id || ''), type: 'function', function: { name: String(c.function?.name || ''), arguments: typeof c.function?.arguments === 'string' ? c.function.arguments : JSON.stringify(c.function?.arguments || {}) } })) } : {}),
+    ...(m.role === 'tool' ? { tool_call_id: String(m.tool_call_id || '') } : {}) }));
+  if (!msgs.length || msgs[0].role !== 'user') return Response.json({ error: 'messages: the request first' }, { status: 400 });
+  const messages = [{ role: 'system', content: agentSystem(SKILL, voicesText()) }, ...msgs];
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(ctl) {
+      const send = (event, data) => { try { ctl.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)); } catch {} };
+      try {
+        const client = new OpenAI({ baseURL: ep.baseURL, apiKey: ep.apiKey, defaultHeaders: ep.headers || {}, timeout: 600000 });
+        const body = { model: ep.model, messages, tools: TOOLS, tool_choice: 'auto', stream: true, temperature: 0.4, max_tokens: 16384, ...(ep.provider === 'openrouter' ? { usage: { include: true } } : ep.local ? {} : { stream_options: { include_usage: true } }) };
+        let last = 0;
+        const tick = d => { const now = Date.now(); if (now - last < 300) return; last = now; send('progress', d); };
+        const out = await collect(await client.chat.completions.create(body), t => tick({ text: t.length }), (n, tail) => tick({ thought: n, tail: tail.slice(-200) }), calls => tick({ calls: calls.map(c => ({ name: c.function.name, chars: c.function.arguments.length })) }));
+        send('done', { text: out.text, tool_calls: out.tool_calls, usage: out.usage });
+      } catch (e) { send('failed', { error: String(e?.message || e).slice(0, 500), status: e?.status || null }); }
+      ctl.close();
+    },
+  });
+  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
 }
 
 // POST /api/finish {scenario, prompt, model, ms[, kept]}: a scenario made elsewhere

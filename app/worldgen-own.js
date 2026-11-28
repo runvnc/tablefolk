@@ -12,9 +12,10 @@
  *                              (this browser's localStorage, 'tablefolk_own_model')
  *     signIn()                 OpenRouter's sign-in (OAuth PKCE): back here with a key of your own
  *     finishSignIn()           on return (?code=...): trades the code for the key; true when it did
- *     run(prompt, mode, emit, {agent})  build a world (agent: the tool-calling agent, worldgen-agent.js); emit like the server's stream: 'progress'
+ *     run(prompt, mode, emit, {agent, sections, shape})  build a world (agent: the tool-calling agent, worldgen-agent.js); emit like the server's stream: 'progress'
  *                              {stage, chars, thought, preview, model}, 'done' {scenario, code, link, ms, model}, 'failed' {error}
- *     revise(scenario, request, emit, {agent})   the same for "ask the AI for changes" (agent: the same session)
+ *     revise(scenario, request, emit, {agent, review})   the same for "ask the AI for changes" (agent: the same
+ *                              session; review {round, rounds, history}: a "Look it over" round by the agent)
  *     critique(body, image, say)  one review round of the builder's agent: {text, sawImage, ms, model}
  *   }
  *
@@ -217,23 +218,26 @@
     const info = await modelInfo(cfg);
     return { info, backend: window.tfWorldAgent.openaiBackend(cfg, info) };
   }
-  async function runAgent(prompt, mode, emit, scenario = null, request = null) {
+  // opts: {sections, shape} for a new world; {review} for a review round (app/builder.js)
+  async function runAgent(prompt, mode, emit, scenario = null, request = null, opts = {}) {
     const cfg = get();
     let a; try { a = await agentFor(cfg); } catch (e) { return emit('failed', { error: e.message }); }
-    const json = () => { emit('progress', { stage: 'waiting', label: `${cfg.model} takes no tools here: writing the world as one answer instead`, model: cfg.model }); return scenario ? runWith({ scenario, request }, 'change: ' + request, emit) : runWith({ prompt, mode }, prompt, emit); };
+    // (a review round has no one-answer form: it fails with the reason instead)
+    const json = () => { if (opts.review) return emit('failed', { error: `${cfg.model} takes no tools here, so its agent cannot review the world` }); emit('progress', { stage: 'waiting', label: `${cfg.model} takes no tools here: writing the world as one answer instead`, model: cfg.model }); return scenario ? runWith({ scenario, request }, 'change: ' + request, emit) : runWith({ prompt, mode }, prompt, emit); };
     if (a.info.tools === false) return json();
     let fellBack = false;
     const watch = (ev, d) => {
-      if (ev === 'failed' && !fellBack && toolsRefused(d.error) && (window.tfWorldAgent.session?.steps || 0) <= 1) { fellBack = true; window.tfWorldAgent.reset(); return json(); }
+      if (ev === 'failed' && !fellBack && (d.noTools || toolsRefused(d.error)) && (window.tfWorldAgent.session?.steps || 0) <= 1) { fellBack = true; window.tfWorldAgent.reset(); return json(); }
       if (ev === 'failed') d = { ...d, error: explain({ message: d.error }, cfg) };
       emit(ev, d);
     };
-    if (scenario) await window.tfWorldAgent.change(scenario, request, watch, window.tfWorldAgent.session?.backend?.name === cfg.model ? null : a.backend);
-    else await window.tfWorldAgent.build(prompt, a.backend, watch);
+    if (scenario) await window.tfWorldAgent.change(scenario, request, watch, window.tfWorldAgent.session?.backend?.name === cfg.model ? null : a.backend, { review: opts.review });
+    else await window.tfWorldAgent.build(prompt, a.backend, watch, { sections: opts.sections, shape: opts.shape });
   }
-  // opts.agent: agent mode (the builder's toggle)
-  const run = (prompt, mode, emit, opts = {}) => opts.agent ? runAgent(prompt, mode, emit) : runWith({ prompt, mode }, prompt, emit);
-  const revise = (scenario, request, emit, opts = {}) => opts.agent ? runAgent('', '', emit, scenario, request) : runWith({ scenario, request }, 'change: ' + request, emit);
+  // opts.agent: agent mode (the builder's toggle); opts.sections/shape: a world in sections (agent mode);
+  // opts.review: a review round of "Look it over" (agent mode)
+  const run = (prompt, mode, emit, opts = {}) => opts.agent ? runAgent(prompt, mode, emit, null, null, opts) : runWith({ prompt, mode }, prompt, emit);
+  const revise = (scenario, request, emit, opts = {}) => opts.agent ? runAgent('', '', emit, scenario, request, opts) : runWith({ scenario, request }, 'change: ' + request, emit);
 
   window.tfOwnModel = { get, set, signIn, finishSignIn, run, revise, critique, parseJSON, modelInfo, PLAY_MODEL };
 })();

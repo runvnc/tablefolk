@@ -565,8 +565,9 @@
       generate: (messages, opts, onToken) => L.generate(messages, { agentId: 'worldgen-agent', temperature: opts.temperature, maxTokens: opts.maxTokens }, onToken),
       raw: L.raw ? (prompt, opts, onToken) => L.raw(prompt, opts, onToken) : null });
   }
-  async function runAgent(prompt, emit) {
-    try { const b = await agentBackend(emit); await window.tfWorldAgent.build(prompt, b, emit); }
+  // opts {sections, shape}: a world in sections (the agent plans them with plan_sections)
+  async function runAgent(prompt, emit, opts = {}) {
+    try { const b = await agentBackend(emit); await window.tfWorldAgent.build(prompt, b, emit, opts); }
     catch (e) { emit('failed', { error: e.message || String(e) }); }
   }
   window.tfWorldgen = { run, runOne, runSections, runAgent, agentBackend, parsePlan, parseSectionPlan, pressure, json, log, stop: () => { stopping = true; } };

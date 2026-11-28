@@ -10,16 +10,21 @@
  * (renderMessages / inklingPrompt in, parseToolCalls out).
  *
  *   window.tfWorldAgent = {
- *     build(prompt, backend, emit)       a new world; emit like the other runs: 'progress'
+ *     build(prompt, backend, emit, opts) a new world; emit like the other runs: 'progress'
  *                                        {stage: 'agent', label, preview, step}, 'done' {scenario,
- *                                        code, link, ms, model, summary, agent: true}, 'failed' {error}
- *     change(scenario, request, emit)    a follow-up in the same session (same model, same history;
- *                                        old turns are summarised when the window fills)
+ *                                        code, link, ms, model, summary, agent: true}, 'failed' {error, noTools?}
+ *                                        opts {sections, shape}: a world in sections (plan_sections first)
+ *     change(scenario, request, emit, backend?, opts?)  a follow-up in the same session (same model, same
+ *                                        history; old turns are summarised when the window fills);
+ *                                        opts.review {round, rounds, history}: a "Look it over" round
  *     stop()                             ends the run after the current step; what is built is
  *                                        finished if it passes the checks
  *     session                            { backend, messages, scenario, log, steps, tokens } or null
- *     canAgent(modelKey, info?)          { ok, format, why }: whether agent mode can run that model
+ *     canAgent(modelKey, info?)          { ok, format, why, dflt }: whether agent mode can run that model
+ *                                        (and whether it is on by default)
  *     openaiBackend(cfg, info)           a backend over an OpenAI-compatible endpoint
+ *     serverBackend({where, model}, info) the server's own model (where cloud | server), each step through
+ *                                        POST /api/worldgen/step (the server's system message and tools)
  *     localBackend(spec)                 a backend over an in-browser engine (worldgen-browser.js)
  *     parseToolCalls(text, format), renderMessages(messages, tools, format), inklingPrompt(messages, tools), compact(...)
  *   }
@@ -28,6 +33,15 @@
  * -> { text, calls: [{ id, name, args }], usage, cost } }. A step cap (60) and a token budget
  * (2M tokens, ?agentTokens=) end a run that does not finish by itself; a tool's error goes
  * back to the model as its result, not as a failure of the run.
+ *
+ * Going round in circles (watch()): the same call with the same arguments three times, a
+ * call repeated while the world has not changed (answered "already done" without running),
+ * set_map or plan_sections four times running, one tool failing three times running, or six
+ * steps without a change to the world: the model is told what it is doing, what the world
+ * is now and what to do next (recovery()); the third time the run ends. A run that ends
+ * without a finished world (stop, the caps, circles, a model that stops calling tools or
+ * fails mid-run) asks finish with auto: code completes and repairs what it can
+ * (worldgen-tools.js autoComplete), so every model ends with a world or a plain message.
  *
  * Plain script, no dependencies; node loads it for tools/worldgen-tools-test.mjs
  * (globalThis.TablefolkWorldAgent).
@@ -46,13 +60,20 @@
   function canAgent(modelKey, info = null) {
     if (modelKey === 'endpoint' || modelKey === 'own') {
       if (info?.tools === false) return { ok: false, format: 'openai', why: 'the provider says this model does not take tools' };
-      return { ok: true, format: 'openai', why: info?.tools ? 'the model takes tools' : 'the provider does not say; agent mode tries it and falls back to one answer' };
+      return { ok: true, format: 'openai', dflt: true, why: info?.tools ? 'the model takes tools' : 'the provider does not say; agent mode tries it and falls back to one answer' };
     }
-    if (AGENT_MODELS[modelKey]) return { ok: true, format: AGENT_MODELS[modelKey], why: 'it calls tools in its own format' };
+    // the server's own model (cloud: OpenRouter or OpenAI; server: the local model server):
+    // on by default where the provider says it takes tools (/api/worldgen/options)
+    if (modelKey === 'cloud' || modelKey === 'server') {
+      if (info?.tools === false) return { ok: false, format: 'openai', why: 'the provider says this model does not take tools' };
+      return { ok: true, format: 'openai', dflt: info?.tools === true, why: info?.tools ? 'the model takes tools' : 'the server does not say whether this model takes tools; agent mode tries it and falls back to one answer' };
+    }
+    if (AGENT_MODELS[modelKey]) return { ok: true, format: AGENT_MODELS[modelKey], dflt: true, why: 'it calls tools in its own format' };
     if (/gemma|raon|qwen1|qwen2|minicpm|lfm/.test(String(modelKey))) return { ok: false, why: 'too small to work through tools reliably: it writes the world step by step in plain answers' };
-    if (modelKey === 'cloud' || modelKey === 'server') return { ok: false, why: "this server's own model writes one answer" };
     return { ok: false, why: 'not a model agent mode knows' };
   }
+  // a provider's refusal of the tools themselves (the model takes none): fall back to one answer
+  const toolsRefused = e => /tool|function/i.test(String(e)) && /400|404|422|support|not allowed|unrecogni|invalid/i.test(String(e));
 
   // ---- loose JSON: the first balanced {...}, fences, comments and trailing commas forgiven ----
   function looseJSON(text) {
@@ -212,11 +233,41 @@
         let res;
         try { res = await client.chat.completions.create(body, { signal }); }
         catch (e) { if ((e?.status === 402 || /max_tokens|fewer/i.test(e?.message)) && body.max_tokens > 8192) res = await client.chat.completions.create({ ...body, max_tokens: 8192 }, { signal }); else throw e; }
-        const out = await lib.collect(res, t => onStream?.({ text: t }), (n, tail) => onStream?.({ thought: n, tail }), calls => onStream?.({ calls }));
-        const calls = (out.tool_calls || []).map(tc => { let args = {}, bad = null; try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) { const j = looseJSON(tc.function.arguments); if (j) args = j.value; else bad = 'the arguments were not valid JSON: ' + e.message; } return { id: tc.id || callId(), name: tc.function.name, args, bad }; });
-        // a model that writes its calls as text despite the tools (some local servers): read them from the text
-        if (!calls.length && /<tool_call>|<function=|"arguments"\s*:/.test(out.text)) { const p = parseToolCalls(out.text, 'qwen-xml'); return { text: p.text, calls: p.calls, usage: out.usage, cost: out.usage?.cost }; }
-        return { text: out.text, calls, usage: out.usage, cost: out.usage?.cost };
+        const out = await lib.collect(res, t => onStream?.({ text: t }), (n, tail) => onStream?.({ thought: n, tail }), calls => onStream?.({ calls: calls.map(c => ({ name: c.function.name, chars: c.function.arguments.length })) }));
+        return readAnswer(out);
+      },
+    };
+  }
+  // an OpenAI-style answer {text, tool_calls, usage} -> { text, calls, usage, cost }
+  function readAnswer(out) {
+    const calls = (out.tool_calls || []).filter(tc => tc?.function?.name).map(tc => { let args = {}, bad = null; try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) { const j = looseJSON(tc.function.arguments); if (j) args = j.value; else bad = 'the arguments were not valid JSON: ' + e.message; } return { id: tc.id || callId(), name: tc.function.name, args, bad }; });
+    // a model that writes its calls as text despite the tools (some local servers): read them from the text
+    if (!calls.length && /<tool_call>|<function=|"arguments"\s*:/.test(out.text || '')) { const p = parseToolCalls(out.text, 'qwen-xml'); return { text: p.text, calls: p.calls, usage: out.usage, cost: out.usage?.cost }; }
+    return { text: out.text || '', calls, usage: out.usage, cost: out.usage?.cost };
+  }
+  // the server's own model ("Cloud" or "On this server"): each step through POST /api/worldgen/step,
+  // which puts the server's system message and tools in front and streams back progress, then the answer
+  function serverBackend(cfg, info = {}) {
+    return {
+      name: cfg.model || "the server's model", kind: 'openai', context: info.context || 65536, where: cfg.where,
+      async step(messages, tools, onStream, signal) {
+        const q = new URLSearchParams({ where: cfg.where || 'cloud' }); if (cfg.model) q.set('model', cfg.model);
+        const r = await fetch('/api/worldgen/step?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: messages.filter(m => m.role !== 'system').map(({ raw, ...m }) => m) }), signal });
+        if (!r.ok || !r.body) { const d = await r.json().catch(() => ({})); const e = new Error(d.error || 'HTTP ' + r.status); e.status = r.status; throw e; }
+        const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', out = null;
+        for (;;) {
+          const { value, done } = await rd.read(); if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+            const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+            const ev = chunk.match(/^event: (.*)$/m)?.[1]; let d = {}; try { d = JSON.parse(chunk.match(/^data: (.*)$/m)?.[1] || '{}'); } catch {}
+            if (ev === 'progress') onStream?.(d);
+            else if (ev === 'failed') { const e = new Error(d.error || 'the model failed'); e.status = d.status; throw e; }
+            else if (ev === 'done') out = d;
+          }
+        }
+        if (!out) throw new Error('no answer from the server (connection lost?)');
+        return readAnswer(out);
       },
     };
   }
@@ -255,13 +306,46 @@
   let session = null, stopping = false, aborter = null;
   const say = (emit, label, extra = {}) => emit('progress', { stage: 'agent', label, ...extra, preview: session.log.slice(-6).join('\n') });
 
+  // ---- going round in circles: what the world is now, and what is left ----
+  const READ_ONLY = new Set(['get_scenario', 'get_catalog', 'validate', 'preview']);
+  const sigOf = c => c.name + ' ' + JSON.stringify(c.args || {});
+  const hasMap = s => !!(s?.generate || (Array.isArray(s?.grid) && s.grid.length) || (Array.isArray(s?.map) && s.map.length));
+  function worldNow(s) {
+    const subs = Object.entries(s.subworlds || {});
+    const parts = [s.title ? `"${s.title}"` : 'no title yet', hasMap(s) ? `a ${s.generate ? s.generate.kind + ' map' : s.grid ? 'drawn room' : 'laid-out scene'}` : 'no map yet',
+      (s.agents || []).length ? 'characters ' + s.agents.map(a => a.id).join(', ') : 'no characters yet', `${(s.objects || []).length} things`];
+    if (subs.length) parts.push('sections ' + subs.map(([k, v]) => `${k} (${v.generate?.kind || 'no map'}: ${(v.agents || []).map(a => a.id).join(', ') || 'nobody yet'})`).join('; '));
+    return parts.join('; ');
+  }
+  function nextStep(S) {
+    const s = S.scenario, empty = Object.entries(s.subworlds || {}).filter(([, v]) => !(v.agents || []).length).map(([k]) => k);
+    if (!hasMap(s)) return 'call set_map (method "generate") once';
+    if (!(s.agents || []).length) return 'add the characters one by one with character (action "add", each with a personality)';
+    if (empty.length) return `add the characters of section${empty.length > 1 ? 's' : ''} ${empty.join(', ')} (character add with "section")`;
+    if (S.problems?.length) return 'fix the first problem validate listed: ' + String(S.problems[0]).slice(0, 200);
+    if (!s.title) return 'give it a title with set_meta';
+    return 'call validate, fix what it lists, then call finish with a short summary';
+  }
+  const recovery = (S, why) => `You are going round in circles: ${why}. Do not make that call again.\nThe world now: ${worldNow(S.scenario)}.\nNext: ${nextStep(S)}. Make one new call now; if the world is complete, call finish.`;
+  // after a step: the calls made ({sig, name, ok, changed}); returns why the run looks stuck, or null
+  function watch(S) {
+    const c = S.calls, last = c[c.length - 1]; if (!last) return null;
+    const same = c.slice(-8).filter(x => x.sig === last.sig).length;
+    if (same >= 3) return `you called ${last.name} with the same arguments ${same} times`;
+    const run = n => c.length >= n && c.slice(-n).every(x => x.name === last.name);
+    if (['set_map', 'plan_sections'].includes(last.name) && run(4)) return `you called ${last.name} 4 times running`;
+    if (!READ_ONLY.has(last.name) && run(3) && c.slice(-3).every(x => !x.ok)) return `${last.name} failed 3 times running (last: ${String(last.error || '').slice(0, 160)}); read its error, use get_catalog if a name is wrong, or do something else first`;
+    if (S.idle >= 6) return `${S.idle} steps without a change to the world`;
+    return null;
+  }
+
   async function loop(emit, t0) {
     const S = session, B = S.backend;
-    let nudges = 0;
-    stopping = false;
+    let nudges = 0, why = '';
+    stopping = false; S.calls = []; S.idle = 0; S.stuck = 0; S.problems = null;
     for (let n = 0; n < MAX_STEPS; n++) {
-      if (stopping) break;
-      if (S.tokens > TOKEN_BUDGET()) { S.log.push(`stopped: the token budget (${TOKEN_BUDGET().toLocaleString()}) is used up`); break; }
+      if (stopping) { why = 'was stopped'; break; }
+      if (S.tokens > TOKEN_BUDGET()) { why = `used up the token budget (${TOKEN_BUDGET().toLocaleString()})`; S.log.push('stopped: ' + why); break; }
       // the window: compact at 60% of it (about 3.5 characters a token)
       const limit = B.context * 3.5 * 0.6;
       if (chars(S.messages) + JSON.stringify(S.tools).length > limit) S.messages = compact(S.messages, S.log, Math.max(4000, limit * 0.5 - chars(S.messages.slice(0, 2))));
@@ -273,88 +357,117 @@
       try {
         r = await B.step(S.messages, S.tools, d => {
           const now = Date.now(); if (now - lastShown < 400) return; lastShown = now;
-          if (d.calls?.length) { const c = d.calls[d.calls.length - 1]; say(emit, `step ${S.steps}: writing ${c.function.name || 'a call'}… ${c.function.arguments.length} characters`, { step: S.steps }); }
+          if (d.calls?.length) { const c = d.calls[d.calls.length - 1]; say(emit, `step ${S.steps}: writing ${c.name || 'a call'}… ${c.chars || 0} characters`, { step: S.steps }); }
           else if (d.thought) say(emit, `step ${S.steps}: thinking… ${d.thought} characters`, { step: S.steps });
-          else if (d.text) say(emit, `step ${S.steps}: writing… ${d.text.length} characters`, { step: S.steps });
+          else if (d.text) say(emit, `step ${S.steps}: writing… ${typeof d.text === 'number' ? d.text : d.text.length} characters`, { step: S.steps });
         }, aborter?.signal);
       } catch (e) {
-        if (stopping) break;
-        throw e;
+        if (stopping) { why = 'was stopped'; break; }
+        // nothing built yet: the error is the answer (the caller may fall back to one answer)
+        if (!S.version) throw e;
+        why = `failed at step ${S.steps} (${String(e?.message || e).slice(0, 200)})`; S.log.push('the model ' + why); break;
       }
       S.tokens += (r.usage?.prompt_tokens || 0) + (r.usage?.completion_tokens || 0); if (r.cost) S.cost += +r.cost || 0;
       S.messages.push({ role: 'assistant', content: r.text || '', ...(B.format === 'inkling' && r.raw != null ? { raw: r.raw } : {}), ...(r.calls.length ? { tool_calls: r.calls.map(c => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })) } : {}) });
       if (!r.calls.length) {
-        if (++nudges > 2) { S.log.push('the model stopped calling tools'); break; }
         if (r.text) S.log.push('the model: ' + r.text.slice(0, 160));
-        S.messages.push({ role: 'user', content: 'Use the tools to build the world (one call or several); when it is complete and validate shows no problems, call finish with a short summary.' });
+        if (++nudges > 2) { why = 'stopped calling tools'; S.log.push('the model stopped calling tools'); break; }
+        S.messages.push({ role: 'user', content: (S.version ? `The world now: ${worldNow(S.scenario)}. Next: ${nextStep(S)}. ` : '') + 'Use the tools to build the world (one call or several); when it is complete and validate shows no problems, call finish with a short summary.' });
         continue;
       }
       nudges = 0;
+      const v0 = S.version;
       for (const c of r.calls) {
         let d;
+        const sig = sigOf(c);
         if (c.bad) d = { result: { error: c.bad }, log: `${c.name}: ${c.bad}` };
         else if (c.name === 'undo') {
           const prev = S.history.pop();
-          if (prev) { S.scenario = JSON.parse(prev); d = { result: { ok: true }, log: 'took back the last change' }; } else d = { result: { error: 'nothing to take back' }, log: 'undo: nothing to take back' };
+          if (prev) { S.scenario = JSON.parse(prev); S.version++; d = { result: { ok: true }, log: 'took back the last change' }; } else d = { result: { error: 'nothing to take back' }, log: 'undo: nothing to take back' };
+        } else if (!READ_ONLY.has(c.name) && c.name !== 'finish' && S.lastChange?.sig === sig && S.lastChange.version === S.version) {
+          // the same change again on the same world: already done (it would change nothing)
+          d = { result: { ok: true, unchanged: true, note: `already done: this exact call was made last time and the world has not changed since. Do not repeat it. Next: ${nextStep(S)}.` }, log: `${c.name}: already done (repeated)`, repeat: true };
         } else {
           try { d = await post('/api/worldgen/tool', { scenario: S.scenario, name: c.name, args: c.args, prompt: S.prompt, fresh: S.fresh }); }
           catch (e) { d = { result: { error: 'the tool could not run: ' + e.message }, log: `${c.name}: ${e.message}` }; }
-          if (d.changed && d.scenario) { S.history.push(JSON.stringify(S.scenario)); if (S.history.length > 80) S.history.shift(); S.scenario = d.scenario; }
+          if (d.changed && d.scenario) { S.history.push(JSON.stringify(S.scenario)); if (S.history.length > 80) S.history.shift(); S.scenario = d.scenario; S.version++; S.lastChange = { sig, version: S.version }; }
+          if (c.name === 'validate' && Array.isArray(d.result?.problems)) S.problems = d.result.problems;
+          if (c.name === 'finish' && d.problems) S.problems = d.problems;
         }
+        S.calls.push({ sig, name: c.name, ok: !d.result?.error && d.result?.ok !== false && !d.repeat, error: d.result?.error || (d.result?.problems || []).join('; ') });
+        if (S.calls.length > 40) S.calls.shift();
         S.messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(d.result).slice(0, 12000) });
         if (d.log) { S.log.push(d.log); say(emit, d.log, { step: S.steps }); }
         if (d.done) return done(emit, d.done, t0);
       }
+      S.idle = S.version > v0 ? 0 : S.idle + 1;
+      const stuck = watch(S);
+      if (stuck) {
+        S.stuck++; S.calls = []; S.idle = 0;
+        S.log.push('going round in circles: ' + stuck);
+        say(emit, `step ${S.steps}: the model is going round in circles (${stuck}); telling it how to go on`, { step: S.steps });
+        if (S.stuck >= 3) { why = 'kept going round in circles (' + stuck + ')'; break; }
+        S.messages.push({ role: 'user', content: recovery(S, stuck) });
+      }
     }
-    // the step cap, the budget, stop, or no more calls: finish what is there if it passes
-    say(emit, 'checking what was built…');
-    const d = await post('/api/worldgen/tool', { scenario: S.scenario, name: 'finish', args: { summary: stopping ? 'Stopped by the player.' : 'Finished at the step limit.' }, prompt: S.prompt, fresh: S.fresh }).catch(e => ({ result: { problems: [e.message] } }));
-    if (d.done) return done(emit, d.done, t0);
-    emit('failed', { error: `${stopping ? 'stopped' : 'the agent ended'} before the world passed the checks: ${(d.result?.problems || []).slice(0, 4).join('; ')}` });
+    if (!why) why = `reached the step limit (${MAX_STEPS})`;
+    // stop, the caps, circles, no more calls, a failed model: finish what is there; code completes what it can
+    if (!S.version && !stopping) {
+      const said = S.log.filter(l => l.startsWith('the model: ')).pop();
+      return emit('failed', { error: `${B.name} ${why} before building anything${said ? ' (' + said.slice(0, 200) + ')' : ''}. Try again, or turn agent mode off to have it write the world as one answer.`, noTools: why === 'stopped calling tools' });
+    }
+    say(emit, `the agent ${why}: checking what was built…`);
+    const d = await post('/api/worldgen/tool', { scenario: S.scenario, name: 'finish', args: { summary: stopping ? 'Stopped by the player.' : `The agent ${why}; what it built was checked and completed.` }, prompt: S.prompt, fresh: S.fresh, auto: true }).catch(e => ({ result: { problems: [e.message] } }));
+    if (d.done) { if (d.done.auto?.length) S.log.push('completed by code: ' + d.done.auto.join('; ')); return done(emit, d.done, t0, why); }
+    emit('failed', { error: `${B.name} ${why}, and the world could not be completed: ${(d.result?.problems || []).slice(0, 4).join('; ')}. Try again (runs differ), ask for a smaller world, or turn agent mode off to have the model write it as one answer.` });
   }
-  async function done(emit, d, t0) {
+  async function done(emit, d, t0, why = '') {
     const S = session;
     S.scenario = d.scenario; S.history.push(JSON.stringify(d.scenario));
     // the server's record and link, as other built worlds (no request: the checks already ran)
     let saved = null; try { saved = await post('/api/finish', { scenario: d.scenario, model: S.backend.name + ' (agent)', ms: Date.now() - t0, mode: 'agent' }); } catch {}
     const cost = S.cost ? ` · $${S.cost.toFixed(4)}` : '';
+    const auto = d.auto?.length ? ` (The agent ${why || 'ended early'}; code completed: ${d.auto.join('; ')}.)` : why ? ` (The agent ${why}.)` : '';
     emit('done', { scenario: saved?.scenario || d.scenario, code: saved?.code || d.code, link: saved?.link || d.link, ms: Date.now() - t0, model: `${S.backend.name} (agent mode, ${S.steps} steps${cost})`,
-      summary: d.summary, agent: true, steps: S.steps, tokens: S.tokens, cost: S.cost, log: S.log.slice() });
+      summary: (d.summary || '') + auto, agent: true, steps: S.steps, tokens: S.tokens, cost: S.cost, log: S.log.slice(), report: d.report, ended: why || null });
   }
   async function start(body) {
     const d = await post('/api/worldgen/agent', body);
     if (!d.tools) throw new Error(d.error || 'no tools from the server');
     return d;
   }
-  async function build(prompt, backend, emit) {
+  const fresh = (backend, d, scenario, prompt) => ({ backend, tools: d.tools, messages: [{ role: 'system', content: d.system }, { role: 'user', content: d.user }], scenario, history: [], log: [], steps: 0, tokens: 0, cost: 0, version: 0, prompt, fresh: !prompt ? false : true });
+  async function build(prompt, backend, emit, opts = {}) {
     const t0 = Date.now();
     try {
-      const d = await start({ prompt });
-      session = { backend, tools: d.tools, messages: [{ role: 'system', content: d.system }, { role: 'user', content: d.user }], scenario: {}, history: [], log: [], steps: 0, tokens: 0, cost: 0, prompt, fresh: true };
-      say(emit, `agent mode: ${backend.name} builds the world with tools`);
+      const d = await start({ prompt, ...(+opts.sections > 1 ? { sections: +opts.sections, shape: opts.shape || 'auto' } : {}) });
+      session = fresh(backend, d, {}, prompt);
+      say(emit, `agent mode: ${backend.name} builds the world with tools${+opts.sections > 1 ? ` in ${opts.sections} sections` : ''}`);
       await loop(emit, t0);
     } catch (e) { emit('failed', { error: String(e?.message || e) }); }
   }
-  async function change(scenario, request, emit, backend = null) {
+  async function change(scenario, request, emit, backend = null, opts = {}) {
     const t0 = Date.now();
     try {
       if (!session && !backend) throw new Error('no agent session: build a world in agent mode first');
+      const body = opts.review ? { review: opts.review } : { request };
       if (!session || (backend && backend !== session.backend)) {
-        const d = await start({ request, system: true });
-        session = { backend: backend || session.backend, tools: d.tools, messages: [{ role: 'system', content: d.system }, { role: 'user', content: d.user }], scenario, history: [], log: [], steps: 0, tokens: 0, cost: 0, prompt: '', fresh: false };
+        const d = await start({ ...body, system: true });
+        session = fresh(backend || session.backend, d, scenario, '');
       } else {
-        const d = await start({ request });
+        const d = await start(body);
         session.messages.push({ role: 'user', content: d.user });
         session.scenario = scenario; session.fresh = false;
       }
-      session.log.push('the player asked: ' + request.slice(0, 160));
-      session.steps = 0; session.cost = 0; session.tokens = 0;   // the step cap and the budget are per request
+      session.log.push(opts.review ? `review round ${opts.review.round} of ${opts.review.rounds}` : 'the player asked: ' + String(request).slice(0, 160));
+      session.steps = 0; session.cost = 0; session.tokens = 0; session.version = 1;   // the step cap and the budget are per request; the world exists
+      session.lastChange = null;
       await loop(emit, t0);
     } catch (e) { emit('failed', { error: String(e?.message || e) }); }
   }
   function stop() { stopping = true; try { aborter?.abort(); } catch {} }
 
-  const api = { build, change, stop, canAgent, openaiBackend, localBackend, parseToolCalls, renderMessages, inklingPrompt, compact, AGENT_MODELS, get session() { return session; }, reset() { session = null; } };
+  const api = { build, change, stop, canAgent, toolsRefused, openaiBackend, serverBackend, localBackend, readAnswer, parseToolCalls, renderMessages, inklingPrompt, compact, watch, recovery, nextStep, worldNow, AGENT_MODELS, get session() { return session; }, reset() { session = null; } };
   globalThis.TablefolkWorldAgent = api;
   if (W) W.tfWorldAgent = api;
 })();

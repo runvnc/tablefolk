@@ -18,7 +18,9 @@
  * Look it over and improve (the agent): rounds of review and change. The map
  * editor draws the whole map (snapshot(), describe()); the model reviews it
  * (POST /api/critique, or the visitor's own model) and asks for changes, which
- * go through the same revision as "Ask". See improve().
+ * go through the same revision as "Ask". See improve(). A world built in agent
+ * mode is reviewed by its agent instead (reviewRound: preview, validate, fix,
+ * "GOOD:" or "CHANGED:"), with every model agent mode runs.
  *
  * Pictures (app/builder-paint.js, @tablefolk/paint with tiny-sd): signs,
  * paintings, tapestries ("picture" objects), notes with a picture and book
@@ -310,8 +312,6 @@
       <div data-panel="raw" ${tabNow === 'raw' ? '' : 'hidden'}><fieldset><legend>Raw JSON</legend><textarea id="rawJson" class="mono" rows="22"></textarea><div class="toolbar"><button type="button" data-act="applyRaw">Apply JSON</button></div></fieldset></div>`;
     if (typed && $('aiReq')) $('aiReq').value = typed; if (said && $('aiMsg')) $('aiMsg').textContent = said;
     if ($('rawJson')) $('rawJson').value = JSON.stringify(scn, null, 2);
-    // agent mode in this browser: no separate review rounds (ask the agent instead)
-    if (revise.where === 'agent') box.querySelector('[data-act=improve]')?.closest('.toolbar')?.setAttribute('hidden', '');
     // the rules box edits goal.win / goal.lose / goal.maxTurns together
     const rules = $('f___rules'); if (rules) { const g = scn.goal || {}; const r = {}; for (const k of ['win', 'lose', 'maxTurns', 'winText', 'loseText', 'score']) if (g[k] != null) r[k] = g[k]; rules.value = Object.keys(r).length ? JSON.stringify(r, null, 1) : ''; }
   }
@@ -642,18 +642,23 @@
     return `This world is made of ${lines.length} sections (maps joined by links: stairs, doors, edges):\n${lines.join('\n')}\nThe scenario below is only the section "${cur().title || here || 'top map'}". Change only this section; keep its "links" unless asked (they lead to the other sections).\n\n`;
   }
   function sectionOut(s) { const { subworlds, ...rest } = s; return rest; }
-  async function reviseAI(req, say) {
-    const path = secPath.slice(), base = cur(), top = !path.length;
-    const send = multi() ? sectionOut(base) : base;
-    req = worldContext() + req;
+  // agent mode (app/worldgen-agent.js): a model in this browser or the server's ({where: 'agent'}),
+  // or the visitor's own ({where: 'own', agent: true}); its tools reach every section
+  const agentMode = () => revise.where === 'agent' || (revise.where === 'own' && !!revise.agent);
+  // opts.review {round, rounds, history}: a review round in agent mode (the agent previews,
+  // validates and fixes; req is not used)
+  async function reviseAI(req, say, opts = {}) {
+    const whole = agentMode(), path = secPath.slice(), base = whole ? scn : cur(), top = whole || !path.length;
+    const send = !whole && multi() ? sectionOut(base) : base;
+    if (!whole) req = worldContext() + req;
     const { light, heavy } = lightImages(top ? lightVoices(lightBooks(send)) : send);
     let done = null;
     const onEv = (res, rej) => (ev, d) => { if (ev === 'progress') say(progressText(d)); else if (ev === 'done') res(d); else if (ev === 'failed') rej(new Error(d.error)); };
-    // agent mode with a model in this browser: the same session goes on (app/worldgen-agent.js)
-    if (revise.where === 'agent' && window.tfWorldAgent) done = await new Promise((res, rej) => window.tfWorldAgent.change(light, req, onEv(res, rej)));
+    // agent mode with a model in this browser or the server's: the same session goes on (app/worldgen-agent.js)
+    if (revise.where === 'agent' && window.tfWorldAgent) done = await new Promise((res, rej) => window.tfWorldAgent.change(light, req, onEv(res, rej), null, opts));
     // the visitor's own key or server: this page calls it (app/worldgen-own.js); agent mode keeps its session
     else if (revise.where === 'own' && window.tfOwnModel) {
-      done = await new Promise((res, rej) => window.tfOwnModel.revise(light, req, onEv(res, rej), { agent: !!revise.agent }));
+      done = await new Promise((res, rej) => window.tfOwnModel.revise(light, req, onEv(res, rej), { agent: !!revise.agent, review: opts.review }));
     } else {
       const q = new URLSearchParams(); if (revise.where) q.set('where', revise.where); if (revise.model) q.set('model', revise.model);
       const r = await fetch('/api/revise?' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: light, request: req }) });
@@ -675,6 +680,8 @@
     remember();
     let next = heavy(done.scenario);
     if (top) next = heavyVoices(heavyBooks(next, scn), scn);
+    // the agent's answer is the whole world (its sections too): the section shown stays when it is still there
+    if (whole) { scn = next; if (!sectionAt(path)) secPath = []; render(); loadMap(); return done; }
     if (base.subworlds && next && typeof next === 'object') next.subworlds = base.subworlds;   // the other sections are not the AI's to rewrite
     putSection(path, next); secPath = path; render(); loadMap();
     return done;
@@ -758,13 +765,29 @@
       tiles ? `${tiles} floor tile${tiles > 1 ? 's' : ''} changed` : '', changed.length ? 'changed ' + changed.join(', ') : ''].filter(Boolean).join('; ');
     return { added, lost, text };
   }
+  // In agent mode a round is the agent's own: it previews and validates the whole world, fixes
+  // what is wrong or weak with its tools and says GOOD or CHANGED (reviewRound); no picture.
+  async function reviewRound(round, rounds, history, say) {
+    const before = JSON.stringify(scn);
+    const done = await reviseAI('', t => say(`round ${round}/${rounds}: ${t}`), { review: { round, rounds, history } });
+    const summary = String(done.summary || '').trim(), same = JSON.stringify(scn) === before;
+    return { good: same || /^\W*good\b/i.test(summary), summary: summary.replace(/^\W*(good|changed)\s*[:.-]?\s*/i, ''), done, same };
+  }
   async function improve(rounds = agent.rounds) {
-    if (agent.running || asking || revise.where === undefined || revise.where === 'agent') return;   // (the in-browser agent: ask it instead)
+    if (agent.running || asking || revise.where === undefined) return;
     agent.running = true; agent.stop = false; agent.log = []; render();
     const say = t => { const m = $('aiMsg'); if (m) m.textContent = t; };
     const history = [];
     try {
       for (let round = 1; round <= rounds && !agent.stop; round++) {
+        if (agentMode()) {
+          say(`round ${round}/${rounds}: the agent looks the world over…`);
+          const before = JSON.parse(JSON.stringify(scn)), r = await reviewRound(round, rounds, history, say), d = diffWorlds(before, scn);
+          logLine(`<b>Round ${round}</b> (the agent checked the world with preview and validate, ${r.done.steps || 0} steps${r.done.cost ? ', $' + r.done.cost.toFixed(4) : ''}): ${r.good ? 'looks good' : 'changed it'}${r.summary ? '<br>' + esc(r.summary) : ''}${d.text ? '<br><b>changes:</b> ' + esc(d.text) : ''}${d.lost.length ? ` <b>· lost: ${esc(d.lost.join(', '))}</b>` : ''}`, d.lost.length ? 'warn' : r.good ? '' : 'done');
+          history.push((r.summary || (r.good ? 'good' : 'changed')).slice(0, 300) + (d.lost.length ? ` (this round lost: ${d.lost.join(', ')}; put back what should stay)` : ''));
+          if (r.good) break;
+          continue;
+        }
         say(`round ${round}/${rounds}: looking at the map…`);
         const c = await critique(round, rounds, history, say);
         const thumb = c.shot ? `<img class="agentshot" title="the map it looked at (click to enlarge)" alt="map, round ${round}" src="${c.shot.url}">` : '';
