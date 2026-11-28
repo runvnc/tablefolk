@@ -57,7 +57,9 @@ function prefixPlan(prompt, recent, primed = []) {
 }
 // stop strings: the end of the answer; for Inkling also 1-2% of answers that run on into reasoning ("The user wants me to...")
 function stopsFor(template) {
-  if (template === 'inkling') return ['<|end_message|>', '<|content_model_end_sampling|>', '<|message_', 'The user'];
+  // (and "Let me think" after a command or at a line's start: answers that ran on into reasoning to the 256-token cap,
+  // 3 of 20 calls in a free-day smoke run, 2026-11-27; inside say("Let me think...") it does not match)
+  if (template === 'inkling') return ['<|end_message|>', '<|content_model_end_sampling|>', '<|message_', 'The user', ')Let me think', '\nLet me think'];
   if (/^(chatml|raon|qwen-nothink)$/.test(template)) return ['<|im_end|>', '<|im_start|>'];
   return [MINICPM_END];
 }
@@ -232,7 +234,9 @@ export function createWllama3Engine(wllamaInstance) {
             clearInterval(poll);
           }
 
-          const text = cutAt(full, stops).trim();
+          let text = cutAt(full, stops).trim();
+          // a stop that begins with ')' (")Let me think") takes the command's closing parenthesis with it: put it back
+          if (stops.some(st => st[0] === ')')) { const last = text.split('\n').pop(); let d = 0, q = false; for (const c of last) { if (c === '"') q = !q; else if (!q && c === '(') d++; else if (!q && c === ')') d--; } if (d === 1 && !q) text += ')'; }
           const totalMs = performance.now() - t0;
           const genMs = firstTokenAt !== null ? performance.now() - firstTokenAt : null;
 
