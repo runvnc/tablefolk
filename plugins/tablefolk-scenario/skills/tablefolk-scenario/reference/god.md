@@ -181,6 +181,23 @@ three councils all 12 votes read from the words matched what was said (9
 read by code, 3 by the matcher; a cautious "I will, but first..." as a
 bargain, a doubter's objection as no).
 
+With Bonsai 2.5 27B on a 16 GB card (RTX 4080 SUPER, God of Ashford at
+`autonomy` guided, a day of 24 real minutes, 10 game hours with a scripted
+god: the field blessed, an offering decreed, an omen of rain then the rain, a
+dream to the least devout, a decree to pray at dusk; 2026-11-27): 123 model
+calls (9.5 a game hour, a turn 13 s), every activity chosen by the
+villagers' model, 3% of turns wasted. Both councils took 33-41 s and the
+votes matched the speeches: the faithful agreed with reasons of their own
+("three loaves is a small price for grace"), Bram and Finn refused in
+character ("Three loaves? That's more than half my pantry... I refuse"), and
+all 10 speeches were read by code. The offering was carried out and met. Only
+two prayers came in 10 hours, both thanks (nothing to answer). Finn told his
+dream aloud the next morning. Belief went from 54 to 60.5 after the omen came
+true, then settled at 59; mana stayed between 21 and 34. An LLM judge
+(`judge.mjs`) gave the villagers 4.0 coherence, 4.6 personality, 4.4
+purpose, 3.2 surprise. Tools: `tools/browser-test/god-player.mjs` beside
+`live-eval.mjs` (the maintainer skill's brains.md, "Rented-card checks").
+
 ## For authors
 
 - `"packages": ["god"]`, groups `faithful` and `doubters` (and `house_...`
