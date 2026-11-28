@@ -23,7 +23,8 @@
  *              and far (_lod) versions switched at LOD_FAR camera distance
  * The structure is merged per material per building (vertex colours carry dirt
  * at the base, the building's tint and per-panel plaster tints), sharing one
- * material set (assets/textures/kit, WebP; 512 at light quality). Logic walls
+ * material set (assets/textures/kit, WebP; 512 at light quality; KTX2 only with
+ * ?ktx2=1: ktx2() below). Logic walls
  * (collision, sight, paths, doors, locks) are unchanged: the kit only draws.
  * The door leaf is the kit's leaf on the game's hinge (app.js door animator).
  *
@@ -44,7 +45,7 @@
   'use strict';
   const Q = new URLSearchParams(location.search);
   const BASE = () => (window.tablefolkPacks?.base || '/assets/');
-  const KIT_V = '20261127a';
+  const KIT_V = '20261127b';
   const LOD_FAR = 20, LOD_HYST = 1.5;   // camera distance (game units) where far pieces and slab roofs take over
   const MATS = ['plaster', 'fieldstone', 'quoin', 'timber', 'siding', 'floor', 'shingle', 'thatch', 'tile'];
   const TILE = { plaster: [3, 3], fieldstone: [1.5, 1.5], quoin: [2.4, 2.4], thatch: [2, 2], shingle: [1.6, 1.6], floor: [2, 2], siding: [2, 2], timber: [2, .5], tile: [2.5, 2.5] };
@@ -833,9 +834,35 @@
   const q = () => window.TABLEFOLK_GFX?.quality || 'medium';
   const lite = () => !!window.TABLEFOLK_GFX?.lite || q() === 'light';
   let mats = null;
+  // KTX2 (Basis Universal, transcoded to BC7 / ASTC / ETC2 on the card; tools/kit/encode_ktx2.mjs, glb_ktx2.mjs):
+  // OFF by default, ?ktx2=1 turns it on (the files are not in the repo: run the two scripts first). Measured
+  // 2026-11-27 (rendering.md "KTX2 for the kit, measured"): a quarter of the textures' graphics memory (hearthvale
+  // high 116 -> 29 MB, -128 MB in all with the pieces), but ETC1S colour showed (the shingle's contrast and
+  // blotches), and UASTC colour, which did not, makes the download about 4x the WebP's (high 3.6 -> ~14 MB plus
+  // the pieces) and the kit's textures ready ~6 s later. The decoder and transcoders are vendored (app/vendor/ktx2,
+  // via tablefolkVendorUrl); a KTX2 that fails to load falls back to its WebP (or the piece to its AVIF GLB).
+  let ktx2On = null; const KTX2_KINDS = (new URLSearchParams(location.search).get('ktx2kinds') || 'color,normal,rough').split(',');   // (?ktx2kinds=: which maps, for comparisons)
+  function ktx2() {
+    if (ktx2On !== null) return ktx2On;
+    const K = BABYLON.KhronosTextureContainer2, caps = state.scene?.getEngine?.()?.getCaps?.() || {};
+    ktx2On = new URLSearchParams(location.search).get('ktx2') === '1' && !!K && K.IsSupported !== false && !!(caps.bptc || caps.s3tc || caps.astc || caps.etc2) && typeof Worker !== 'undefined' && typeof WebAssembly !== 'undefined';
+    if (ktx2On) {
+      const V = u => (window.tablefolkVendorUrl || (x => x))(u), C = 'https://cdn.babylonjs.com/', T = C + 'ktx2Transcoders/1/';
+      Object.assign(K.URLConfig, { jsDecoderModule: V(C + 'babylon.ktx2Decoder.js'), wasmUASTCToASTC: V(T + 'uastc_astc.wasm'), wasmUASTCToBC7: V(T + 'uastc_bc7.wasm'), wasmUASTCToRGBA_UNORM: V(T + 'uastc_rgba8_unorm_v2.wasm'), wasmUASTCToRGBA_SRGB: V(T + 'uastc_rgba8_srgb_v2.wasm'), wasmUASTCToR8_UNORM: V(T + 'uastc_r8_unorm.wasm'), wasmUASTCToRG8_UNORM: V(T + 'uastc_rg8_unorm.wasm'), jsMSCTranscoder: V(T + 'msc_basis_transcoder.js'), wasmMSCTranscoder: V(T + 'msc_basis_transcoder.wasm'), wasmZSTDDecoder: V(C + 'zstddec.wasm') });
+    }
+    window.tablefolkDiag?.note?.('graphics', 'kit textures: ' + (ktx2On ? 'KTX2 (' + ['bptc', 'astc', 's3tc', 'etc2'].filter(k => caps[k]).join(', ') + ')' : 'WebP'));
+    return ktx2On;
+  }
   function texture(name, kind, srgb, small) {
-    const t = new BABYLON.Texture(BASE() + 'textures/kit/' + name + '_' + kind + (small ? '_512' : '') + '.webp?v=' + KIT_V, state.scene, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
-    t.gammaSpace = !!srgb; t.wrapU = t.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8;
+    const file = BASE() + 'textures/kit/' + name + '_' + kind + (small ? '_512' : ''), mode = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
+    const webp = () => file + '.webp?v=' + KIT_V;
+    const set = t => { t.gammaSpace = !!srgb; t.wrapU = t.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; return t; };
+    if (!ktx2() || !KTX2_KINDS.includes(kind)) return set(new BABYLON.Texture(webp(), state.scene, false, true, mode));
+    // (the KTX2 files are stored flipped: a compressed texture is not flipped on load)
+    const t = set(new BABYLON.Texture(file + '.ktx2?v=' + KIT_V, state.scene, false, false, mode, null, () => {
+      console.warn('[buildings] KTX2 failed, using WebP:', name, kind);
+      try { t.updateURL(webp(), null, null, '.webp'); t._invertY = true; } catch (e) { console.warn('[buildings] WebP fallback', e); }
+    }));
     return t;
   }
   function material(name, roofSet) {
@@ -1058,7 +1085,12 @@ if (tfKitNight.x > 0.01 && vTfGlow > 0.5) { float gl = dot(surfaceAlbedo, vec3(0
     if (pieces && pieces.scene === state.scene && (!pieces.ready || pieces.ready.alive())) return pieces.p;
     const sc = state.scene, dir = BASE() + 'models/kit/';
     const one = async (name, far) => {
-      const c = await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, pieceFile(name, far) + '?v=' + KIT_V, sc);
+      // KTX2 textures (KHR_texture_basisu, tools/kit/glb_ktx2.mjs) where the card takes them; the AVIF file if that fails.
+      // (not the window, shut window and dormer, near or far: glowClasses reads their colour back, and a compressed texture
+      // reads back as blocks)
+      const file = pieceFile(name, far);
+      const c0 = ktx2() && !(name in GLOWS) ? await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file.replace(/\.glb$/, '.ktx2.glb') + '?v=' + KIT_V, sc).catch(e => { console.warn('[buildings] KTX2 piece failed, using AVIF:', file, e?.message || e); return null; }) : null;
+      const c = c0 || await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file + '?v=' + KIT_V, sc);
       const outp = [];
       for (const m of c.meshes) {
         if (!(m.getTotalVertices?.() > 0)) continue;

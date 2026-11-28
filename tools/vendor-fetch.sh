@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=app/vendor
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$OUT/ktx2"
 
 # CDN URL  ->  file name under app/vendor/
 FILES=(
@@ -25,6 +25,17 @@ FILES=(
   "https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako_deflate.min.js pako_deflate.min.js"
   "https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js UPNG.js"
   "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js html2canvas.min.js"
+  # the KTX2 decoder and Basis transcoders (buildings.js, the kit textures; Apache-2.0, ktx2/LICENSE.txt)
+  "https://cdn.babylonjs.com/babylon.ktx2Decoder.js ktx2/babylon.ktx2Decoder.js"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/msc_basis_transcoder.js ktx2/msc_basis_transcoder.js"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/msc_basis_transcoder.wasm ktx2/msc_basis_transcoder.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_astc.wasm ktx2/uastc_astc.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_bc7.wasm ktx2/uastc_bc7.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_r8_unorm.wasm ktx2/uastc_r8_unorm.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_rg8_unorm.wasm ktx2/uastc_rg8_unorm.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_rgba8_srgb_v2.wasm ktx2/uastc_rgba8_srgb_v2.wasm"
+  "https://cdn.babylonjs.com/ktx2Transcoders/1/uastc_rgba8_unorm_v2.wasm ktx2/uastc_rgba8_unorm_v2.wasm"
+  "https://cdn.babylonjs.com/zstddec.wasm ktx2/zstddec.wasm"
 )
 
 entries=()

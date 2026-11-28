@@ -610,7 +610,8 @@ notes in `work/kit/` (`NOTES.md` is in git: every number and decision; sheets in
   house; switch at about 20 units. Sheet with the concepts and the old inn:
   `work/kit/shots/side_by_side_2.jpg`.
 - In the game: merged across houses (one mesh per material for the world), per-panel infill tint and darker
-  shingle done. Open: KTX2 textures (no encoder installed), impostors or a merged far village.
+  shingle done. KTX2 textures: built and measured, kept off (`tools/kit/encode_ktx2.mjs`, `glb_ktx2.mjs`, `?ktx2=1`;
+  rendering.md "KTX2 for the kit, measured"). Open: impostors or a merged far village.
   $11.62 of fal in all (ledger `work/kit/ledger.jsonl`).
 
 ### Procedural trees, plants and the environment texture set (2026-11-20)

@@ -1,0 +1,8 @@
+KTX2 decoding for Babylon.js, fetched from cdn.babylonjs.com/v9.35.0/ (tools/vendor-fetch.sh).
+
+babylon.ktx2Decoder.js, uastc_*.wasm: Babylon.js, Apache License 2.0,
+  https://github.com/BabylonJS/Babylon.js (LICENSE.md).
+msc_basis_transcoder.js/.wasm: the Basis Universal transcoder (Binomial LLC),
+  Apache License 2.0, https://github.com/BinomialLLC/basis_universal.
+zstddec.wasm: Zstandard decoder (Meta Platforms), BSD licence, https://github.com/facebook/zstd,
+  built for the browser by the zstddec project (MIT), https://github.com/donmccurdy/zstddec.

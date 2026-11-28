@@ -637,9 +637,46 @@ loading cover, with the walls).
   After round 2 of draw calls (same views): hearthvale high 260 / 364, light 95-139 / 115-205; village 23 high
   229 / 213, light 118 / 105 (work/kit/NOTES.md phase 7 has the whole table).
 - Not done: chunked merged sets or a merged far version of whole houses (more
-  draws whenever several are in view; the kit is 1-4% of the triangles); KTX2
-  (needs Babylon's KTX2 decoder vendored and a second texture set: ~150 MB
-  saved at high, NOTES.md phase 7).
+  draws whenever several are in view; the kit is 1-4% of the triangles).
+- **KTX2 for the kit, measured (2026-11-27): kept off** (`?ktx2=1` turns it on).
+  Built: `tools/kit/encode_ktx2.mjs` (the texture sets; ktx2-encoder 0.6.0 under
+  `work/ktx2/`, Pillow decodes the WebP; flipped at encode, since a compressed
+  texture is not flipped on load) and `tools/kit/glb_ktx2.mjs` (the pieces'
+  AVIF images as `KHR_texture_basisu`, `<name>.ktx2.glb`; not window, shut
+  window, dormer: glowClasses reads their colour back, and a compressed
+  texture reads back as blocks); buildings.js `ktx2()` uses them when the card
+  has BC, ASTC or ETC2, falling back to WebP / AVIF per file; Babylon's KTX2
+  decoder and transcoders are vendored (`app/vendor/ktx2`, Apache-2.0, from
+  cdn.babylonjs.com/v9.35.0, tools/vendor-fetch.sh). app.js now asks WebGPU
+  for `texture-compression-bc/etc2/astc` (Babylon asks for no features by
+  default: without them the caps showed no compressed format), and
+  `tablefolkGfxGB` counts compressed textures by format. The encoded files
+  are not in the repo. RTX 2060 headless, 1100x700, `work/ktx2/measure.mjs`
+  (WebP / KTX2: kit textures' graphics memory, all BC7; tablefolkGfxGB with
+  the pieces; the kit's texture download; the kit's textures ready / reveal):
+
+  | world, quality | kit textures | tablefolkGfxGB | download | ready / reveal s |
+  |---|---|---|---|---|
+  | hearthvale high | 116 / 29 MB | 2.50 / 2.37 | 3.9 / 5.8 MB | 7.7 / 10.6-11.6; 19.9 / 21.9-22.3 |
+  | hearthvale light | 24 / 6 MB | 1.155 / 1.112 | 0.5 / 1.7 MB | 4.8 / 12.4; 22.0 / 25.1 |
+  | village 23 high | 100 / 25 MB | 1.92 / 1.81 | 3.5 / 4.5 MB | 4.9 / 13.4; 27.5 / 25.5 |
+  | village 23 light | 21 / 5 MB | 0.865 / 0.824 | 0.8 / 2.4 MB | -; 21.3 / 22.4 |
+
+  Pictures (`work/ktx2/shots/`, `crop5_far.jpg`: WebP, ETC1S, UASTC colour):
+  ETC1S colour visibly loses the shingle's contrast and adds purple and green
+  blotches (tile a little blockier); UASTC colour looks like the WebP, and the
+  normal (UASTC) and roughness (ETC1S) maps showed no difference. (A darker
+  stone in some pairs was the game clock's light between runs, not KTX2: a
+  WebP rerun was as dark.) Orientation right (door hinges, roof courses).
+  UASTC colour costs ~1.2 MB a 1024 map: the kit's download at high would be
+  ~14 MB against 3.6 MB of WebP (medium 13.5 / 3.0, light 4.1 / 0.9), the
+  pieces 2.3 -> 7.1 MB, and the textures were ready ~6 s later on this laptop
+  (workers starting during the load; warm, a 1024 map takes 50-200 ms).
+  Decision: ~90-130 MB saved at high, ~5% of the scene's graphics memory, does
+  not pay for 4x the download with no loss (or visible loss at the same
+  download); the 12 GB case that needed room (Bonsai 2.5 27B) now runs at
+  medium anyway. Revisit if graphics memory becomes the limit (phones, ASTC)
+  or Basis gets a smaller lossless-looking colour mode.
 
 ## Roofs
 
