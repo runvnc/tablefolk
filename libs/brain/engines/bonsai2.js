@@ -152,7 +152,7 @@ const plain = c => typeof c === 'string' ? c : (c || []).filter(p => p.type === 
 // character's cache out; the least recently used goes when the pool is full.
 function sessionFor(engine, agentId) {
   if (!engine.pool || engine.maxSessions <= 1) return engine.session;
-  const id = String(agentId || ''), key = /~|^(menu|api|tf-|default$)/.test(id) || !id ? '~side' : id;
+  const id = String(agentId || ''), key = /~|^(menu|api|agency|probe|tf-|default$)/.test(id) || !id ? '~side' : id;   // agency.js's picks and plans, the capability check: side calls
   const pool = engine.pool;
   if (pool.has(key)) { const s = pool.get(key); pool.delete(key); pool.set(key, s); return s; }
   // the first speaker takes the session made at load
