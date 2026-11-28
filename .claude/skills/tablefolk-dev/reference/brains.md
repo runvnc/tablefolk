@@ -2333,7 +2333,7 @@ turns on hearthvale, a round of the five within 12 squares in 0.2-8 s, the
 clock 10 minutes on, nothing moving between turns; the tabletop view walks
 the player by click (3 squares, 3 left) and shows the ring and "thinking…".
 
-Not measured yet (needs a capable card): living with a busy guided village
+Measured since on rented 12 and 16 GB cards: "Rented-card checks" below. Not measured before (needs a capable card): living with a busy guided village
 (how long the player's line waits behind a running call, the queue length),
 turn rounds at guided and free (seconds a round, early turns used), adventure
 with Bonsai 2 9B / 27B. `modes-eval.mjs` measures all three; commands for a
