@@ -36,7 +36,7 @@
  *
  *   TablefolkPlanCore = {
  *     VERBS, SHAPES, resolve(plan, map) -> { verb, shape, cells, gate, rect, posts, path, error },
- *     validate(result, map, { kind }) -> { cells, dropped: [{ cell, why }], ok, warnings },
+ *     validate(result, map, { kind, ground }) -> { cells, dropped: [{ cell, why }], ok, warnings }   (ground: 'rock' | 'floor', a kind's own)
  *     plan(plan, map) -> resolve + validate in one, { ...result, cells, dropped, warnings }
  *     parseWords(text, places) -> { plan, verb, missing: [], ask: null | 'side' }   (code only: no model)
  *     modelPrompt(text, places, { verb, small }) -> messages; parseAnswer(text) -> object | null
@@ -262,17 +262,21 @@
     }
     return best || new Set();
   }
-  function validate(res, map, { kind } = {}) {
+  // ground (a designation kind's "ground", designate.js): 'rock' takes walls and rocks (digging into rock: no
+  // reach needed, the kind's ready() says when a square can be worked), 'floor' any walkable floor (roads, paved,
+  // painted, inside walled rooms), else the verb's own rule
+  const GROUND = { rock: '#r', floor: '.:=*o' };
+  function validate(res, map, { kind, ground } = {}) {
     if (!res || res.error) return { ok: false, cells: [], dropped: [], warnings: [res?.error || 'nothing to check'] };
     const C = ctx(map), verb = kind || res.verb, land = mainland(C), out = [], dropped = [];
-    const allowed = verb === 'dig' && res.plan?.under ? '.:=*o' : verb === 'clear' ? '.:=*%rx' : verb === 'patrol' || verb === 'guard' ? '.:=*B+' : res.shape === 'ring' || res.shape === 'line' ? '.:=*' : '.*';
+    const allowed = GROUND[ground] || (verb === 'dig' && res.plan?.under ? '.:=*o' : verb === 'clear' ? '.:=*%rx' : verb === 'patrol' || verb === 'guard' ? '.:=*B+' : res.shape === 'ring' || res.shape === 'line' ? '.:=*' : '.*');
     const gateK = res.gate ? key(...res.gate) : null;
     for (const c of res.cells || []) {
       const ch = C.at(c[0], c[1]);
       if (ch === null) { dropped.push({ cell: c, why: 'off the map' }); continue; }
-      if (!allowed.includes(ch) && key(...c) !== gateK) { dropped.push({ cell: c, why: WHY[ch] || (ch === ':' || ch === '=' ? 'a road' : 'not open ground') }); continue; }
+      if (!allowed.includes(ch) && key(...c) !== gateK) { dropped.push({ cell: c, why: ground === 'rock' ? 'not rock' : WHY[ch] || (ch === ':' || ch === '=' ? 'a road' : 'not open ground') }); continue; }
       const reach = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => land.has(key(c[0] + dx, c[1] + dy)));
-      if (!reach && !(verb === 'dig' && res.plan?.under)) { dropped.push({ cell: c, why: 'nobody can get there' }); continue; }
+      if (!reach && !(verb === 'dig' && res.plan?.under) && ground !== 'rock') { dropped.push({ cell: c, why: 'nobody can get there' }); continue; }
       out.push(c);
     }
     const warnings = [];

@@ -1,0 +1,36 @@
+{
+  "id": "keeper",
+  "name": "Keeper",
+  "version": "1.0.0",
+  "description": "A Dungeon Keeper game: you are the dungeon's keeper, with no body, only a hand and your gold. Mark rock for your imps to dig (gold from the veins), claim rooms (lair, hatchery, treasury, training room, library, workshop, prison), and creatures come through the portal for them: goblins, orc warriors, warlocks, a troll, kobolds, spiders. They eat, sleep, train, study and craft by code, want their wages every pay day and argue at a council when they are not paid; heroes break in to smash the heart. Powers: the hand (pick up and drop), slap, heal, call to arms, lightning. Runs with no model; with a brain, creatures complain, scheme and argue in their own words.",
+  "author": "Tablefolk",
+  "license": "CC0-1.0",
+  "keywords": ["tablefolk-package", "dungeon-keeper", "game"],
+
+  "skills": {
+    "keeper_creature": {
+      "prompt": "You serve the keeper of a dungeon: a voice and a hand from above that digs, builds rooms, slaps, heals and pays (or does not). You work for wages, food and a bed, and you say so when you are not getting them.",
+      "card": ["keeper_creature"]
+    }
+  },
+
+  "jobs": {
+    "keeper_imp": { "name": "Imp", "match": "\\bimp\\b", "hours": [0, 24], "sleep": [0, 0], "fights": false, "gold": 0,
+      "steps": [{ "wander": true }], "fallback": [{ "idle": "pace" }] },
+    "keeper_creature": { "name": "Creature", "match": "\\b(goblin|orc|warlock|troll|kobold|spider|skeleton)\\b", "hours": [0, 24], "sleep": [0, 0], "fights": true, "gold": 0,
+      "skills": ["keeper_creature"], "steps": [{ "wander": true }], "fallback": [{ "idle": "pace" }] }
+  },
+
+  "threats": {
+    "heroes": { "who": ["knight", "adventurer", "mage"], "name": "adventurer", "count": 3, "when": [21, 23], "every": 1, "from": "hero_gate",
+      "behaviour": "raid", "retreat": "half", "scares": false, "hp": 10,
+      "announce": "Heroes have broken into the dungeon from the south gate! They march on the heart." }
+  },
+
+  "lines": {
+    "raid_fighter": { "any": ["Heroes! Kill them!", "For the keeper!", "Intruders! To the heart!"] },
+    "allclear": { "any": ["They're dead or gone. Back to work.", "That's the last of the heroes."] }
+  },
+
+  "modules": ["keeper.js"]
+}

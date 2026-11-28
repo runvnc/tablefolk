@@ -1,0 +1,232 @@
+{
+ "v": 1,
+ "title": "The Keeper's Lair",
+ "subtitle": "You are the dungeon's keeper. Dig, build rooms, pay your creatures, smash the heroes.",
+ "intro": "Your dungeon is a heart in the rock and three imps. Mark rock to dig (▦ Mark, dig): the glittering squares are gold, and the imps carry it to the heart or a treasury. Mark rooms on open floor (lair, hatchery, treasury, training room, library, workshop, prison): a finished room big enough draws a creature through the portal. Every 8 hours is pay day: 💰 Pay wages, or face a creature council. Heroes come in from the south gate at night. Powers: ✋ the hand (pick up, then 👇 drop), 👋 slap, ✚ heal, 🚩 call to arms, and ⚡ lightning once the library has researched it. ⏸ and ×2 control time.",
+ "live": true,
+ "pace": "busy",
+ "time": "08:00",
+ "dayMinutes": 12,
+ "seed": 5,
+ "showIntro": true,
+ "packages": [
+  "keeper"
+ ],
+ "player": {
+  "name": "the Keeper",
+  "avatar": false,
+  "gold": 0,
+  "items": []
+ },
+ "size": [
+  31,
+  23
+ ],
+ "grid": [
+  "###############################",
+  "###############################",
+  "###########gg##################",
+  "###########g#^^^^^####:::::####",
+  "##########gg#^^^^^###::::::####",
+  "#############^^^^^::::::::::###",
+  "####g########^^^^^###:::::::###",
+  "####g########^^^^^###:::::::###",
+  "###########g###:###g#:::::::###",
+  "##########gg###:###g#:::::::###",
+  "#############:::::###:::::::###",
+  "#############:::::###::::::####",
+  "#############:::::####:::::####",
+  "###############:###############",
+  "#########g#####:###############",
+  "########gg#####:::::::#########",
+  "#########g###########:#########",
+  "####################::::#######",
+  "####g###############::::#######",
+  "####g###############::::#######",
+  "####################::::#######",
+  "###############################",
+  "###############################"
+ ],
+ "legend": {
+  "g": "wall"
+ },
+ "walls": "stone",
+ "wallHeight": 1.5,
+ "lighting": "dim",
+ "dark": false,
+ "base": "plain",
+ "places": [
+  {
+   "id": "heart",
+   "kind": "heart",
+   "x0": -2,
+   "x1": 2,
+   "z0": -8,
+   "z1": -4,
+   "center": [
+    0,
+    -6
+   ]
+  },
+  {
+   "id": "portal",
+   "kind": "portal",
+   "x0": -2,
+   "x1": 2,
+   "z0": -1,
+   "z1": 1,
+   "center": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "cavern",
+   "kind": "cavern",
+   "x0": -12,
+   "x1": -6,
+   "z0": -8,
+   "z1": 1,
+   "center": [
+    -9,
+    -3.5
+   ]
+  },
+  {
+   "id": "hero_gate",
+   "kind": "gate",
+   "x0": -8,
+   "x1": -5,
+   "z0": 6,
+   "z1": 9,
+   "center": [
+    -6.5,
+    7.5
+   ]
+  }
+ ],
+ "objects": [
+  {
+   "type": "crystals",
+   "x": 0,
+   "z": -6
+  },
+  {
+   "type": "torch",
+   "x": 2,
+   "z": -8
+  },
+  {
+   "type": "torch",
+   "x": -2,
+   "z": -8
+  },
+  {
+   "type": "torch",
+   "x": -12,
+   "z": -7
+  },
+  {
+   "type": "torch",
+   "x": -6,
+   "z": 0
+  },
+  {
+   "type": "light",
+   "x": -9,
+   "z": -3,
+   "y": 1.5,
+   "intensity": 1.2,
+   "range": 7,
+   "color": "#ffb070"
+  },
+  {
+   "type": "light",
+   "x": -6,
+   "z": 7,
+   "y": 1.4,
+   "intensity": 1.0,
+   "range": 5,
+   "color": "#9fc0ff"
+  },
+  {
+   "type": "skull",
+   "x": -7,
+   "z": 8
+  },
+  {
+   "type": "bone",
+   "x": -5,
+   "z": 7
+  }
+ ],
+ "groups": {
+  "imps": {
+   "name": "the imps",
+   "members": [
+    "imp1",
+    "imp2",
+    "imp3"
+   ],
+   "autonomy": "rails",
+   "description": "the keeper's diggers"
+  },
+  "creatures": {
+   "name": "the creatures",
+   "members": [],
+   "autonomy": "guided",
+   "description": "the creatures who serve the keeper for wages"
+  }
+ },
+ "threats": [
+  {
+   "kind": "heroes"
+  }
+ ],
+ "resources": {
+  "gold": {
+   "start": 80
+  }
+ },
+ "allowed": [
+  "say",
+  "walk",
+  "face",
+  "look",
+  "emote",
+  "give",
+  "eat",
+  "use",
+  "take",
+  "put",
+  "inventory",
+  "attack",
+  "wield"
+ ],
+ "agents": [
+  {
+   "id": "imp1",
+   "model": "imp",
+   "hostile": false,
+   "job": "keeper_imp",
+   "in": "heart",
+   "personality": "An imp: a small red digger that serves the keeper without wages."
+  },
+  {
+   "id": "imp2",
+   "model": "imp",
+   "hostile": false,
+   "job": "keeper_imp",
+   "in": "heart",
+   "personality": "An imp: a small red digger that serves the keeper without wages."
+  },
+  {
+   "id": "imp3",
+   "model": "imp",
+   "hostile": false,
+   "job": "keeper_imp",
+   "in": "heart",
+   "personality": "An imp: a small red digger that serves the keeper without wages."
+  }
+ ]
+}

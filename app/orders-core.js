@@ -10,7 +10,8 @@
  *   board = createBoard({ now })            now(): game minutes (any clock)
  *   board.add({ kind, cells: [{x, z}], gate: {x, z}, priority 1-5 (3), who: id | group | job | [..],
  *               by: 'player' | 'package' | 'director' | 'scenario', label, standing, needs, maxWorkers }) -> d
- *   board.claim(worker, { eligible(d) -> bool, pos: {x, z} }) -> { d, cell } | null
+ *   board.claim(worker, { eligible(d) -> bool, ready(d, cell) -> bool, pos: {x, z} }) -> { d, cell } | null
+ *        (ready: a square that cannot be worked yet is passed over, e.g. rock with no open side to dig from)
  *        the highest priority open designation the worker may take, its nearest open square;
  *        a "standing" kind (a guard post, a patrol route) goes to the square served longest ago
  *   board.claimOf(worker) -> { d, cell } | null;  board.release(worker, { fail, why })  (3 failures: blocked an hour)
@@ -19,7 +20,7 @@
  *   board.data() / board.load(data)
  * Demands: what is demanded, of whom, by when, what counts as met, what follows.
  *   demands = createDemands({ now })
- *   demands.add({ text, of: { group } | { id } | 'all', by: <game minute> | { in: minutes }, met: <condition>,
+ *   demands.add({ text, of: { group } | { id } | 'all' | 'player' (made of the player: a keeper's creatures want their wages), by: <game minute> | { in: minutes }, met: <condition>,
  *                 onMet: actions, onMissed: actions, via: id, from: 'player' | <package> | 'director', reward, template })
  *     met: { flag: "name" } | { if: "<script condition>" } | { deliver: { item, n, to } } | { goal: { ... } } | { check: "<package check>" }
  *   demands.tick(isMet(d) -> bool | { progress }) -> [{ d, status: 'met' | 'missed' }]   (the host runs onMet / onMissed)
@@ -59,13 +60,13 @@
     }
     const workersOn = d => d.cells.filter(c => c.st === 'claimed').length;
     function open() { return all.filter(d => d.status === 'open').sort((a, b) => b.priority - a.priority || a.created - b.created); }
-    function claim(worker, { eligible = () => true, pos = { x: 0, z: 0 }, retryAfter = 60 } = {}) {
+    function claim(worker, { eligible = () => true, ready = null, pos = { x: 0, z: 0 }, retryAfter = 60 } = {}) {
       const id = typeof worker === 'string' ? worker : worker.id, have = claimOf(id); if (have) return have;
       const t = now();
       for (const d of open()) {
         if (!eligible(d)) continue;
         if (d.maxWorkers && workersOn(d) >= d.maxWorkers) continue;
-        const free = d.cells.filter(c => c.st === 'open' || (c.st === 'blocked' && t >= (c.until ?? Infinity)));
+        const free = d.cells.filter(c => (c.st === 'open' || (c.st === 'blocked' && t >= (c.until ?? Infinity))) && (!ready || ready(d, c)));
         if (!free.length) continue;
         free.sort((a, b) => d.standing ? (a.served - b.served) || d2(a, pos) - d2(b, pos) : d2(a, pos) - d2(b, pos));
         const c = free[0]; c.st = 'claimed'; c.by = id; c.at = t;
@@ -121,7 +122,7 @@
       if (!spec || (!spec.text && !spec.what)) throw new Error('a demand needs "text" (what is demanded)');
       const t = now();
       const by = spec.by == null ? null : typeof spec.by === 'object' && spec.by.in != null ? t + +spec.by.in : +spec.by;
-      let of = spec.of ?? 'all'; if (typeof of === 'string' && of !== 'all') of = { group: of };
+      let of = spec.of ?? 'all'; if (typeof of === 'string' && of !== 'all' && of !== 'player') of = { group: of };
       const d = { id: spec.id || 'q' + (++seq), text: String(spec.text || spec.what), of, by: Number.isFinite(by) ? by : null, met: spec.met || null,
         onMet: spec.onMet || null, onMissed: spec.onMissed || null, via: spec.via || null, from: spec.from || 'player', template: spec.template || null,
         reward: spec.reward || null, status: 'open', created: t, delivered: false, progress: 0, refused: [], bargains: [], data: spec.data || {} };

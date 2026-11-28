@@ -17,7 +17,11 @@
  *   needs: { stone: 1 } (fetched per square: the job's fallbacks gather or buy it), maxWorkers,
  *   work: { build: type, gate: type | null, dig, clear, paint: material, crop: type, stand: minutes,
  *           anim, time (seconds), say } | run(g, cell, ctx) (code: a job step result),
- *   done(d, ctx) (all squares done), standing }.
+ *   done(d, ctx) (all squares done), standing,
+ *   ground: 'rock' (walls and rocks can be marked, none need be reachable) | 'floor' (any walkable floor:
+ *     roads, paved and painted squares, inside walled rooms) | default (open ground, as the core kinds),
+ *   accept(x, z) -> true | 'why not' (the Mark tool's test of each square), ready(cell, d) -> bool (workers
+ *     pass over a square until it is: rock with no open side yet) }.
  * A designation: orders-core board entries plus "section" (the map it belongs to).
  * Who works: on rails, jobs.js tick asks workFor(g) in the job's hours, before its own steps (the
  * highest priority open designation it may take, the nearest square); above rails, open work shows
@@ -152,7 +156,7 @@
     s ||= k.S(g); j ||= J().jobOf(g);
     let h = board.claimOf(g.id);
     if (h && only && h.d.id !== only) { board.release(g.id); h = null; }
-    if (!h) h = board.claim(g.id, { eligible: d => (!only || d.id === only) && mayDo(g, d, j), pos: posOf(g) });
+    if (!h) h = board.claim(g.id, { eligible: d => (!only || d.id === only) && mayDo(g, d, j), ready: readyCell, pos: posOf(g) });
     if (!h) return null;
     draw();
     let r; try { r = await unit(g, s, j, h); } catch (e) { console.warn('[designate]', g.id, e); r = { fail: e.message || String(e) }; }
@@ -164,6 +168,8 @@
     }
     return { ms: r.ms || 1500 };
   }
+  // a kind's ready(cell, d): a square it cannot work yet is passed over (rock with no open side to dig from)
+  const readyCell = (d, c) => { const r = KINDS.get(d.kind)?.ready; if (typeof r !== 'function') return true; try { return !!r(c, d); } catch { return true; } };
   const nb4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], nb8 = [...nb4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
   const openCell = (d, x, z) => d.cells.some(c => c.x === x && c.z === z && c.st !== 'done');
   // where to stand to work on a square: beside it (not on another square still to build), reachable
@@ -389,8 +395,10 @@
   // check hand-drawn squares like a plan's (validate) and show them for the player to confirm
   function confirm({ kind, cells, gate = null, plan = null, text, warnings = [], by = 'player' }) {
     const map = gameMap(), k = KINDS.get(kind);
-    const v = PC().validate({ verb: kind, shape: k.shape, cells: cells.map(c => PC().fromBoard(map, c.x, c.z)), gate: gate ? PC().fromBoard(map, gate.x, gate.z) : null, plan: plan || {} }, map, { kind });
-    const keep = v.cells.map(c => PC().toBoard(map, c)), warn = [...warnings, ...v.warnings];
+    const v = PC().validate({ verb: kind, shape: k.shape, cells: cells.map(c => PC().fromBoard(map, c.x, c.z)), gate: gate ? PC().fromBoard(map, gate.x, gate.z) : null, plan: plan || {} }, map, { kind, ground: k.ground });
+    let keep = v.cells.map(c => PC().toBoard(map, c)); const warn = [...warnings, ...v.warnings];
+    // a package kind's own test of each square (accept(x, z) -> true or the reason it cannot be marked)
+    if (typeof k.accept === 'function') { const why = {}; keep = keep.filter(c => { let r = true; try { r = k.accept(c.x, c.z); } catch { r = 'not here'; } if (r === true) return true; why[r || 'not here'] = (why[r || 'not here'] || 0) + 1; return false; }); if (Object.keys(why).length) warn.push('left out ' + Object.entries(why).map(([w, n]) => `${n} square${n > 1 ? 's' : ''}: ${w}`).join('; ')); }
     if (!keep.length) { toast(`Nothing to mark there: ${warn[0] || 'no open squares'}`, 'warn'); ghost(null); palette(); return; }
     pending = { kind, cells: keep, gate, plan, text };
     ghost(keep, k.color, k.h || .12, gate);

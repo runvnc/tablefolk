@@ -27,6 +27,8 @@
  * by 18:00 (1 of 3 brought)"). On rails code does the obvious job (fetch the
  * item and leave it at the place; a work demand becomes designations for
  * the group); above rails it is one of the activities (do it, or refuse it).
+ * "of": "player" is a demand made of the player (a keeper's creatures want their wages): it binds no
+ * character; the messenger ("via") says it and the player sees it in the Orders tool and a toast.
  *   met: { flag } | { if: "<condition>" } | { deliver: { item, n, to: place | character } } | { designation: true }
  *        | { check: "<package template>" }   (a package template's check(d, api) -> true | { met, progress })
  *   onMet / onMissed: script actions (set, reply...) plus { resource: { belief: 5 } }, { weather: "storm" },
@@ -151,8 +153,9 @@
     if (a.narrate) { try { window.tablefolkDirector?.narrate?.(a.narrate); } catch {} delete rest.narrate; }
     if (Object.keys(rest).length) try { await ST()?.perform(rest, d.via || null); } catch (e) { console.warn('[demands]', e); }
   }
-  const memberIds = d => d.of === 'all' ? state.characters.filter(c => !c.defeated && !c._threat && c._job !== undefined).map(c => c.id) : d.of?.id ? [d.of.id] : groups.members(d.of?.group);
-  const ofText = d => d.of === 'all' ? 'everyone' : d.of?.id ? d.of.id : (n => /^the /i.test(n) ? n : 'the ' + n)(String(G[d.of?.group]?.name || d.of?.group));
+  // (a demand "of": "player" binds nobody in the world: the player is asked, a keeper by its creatures)
+  const memberIds = d => d.of === 'player' ? [] : d.of === 'all' ? state.characters.filter(c => !c.defeated && !c._threat && c._job !== undefined).map(c => c.id) : d.of?.id ? [d.of.id] : groups.members(d.of?.group);
+  const ofText = d => d.of === 'player' ? 'you' : d.of === 'all' ? 'everyone' : d.of?.id ? d.of.id : (n => /^the /i.test(n) ? n : 'the ' + n)(String(G[d.of?.group]?.name || d.of?.group));
   const byText = d => d.by == null ? '' : ` by ${dayOf(d.by) !== dayOf(gm()) ? 'day ' + dayOf(d.by) + ', ' : ''}${hhmm(d.by)}`;
   const emitD = (d, status) => dispatchEvent(new CustomEvent('tablefolk-demand', { detail: { id: d.id, status: status || d.status, text: d.text, of: d.of, by: d.by } }));
   // the messenger: "via", else an elder, priest or chief by role or look, else a member
