@@ -4,6 +4,8 @@
 // (for scenario-smoke.mjs). Uses a real model: OPENROUTER_API_KEY in the
 // environment (never printed), AGENT_MODEL (default deepseek/deepseek-v4.1-flash).
 // ENGINE_LOG=1 prints the in-browser engine's per-call timings.
+// WHERE=cloud|server: this server's own model (agent steps through /api/worldgen/step).
+// SECTIONS=3 SHAPE=region: a world in sections.
 // WHERE=browser: a model in the test Chrome instead (AGENT_MODEL=bonsai2-27b; it is
 // downloaded if this profile has not got it: only on a rented GPU box).
 //
@@ -26,7 +28,7 @@ if (process.env.ENGINE_LOG) page.on('console', m => { const t = m.text(); if (/\
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.goto(base + '/world/?t=' + Date.now());
 if (WHERE === 'own') await page.evaluate(([k, m]) => localStorage.setItem('tablefolk_own_model', JSON.stringify({ provider: 'openrouter', apiKey: k, model: m })), [key, model]);
-await page.goto(`${base}/world/${encodeURIComponent(prompt).replace(/%20/g, '+')}?where=${WHERE}&agent=1&model=${encodeURIComponent(model)}`);
+await page.goto(`${base}/world/${encodeURIComponent(prompt).replace(/%20/g, '+')}?where=${WHERE}&agent=1&model=${encodeURIComponent(model)}${process.env.SECTIONS ? '&sections=' + process.env.SECTIONS + '&shape=' + (process.env.SHAPE || 'auto') : ''}`);
 // the form's toggle: on for this model by default
 await page.waitForTimeout(1500);
 say('agent toggle: ' + JSON.stringify(await page.evaluate(() => ({ checked: document.forms.f?.agent?.checked, disabled: document.forms.f?.agent?.disabled, note: document.getElementById('agentNote')?.textContent }))));
